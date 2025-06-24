@@ -2,6 +2,9 @@ from fastapi import FastAPI
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -16,5 +19,5 @@ async def root():
 async def get_properties():
     async with engine.connect() as conn:
         result = await conn.execute(text("SELECT * FROM properties"))
-        rows = result.fetchall()
-        return [dict(row._mapping) for row in rows]
+        rows = result.mappings().all()
+        return [dict(row) for row in rows]
