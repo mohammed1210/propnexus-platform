@@ -1,9 +1,0 @@
-(self.webpackChunk_N_E=self.webpackChunk_N_E||[]).push([[931],{7103:function(e,r,t){Promise.resolve().then(t.bind(t,2046))},2046:function(e,r,t){"use strict";t.r(r),t.d(r,{default:function(){return s}});var n=t(9268),o=t(6006);function s(){let[e,r]=(0,o.useState)([]);return(0,o.useEffect)(()=>{fetch("https://propnexus-backend-production.up.railway.app/properties").then(e=>e.json()).then(e=>r(e)).catch(()=>r([]))},[]),(0,n.jsxs)("main",{style:{padding:"2rem"},children:[(0,n.jsx)("h1",{children:"Live Property Deals"}),0===e.length?(0,n.jsx)("p",{children:"No properties found."}):e.map((e,r)=>(0,n.jsxs)("div",{style:{marginBottom:"1rem",borderBottom:"1px solid #333",paddingBottom:"1rem"},children:[(0,n.jsx)("strong",{children:e.title}),(0,n.jsx)("br",{}),"Price: \xa3",e.price,(0,n.jsx)("br",{}),"Yield: ",e.yield,"%"]},r))]})}},3177:function(e,r,t){"use strict";/**
- * @license React
- * react-jsx-runtime.production.min.js
- *
- * Copyright (c) Meta Platforms, Inc. and affiliates.
- *
- * This source code is licensed under the MIT license found in the
- * LICENSE file in the root directory of this source tree.
- */var n=t(6006),o=Symbol.for("react.element"),s=(Symbol.for("react.fragment"),Object.prototype.hasOwnProperty),i=n.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentOwner,c={key:!0,ref:!0,__self:!0,__source:!0};function u(e,r,t){var n,u={},p=null,l=null;for(n in void 0!==t&&(p=""+t),void 0!==r.key&&(p=""+r.key),void 0!==r.ref&&(l=r.ref),r)s.call(r,n)&&!c.hasOwnProperty(n)&&(u[n]=r[n]);if(e&&e.defaultProps)for(n in r=e.defaultProps)void 0===u[n]&&(u[n]=r[n]);return{$$typeof:o,type:e,key:p,ref:l,props:u,_owner:i.current}}r.jsx=u,r.jsxs=u},9268:function(e,r,t){"use strict";e.exports=t(3177)}},function(e){e.O(0,[253,769,744],function(){return e(e.s=7103)}),_N_E=e.O()}]);
