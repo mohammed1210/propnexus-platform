@@ -18,13 +18,13 @@ async def root():
 @app.post("/scrape-zoopla")
 async def scrape_zoopla():
     scraped_properties = await scrape_zoopla_properties()
-    # Example: Insert properties into Supabase here if needed
+    # Example: Insert into Supabase if needed
     return {"status": f"Zoopla scrape completed and {len(scraped_properties)} properties fetched", "data": scraped_properties}
 
 @app.post("/scrape-rightmove")
 async def scrape_rightmove():
     scraped_properties = await scrape_rightmove_properties()
-    # Example: Insert properties into Supabase here if needed
+    # Example: Insert into Supabase if needed
     return {"status": f"Rightmove scrape completed and {len(scraped_properties)} properties fetched", "data": scraped_properties}
 
 @app.get("/properties")
