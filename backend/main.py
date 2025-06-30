@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from backend.scraper.zoopla_scraper import scrape_zoopla_properties
-from backend.scraper.rightmove_scraper import scrape_rightmove_properties
+from scraper.zoopla_scraper import scrape_zoopla_properties
+from scraper.rightmove_scraper import scrape_rightmove_properties
 
 app = FastAPI()
 
