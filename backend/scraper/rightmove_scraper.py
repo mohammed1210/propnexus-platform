@@ -10,5 +10,5 @@ async def scrape_rightmove_properties(background_tasks: BackgroundTasks = None):
 
     print("Rightmove scraping finished and data inserted.")
 
-    # Return dummy data for now
+    # Return dummy data to confirm endpoint works
     return [{"title": "Example Rightmove Property", "price": "£300,000"}]
