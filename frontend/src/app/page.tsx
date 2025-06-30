@@ -8,7 +8,10 @@ export default function Home() {
   useEffect(() => {
     fetch('https://propnexus-backend-production.up.railway.app/properties')
       .then((res) => res.json())
-      .then((data) => setProperties(data))
+      .then((data) => {
+        console.log('Fetched properties:', data); // Debug log
+        setProperties(data);
+      })
       .catch(() => setProperties([]));
   }, []);
 
@@ -19,25 +22,13 @@ export default function Home() {
         <p>No properties found.</p>
       ) : (
         properties.map((property, idx) => (
-          <div
-            key={idx}
-            style={{
-              marginBottom: '1rem',
-              padding: '1rem',
-              border: '1px solid #ccc',
-              borderRadius: '6px',
-              background: '#f9f9f9',
-            }}
-          >
-            <strong>{property.title}</strong>
-            <p>Price: {property.price}</p>
-            <p>Yield: {property.yield_percent ? `${property.yield_percent}%` : 'N/A'}</p>
-            <p>ROI: {property.roi_percent ? `${property.roi_percent}%` : 'N/A'}</p>
-            <p>BMV: {property.bmv ? `${property.bmv}%` : 'N/A'}</p>
-            <p>Location: {property.location}</p>
-            <p>Source: {property.source}</p>
-            <img src={property.imageurl} alt={property.title} style={{ maxWidth: '100%', marginTop: '0.5rem' }} />
-            <p>{property.description}</p>
+          <div key={idx} style={{ marginBottom: '1rem', borderBottom: '1px solid #333', paddingBottom: '1rem' }}>
+            <strong>{property.title}</strong><br />
+            Price: £{property.price}<br />
+            Location: {property.location}<br />
+            Yield: {property.yield_percent ? `${property.yield_percent}%` : 'N/A'}<br />
+            ROI: {property.roi_percent ? `${property.roi_percent}%` : 'N/A'}<br />
+            Source: {property.source}
           </div>
         ))
       )}
