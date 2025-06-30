@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from scraper.zoopla_scraper import scrape_zoopla_properties
-from scraper.rightmove_scraper import scrape_rightmove_properties
+from backend.scraper.zoopla_scraper import scrape_zoopla_properties
+from backend.scraper.rightmove_scraper import scrape_rightmove_properties
 
 app = FastAPI()
 
@@ -10,10 +10,16 @@ async def root():
 
 @app.post("/scrape-zoopla")
 async def scrape_zoopla():
-    await scrape_zoopla_properties()
-    return {"status": "Zoopla scrape completed and property inserted"}
+    scraped_properties = await scrape_zoopla_properties()
+    return {
+        "status": f"Zoopla scrape completed and {len(scraped_properties)} properties fetched",
+        "data": scraped_properties,
+    }
 
 @app.post("/scrape-rightmove")
 async def scrape_rightmove():
-    await scrape_rightmove_properties()
-    return {"status": "Rightmove scrape completed and property inserted"}
+    scraped_properties = await scrape_rightmove_properties()
+    return {
+        "status": f"Rightmove scrape completed and {len(scraped_properties)} properties fetched",
+        "data": scraped_properties,
+    }
