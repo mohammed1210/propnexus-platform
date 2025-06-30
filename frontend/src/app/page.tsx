@@ -22,7 +22,7 @@ export default function Home() {
           <div key={idx} style={{ marginBottom: '1rem', borderBottom: '1px solid #333', paddingBottom: '1rem' }}>
             <strong>{property.title}</strong><br />
             Price: £{property.price}<br />
-            Yield: {property.yield}%
+            <p>Yield: {property.yield_percent ? `${property.yield_percent}%` : 'N/A'}</p>
           </div>
         ))
       )}
