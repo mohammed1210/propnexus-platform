@@ -1,15 +1,23 @@
 from fastapi import FastAPI
-from scraper.zoopla_scraper import scrape_zoopla_properties
-from scraper.rightmove_scraper import scrape_rightmove_properties
-from supabase import create_client, Client
-import os
+from fastapi.middleware.cors import CORSMiddleware
+from backend.scraper.zoopla_scraper import scrape_zoopla_properties
+from backend.scraper.rightmove_scraper import scrape_rightmove_properties
 
 app = FastAPI()
 
-# Supabase config
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# ✅ Allow CORS for your frontend domain
+origins = [
+    "https://propnexus-platform.vercel.app",
+    "http://localhost:3000",  # optional: for local dev
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 async def root():
@@ -17,17 +25,18 @@ async def root():
 
 @app.post("/scrape-zoopla")
 async def scrape_zoopla():
-    scraped_properties = await scrape_zoopla_properties()
-    # Example: Insert into Supabase if needed
-    return {"status": f"Zoopla scrape completed and {len(scraped_properties)} properties fetched", "data": scraped_properties}
+    data = await scrape_zoopla_properties()
+    return {"status": f"Zoopla scrape completed and {len(data)} properties fetched", "data": data}
 
 @app.post("/scrape-rightmove")
 async def scrape_rightmove():
-    scraped_properties = await scrape_rightmove_properties()
-    # Example: Insert into Supabase if needed
-    return {"status": f"Rightmove scrape completed and {len(scraped_properties)} properties fetched", "data": scraped_properties}
+    data = await scrape_rightmove_properties()
+    return {"status": f"Rightmove scrape completed and {len(data)} properties fetched", "data": data}
 
+# Example dummy properties endpoint if needed
 @app.get("/properties")
 async def get_properties():
-    response = supabase.table("properties").select("*").execute()
-    return response.data
+    return [
+        {"title": "Example Zoopla Property", "price": "£200,000", "yield_percent": 6.5},
+        {"title": "Example Rightmove Property", "price": "£300,000", "yield_percent": 5.2},
+    ]
