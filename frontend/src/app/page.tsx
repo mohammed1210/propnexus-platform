@@ -1,3 +1,5 @@
+import 'leaflet/dist/leaflet.css';
+
 "use client";
 
 import dynamic from "next/dynamic";
