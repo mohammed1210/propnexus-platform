@@ -1,107 +1,98 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import GoogleMapReact from 'google-map-react';
 
-export default function PropertiesPage() {
-  const [properties, setProperties] = useState([]);
-  const [filteredProperties, setFilteredProperties] = useState([]);
-
-  // Filters
+export default function Home() {
+  const [properties, setProperties] = useState<any[]>([]);
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(1000000);
   const [minYield, setMinYield] = useState(0);
-  const [selectedSource, setSelectedSource] = useState('all');
+  const [source, setSource] = useState('All');
 
-  // Fetch properties on load
   useEffect(() => {
     fetch('https://propnexus-backend-production.up.railway.app/properties')
-      .then((res) => res.json())
-      .then((data) => {
+      .then(res => res.json())
+      .then(data => {
+        console.log('Fetched properties:', data);
         setProperties(data);
-        setFilteredProperties(data);
       })
-      .catch((err) => console.error('Error fetching properties:', err));
+      .catch(() => setProperties([]));
   }, []);
 
-  // Apply filters
-  useEffect(() => {
-    let filtered = properties;
+  const filtered = properties.filter(p => {
+    const priceOK = p.price >= minPrice && p.price <= maxPrice;
+    const yieldOK = p.yield_percent >= minYield;
+    const sourceOK = source === 'All' || p.source === source;
+    return priceOK && yieldOK && sourceOK;
+  });
 
-    filtered = filtered.filter((prop) => prop.price >= minPrice && prop.price <= maxPrice);
-    filtered = filtered.filter((prop) => prop.yield_percent >= minYield);
+  // Approx coordinates if missing
+  const getCoords = (location: string) => {
+    if (location.includes('London')) return { lat: 51.5072, lng: -0.1276 };
+    if (location.includes('Manchester')) return { lat: 53.4808, lng: -2.2426 };
+    if (location.includes('Leeds')) return { lat: 53.8008, lng: -1.5491 };
+    if (location.includes('Surrey')) return { lat: 51.2798, lng: -0.5427 };
+    if (location.includes('Liverpool')) return { lat: 53.4084, lng: -2.9916 };
+    return { lat: 52.3555, lng: -1.1743 }; // Default UK
+  };
 
-    if (selectedSource !== 'all') {
-      filtered = filtered.filter((prop) => prop.source.toLowerCase() === selectedSource);
-    }
-
-    setFilteredProperties(filtered);
-  }, [minPrice, maxPrice, minYield, selectedSource, properties]);
+  const Marker = ({ text }: { text: string }) => (
+    <div style={{ color: 'red', fontWeight: 'bold' }}>{text}</div>
+  );
 
   return (
-    <div>
+    <main style={{ padding: '1rem' }}>
       <h1>Properties</h1>
-
-      {/* Filters Panel */}
-      <div style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
-        <div>
-          <label>Min Price (£): </label>
-          <input
-            type="number"
-            value={minPrice}
-            onChange={(e) => setMinPrice(Number(e.target.value))}
-          />
-        </div>
-        <div>
-          <label>Max Price (£): </label>
-          <input
-            type="number"
-            value={maxPrice}
-            onChange={(e) => setMaxPrice(Number(e.target.value))}
-          />
-        </div>
-        <div>
-          <label>Min Yield (%): </label>
-          <input
-            type="number"
-            value={minYield}
-            onChange={(e) => setMinYield(Number(e.target.value))}
-          />
-        </div>
-        <div>
-          <label>Source: </label>
-          <select value={selectedSource} onChange={(e) => setSelectedSource(e.target.value)}>
-            <option value="all">All</option>
-            <option value="zoopla">Zoopla</option>
-            <option value="rightmove">Rightmove</option>
-          </select>
-        </div>
+      <div>
+        <label>Min Price (£): </label>
+        <input type="number" value={minPrice} onChange={e => setMinPrice(Number(e.target.value))} />
+        <label>Max Price (£): </label>
+        <input type="number" value={maxPrice} onChange={e => setMaxPrice(Number(e.target.value))} />
+        <label>Min Yield (%): </label>
+        <input type="number" value={minYield} onChange={e => setMinYield(Number(e.target.value))} />
+        <label>Source: </label>
+        <select value={source} onChange={e => setSource(e.target.value)}>
+          <option value="All">All</option>
+          <option value="Rightmove">Rightmove</option>
+          <option value="Zoopla">Zoopla</option>
+        </select>
       </div>
 
-      {/* Properties Grid */}
-      <div style={{ display: 'flex', flexWrap: 'wrap' }}>
-        {filteredProperties.map((prop) => (
-          <div
-            key={prop.id}
-            style={{
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              padding: '1rem',
-              margin: '0.5rem',
-              width: '250px',
-            }}
-          >
-            <img
-              src={prop.imageurl}
-              alt={prop.title}
-              style={{ width: '100%', height: '150px', objectFit: 'cover' }}
-            />
-            <h3>{prop.title}</h3>
-            <p>£{prop.price}</p>
-            <p>Yield: {prop.yield_percent}%</p>
-            <p>Source: {prop.source}</p>
+      <div style={{ height: '500px', width: '100%', marginTop: '1rem' }}>
+        <GoogleMapReact
+          bootstrapURLKeys={{ key: 'AIzaSyCkjrvxTk_GSFhDMyuOgpgxBnH9gF-oGSM' }}
+          defaultCenter={{ lat: 54.5, lng: -3 }}
+          defaultZoom={6}
+        >
+          {filtered.map((p, idx) => {
+            const coords = getCoords(p.location);
+            return (
+              <Marker
+                key={idx}
+                lat={coords.lat}
+                lng={coords.lng}
+                text={`£${p.price}`}
+              />
+            );
+          })}
+        </GoogleMapReact>
+      </div>
+
+      {filtered.length === 0 ? (
+        <p>No properties found.</p>
+      ) : (
+        filtered.map((p, idx) => (
+          <div key={idx} style={{ margin: '1rem 0', padding: '1rem', border: '1px solid #333', borderRadius: '6px' }}>
+            <strong>{p.title}</strong><br />
+            Price: £{p.price}<br />
+            Location: {p.location}<br />
+            Yield: {p.yield_percent}%<br />
+            ROI: {p.roi_percent}%<br />
+            Source: {p.source}<br />
           </div>
-        ))}
-      </div>
-    </div>
+        ))
+      )}
+    </main>
   );
 }
