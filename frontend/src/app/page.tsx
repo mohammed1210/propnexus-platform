@@ -1,90 +1,105 @@
-'use client';
+import React, { useState, useEffect } from 'react';
 
-import { useEffect, useState } from 'react';
+export default function PropertiesPage() {
+  const [properties, setProperties] = useState([]);
+  const [filteredProperties, setFilteredProperties] = useState([]);
 
-export default function Home() {
-  const [properties, setProperties] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Filters
+  const [minPrice, setMinPrice] = useState(0);
+  const [maxPrice, setMaxPrice] = useState(1000000);
+  const [minYield, setMinYield] = useState(0);
+  const [selectedSource, setSelectedSource] = useState('all');
 
+  // Fetch properties on load
   useEffect(() => {
     fetch('https://propnexus-backend-production.up.railway.app/properties')
       .then((res) => res.json())
-      .then(async (data) => {
-        console.log('Fetched properties:', data);
-
-        const updated = await Promise.all(
-          data.map(async (property: any) => {
-            if (property.location) {
-              const coords = await geocodePostcode(property.location);
-              return { ...property, lat: coords.lat, lng: coords.lng };
-            }
-            return property;
-          })
-        );
-
-        setProperties(updated);
-        setLoading(false);
+      .then((data) => {
+        setProperties(data);
+        setFilteredProperties(data);
       })
-      .catch(() => {
-        setProperties([]);
-        setLoading(false);
-      });
+      .catch((err) => console.error('Error fetching properties:', err));
   }, []);
 
-  // Function to geocode using Google Maps API
-  async function geocodePostcode(postcode: string) {
-    try {
-      const apiKey = 'AIzaSyCkjrvxTk_GSFhDMyuOgpgxBnH9gF-oGSM';
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-          postcode
-        )}&key=${apiKey}`
-      );
-      const data = await response.json();
-      if (data.status === 'OK') {
-        const location = data.results[0].geometry.location;
-        return { lat: location.lat, lng: location.lng };
-      } else {
-        console.error('Geocoding failed:', data.status);
-        return { lat: 0, lng: 0 };
-      }
-    } catch (err) {
-      console.error('Error fetching geocode:', err);
-      return { lat: 0, lng: 0 };
+  // Apply filters
+  useEffect(() => {
+    let filtered = properties;
+
+    filtered = filtered.filter((prop) => prop.price >= minPrice && prop.price <= maxPrice);
+    filtered = filtered.filter((prop) => prop.yield_percent >= minYield);
+
+    if (selectedSource !== 'all') {
+      filtered = filtered.filter((prop) => prop.source.toLowerCase() === selectedSource);
     }
-  }
+
+    setFilteredProperties(filtered);
+  }, [minPrice, maxPrice, minYield, selectedSource, properties]);
 
   return (
-    <main style={{ padding: '2rem' }}>
-      <h1>Live Property Deals</h1>
-      {loading ? (
-        <p>Loading properties...</p>
-      ) : properties.length === 0 ? (
-        <p>No properties found.</p>
-      ) : (
-        <>
-          <div style={{ height: '500px', width: '100%', marginBottom: '2rem' }}>
-            <iframe
-              width="100%"
-              height="100%"
-              loading="lazy"
-              allowFullScreen
-              src={`https://www.google.com/maps/embed/v1/view?key=AIzaSyCkjrvxTk_GSFhDMyuOgpgxBnH9gF-oGSM&center=${properties[0].lat},${properties[0].lng}&zoom=6`}
-            ></iframe>
-          </div>
+    <div>
+      <h1>Properties</h1>
 
-          {properties.map((property, idx) => (
-            <div key={idx} style={{ marginBottom: '1rem', borderBottom: '1px solid #333', paddingBottom: '1rem' }}>
-              <strong>{property.title}</strong><br />
-              Price: £{property.price}<br />
-              Location: {property.location}<br />
-              Yield: {property.yield_percent ? `${property.yield_percent}%` : 'N/A'}<br />
-              ROI: {property.roi_percent ? `${property.roi_percent}%` : 'N/A'}<br />
-              Source: {property.source}
-            </div>
-          ))}
-        </>
-      )}
-    </main>
+      {/* Filters Panel */}
+      <div style={{ marginBottom: '1rem', border: '1px solid #ccc', padding: '1rem' }}>
+        <div>
+          <label>Min Price (£): </label>
+          <input
+            type="number"
+            value={minPrice}
+            onChange={(e) => setMinPrice(Number(e.target.value))}
+          />
+        </div>
+        <div>
+          <label>Max Price (£): </label>
+          <input
+            type="number"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(Number(e.target.value))}
+          />
+        </div>
+        <div>
+          <label>Min Yield (%): </label>
+          <input
+            type="number"
+            value={minYield}
+            onChange={(e) => setMinYield(Number(e.target.value))}
+          />
+        </div>
+        <div>
+          <label>Source: </label>
+          <select value={selectedSource} onChange={(e) => setSelectedSource(e.target.value)}>
+            <option value="all">All</option>
+            <option value="zoopla">Zoopla</option>
+            <option value="rightmove">Rightmove</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Properties Grid */}
+      <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+        {filteredProperties.map((prop) => (
+          <div
+            key={prop.id}
+            style={{
+              border: '1px solid #ddd',
+              borderRadius: '8px',
+              padding: '1rem',
+              margin: '0.5rem',
+              width: '250px',
+            }}
+          >
+            <img
+              src={prop.imageurl}
+              alt={prop.title}
+              style={{ width: '100%', height: '150px', objectFit: 'cover' }}
+            />
+            <h3>{prop.title}</h3>
+            <p>£{prop.price}</p>
+            <p>Yield: {prop.yield_percent}%</p>
+            <p>Source: {prop.source}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
