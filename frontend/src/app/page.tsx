@@ -10,16 +10,26 @@ type Property = {
   title: string;
   location: string;
   price: number;
+  description: string;
+  latitude: number;
+  longitude: number;
 };
 
 export default function Page() {
   const [properties, setProperties] = useState<Property[]>([]);
 
   useEffect(() => {
-    fetch("https://propnexus-backend-production.up.railway.app/properties")
-      .then((res) => res.json())
-      .then((data) => setProperties(data))
-      .catch((error) => console.error("Error fetching properties:", error));
+    const fetchProperties = async () => {
+      try {
+        const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
+        const data = await res.json();
+        setProperties(data);
+      } catch (error) {
+        console.error("Error fetching properties:", error);
+      }
+    };
+
+    fetchProperties();
   }, []);
 
   return (
@@ -29,25 +39,10 @@ export default function Page() {
       <ul>
         {properties.map((p) => (
           <li key={p.id}>
-            {p.title} - {p.location} - £{p.price}
+            {p.title} — {p.location} — £{p.price}
           </li>
         ))}
       </ul>
     </main>
-
-
-import dynamic from "next/dynamic";
-
-const Map = dynamic(() => import("./Map"), {
-  ssr: false,
-});
-
-export default function Page() {
-  return (
-    <div>
-      <h1>Properties</h1>
-      <Map />
-    </div>
-d1ea4cb (Final: Add map and page updates, package fixes, clean scraper)
   );
 }
