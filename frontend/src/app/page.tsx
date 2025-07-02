@@ -1,5 +1,5 @@
 "use client";
-<<<<<<< HEAD
+
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
@@ -34,7 +34,7 @@ export default function Page() {
         ))}
       </ul>
     </main>
-=======
+
 
 import dynamic from "next/dynamic";
 
@@ -48,6 +48,6 @@ export default function Page() {
       <h1>Properties</h1>
       <Map />
     </div>
->>>>>>> d1ea4cb (Final: Add map and page updates, package fixes, clean scraper)
+d1ea4cb (Final: Add map and page updates, package fixes, clean scraper)
   );
 }
