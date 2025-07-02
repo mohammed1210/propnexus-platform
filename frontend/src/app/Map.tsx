@@ -3,8 +3,7 @@
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useEffect } from "react";
-import type { LatLngExpression } from "leaflet";
+import { useEffect, useState } from "react";
 
 type Property = {
   id: string;
@@ -16,41 +15,44 @@ type Property = {
   longitude: number;
 };
 
-type Props = {
-  properties: Property[];
-};
+const customIcon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
 
-export default function Map({ properties }: Props) {
-  // Fix default icon
+export default function Map() {
+  const [properties, setProperties] = useState<Property[]>([]);
+
   useEffect(() => {
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconUrl: "https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon.png",
-      iconRetinaUrl: "https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon-2x.png",
-      shadowUrl: "https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png",
-    });
+    const fetchProperties = async () => {
+      try {
+        const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
+        const data = await res.json();
+
+        const withCoords = data.map((prop: any) => ({
+          ...prop,
+          latitude: prop.latitude || 53.8008,
+          longitude: prop.longitude || -1.5491,
+        }));
+
+        setProperties(withCoords);
+      } catch (error) {
+        console.error("Error fetching properties:", error);
+      }
+    };
+
+    fetchProperties();
   }, []);
 
-  const customIcon = L.icon({
-    iconUrl: "https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon.png",
-    iconSize: [25, 41],
-    iconAnchor: [12, 41],
-  });
-
-  const center: LatLngExpression = [53.8, -1.55];
-
   return (
-    <MapContainer center={center} zoom={6} style={{ height: "80vh", width: "100%" }}>
+    <MapContainer center={[53.8, -1.55]} zoom={6} style={{ height: "80vh", width: "100%" }}>
       <TileLayer
         attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       {properties.map((prop) => (
-        <Marker
-          key={prop.id}
-          position={[prop.latitude || 53.8, prop.longitude || -1.55]}
-          icon={customIcon}
-        >
+        <Marker key={prop.id} position={[prop.latitude, prop.longitude]} icon={customIcon}>
           <Popup>
             <strong>{prop.title}</strong><br />
             £{prop.price.toLocaleString()}<br />
