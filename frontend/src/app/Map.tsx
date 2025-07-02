@@ -3,61 +3,48 @@
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { useEffect, useState } from "react";
 
-type Property = {
+// Define your Property type
+export interface Property {
   id: string;
   title: string;
-  location: string;
-  price: number;
-  description: string;
   latitude: number;
   longitude: number;
-};
+}
 
-const customIcon = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
+// Props type for Map component
+interface MapProps {
+  properties: Property[];
+}
+
+// Fix Leaflet's default icon issue
+delete (L.Icon.Default as any).prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
 });
 
-export default function Map() {
-  const [properties, setProperties] = useState<Property[]>([]);
-
-  useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
-        const data = await res.json();
-
-        const withCoords = data.map((prop: any) => ({
-          ...prop,
-          latitude: prop.latitude || 53.8008,
-          longitude: prop.longitude || -1.5491,
-        }));
-
-        setProperties(withCoords);
-      } catch (error) {
-        console.error("Error fetching properties:", error);
-      }
-    };
-
-    fetchProperties();
-  }, []);
-
+export default function Map({ properties }: MapProps) {
   return (
-    <MapContainer center={[53.8, -1.55]} zoom={6} style={{ height: "80vh", width: "100%" }}>
+    <MapContainer
+      center={[51.505, -0.09]}
+      zoom={13}
+      style={{ height: "500px", width: "100%" }}
+    >
       <TileLayer
-        attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
       />
-      {properties.map((prop) => (
-        <Marker key={prop.id} position={[prop.latitude, prop.longitude]} icon={customIcon}>
-          <Popup>
-            <strong>{prop.title}</strong><br />
-            £{prop.price.toLocaleString()}<br />
-            {prop.location}
-          </Popup>
+      {properties.map((property) => (
+        <Marker
+          key={property.id}
+          position={[property.latitude, property.longitude]}
+        >
+          <Popup>{property.title}</Popup>
         </Marker>
       ))}
     </MapContainer>
