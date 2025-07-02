@@ -4,49 +4,40 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-// Define your Property type
-export interface Property {
+type Property = {
   id: string;
-  title: string;
   latitude: number;
   longitude: number;
-}
+  address: string;
+  price: string;
+};
 
-// Props type for Map component
-interface MapProps {
+type MapProps = {
   properties: Property[];
-}
+};
 
-// Fix Leaflet's default icon issue
-delete (L.Icon.Default as any).prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-icon-2x.png",
-  iconUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-icon.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.4/images/marker-shadow.png",
-});
+const Map = ({ properties }: MapProps) => {
+  const defaultPosition: [number, number] = [51.505, -0.09]; // fallback center (London)
 
-export default function Map({ properties }: MapProps) {
   return (
-    <MapContainer
-      center={[51.505, -0.09]}
-      zoom={13}
-      style={{ height: "500px", width: "100%" }}
-    >
+    <MapContainer center={defaultPosition} zoom={6} style={{ height: "500px", width: "100%" }}>
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
-      {properties.map((property) => (
-        <Marker
-          key={property.id}
-          position={[property.latitude, property.longitude]}
-        >
-          <Popup>{property.title}</Popup>
-        </Marker>
-      ))}
+      {properties
+        .filter((p) => p.latitude !== undefined && p.longitude !== undefined)
+        .map((property) => (
+          <Marker key={property.id} position={[property.latitude, property.longitude]}>
+            <Popup>
+              <strong>{property.address}</strong>
+              <br />
+              Price: {property.price}
+            </Popup>
+          </Marker>
+        ))}
     </MapContainer>
   );
-}
+};
+
+export default Map;
