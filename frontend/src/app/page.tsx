@@ -1,4 +1,5 @@
 "use client";
+<<<<<<< HEAD
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
@@ -33,5 +34,20 @@ export default function Page() {
         ))}
       </ul>
     </main>
+=======
+
+import dynamic from "next/dynamic";
+
+const Map = dynamic(() => import("./Map"), {
+  ssr: false,
+});
+
+export default function Page() {
+  return (
+    <div>
+      <h1>Properties</h1>
+      <Map />
+    </div>
+>>>>>>> d1ea4cb (Final: Add map and page updates, package fixes, clean scraper)
   );
 }
