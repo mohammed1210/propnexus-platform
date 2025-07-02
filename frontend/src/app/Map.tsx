@@ -37,7 +37,7 @@ export default function Map({ properties }: Props) {
   });
 
   return (
-    <MapContainer center={[53.8, -1.55]} zoom={6} style={{ height: "80vh", width: "100%" }}>
+    <MapContainer center={[53.8, -1.55] as [number, number]} zoom={6} style={{ height: "80vh", width: "100%" }}>
       <TileLayer
         attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
