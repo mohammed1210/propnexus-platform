@@ -39,7 +39,7 @@ export default function Page() {
       <ul>
         {properties.map((p) => (
           <li key={p.id}>
-            {p.title} — {p.location} — £{p.price}
+            {p.title} – {p.location} – £{p.price}
           </li>
         ))}
       </ul>
