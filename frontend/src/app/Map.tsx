@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect } from "react";
+import type { LatLngExpression } from "leaflet";
 
 type Property = {
   id: string;
@@ -20,7 +21,7 @@ type Props = {
 };
 
 export default function Map({ properties }: Props) {
-  // Fix Leaflet default icon issue
+  // Fix default icon
   useEffect(() => {
     delete (L.Icon.Default.prototype as any)._getIconUrl;
     L.Icon.Default.mergeOptions({
@@ -36,8 +37,10 @@ export default function Map({ properties }: Props) {
     iconAnchor: [12, 41],
   });
 
+  const center: LatLngExpression = [53.8, -1.55];
+
   return (
-    <MapContainer center={[53.8, -1.55] as [number, number]} zoom={6} style={{ height: "80vh", width: "100%" }}>
+    <MapContainer center={center} zoom={6} style={{ height: "80vh", width: "100%" }}>
       <TileLayer
         attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
