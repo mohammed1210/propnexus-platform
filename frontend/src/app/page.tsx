@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 
-const Map = dynamic(() => import("./map"), { ssr: false });
+const Map = dynamic(() => import("./Map"), { ssr: false });
 
 type Property = {
   id: string;
