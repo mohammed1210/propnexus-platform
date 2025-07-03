@@ -1,5 +1,5 @@
 from fastapi import BackgroundTasks
-from ..utils.postcode import get_lat_lng_from_postcode
+from utils.postcode import get_lat_lng_from_postcode
 
 async def scrape_rightmove_properties(background_tasks: BackgroundTasks = None):
     print("Rightmove scraping started...")
