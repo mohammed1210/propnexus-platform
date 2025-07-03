@@ -1,14 +1,31 @@
 from fastapi import BackgroundTasks
+from utils.postcode import get_lat_lng_from_postcode
 
 async def scrape_rightmove_properties(background_tasks: BackgroundTasks = None):
-    # Placeholder logic for now
     print("Rightmove scraping started...")
 
-    # TODO: Here add actual scraping logic using Playwright or requests.
-    # Example: fetch listing pages, parse titles, price, location, etc.
-    # Then insert into Supabase using your insert_property_to_supabase function.
+    # Example dummy property list
+    properties = [
+        {
+            "title": "Example Rightmove Property",
+            "location": "NG7 2RD",
+            "price": 300000
+        }
+    ]
+
+    for prop in properties:
+        coords = get_lat_lng_from_postcode(prop["location"])
+        if coords:
+            prop["latitude"] = coords["latitude"]
+            prop["longitude"] = coords["longitude"]
+        else:
+            prop["latitude"] = 0
+            prop["longitude"] = 0
+
+        # Example log; here you'd insert to DB
+        print(f"Processed property: {prop['title']} ({prop['latitude']}, {prop['longitude']})")
 
     print("Rightmove scraping finished and data inserted.")
 
-    # Return dummy data to confirm endpoint works
-    return [{"title": "Example Rightmove Property", "price": "£300,000"}]
+    # Return properties to confirm
+    return properties
