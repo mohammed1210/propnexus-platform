@@ -1,5 +1,5 @@
 from fastapi import BackgroundTasks
-from scraper.zoopla_scraper import scrape_zoopla_properties
+from ..utils.postcode import get_lat_lng_from_postcode
 
 async def scrape_zoopla_properties(background_tasks: BackgroundTasks = None):
     print("Zoopla scraping started...")
