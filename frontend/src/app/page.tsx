@@ -13,6 +13,7 @@ type Property = {
   description: string;
   latitude: number;
   longitude: number;
+  address: string; // ✅ added to fix type error
 };
 
 export default function Page() {
@@ -23,7 +24,11 @@ export default function Page() {
       try {
         const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
         const data = await res.json();
-        setProperties(data);
+        const dataWithAddress = data.map((p: any) => ({
+          ...p,
+          address: p.address || "",
+        }));
+        setProperties(dataWithAddress);
       } catch (error) {
         console.error("Error fetching properties:", error);
       }
