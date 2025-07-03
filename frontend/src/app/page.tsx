@@ -2,19 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { Property } from "./types"; // ✅ use shared type
 
 const Map = dynamic(() => import("./Map"), { ssr: false });
-
-type Property = {
-  id: string;
-  title: string;
-  location: string;
-  price: number;
-  description: string;
-  latitude: number;
-  longitude: number;
-  address: string; // ✅ added to fix type error
-};
 
 export default function Page() {
   const [properties, setProperties] = useState<Property[]>([]);
