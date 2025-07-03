@@ -4,7 +4,7 @@ import React from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import type { Property } from "../types/property";
+import type { Property } from "./types";
 
 // Fix default marker icon
 delete (L.Icon.Default as any).prototype._getIconUrl;
