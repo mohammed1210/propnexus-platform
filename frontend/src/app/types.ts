@@ -6,5 +6,5 @@ export type Property = {
   description: string;
   latitude: number;
   longitude: number;
-  address: string; // included to avoid future errors
+  address?: string; // ✅ optional if you might not always have it
 };
