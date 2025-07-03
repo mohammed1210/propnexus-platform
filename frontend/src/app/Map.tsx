@@ -1,41 +1,50 @@
 "use client";
 
+import React from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { Property } from "./types";
 import L from "leaflet";
+import type { Property } from "@/types/property";
 
-// Fix default marker icon (optional if default is missing)
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+// Fix default marker icon (Leaflet quirk in Next.js)
+delete (L.Icon.Default as any).prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-type MapProps = {
+interface Props {
   properties: Property[];
-};
+}
 
-export default function Map({ properties }: MapProps) {
+const Map = ({ properties }: Props) => {
+  const center = { lat: 54.5, lng: -3 }; // Approximate UK center
+
   return (
-    <MapContainer center={[54.5, -3]} zoom={6} style={{ height: "600px", width: "100%" }}>
+    <MapContainer center={center} zoom={6} style={{ height: "500px", width: "100%" }}>
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {properties
-        .filter((p) => p.latitude && p.longitude)
-        .map((p) => (
-          <Marker key={p.id} position={[p.latitude, p.longitude]}>
-            <Popup>
-              <strong>{p.title}</strong><br />
-              {p.address}<br />
-              £{p.price.toLocaleString()}
-            </Popup>
-          </Marker>
-        ))}
+      {properties.map((property) => (
+        <Marker
+          key={property.id}
+          position={[
+            property.latitude ?? 0,
+            property.longitude ?? 0,
+          ]}
+        >
+          <Popup>
+            <h3>{property.title}</h3>
+            <p>{property.location}</p>
+            <p>£{property.price.toLocaleString()}</p>
+          </Popup>
+        </Marker>
+      ))}
     </MapContainer>
   );
-}
+};
+
+export default Map;
