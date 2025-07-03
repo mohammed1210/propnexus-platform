@@ -4,9 +4,9 @@ import React from "react";
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import type { Property } from "@/types/property";
+import type { Property } from "../types/property";
 
-// Fix default marker icon (Leaflet quirk in Next.js)
+// Fix default marker icon
 delete (L.Icon.Default as any).prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
@@ -19,7 +19,7 @@ interface Props {
 }
 
 const Map = ({ properties }: Props) => {
-  const center = { lat: 54.5, lng: -3 }; // Approximate UK center
+  const center = { lat: 54.5, lng: -3 };
 
   return (
     <MapContainer center={center} zoom={6} style={{ height: "500px", width: "100%" }}>
