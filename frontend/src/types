@@ -1,0 +1,1 @@
+import type { Property } from "../types/property";
