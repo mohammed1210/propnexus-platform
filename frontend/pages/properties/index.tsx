@@ -1,46 +1,38 @@
 import { useEffect, useState } from 'react';
-import PropertyCard from "@/components/Propertycard";
+import Propertycard from "@/components/Propertycard";
 
 interface Property {
   id: string;
   title: string;
   price: number;
   location: string;
-  imageurl?: string;
+  imageurl: string;
 }
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
 
   useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const res = await fetch('/api/properties'); // Adjust if your API endpoint is different
-        const data = await res.json();
-        setProperties(data);
-      } catch (error) {
-        console.error('Error fetching properties:', error);
-      }
-    };
-
-    fetchProperties();
+    fetch('/api/properties') // update to your actual backend API endpoint if needed
+      .then(res => res.json())
+      .then(data => setProperties(data))
+      .catch(err => console.error(err));
   }, []);
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'center', padding: '20px' }}>
-      {properties.length === 0 ? (
-        <p>Loading properties...</p>
-      ) : (
-        properties.map((property) => (
-          <PropertyCard
+    <div>
+      <h1>Properties</h1>
+      <div>
+        {properties.map((property) => (
+          <Propertycard
             key={property.id}
             title={property.title}
             price={property.price}
             location={property.location}
             imageurl={property.imageurl}
           />
-        ))
-      )}
+        ))}
+      </div>
     </div>
   );
 }
