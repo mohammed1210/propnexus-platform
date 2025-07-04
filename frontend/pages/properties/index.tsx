@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import PropertyCard from "../../components/PropertyCard";
-import styles from "./Properties.module.css";
+import PropertyCard from "@/components/PropertyCard";
+import styles from "@/styles/Properties.module.css";
 
 interface Property {
   id: string;
@@ -19,14 +19,14 @@ export default function PropertiesPage() {
   const [maxPrice, setMaxPrice] = useState<number>(Infinity);
 
   useEffect(() => {
-    fetch('/api/properties') // <-- update to your backend endpoint if needed
+    fetch('/api/properties')
       .then(res => res.json())
       .then(data => setProperties(data))
       .catch(err => console.error(err));
   }, []);
 
   const filteredProperties = properties.filter(
-    (property) => property.price >= minPrice && property.price <= maxPrice
+    (p) => p.price >= minPrice && p.price <= maxPrice
   );
 
   return (
@@ -36,14 +36,17 @@ export default function PropertiesPage() {
         <input
           type="number"
           placeholder="Min price"
+          value={minPrice === 0 ? '' : minPrice}
           onChange={(e) => setMinPrice(Number(e.target.value))}
         />
         <input
           type="number"
           placeholder="Max price"
+          value={maxPrice === Infinity ? '' : maxPrice}
           onChange={(e) => setMaxPrice(Number(e.target.value))}
         />
       </div>
+
       <div className={styles.cardsContainer}>
         {filteredProperties.map((property) => (
           <PropertyCard key={property.id} property={property} />
