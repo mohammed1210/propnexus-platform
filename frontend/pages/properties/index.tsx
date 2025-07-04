@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import PropertyCard from "@/components/PropertyCard";
+import PropertyCard from "../../components/PropertyCard";
 import styles from './PropertiesPage.module.css';
 
 interface Property {
