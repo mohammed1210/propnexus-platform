@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react';
-import PropertyCard from "../../components/PropertyCard";
+import PropertyCard from "@/components/PropertyCard";
+import styles from './PropertiesPage.module.css';
 
 interface Property {
   id: string;
   title: string;
   price: number;
   location: string;
-  imageurl?: string;
+  imageurl: string;
 }
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
-  const [maxPrice, setMaxPrice] = useState<number>(1000000);
-  const [minPrice, setMinPrice] = useState<number>(0);
+  const [minPrice, setMinPrice] = useState<number | ''>('');
+  const [maxPrice, setMaxPrice] = useState<number | ''>('');
+  const [locationFilter, setLocationFilter] = useState('');
 
   useEffect(() => {
     fetch('/api/properties')
@@ -21,44 +23,46 @@ export default function PropertiesPage() {
       .catch(err => console.error(err));
   }, []);
 
-  const filteredProperties = properties.filter(
-    (p) => p.price >= minPrice && p.price <= maxPrice
-  );
+  const filteredProperties = properties.filter((p) => {
+    const matchesMin = minPrice === '' || p.price >= minPrice;
+    const matchesMax = maxPrice === '' || p.price <= maxPrice;
+    const matchesLocation = locationFilter === '' || p.location.toLowerCase().includes(locationFilter.toLowerCase());
+    return matchesMin && matchesMax && matchesLocation;
+  });
 
   return (
     <div>
-      <h1>Available Properties</h1>
+      <h1>Properties</h1>
 
-      <div style={{ marginBottom: '20px' }}>
-        <label>Min Price: £{minPrice}</label>
+      <div className={styles.filters}>
         <input
-          type="range"
-          min="0"
-          max="2000000"
-          step="50000"
+          type="number"
+          placeholder="Min price"
           value={minPrice}
-          onChange={(e) => setMinPrice(Number(e.target.value))}
+          onChange={(e) => setMinPrice(e.target.value ? parseInt(e.target.value) : '')}
         />
-
-        <label>Max Price: £{maxPrice}</label>
         <input
-          type="range"
-          min="50000"
-          max="5000000"
-          step="50000"
+          type="number"
+          placeholder="Max price"
           value={maxPrice}
-          onChange={(e) => setMaxPrice(Number(e.target.value))}
+          onChange={(e) => setMaxPrice(e.target.value ? parseInt(e.target.value) : '')}
+        />
+        <input
+          type="text"
+          placeholder="Location"
+          value={locationFilter}
+          onChange={(e) => setLocationFilter(e.target.value)}
         />
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-        {filteredProperties.map((prop) => (
+      <div className={styles.cardsContainer}>
+        {filteredProperties.map((p) => (
           <PropertyCard
-            key={prop.id}
-            title={prop.title}
-            price={prop.price}
-            location={prop.location}
-            imageurl={prop.imageurl}
+            key={p.id}
+            title={p.title}
+            price={p.price}
+            location={p.location}
+            imageurl={p.imageurl}
           />
         ))}
       </div>
