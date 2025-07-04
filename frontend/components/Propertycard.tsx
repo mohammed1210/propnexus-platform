@@ -7,7 +7,7 @@ interface PropertyCardProps {
   imageurl?: string;
 }
 
-export default function PropertyCard({ title, price, location, imageurl }: PropertyCardProps) {
+export default function Propertycard({ title, price, location, imageurl }: PropertyCardProps) {
   return (
     <div className={styles.card}>
       {imageurl ? (
