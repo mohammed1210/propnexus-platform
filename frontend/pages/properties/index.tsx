@@ -13,26 +13,23 @@ export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
 
   useEffect(() => {
-    fetch('/api/properties') // update to your actual backend API endpoint if needed
+    fetch('/api/properties') // Adjust if your API endpoint is different
       .then(res => res.json())
       .then(data => setProperties(data))
-      .catch(err => console.error(err));
+      .catch(err => console.error("Failed to fetch properties:", err));
   }, []);
 
   return (
     <div>
-      <h1>Properties</h1>
-      <div>
-        {properties.map((property) => (
-          <Propertycard
-            key={property.id}
-            title={property.title}
-            price={property.price}
-            location={property.location}
-            imageurl={property.imageurl}
-          />
-        ))}
-      </div>
+      {properties.map((property) => (
+        <PropertyCard
+          key={property.id}
+          title={property.title}
+          price={property.price}
+          location={property.location}
+          imageurl={property.imageurl}
+        />
+      ))}
     </div>
   );
 }
