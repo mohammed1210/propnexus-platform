@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import PropertyCard from "@/components/PropertyCard";
-import styles from "./Properties.module.css";
+import styles from "@/styles/Properties.module.css";
 
 interface Property {
   id: string;
@@ -16,7 +16,7 @@ export default function PropertiesPage() {
   const [maxPrice, setMaxPrice] = useState<number>(Infinity);
 
   useEffect(() => {
-    fetch('/api/properties') // <-- update this endpoint if needed
+    fetch('/api/properties') // <-- update to your backend endpoint if needed
       .then(res => res.json())
       .then(data => setProperties(data))
       .catch(err => console.error(err));
@@ -29,29 +29,21 @@ export default function PropertiesPage() {
   return (
     <div>
       <h1>Properties</h1>
-
       <div className={styles.filters}>
         <input
           type="number"
-          placeholder="Min Price"
+          placeholder="Min price"
           onChange={(e) => setMinPrice(Number(e.target.value))}
         />
         <input
           type="number"
-          placeholder="Max Price"
-          onChange={(e) => setMaxPrice(Number(e.target.value) || Infinity)}
+          placeholder="Max price"
+          onChange={(e) => setMaxPrice(Number(e.target.value))}
         />
       </div>
-
       <div className={styles.cardsContainer}>
         {filteredProperties.map((property) => (
-          <PropertyCard
-            key={property.id}
-            title={property.title}
-            price={property.price}
-            location={property.location}
-            imageurl={property.imageurl}
-          />
+          <PropertyCard key={property.id} property={property} />
         ))}
       </div>
     </div>
