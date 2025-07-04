@@ -19,6 +19,7 @@ export default function PropertyCard({ title, price, location, imageurl }: Prope
         <h3 className={styles.title}>{title}</h3>
         <p className={styles.location}>{location}</p>
         <p className={styles.price}>£{price.toLocaleString()}</p>
+        <button className={styles.detailsButton}>View Details</button>
       </div>
     </div>
   );
