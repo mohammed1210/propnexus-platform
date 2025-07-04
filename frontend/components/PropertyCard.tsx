@@ -1,26 +1,25 @@
-import styles from './PropertyCard.module.css';
+import styles from "@/styles/Properties.module.css";
 
-interface PropertyCardProps {
+interface Property {
+  id: string;
   title: string;
   price: number;
   location: string;
-  imageurl?: string;
+  bedrooms: number;
+  bathrooms: number;
+  description: string;
+  image: string;
 }
 
-export default function PropertyCard({ title, price, location, imageurl }: PropertyCardProps) {
+export default function PropertyCard({ property }: { property: Property }) {
   return (
     <div className={styles.card}>
-      {imageurl ? (
-        <img src={imageurl} alt={title} className={styles.image} />
-      ) : (
-        <div className={styles.placeholder}>No Image</div>
-      )}
-      <div className={styles.content}>
-        <h3 className={styles.title}>{title}</h3>
-        <p className={styles.location}>{location}</p>
-        <p className={styles.price}>£{price.toLocaleString()}</p>
-        <button className={styles.detailsButton}>View Details</button>
-      </div>
+      <img src={property.image || "/placeholder.jpg"} alt={property.title} />
+      <h3>{property.title}</h3>
+      <p>{property.location}</p>
+      <p>£{property.price.toLocaleString()}</p>
+      <p>{property.bedrooms} beds • {property.bathrooms} baths</p>
+      <p>{property.description}</p>
     </div>
   );
 }
