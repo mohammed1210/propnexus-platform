@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import PropertyCard from "../../components/PropertyCard";
+import PropertyCard from "@/components/PropertyCard";
 import styles from "@/styles/Properties.module.css";
 
 interface Property {
@@ -7,62 +7,53 @@ interface Property {
   title: string;
   price: number;
   location: string;
-  bedrooms: number;
-  bathrooms: number;
-  description: string;
-  image: string;
+  imageurl: string;
 }
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [minPrice, setMinPrice] = useState<number>(0);
-  const [maxPrice, setMaxPrice] = useState<number>(1000000);
-  const [minBedrooms, setMinBedrooms] = useState<number>(0);
+  const [maxPrice, setMaxPrice] = useState<number>(Infinity);
 
   useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
-        const data = await res.json();
-        setProperties(data);
-      } catch (error) {
-        console.error("Failed to fetch properties:", error);
-      }
-    };
-    fetchProperties();
+    fetch('/api/properties') // <-- update this endpoint if needed
+      .then(res => res.json())
+      .then(data => setProperties(data))
+      .catch(err => console.error(err));
   }, []);
 
   const filteredProperties = properties.filter(
-    (p) =>
-      p.price >= minPrice &&
-      p.price <= maxPrice &&
-      p.bedrooms >= minBedrooms
+    (property) => property.price >= minPrice && property.price <= maxPrice
   );
 
   return (
-    <main className={styles.main}>
-      <h1>Available Properties</h1>
+    <div>
+      <h1>Properties</h1>
 
       <div className={styles.filters}>
-        <label>
-          Min Price:
-          <input type="number" value={minPrice} onChange={(e) => setMinPrice(Number(e.target.value))} />
-        </label>
-        <label>
-          Max Price:
-          <input type="number" value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))} />
-        </label>
-        <label>
-          Min Bedrooms:
-          <input type="number" value={minBedrooms} onChange={(e) => setMinBedrooms(Number(e.target.value))} />
-        </label>
+        <input
+          type="number"
+          placeholder="Min Price"
+          onChange={(e) => setMinPrice(Number(e.target.value))}
+        />
+        <input
+          type="number"
+          placeholder="Max Price"
+          onChange={(e) => setMaxPrice(Number(e.target.value) || Infinity)}
+        />
       </div>
 
       <div className={styles.cardsContainer}>
         {filteredProperties.map((property) => (
-          <PropertyCard key={property.id} property={property} />
+          <PropertyCard
+            key={property.id}
+            title={property.title}
+            price={property.price}
+            location={property.location}
+            imageurl={property.imageurl}
+          />
         ))}
       </div>
-    </main>
+    </div>
   );
 }
