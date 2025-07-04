@@ -7,7 +7,10 @@ interface Property {
   title: string;
   price: number;
   location: string;
-  imageurl: string;
+  bedrooms: number;
+  bathrooms: number;
+  description: string;
+  image: string;
 }
 
 export default function PropertiesPage() {
