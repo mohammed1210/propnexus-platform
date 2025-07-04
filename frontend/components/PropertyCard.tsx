@@ -1,4 +1,4 @@
-import styles from "@/styles/Properties.module.css";
+import styles from "./PropertyCard.module.css";
 
 interface Property {
   id: string;
