@@ -1,4 +1,4 @@
-import styles from './Propertycard.module.css';
+import styles from './PropertyCard.module.css';
 
 interface PropertyCardProps {
   title: string;
@@ -7,7 +7,7 @@ interface PropertyCardProps {
   imageurl?: string;
 }
 
-export default function Propertycard({ title, price, location, imageurl }: PropertyCardProps) {
+export default function PropertyCard({ title, price, location, imageurl }: PropertyCardProps) {
   return (
     <div className={styles.card}>
       {imageurl ? (
