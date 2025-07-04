@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
 import styles from "@/styles/Properties.module.css";
 
@@ -19,14 +19,14 @@ export default function PropertiesPage() {
   const [maxPrice, setMaxPrice] = useState<number>(Infinity);
 
   useEffect(() => {
-    fetch('/api/properties')
-      .then(res => res.json())
-      .then(data => setProperties(data))
-      .catch(err => console.error(err));
+    fetch("/api/properties") // Update to your backend endpoint
+      .then((res) => res.json())
+      .then((data) => setProperties(data))
+      .catch((err) => console.error(err));
   }, []);
 
   const filteredProperties = properties.filter(
-    (p) => p.price >= minPrice && p.price <= maxPrice
+    (property) => property.price >= minPrice && property.price <= maxPrice
   );
 
   return (
@@ -35,18 +35,17 @@ export default function PropertiesPage() {
       <div className={styles.filters}>
         <input
           type="number"
-          placeholder="Min price"
-          value={minPrice === 0 ? '' : minPrice}
+          placeholder="Min Price"
+          value={minPrice === 0 ? "" : minPrice}
           onChange={(e) => setMinPrice(Number(e.target.value))}
         />
         <input
           type="number"
-          placeholder="Max price"
-          value={maxPrice === Infinity ? '' : maxPrice}
+          placeholder="Max Price"
+          value={maxPrice === Infinity ? "" : maxPrice}
           onChange={(e) => setMaxPrice(Number(e.target.value))}
         />
       </div>
-
       <div className={styles.cardsContainer}>
         {filteredProperties.map((property) => (
           <PropertyCard key={property.id} property={property} />
