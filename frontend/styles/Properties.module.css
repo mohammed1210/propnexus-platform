@@ -13,37 +13,27 @@
 .card {
   border: 1px solid #ddd;
   border-radius: 8px;
-  padding: 1rem;
-  background-color: #fff;
-  text-align: center;
-}
-
-.card img {
+  overflow: hidden;
   width: 100%;
-  height: 150px;
-  object-fit: cover;
-  border-radius: 4px;
-}
-
-.placeholder {
-  width: 100%;
-  height: 150px;
-  background-color: #eee;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #777;
+  flex-direction: column;
+  background-color: #fff;
+}
+
+.image {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
 }
 
 .content {
-  padding-top: 0.5rem;
+  padding: 1rem;
 }
 
-.title {
-  font-size: 1.2rem;
-  margin: 0.5rem 0;
+.content h3 {
+  margin: 0 0 0.5rem 0;
 }
 
-.location {
-  color: #666;
+.content p {
+  margin: 0.25rem 0;
 }
