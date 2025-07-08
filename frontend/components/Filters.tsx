@@ -1,4 +1,6 @@
-export interface FiltersProps {
+import React from "react";
+
+interface FiltersProps {
   priceRange: [number, number];
   onPriceChange: React.Dispatch<React.SetStateAction<[number, number]>>;
   yieldRange: [number, number];
@@ -13,42 +15,29 @@ export interface FiltersProps {
   onLocationChange: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export default function Filters({
-  priceRange,
-  onPriceChange,
-  yieldRange,
-  onYieldChange,
-  roiRange,
-  onRoiChange,
-  bedrooms,
-  onBedroomsChange,
-  propertyType,
-  onPropertyTypeChange,
-  location,
-  onLocationChange,
-}: FiltersProps) {
+export default function Filters(props: FiltersProps) {
   return (
     <div className="flex flex-col md:flex-row gap-2 md:gap-4 mb-4">
       <input
         type="text"
         placeholder="Location"
         className="border rounded p-2 w-full md:w-auto"
-        value={location}
-        onChange={(e) => onLocationChange(e.target.value)}
+        value={props.location}
+        onChange={(e) => props.onLocationChange(e.target.value)}
       />
       <input
         type="number"
         placeholder="Bedrooms"
         className="border rounded p-2 w-full md:w-auto"
-        value={bedrooms || ""}
-        onChange={(e) => onBedroomsChange(Number(e.target.value) || null)}
+        value={props.bedrooms ?? ""}
+        onChange={(e) => props.onBedroomsChange(Number(e.target.value) || null)}
       />
       <input
         type="text"
         placeholder="Property Type"
         className="border rounded p-2 w-full md:w-auto"
-        value={propertyType}
-        onChange={(e) => onPropertyTypeChange(e.target.value)}
+        value={props.propertyType}
+        onChange={(e) => props.onPropertyTypeChange(e.target.value)}
       />
     </div>
   );
