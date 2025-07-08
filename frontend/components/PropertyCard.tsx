@@ -1,16 +1,35 @@
 import styles from "./PropertyCard.module.css";
 import { Property } from "../src/app/types";
 
-export default function PropertyCard({ property }: { property: Property }) {
+export default function PropertyCard({
+  id,
+  title,
+  price,
+  location,
+  bedrooms,
+  bathrooms,
+  description,
+  image,
+}: Property) {
   return (
     <div className={styles.card}>
-      <img src={property.image || "/placeholder.jpg"} alt={property.title} className={styles.image} />
+      <img
+        src={image || "/placeholder.jpg"}
+        alt={title}
+        className={styles.image}
+      />
       <div className={styles.content}>
-        <h3>{property.title}</h3>
-        <p>{property.location}</p>
-        <p>£{property.price.toLocaleString()}</p>
-        <p>{property.bedrooms} beds • {property.bathrooms} baths</p>
-        <p>{property.description}</p>
+        <h3 className={styles.title}>{title}</h3>
+        <p className={styles.location}>{location}</p>
+        <p className={styles.price}>£{price.toLocaleString()}</p>
+        <p className={styles.details}>
+          {bedrooms} beds • {bathrooms} baths
+        </p>
+        <p className={styles.description}>{description}</p>
+        <div className={styles.buttons}>
+          <button className={styles.button}>Save Deal</button>
+          <button className={styles.buttonSecondary}>View Details</button>
+        </div>
       </div>
     </div>
   );
