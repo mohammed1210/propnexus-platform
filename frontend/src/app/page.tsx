@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
 import Filters from "@/components/Filters";
 import type { Property } from "./types";
-import mockProperties from "./mockProperties"; // Local mock data
+import mockProperties from "./mockProperties";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -15,12 +15,8 @@ export default function PropertiesPage() {
   const [location, setLocation] = useState<string>("");
 
   useEffect(() => {
+    // Use API or mock
     setProperties(mockProperties);
-    // Or use API fetch:
-    // fetch("/api/properties")
-    //   .then((res) => res.json())
-    //   .then((data) => setProperties(data))
-    //   .catch((err) => console.error(err));
   }, []);
 
   const filteredProperties = properties.filter(
@@ -31,9 +27,9 @@ export default function PropertiesPage() {
       property.yieldValue <= yieldRange[1] &&
       property.roi >= roiRange[0] &&
       property.roi <= roiRange[1] &&
-      (!bedrooms || property.bedrooms === bedrooms) &&
-      (!location || property.location.toLowerCase().includes(location.toLowerCase())) &&
-      (!propertyType || property.title.toLowerCase().includes(propertyType.toLowerCase()))
+      (bedrooms === null || property.bedrooms === bedrooms) &&
+      (propertyType === "" || property.title.includes(propertyType)) &&
+      (location === "" || property.location.toLowerCase().includes(location.toLowerCase()))
   );
 
   return (
