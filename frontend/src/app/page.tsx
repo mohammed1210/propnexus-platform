@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import PropertyCard from "../components/PropertyCard";
-import Filters from "../components/Filters";
+import PropertyCard from "@/components/PropertyCard";
+import Filters from "@/components/Filters";
 import { Property } from "../types";
 
 export default function PropertiesPage() {
