@@ -2,83 +2,61 @@ import React from "react";
 
 interface FiltersProps {
   priceRange: [number, number];
-  onPriceChange: React.Dispatch<React.SetStateAction<[number, number]>>;
+  onPriceChange: (range: [number, number]) => void;
   yieldRange: [number, number];
-  onYieldChange: React.Dispatch<React.SetStateAction<[number, number]>>;
+  onYieldChange: (range: [number, number]) => void;
   roiRange: [number, number];
-  onRoiChange: React.Dispatch<React.SetStateAction<[number, number]>>;
+  onRoiChange: (range: [number, number]) => void;
   bedrooms: number | null;
-  onBedroomsChange: React.Dispatch<React.SetStateAction<number | null>>;
+  onBedroomsChange: (value: number | null) => void;
   propertyType: string;
-  onPropertyTypeChange: React.Dispatch<React.SetStateAction<string>>;
+  onPropertyTypeChange: (value: string) => void;
   location: string;
-  onLocationChange: React.Dispatch<React.SetStateAction<string>>;
+  onLocationChange: (value: string) => void;
 }
 
 export default function Filters(props: FiltersProps) {
+  const {
+    priceRange,
+    onPriceChange,
+    yieldRange,
+    onYieldChange,
+    roiRange,
+    onRoiChange,
+    bedrooms,
+    onBedroomsChange,
+    propertyType,
+    onPropertyTypeChange,
+    location,
+    onLocationChange,
+  } = props;
+
   return (
-    <div className="flex flex-col gap-4 mb-4">
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Location"
-          className="border rounded p-2 w-full"
-          value={props.location}
-          onChange={(e) => props.onLocationChange(e.target.value)}
-        />
-        <input
-          type="number"
-          placeholder="Bedrooms"
-          className="border rounded p-2 w-full"
-          value={props.bedrooms ?? ""}
-          onChange={(e) => props.onBedroomsChange(Number(e.target.value) || null)}
-        />
-        <select
-  className="border rounded p-2 w-full md:w-auto"
-  value={propertyType}
-  onChange={(e) => onPropertyTypeChange(e.target.value)}
->
-  <option value="">All Types</option>
-  <option value="House">House</option>
-  <option value="Apartment">Apartment</option>
-  <option value="Studio">Studio</option>
-  <option value="Detached">Detached</option>
-  <option value="Semi-Detached">Semi-Detached</option>
-</select>
-      </div>
-      <div>
-        <label>Max Price (£): Up to £{props.priceRange[1].toLocaleString()}</label>
-        <input
-          type="range"
-          min={50000}
-          max={2000000}
-          value={props.priceRange[1]}
-          onChange={(e) => props.onPriceChange([50000, Number(e.target.value)])}
-          className="w-full"
-        />
-      </div>
-      <div>
-        <label>Max Yield %: Up to {props.yieldRange[1]}%</label>
-        <input
-          type="range"
-          min={2}
-          max={15}
-          value={props.yieldRange[1]}
-          onChange={(e) => props.onYieldChange([2, Number(e.target.value)])}
-          className="w-full"
-        />
-      </div>
-      <div>
-        <label>Max ROI %: Up to {props.roiRange[1]}%</label>
-        <input
-          type="range"
-          min={2}
-          max={20}
-          value={props.roiRange[1]}
-          onChange={(e) => props.onRoiChange([2, Number(e.target.value)])}
-          className="w-full"
-        />
-      </div>
+    <div className="flex flex-col md:flex-row gap-2 md:gap-4 mb-4">
+      <input
+        type="text"
+        placeholder="Location"
+        className="border rounded p-2 w-full md:w-auto"
+        value={location}
+        onChange={(e) => onLocationChange(e.target.value)}
+      />
+      <input
+        type="number"
+        placeholder="Bedrooms"
+        className="border rounded p-2 w-full md:w-auto"
+        value={bedrooms ?? ""}
+        onChange={(e) => onBedroomsChange(Number(e.target.value) || null)}
+      />
+      <select
+        className="border rounded p-2 w-full md:w-auto"
+        value={propertyType}
+        onChange={(e) => onPropertyTypeChange(e.target.value)}
+      >
+        <option value="">All Types</option>
+        <option value="House">House</option>
+        <option value="Apartment">Apartment</option>
+        <option value="Studio">Studio</option>
+      </select>
     </div>
   );
 }
