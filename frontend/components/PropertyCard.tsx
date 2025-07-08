@@ -1,27 +1,44 @@
-import styles from "./PropertyCard.module.css";
+import React from "react";
 
-interface Property {
-  id: string;
+interface PropertyCardProps {
   title: string;
   price: number;
   location: string;
   bedrooms: number;
   bathrooms: number;
-  description: string;
+  yieldValue: number;
+  roi: number;
   image: string;
 }
 
-export default function PropertyCard({ property }: { property: Property }) {
+const PropertyCard: React.FC<PropertyCardProps> = ({
+  title,
+  price,
+  location,
+  bedrooms,
+  bathrooms,
+  yieldValue,
+  roi,
+  image,
+}) => {
   return (
-    <div className={styles.card}>
-      <img src={property.image || "/placeholder.jpg"} alt={property.title} className={styles.image} />
-      <div className={styles.content}>
-        <h3>{property.title}</h3>
-        <p>{property.location}</p>
-        <p>£{property.price.toLocaleString()}</p>
-        <p>{property.bedrooms} beds • {property.bathrooms} baths</p>
-        <p>{property.description}</p>
+    <div className="bg-white rounded-lg shadow-md overflow-hidden transition hover:shadow-lg">
+      <img src={image} alt={title} className="w-full h-48 object-cover" />
+      <div className="p-4">
+        <h2 className="text-lg font-semibold mb-1">{title}</h2>
+        <p className="text-gray-500 mb-2">{location}</p>
+        <p className="text-primary-600 font-bold text-xl mb-2">£{price.toLocaleString()}</p>
+        <div className="flex justify-between text-sm text-gray-600 mb-2">
+          <span>{bedrooms} 🛏️</span>
+          <span>{bathrooms} 🛁</span>
+        </div>
+        <div className="flex justify-between text-sm">
+          <span>Yield: {yieldValue}%</span>
+          <span>ROI: {roi}%</span>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default PropertyCard;
