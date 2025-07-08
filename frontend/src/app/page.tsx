@@ -1,3 +1,5 @@
+import { mockProperties } from "./mockProperties";
+
 "use client";
 import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
@@ -13,12 +15,28 @@ export default function PropertiesPage() {
   const [propertyType, setPropertyType] = useState<string>("");
   const [location, setLocation] = useState<string>("");
 
+  "use client";
+import { useEffect, useState } from "react";
+import PropertyCard from "@/components/PropertyCard";
+import Filters from "@/components/Filters";
+import { Property } from "./types";
+import { mockProperties } from "./mockProperties"; // <-- add this
+
+export default function PropertiesPage() {
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([50000, 2000000]);
+  const [yieldRange, setYieldRange] = useState<[number, number]>([2, 15]);
+  const [roiRange, setRoiRange] = useState<[number, number]>([2, 20]);
+  const [bedrooms, setBedrooms] = useState<number | null>(null);
+  const [propertyType, setPropertyType] = useState<string>("");
+  const [location, setLocation] = useState<string>("");
+
   useEffect(() => {
-    fetch("/api/properties")
-      .then((res) => res.json())
-      .then((data) => setProperties(data))
-      .catch((err) => console.error(err));
+    setProperties(mockProperties);
   }, []);
+
+  // ...rest of your component code
+}
 
   return (
     <div className="max-w-7xl mx-auto px-4">
