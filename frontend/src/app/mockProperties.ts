@@ -1,0 +1,40 @@
+import { Property } from "./types";
+
+export const mockProperties: Property[] = [
+  {
+    id: "1",
+    title: "Modern Family Home",
+    price: 250000,
+    location: "Liverpool",
+    bedrooms: 3,
+    bathrooms: 2,
+    description: "A spacious family home with a large garden.",
+    image: "/house1.jpg",
+    yieldValue: 5.6,
+    roi: 11.2,
+  },
+  {
+    id: "2",
+    title: "City Apartment",
+    price: 180000,
+    location: "Newcastle",
+    bedrooms: 2,
+    bathrooms: 1,
+    description: "Modern apartment in the heart of the city.",
+    image: "/apartment1.jpg",
+    yieldValue: 5.1,
+    roi: 9.4,
+  },
+  {
+    id: "3",
+    title: "Cosy Suburban House",
+    price: 225000,
+    location: "Sheffield",
+    bedrooms: 3,
+    bathrooms: 2,
+    description: "A cosy house in a quiet suburb.",
+    image: "/house2.jpg",
+    yieldValue: 4.8,
+    roi: 8.2,
+  },
+];
