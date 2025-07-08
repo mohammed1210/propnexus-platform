@@ -88,21 +88,7 @@ export default function PropertiesPage() {
         location={location}
         onLocationChange={setLocation}
       />
-      <PropertyCard
-  key={property.id}
-  id={property.id}
-  title={property.title}
-  price={property.price}
-  location={property.location}
-  bedrooms={property.bedrooms}
-  bathrooms={property.bathrooms}
-  description={property.description}
-  image={property.image}
-  yieldValue={property.yieldValue}
-  roi={property.roi}
-  latitude={property.latitude}
-  longitude={property.longitude}
-/>
+      <PropertyCard key={property.id} property={property} />
         ))}
       </div>
     </div>
