@@ -88,9 +88,21 @@ export default function PropertiesPage() {
         location={location}
         onLocationChange={setLocation}
       />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-        {filteredProperties.map((property) => (
-          <PropertyCard key={property.id} property={property} />
+      <PropertyCard
+  key={property.id}
+  id={property.id}
+  title={property.title}
+  price={property.price}
+  location={property.location}
+  bedrooms={property.bedrooms}
+  bathrooms={property.bathrooms}
+  description={property.description}
+  image={property.image}
+  yieldValue={property.yieldValue}
+  roi={property.roi}
+  latitude={property.latitude}
+  longitude={property.longitude}
+/>
         ))}
       </div>
     </div>
