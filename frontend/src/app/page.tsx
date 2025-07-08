@@ -69,7 +69,6 @@ export default function PropertiesPage() {
             price={property.price}
             location={property.location}
             bedrooms={property.bedrooms}
-            bathrooms={property.bathrooms}
             yieldValue={property.yieldValue}
             roi={property.roi}
             image={property.image}
