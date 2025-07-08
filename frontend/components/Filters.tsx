@@ -17,9 +17,26 @@ interface FiltersProps {
 
 export default function Filters(props: FiltersProps) {
   return (
-    <div>
-      {/* Add your filter sliders and inputs here */}
-      <p>Filters component placeholder</p>
-    </div>
-  );
-}
+    <div className="flex flex-col md:flex-row gap-2 md:gap-4 mb-4">
+  <input
+    type="text"
+    placeholder="Location"
+    className="border rounded p-2 w-full md:w-auto"
+    value={location}
+    onChange={(e) => onLocationChange(e.target.value)}
+  />
+  <input
+    type="number"
+    placeholder="Bedrooms"
+    className="border rounded p-2 w-full md:w-auto"
+    value={bedrooms || ""}
+    onChange={(e) => onBedroomsChange(Number(e.target.value) || null)}
+  />
+  <input
+    type="text"
+    placeholder="Property Type"
+    className="border rounded p-2 w-full md:w-auto"
+    value={propertyType}
+    onChange={(e) => onPropertyTypeChange(e.target.value)}
+  />
+</div>
