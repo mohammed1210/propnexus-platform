@@ -1,50 +1,45 @@
 "use client";
-
-import React from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
+import { useEffect, useState } from "react";
+import PropertyCard from "@/components/PropertyCard";
+import Filters from "@/components/Filters";
 import type { Property } from "./types";
+import mockProperties from "./mockProperties";
 
-// Fix default marker icon
-delete (L.Icon.Default as any).prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
+export default function PropertiesPage() {
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([50000, 2000000]);
+  const [yieldRange, setYieldRange] = useState<[number, number]>([2, 15]);
+  const [roiRange, setRoiRange] = useState<[number, number]>([2, 20]);
+  const [bedrooms, setBedrooms] = useState<number | null>(null);
+  const [propertyType, setPropertyType] = useState<string>("");
+  const [location, setLocation] = useState<string>("");
 
-interface Props {
-  properties: Property[];
-}
-
-const Map = ({ properties }: Props) => {
-  const center = { lat: 54.5, lng: -3 };
+  useEffect(() => {
+    setProperties(mockProperties);
+  }, []);
 
   return (
-    <MapContainer center={center} zoom={6} style={{ height: "500px", width: "100%" }}>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    <div className="max-w-7xl mx-auto px-4">
+      <h1 className="text-2xl font-bold mb-4">Properties</h1>
+      <Filters
+        priceRange={priceRange}
+        onPriceChange={setPriceRange}
+        yieldRange={yieldRange}
+        onYieldChange={setYieldRange}
+        roiRange={roiRange}
+        onRoiChange={setRoiRange}
+        bedrooms={bedrooms}
+        onBedroomsChange={setBedrooms}
+        propertyType={propertyType}
+        onPropertyTypeChange={setPropertyType}
+        location={location}
+        onLocationChange={setLocation}
       />
-
-      {properties.map((property) => (
-        <Marker
-          key={property.id}
-          position={[
-            property.latitude ?? 0,
-            property.longitude ?? 0,
-          ]}
-        >
-          <Popup>
-            <h3>{property.title}</h3>
-            <p>{property.location}</p>
-            <p>£{property.price.toLocaleString()}</p>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {properties.map((property) => (
+          <PropertyCard key={property.id} property={property} />
+        ))}
+      </div>
+    </div>
   );
-};
-
-export default Map;
+}
