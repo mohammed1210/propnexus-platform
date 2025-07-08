@@ -56,3 +56,34 @@
 .detailsButton:hover {
   background-color: #005bb5;
 }
+
+/* PropertyCard.module.css */
+
+.button {
+  background-color: #2563eb; /* Tailwind blue-600 */
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+}
+
+.button:hover {
+  background-color: #1d4ed8; /* Tailwind blue-700 */
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.buttonSecondary {
+  background-color: white;
+  border: 1px solid #2563eb; /* blue-600 */
+  color: #2563eb;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.buttonSecondary:hover {
+  background-color: #eff6ff; /* Tailwind blue-50 */
+}
