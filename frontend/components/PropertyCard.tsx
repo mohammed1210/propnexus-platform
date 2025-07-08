@@ -1,4 +1,6 @@
-export interface Property {
+import styles from "./PropertyCard.module.css";
+
+interface PropertyProps {
   id: string;
   title: string;
   price: number;
@@ -7,30 +9,37 @@ export interface Property {
   bathrooms: number;
   description: string;
   image: string;
-  yieldValue: number;
-  roi: number;
 }
 
-interface PropertyProps {
-  property: Property;
-}
-
-export default function PropertyCard({ property }: PropertyProps) {
+export default function PropertyCard({
+  id,
+  title,
+  price,
+  location,
+  bedrooms,
+  bathrooms,
+  description,
+  image,
+}: PropertyProps) {
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
+    <div className={styles.card}>
       <img
-        src={property.image || "/placeholder.jpg"}
-        alt={property.title}
-        className="w-full h-48 object-cover"
+        src={image || "/placeholder.jpg"}
+        alt={title}
+        className={styles.image}
       />
-      <div className="p-4">
-        <h3 className="text-lg font-semibold mb-1">{property.title}</h3>
-        <p className="text-gray-500 text-sm mb-1">{property.location}</p>
-        <p className="text-xl font-bold text-blue-700 mb-2">£{property.price.toLocaleString()}</p>
-        <p className="text-gray-600 text-sm mb-1">
-          {property.bedrooms} beds • {property.bathrooms} baths
+      <div className={styles.content}>
+        <h3 className={styles.title}>{title}</h3>
+        <p className={styles.location}>{location}</p>
+        <p className={styles.price}>£{price.toLocaleString()}</p>
+        <p className={styles.details}>
+          {bedrooms} beds • {bathrooms} baths
         </p>
-        <p className="text-gray-700 text-sm">{property.description}</p>
+        <p className={styles.description}>{description}</p>
+        <div className={styles.buttons}>
+          <button className={styles.button}>Save Deal</button>
+          <button className={styles.buttonSecondary}>View Details</button>
+        </div>
       </div>
     </div>
   );
