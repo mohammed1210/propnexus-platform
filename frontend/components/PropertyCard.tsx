@@ -9,17 +9,13 @@ export interface Property {
   bathrooms: number;
   description: string;
   image: string;
+  yieldValue: number;
+  roi: number;
 }
 
 interface PropertyCardProps {
   property: Property;
 }
-
-<img
-  src={image ? image : "/placeholder.jpg"}
-  alt={title}
-  className={styles.image}
-/>
 
 export default function PropertyCard({ property }: PropertyCardProps) {
   return (
@@ -30,13 +26,20 @@ export default function PropertyCard({ property }: PropertyCardProps) {
         className={styles.image}
       />
       <div className={styles.content}>
-        <h3>{property.title}</h3>
-        <p>{property.location}</p>
-        <p>£{property.price.toLocaleString()}</p>
-        <p>
+        <h3 className={styles.title}>{property.title}</h3>
+        <p className={styles.location}>{property.location}</p>
+        <p className={styles.price}>£{property.price.toLocaleString()}</p>
+        <p className={styles.details}>
           {property.bedrooms} beds • {property.bathrooms} baths
         </p>
-        <p>{property.description}</p>
+        <p className={styles.description}>{property.description}</p>
+        <p>
+          Yield: {property.yieldValue}% | ROI: {property.roi}%
+        </p>
+        <div className={styles.buttons}>
+          <button className={styles.button}>Save Deal</button>
+          <button className={styles.buttonSecondary}>View Details</button>
+        </div>
       </div>
     </div>
   );
