@@ -7,6 +7,8 @@ export interface Property {
   bathrooms: number;
   description: string;
   image: string;
+  yieldValue: number;
+  roi: number;
 }
 
 interface PropertyProps {
