@@ -15,6 +15,12 @@ interface PropertyCardProps {
   property: Property;
 }
 
+<img
+  src={image ? image : "/placeholder.jpg"}
+  alt={title}
+  className={styles.image}
+/>
+
 export default function PropertyCard({ property }: PropertyCardProps) {
   return (
     <div className={styles.card}>
