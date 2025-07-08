@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 
 interface FiltersProps {
@@ -30,31 +31,31 @@ const Filters: React.FC<FiltersProps> = ({
   onLocationChange,
 }) => {
   return (
-    <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+    <div className="bg-white p-6 rounded-lg shadow mb-6 border border-gray-200">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <input
           type="text"
           placeholder="Location"
           value={location}
           onChange={(e) => onLocationChange(e.target.value)}
-          className="border p-2 rounded"
+          className="border border-gray-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <input
           type="number"
           placeholder="Bedrooms"
           value={bedrooms ?? ""}
           onChange={(e) => onBedroomsChange(e.target.value ? parseInt(e.target.value) : null)}
-          className="border p-2 rounded"
+          className="border border-gray-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <input
           type="text"
           placeholder="Property Type"
           value={propertyType}
           onChange={(e) => onPropertyTypeChange(e.target.value)}
-          className="border p-2 rounded"
+          className="border border-gray-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
         />
         <div>
-          <label className="block text-sm font-medium mb-1">Price Range</label>
+          <label className="block text-sm font-medium mb-1">Max Price (£)</label>
           <input
             type="range"
             min={50000}
@@ -63,10 +64,10 @@ const Filters: React.FC<FiltersProps> = ({
             onChange={(e) => onPriceChange([priceRange[0], parseInt(e.target.value)])}
             className="w-full"
           />
-          <div className="text-sm">Up to £{priceRange[1].toLocaleString()}</div>
+          <div className="text-sm mt-1">Up to £{priceRange[1].toLocaleString()}</div>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Yield %</label>
+          <label className="block text-sm font-medium mb-1">Max Yield %</label>
           <input
             type="range"
             min={2}
@@ -75,10 +76,10 @@ const Filters: React.FC<FiltersProps> = ({
             onChange={(e) => onYieldChange([yieldRange[0], parseInt(e.target.value)])}
             className="w-full"
           />
-          <div className="text-sm">Up to {yieldRange[1]}%</div>
+          <div className="text-sm mt-1">Up to {yieldRange[1]}%</div>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">ROI %</label>
+          <label className="block text-sm font-medium mb-1">Max ROI %</label>
           <input
             type="range"
             min={2}
@@ -87,7 +88,7 @@ const Filters: React.FC<FiltersProps> = ({
             onChange={(e) => onRoiChange([roiRange[0], parseInt(e.target.value)])}
             className="w-full"
           />
-          <div className="text-sm">Up to {roiRange[1]}%</div>
+          <div className="text-sm mt-1">Up to {roiRange[1]}%</div>
         </div>
       </div>
     </div>
