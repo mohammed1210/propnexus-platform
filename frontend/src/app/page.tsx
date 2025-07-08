@@ -43,7 +43,7 @@ export default function PropertiesPage() {
   },
   {
     id: "3",
-    #title: "Cosy Suburban House",
+    title: "Cosy Suburban House",
     price: 225000,
     location: "Sheffield",
     bedrooms: 3,
@@ -53,7 +53,7 @@ export default function PropertiesPage() {
     yieldValue: 4.8,
     roi: 8.2,
   },
-  ];
+];
 
     setProperties(fetchedProperties);
   }, []);
