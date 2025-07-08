@@ -1,16 +1,22 @@
 import styles from "./PropertyCard.module.css";
-import { Property } from "../src/app/types";
+import type { Property } from "../src/app/types";
 
-export default function PropertyCard({
-  id,
-  title,
-  price,
-  location,
-  bedrooms,
-  bathrooms,
-  description,
-  image,
-}: Property) {
+export default function PropertyCard({ property }: { property: Property }) {
+  const {
+    id,
+    title,
+    price,
+    location,
+    bedrooms,
+    bathrooms,
+    description,
+    image,
+    yieldValue,
+    roi,
+    latitude,
+    longitude,
+  } = property;
+
   return (
     <div className={styles.card}>
       <img
@@ -26,6 +32,7 @@ export default function PropertyCard({
           {bedrooms} beds • {bathrooms} baths
         </p>
         <p className={styles.description}>{description}</p>
+        <p>Yield: {yieldValue}% | ROI: {roi}%</p>
         <div className={styles.buttons}>
           <button className={styles.button}>Save Deal</button>
           <button className={styles.buttonSecondary}>View Details</button>
