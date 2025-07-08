@@ -61,20 +61,21 @@ export default function PropertiesPage() {
         location={location}
         onLocationChange={setLocation}
       />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {properties.map((property) => (
-          <PropertyCard
-            key={property.id}
-            title={property.title}
-            price={property.price}
-            location={property.location}
-            bedrooms={property.bedrooms}
-            yieldValue={property.yieldValue}
-            roi={property.roi}
-            image={property.image}
-          />
-        ))}
-      </div>
+      <div className="max-w-7xl mx-auto px-4">
+  <Filters ...props />
+  {properties.map((property) => (
+    <PropertyCard
+      key={property.id}
+      title={property.title}
+      price={property.price}
+      location={property.location}
+      bedrooms={property.bedrooms}
+      yieldValue={property.yieldValue}
+      roi={property.roi}
+      image={property.image}
+    />
+  ))}
+</div>
     </div>
   );
 }
