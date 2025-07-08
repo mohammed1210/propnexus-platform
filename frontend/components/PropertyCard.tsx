@@ -1,6 +1,6 @@
 import styles from "./PropertyCard.module.css";
 
-interface Property {
+export interface Property {
   id: string;
   title: string;
   price: number;
@@ -11,15 +11,25 @@ interface Property {
   image: string;
 }
 
-export default function PropertyCard({ property }: { property: Property }) {
+interface PropertyCardProps {
+  property: Property;
+}
+
+export default function PropertyCard({ property }: PropertyCardProps) {
   return (
     <div className={styles.card}>
-      <img src={property.image || "/placeholder.jpg"} alt={property.title} className={styles.image} />
+      <img
+        src={property.image || "/placeholder.jpg"}
+        alt={property.title}
+        className={styles.image}
+      />
       <div className={styles.content}>
         <h3>{property.title}</h3>
         <p>{property.location}</p>
         <p>£{property.price.toLocaleString()}</p>
-        <p>{property.bedrooms} beds • {property.bathrooms} baths</p>
+        <p>
+          {property.bedrooms} beds • {property.bathrooms} baths
+        </p>
         <p>{property.description}</p>
       </div>
     </div>
