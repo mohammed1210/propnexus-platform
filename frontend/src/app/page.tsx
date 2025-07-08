@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
-import type { Property } from "../src/app/types";
+import type { Property } from "./types";
 import Filters from "@/components/Filters";
 
 export default function PropertiesPage() {
