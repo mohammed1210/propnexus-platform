@@ -1,12 +1,13 @@
 import React from "react";
 
-interface PropertyProps {
+export interface Property {
+  id: string;
   title: string;
   price: number;
   location: string;
-  yieldValue: number;
-  roi: number;
   bedrooms: number;
+  bathrooms: number;
+  description: string;
   image: string;
 }
 
