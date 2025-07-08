@@ -9,4 +9,6 @@ export interface Property {
   image: string;
   yieldValue: number;
   roi: number;
+  latitude?: number;
+  longitude?: number;
 }
