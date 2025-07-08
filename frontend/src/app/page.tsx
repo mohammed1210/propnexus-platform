@@ -1,10 +1,9 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
 import Filters from "@/components/Filters";
 import type { Property } from "./types";
-import mockProperties from "./mockProperties"; // Optional local mock file if you want
+import mockProperties from "./mockProperties"; // ✅ Add this line
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -15,33 +14,15 @@ export default function PropertiesPage() {
   const [propertyType, setPropertyType] = useState<string>("");
   const [location, setLocation] = useState<string>("");
 
-  // 👉 Use either API fetch or mockProperties (pick ONE)
   useEffect(() => {
-    // Uncomment this if using live API
-    /*
-    fetch("/api/properties")
-      .then((res) => res.json())
-      .then((data) => setProperties(data))
-      .catch((err) => console.error(err));
-    */
+    // Comment out API fetch while using local mock
+    // fetch("/api/properties")
+    //   .then((res) => res.json())
+    //   .then((data) => setProperties(data))
+    //   .catch((err) => console.error(err));
 
-    // Or, if using local mock
     setProperties(mockProperties);
   }, []);
-
-  const filteredProperties = properties.filter((property) => {
-    return (
-      property.price >= priceRange[0] &&
-      property.price <= priceRange[1] &&
-      property.yieldValue >= yieldRange[0] &&
-      property.yieldValue <= yieldRange[1] &&
-      property.roi >= roiRange[0] &&
-      property.roi <= roiRange[1] &&
-      (bedrooms === null || property.bedrooms === bedrooms) &&
-      (propertyType === "" || property.description.toLowerCase().includes(propertyType.toLowerCase())) &&
-      (location === "" || property.location.toLowerCase().includes(location.toLowerCase()))
-    );
-  });
 
   return (
     <div className="max-w-7xl mx-auto px-4">
@@ -61,7 +42,7 @@ export default function PropertiesPage() {
         onLocationChange={setLocation}
       />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredProperties.map((property) => (
+        {properties.map((property) => (
           <PropertyCard key={property.id} property={property} />
         ))}
       </div>
