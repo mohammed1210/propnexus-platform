@@ -12,6 +12,8 @@ const mockProperties: Property[] = [
     image: "/house1.jpg",
     yieldValue: 5.6,
     roi: 11.2,
+    latitude: 53.4084,
+    longitude: -2.9916,
   },
   {
     id: "2",
@@ -24,6 +26,8 @@ const mockProperties: Property[] = [
     image: "/apartment1.jpg",
     yieldValue: 5.1,
     roi: 9.4,
+    latitude: 54.9783,
+    longitude: -1.6178,
   },
   {
     id: "3",
@@ -36,6 +40,8 @@ const mockProperties: Property[] = [
     image: "/house2.jpg",
     yieldValue: 4.8,
     roi: 8.2,
+    latitude: 53.3811,
+    longitude: -1.4701,
   },
 ];
 
