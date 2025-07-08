@@ -1,5 +1,5 @@
 import styles from "./PropertyCard.module.css";
-import type { Property } from "@/app/types";
+import type { Property } from "../src/app/types";
 
 interface PropertyCardProps {
   property: Property;
