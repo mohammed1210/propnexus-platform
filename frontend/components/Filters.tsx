@@ -1,22 +1,32 @@
-interface FiltersProps {
-  location: string;
+export interface FiltersProps {
+  priceRange: [number, number];
+  onPriceChange: React.Dispatch<React.SetStateAction<[number, number]>>;
+  yieldRange: [number, number];
+  onYieldChange: React.Dispatch<React.SetStateAction<[number, number]>>;
+  roiRange: [number, number];
+  onRoiChange: React.Dispatch<React.SetStateAction<[number, number]>>;
   bedrooms: number | null;
-  propertyType: string;
-  onLocationChange: React.Dispatch<React.SetStateAction<string>>;
   onBedroomsChange: React.Dispatch<React.SetStateAction<number | null>>;
+  propertyType: string;
   onPropertyTypeChange: React.Dispatch<React.SetStateAction<string>>;
+  location: string;
+  onLocationChange: React.Dispatch<React.SetStateAction<string>>;
 }
 
-export default function Filters(props: FiltersProps) {
-  const {
-    location,
-    bedrooms,
-    propertyType,
-    onLocationChange,
-    onBedroomsChange,
-    onPropertyTypeChange,
-  } = props;
-
+export default function Filters({
+  priceRange,
+  onPriceChange,
+  yieldRange,
+  onYieldChange,
+  roiRange,
+  onRoiChange,
+  bedrooms,
+  onBedroomsChange,
+  propertyType,
+  onPropertyTypeChange,
+  location,
+  onLocationChange,
+}: FiltersProps) {
   return (
     <div className="flex flex-col md:flex-row gap-2 md:gap-4 mb-4">
       <input
