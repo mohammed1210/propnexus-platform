@@ -1,10 +1,12 @@
 export type Property = {
   id: string;
   title: string;
-  location: string;
-  address: string;
   price: number;
+  location: string;
+  bedrooms: number;
+  bathrooms: number;
   description: string;
-  latitude?: number;
-  longitude?: number;
+  image: string;
+  yieldValue: number;
+  roi: number;
 };
