@@ -1,17 +1,5 @@
 import styles from "./PropertyCard.module.css";
-
-export interface Property {
-  id: string;
-  title: string;
-  price: number;
-  location: string;
-  bedrooms: number;
-  bathrooms: number;
-  description: string;
-  image: string;
-  yieldValue: number;
-  roi: number;
-}
+import type { Property } from "../src/app/types";
 
 interface PropertyCardProps {
   property: Property;
@@ -33,9 +21,7 @@ export default function PropertyCard({ property }: PropertyCardProps) {
           {property.bedrooms} beds • {property.bathrooms} baths
         </p>
         <p className={styles.description}>{property.description}</p>
-        <p>
-          Yield: {property.yieldValue}% | ROI: {property.roi}%
-        </p>
+        <p>Yield: {property.yieldValue}% | ROI: {property.roi}%</p>
         <div className={styles.buttons}>
           <button className={styles.button}>Save Deal</button>
           <button className={styles.buttonSecondary}>View Details</button>
