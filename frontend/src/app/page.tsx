@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
 import Filters from "@/components/Filters";
 import type { Property } from "./types";
-import mockProperties from "./mockProperties"; // ✅ Add this line
+import mockProperties from "./mockProperties"; // Local mock data
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -15,14 +15,26 @@ export default function PropertiesPage() {
   const [location, setLocation] = useState<string>("");
 
   useEffect(() => {
-    // Comment out API fetch while using local mock
+    setProperties(mockProperties);
+    // Or use API fetch:
     // fetch("/api/properties")
     //   .then((res) => res.json())
     //   .then((data) => setProperties(data))
     //   .catch((err) => console.error(err));
-
-    setProperties(mockProperties);
   }, []);
+
+  const filteredProperties = properties.filter(
+    (property) =>
+      property.price >= priceRange[0] &&
+      property.price <= priceRange[1] &&
+      property.yieldValue >= yieldRange[0] &&
+      property.yieldValue <= yieldRange[1] &&
+      property.roi >= roiRange[0] &&
+      property.roi <= roiRange[1] &&
+      (!bedrooms || property.bedrooms === bedrooms) &&
+      (!location || property.location.toLowerCase().includes(location.toLowerCase())) &&
+      (!propertyType || property.title.toLowerCase().includes(propertyType.toLowerCase()))
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-4">
@@ -42,7 +54,7 @@ export default function PropertiesPage() {
         onLocationChange={setLocation}
       />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {properties.map((property) => (
+        {filteredProperties.map((property) => (
           <PropertyCard key={property.id} property={property} />
         ))}
       </div>
