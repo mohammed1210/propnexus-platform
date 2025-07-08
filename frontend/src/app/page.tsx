@@ -1,43 +1,56 @@
 "use client";
-
-import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { Property } from "./types"; // ✅ use shared type
+import PropertyCard from "../components/PropertyCard";
+import Filters from "../components/Filters";
+import { Property } from "../types";
 
-const Map = dynamic(() => import("./Map"), { ssr: false });
-
-export default function Page() {
+export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([50000, 2000000]);
+  const [yieldRange, setYieldRange] = useState<[number, number]>([2, 15]);
+  const [roiRange, setRoiRange] = useState<[number, number]>([2, 20]);
+  const [bedrooms, setBedrooms] = useState<number | null>(null);
+  const [propertyType, setPropertyType] = useState<string>("");
+  const [location, setLocation] = useState<string>("");
 
   useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
-        const data = await res.json();
-        const dataWithAddress = data.map((p: any) => ({
-          ...p,
-          address: p.address || "",
-        }));
-        setProperties(dataWithAddress);
-      } catch (error) {
-        console.error("Error fetching properties:", error);
-      }
-    };
-
-    fetchProperties();
+    fetch("/api/properties")
+      .then((res) => res.json())
+      .then((data) => setProperties(data))
+      .catch((err) => console.error(err));
   }, []);
 
   return (
-    <main>
-      <h1>Properties</h1>
-      <Map properties={properties} />
-      <ul>
-        {properties.map((p) => (
-          <li key={p.id}>
-            {p.title} – {p.location} – £{p.price}
-          </li>
+    <div className="max-w-7xl mx-auto px-4">
+      <h1 className="text-2xl font-bold mb-4">Properties</h1>
+      <Filters
+        priceRange={priceRange}
+        onPriceChange={setPriceRange}
+        yieldRange={yieldRange}
+        onYieldChange={setYieldRange}
+        roiRange={roiRange}
+        onRoiChange={setRoiRange}
+        bedrooms={bedrooms}
+        onBedroomsChange={setBedrooms}
+        propertyType={propertyType}
+        onPropertyTypeChange={setPropertyType}
+        location={location}
+        onLocationChange={setLocation}
+      />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {properties.map((property) => (
+          <PropertyCard
+            key={property.id}
+            title={property.title}
+            price={property.price}
+            location={property.location}
+            bedrooms={property.bedrooms}
+            yieldValue={property.yieldValue}
+            roi={property.roi}
+            image={property.image}
+          />
         ))}
-      </ul>
-    </main>
+      </div>
+    </div>
   );
 }
