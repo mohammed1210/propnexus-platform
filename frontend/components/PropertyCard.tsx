@@ -1,5 +1,13 @@
 import styles from "./PropertyCard.module.css";
 
+import { Property } from "../src/app/types";
+
+export default function PropertyCard({ property }: { property: Property }) {
+  return (
+    // unchanged content
+  );
+}
+
 interface PropertyProps {
   id: string;
   title: string;
