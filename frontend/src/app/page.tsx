@@ -1,21 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import PropertyCard from "../../components/PropertyCard";
-import Filters from "../../components/Filters";
-
-interface Property {
-  id: string;
-  title: string;
-  price: number;
-  location: string;
-  bedrooms: number;
-  bathrooms: number;
-  yieldValue: number;
-  roi: number;
-  image: string;
-  propertyType: string;
-}
+import PropertyCard, { Property } from "@/components/PropertyCard";
+import Filters from "@/components/Filters";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -27,22 +14,45 @@ export default function PropertiesPage() {
   const [location, setLocation] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams();
-    params.append("minPrice", priceRange[0].toString());
-    params.append("maxPrice", priceRange[1].toString());
-    params.append("minYield", yieldRange[0].toString());
-    params.append("maxYield", yieldRange[1].toString());
-    params.append("minROI", roiRange[0].toString());
-    params.append("maxROI", roiRange[1].toString());
-    if (bedrooms !== null) params.append("bedrooms", bedrooms.toString());
-    if (propertyType) params.append("propertyType", propertyType);
-    if (location) params.append("location", location);
+    // Example mock data (replace with your real API call if needed)
+    const fetchedProperties: Property[] = [
+      {
+        id: "1",
+        title: "Modern Family Home",
+        price: 250000,
+        location: "Liverpool",
+        bedrooms: 3,
+        bathrooms: 2,
+        description: "Spacious family home with garden",
+        image: "/house1.jpg"
+      },
+      {
+        id: "2",
+        title: "City Apartment",
+        price: 180000,
+        location: "Newcastle upon Tyne",
+        bedrooms: 2,
+        bathrooms: 1,
+        description: "Stylish city apartment close to amenities",
+        image: "/apartment1.jpg"
+      }
+    ];
 
-    fetch(`/api/properties?${params.toString()}`)
-      .then((res) => res.json())
-      .then((data) => setProperties(data))
-      .catch((err) => console.error(err));
-  }, [priceRange, yieldRange, roiRange, bedrooms, propertyType, location]);
+    setProperties(fetchedProperties);
+  }, []);
+
+  const filteredProperties = properties.filter(
+    (property) =>
+      property.price >= priceRange[0] &&
+      property.price <= priceRange[1] &&
+      property.yieldValue >= yieldRange[0] &&
+      property.yieldValue <= yieldRange[1] &&
+      property.roi >= roiRange[0] &&
+      property.roi <= roiRange[1] &&
+      (!bedrooms || property.bedrooms === bedrooms) &&
+      (!propertyType || property.description.toLowerCase().includes(propertyType.toLowerCase())) &&
+      (!location || property.location.toLowerCase().includes(location.toLowerCase()))
+  );
 
   return (
     <div className="container mx-auto px-4">
@@ -61,21 +71,11 @@ export default function PropertiesPage() {
         location={location}
         onLocationChange={setLocation}
       />
-      <div className="max-w-7xl mx-auto px-4">
-  <Filters ...props />
-  {properties.map((property) => (
-    <PropertyCard
-      key={property.id}
-      title={property.title}
-      price={property.price}
-      location={property.location}
-      bedrooms={property.bedrooms}
-      yieldValue={property.yieldValue}
-      roi={property.roi}
-      image={property.image}
-    />
-  ))}
-</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+        {filteredProperties.map((property) => (
+          <PropertyCard key={property.id} property={property} />
+        ))}
+      </div>
     </div>
   );
 }
