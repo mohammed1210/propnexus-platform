@@ -1,3 +1,12 @@
+interface FiltersProps {
+  location: string;
+  bedrooms: number | null;
+  propertyType: string;
+  onLocationChange: React.Dispatch<React.SetStateAction<string>>;
+  onBedroomsChange: React.Dispatch<React.SetStateAction<number | null>>;
+  onPropertyTypeChange: React.Dispatch<React.SetStateAction<string>>;
+}
+
 export default function Filters(props: FiltersProps) {
   const {
     location,
