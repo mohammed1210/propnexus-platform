@@ -2,17 +2,17 @@
 
 interface FiltersProps {
   priceRange: [number, number];
-  setPriceRange: (range: [number, number]) => void;
+  onPriceChange: React.Dispatch<React.SetStateAction<[number, number]>>;
   yieldRange: [number, number];
-  setYieldRange: (range: [number, number]) => void;
+  onYieldChange: React.Dispatch<React.SetStateAction<[number, number]>>;
   roiRange: [number, number];
-  setRoiRange: (range: [number, number]) => void;
+  onRoiChange: React.Dispatch<React.SetStateAction<[number, number]>>;
   bedrooms: number | null;
-  setBedrooms: (beds: number | null) => void;
+  onBedroomsChange: React.Dispatch<React.SetStateAction<number | null>>;
   propertyType: string;
-  setPropertyType: (type: string) => void;
+  onPropertyTypeChange: React.Dispatch<React.SetStateAction<string>>;
   location: string;
-  setLocation: (loc: string) => void;
+  onLocationChange: React.Dispatch<React.SetStateAction<string>>;
 }
 
 export default function Filters(props: FiltersProps) {
