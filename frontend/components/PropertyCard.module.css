@@ -1,10 +1,14 @@
 .card {
-  border: 1px solid #ddd;
+  background: white;
   border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
   overflow: hidden;
-  width: 300px;
-  display: flex;
-  flex-direction: column;
+  margin-bottom: 1.5rem;
+  transition: transform 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
 }
 
 .image {
@@ -13,46 +17,63 @@
   object-fit: cover;
 }
 
-.placeholder {
-  width: 100%;
-  height: 180px;
-  background-color: #eee;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #777;
-}
-
 .content {
-  padding: 12px;
+  padding: 1rem;
 }
 
 .title {
-  font-size: 1.2rem;
-  margin: 0 0 4px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
 }
 
 .location {
-  font-size: 1rem;
   color: #666;
-  margin: 0 0 8px;
+  margin-bottom: 0.5rem;
 }
 
 .price {
-  font-weight: bold;
-  color: #2c3e50;
-  margin: 0 0 12px;
+  color: #1e40af;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
 }
 
-.detailsButton {
-  padding: 8px 12px;
-  background-color: #0070f3;
+.details {
+  margin-bottom: 0.5rem;
+}
+
+.description {
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.button {
+  background-color: #1e40af;
   color: white;
+  padding: 0.5rem 1rem;
   border: none;
   border-radius: 4px;
   cursor: pointer;
 }
 
-.detailsButton:hover {
-  background-color: #005bb5;
+.button:hover {
+  background-color: #1c368c;
+}
+
+.buttonSecondary {
+  background-color: transparent;
+  color: #1e40af;
+  padding: 0.5rem 1rem;
+  border: 1px solid #1e40af;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.buttonSecondary:hover {
+  background-color: #f0f4ff;
 }
