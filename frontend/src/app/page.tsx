@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
 import Filters from "@/components/Filters";
-import { Property } from "../types";
+import { Property } from "./types";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
