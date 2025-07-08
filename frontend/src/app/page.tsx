@@ -13,6 +13,7 @@ export default function PropertiesPage() {
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [propertyType, setPropertyType] = useState<string>("");
   const [location, setLocation] = useState<string>("");
+  const [investmentType, setInvestmentType] = useState<string>("");
 
   useEffect(() => {
     // Use API or mock
