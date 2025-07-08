@@ -33,13 +33,18 @@ export default function Filters(props: FiltersProps) {
           value={props.bedrooms ?? ""}
           onChange={(e) => props.onBedroomsChange(Number(e.target.value) || null)}
         />
-        <input
-          type="text"
-          placeholder="Property Type"
-          className="border rounded p-2 w-full"
-          value={props.propertyType}
-          onChange={(e) => props.onPropertyTypeChange(e.target.value)}
-        />
+        <select
+  className="border rounded p-2 w-full md:w-auto"
+  value={propertyType}
+  onChange={(e) => onPropertyTypeChange(e.target.value)}
+>
+  <option value="">All Types</option>
+  <option value="House">House</option>
+  <option value="Apartment">Apartment</option>
+  <option value="Studio">Studio</option>
+  <option value="Detached">Detached</option>
+  <option value="Semi-Detached">Semi-Detached</option>
+</select>
       </div>
       <div>
         <label>Max Price (£): Up to £{props.priceRange[1].toLocaleString()}</label>
