@@ -1,6 +1,6 @@
-import { Property } from "./types";
+import type { Property } from "./types";
 
-export const mockProperties: Property[] = [
+const mockProperties: Property[] = [
   {
     id: "1",
     title: "Modern Family Home",
@@ -17,10 +17,10 @@ export const mockProperties: Property[] = [
     id: "2",
     title: "City Apartment",
     price: 180000,
-    location: "Newcastle",
+    location: "Newcastle upon Tyne",
     bedrooms: 2,
     bathrooms: 1,
-    description: "Modern apartment in the heart of the city.",
+    description: "A modern apartment in the heart of the city.",
     image: "/apartment1.jpg",
     yieldValue: 5.1,
     roi: 9.4,
@@ -38,3 +38,5 @@ export const mockProperties: Property[] = [
     roi: 8.2,
   },
 ];
+
+export default mockProperties;
