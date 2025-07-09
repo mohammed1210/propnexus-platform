@@ -1,3 +1,9 @@
+import os
+from databases import Database
+
+DATABASE_URL = os.getenv("DATABASE_URL", "your_fallback_url_here")
+database = Database(DATABASE_URL)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
