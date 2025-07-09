@@ -17,8 +17,11 @@ export default function PropertiesPage() {
   const [location, setLocation] = useState<string>("");
 
   useEffect(() => {
-    setProperties(mockProperties);
-  }, []);
+  fetch("https://propnexus-backend-production.up.railway.app/properties")
+    .then((res) => res.json())
+    .then((data) => setProperties(data))
+    .catch((err) => console.error("Failed to fetch properties:", err));
+}, []);
 
   const filteredProperties = properties.filter((property) =>
     property.price >= priceRange[0] &&
