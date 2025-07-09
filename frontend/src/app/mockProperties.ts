@@ -14,6 +14,7 @@ const mockProperties: Property[] = [
     roi: 11.2,
     latitude: 53.4084,
     longitude: -2.9916,
+    propertyType: "House",
     investmentType: "Buy Refurbish Refinance",
   },
   {
@@ -29,6 +30,7 @@ const mockProperties: Property[] = [
     roi: 9.4,
     latitude: 54.9783,
     longitude: -1.6178,
+    propertyType: "Flat",
     investmentType: "Buy to Let",
   },
   {
@@ -44,6 +46,7 @@ const mockProperties: Property[] = [
     roi: 8.2,
     latitude: 53.3811,
     longitude: -1.4701,
+    propertyType: "Bungalow',
     investmentType: "Flip",
   },
 ];
