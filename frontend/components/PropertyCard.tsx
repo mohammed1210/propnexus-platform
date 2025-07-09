@@ -10,9 +10,9 @@ export default function PropertyCard({ property }: { property: Property }) {
     bedrooms,
     bathrooms,
     description,
-    image,
-    yieldValue,
-    roi,
+    imageurl,
+    yield_percent,
+    roi_percent,
     latitude,
     longitude,
   } = property;
