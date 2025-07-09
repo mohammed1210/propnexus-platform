@@ -1,4 +1,4 @@
-import type { FC } from "react";
+import React from "react";
 
 interface FiltersProps {
   priceRange: [number, number];
@@ -17,7 +17,7 @@ interface FiltersProps {
   onInvestmentTypeChange: (value: string) => void;
 }
 
-const Filters: FC<FiltersProps> = ({
+export default function Filters({
   priceRange,
   onPriceChange,
   yieldRange,
@@ -32,34 +32,42 @@ const Filters: FC<FiltersProps> = ({
   onLocationChange,
   investmentType,
   onInvestmentTypeChange,
-}) => {
+}: FiltersProps) {
   return (
-    <div className="flex flex-col md:flex-row gap-2 md:gap-4 mb-4">
+    <div className="space-y-2 mb-4">
       <input
         type="text"
         placeholder="Location"
-        className="border rounded p-2 w-full md:w-auto"
         value={location}
         onChange={(e) => onLocationChange(e.target.value)}
+        className="border rounded p-2 w-full md:w-auto"
       />
       <input
         type="number"
         placeholder="Bedrooms"
-        className="border rounded p-2 w-full md:w-auto"
         value={bedrooms ?? ""}
         onChange={(e) => onBedroomsChange(e.target.value ? Number(e.target.value) : null)}
-      />
-      <input
-        type="text"
-        placeholder="Property Type"
         className="border rounded p-2 w-full md:w-auto"
+      />
+
+      {/* Property Type Dropdown */}
+      <select
         value={propertyType}
         onChange={(e) => onPropertyTypeChange(e.target.value)}
-      />
-      <select
         className="border rounded p-2 w-full md:w-auto"
+      >
+        <option value="">All Property Types</option>
+        <option value="House">House</option>
+        <option value="Apartment">Apartment</option>
+        <option value="HMO">HMO</option>
+        <option value="Serviced Accommodation">Serviced Accommodation</option>
+      </select>
+
+      {/* Investment Type Dropdown */}
+      <select
         value={investmentType}
         onChange={(e) => onInvestmentTypeChange(e.target.value)}
+        className="border rounded p-2 w-full md:w-auto"
       >
         <option value="">All Investment Types</option>
         <option value="Buy Refurbish Refinance">Buy Refurbish Refinance</option>
@@ -70,6 +78,4 @@ const Filters: FC<FiltersProps> = ({
       </select>
     </div>
   );
-};
-
-export default Filters;
+}
