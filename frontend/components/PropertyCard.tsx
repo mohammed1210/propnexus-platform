@@ -20,7 +20,7 @@ export default function PropertyCard({ property }: { property: Property }) {
   return (
     <div className={styles.card}>
       <img
-        src={image || "/placeholder.jpg"}
+        src={imageurl || "/placeholder.jpg"}
         alt={title}
         className={styles.image}
       />
@@ -32,7 +32,7 @@ export default function PropertyCard({ property }: { property: Property }) {
           {bedrooms} beds • {bathrooms} baths
         </p>
         <p className={styles.description}>{description}</p>
-        <p>Yield: {yieldValue}% | ROI: {roi}%</p>
+        <p className={styles.description}>Yield: {yield_percent}% | ROI: {roi_percent}%</p>
         <div className={styles.buttons}>
           <button className={styles.button}>Save Deal</button>
           <button className={styles.buttonSecondary}>View Details</button>
