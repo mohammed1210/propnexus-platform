@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
 import Filters from "@/components/Filters";
 import type { Property } from "./types";
-import mockProperties from "./mockProperties";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -17,19 +16,10 @@ export default function PropertiesPage() {
   const [location, setLocation] = useState("");
 
   useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
-        if (!res.ok) throw new Error("Failed to fetch");
-        const data = await res.json();
-        setProperties(data);
-      } catch (error) {
-        console.error("Using mock properties as fallback:", error);
-        setProperties(mockProperties);
-      }
-    };
-
-    fetchProperties();
+    fetch("https://propnexus-backend-production.up.railway.app/properties")
+      .then((res) => res.json())
+      .then((data) => setProperties(data))
+      .catch((err) => console.error("Error fetching properties:", err));
   }, []);
 
   const filteredProperties = properties.filter(
