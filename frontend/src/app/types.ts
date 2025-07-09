@@ -9,7 +9,8 @@ export interface Property {
   image: string;
   yieldValue: number;
   roi: number;
-  latitude: number;
-  longitude: number;
-  investmentType: string;
+  propertyType?: string; // ✅ Add this
+  investmentType?: string; // ✅ Add this
+  latitude?: number; // if using map
+  longitude?: number;
 }
