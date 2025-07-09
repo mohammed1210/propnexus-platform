@@ -1,4 +1,4 @@
-export type Property = {
+export interface Property {
   id: string;
   title: string;
   price: number;
@@ -9,6 +9,8 @@ export type Property = {
   image: string;
   yieldValue: number;
   roi: number;
-  latitude?: number;   // Optional if not always present
-  longitude?: number;  // Optional if not always present
-};
+  propertyType?: string; // ✅ Add this
+  investmentType?: string; // ✅ Add this
+  latitude?: number; // if using map
+  longitude?: number;
+}
