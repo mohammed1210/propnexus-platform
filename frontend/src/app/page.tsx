@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
 import Filters from "@/components/Filters";
@@ -12,17 +13,11 @@ export default function PropertiesPage() {
   const [roiRange, setRoiRange] = useState<[number, number]>([2, 20]);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [propertyType, setPropertyType] = useState<string>("");
-  const [location, setLocation] = useState<string>("");
   const [investmentType, setInvestmentType] = useState<string>("");
+  const [location, setLocation] = useState<string>("");
 
   useEffect(() => {
-    // Use API or local mock data
     setProperties(mockProperties);
-    // Or if using API:
-    // fetch("/api/properties")
-    //   .then((res) => res.json())
-    //   .then((data) => setProperties(data))
-    //   .catch((err) => console.error(err));
   }, []);
 
   const filteredProperties = properties.filter((property) =>
@@ -31,14 +26,15 @@ export default function PropertiesPage() {
     property.yieldValue >= yieldRange[0] &&
     property.yieldValue <= yieldRange[1] &&
     property.roi >= roiRange[0] &&
-    (bedrooms === null || property.bedrooms === bedrooms) &&
-    (propertyType === "" || property.propertyType?.toLowerCase().includes(propertyType.toLowerCase())) &&
-    (investmentType === "" || property.investmentType?.toLowerCase() === investmentType.toLowerCase()) &&
-    (location === "" || property.location.toLowerCase().includes(location.toLowerCase()))
+    property.roi <= roiRange[1] &&
+    (!bedrooms || property.bedrooms === bedrooms) &&
+    (!propertyType || property.propertyType?.toLowerCase() === propertyType.toLowerCase()) &&
+    (!investmentType || property.investmentType?.toLowerCase() === investmentType.toLowerCase()) &&
+    (!location || property.location.toLowerCase().includes(location.toLowerCase()))
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4">
+    <div className="container mx-auto px-4">
       <h1 className="text-2xl font-bold mb-4">Properties</h1>
       <Filters
         priceRange={priceRange}
@@ -51,12 +47,12 @@ export default function PropertiesPage() {
         onBedroomsChange={setBedrooms}
         propertyType={propertyType}
         onPropertyTypeChange={setPropertyType}
-        location={location}
-        onLocationChange={setLocation}
         investmentType={investmentType}
         onInvestmentTypeChange={setInvestmentType}
+        location={location}
+        onLocationChange={setLocation}
       />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
         {filteredProperties.map((property) => (
           <PropertyCard key={property.id} property={property} />
         ))}
