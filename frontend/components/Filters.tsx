@@ -1,21 +1,23 @@
+import type { FC } from "react";
+
 interface FiltersProps {
   priceRange: [number, number];
-  onPriceChange: React.Dispatch<React.SetStateAction<[number, number]>>;
+  onPriceChange: (range: [number, number]) => void;
   yieldRange: [number, number];
-  onYieldChange: React.Dispatch<React.SetStateAction<[number, number]>>;
+  onYieldChange: (range: [number, number]) => void;
   roiRange: [number, number];
-  onRoiChange: React.Dispatch<React.SetStateAction<[number, number]>>;
+  onRoiChange: (range: [number, number]) => void;
   bedrooms: number | null;
-  onBedroomsChange: React.Dispatch<React.SetStateAction<number | null>>;
+  onBedroomsChange: (value: number | null) => void;
   propertyType: string;
-  onPropertyTypeChange: React.Dispatch<React.SetStateAction<string>>;
+  onPropertyTypeChange: (value: string) => void;
   location: string;
-  onLocationChange: React.Dispatch<React.SetStateAction<string>>;
+  onLocationChange: (value: string) => void;
   investmentType: string;
-  onInvestmentTypeChange: React.Dispatch<React.SetStateAction<string>>;
+  onInvestmentTypeChange: (value: string) => void;
 }
 
-export default function Filters({
+const Filters: FC<FiltersProps> = ({
   priceRange,
   onPriceChange,
   yieldRange,
@@ -30,7 +32,7 @@ export default function Filters({
   onLocationChange,
   investmentType,
   onInvestmentTypeChange,
-}: FiltersProps) {
+}) => {
   return (
     <div className="flex flex-col md:flex-row gap-2 md:gap-4 mb-4">
       <input
@@ -44,22 +46,16 @@ export default function Filters({
         type="number"
         placeholder="Bedrooms"
         className="border rounded p-2 w-full md:w-auto"
-        value={bedrooms || ""}
-        onChange={(e) =>
-          onBedroomsChange(Number(e.target.value) || null)
-        }
+        value={bedrooms ?? ""}
+        onChange={(e) => onBedroomsChange(e.target.value ? Number(e.target.value) : null)}
       />
-      <select
+      <input
+        type="text"
+        placeholder="Property Type"
         className="border rounded p-2 w-full md:w-auto"
         value={propertyType}
         onChange={(e) => onPropertyTypeChange(e.target.value)}
-      >
-        <option value="">All Property Types</option>
-        <option value="House">House</option>
-        <option value="Apartment">Apartment</option>
-        <option value="Studio">Studio</option>
-      </select>
-
+      />
       <select
         className="border rounded p-2 w-full md:w-auto"
         value={investmentType}
@@ -67,11 +63,13 @@ export default function Filters({
       >
         <option value="">All Investment Types</option>
         <option value="Buy Refurbish Refinance">Buy Refurbish Refinance</option>
-        <option value="Buy to Let">Buy to Let (incl. HMO & SA)</option>
+        <option value="Buy to Let">Buy to Let</option>
         <option value="Flip">Flip</option>
         <option value="Lease Option Agreement">Lease Option Agreement</option>
         <option value="Rent to SA">Rent to SA</option>
       </select>
     </div>
   );
-}
+};
+
+export default Filters;
