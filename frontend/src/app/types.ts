@@ -6,9 +6,9 @@ export interface Property {
   bedrooms: number;
   bathrooms: number;
   description: string;
-  image: string;
-  yieldValue: number;
-  roi: number;
+  imageurl: string;
+  yield_percent: number;
+  roi_percent: number;
   propertyType?: string; // ✅ Add this
   investmentType?: string; // ✅ Add this
   latitude?: number; // if using map
