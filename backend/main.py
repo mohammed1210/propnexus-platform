@@ -1,26 +1,25 @@
-import os
-from databases import Database
-
-DATABASE_URL = os.getenv("DATABASE_URL", "your_fallback_url_here")
-database = Database(DATABASE_URL)
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 from pydantic import BaseModel
+import os
+from databases import Database
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:your_password@host:port/dbname")
+database = Database(DATABASE_URL)
 
 app = FastAPI()
 
-# ✅ Allow frontend calls (CORS)
+# ✅ Allow frontend calls
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Or set your Vercel URL for more security
+    allow_origins=["*"],  # Change to your frontend URL for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ✅ Define a Property schema
+# ✅ Property schema
 class Property(BaseModel):
     id: str
     title: str
@@ -37,44 +36,33 @@ class Property(BaseModel):
     propertyType: str
     investmentType: str
 
-# ✅ Example fake DB data (replace this with your actual DB query)
-properties_db = [
-    {
-        "id": "1",
-        "title": "Modern Family Home",
-        "price": 250000,
-        "location": "Liverpool",
-        "bedrooms": 3,
-        "bathrooms": 2,
-        "description": "A spacious family home with a large garden.",
-        "image": "https://your-bucket.s3.amazonaws.com/house1.jpg",
-        "yieldValue": 5.6,
-        "roi": 11.2,
-        "latitude": 53.4084,
-        "longitude": -2.9916,
-        "propertyType": "House",
-        "investmentType": "Buy to Let"
-    },
-    {
-        "id": "2",
-        "title": "City Apartment",
-        "price": 180000,
-        "location": "Newcastle upon Tyne",
-        "bedrooms": 2,
-        "bathrooms": 1,
-        "description": "A modern apartment in the heart of the city.",
-        "image": "https://your-bucket.s3.amazonaws.com/apartment1.jpg",
-        "yieldValue": 5.1,
-        "roi": 9.4,
-        "latitude": 54.9783,
-        "longitude": -1.6178,
-        "propertyType": "Apartment",
-        "investmentType": "Flip"
-    }
-]
+@app.on_event("startup")
+async def startup():
+    await database.connect()
 
-# ✅ API route
+@app.on_event("shutdown")
+async def shutdown():
+    await database.disconnect()
+
 @app.get("/api/properties", response_model=List[Property])
 async def get_properties():
-    # 🔥 Later: Replace this with DB call like: database.fetch_all_properties()
-    return properties_db
+    query = """
+        SELECT 
+            id::text, 
+            title, 
+            price, 
+            location, 
+            bedrooms, 
+            bathrooms, 
+            description, 
+            imageurl AS image, 
+            yield_percent AS yieldValue, 
+            roi_percent AS roi, 
+            0.0 AS latitude, 
+            0.0 AS longitude, 
+            '' AS propertyType, 
+            source AS investmentType
+        FROM properties
+    """
+    rows = await database.fetch_all(query)
+    return rows
