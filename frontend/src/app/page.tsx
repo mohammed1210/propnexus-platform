@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
-import Filters from "@/components/Filters";
 import type { Property } from "./types";
-import mockProperties from "./mockProperties";
+import Filters from "@/components/Filters";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -12,27 +11,33 @@ export default function PropertiesPage() {
   const [yieldRange, setYieldRange] = useState<[number, number]>([2, 15]);
   const [roiRange, setRoiRange] = useState<[number, number]>([2, 20]);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
-  const [propertyType, setPropertyType] = useState<string>("");
-  const [investmentType, setInvestmentType] = useState<string>("");
-  const [location, setLocation] = useState<string>("");
+  const [propertyType, setPropertyType] = useState("");
+  const [investmentType, setInvestmentType] = useState("");
+  const [location, setLocation] = useState("");
 
   useEffect(() => {
-  fetch("https://propnexus-backend-production.up.railway.app/properties")
-    .then((res) => res.json())
-    .then((data) => setProperties(data))
-    .catch((err) => console.error("Failed to fetch properties:", err));
-}, []);
+    const fetchProperties = async () => {
+      try {
+        const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
+        const data = await res.json();
+        setProperties(data);
+      } catch (error) {
+        console.error("Failed to fetch properties:", error);
+      }
+    };
+    fetchProperties();
+  }, []);
 
   const filteredProperties = properties.filter((property) =>
     property.price >= priceRange[0] &&
     property.price <= priceRange[1] &&
-    property.yieldValue >= yieldRange[0] &&
-    property.yieldValue <= yieldRange[1] &&
-    property.roi >= roiRange[0] &&
-    property.roi <= roiRange[1] &&
+    property.yield_percent >= yieldRange[0] &&
+    property.yield_percent <= yieldRange[1] &&
+    property.roi_percent >= roiRange[0] &&
+    property.roi_percent <= roiRange[1] &&
     (!bedrooms || property.bedrooms === bedrooms) &&
-    (!propertyType || property.propertyType?.toLowerCase() === propertyType.toLowerCase()) &&
-    (!investmentType || property.investmentType?.toLowerCase() === investmentType.toLowerCase()) &&
+    (!propertyType || property.propertyType?.toLowerCase().includes(propertyType.toLowerCase())) &&
+    (!investmentType || property.investmentType?.toLowerCase().includes(investmentType.toLowerCase())) &&
     (!location || property.location.toLowerCase().includes(location.toLowerCase()))
   );
 
