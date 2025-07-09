@@ -9,8 +9,8 @@ export interface Property {
   imageurl: string;
   yield_percent: number;
   roi_percent: number;
-  propertyType?: string; // ✅ Add this
-  investmentType?: string; // ✅ Add this
-  latitude?: number; // if using map
+  propertyType?: string;
+  investmentType?: string;
+  latitude?: number;
   longitude?: number;
 }
