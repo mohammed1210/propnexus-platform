@@ -32,7 +32,9 @@ export default function PropertyCard({ property }: { property: Property }) {
           {bedrooms} beds • {bathrooms} baths
         </p>
         <p className={styles.description}>{description}</p>
-        <p className={styles.description}>Yield: {yield_percent}% | ROI: {roi_percent}%</p>
+        <p className={styles.description}>
+          Yield: {yield_percent}% | ROI: {roi_percent}%
+        </p>
         <div className={styles.buttons}>
           <button className={styles.button}>Save Deal</button>
           <button className={styles.buttonSecondary}>View Details</button>
