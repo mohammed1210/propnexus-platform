@@ -16,7 +16,6 @@ export default function PropertiesPage() {
   const [investmentType, setInvestmentType] = useState<string>("");
 
   useEffect(() => {
-    // Use API or mock
     setProperties(mockProperties);
   }, []);
 
@@ -29,7 +28,8 @@ export default function PropertiesPage() {
       property.roi >= roiRange[0] &&
       property.roi <= roiRange[1] &&
       (bedrooms === null || property.bedrooms === bedrooms) &&
-      (propertyType === "" || property.title.includes(propertyType)) &&
+      (propertyType === "" || property.propertyType?.toLowerCase().includes(propertyType.toLowerCase())) &&
+      (investmentType === "" || property.investmentType?.toLowerCase() === investmentType.toLowerCase()) &&
       (location === "" || property.location.toLowerCase().includes(location.toLowerCase()))
   );
 
@@ -49,6 +49,7 @@ export default function PropertiesPage() {
         onPropertyTypeChange={setPropertyType}
         location={location}
         onLocationChange={setLocation}
+        investmentType={investmentType}
         onInvestmentTypeChange={setInvestmentType}
       />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
