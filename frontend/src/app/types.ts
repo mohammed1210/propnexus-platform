@@ -6,7 +6,7 @@ export interface Property {
   bedrooms: number;
   bathrooms: number;
   description: string;
-  imageurl: string;
+  imageurl: string;  // ✅ matches backend
   yield_percent: number;
   roi_percent: number;
   propertyType?: string;
