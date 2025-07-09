@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
-import type { Property } from "./types";
 import Filters from "@/components/Filters";
+import type { Property } from "./types";
+import mockProperties from "./mockProperties";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -19,26 +20,30 @@ export default function PropertiesPage() {
     const fetchProperties = async () => {
       try {
         const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
+        if (!res.ok) throw new Error("Failed to fetch");
         const data = await res.json();
         setProperties(data);
       } catch (error) {
-        console.error("Failed to fetch properties:", error);
+        console.error("Using mock properties as fallback:", error);
+        setProperties(mockProperties);
       }
     };
+
     fetchProperties();
   }, []);
 
-  const filteredProperties = properties.filter((property) =>
-    property.price >= priceRange[0] &&
-    property.price <= priceRange[1] &&
-    property.yield_percent >= yieldRange[0] &&
-    property.yield_percent <= yieldRange[1] &&
-    property.roi_percent >= roiRange[0] &&
-    property.roi_percent <= roiRange[1] &&
-    (!bedrooms || property.bedrooms === bedrooms) &&
-    (!propertyType || property.propertyType?.toLowerCase().includes(propertyType.toLowerCase())) &&
-    (!investmentType || property.investmentType?.toLowerCase().includes(investmentType.toLowerCase())) &&
-    (!location || property.location.toLowerCase().includes(location.toLowerCase()))
+  const filteredProperties = properties.filter(
+    (property) =>
+      property.price >= priceRange[0] &&
+      property.price <= priceRange[1] &&
+      property.yield_percent >= yieldRange[0] &&
+      property.yield_percent <= yieldRange[1] &&
+      property.roi_percent >= roiRange[0] &&
+      property.roi_percent <= roiRange[1] &&
+      (!bedrooms || property.bedrooms === bedrooms) &&
+      (!propertyType || property.propertyType?.toLowerCase().includes(propertyType.toLowerCase())) &&
+      (!investmentType || property.investmentType?.toLowerCase().includes(investmentType.toLowerCase())) &&
+      (!location || property.location.toLowerCase().includes(location.toLowerCase()))
   );
 
   return (
