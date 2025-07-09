@@ -1,4 +1,3 @@
-"use client";
 import React from "react";
 
 interface FiltersProps {
@@ -9,90 +8,77 @@ interface FiltersProps {
   roiRange: [number, number];
   onRoiChange: (range: [number, number]) => void;
   bedrooms: number | null;
-  onBedroomsChange: (value: number | null) => void;
+  onBedroomsChange: (beds: number | null) => void;
   propertyType: string;
-  onPropertyTypeChange: (value: string) => void;
+  onPropertyTypeChange: (type: string) => void;
   location: string;
-  onLocationChange: (value: string) => void;
+  onLocationChange: (loc: string) => void;
+  investmentType: string;
+  onInvestmentTypeChange: (type: string) => void;
 }
 
-const Filters: React.FC<FiltersProps> = ({
-  priceRange,
-  onPriceChange,
-  yieldRange,
-  onYieldChange,
-  roiRange,
-  onRoiChange,
-  bedrooms,
-  onBedroomsChange,
-  propertyType,
-  onPropertyTypeChange,
-  location,
-  onLocationChange,
-}) => {
+export default function Filters(props: FiltersProps) {
+  const {
+    priceRange,
+    onPriceChange,
+    yieldRange,
+    onYieldChange,
+    roiRange,
+    onRoiChange,
+    bedrooms,
+    onBedroomsChange,
+    propertyType,
+    onPropertyTypeChange,
+    location,
+    onLocationChange,
+    investmentType,
+    onInvestmentTypeChange,
+  } = props;
+
   return (
-    <div className="bg-white p-6 rounded-lg shadow mb-6 border border-gray-200">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <input
-          type="text"
-          placeholder="Location"
-          value={location}
-          onChange={(e) => onLocationChange(e.target.value)}
-          className="border border-gray-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-        />
-        <input
-          type="number"
-          placeholder="Bedrooms"
-          value={bedrooms ?? ""}
-          onChange={(e) => onBedroomsChange(e.target.value ? parseInt(e.target.value) : null)}
-          className="border border-gray-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-        />
-        <input
-          type="text"
-          placeholder="Property Type"
-          value={propertyType}
-          onChange={(e) => onPropertyTypeChange(e.target.value)}
-          className="border border-gray-300 p-2 rounded focus:outline-none focus:ring-2 focus:ring-primary-500"
-        />
-        <div>
-          <label className="block text-sm font-medium mb-1">Max Price (£)</label>
-          <input
-            type="range"
-            min={50000}
-            max={2000000}
-            value={priceRange[1]}
-            onChange={(e) => onPriceChange([priceRange[0], parseInt(e.target.value)])}
-            className="w-full"
-          />
-          <div className="text-sm mt-1">Up to £{priceRange[1].toLocaleString()}</div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Max Yield %</label>
-          <input
-            type="range"
-            min={2}
-            max={15}
-            value={yieldRange[1]}
-            onChange={(e) => onYieldChange([yieldRange[0], parseInt(e.target.value)])}
-            className="w-full"
-          />
-          <div className="text-sm mt-1">Up to {yieldRange[1]}%</div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Max ROI %</label>
-          <input
-            type="range"
-            min={2}
-            max={20}
-            value={roiRange[1]}
-            onChange={(e) => onRoiChange([roiRange[0], parseInt(e.target.value)])}
-            className="w-full"
-          />
-          <div className="text-sm mt-1">Up to {roiRange[1]}%</div>
-        </div>
-      </div>
+    <div className="flex flex-col md:flex-row gap-2 md:gap-4 mb-4">
+      <input
+        type="text"
+        placeholder="Location"
+        className="border rounded p-2 w-full md:w-auto"
+        value={location}
+        onChange={(e) => onLocationChange(e.target.value)}
+      />
+
+      <input
+        type="number"
+        placeholder="Bedrooms"
+        className="border rounded p-2 w-full md:w-auto"
+        value={bedrooms || ""}
+        onChange={(e) => onBedroomsChange(Number(e.target.value) || null)}
+      />
+
+      {/* Property Type Dropdown */}
+      <select
+        className="border rounded p-2 w-full md:w-auto"
+        value={propertyType}
+        onChange={(e) => onPropertyTypeChange(e.target.value)}
+      >
+        <option value="">All Property Types</option>
+        <option value="House">House</option>
+        <option value="Apartment">Apartment</option>
+        <option value="HMO">HMO</option>
+        <option value="Serviced Accommodation">Serviced Accommodation</option>
+      </select>
+
+      {/* Investment Type Dropdown */}
+      <select
+        className="border rounded p-2 w-full md:w-auto"
+        value={investmentType}
+        onChange={(e) => onInvestmentTypeChange(e.target.value)}
+      >
+        <option value="">All Investment Types</option>
+        <option value="Buy Refurbish Refinance">Buy Refurbish Refinance</option>
+        <option value="Buy to Let">Buy to Let</option>
+        <option value="Flip">Flip</option>
+        <option value="Lease Option Agreement">Lease Option Agreement</option>
+        <option value="Rent to SA">Rent to SA</option>
+      </select>
     </div>
   );
-};
-
-export default Filters;
+}
