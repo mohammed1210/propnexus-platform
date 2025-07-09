@@ -1,4 +1,4 @@
-import React from "react";
+"use client";
 
 interface FiltersProps {
   priceRange: [number, number];
@@ -8,13 +8,13 @@ interface FiltersProps {
   roiRange: [number, number];
   onRoiChange: (range: [number, number]) => void;
   bedrooms: number | null;
-  onBedroomsChange: (value: number | null) => void;
+  onBedroomsChange: (bedrooms: number | null) => void;
   propertyType: string;
-  onPropertyTypeChange: (value: string) => void;
-  location: string;
-  onLocationChange: (value: string) => void;
+  onPropertyTypeChange: (type: string) => void;
   investmentType: string;
-  onInvestmentTypeChange: (value: string) => void;
+  onInvestmentTypeChange: (type: string) => void;
+  location: string;
+  onLocationChange: (location: string) => void;
 }
 
 export default function Filters({
@@ -28,33 +28,32 @@ export default function Filters({
   onBedroomsChange,
   propertyType,
   onPropertyTypeChange,
-  location,
-  onLocationChange,
   investmentType,
   onInvestmentTypeChange,
+  location,
+  onLocationChange,
 }: FiltersProps) {
   return (
-    <div className="space-y-2 mb-4">
+    <div className="flex flex-wrap gap-2 mb-4">
       <input
         type="text"
         placeholder="Location"
         value={location}
         onChange={(e) => onLocationChange(e.target.value)}
-        className="border rounded p-2 w-full md:w-auto"
+        className="border p-2 rounded"
       />
       <input
         type="number"
         placeholder="Bedrooms"
         value={bedrooms ?? ""}
-        onChange={(e) => onBedroomsChange(e.target.value ? Number(e.target.value) : null)}
-        className="border rounded p-2 w-full md:w-auto"
+        onChange={(e) => onBedroomsChange(e.target.value ? parseInt(e.target.value) : null)}
+        className="border p-2 rounded w-24"
       />
 
-      {/* Property Type Dropdown */}
       <select
         value={propertyType}
         onChange={(e) => onPropertyTypeChange(e.target.value)}
-        className="border rounded p-2 w-full md:w-auto"
+        className="border p-2 rounded"
       >
         <option value="">All Property Types</option>
         <option value="House">House</option>
@@ -63,11 +62,10 @@ export default function Filters({
         <option value="Serviced Accommodation">Serviced Accommodation</option>
       </select>
 
-      {/* Investment Type Dropdown */}
       <select
         value={investmentType}
         onChange={(e) => onInvestmentTypeChange(e.target.value)}
-        className="border rounded p-2 w-full md:w-auto"
+        className="border p-2 rounded"
       >
         <option value="">All Investment Types</option>
         <option value="Buy Refurbish Refinance">Buy Refurbish Refinance</option>
@@ -76,6 +74,8 @@ export default function Filters({
         <option value="Lease Option Agreement">Lease Option Agreement</option>
         <option value="Rent to SA">Rent to SA</option>
       </select>
+
+      {/* Future: Add sliders for priceRange, yieldRange, roiRange, or advanced filter UI here */}
     </div>
   );
 }
