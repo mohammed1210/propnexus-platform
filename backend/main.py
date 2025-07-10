@@ -44,7 +44,7 @@ async def startup():
 async def shutdown():
     await database.disconnect()
 
-@app.get("/api/properties", response_model=List[Property])
+@app.get("/properties", response_model=List[Property])
 async def get_properties():
     query = """
         SELECT 
