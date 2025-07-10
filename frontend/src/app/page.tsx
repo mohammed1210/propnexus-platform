@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import PropertyCard from '../../components/PropertyCard';
-import Filters from '../../components/Filters';
 import type { Property } from './types';
 
 export default function PropertiesPage() {
@@ -25,7 +24,7 @@ export default function PropertiesPage() {
   return (
     <div>
       <h1>Properties</h1>
-      <Filters />
+      {/* <Filters /> ← remove or comment for now */}
       {properties.length === 0 ? (
         <p>No properties found.</p>
       ) : (
