@@ -12,10 +12,11 @@ const mockProperties: Property[] = [
     imageurl: "/house1.jpg",
     yield_percent: 5.6,
     roi_percent: 11.2,
+    source: "Rightmove",
+    investmentType: "BMV",
     latitude: 53.4084,
     longitude: -2.9916,
     propertyType: "House",
-    investmentType: "Buy Refurbish Refinance",
   },
   {
     id: "2",
@@ -28,10 +29,11 @@ const mockProperties: Property[] = [
     imageurl: "/apartment1.jpg",
     yield_percent: 5.1,
     roi_percent: 9.4,
+    source: "Rightmove",
+    investmentType: "Buy to Let",
     latitude: 54.9783,
     longitude: -1.6178,
     propertyType: "Apartment",
-    investmentType: "Buy to Let",
   },
   {
     id: "3",
@@ -44,10 +46,11 @@ const mockProperties: Property[] = [
     imageurl: "/house2.jpg",
     yield_percent: 4.8,
     roi_percent: 8.2,
+    source: "Zoopla",
+    investmentType: "Flip",
     latitude: 53.3811,
     longitude: -1.4701,
     propertyType: "House",
-    investmentType: "Flip",
   },
 ];
 
