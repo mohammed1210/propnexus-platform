@@ -13,6 +13,7 @@ export default function PropertyCard({ property }: { property: Property }) {
   imageurl,
   yield_percent,
   roi_percent,
+  source,
   propertyType,
   investmentType,
   latitude,
