@@ -24,7 +24,6 @@ export default function PropertiesPage() {
   return (
     <div>
       <h1>Properties</h1>
-      {/* <Filters /> ← remove or comment for now */}
       {properties.length === 0 ? (
         <p>No properties found.</p>
       ) : (
