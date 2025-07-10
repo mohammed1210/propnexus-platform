@@ -14,4 +14,6 @@ export interface Property {
   bmv?: number;
   propertyType?: string;
   investmentType?: string;
+  latitude?: number;
+  longitude?: number;
 }
