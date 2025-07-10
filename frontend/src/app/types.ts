@@ -3,12 +3,15 @@ export interface Property {
   title: string;
   price: number;
   location: string;
-  bedrooms: number;
-  bathrooms: number;
+  bedrooms?: number;
+  bathrooms?: number;
   description: string;
-  imageurl: string;  // ✅ matches backend
+  imageurl: string;
   yield_percent: number;
   roi_percent: number;
+  source: string;          // ✅ add this
+  bmv?: number;
+  created_at?: string;
   propertyType?: string;
   investmentType?: string;
   latitude?: number;
