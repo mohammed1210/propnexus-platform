@@ -1,19 +1,18 @@
-export interface Property {
-  id: string;
-  title: string;
-  price: number;
-  location: string;
-  bedrooms?: number;
-  bathrooms?: number;
-  description: string;
-  imageurl: string;
-  yield_percent: number;
-  roi_percent: number;
-  source: string;
-  bmv?: number;            // ✅ ADD this
-  created_at?: string;
-  propertyType?: string;
-  investmentType?: string;
-  latitude?: number;
-  longitude?: number;
-}
+const {
+  id,
+  title,
+  price,
+  location,
+  bedrooms,
+  bathrooms,
+  description,
+  imageurl,
+  yield_percent,
+  roi_percent,
+  source,
+  bmv,              // ✅ ADD this if using
+  propertyType,
+  investmentType,
+  latitude,
+  longitude,
+} = property;
