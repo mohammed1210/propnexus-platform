@@ -56,7 +56,7 @@ async def get_properties():
             roi_percent, 
             bmv, 
             created_at::text
-        FROM properties
+        FROM property_listings
     """
     rows = await database.fetch_all(query)
     return rows
