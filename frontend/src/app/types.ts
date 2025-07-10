@@ -9,8 +9,8 @@ export interface Property {
   imageurl: string;
   yield_percent: number;
   roi_percent: number;
-  source: string;          // ✅ add this
-  bmv?: number;
+  source: string;
+  bmv?: number;            // ✅ ADD this
   created_at?: string;
   propertyType?: string;
   investmentType?: string;
