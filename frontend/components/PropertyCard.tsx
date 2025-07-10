@@ -30,7 +30,7 @@ export default function PropertyCard({ property }: { property: Property }) {
         <p className={styles.location}>{location}</p>
         <p className={styles.price}>£{price.toLocaleString()}</p>
         <p className={styles.details}>
-          {bedrooms} beds • {bathrooms} baths
+          {bedrooms ?? "N/A"} beds • {bathrooms ?? "N/A"} baths
         </p>
         <p className={styles.description}>{description}</p>
         <p className={styles.description}>
