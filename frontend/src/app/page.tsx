@@ -10,7 +10,7 @@ export default function PropertiesPage() {
   useEffect(() => {
     const fetchProperties = async () => {
       try {
-        const res = await fetch('https://propnexus-backend-production.up.railway.app/properties');
+        const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
         const data = await res.json();
         setProperties(data);
       } catch (error) {
