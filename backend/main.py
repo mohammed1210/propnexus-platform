@@ -5,7 +5,6 @@ from pydantic import BaseModel
 import os
 from databases import Database
 
-# ✅ Database URL (adjust as needed)
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:your_password@host:port/dbname")
 database = Database(DATABASE_URL)
 
@@ -20,24 +19,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Property schema matches frontend keys
+# ✅ Property schema
 class Property(BaseModel):
     id: str
     title: str
-    price: float
     location: str
-    bedrooms: int
-    bathrooms: int
+    price: float
+    imageurl: str
     description: str
-    image: str         # ✅ uses alias from query
-    yieldValue: float  # ✅ uses alias from query
-    roi: float         # ✅ uses alias from query
+    source: str
+    yield_percent: float
+    roi_percent: float
     bmv: float
     created_at: str
-    latitude: float
-    longitude: float
-    propertyType: str
-    investmentType: str
 
 @app.on_event("startup")
 async def startup():
@@ -53,20 +47,15 @@ async def get_properties():
         SELECT 
             id::text, 
             title, 
-            price, 
             location, 
-            bedrooms, 
-            bathrooms, 
+            price, 
+            imageurl, 
             description, 
-            imageurl AS image,           -- ✅ alias to match frontend
-            yield_percent AS yieldValue, -- ✅ alias to match frontend
-            roi_percent AS roi,          -- ✅ alias to match frontend
-            bmv,                         -- ✅ directly included
-            created_at,
-            0.0 AS latitude, 
-            0.0 AS longitude, 
-            '' AS propertyType, 
-            source AS investmentType
+            source, 
+            yield_percent, 
+            roi_percent, 
+            bmv, 
+            created_at::text
         FROM properties
     """
     rows = await database.fetch_all(query)
