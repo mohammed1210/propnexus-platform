@@ -16,8 +16,6 @@ export default function PropertyCard({ property }: { property: Property }) {
     source,
     propertyType,
     investmentType,
-    latitude,
-    longitude,
   } = property;
 
   return (
