@@ -12,7 +12,7 @@ export interface Property {
   source: string;
   created_at?: string;
   propertyType?: string;
-  investmentType?: string; // ✅ BMV, Flip, Rent to SA, etc.
+  investmentType?: string;
   latitude?: number;
   longitude?: number;
 }
