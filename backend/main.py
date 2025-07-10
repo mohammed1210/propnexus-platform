@@ -5,7 +5,7 @@ from pydantic import BaseModel
 import os
 from databases import Database
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:your_password@host:port/dbname")
+DATABASE_URL = os.getenv("DATABASE_URL", "https://propnexus-backend-production.up.railway.app/properties")
 database = Database(DATABASE_URL)
 
 app = FastAPI()
