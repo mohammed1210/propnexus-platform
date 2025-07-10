@@ -36,6 +36,7 @@ export default function PropertyCard({ property }: { property: Property }) {
         </p>
         <p className={styles.description}>{description}</p>
         <p className={styles.description}>
+        <p className={styles.source}>Source: {source}</p>
           Yield: {yield_percent}% | ROI: {roi_percent}%
         </p>
         <div className={styles.buttons}>
