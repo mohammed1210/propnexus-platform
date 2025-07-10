@@ -44,19 +44,21 @@ async def shutdown():
 @app.get("/properties", response_model=List[Property])
 async def get_properties():
     query = """
-        SELECT 
-            id::text, 
-            title, 
-            location, 
-            price, 
-            imageurl, 
-            description, 
-            source, 
-            yield_percent, 
-            roi_percent, 
-            bmv, 
-            created_at::text
-        FROM property_listings
-    """
+    SELECT 
+        id::text,
+        title,
+        location,
+        price,
+        bedrooms,
+        bathrooms,
+        description,
+        imageurl,
+        yield_percent,
+        roi_percent,
+        source,
+        bmv,
+        created_at::text
+    FROM property_listings
+"""
     rows = await database.fetch_all(query)
     return rows
