@@ -23,14 +23,19 @@ app.add_middleware(
 class Property(BaseModel):
     id: str
     title: str
+    description: str
     location: str
+    bedrooms: int
+    bathrooms: int
     price: float
     imageurl: str
-    description: str
     source: str
     yield_percent: float
     roi_percent: float
-    bmv: float
+    propertyType: str
+    investmentType: str
+    longitude: float
+    latitude: float
     created_at: str
 
 @app.on_event("startup")
