@@ -11,7 +11,6 @@ export interface Property {
   roi_percent: number;
   source: string;
   created_at?: string;
-  bmv?: number;
   propertyType?: string;
   investmentType?: string;
   latitude?: number;
