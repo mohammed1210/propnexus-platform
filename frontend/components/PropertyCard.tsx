@@ -1,5 +1,5 @@
 import styles from "./PropertyCard.module.css";
-import type { propertyType } from "../src/app/types";
+import type { Property } from "../src/app/types";
 
 export default function PropertyCard({ property }: { property: Property }) {
   const {
@@ -37,11 +37,12 @@ export default function PropertyCard({ property }: { property: Property }) {
           Yield: {yield_percent}% | ROI: {roi_percent}%
         </p>
         <p className={styles.details}>
-          Investment Type: {investmentType || "N/A"}
+          Property Type: {propertyType}
         </p>
         <p className={styles.details}>
-          Source: {source}
+          Investment Type: {investmentType || "N/A"}
         </p>
+        <p className={styles.details}>Source: {source}</p>
         <div className={styles.buttons}>
           <button className={styles.button}>Save Deal</button>
           <button className={styles.buttonSecondary}>View Details</button>
