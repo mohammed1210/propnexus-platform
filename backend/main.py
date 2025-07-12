@@ -13,7 +13,7 @@ app = FastAPI()
 # ✅ Allow frontend calls
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Change to your frontend URL for production
+    allow_origins=["https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app"],  # ✅ Your Vercel frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
