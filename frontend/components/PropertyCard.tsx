@@ -3,20 +3,23 @@ import type { Property } from "../src/app/types";
 
 export default function PropertyCard({ property }: { property: Property }) {
   const {
-    id,
-    title,
-    price,
-    location,
-    bedrooms,
-    bathrooms,
-    description,
-    imageurl,
-    yield_percent,
-    roi_percent,
-    source,
-    propertyType,      // ✅ now matches
-    investmentType,
-  } = property;
+  id,
+  title,
+  location,
+  price,
+  bedrooms,
+  bathrooms,
+  description,
+  imageurl,
+  source,
+  yield_percent,
+  roi_percent,
+  propertyType,
+  investmentType,
+  latitude,
+  longitude,
+  created_at,
+} = property;
 
   return (
     <div className={styles.card}>
