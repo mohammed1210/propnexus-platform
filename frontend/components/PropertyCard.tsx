@@ -3,7 +3,6 @@ import type { Property } from "../src/app/types";
 
 export default function PropertyCard({ property }: { property: Property }) {
   const {
-    id,
     title,
     price,
     location,
@@ -16,9 +15,6 @@ export default function PropertyCard({ property }: { property: Property }) {
     source,
     propertyType,
     investmentType,
-    latitude,
-    longitude,
-    created_at,
   } = property;
 
   return (
@@ -39,10 +35,8 @@ export default function PropertyCard({ property }: { property: Property }) {
         <p className={styles.description}>
           Yield: {yield_percent}% | ROI: {roi_percent}%
         </p>
-        <p className={styles.details}>
-          Investment Type: {investmentType || "N/A"}
-        </p>
-        <p className={styles.details}>Property Type: {propertyType || "N/A"}</p>
+        <p className={styles.details}>Property Type: {propertyType}</p>
+        <p className={styles.details}>Investment Type: {investmentType}</p>
         <p className={styles.details}>Source: {source}</p>
         <div className={styles.buttons}>
           <button className={styles.button}>Save Deal</button>
