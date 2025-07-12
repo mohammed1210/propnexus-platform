@@ -14,7 +14,7 @@ export default function PropertyCard({ property }: { property: Property }) {
     yield_percent,
     roi_percent,
     source,
-    propertyType,
+    propertyType,      // ✅ now matches
     investmentType,
   } = property;
 
@@ -37,7 +37,7 @@ export default function PropertyCard({ property }: { property: Property }) {
           Yield: {yield_percent}% | ROI: {roi_percent}%
         </p>
         <p className={styles.details}>
-          Property Type: {propertyType}
+          Property Type: {propertyType || "N/A"}
         </p>
         <p className={styles.details}>
           Investment Type: {investmentType || "N/A"}
