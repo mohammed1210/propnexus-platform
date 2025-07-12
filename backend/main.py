@@ -10,16 +10,19 @@ database = Database(DATABASE_URL)
 
 app = FastAPI()
 
-# ✅ Allow frontend calls
+# ✅ Update this to your Vercel frontend URL
+origins = [
+    "https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app"],  # ✅ Your Vercel frontend URL
+    allow_origins=origins,  # ← change here
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ✅ Property schema
 class Property(BaseModel):
     id: str
     title: str
@@ -67,6 +70,6 @@ async def get_properties():
         latitude,
         created_at::text
     FROM properties
-"""
+    """
     rows = await database.fetch_all(query)
     return rows
