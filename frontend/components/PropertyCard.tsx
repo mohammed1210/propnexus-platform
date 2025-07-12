@@ -1,5 +1,5 @@
 import styles from "./PropertyCard.module.css";
-import type { Property } from "../src/app/types";
+import type { propertyType } from "../src/app/types";
 
 export default function PropertyCard({ property }: { property: Property }) {
   const {
