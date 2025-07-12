@@ -11,7 +11,8 @@ export default function PropertiesPage() {
     const fetchProperties = async () => {
       try {
         const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
-        const data = await res.json();
+        const data: Property[] = await res.json();
+        console.log("Fetched properties:", data); // ✅ Add console log to debug
         setProperties(data);
       } catch (error) {
         console.error('Error fetching properties:', error);
