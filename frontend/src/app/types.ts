@@ -8,7 +8,7 @@ export interface Property {
   source: string;
   yield_percent: number;
   roi_percent: number;
-  propertType: string;
+  propertyType: string;
   investmentType: string;
   bedrooms: number;
   bathrooms: number;
