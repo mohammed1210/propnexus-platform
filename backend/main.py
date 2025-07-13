@@ -6,6 +6,7 @@ import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
+# ✅ Load .env variables
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -14,10 +15,11 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI()
 
-# Allow frontend origin and local dev
+# ✅ CORS setup — allow both production & local
 origins = [
     "https://propnexus-platform.vercel.app",
-    "http://localhost:3000"
+    "https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app",  # Your feature branch URL
+    "http://localhost:3000",
 ]
 
 app.add_middleware(
@@ -32,17 +34,32 @@ app.add_middleware(
 async def root():
     return {"message": "PropNexus backend is running."}
 
+@app.get("/properties")
+async def get_properties():
+    """
+    ✅ Fetch properties from Supabase table
+    """
+    response = supabase.table("properties").select("*").execute()
+    return response.data
+
 @app.post("/scrape-zoopla")
 async def scrape_zoopla():
+    """
+    ✅ Trigger Zoopla scraper
+    """
     data = await scrape_zoopla_properties()
-    return {"status": f"Zoopla scrape completed and {len(data)} properties fetched", "data": data}
+    return {
+        "status": f"Zoopla scrape completed and {len(data)} properties fetched",
+        "data": data,
+    }
 
 @app.post("/scrape-rightmove")
 async def scrape_rightmove():
+    """
+    ✅ Trigger Rightmove scraper
+    """
     data = await scrape_rightmove_properties()
-    return {"status": f"Rightmove scrape completed and {len(data)} properties fetched", "data": data}
-
-@app.get("/properties")
-async def get_properties():
-    response = supabase.table("properties").select("*").execute()
-    return response.data
+    return {
+        "status": f"Rightmove scrape completed and {len(data)} properties fetched",
+        "data": data,
+    }
