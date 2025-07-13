@@ -5,11 +5,9 @@ import type { Property } from "./types";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-delete L.Icon.Default.prototype._getIconUrl;
-
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://propnexus-assets.s3.eu-west-2.amazonaws.com/key-marker.png",
-  iconUrl: "https://propnexus-assets.s3.eu-west-2.amazonaws.com/key-marker.png",
+  iconRetinaUrl: "https://cdn.jsdelivr.net/gh/propnexus/assets/key-marker.png",
+  iconUrl: "https://cdn.jsdelivr.net/gh/propnexus/assets/key-marker.png",
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
