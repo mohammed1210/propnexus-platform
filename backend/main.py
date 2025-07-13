@@ -12,7 +12,9 @@ app = FastAPI()
 
 # ✅ Update this to your Vercel frontend URL
 origins = [
-    "https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app"
+    "https://propnexus-platform.vercel.app",
+    "https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app",
+    "http://localhost:3000"  # (optional for local testing)
 ]
 
 app.add_middleware(
