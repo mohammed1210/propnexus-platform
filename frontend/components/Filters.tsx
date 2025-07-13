@@ -2,20 +2,20 @@
 import type { FC } from "react";
 
 interface FiltersProps {
-  priceRange: [number, number];
-  onPriceChange: (range: [number, number]) => void;
-  yieldRange: [number, number];
-  onYieldChange: (range: [number, number]) => void;
-  roiRange: [number, number];
-  onRoiChange: (range: [number, number]) => void;
+  priceRange: number;
+  onPriceChange: (value: number) => void;
+  yieldRange: number;
+  onYieldChange: (value: number) => void;
+  roiRange: number;
+  onRoiChange: (value: number) => void;
   bedrooms: number | null;
-  onBedroomsChange: (bedrooms: number | null) => void;
+  onBedroomsChange: (value: number | null) => void;
   propertyType: string;
-  onPropertyTypeChange: (type: string) => void;
+  onPropertyTypeChange: (value: string) => void;
   location: string;
-  onLocationChange: (location: string) => void;
+  onLocationChange: (value: string) => void;
   investmentType: string;
-  onInvestmentTypeChange: (type: string) => void;
+  onInvestmentTypeChange: (value: string) => void;
 }
 
 const Filters: FC<FiltersProps> = ({
@@ -35,14 +35,7 @@ const Filters: FC<FiltersProps> = ({
   onInvestmentTypeChange,
 }) => {
   return (
-    <div>
-      {/* Your inputs here, using priceRange, yieldRange, roiRange */}
-    </div>
-  );
-};
-
-export default Filters; (
-    <div className="flex flex-col gap-2 mb-4">
+    <div className="flex flex-wrap gap-2 mb-4">
       <input
         type="text"
         placeholder="Location"
@@ -54,8 +47,8 @@ export default Filters; (
         type="number"
         placeholder="Bedrooms"
         value={bedrooms ?? ""}
-        onChange={(e) => onBedroomsChange(e.target.value ? parseInt(e.target.value) : null)}
-        className="border p-2 rounded"
+        onChange={(e) => onBedroomsChange(e.target.value ? Number(e.target.value) : null)}
+        className="border p-2 rounded w-24"
       />
       <select
         value={propertyType}
@@ -81,36 +74,33 @@ export default Filters; (
         <option value="Rent to SA">Rent to SA</option>
       </select>
       <label>
-        Price: £{price.toLocaleString()}
+        Price (£): {priceRange.toLocaleString()}
         <input
           type="range"
-          min="50000"
-          max="2000000"
-          value={price}
+          min={50000}
+          max={2000000}
+          value={priceRange}
           onChange={(e) => onPriceChange(Number(e.target.value))}
-          className="w-full"
         />
       </label>
       <label>
-        Yield: {yieldValue}%
+        Yield (%): {yieldRange}
         <input
           type="range"
-          min="2"
-          max="15"
-          value={yieldValue}
+          min={2}
+          max={20}
+          value={yieldRange}
           onChange={(e) => onYieldChange(Number(e.target.value))}
-          className="w-full"
         />
       </label>
       <label>
-        ROI: {roi}%
+        ROI (%): {roiRange}
         <input
           type="range"
-          min="2"
-          max="20"
-          value={roi}
+          min={2}
+          max={20}
+          value={roiRange}
           onChange={(e) => onRoiChange(Number(e.target.value))}
-          className="w-full"
         />
       </label>
     </div>
