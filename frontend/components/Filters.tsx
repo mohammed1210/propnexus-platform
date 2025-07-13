@@ -19,11 +19,11 @@ interface FiltersProps {
 }
 
 const Filters: FC<FiltersProps> = ({
-  price,
+  priceRange,
   onPriceChange,
-  yieldValue,
+  yieldRange,
   onYieldChange,
-  roi,
+  roiRange,
   onRoiChange,
   bedrooms,
   onBedroomsChange,
@@ -35,6 +35,13 @@ const Filters: FC<FiltersProps> = ({
   onInvestmentTypeChange,
 }) => {
   return (
+    <div>
+      {/* Your inputs here, using priceRange, yieldRange, roiRange */}
+    </div>
+  );
+};
+
+export default Filters; (
     <div className="flex flex-col gap-2 mb-4">
       <input
         type="text"
