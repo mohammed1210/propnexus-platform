@@ -1,41 +1,34 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
 import Filters from "@/components/Filters";
+import MapView from "./Map"; // ✅ Correct import
 import type { Property } from "./types";
-import MapView from "./Map";
-
-<MapView properties={filteredProperties} />
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
-  const [priceRange, setPriceRange] = useState<number>(2000000);
-  const [yieldRange, setYieldRange] = useState<number>(15);
-  const [roiRange, setRoiRange] = useState<number>(20);
+  const [price, setPrice] = useState<number>(500000);
+  const [yieldValue, setYieldValue] = useState<number>(5);
+  const [roiValue, setRoiValue] = useState<number>(8);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [propertyType, setPropertyType] = useState<string>("");
   const [location, setLocation] = useState<string>("");
   const [investmentType, setInvestmentType] = useState<string>("");
 
   useEffect(() => {
-    const fetchProperties = async () => {
-      try {
-        const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
-        const data: Property[] = await res.json();
-        setProperties(data);
-      } catch (error) {
-        console.error("Error fetching properties:", error);
-      }
-    };
-
-    fetchProperties();
+    fetch("https://propnexus-backend-production.up.railway.app/properties")
+      .then((res) => res.json())
+      .then((data) => setProperties(data))
+      .catch((err) => console.error(err));
   }, []);
 
+  // ✅ Define filteredProperties here
   const filteredProperties = properties.filter(
     (property) =>
-      property.price <= priceRange &&
-      property.yield_percent <= yieldRange &&
-      property.roi_percent <= roiRange &&
+      property.price <= price &&
+      property.yield_percent >= yieldValue &&
+      property.roi_percent >= roiValue &&
       (bedrooms === null || property.bedrooms === bedrooms) &&
       (propertyType === "" || property.propertyType?.toLowerCase().includes(propertyType.toLowerCase())) &&
       (investmentType === "" || property.investmentType?.toLowerCase() === investmentType.toLowerCase()) &&
@@ -46,12 +39,12 @@ export default function PropertiesPage() {
     <div className="max-w-7xl mx-auto px-4">
       <h1 className="text-2xl font-bold mb-4">Properties</h1>
       <Filters
-        priceRange={priceRange}
-        onPriceChange={setPriceRange}
-        yieldRange={yieldRange}
-        onYieldChange={setYieldRange}
-        roiRange={roiRange}
-        onRoiChange={setRoiRange}
+        price={price}
+        onPriceChange={setPrice}
+        yieldValue={yieldValue}
+        onYieldChange={setYieldValue}
+        roiValue={roiValue}
+        onRoiChange={setRoiValue}
         bedrooms={bedrooms}
         onBedroomsChange={setBedrooms}
         propertyType={propertyType}
@@ -61,6 +54,7 @@ export default function PropertiesPage() {
         investmentType={investmentType}
         onInvestmentTypeChange={setInvestmentType}
       />
+      <MapView properties={filteredProperties} />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredProperties.map((property) => (
           <PropertyCard key={property.id} property={property} />
