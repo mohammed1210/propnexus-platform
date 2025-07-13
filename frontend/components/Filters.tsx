@@ -2,12 +2,12 @@
 import type { FC } from "react";
 
 interface FiltersProps {
-  priceRange: [number, number];
-  onPriceChange: (range: [number, number]) => void;
-  yieldRange: [number, number];
-  onYieldChange: (range: [number, number]) => void;
-  roiRange: [number, number];
-  onRoiChange: (range: [number, number]) => void;
+  price: number;
+  onPriceChange: (value: number) => void;
+  yieldValue: number;
+  onYieldChange: (value: number) => void;
+  roi: number;
+  onRoiChange: (value: number) => void;
   bedrooms: number | null;
   onBedroomsChange: (value: number | null) => void;
   propertyType: string;
@@ -19,11 +19,11 @@ interface FiltersProps {
 }
 
 const Filters: FC<FiltersProps> = ({
-  priceRange,
+  price,
   onPriceChange,
-  yieldRange,
+  yieldValue,
   onYieldChange,
-  roiRange,
+  roi,
   onRoiChange,
   bedrooms,
   onBedroomsChange,
@@ -35,124 +35,77 @@ const Filters: FC<FiltersProps> = ({
   onInvestmentTypeChange,
 }) => {
   return (
-    <div className="flex flex-col gap-4 mb-6">
-      <div className="flex flex-wrap gap-2">
+    <div className="flex flex-col gap-2 mb-4">
+      <input
+        type="text"
+        placeholder="Location"
+        value={location}
+        onChange={(e) => onLocationChange(e.target.value)}
+        className="border p-2 rounded"
+      />
+      <input
+        type="number"
+        placeholder="Bedrooms"
+        value={bedrooms ?? ""}
+        onChange={(e) => onBedroomsChange(e.target.value ? parseInt(e.target.value) : null)}
+        className="border p-2 rounded"
+      />
+      <select
+        value={propertyType}
+        onChange={(e) => onPropertyTypeChange(e.target.value)}
+        className="border p-2 rounded"
+      >
+        <option value="">All Property Types</option>
+        <option value="House">House</option>
+        <option value="Apartment">Apartment</option>
+        <option value="HMO">HMO</option>
+        <option value="Serviced Accommodation">Serviced Accommodation</option>
+      </select>
+      <select
+        value={investmentType}
+        onChange={(e) => onInvestmentTypeChange(e.target.value)}
+        className="border p-2 rounded"
+      >
+        <option value="">All Investment Types</option>
+        <option value="Buy Refurbish Refinance">Buy Refurbish Refinance</option>
+        <option value="Buy to Let">Buy to Let</option>
+        <option value="Flip">Flip</option>
+        <option value="Lease Option Agreement">Lease Option Agreement</option>
+        <option value="Rent to SA">Rent to SA</option>
+      </select>
+      <label>
+        Price: £{price.toLocaleString()}
         <input
-          type="text"
-          placeholder="Location"
-          value={location}
-          onChange={(e) => onLocationChange(e.target.value)}
-          className="border p-2 rounded"
+          type="range"
+          min="50000"
+          max="2000000"
+          value={price}
+          onChange={(e) => onPriceChange(Number(e.target.value))}
+          className="w-full"
         />
-
+      </label>
+      <label>
+        Yield: {yieldValue}%
         <input
-          type="number"
-          placeholder="Bedrooms"
-          value={bedrooms ?? ""}
-          onChange={(e) =>
-            onBedroomsChange(e.target.value ? parseInt(e.target.value) : null)
-          }
-          className="border p-2 rounded w-24"
+          type="range"
+          min="2"
+          max="15"
+          value={yieldValue}
+          onChange={(e) => onYieldChange(Number(e.target.value))}
+          className="w-full"
         />
-
-        <select
-          value={propertyType}
-          onChange={(e) => onPropertyTypeChange(e.target.value)}
-          className="border p-2 rounded"
-        >
-          <option value="">All Property Types</option>
-          <option value="House">House</option>
-          <option value="Apartment">Apartment</option>
-          <option value="HMO">HMO</option>
-          <option value="Serviced Accommodation">Serviced Accommodation</option>
-        </select>
-
-        <select
-          value={investmentType}
-          onChange={(e) => onInvestmentTypeChange(e.target.value)}
-          className="border p-2 rounded"
-        >
-          <option value="">All Investment Types</option>
-          <option value="Buy Refurbish Refinance">Buy Refurbish Refinance</option>
-          <option value="Buy to Let">Buy to Let</option>
-          <option value="Flip">Flip</option>
-          <option value="Lease Option Agreement">Lease Option Agreement</option>
-          <option value="Rent to SA">Rent to SA</option>
-        </select>
-      </div>
-
-      {/* Sliders */}
-      <div>
-        <label>Price Range: £{priceRange[0].toLocaleString()} – £{priceRange[1].toLocaleString()}</label>
-        <div className="flex gap-2">
-          <input
-            type="range"
-            min={50000}
-            max={2000000}
-            step={5000}
-            value={priceRange[0]}
-            onChange={(e) => onPriceChange([Number(e.target.value), priceRange[1]])}
-            className="w-full"
-          />
-          <input
-            type="range"
-            min={50000}
-            max={2000000}
-            step={5000}
-            value={priceRange[1]}
-            onChange={(e) => onPriceChange([priceRange[0], Number(e.target.value)])}
-            className="w-full"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label>Yield Range: {yieldRange[0]}% – {yieldRange[1]}%</label>
-        <div className="flex gap-2">
-          <input
-            type="range"
-            min={2}
-            max={15}
-            step={0.5}
-            value={yieldRange[0]}
-            onChange={(e) => onYieldChange([Number(e.target.value), yieldRange[1]])}
-            className="w-full"
-          />
-          <input
-            type="range"
-            min={2}
-            max={15}
-            step={0.5}
-            value={yieldRange[1]}
-            onChange={(e) => onYieldChange([yieldRange[0], Number(e.target.value)])}
-            className="w-full"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label>ROI Range: {roiRange[0]}% – {roiRange[1]}%</label>
-        <div className="flex gap-2">
-          <input
-            type="range"
-            min={2}
-            max={20}
-            step={0.5}
-            value={roiRange[0]}
-            onChange={(e) => onRoiChange([Number(e.target.value), roiRange[1]])}
-            className="w-full"
-          />
-          <input
-            type="range"
-            min={2}
-            max={20}
-            step={0.5}
-            value={roiRange[1]}
-            onChange={(e) => onRoiChange([roiRange[0], Number(e.target.value)])}
-            className="w-full"
-          />
-        </div>
-      </div>
+      </label>
+      <label>
+        ROI: {roi}%
+        <input
+          type="range"
+          min="2"
+          max="20"
+          value={roi}
+          onChange={(e) => onRoiChange(Number(e.target.value))}
+          className="w-full"
+        />
+      </label>
     </div>
   );
 };
