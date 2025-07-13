@@ -11,7 +11,7 @@ export default function PropertyCard({ property }: PropertyCardProps) {
       <img
         src={property.imageurl || "/placeholder.jpg"}
         alt={property.title}
-        className={styles.imageurl}
+        className={styles.image}
       />
       <div className={styles.content}>
         <h3>{property.title}</h3>
@@ -21,7 +21,7 @@ export default function PropertyCard({ property }: PropertyCardProps) {
           {property.bedrooms} beds • {property.bathrooms} baths
         </p>
         <p>{property.description}</p>
-        <p>Yield: {property.yield_percent}% | ROI: {property.roi}%</p>
+        <p>Yield: {property.yield_percent}% | ROI: {property.roi_percent}%</p>
         <div className={styles.buttons}>
           <button
             className={styles.button}
