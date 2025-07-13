@@ -1,108 +1,62 @@
-"use client";
-import type { FC } from "react";
+import React from "react";
 
 interface FiltersProps {
-  priceRange: number;
+  price: number;
   onPriceChange: (value: number) => void;
-  yieldRange: number;
+  yieldValue: number;
   onYieldChange: (value: number) => void;
-  roiRange: number;
+  roiValue: number;
   onRoiChange: (value: number) => void;
-  bedrooms: number | null;
-  onBedroomsChange: (value: number | null) => void;
-  propertyType: string;
-  onPropertyTypeChange: (value: string) => void;
-  location: string;
-  onLocationChange: (value: string) => void;
-  investmentType: string;
-  onInvestmentTypeChange: (value: string) => void;
 }
 
-const Filters: FC<FiltersProps> = ({
-  priceRange,
+const Filters: React.FC<FiltersProps> = ({
+  price,
   onPriceChange,
-  yieldRange,
+  yieldValue,
   onYieldChange,
-  roiRange,
+  roiValue,
   onRoiChange,
-  bedrooms,
-  onBedroomsChange,
-  propertyType,
-  onPropertyTypeChange,
-  location,
-  onLocationChange,
-  investmentType,
-  onInvestmentTypeChange,
 }) => {
   return (
-    <div className="flex flex-wrap gap-2 mb-4">
-      <input
-        type="text"
-        placeholder="Location"
-        value={location}
-        onChange={(e) => onLocationChange(e.target.value)}
-        className="border p-2 rounded"
-      />
-      <input
-        type="number"
-        placeholder="Bedrooms"
-        value={bedrooms ?? ""}
-        onChange={(e) => onBedroomsChange(e.target.value ? Number(e.target.value) : null)}
-        className="border p-2 rounded w-24"
-      />
-      <select
-        value={propertyType}
-        onChange={(e) => onPropertyTypeChange(e.target.value)}
-        className="border p-2 rounded"
-      >
-        <option value="">All Property Types</option>
-        <option value="House">House</option>
-        <option value="Apartment">Apartment</option>
-        <option value="HMO">HMO</option>
-        <option value="Serviced Accommodation">Serviced Accommodation</option>
-      </select>
-      <select
-        value={investmentType}
-        onChange={(e) => onInvestmentTypeChange(e.target.value)}
-        className="border p-2 rounded"
-      >
-        <option value="">All Investment Types</option>
-        <option value="Buy Refurbish Refinance">Buy Refurbish Refinance</option>
-        <option value="Buy to Let">Buy to Let</option>
-        <option value="Flip">Flip</option>
-        <option value="Lease Option Agreement">Lease Option Agreement</option>
-        <option value="Rent to SA">Rent to SA</option>
-      </select>
-      <label>
-        Price (£): {priceRange.toLocaleString()}
+    <div className="bg-white p-4 rounded shadow mb-6">
+      <div className="mb-4">
+        <label>Price (£): {price.toLocaleString()}</label>
         <input
           type="range"
           min={50000}
           max={2000000}
-          value={priceRange}
+          step={10000}
+          value={price}
           onChange={(e) => onPriceChange(Number(e.target.value))}
+          className="w-full"
         />
-      </label>
-      <label>
-        Yield (%): {yieldRange}
+      </div>
+
+      <div className="mb-4">
+        <label>Yield (%): {yieldValue}</label>
         <input
           type="range"
           min={2}
-          max={20}
-          value={yieldRange}
+          max={15}
+          step={0.1}
+          value={yieldValue}
           onChange={(e) => onYieldChange(Number(e.target.value))}
+          className="w-full"
         />
-      </label>
-      <label>
-        ROI (%): {roiRange}
+      </div>
+
+      <div className="mb-4">
+        <label>ROI (%): {roiValue}</label>
         <input
           type="range"
           min={2}
           max={20}
-          value={roiRange}
+          step={0.1}
+          value={roiValue}
           onChange={(e) => onRoiChange(Number(e.target.value))}
+          className="w-full"
         />
-      </label>
+      </div>
     </div>
   );
 };
