@@ -6,9 +6,9 @@ import type { Property } from "./types";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
-  const [price, setPrice] = useState<number>(200000);
-  const [yieldValue, setYieldValue] = useState<number>(5);
-  const [roi, setRoi] = useState<number>(8);
+  const [priceRange, setPriceRange] = useState<[number, number]>([50000, 2000000]);
+  const [yieldRange, setYieldRange] = useState<[number, number]>([2, 15]);
+  const [roiRange, setRoiRange] = useState<[number, number]>([2, 20]);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [propertyType, setPropertyType] = useState<string>("");
   const [location, setLocation] = useState<string>("");
@@ -19,7 +19,6 @@ export default function PropertiesPage() {
       try {
         const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
         const data: Property[] = await res.json();
-        console.log("Fetched properties:", data);
         setProperties(data);
       } catch (error) {
         console.error("Error fetching properties:", error);
@@ -33,7 +32,7 @@ export default function PropertiesPage() {
     (property) =>
       property.price >= priceRange[0] &&
       property.price <= priceRange[1] &&
-      property.yield_percent >= yieldRange[0] && // ✅ Update keys to match your backend if needed
+      property.yield_percent >= yieldRange[0] &&
       property.yield_percent <= yieldRange[1] &&
       property.roi_percent >= roiRange[0] &&
       property.roi_percent <= roiRange[1] &&
@@ -44,7 +43,7 @@ export default function PropertiesPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4 bg-white">
+    <div className="max-w-7xl mx-auto px-4">
       <h1 className="text-2xl font-bold mb-4">Properties</h1>
       <Filters
         priceRange={priceRange}
