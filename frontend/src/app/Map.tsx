@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import PropertyCard from "@/components/PropertyCard";
 import Filters from "@/components/Filters";
 import type { Property } from "./types";
-import mockProperties from "./mockProperties";
+
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
