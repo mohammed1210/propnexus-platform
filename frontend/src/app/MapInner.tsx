@@ -2,10 +2,11 @@
 
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import type { Property } from "./types";
-import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
-// Tell TypeScript to allow access to private
+delete L.Icon.Default.prototype._getIconUrl;
+
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://propnexus-assets.s3.eu-west-2.amazonaws.com/key-marker.png",
   iconUrl: "https://propnexus-assets.s3.eu-west-2.amazonaws.com/key-marker.png",
