@@ -2,20 +2,20 @@
 import type { FC } from "react";
 
 interface FiltersProps {
-  price: number;
-  onPriceChange: (value: number) => void;
-  yieldValue: number;
-  onYieldChange: (value: number) => void;
-  roi: number;
-  onRoiChange: (value: number) => void;
+  priceRange: [number, number];
+  onPriceChange: (range: [number, number]) => void;
+  yieldRange: [number, number];
+  onYieldChange: (range: [number, number]) => void;
+  roiRange: [number, number];
+  onRoiChange: (range: [number, number]) => void;
   bedrooms: number | null;
-  onBedroomsChange: (value: number | null) => void;
+  onBedroomsChange: (bedrooms: number | null) => void;
   propertyType: string;
-  onPropertyTypeChange: (value: string) => void;
+  onPropertyTypeChange: (type: string) => void;
   location: string;
-  onLocationChange: (value: string) => void;
+  onLocationChange: (location: string) => void;
   investmentType: string;
-  onInvestmentTypeChange: (value: string) => void;
+  onInvestmentTypeChange: (type: string) => void;
 }
 
 const Filters: FC<FiltersProps> = ({
