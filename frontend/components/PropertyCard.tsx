@@ -1,39 +1,85 @@
-import styles from "./PropertyCard.module.css";
-import type { Property } from "../src/app/types";
-
-interface PropertyCardProps {
-  property: Property;
+.card {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-export default function PropertyCard({ property }: PropertyCardProps) {
-  return (
-    <div className={styles.card}>
-      <img
-        src={property.imageurl || "/placeholder.jpg"}
-        alt={property.title}
-        className={styles.image}
-      />
-      <div className={styles.content}>
-        <h3 className={styles.title}>{property.title}</h3>
-        <p className={styles.location}>{property.location}</p>
-        <p className={styles.price}>£{property.price.toLocaleString()}</p>
-        <p className={styles.details}>
-          {property.bedrooms} beds • {property.bathrooms} baths
-        </p>
-        <p className={styles.description}>{property.description}</p>
-        <p className={styles.details}>
-          Yield: {property.yield_percent}% | ROI: {property.roi_percent}%
-        </p>
-        <div className={styles.buttons}>
-          <button
-            className={styles.button}
-            onClick={() => alert("Deal saved!")}
-          >
-            Save Deal
-          </button>
-          <button className={styles.buttonSecondary}>View Details</button>
-        </div>
-      </div>
-    </div>
-  );
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+}
+
+.image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.content {
+  padding: 1rem;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #111827; /* dark gray text */
+}
+
+.location {
+  color: #6b7280; /* medium gray */
+  margin-bottom: 0.5rem;
+}
+
+.price {
+  font-weight: bold;
+  color: #2563eb; /* blue price */
+  margin-bottom: 0.5rem;
+}
+
+.details {
+  margin-bottom: 0.5rem;
+  color: #374151; /* gray details text */
+}
+
+.description {
+  margin-bottom: 1rem;
+  color: #4b5563; /* slightly lighter gray */
+}
+
+.buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.button {
+  background-color: #2563eb;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.button:hover {
+  background-color: #1d4ed8;
+  transform: scale(1.03);
+}
+
+.buttonSecondary {
+  background-color: white;
+  color: #2563eb;
+  border: 1px solid #2563eb;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s ease, transform 0.1s ease;
+}
+
+.buttonSecondary:hover {
+  background-color: #f3f4f6;
+  transform: scale(1.03);
 }
