@@ -11,6 +11,10 @@ interface FiltersProps {
   onBedroomsChange: (value: number | null) => void;
   propertyType: string;
   onPropertyTypeChange: (value: string) => void;
+  location: string;
+  onLocationChange: (value: string) => void;
+  investmentType: string;
+  onInvestmentTypeChange: (value: string) => void;
 }
 
 const Filters: React.FC<FiltersProps> = ({
@@ -24,6 +28,10 @@ const Filters: React.FC<FiltersProps> = ({
   onBedroomsChange,
   propertyType,
   onPropertyTypeChange,
+  location,
+  onLocationChange,
+  investmentType,
+  onInvestmentTypeChange,
 }) => {
   return (
     <div className="bg-white p-4 rounded shadow mb-6">
@@ -85,6 +93,28 @@ const Filters: React.FC<FiltersProps> = ({
           onChange={(e) => onPropertyTypeChange(e.target.value)}
           className="w-full border p-1"
           placeholder="e.g. Detached, Flat"
+        />
+      </div>
+
+      <div className="mb-4">
+        <label>Location:</label>
+        <input
+          type="text"
+          value={location}
+          onChange={(e) => onLocationChange(e.target.value)}
+          className="w-full border p-1"
+          placeholder="e.g. London"
+        />
+      </div>
+
+      <div className="mb-4">
+        <label>Investment Type:</label>
+        <input
+          type="text"
+          value={investmentType}
+          onChange={(e) => onInvestmentTypeChange(e.target.value)}
+          className="w-full border p-1"
+          placeholder="e.g. BTL, Flip"
         />
       </div>
     </div>
