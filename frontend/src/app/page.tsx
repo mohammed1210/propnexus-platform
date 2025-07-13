@@ -6,9 +6,9 @@ import type { Property } from "./types";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
-  const [priceRange, setPriceRange] = useState<[number, number]>([50000, 2000000]);
-  const [yieldRange, setYieldRange] = useState<[number, number]>([2, 15]);
-  const [roiRange, setRoiRange] = useState<[number, number]>([2, 20]);
+  const [price, setPrice] = useState<number>(200000);
+  const [yieldValue, setYieldValue] = useState<number>(5);
+  const [roi, setRoi] = useState<number>(8);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [propertyType, setPropertyType] = useState<string>("");
   const [location, setLocation] = useState<string>("");
