@@ -7,6 +7,10 @@ interface FiltersProps {
   onYieldChange: (value: number) => void;
   roiValue: number;
   onRoiChange: (value: number) => void;
+  bedrooms: number | null;
+  onBedroomsChange: (value: number | null) => void;
+  propertyType: string;
+  onPropertyTypeChange: (value: string) => void;
 }
 
 const Filters: React.FC<FiltersProps> = ({
@@ -16,6 +20,10 @@ const Filters: React.FC<FiltersProps> = ({
   onYieldChange,
   roiValue,
   onRoiChange,
+  bedrooms,
+  onBedroomsChange,
+  propertyType,
+  onPropertyTypeChange,
 }) => {
   return (
     <div className="bg-white p-4 rounded shadow mb-6">
@@ -55,6 +63,28 @@ const Filters: React.FC<FiltersProps> = ({
           value={roiValue}
           onChange={(e) => onRoiChange(Number(e.target.value))}
           className="w-full"
+        />
+      </div>
+
+      <div className="mb-4">
+        <label>Bedrooms:</label>
+        <input
+          type="number"
+          value={bedrooms ?? ""}
+          onChange={(e) => onBedroomsChange(e.target.value ? Number(e.target.value) : null)}
+          className="w-full border p-1"
+          placeholder="Any"
+        />
+      </div>
+
+      <div className="mb-4">
+        <label>Property Type:</label>
+        <input
+          type="text"
+          value={propertyType}
+          onChange={(e) => onPropertyTypeChange(e.target.value)}
+          className="w-full border p-1"
+          placeholder="e.g. Detached, Flat"
         />
       </div>
     </div>
