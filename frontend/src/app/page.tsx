@@ -6,9 +6,9 @@ import type { Property } from "./types";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
-  const [priceRange, setPriceRange] = useState<[number, number]>([50000, 2000000]);
-  const [yieldRange, setYieldRange] = useState<[number, number]>([2, 15]);
-  const [roiRange, setRoiRange] = useState<[number, number]>([2, 20]);
+  const [priceRange, setPriceRange] = useState<number>(2000000);
+  const [yieldRange, setYieldRange] = useState<number>(15);
+  const [roiRange, setRoiRange] = useState<number>(20);
   const [bedrooms, setBedrooms] = useState<number | null>(null);
   const [propertyType, setPropertyType] = useState<string>("");
   const [location, setLocation] = useState<string>("");
@@ -30,12 +30,9 @@ export default function PropertiesPage() {
 
   const filteredProperties = properties.filter(
     (property) =>
-      property.price >= priceRange[0] &&
-      property.price <= priceRange[1] &&
-      property.yield_percent >= yieldRange[0] &&
-      property.yield_percent <= yieldRange[1] &&
-      property.roi_percent >= roiRange[0] &&
-      property.roi_percent <= roiRange[1] &&
+      property.price <= priceRange &&
+      property.yield_percent <= yieldRange &&
+      property.roi_percent <= roiRange &&
       (bedrooms === null || property.bedrooms === bedrooms) &&
       (propertyType === "" || property.propertyType?.toLowerCase().includes(propertyType.toLowerCase())) &&
       (investmentType === "" || property.investmentType?.toLowerCase() === investmentType.toLowerCase()) &&
