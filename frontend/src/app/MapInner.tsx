@@ -6,10 +6,10 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
 // Tell TypeScript to allow access to private
-delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  iconRetinaUrl: "https://propnexus-assets.s3.eu-west-2.amazonaws.com/key-marker.png",
+  iconUrl: "https://propnexus-assets.s3.eu-west-2.amazonaws.com/key-marker.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
 interface MapProps {
