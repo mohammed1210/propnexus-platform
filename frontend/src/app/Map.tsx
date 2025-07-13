@@ -16,7 +16,6 @@ export default function PropertiesPage() {
   const [investmentType, setInvestmentType] = useState<string>("");
 
   useEffect(() => {
-    setProperties(mockProperties);
   }, []);
 
   return (
