@@ -1,72 +1,64 @@
 .card {
-  background: #ffffff;
+  background-color: #fff;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
   margin-bottom: 20px;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s;
 }
 
 .card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-5px);
+}
+
+.image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.content {
+  padding: 16px;
 }
 
 .title {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: #222222;
-  margin-bottom: 6px;
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
 }
 
-.address {
-  font-size: 0.95rem;
-  color: #666666;
-  margin-bottom: 10px;
+.location {
+  margin: 0 0 4px;
+  color: #555;
 }
 
 .price {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: #0070f3; /* Brand blue accent */
-  margin-bottom: 10px;
-}
-
-.details, .description, .metrics {
-  font-size: 0.9rem;
-  margin-bottom: 8px;
-  color: #333333;
+  margin: 0 0 8px;
+  font-weight: bold;
+  color: #007bff;
 }
 
 .buttons {
   display: flex;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
-.saveBtn, .detailsBtn {
+.save,
+.details {
   flex: 1;
-  padding: 8px 12px;
+  padding: 8px;
   border: none;
-  border-radius: 5px;
+  border-radius: 4px;
   cursor: pointer;
-  font-weight: 600;
-  transition: background 0.2s;
 }
 
-.saveBtn {
-  background-color: #0070f3;
-  color: white;
+.save {
+  background-color: #28a745;
+  color: #fff;
 }
 
-.saveBtn:hover {
-  background-color: #0059c1;
-}
-
-.detailsBtn {
-  background-color: #f0f0f0;
-  color: #333333;
-}
-
-.detailsBtn:hover {
-  background-color: #e0e0e0;
+.details {
+  background-color: #007bff;
+  color: #fff;
 }
