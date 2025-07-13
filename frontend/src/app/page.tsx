@@ -44,7 +44,7 @@ export default function PropertiesPage() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto px-4">
+    <div className="max-w-7xl mx-auto px-4 bg-white">
       <h1 className="text-2xl font-bold mb-4">Properties</h1>
       <Filters
         priceRange={priceRange}
