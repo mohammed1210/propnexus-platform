@@ -15,16 +15,28 @@ export default function PropertiesPage() {
   const [investmentType, setInvestmentType] = useState<string>("");
 
   useEffect(() => {
+    const fetchProperties = async () => {
+      try {
+        const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
+        const data: Property[] = await res.json();
+        console.log("Fetched properties:", data);
+        setProperties(data);
+      } catch (error) {
+        console.error("Error fetching properties:", error);
+      }
+    };
+
+    fetchProperties();
   }, []);
 
   const filteredProperties = properties.filter(
     (property) =>
       property.price >= priceRange[0] &&
       property.price <= priceRange[1] &&
-      property.yieldValue >= yieldRange[0] &&
-      property.yieldValue <= yieldRange[1] &&
-      property.roi >= roiRange[0] &&
-      property.roi <= roiRange[1] &&
+      property.yield_percent >= yieldRange[0] && // ✅ Update keys to match your backend if needed
+      property.yield_percent <= yieldRange[1] &&
+      property.roi_percent >= roiRange[0] &&
+      property.roi_percent <= roiRange[1] &&
       (bedrooms === null || property.bedrooms === bedrooms) &&
       (propertyType === "" || property.propertyType?.toLowerCase().includes(propertyType.toLowerCase())) &&
       (investmentType === "" || property.investmentType?.toLowerCase() === investmentType.toLowerCase()) &&
