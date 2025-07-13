@@ -1,18 +1,18 @@
 export interface Property {
   id: string;
   title: string;
-  location: string;
   price: number;
-  imageurl: string;
+  location: string;
+  bedrooms: number;
+  bathrooms: number;
   description: string;
-  source: string;
+  imageurl: string;
   yield_percent: number;
   roi_percent: number;
   propertyType: string;
   investmentType: string;
-  bedrooms: number;
-  bathrooms: number;
   latitude: number;
   longitude: number;
+  source: string;
   created_at: string;
 }

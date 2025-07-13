@@ -1,37 +1,76 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import PropertyCard from '../../components/PropertyCard';
-import type { Property } from './types';
+"use client";
+import { useEffect, useState } from "react";
+import PropertyCard from "@/components/PropertyCard";
+import Filters from "@/components/Filters";
+import type { Property } from "./types";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([50000, 2000000]);
+  const [yieldRange, setYieldRange] = useState<[number, number]>([2, 15]);
+  const [roiRange, setRoiRange] = useState<[number, number]>([2, 20]);
+  const [bedrooms, setBedrooms] = useState<number | null>(null);
+  const [propertyType, setPropertyType] = useState<string>("");
+  const [location, setLocation] = useState<string>("");
+  const [investmentType, setInvestmentType] = useState<string>("");
 
   useEffect(() => {
     const fetchProperties = async () => {
       try {
         const res = await fetch("https://propnexus-backend-production.up.railway.app/properties");
         const data: Property[] = await res.json();
-        console.log("Fetched properties:", data); // ✅ Add console log to debug
+        console.log("Fetched properties:", data);
         setProperties(data);
       } catch (error) {
-        console.error('Error fetching properties:', error);
+        console.error("Error fetching properties:", error);
       }
     };
 
     fetchProperties();
   }, []);
 
+  const filteredProperties = properties.filter(
+    (property) =>
+      property.price >= priceRange[0] &&
+      property.price <= priceRange[1] &&
+      property.yield_percent >= yieldRange[0] &&
+      property.yield_percent <= yieldRange[1] &&
+      property.roi_percent >= roiRange[0] &&
+      property.roi_percent <= roiRange[1] &&
+      (bedrooms === null || property.bedrooms === bedrooms) &&
+      (propertyType === "" || property.propertyType?.toLowerCase().includes(propertyType.toLowerCase())) &&
+      (investmentType === "" || property.investmentType?.toLowerCase() === investmentType.toLowerCase()) &&
+      (location === "" || property.location.toLowerCase().includes(location.toLowerCase()))
+  );
+
   return (
-    <div>
-      <h1>Properties</h1>
-      {properties.length === 0 ? (
-        <p>No properties found.</p>
-      ) : (
-        properties.map((property) => (
-          <PropertyCard key={property.id} property={property} />
-        ))
-      )}
+    <div className="max-w-7xl mx-auto px-4">
+      <h1 className="text-2xl font-bold mb-4">Properties</h1>
+      <Filters
+        priceRange={priceRange}
+        onPriceChange={setPriceRange}
+        yieldRange={yieldRange}
+        onYieldChange={setYieldRange}
+        roiRange={roiRange}
+        onRoiChange={setRoiRange}
+        bedrooms={bedrooms}
+        onBedroomsChange={setBedrooms}
+        propertyType={propertyType}
+        onPropertyTypeChange={setPropertyType}
+        location={location}
+        onLocationChange={setLocation}
+        investmentType={investmentType}
+        onInvestmentTypeChange={setInvestmentType}
+      />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredProperties.length === 0 ? (
+          <p>No properties found.</p>
+        ) : (
+          filteredProperties.map((property) => (
+            <PropertyCard key={property.id} property={property} />
+          ))
+        )}
+      </div>
     </div>
   );
 }
