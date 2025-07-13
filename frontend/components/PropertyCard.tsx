@@ -1,5 +1,5 @@
 import React from "react";
-import type { Property } from "../app/types";
+import type { Property } from "../source/app/types";
 import styles from "./PropertyCard.module.css";
 
 interface PropertyCardProps {
