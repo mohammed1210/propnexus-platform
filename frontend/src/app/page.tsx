@@ -1,5 +1,5 @@
 import MapView from "./Map";
-import PropertyCard from "../components/PropertyCard";
+import PropertyCard from "../../components/PropertyCard";
 import type { Property } from "./types";
 import styles from "./Page.module.css";
 
