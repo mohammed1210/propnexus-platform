@@ -1,79 +1,68 @@
 "use client";
-import dynamic from "next/dynamic";
-import { useState } from "react";
-import PropertyCard from "../../components/PropertyCard";
-import type { Property } from "./types";
 
-// ✅ Dynamically import MapInner, client only
-const MapInner = dynamic(() => import("./MapInner"), {
-  ssr: false,
-});
+import { useEffect, useState } from "react";
+import PropertyCard from "../components/PropertyCard";
+import MapInner from "./MapInner";
+import styles from "./page.module.css";
+import type { Property } from "../src/app/types";
 
 export default function PropertiesPage() {
-  const [showMap, setShowMap] = useState(true);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
 
-  const exampleProperties: Property[] = [
-    {
-      id: "1",
-      title: "3 Bed Detached House in Surrey",
-      location: "G1 2FF",
-      price: 150000,
-      imageurl: "",
-      description: "Detached house in a high-value area.",
-      source: "Rightmove",
-      yield_percent: 6,
-      roi_percent: 15.4,
-      bedrooms: 2,
-      bathrooms: 1,
-      propertyType: "Detached",
-      investmentType: "BTL",
-      latitude: 51.3,
-      longitude: -0.6,
-      created_at: "",
-    },
-    {
-      id: "2",
-      title: "2 Bed Maisonette in Reading",
-      location: "E14 5AB",
-      price: 125000,
-      imageurl: "",
-      description: "Maisonette in Reading located in a high-yield area.",
-      source: "Zoopla",
-      yield_percent: 8.16,
-      roi_percent: 9.2,
-      bedrooms: 2,
-      bathrooms: 2,
-      propertyType: "Maisonette",
-      investmentType: "Flip",
-      latitude: 51.5,
-      longitude: -0.9,
-      created_at: "",
-    },
-  ];
+  // Example filters
+  const [minPrice, setMinPrice] = useState<number>(0);
+  const [maxPrice, setMaxPrice] = useState<number>(2000000);
+
+  useEffect(() => {
+    fetch("/api/properties")
+      .then((res) => res.json())
+      .then((data) => {
+        setProperties(data);
+        setFilteredProperties(data);
+      })
+      .catch((err) => console.error(err));
+  }, []);
+
+  useEffect(() => {
+    const newFiltered = properties.filter(
+      (prop) => prop.price >= minPrice && prop.price <= maxPrice
+    );
+    setFilteredProperties(newFiltered);
+  }, [minPrice, maxPrice, properties]);
 
   return (
     <div>
       <h1>Properties</h1>
-      <button
-        onClick={() => setShowMap(!showMap)}
-        style={{
-          marginBottom: "20px",
-          padding: "10px 20px",
-          background: "#007bff",
-          color: "#fff",
-          border: "none",
-          borderRadius: "4px",
-          cursor: "pointer",
-        }}
-      >
-        {showMap ? "Show List Only" : "Show Map + List"}
-      </button>
 
-      {showMap && <MapInner properties={exampleProperties} />}
+      {/* Example simple filters */}
+      <div className={styles.filters}>
+        <label>
+          Min Price:
+          <input
+            type="number"
+            value={minPrice}
+            onChange={(e) => setMinPrice(Number(e.target.value))}
+          />
+        </label>
+        <label>
+          Max Price:
+          <input
+            type="number"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(Number(e.target.value))}
+          />
+        </label>
+      </div>
 
-      {exampleProperties.map((property) => (
-        <PropertyCard key={property.id} property={property} />
-      ))}
+      {/* ✅ Pass full property list to map */}
+      <MapInner properties={properties} />
+
+      <div className={styles.listContainer}>
+        {filteredProperties.map((property) => (
+          <PropertyCard key={property.id} property={property} />
+        ))}
+      </div>
     </div>
   );
 }
