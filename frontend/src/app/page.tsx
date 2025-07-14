@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import PropertyCard from "../../components/PropertyCard";
 import MapInner from "./MapInner";
-import type { Property } from "../types";
+import type { Property } from "./types";
 import styles from "./Page.module.css";
 
 export default function PropertiesPage() {
