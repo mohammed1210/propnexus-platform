@@ -1,5 +1,5 @@
 import React from "react";
-import type { Property } from "../app/types";
+import type { Property } from "../src/app/types";
 import styles from "./PropertyCard.module.css";
 
 interface PropertyCardProps {
@@ -12,9 +12,11 @@ const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
       <h2 className={styles.title}>{property.title}</h2>
       <p className={styles.location}>{property.location}</p>
       <p className={styles.price}>£{property.price.toLocaleString()}</p>
-      <p>
-        {property.bedrooms} beds • {property.bathrooms ?? 1} baths
-      </p>
+      {property.bedrooms !== undefined && (
+        <p>
+          {property.bedrooms} beds {property.bathrooms ? `• ${property.bathrooms} baths` : ""}
+        </p>
+      )}
       <p>{property.description}</p>
       <p>
         Yield: {property.yield_percent}% | ROI: {property.roi_percent}%
