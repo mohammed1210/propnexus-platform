@@ -1,11 +1,12 @@
 "use client";
+
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import type { Property } from "./types";
+import type { Property } from "../src/app/types";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
-// Fix default marker icon issue
-delete (L.Icon.Default as any).prototype._getIconUrl;
+// Fix default marker icon
+delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
@@ -21,29 +22,25 @@ interface MapProps {
 
 export default function MapInner({ properties }: MapProps) {
   return (
-    <MapContainer
-      center={[52.3555, -1.1743]} // UK center
-      zoom={6}
-      style={{ height: "500px", width: "100%", marginBottom: "20px", borderRadius: "8px" }}
-    >
+    <MapContainer center={[53.5, -2]} zoom={6} style={{ height: "400px", width: "100%" }}>
       <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; OpenStreetMap contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {properties
-        .filter((p) => p.latitude && p.longitude)
-        .map((property) => (
+      {properties.map((prop) =>
+        prop.latitude && prop.longitude ? (
           <Marker
-            key={property.id}
-            position={[property.latitude!, property.longitude!]}
+            key={prop.id}
+            position={[prop.latitude, prop.longitude]}
           >
             <Popup>
-              <strong>{property.title}</strong><br />
-              £{property.price.toLocaleString()}<br />
-              Yield: {property.yield_percent}% | ROI: {property.roi_percent}%
+              <strong>{prop.title}</strong>
+              <br />
+              £{prop.price.toLocaleString()}
             </Popup>
           </Marker>
-        ))}
+        ) : null
+      )}
     </MapContainer>
   );
 }
