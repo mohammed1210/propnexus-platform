@@ -1,15 +1,17 @@
 "use client";
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import PropertyCard from "../../components/PropertyCard";
-import MapInner from "./MapInner";
 import type { Property } from "./types";
 
+// ✅ Dynamically import MapInner, client only
+const MapInner = dynamic(() => import("./MapInner"), {
+  ssr: false,
+});
+
 export default function PropertiesPage() {
-  const [properties, setProperties] = useState<Property[]>([]);
   const [showMap, setShowMap] = useState(true);
 
-  // Example data for demonstration
-  // Replace with your fetch logic if needed
   const exampleProperties: Property[] = [
     {
       id: "1",
