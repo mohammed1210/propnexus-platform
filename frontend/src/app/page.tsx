@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import PropertyCard from "../../components/PropertyCard";
 import MapInner from "./MapInner";
 import type { Property } from "../app/types";
-import styles from "./page.module.css";
+import styles from "./Page.module.css";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
