@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import PropertyCard from "../../components/PropertyCard";
 import MapInner from "./MapInner";
 import type { Property } from "../app/types";
+import styles from "./page.module.css";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -29,8 +30,8 @@ export default function PropertiesPage() {
   }, [minPrice, maxPrice, properties]);
 
   return (
-    <div>
-      <h1>Properties</h1>
+    <div className={styles.container}>
+      <h1 className={styles.title}>Properties</h1>
 
       <div style={{ marginBottom: "20px" }}>
         <label>
@@ -53,9 +54,11 @@ export default function PropertiesPage() {
         </label>
       </div>
 
-      <MapInner properties={properties} />
+      <div className={styles.mapWrapper}>
+        <MapInner properties={properties} />
+      </div>
 
-      <div style={{ marginTop: "20px" }}>
+      <div className={styles.cards}>
         {filteredProperties.map((property) => (
           <PropertyCard key={property.id} property={property} />
         ))}
