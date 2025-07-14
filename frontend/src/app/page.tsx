@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import PropertyCard from "../../components/PropertyCard";
 import MapInner from "./MapInner";
-import type { Property } from "../app/types";
+import type { Property } from "../types";
 import styles from "./Page.module.css";
 
 export default function PropertiesPage() {
@@ -15,7 +15,7 @@ export default function PropertiesPage() {
   useEffect(() => {
     fetch("/api/properties")
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: Property[]) => {
         setProperties(data);
         setFilteredProperties(data);
       })
@@ -55,7 +55,7 @@ export default function PropertiesPage() {
       </div>
 
       <div className={styles.mapWrapper}>
-        <MapInner properties={properties} />
+        <MapInner properties={filteredProperties} />
       </div>
 
       <div className={styles.cards}>
