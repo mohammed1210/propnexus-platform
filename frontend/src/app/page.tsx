@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import PropertyCard from "../components/PropertyCard";
+import PropertyCard from "../../components/PropertyCard";
 import MapInner from "./MapInner";
 import type { Property } from "../src/app/types";
 
