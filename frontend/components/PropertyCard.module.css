@@ -1,48 +1,78 @@
 .card {
-  border: 1px solid #ddd;
+  background-color: #ffffff;
   border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  margin-bottom: 20px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+.content {
   padding: 16px;
-  margin-bottom: 16px;
-  background-color: #fff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 .title {
-  font-size: 1.25rem;
+  margin: 0 0 6px;
+  font-size: 20px;
   font-weight: 600;
-  margin-bottom: 8px;
+  color: #333;
+}
+
+.location {
+  margin: 0 0 6px;
+  color: #777;
 }
 
 .price {
-  color: #1E90FF;
+  margin: 0 0 10px;
   font-weight: bold;
-  font-size: 1.1rem;
+  color: #007bff;
+  font-size: 18px;
+}
+
+.details {
+  margin: 0 0 8px;
+  color: #555;
 }
 
 .description {
-  margin-top: 8px;
+  margin: 0 0 8px;
+  color: #444;
 }
 
-.buttonContainer {
+.stats {
+  margin: 0 0 12px;
+  color: #666;
+  font-size: 14px;
+}
+
+.buttons {
   display: flex;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 10px;
 }
 
-.buttonContainer button {
+.save,
+.detailsBtn {
   flex: 1;
-  padding: 8px;
-  border-radius: 4px;
+  padding: 10px;
   border: none;
+  border-radius: 4px;
   cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
 }
 
-.buttonContainer button:first-child {
+.save {
   background-color: #28a745;
   color: #fff;
 }
 
-.buttonContainer button:last-child {
-  background-color: #1E90FF;
+.detailsBtn {
+  background-color: #007bff;
   color: #fff;
 }
