@@ -1,41 +1,34 @@
 "use client";
 
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import type { Property } from "./types";
+import type { Property } from "../types";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect } from "react";
 
-// Fix Leaflet default icon issues
-import iconUrl from "leaflet/dist/images/marker-icon.png";
-import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
-import shadowUrl from "leaflet/dist/images/marker-shadow.png";
-
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconUrl,
-  iconRetinaUrl,
-  shadowUrl,
-});
-
-interface MapInnerProps {
+interface MapProps {
   properties: Property[];
 }
 
-export default function MapInner({ properties }: MapInnerProps) {
+export default function MapInner({ properties }: MapProps) {
   useEffect(() => {
-    // Just to ensure client code runs
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+      iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
+      shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
+    });
   }, []);
 
   return (
-    <MapContainer center={[51.505, -0.09]} zoom={6} style={{ height: "500px", width: "100%" }}>
+    <MapContainer center={[51.505, -0.09]} zoom={5} style={{ height: "500px", width: "100%" }}>
       <TileLayer
+        attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
       />
-      {properties.map((property) => (
-        property.latitude !== undefined &&
-        property.longitude !== undefined && (
+      {properties
+        .filter((property) => property.latitude !== undefined && property.longitude !== undefined)
+        .map((property) => (
           <Marker
             key={property.id}
             position={[property.latitude as number, property.longitude as number]}
@@ -46,8 +39,7 @@ export default function MapInner({ properties }: MapInnerProps) {
               £{property.price.toLocaleString()}
             </Popup>
           </Marker>
-        )
-      ))}
+        ))}
     </MapContainer>
   );
 }
