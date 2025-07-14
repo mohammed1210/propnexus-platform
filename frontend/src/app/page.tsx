@@ -1,13 +1,10 @@
-import MapView from "./Map";
 import PropertyCard from "../../components/PropertyCard";
-import type { Property } from "./types"; // ✅ Adjust path if needed
-import Filters from "@/components/Filters";
+import type { Property } from "./types"; // adjust path if needed
 
 export default async function PropertiesPage() {
   const res = await fetch(
     "https://propnexus-backend-production.up.railway.app/properties",
     {
-      // Enable Vercel static optimization with periodic revalidation
       next: { revalidate: 60 },
     }
   );
@@ -18,8 +15,8 @@ export default async function PropertiesPage() {
     <div className="max-w-7xl mx-auto px-4">
       <h1 className="text-2xl font-bold mb-4">Properties</h1>
 
-      {/* Optional: Add Filters here if you want */}
-      <Filters
+      {/* ✅ Remove Filters block to fix build error */}
+      {/* <Filters
         priceRange={[50000, 2000000]}
         onPriceChange={() => {}}
         yieldRange={[2, 15]}
@@ -34,7 +31,7 @@ export default async function PropertiesPage() {
         onLocationChange={() => {}}
         investmentType=""
         onInvestmentTypeChange={() => {}}
-      />
+      /> */}
 
       {properties.length === 0 ? (
         <p>No properties found.</p>
