@@ -1,17 +1,20 @@
 "use client";
-
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import type { Property } from "./types";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect } from "react";
 
-// Fix default marker icon issues
+// Fix Leaflet default icon issues
+import iconUrl from "leaflet/dist/images/marker-icon.png";
+import iconRetinaUrl from "leaflet/dist/images/marker-icon-2x.png";
+import shadowUrl from "leaflet/dist/images/marker-shadow.png";
+
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.3/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.3/dist/images/marker-shadow.png",
+  iconUrl,
+  iconRetinaUrl,
+  shadowUrl,
 });
 
 interface MapInnerProps {
@@ -19,32 +22,31 @@ interface MapInnerProps {
 }
 
 export default function MapInner({ properties }: MapInnerProps) {
+  useEffect(() => {
+    // Just to ensure client code runs
+  }, []);
+
   return (
-    <MapContainer center={[51.505, -0.09]} zoom={6} style={{ height: "500px", width: "100%", marginTop: "20px", borderRadius: "8px" }}>
+    <MapContainer center={[51.505, -0.09]} zoom={6} style={{ height: "500px", width: "100%" }}>
       <TileLayer
-        attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors'
       />
-      {properties
-        .filter(
-          (property) =>
-            typeof property.latitude === "number" &&
-            typeof property.longitude === "number"
-        )
-        .map((property) => (
+      {properties.map((property) => (
+        property.latitude !== undefined &&
+        property.longitude !== undefined && (
           <Marker
             key={property.id}
-            position={[property.latitude!, property.longitude!]}
+            position={[property.latitude as number, property.longitude as number]}
           >
             <Popup>
               <strong>{property.title}</strong>
               <br />
-              {property.location}
-              <br />
               £{property.price.toLocaleString()}
             </Popup>
           </Marker>
-        ))}
+        )
+      ))}
     </MapContainer>
   );
 }
