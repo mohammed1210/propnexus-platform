@@ -1,16 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import PropertyCard from "../components/PropertyCard";
+import PropertyCard from "../../components/PropertyCard";
 import MapInner from "./MapInner";
-import styles from "./page.module.css";
-import type { Property } from "../src/app/types";
+import type { Property } from "../app/types";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
-
-  // Example filters
   const [minPrice, setMinPrice] = useState<number>(0);
   const [maxPrice, setMaxPrice] = useState<number>(2000000);
 
@@ -35,14 +32,14 @@ export default function PropertiesPage() {
     <div>
       <h1>Properties</h1>
 
-      {/* Example simple filters */}
-      <div className={styles.filters}>
+      <div style={{ marginBottom: "20px" }}>
         <label>
           Min Price:
           <input
             type="number"
             value={minPrice}
             onChange={(e) => setMinPrice(Number(e.target.value))}
+            style={{ marginLeft: "5px", marginRight: "10px" }}
           />
         </label>
         <label>
@@ -51,14 +48,14 @@ export default function PropertiesPage() {
             type="number"
             value={maxPrice}
             onChange={(e) => setMaxPrice(Number(e.target.value))}
+            style={{ marginLeft: "5px" }}
           />
         </label>
       </div>
 
-      {/* ✅ Pass full property list to map */}
       <MapInner properties={properties} />
 
-      <div className={styles.listContainer}>
+      <div style={{ marginTop: "20px" }}>
         {filteredProperties.map((property) => (
           <PropertyCard key={property.id} property={property} />
         ))}
