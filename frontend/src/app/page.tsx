@@ -9,8 +9,6 @@ import MapInner from "./MapInner";
 import type { Property } from "./types";
 import styles from "./Page.module.css";
 
-export const dynamic = "force-dynamic"; // ✅ Disable static prerender, fix window error
-
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
