@@ -1,7 +1,7 @@
 "use client";
 
-export const dynamic = "force-dynamic"; // ✅ Tell Next.js to skip static export
-export const fetchCache = "force-no-store"; // ✅ Disable static fetch caching
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 import { useEffect, useState } from "react";
 import PropertyCard from "../../components/PropertyCard";
