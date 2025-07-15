@@ -1,6 +1,6 @@
 import React from "react";
 import styles from "./PropertyCard.module.css";
-import type { Property } from "../app/types"; // ✅ corrected path
+import type { Property } from "..src/app/types"; // ✅ corrected path
 
 export default function PropertyCard({ property }: { property: Property }) {
   return (
