@@ -4,10 +4,13 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import PropertyCard from "../../components/PropertyCard";
-import MapInner from "./MapInner";
-import type { Property } from "./types";
+import type { Property } from "../types";
 import styles from "./Page.module.css";
+
+// ⬇️ Dynamically import MapInner, disable SSR
+const MapInner = dynamic(() => import("./MapInner"), { ssr: false });
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -58,7 +61,7 @@ export default function PropertiesPage() {
       </div>
 
       <div className={styles.mapWrapper}>
-        <MapInner properties={filteredProperties} />
+        <MapInner properties={properties} />
       </div>
 
       <div className={styles.cards}>
