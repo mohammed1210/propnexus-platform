@@ -13,7 +13,8 @@ export default function PropertyCard({ property }: { property: Property }) {
       </p>
       <p className={styles.description}>{property.description}</p>
       <p className={styles.metrics}>
-        Yield: {property.yield ? `${property.yield}%` : "N/A"} | ROI: {property.roi ? `${property.roi}%` : "N/A"}
+      Yield: {property.yield_percent ? `${property.yield_percent}%` : "N/A"} | 
+      ROI: {property.roi_percent ? `${property.roi_percent}%` : "N/A"}
       </p>
       <div className={styles.buttons}>
         <button className={styles.saveButton}>Save Deal</button>
