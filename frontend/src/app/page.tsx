@@ -1,15 +1,10 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-export const fetchCache = "force-no-store";
-
 import { useEffect, useState } from "react";
-import nextDynamic from "next/dynamic";
 import PropertyCard from "../../components/PropertyCard";
-import type { Property } from "./types";
+import MapInner from "./MapInner";
+import type { Property } from "../types";
 import styles from "./Page.module.css";
-
-const MapInner = nextDynamic(() => import("./MapInner"), { ssr: false });
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -28,29 +23,33 @@ export default function PropertiesPage() {
   }, []);
 
   useEffect(() => {
-  if (minPrice === 0 && maxPrice === 2000000) {
-    setFilteredProperties(properties);
-    return;
-  }
-
-  const newFiltered = properties.filter(
-    (prop) => prop.price >= minPrice && prop.price <= maxPrice
-  );
-  setFilteredProperties(newFiltered);
-}, [minPrice, maxPrice, properties]);
+    const newFiltered = properties.filter(
+      (prop) => prop.price >= minPrice && prop.price <= maxPrice
+    );
+    setFilteredProperties(newFiltered);
+  }, [minPrice, maxPrice, properties]);
 
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>Properties</h1>
 
-      <div style={{ marginBottom: "20px" }}>
-        <label>
+      <div
+        style={{
+          backgroundColor: "#fff",
+          border: "1px solid #e5e7eb",
+          borderRadius: "10px",
+          padding: "15px",
+          boxShadow: "0 2px 5px rgba(0,0,0,0.04)",
+          marginBottom: "20px",
+        }}
+      >
+        <label style={{ marginRight: "10px" }}>
           Min Price:
           <input
             type="number"
             value={minPrice}
             onChange={(e) => setMinPrice(Number(e.target.value))}
-            style={{ marginLeft: "5px", marginRight: "10px" }}
+            style={{ marginLeft: "5px", padding: "5px" }}
           />
         </label>
         <label>
@@ -59,23 +58,19 @@ export default function PropertiesPage() {
             type="number"
             value={maxPrice}
             onChange={(e) => setMaxPrice(Number(e.target.value))}
-            style={{ marginLeft: "5px" }}
+            style={{ marginLeft: "5px", padding: "5px" }}
           />
         </label>
       </div>
 
       <div className={styles.mapWrapper}>
-        <MapInner properties={filteredProperties} />
+        <MapInner properties={properties} />
       </div>
 
       <div className={styles.cards}>
-        {filteredProperties.length > 0 ? (
-          filteredProperties.map((property) => (
-            <PropertyCard key={property.id} property={property} />
-          ))
-        ) : (
-          <p>No properties found within this range.</p>
-        )}
+        {filteredProperties.map((property) => (
+          <PropertyCard key={property.id} property={property} />
+        ))}
       </div>
     </div>
   );
