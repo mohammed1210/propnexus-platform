@@ -4,12 +4,11 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 import { useEffect, useState } from "react";
-import nextDynamic from "next/dynamic"; // ✅ renamed
+import nextDynamic from "next/dynamic";
 import PropertyCard from "../../components/PropertyCard";
-import type { Property } from "./types";
+import type { Property } from "../types";
 import styles from "./Page.module.css";
 
-// Use renamed import
 const MapInner = nextDynamic(() => import("./MapInner"), { ssr: false });
 
 export default function PropertiesPage() {
@@ -61,13 +60,17 @@ export default function PropertiesPage() {
       </div>
 
       <div className={styles.mapWrapper}>
-        <MapInner properties={properties} />
+        <MapInner properties={filteredProperties} />
       </div>
 
       <div className={styles.cards}>
-        {filteredProperties.map((property) => (
-          <PropertyCard key={property.id} property={property} />
-        ))}
+        {filteredProperties.length > 0 ? (
+          filteredProperties.map((property) => (
+            <PropertyCard key={property.id} property={property} />
+          ))
+        ) : (
+          <p>No properties found within this range.</p>
+        )}
       </div>
     </div>
   );
