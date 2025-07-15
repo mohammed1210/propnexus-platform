@@ -9,23 +9,27 @@ interface PropertyCardProps {
 const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
   return (
     <div className={styles.card}>
-      <div className={styles.content}>
-        <h2 className={styles.title}>{property.title}</h2>
-        <p className={styles.location}>{property.location}</p>
-        <p className={styles.price}>£{property.price.toLocaleString()}</p>
-        {property.bedrooms !== undefined && (
-          <p className={styles.details}>
-            {property.bedrooms} beds {property.bathrooms ? `• ${property.bathrooms} baths` : ""}
-          </p>
-        )}
-        <p className={styles.description}>{property.description}</p>
-        <p className={styles.stats}>
-          Yield: {property.yield_percent}% | ROI: {property.roi_percent}%
+      <h2 className={styles.title}>{property.title || property.location}</h2>
+      <p className={styles.location}>{property.location}</p>
+      <p className={styles.price}>£{property.price.toLocaleString()}</p>
+
+      {property.bedrooms !== undefined && (
+        <p className={styles.info}>
+          {property.bedrooms} beds • {property.bathrooms ?? 1} baths
         </p>
-        <div className={styles.buttons}>
-          <button className={styles.save}>Save Deal</button>
-          <button className={styles.detailsBtn}>View Details</button>
-        </div>
+      )}
+
+      {property.description && (
+        <p className={styles.description}>{property.description}</p>
+      )}
+
+      <p className={styles.stats}>
+        Yield: {property.yield_percent ? `${property.yield_percent}%` : "N/A"} | ROI: {property.roi_percent ? `${property.roi_percent}%` : "N/A"}
+      </p>
+
+      <div className={styles.buttons}>
+        <button className={styles.save}>Save Deal</button>
+        <button className={styles.details}>View Details</button>
       </div>
     </div>
   );
