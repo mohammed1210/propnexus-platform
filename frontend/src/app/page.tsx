@@ -28,11 +28,16 @@ export default function PropertiesPage() {
   }, []);
 
   useEffect(() => {
-    const newFiltered = properties.filter(
-      (prop) => prop.price >= minPrice && prop.price <= maxPrice
-    );
-    setFilteredProperties(newFiltered);
-  }, [minPrice, maxPrice, properties]);
+  if (minPrice === 0 && maxPrice === 2000000) {
+    setFilteredProperties(properties);
+    return;
+  }
+
+  const newFiltered = properties.filter(
+    (prop) => prop.price >= minPrice && prop.price <= maxPrice
+  );
+  setFilteredProperties(newFiltered);
+}, [minPrice, maxPrice, properties]);
 
   return (
     <div className={styles.container}>
