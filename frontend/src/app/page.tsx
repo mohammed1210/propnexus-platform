@@ -6,7 +6,7 @@ export const fetchCache = "force-no-store";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import PropertyCard from "../../components/PropertyCard";
-import type { Property } from "../types";
+import type { Property } from "./types";
 import styles from "./Page.module.css";
 
 // ⬇️ Dynamically import MapInner, disable SSR
