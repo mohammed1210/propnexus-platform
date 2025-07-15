@@ -9,16 +9,11 @@ interface PropertyCardProps {
 const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
   return (
     <div className={styles.card}>
-      <h2 className={styles.title}>{property.title}</h2>
+      <h2 className={styles.title}>{property.title || property.location}</h2>
       <p className={styles.location}>{property.location}</p>
       <p className={styles.price}>£{property.price.toLocaleString()}</p>
-      {property.bedrooms !== undefined && (
-        <p className={styles.bedsBaths}>
-          {property.bedrooms} beds • {property.bathrooms ?? 1} baths
-        </p>
-      )}
       <p className={styles.description}>{property.description}</p>
-      <p className={styles.metrics}>
+      <p>
         Yield: {property.yield_percent ? `${property.yield_percent}%` : "N/A"} | 
         ROI: {property.roi_percent ? `${property.roi_percent}%` : "N/A"}
       </p>
