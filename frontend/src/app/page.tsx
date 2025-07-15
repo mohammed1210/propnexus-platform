@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = "force-dynamic";
+
 import { useEffect, useState } from "react";
 import PropertyCard from "../../components/PropertyCard";
 import MapInner from "./MapInner";
