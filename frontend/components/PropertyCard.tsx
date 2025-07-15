@@ -2,7 +2,7 @@
 
 import React from "react";
 import styles from "./PropertyCard.module.css";
-import type { Property } from "./types";
+import type { Property } from "../types";
 
 export default function PropertyCard({ property }: { property: Property }) {
   return (
