@@ -1,41 +1,52 @@
 .card {
-  background: #fff;
-  border: 1px solid #e0e0e0;
+  background: white;
   border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
   padding: 20px;
-  margin: 20px 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  margin-bottom: 20px;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
 }
 
 .title {
   font-size: 20px;
   font-weight: 600;
-  margin: 0 0 5px;
+  margin-bottom: 4px;
 }
 
 .location {
-  font-size: 16px;
   color: #666;
-  margin: 0 0 10px;
+  font-size: 15px;
+  margin-bottom: 8px;
 }
 
 .price {
   font-size: 18px;
+  font-weight: 700;
   color: #0070f3;
-  font-weight: 500;
-  margin: 0 0 10px;
+  margin-bottom: 8px;
+}
+
+.bedBath {
+  font-size: 14px;
+  color: #444;
+  margin-bottom: 8px;
 }
 
 .description {
   font-size: 15px;
-  color: #333;
-  margin-bottom: 15px;
+  color: #444;
+  margin-bottom: 8px;
+}
+
+.metrics {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 16px;
 }
 
 .buttons {
@@ -45,30 +56,32 @@
 
 .save {
   flex: 1;
-  background: #22c55e;
-  color: #fff;
+  background-color: #22c55e;
+  color: white;
   border: none;
-  padding: 10px;
+  padding: 10px 0;
   border-radius: 6px;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.save:hover {
+  background-color: #16a34a;
 }
 
 .details {
   flex: 1;
-  background: #2563eb;
-  color: #fff;
+  background-color: #2563eb;
+  color: white;
   border: none;
-  padding: 10px;
+  padding: 10px 0;
   border-radius: 6px;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 500;
-}
-
-.save:hover {
-  background: #16a34a;
+  transition: background 0.2s;
 }
 
 .details:hover {
-  background: #1e40af;
+  background-color: #1d4ed8;
 }
