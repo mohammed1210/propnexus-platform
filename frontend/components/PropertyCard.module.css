@@ -1,90 +1,81 @@
 .card {
-  background-color: #ffffff;
+  background: #fff;
   border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  overflow: hidden;
+  border-radius: 10px;
+  padding: 20px;
   margin-bottom: 20px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
 
 .title {
   font-size: 20px;
   font-weight: 600;
-  margin: 16px 16px 4px 16px;
-  color: #212121;
+  margin: 0 0 5px;
 }
 
 .location {
-  margin: 0 16px 8px 16px;
-  color: #555;
-  font-size: 14px;
+  color: #777;
+  margin: 0 0 10px;
 }
 
 .price {
-  margin: 0 16px 12px 16px;
+  color: #0070f3;
+  font-weight: bold;
   font-size: 18px;
-  font-weight: 700;
-  color: #007bff;
+  margin: 0 0 10px;
 }
 
-.info {
-  margin: 0 16px 4px 16px;
-  font-size: 14px;
-  color: #444;
+.bedsBaths {
+  margin: 0 0 10px;
 }
 
 .description {
-  margin: 0 16px 8px 16px;
-  font-size: 13px;
-  color: #666;
+  margin: 0 0 10px;
+  color: #555;
 }
 
-.stats {
-  margin: 0 16px 16px 16px;
-  font-size: 13px;
-  color: #666;
+.metrics {
+  margin: 0 0 15px;
+  font-weight: 500;
 }
 
 .buttons {
   display: flex;
-  justify-content: space-between;
-  padding: 0 16px 16px 16px;
-  gap: 8px;
-}
-
-.save,
-.details {
-  flex: 1;
-  padding: 10px;
-  border: none;
-  border-radius: 4px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s ease, transform 0.1s ease;
+  gap: 10px;
 }
 
 .save {
-  background-color: #28a745;
-  color: #fff;
+  background-color: #22c55e;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  flex: 1;
+  cursor: pointer;
+  font-weight: 600;
 }
 
 .save:hover {
-  background-color: #218838;
-  transform: translateY(-1px);
+  background-color: #16a34a;
 }
 
 .details {
-  background-color: #007bff;
-  color: #fff;
+  background-color: #2563eb;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 5px;
+  flex: 1;
+  cursor: pointer;
+  font-weight: 600;
 }
 
 .details:hover {
-  background-color: #0069d9;
-  transform: translateY(-1px);
+  background-color: #1e40af;
 }
