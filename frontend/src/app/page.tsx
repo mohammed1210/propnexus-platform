@@ -62,21 +62,18 @@ export default function PropertiesPage() {
         margin: '0 auto',
       }}
     >
-      <h1
-        style={{
-          marginBottom: '20px',
-          fontSize: '28px',
-          fontWeight: 600,
-          color: '#111827',
-          backgroundColor: '#f3f4f6',
-          padding: '12px 20px',
-          borderRadius: '8px',
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.04)',
-        }}
-      >
-        Property Listings
-      </h1>
+    <h1
+      style={{
+        marginBottom: '20px',
+        backgroundColor: '#f1f5f9', // light slate gray
+        padding: '12px 20px',
+        borderRadius: '8px',
+        fontSize: '24px',
+        fontWeight: '600',
+      }}
+    >
+      Property Listings
+    </h1>
 
       <div
         style={{
