@@ -103,7 +103,7 @@ export default function PropertiesPage() {
 
       {filteredProperties.length > 0 ? (
         filteredProperties.map((property) => (
-          <PropertyCard key={property.id} {...property} />
+          <PropertyCard key={property.id} property={property} />
         ))
       ) : (
         <p>No matching properties found.</p>
