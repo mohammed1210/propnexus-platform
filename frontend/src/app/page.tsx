@@ -53,78 +53,86 @@ export default function PropertiesPage() {
   }, [minPrice, maxPrice, searchLocation, properties]);
 
   return (
-    <div style={{ padding: '20px', backgroundColor: '#f9fafb' }}>
+    <div
+      style={{
+        padding: '20px',
+        backgroundColor: '#f9fafb',
+        minHeight: '100vh',
+        maxWidth: '1000px',
+        margin: '0 auto',
+      }}
+    >
       <h1
-  style={{
-    marginBottom: '20px',
-    fontSize: '28px',
-    fontWeight: 600,
-    color: '#111827',
-    backgroundColor: '#f3f4f6',
-    padding: '12px 20px',
-    borderRadius: '8px',
-    border: '1px solid #e5e7eb',
-    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.04)',
-  }}
->
-  Property Listings
-</h1>
+        style={{
+          marginBottom: '20px',
+          fontSize: '28px',
+          fontWeight: 600,
+          color: '#111827',
+          backgroundColor: '#f3f4f6',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          border: '1px solid #e5e7eb',
+          boxShadow: '0 1px 4px rgba(0, 0, 0, 0.04)',
+        }}
+      >
+        Property Listings
+      </h1>
 
       <div
-  style={{
-    backgroundColor: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '10px',
-    padding: '20px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-    marginBottom: '30px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-  }}
->
-  <input
-    type="text"
-    placeholder="Search by location"
-    value={searchLocation}
-    onChange={(e) => setSearchLocation(e.target.value)}
-    style={{
-      padding: '10px',
-      fontSize: '16px',
-      borderRadius: '6px',
-      border: '1px solid #d1d5db',
-    }}
-  />
+        style={{
+          backgroundColor: '#fff',
+          border: '1px solid #e5e7eb',
+          borderRadius: '10px',
+          padding: '20px',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+          marginBottom: '30px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+        }}
+      >
+        <input
+          type="text"
+          placeholder="Search by location"
+          value={searchLocation}
+          onChange={(e) => setSearchLocation(e.target.value)}
+          style={{
+            padding: '10px',
+            fontSize: '16px',
+            borderRadius: '6px',
+            border: '1px solid #d1d5db',
+          }}
+        />
 
-  <div style={{ display: 'flex', gap: '12px' }}>
-    <input
-      type="number"
-      placeholder="Min Price"
-      value={minPrice}
-      onChange={(e) => setMinPrice(Number(e.target.value))}
-      style={{
-        flex: 1,
-        padding: '10px',
-        fontSize: '16px',
-        borderRadius: '6px',
-        border: '1px solid #d1d5db',
-      }}
-    />
-    <input
-      type="number"
-      placeholder="Max Price"
-      value={maxPrice}
-      onChange={(e) => setMaxPrice(Number(e.target.value))}
-      style={{
-        flex: 1,
-        padding: '10px',
-        fontSize: '16px',
-        borderRadius: '6px',
-        border: '1px solid #d1d5db',
-      }}
-    />
-  </div>
-</div>
+        <div style={{ display: 'flex', gap: '12px' }}>
+          <input
+            type="number"
+            placeholder="Min Price"
+            value={minPrice}
+            onChange={(e) => setMinPrice(Number(e.target.value))}
+            style={{
+              flex: 1,
+              padding: '10px',
+              fontSize: '16px',
+              borderRadius: '6px',
+              border: '1px solid #d1d5db',
+            }}
+          />
+          <input
+            type="number"
+            placeholder="Max Price"
+            value={maxPrice}
+            onChange={(e) => setMaxPrice(Number(e.target.value))}
+            style={{
+              flex: 1,
+              padding: '10px',
+              fontSize: '16px',
+              borderRadius: '6px',
+              border: '1px solid #d1d5db',
+            }}
+          />
+        </div>
+      </div>
 
       {filteredProperties.length > 0 ? (
         filteredProperties.map((property) => (
