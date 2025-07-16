@@ -1,5 +1,3 @@
-/* globals.css */
-
 html,
 body {
   padding: 0;
@@ -7,7 +5,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
     Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
   background: #f9fafb; /* Light grey background */
-  color: #111827; /* Dark gray text color for good contrast */
+  color: #111827;
 }
 
 a {
