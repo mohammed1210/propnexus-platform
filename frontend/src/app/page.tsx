@@ -7,6 +7,8 @@ import PropertyCard from "../../components/PropertyCard";
 import MapInner from "./MapInner";
 import type { Property } from "./types";
 import styles from "./Page.module.css";
+import Header from "../../components/Header";
+import Filters from "../../components/Filters";
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
