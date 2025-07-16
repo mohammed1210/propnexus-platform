@@ -1,62 +1,52 @@
 .card {
-  background: white;
+  background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-  padding: 16px;
-  margin-bottom: 20px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  margin-bottom: 24px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
 }
 
 .title {
   margin: 0 0 6px;
   font-size: 20px;
   font-weight: 600;
+  color: #111827; /* A rich black for strong headline contrast */
 }
 
 .location {
   margin: 0 0 6px;
   color: #6b7280;
+  font-size: 14px;
 }
 
 .price {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-weight: bold;
   color: #2563eb;
   font-size: 18px;
 }
 
-.details, .description, .metrics {
+.details {
   margin: 4px 0;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.description {
+  margin: 6px 0;
+  font-size: 14px;
   color: #374151;
 }
 
-.buttons {
-  display: flex;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.save, .detailsBtn {
-  flex: 1;
-  padding: 8px 10px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.save {
-  background-color: #28a745;
-  color: white;
-}
-
-.detailsBtn {
-  background-color: #2563eb;
-  color: white;
+.metrics {
+  margin: 6px 0;
+  font-size: 14px;
+  color: #4b5563;
 }
