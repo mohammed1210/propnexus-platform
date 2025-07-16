@@ -45,6 +45,11 @@ p {
   color: #374151;
 }
 
+body {
+  background-color: #f9fafb; /* soft light grey, like modern SaaS */
+  color: #111827; /* near-black text for good contrast */
+}
+
 body::-webkit-scrollbar {
   width: 10px;
 }
