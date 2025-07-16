@@ -1,17 +1,13 @@
-/* Reset some defaults */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+/* globals.css */
 
-html, body {
-  height: 100%;
-  width: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  background-color: #f9fafb; /* Soft light grey background */
-  color: #111827; /* Near-black text */
-  line-height: 1.6;
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  background: #f9fafb; /* Light grey background */
+  color: #111827; /* Dark gray text color for good contrast */
 }
 
 a {
@@ -19,46 +15,6 @@ a {
   text-decoration: none;
 }
 
-button {
-  font-family: inherit;
-}
-
-input, select, textarea {
-  font-family: inherit;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 6px 10px;
-  transition: border-color 0.2s ease;
-}
-
-input:focus, select:focus, textarea:focus {
-  border-color: #2563eb;
-  outline: none;
-}
-
-h1, h2, h3, h4, h5, h6 {
-  color: #111827;
-  font-weight: 600;
-}
-
-p {
-  color: #374151;
-}
-
-body {
-  background-color: #f9fafb; /* soft light grey, like modern SaaS */
-  color: #111827; /* near-black text for good contrast */
-}
-
-body::-webkit-scrollbar {
-  width: 10px;
-}
-
-body::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 5px;
-}
-
-body::-webkit-scrollbar-track {
-  background: #f9fafb;
+* {
+  box-sizing: border-box;
 }
