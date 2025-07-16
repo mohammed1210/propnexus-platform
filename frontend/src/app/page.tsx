@@ -12,7 +12,15 @@ interface Property {
   bedrooms: number;
   bathrooms: number;
   description: string;
-  image: string;
+  imageurl: string;
+  yield_percent: number;
+  roi_percent: number;
+  source: string;
+  created_at: string;
+  latitude: number;
+  longitude: number;
+  propertyType: string;
+  investmentType: string;
 }
 
 export default function PropertiesPage() {
