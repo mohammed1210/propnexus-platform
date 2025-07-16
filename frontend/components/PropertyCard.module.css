@@ -1,8 +1,8 @@
 .card {
-  background: #ffffff;
+  background: white;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
   padding: 20px;
   margin-bottom: 24px;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -10,20 +10,18 @@
 
 .card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
 }
 
 .title {
   margin: 0 0 6px;
   font-size: 20px;
   font-weight: 600;
-  color: #111827; /* A rich black for strong headline contrast */
 }
 
 .location {
   margin: 0 0 6px;
   color: #6b7280;
-  font-size: 14px;
 }
 
 .price {
@@ -33,20 +31,42 @@
   font-size: 18px;
 }
 
-.details {
+.details, .description, .metrics {
   margin: 4px 0;
-  font-size: 14px;
-  color: #4b5563;
-}
-
-.description {
-  margin: 6px 0;
-  font-size: 14px;
   color: #374151;
 }
 
-.metrics {
-  margin: 6px 0;
-  font-size: 14px;
-  color: #4b5563;
+.buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.saveButton {
+  background-color: #22c55e;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.saveButton:hover {
+  background-color: #16a34a;
+}
+
+.viewButton {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.viewButton:hover {
+  background-color: #1d4ed8;
 }
