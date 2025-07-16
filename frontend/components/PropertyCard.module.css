@@ -52,21 +52,29 @@
   transition: background-color 0.2s ease;
 }
 
-.saveButton:hover {
-  background-color: #16a34a;
-}
-
-.viewButton {
-  background-color: #2563eb;
+.saveButton {
+  background-color: #22c55e; /* green */
   color: white;
   border: none;
   padding: 8px 14px;
   border-radius: 6px;
   cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s ease;
+  margin-right: 8px;
+}
+
+.saveButton:hover {
+  background-color: #16a34a;
+}
+
+.viewButton {
+  background-color: #2563eb; /* blue */
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 
 .viewButton:hover {
-  background-color: #1d4ed8;
+  background-color: #1e40af;
 }
