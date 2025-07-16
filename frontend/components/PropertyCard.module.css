@@ -1,84 +1,62 @@
 .card {
-  background-color: #fff;
+  background: white;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  padding: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  padding: 16px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 .title {
+  margin: 0 0 6px;
   font-size: 20px;
   font-weight: 600;
-  color: #111;
-  margin: 0 0 4px 0;
 }
 
 .location {
+  margin: 0 0 6px;
   color: #6b7280;
-  margin-bottom: 8px;
 }
 
 .price {
+  margin: 0 0 10px;
+  font-weight: bold;
+  color: #2563eb;
   font-size: 18px;
-  font-weight: 700;
-  color: #2563eb; /* Blue accent */
-  margin-bottom: 8px;
 }
 
-.bedsBaths {
-  color: #4a4a4a;
-  margin-bottom: 8px;
+.details, .description, .metrics {
+  margin: 4px 0;
+  color: #374151;
 }
 
-.description {
-  color: #4a4a4a;
-  margin-bottom: 12px;
-}
-
-.metrics {
-  font-size: 14px;
-  color: #6b7280;
-  margin-bottom: 15px;
-}
-
-.buttonRow {
+.buttons {
   display: flex;
   gap: 10px;
+  margin-top: 12px;
 }
 
-.saveButton {
+.save, .detailsBtn {
   flex: 1;
-  padding: 10px;
-  background-color: #22c55e;
-  color: white;
+  padding: 8px 10px;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   font-weight: 500;
 }
 
-.saveButton:hover {
-  background-color: #16a34a;
+.save {
+  background-color: #28a745;
+  color: white;
 }
 
-.detailsButton {
-  flex: 1;
-  padding: 10px;
+.detailsBtn {
   background-color: #2563eb;
   color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.detailsButton:hover {
-  background-color: #1d4ed8;
 }
