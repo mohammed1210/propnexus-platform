@@ -45,7 +45,7 @@ export default function PropertyCard({ property }: Props) {
         </div>
 
         <div className={styles.metrics}>
-          📈 Yield: {property.yield || 0}% | ROI: {property.roi || 0}%
+          📈 Yield: {property.yield_percent || 0}% | ROI: {property.roi_percent || 0}%
         </div>
 
         <div className={styles.buttons}>
