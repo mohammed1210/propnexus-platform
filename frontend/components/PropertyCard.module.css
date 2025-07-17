@@ -1,39 +1,46 @@
 .card {
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  background-color: #ffffff;
   padding: 20px;
-  margin-bottom: 24px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
 }
 
 .title {
-  margin: 0 0 6px;
   font-size: 20px;
   font-weight: 600;
+  margin-bottom: 4px;
 }
 
 .location {
-  margin: 0 0 6px;
+  font-size: 16px;
   color: #6b7280;
+  margin-bottom: 4px;
 }
 
 .price {
-  margin: 0 0 12px;
-  font-weight: bold;
-  color: #2563eb;
   font-size: 18px;
+  font-weight: 500;
+  color: #2563eb;
+  margin-bottom: 6px;
 }
 
-.details, .description, .metrics {
-  margin: 4px 0;
+.details {
+  font-size: 15px;
+  color: #4b5563;
+  margin-bottom: 6px;
+}
+
+.description {
+  font-size: 14px;
   color: #374151;
+  margin-bottom: 6px;
+}
+
+.metrics {
+  font-size: 14px;
+  color: #1f2937;
+  margin-bottom: 12px;
 }
 
 .buttons {
@@ -41,40 +48,22 @@
   gap: 10px;
 }
 
-.saveButton {
-  background-color: #22c55e;
+.save {
+  padding: 8px 14px;
+  background-color: #ef4444; /* red */
   color: white;
   border: none;
-  padding: 8px 14px;
   border-radius: 6px;
-  cursor: pointer;
   font-weight: 500;
-  transition: background-color 0.2s ease;
-}
-
-.saveButton {
-  background-color: #22c55e; /* green */
-  color: white;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  margin-right: 8px;
-}
-
-.saveButton:hover {
-  background-color: #16a34a;
-}
-
-.viewButton {
-  background-color: #2563eb; /* blue */
-  color: white;
-  border: none;
-  padding: 8px 14px;
-  border-radius: 6px;
   cursor: pointer;
 }
 
-.viewButton:hover {
-  background-color: #1e40af;
+.detailsBtn {
+  padding: 8px 14px;
+  background-color: #3b82f6; /* blue */
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
 }
