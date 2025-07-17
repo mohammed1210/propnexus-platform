@@ -13,7 +13,6 @@ export default function PropertiesPage() {
   const [searchLocation, setSearchLocation] = useState<string>('');
   const [bedrooms, setBedrooms] = useState<string>('Any');
   const [propertyType, setPropertyType] = useState<string>('All');
-  const [investmentType, setInvestmentType] = useState<string>('All');
   const [showMap, setShowMap] = useState<boolean>(true);
 
   useEffect(() => {
@@ -28,16 +27,33 @@ export default function PropertiesPage() {
 
   useEffect(() => {
     const filtered = properties.filter((property) => {
-      const matchesPrice = property.price >= minPrice && property.price <= maxPrice;
-      const matchesLocation = property.location.toLowerCase().includes(searchLocation.toLowerCase());
-      const matchesBedrooms = bedrooms === 'Any' || property.bedrooms === Number(bedrooms);
-      const matchesPropertyType = propertyType === 'All' || property.propertyType.toLowerCase() === propertyType.toLowerCase();
-      const matchesInvestmentType = investmentType === 'All' || property.investmentType?.toLowerCase() === investmentType.toLowerCase();
+      const matchesPrice =
+        property.price >= minPrice && property.price <= maxPrice;
+      const matchesLocation = property.location
+        .toLowerCase()
+        .includes(searchLocation.toLowerCase());
+      const matchesBedrooms =
+        bedrooms === 'Any' || property.bedrooms === Number(bedrooms);
+      const matchesPropertyType =
+        propertyType === 'All' ||
+        property.propertyType.toLowerCase() === propertyType.toLowerCase();
 
-      return matchesPrice && matchesLocation && matchesBedrooms && matchesPropertyType && matchesInvestmentType;
+      return (
+        matchesPrice &&
+        matchesLocation &&
+        matchesBedrooms &&
+        matchesPropertyType
+      );
     });
     setFilteredProperties(filtered);
-  }, [minPrice, maxPrice, searchLocation, properties, bedrooms, propertyType, investmentType]);
+  }, [
+    minPrice,
+    maxPrice,
+    searchLocation,
+    properties,
+    bedrooms,
+    propertyType,
+  ]);
 
   return (
     <div
@@ -91,29 +107,13 @@ export default function PropertiesPage() {
               border: '1px solid #d1d5db',
             }}
           />
-          <select
-            value={investmentType}
-            onChange={(e) => setInvestmentType(e.target.value)}
-            style={{
-              flex: '1 1 160px',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-            }}
-          >
-            <option value="All">All Strategies</option>
-            <option value="HMO">HMO</option>
-            <option value="Flip">Flip</option>
-            <option value="BRRR">BRRR</option>
-            <option value="Buy to Let">Buy to Let</option>
-          </select>
           <input
             type="number"
             placeholder="Min Price"
             value={minPrice}
             onChange={(e) => setMinPrice(Number(e.target.value))}
             style={{
-              flex: '1 1 100px',
+              flex: '1 1 120px',
               padding: '10px',
               borderRadius: '6px',
               border: '1px solid #d1d5db',
@@ -125,7 +125,7 @@ export default function PropertiesPage() {
             value={maxPrice}
             onChange={(e) => setMaxPrice(Number(e.target.value))}
             style={{
-              flex: '1 1 100px',
+              flex: '1 1 120px',
               padding: '10px',
               borderRadius: '6px',
               border: '1px solid #d1d5db',
@@ -135,13 +135,13 @@ export default function PropertiesPage() {
             value={bedrooms}
             onChange={(e) => setBedrooms(e.target.value)}
             style={{
-              flex: '1 1 100px',
+              flex: '1 1 120px',
               padding: '10px',
               borderRadius: '6px',
               border: '1px solid #d1d5db',
             }}
           >
-            <option value="Any">Beds</option>
+            <option value="Any">Any Beds</option>
             <option value="1">1 Bed</option>
             <option value="2">2 Beds</option>
             <option value="3">3 Beds</option>
@@ -151,22 +151,22 @@ export default function PropertiesPage() {
             value={propertyType}
             onChange={(e) => setPropertyType(e.target.value)}
             style={{
-              flex: '1 1 120px',
+              flex: '1 1 140px',
               padding: '10px',
               borderRadius: '6px',
               border: '1px solid #d1d5db',
             }}
           >
-            <option value="All">Property Type</option>
-            <option value="House">House</option>
+            <option value="All">All Types</option>
             <option value="Flat">Flat</option>
+            <option value="House">House</option>
             <option value="Studio">Studio</option>
           </select>
           <button
             onClick={() => setShowMap((prev) => !prev)}
             style={{
               padding: '10px 14px',
-              backgroundColor: showMap ? '#334155' : '#0ea5e9',
+              backgroundColor: showMap ? '#334155' : '#3b82f6',
               color: '#fff',
               borderRadius: '6px',
               border: 'none',
@@ -186,7 +186,7 @@ export default function PropertiesPage() {
         )}
       </div>
 
-      {showMap && <MapView />}
+      {showMap && <MapView properties={filteredProperties} />}
     </div>
   );
 }
