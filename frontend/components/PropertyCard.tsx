@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Property } from '../types';
+import { Property } from '../src/app/types';
 import styles from './PropertyCard.module.css';
 
 export default function PropertyCard({ property }: { property: Property }) {
