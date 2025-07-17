@@ -1,4 +1,3 @@
-// src/app/MapView.tsx
 'use client';
 
 import React from 'react';
