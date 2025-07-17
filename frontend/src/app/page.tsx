@@ -75,13 +75,11 @@ export default function PropertiesPage() {
       Property Listings
     </h1>
 
-    <div 
-      style={{
-        display: 'flex',
-        gap: '10px',
-        flexWrap: 'wrap' // ✅ new
-      }}
-    >
+    <div style={{
+      display: 'flex',
+      gap: '10px',
+      flexWrap: 'wrap' // ✅ new
+      }}>
 
       <div
         style={{
