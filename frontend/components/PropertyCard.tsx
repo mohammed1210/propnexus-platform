@@ -10,8 +10,8 @@ interface Property {
   price: number;
   bedrooms: number;
   bathrooms: number;
-  yield: number;
-  roi: number;
+  yield_percent: number;
+  roi_percent: number;
   imageurl?: string;
 }
 
