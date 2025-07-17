@@ -3,7 +3,7 @@
 import React, { useEffect } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Property } from '../src/app/types';
+import { Property } from '../types';
 
 interface Props {
   properties: Property[];
@@ -11,18 +11,18 @@ interface Props {
 
 export default function MapView({ properties }: Props) {
   useEffect(() => {
-    const mapContainer = L.map('map-container').setView([51.505, -0.09], 6);
+    const map = L.map('map-container').setView([51.505, -0.09], 6);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors',
-    }).addTo(mapContainer);
+    }).addTo(map);
 
     const markers: L.Marker[] = [];
 
     properties.forEach((property) => {
       if (property.latitude && property.longitude) {
         const marker = L.marker([property.latitude, property.longitude])
-          .addTo(mapContainer)
+          .addTo(map)
           .bindPopup(
             `<strong>${property.title}</strong><br/>£${property.price.toLocaleString()}`
           );
@@ -30,15 +30,13 @@ export default function MapView({ properties }: Props) {
       }
     });
 
-    // Auto-zoom to fit all markers
     if (markers.length > 0) {
       const group = L.featureGroup(markers);
-      mapContainer.fitBounds(group.getBounds().pad(0.2));
+      map.fitBounds(group.getBounds().pad(0.2));
     }
 
-    // Cleanup on unmount
     return () => {
-      mapContainer.remove();
+      map.remove();
     };
   }, [properties]);
 
