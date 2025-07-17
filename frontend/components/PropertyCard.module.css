@@ -1,69 +1,63 @@
 .card {
-  background-color: #ffffff;
-  padding: 20px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 10px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  padding: 20px;
+  margin-bottom: 24px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
 }
 
 .title {
   font-size: 20px;
   font-weight: 600;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .location {
-  font-size: 16px;
   color: #6b7280;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 
 .price {
+  color: #0f766e;
   font-size: 18px;
-  font-weight: 500;
-  color: #2563eb;
-  margin-bottom: 6px;
-}
-
-.details {
-  font-size: 15px;
-  color: #4b5563;
-  margin-bottom: 6px;
-}
-
-.description {
-  font-size: 14px;
-  color: #374151;
-  margin-bottom: 6px;
-}
-
-.metrics {
-  font-size: 14px;
-  color: #1f2937;
+  font-weight: bold;
   margin-bottom: 12px;
+}
+
+.details, .description, .metrics, .source {
+  color: #374151;
+  margin: 6px 0;
 }
 
 .buttons {
   display: flex;
   gap: 10px;
+  margin-top: 10px;
 }
 
 .save {
-  padding: 8px 14px;
-  background-color: #ef4444; /* red */
-  color: white;
+  background-color: #e0f2f1;
+  color: #065f46;
   border: none;
   border-radius: 6px;
-  font-weight: 500;
+  padding: 8px 12px;
   cursor: pointer;
+  font-weight: 500;
 }
 
 .detailsBtn {
-  padding: 8px 14px;
-  background-color: #3b82f6; /* blue */
+  background-color: #0284c7;
   color: white;
   border: none;
   border-radius: 6px;
-  font-weight: 500;
+  padding: 8px 12px;
   cursor: pointer;
+  font-weight: 500;
 }
