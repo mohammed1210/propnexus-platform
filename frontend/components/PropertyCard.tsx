@@ -5,7 +5,7 @@ import { Property } from '../src/app/types';
 import styles from './PropertyCard.module.css';
 
 export default function PropertyCard({ property }: { property: Property }) {
-  const fallbackImage = '/placeholder.jpg'; // Replace with your actual placeholder if needed
+  const fallbackImage = '/placeholder.jpg'; // Make sure this exists in your public folder
 
   return (
     <div className={styles.card}>
@@ -14,7 +14,9 @@ export default function PropertyCard({ property }: { property: Property }) {
         alt={property.title}
         className={styles.image}
         onError={(e) => {
-          (e.target as HTMLImageElement).src = fallbackImage;
+          const target = e.target as HTMLImageElement;
+          target.onerror = null;
+          target.src = fallbackImage;
         }}
       />
       <div className={styles.info}>
@@ -24,19 +26,17 @@ export default function PropertyCard({ property }: { property: Property }) {
 
         {property.bedrooms !== undefined && (
           <p className={styles.details}>
-            🛏 {property.bedrooms} bed{property.bedrooms > 1 ? 's' : ''}{' '}
-            {property.bathrooms !== undefined && (
-              <>
-                • 🛁 {property.bathrooms} bath
-                {property.bathrooms > 1 ? 's' : ''}
-              </>
->
-            )}
+            🛏 {property.bedrooms} bed{property.bedrooms > 1 ? 's' : ''}
+            {property.bathrooms
+              ? ` • 🛁 ${property.bathrooms} bath${
+                  property.bathrooms > 1 ? 's' : ''
+                }`
+              : ''}
           </p>
         )}
 
         <p className={styles.metrics}>
-          📈 Yield: {property.yield_percent}% &nbsp;|&nbsp; ROI: {property.roi_percent}%
+          📈 Yield: {property.yield_percent}% | ROI: {property.roi_percent}%
         </p>
 
         <div className={styles.buttons}>
