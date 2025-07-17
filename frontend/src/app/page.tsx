@@ -63,74 +63,73 @@ export default function PropertiesPage() {
       }}
     >
       <h1
-        style={{
-          marginBottom: '20px',
-          backgroundColor: '#e2e8f0', // darker slate gray
-          color: '#1f2937',
-          padding: '12px 20px',
-          borderRadius: '8px',
-          fontSize: '24px',
-          fontWeight: '600',
-        }}
-      >
-        Property Listings
-      </h1>
+  style={{
+    marginBottom: '20px',
+    backgroundColor: '#e2e8f0', // darker slate gray
+    padding: '16px 24px',
+    borderRadius: '8px',
+    fontSize: '24px',
+    fontWeight: '600',
+    color: '#111827',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  }}
+>
+  PropNexuas
+</h1>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px' }}>
-        <div
-          style={{
-            backgroundColor: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: '10px',
-            padding: '20px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-            flex: '1 1 300px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-          }}
-        >
-          <input
-            type="text"
-            placeholder="Search by location"
-            value={searchLocation}
-            onChange={(e) => setSearchLocation(e.target.value)}
-            style={{
-              padding: '10px',
-              fontSize: '16px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-            }}
-          />
-
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <input
-              type="number"
-              placeholder="Min Price"
-              value={minPrice}
-              onChange={(e) => setMinPrice(Number(e.target.value))}
-              style={{
-                flex: 1,
-                padding: '10px',
-                fontSize: '16px',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-              }}
-            />
-            <input
-              type="number"
-              placeholder="Max Price"
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(Number(e.target.value))}
-              style={{
-                flex: 1,
-                padding: '10px',
-                fontSize: '16px',
-                borderRadius: '6px',
-                border: '1px solid #d1d5db',
-              }}
-            />
-          </div>
+<div
+  style={{
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '12px',
+    backgroundColor: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '10px',
+    padding: '20px',
+    marginBottom: '30px',
+    boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+  }}
+>
+  <input
+    type="text"
+    placeholder="Search by location"
+    value={searchLocation}
+    onChange={(e) => setSearchLocation(e.target.value)}
+    style={{
+      flex: '1 1 180px',
+      padding: '10px',
+      fontSize: '16px',
+      borderRadius: '6px',
+      border: '1px solid #d1d5db',
+    }}
+  />
+  <input
+    type="number"
+    placeholder="Min Price"
+    value={minPrice}
+    onChange={(e) => setMinPrice(Number(e.target.value))}
+    style={{
+      flex: '1 1 120px',
+      padding: '10px',
+      fontSize: '16px',
+      borderRadius: '6px',
+      border: '1px solid #d1d5db',
+    }}
+  />
+  <input
+    type="number"
+    placeholder="Max Price"
+    value={maxPrice}
+    onChange={(e) => setMaxPrice(Number(e.target.value))}
+    style={{
+      flex: '1 1 120px',
+      padding: '10px',
+      fontSize: '16px',
+      borderRadius: '6px',
+      border: '1px solid #d1d5db',
+    }}
+  />
+</div>
         </div>
       </div>
 
