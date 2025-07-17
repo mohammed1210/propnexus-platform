@@ -141,18 +141,14 @@ export default function PropertiesPage() {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: showMap ? 'row' : 'column' }}>
-        <div style={{ flex: '1' }}>
-          {filteredProperties.length > 0 ? (
-            filteredProperties.map((property) => (
-              <PropertyCard key={property.id} property={property} />
-            ))
-          ) : (
-            <p>No matching properties found.</p>
-          )}
-        </div>
-        {showMap && <div style={{ flex: '1' }}><MapView /></div>}
-      </div>
+      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-start' }}>
+  <div style={{ flex: '1 1 60%' }}>
+    {filteredProperties.map((property) => (
+      <PropertyCard key={property.id} property={property} />
+    ))}
+  </div>
+  {showMap && <MapView />}
+</div>
     </div>
   );
 }
