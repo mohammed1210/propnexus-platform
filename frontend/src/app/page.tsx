@@ -14,6 +14,9 @@ export default function PropertiesPage() {
   const [searchLocation, setSearchLocation] = useState<string>('');
   const [bedrooms, setBedrooms] = useState<string>('Any');
   const [propertyType, setPropertyType] = useState<string>('All');
+  const [investmentType, setInvestmentType] = useState<string>('All');
+  const [minYield, setMinYield] = useState<number>(0);
+  const [minROI, setMinROI] = useState<number>(0);
   const [showMap, setShowMap] = useState<boolean>(true);
 
   useEffect(() => {
@@ -37,13 +40,21 @@ export default function PropertiesPage() {
         bedrooms === 'Any' || property.bedrooms === Number(bedrooms);
       const matchesPropertyType =
         propertyType === 'All' ||
-        property.propertyType.toLowerCase() === propertyType.toLowerCase();
+        property.propertyType?.toLowerCase() === propertyType.toLowerCase();
+      const matchesYield = property.yield_percent >= minYield;
+      const matchesROI = property.roi_percent >= minROI;
+      const matchesInvestmentType =
+        investmentType === 'All' ||
+        property.investmentType?.toLowerCase() === investmentType.toLowerCase();
 
       return (
         matchesPrice &&
         matchesLocation &&
         matchesBedrooms &&
-        matchesPropertyType
+        matchesPropertyType &&
+        matchesYield &&
+        matchesROI &&
+        matchesInvestmentType
       );
     });
     setFilteredProperties(filtered);
@@ -54,6 +65,9 @@ export default function PropertiesPage() {
     properties,
     bedrooms,
     propertyType,
+    minYield,
+    minROI,
+    investmentType,
   ]);
 
   return (
@@ -66,6 +80,7 @@ export default function PropertiesPage() {
         margin: '0 auto',
         display: 'flex',
         gap: '20px',
+        flexWrap: 'wrap',
       }}
     >
       <div style={{ flex: '1 1 60%' }}>
@@ -163,6 +178,45 @@ export default function PropertiesPage() {
             <option value="House">House</option>
             <option value="Studio">Studio</option>
           </select>
+          <select
+            value={investmentType}
+            onChange={(e) => setInvestmentType(e.target.value)}
+            style={{
+              flex: '1 1 140px',
+              padding: '10px',
+              borderRadius: '6px',
+              border: '1px solid #d1d5db',
+            }}
+          >
+            <option value="All">All Investment Types</option>
+            <option value="HMO">HMO</option>
+            <option value="Flips">Flips</option>
+            <option value="Buy to Let">Buy to Let</option>
+          </select>
+          <input
+            type="number"
+            placeholder="Min Yield (%)"
+            value={minYield}
+            onChange={(e) => setMinYield(Number(e.target.value))}
+            style={{
+              flex: '1 1 120px',
+              padding: '10px',
+              borderRadius: '6px',
+              border: '1px solid #d1d5db',
+            }}
+          />
+          <input
+            type="number"
+            placeholder="Min ROI (%)"
+            value={minROI}
+            onChange={(e) => setMinROI(Number(e.target.value))}
+            style={{
+              flex: '1 1 120px',
+              padding: '10px',
+              borderRadius: '6px',
+              border: '1px solid #d1d5db',
+            }}
+          />
           <button
             onClick={() => setShowMap((prev) => !prev)}
             style={{
@@ -187,7 +241,11 @@ export default function PropertiesPage() {
         )}
       </div>
 
-      {showMap && <MapView properties={filteredProperties} />}
+      {showMap && (
+        <div style={{ flex: '1 1 35%', minHeight: '80vh' }}>
+          <MapView properties={filteredProperties} />
+        </div>
+      )}
     </div>
   );
 }
