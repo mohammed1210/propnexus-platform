@@ -1,5 +1,4 @@
 'use client';
-
 import React from 'react';
 
 export default function MapView() {
@@ -20,7 +19,7 @@ export default function MapView() {
         color: '#1f2937',
       }}
     >
-      Map view (dummy placeholder for now)
+      🗺 Map view (placeholder)
     </div>
   );
 }
