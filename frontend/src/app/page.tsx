@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Property } from '../types';
 import PropertyCard from '../../components/PropertyCard';
-import MapView from './MapView';
+import dynamic from 'next/dynamic';
+const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([]);
