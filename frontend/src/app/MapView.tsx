@@ -11,47 +11,48 @@ interface Props {
 
 export default function MapView({ properties }: Props) {
   useEffect(() => {
-    const map = L.map('map-container').setView([51.505, -0.09], 6);
+    const map = L.map('leaflet-map').setView([51.505, -0.09], 6);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
     }).addTo(map);
-
-    const markers: L.Marker[] = [];
 
     properties.forEach((property) => {
       if (property.latitude && property.longitude) {
-        const marker = L.marker([property.latitude, property.longitude])
-          .addTo(map)
-          .bindPopup(
-            `<strong>${property.title}</strong><br/>£${property.price.toLocaleString()}`
-          );
-        markers.push(marker);
+        const marker = L.marker([property.latitude, property.longitude]).addTo(map);
+        marker.bindPopup(
+          `<strong>${property.title}</strong><br/>£${property.price.toLocaleString()}`
+        );
       }
     });
 
-    if (markers.length > 0) {
-      const group = L.featureGroup(markers);
-      map.fitBounds(group.getBounds().pad(0.2));
+    // Fit bounds if properties have coords
+    const coords = properties
+      .filter((p) => p.latitude && p.longitude)
+      .map((p) => [p.latitude, p.longitude]) as [number, number][];
+
+    if (coords.length > 0) {
+      map.fitBounds(coords, { padding: [30, 30] });
     }
 
     return () => {
-      map.remove();
+      map.remove(); // Clean up on unmount
     };
   }, [properties]);
 
   return (
     <div
-      id="map-container"
+      id="leaflet-map"
       style={{
         flex: '1 1 40%',
         height: '100%',
         minHeight: '500px',
         marginLeft: '20px',
         borderRadius: '10px',
+        backgroundColor: '#f1f5f9',
         boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
         transition: 'all 0.2s ease',
-        zIndex: 0,
       }}
     />
   );
