@@ -1,3 +1,4 @@
+
 import React from "react";
 import type { Property } from "../src/app/types";
 import styles from "./PropertyCard.module.css";
