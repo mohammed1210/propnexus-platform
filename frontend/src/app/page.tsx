@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Property } from '../types';
 import PropertyCard from '../../components/PropertyCard';
 import dynamic from 'next/dynamic';
+
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
 export default function PropertiesPage() {
@@ -17,7 +18,19 @@ export default function PropertiesPage() {
   const [investmentType, setInvestmentType] = useState<string>('All');
   const [minYield, setMinYield] = useState<number>(0);
   const [minROI, setMinROI] = useState<number>(0);
-  const [showMap, setShowMap] = useState<boolean>(true);
+  const [showMap, setShowMap] = useState<boolean>(false); // default hidden on mobile
+
+  // Reset filters
+  const resetFilters = () => {
+    setSearchLocation('');
+    setMinPrice(0);
+    setMaxPrice(2000000);
+    setBedrooms('Any');
+    setPropertyType('All');
+    setInvestmentType('All');
+    setMinYield(0);
+    setMinROI(0);
+  };
 
   useEffect(() => {
     fetch('/api/properties')
@@ -98,7 +111,8 @@ export default function PropertiesPage() {
           Find Your Next Investment Property
         </h1>
 
-        <div
+        <form
+          onSubmit={(e) => e.preventDefault()}
           style={{
             backgroundColor: '#fff',
             border: '1px solid #e5e7eb',
@@ -116,78 +130,36 @@ export default function PropertiesPage() {
             placeholder="Search location"
             value={searchLocation}
             onChange={(e) => setSearchLocation(e.target.value)}
-            style={{
-              flex: '1 1 250px',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-            }}
+            style={inputStyle}
           />
           <input
             type="number"
             placeholder="Min Price"
             value={minPrice}
             onChange={(e) => setMinPrice(Number(e.target.value))}
-            style={{
-              flex: '1 1 120px',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-            }}
+            style={inputStyle}
           />
           <input
             type="number"
             placeholder="Max Price"
             value={maxPrice}
             onChange={(e) => setMaxPrice(Number(e.target.value))}
-            style={{
-              flex: '1 1 120px',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-            }}
+            style={inputStyle}
           />
-          <select
-            value={bedrooms}
-            onChange={(e) => setBedrooms(e.target.value)}
-            style={{
-              flex: '1 1 120px',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-            }}
-          >
+          <select value={bedrooms} onChange={(e) => setBedrooms(e.target.value)} style={inputStyle}>
             <option value="Any">Any Beds</option>
             <option value="1">1 Bed</option>
             <option value="2">2 Beds</option>
             <option value="3">3 Beds</option>
             <option value="4">4+ Beds</option>
           </select>
-          <select
-            value={propertyType}
-            onChange={(e) => setPropertyType(e.target.value)}
-            style={{
-              flex: '1 1 140px',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-            }}
-          >
+          <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)} style={inputStyle}>
             <option value="All">All Types</option>
             <option value="Flat">Flat</option>
             <option value="House">House</option>
             <option value="Studio">Studio</option>
           </select>
-          <select
-            value={investmentType}
-            onChange={(e) => setInvestmentType(e.target.value)}
-            style={{
-              flex: '1 1 140px',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-            }}
-          >
+          <select value={investmentType} onChange={(e) => setInvestmentType(e.target.value)} style={inputStyle}>
             <option value="All">All Investment Types</option>
             <option value="HMO">HMO</option>
             <option value="Flips">Flips</option>
@@ -198,39 +170,50 @@ export default function PropertiesPage() {
             placeholder="Min Yield (%)"
             value={minYield}
             onChange={(e) => setMinYield(Number(e.target.value))}
-            style={{
-              flex: '1 1 120px',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-            }}
+            style={inputStyle}
           />
           <input
             type="number"
             placeholder="Min ROI (%)"
             value={minROI}
             onChange={(e) => setMinROI(Number(e.target.value))}
-            style={{
-              flex: '1 1 120px',
-              padding: '10px',
-              borderRadius: '6px',
-              border: '1px solid #d1d5db',
-            }}
+            style={inputStyle}
           />
-          <button
-            onClick={() => setShowMap((prev) => !prev)}
-            style={{
-              padding: '10px 14px',
-              backgroundColor: showMap ? '#334155' : '#3b82f6',
-              color: '#fff',
-              borderRadius: '6px',
-              border: 'none',
-              fontWeight: '500',
-            }}
-          >
-            {showMap ? 'Hide Map' : 'Show Map'}
-          </button>
-        </div>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+            <button
+              type="button"
+              onClick={() => setShowMap((prev) => !prev)}
+              style={{
+                padding: '10px 14px',
+                backgroundColor: showMap ? '#334155' : '#3b82f6',
+                color: '#fff',
+                borderRadius: '6px',
+                border: 'none',
+                fontWeight: '500',
+              }}
+            >
+              {showMap ? 'Hide Map' : 'Show Map'}
+            </button>
+            <button
+              type="button"
+              onClick={resetFilters}
+              style={{
+                padding: '10px 14px',
+                backgroundColor: '#e5e7eb',
+                color: '#1f2937',
+                borderRadius: '6px',
+                border: '1px solid #cbd5e1',
+                fontWeight: '500',
+              }}
+            >
+              Reset Filters
+            </button>
+          </div>
+        </form>
+
+        <p style={{ fontSize: '16px', fontWeight: 500, marginBottom: '10px' }}>
+          {filteredProperties.length} result{filteredProperties.length !== 1 && 's'} found
+        </p>
 
         {filteredProperties.length > 0 ? (
           filteredProperties.map((property) => (
@@ -249,3 +232,10 @@ export default function PropertiesPage() {
     </div>
   );
 }
+
+const inputStyle: React.CSSProperties = {
+  flex: '1 1 140px',
+  padding: '10px',
+  borderRadius: '6px',
+  border: '1px solid #d1d5db',
+};
