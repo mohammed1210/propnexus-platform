@@ -1,5 +1,5 @@
 import React from "react";
-import type { Property } from "../src/app/types";
+import type { Property } from "../src/app/page";
 import styles from "./PropertyCard.module.css";
 
 export default function PropertyCard({ property }: { property: Property }) {
