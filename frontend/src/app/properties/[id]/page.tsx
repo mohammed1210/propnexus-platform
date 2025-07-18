@@ -5,7 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { Property } from '../../../types';
 
 export default function PropertyDetailsPage() {
-  const { id } = useParams<{ id: string }>();
+  const params = useParams<{ id: string }>();
+  const id = params.id;
   const router = useRouter();
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
