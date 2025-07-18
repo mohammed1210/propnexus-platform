@@ -2,6 +2,7 @@
 
 import React from 'react';
 import styles from './PropertyCard.module.css';
+import Link from 'next/link';
 
 interface Property {
   id: string;
@@ -23,7 +24,7 @@ export default function PropertyCard({ property }: Props) {
   const fallbackImage = '/placeholder.jpg'; // Add this to your /public folder if needed
 
   return (
-    <div className={styles.card}>
+    <Link href={`/property/${property.id}`} className={styles.card}>
       <img
         src={property.imageurl || fallbackImage}
         alt={property.title}
@@ -37,7 +38,7 @@ export default function PropertyCard({ property }: Props) {
         <div className={styles.title}>{property.title}</div>
         <div className={styles.location}>{property.location}</div>
         <div className={styles.price}>
-          £{property.price.toLocaleString()}
+          £{property.price?.toLocaleString?.() || 'N/A'}
         </div>
 
         <div className={styles.details}>
@@ -53,6 +54,6 @@ export default function PropertyCard({ property }: Props) {
           <button className={styles.detailsBtn}>🔍 View Details</button>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
