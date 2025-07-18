@@ -1,36 +1,27 @@
+// app/properties/[id]/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Property } from '../../../types';
 
-export default function PropertyDetailPage() {
+export default function PropertyDetailsPage() {
   const { id } = useParams();
   const [property, setProperty] = useState<Property | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) return;
-
     fetch(`/api/properties/${id}`)
       .then((res) => res.json())
       .then((data) => {
         setProperty(data);
         setLoading(false);
       })
-      .catch((err) => {
-        console.error('Failed to fetch property:', err);
-        setLoading(false);
-      });
+      .catch(() => setLoading(false));
   }, [id]);
 
-  if (loading) {
-    return <p style={{ padding: '20px' }}>Loading...</p>;
-  }
-
-  if (!property) {
-    return <p style={{ padding: '20px' }}>Property not found.</p>;
-  }
+  if (loading) return <p>Loading...</p>;
+  if (!property) return <p>Property not found.</p>;
 
   return (
     <div
@@ -40,38 +31,36 @@ export default function PropertyDetailPage() {
         padding: '20px',
         backgroundColor: '#ffffff',
         borderRadius: '12px',
-        boxShadow: '0 2px 12px rgba(0, 0, 0, 0.05)',
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.06)',
       }}
     >
       <img
         src={property.imageurl || '/placeholder.jpg'}
         alt={property.title}
-        style={{
-          width: '100%',
-          height: '360px',
-          objectFit: 'cover',
-          borderRadius: '10px',
-          backgroundColor: '#f1f5f9',
-          marginBottom: '20px',
-        }}
-        onError={(e) => {
-          (e.target as HTMLImageElement).src = '/placeholder.jpg';
-        }}
+        style={{ width: '100%', borderRadius: '10px', marginBottom: '20px' }}
       />
-
-      <h1 style={{ fontSize: '28px', fontWeight: 700, marginBottom: '8px' }}>
-        {property.title}
-      </h1>
+      <h1 style={{ fontSize: '28px', marginBottom: '10px' }}>{property.title}</h1>
       <p style={{ fontSize: '18px', color: '#64748b' }}>{property.location}</p>
-      <p style={{ fontSize: '22px', fontWeight: 600, marginTop: '12px' }}>
+      <p style={{ fontSize: '20px', fontWeight: 'bold' }}>
         £{property.price.toLocaleString()}
       </p>
-
+      <p style={{ margin: '10px 0' }}>
+        🛏 {property.bedrooms} beds • 🛁 {property.bathrooms} bath
+      </p>
+      <p style={{ marginBottom: '20px' }}>{property.description}</p>
       <div
         style={{
-          marginTop: '16px',
-          fontSize: '16px',
-          color: '#475569',
           display: 'flex',
-          flexWrap: 'wrap',
-          gap: '12px
+          gap: '12px',
+          backgroundColor: '#ecfdf5',
+          padding: '10px 16px',
+          borderRadius: '8px',
+          fontWeight: 500,
+          color: '#065f46',
+        }}
+      >
+        📈 Yield: {property.yield_percent || 0}% | ROI: {property.roi_percent || 0}%
+      </div>
+    </div>
+  );
+}
