@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Property } from '../types';
 import PropertyCard from '../../components/PropertyCard';
 import dynamic from 'next/dynamic';
+
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
 export default function PropertiesPage() {
@@ -112,7 +113,7 @@ export default function PropertiesPage() {
             gap: '12px',
           }}
         >
-          {/* Basic Filters */}
+          {/* Visible Filters */}
           <input
             type="text"
             placeholder="Search location"
@@ -140,7 +141,6 @@ export default function PropertiesPage() {
             <option value="Flips">Flips</option>
             <option value="Buy to Let">Buy to Let</option>
           </select>
-
           <button
             onClick={() => setShowMoreFilters((prev) => !prev)}
             style={{
@@ -157,7 +157,6 @@ export default function PropertiesPage() {
             {showMoreFilters ? 'Hide Filters' : 'More Filters'}
           </button>
 
-          {/* Expandable Advanced Filters */}
           {showMoreFilters && (
             <>
               <input
@@ -165,34 +164,19 @@ export default function PropertiesPage() {
                 placeholder="Min Price"
                 value={minPrice}
                 onChange={(e) => setMinPrice(Number(e.target.value))}
-                style={{
-                  flex: '1 1 120px',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                }}
+                style={inputStyle}
               />
               <input
                 type="number"
                 placeholder="Max Price"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}
-                style={{
-                  flex: '1 1 120px',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                }}
+                style={inputStyle}
               />
               <select
                 value={bedrooms}
                 onChange={(e) => setBedrooms(e.target.value)}
-                style={{
-                  flex: '1 1 120px',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                }}
+                style={inputStyle}
               >
                 <option value="Any">Any Beds</option>
                 <option value="1">1 Bed</option>
@@ -203,12 +187,7 @@ export default function PropertiesPage() {
               <select
                 value={propertyType}
                 onChange={(e) => setPropertyType(e.target.value)}
-                style={{
-                  flex: '1 1 140px',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                }}
+                style={inputStyle}
               >
                 <option value="All">All Types</option>
                 <option value="Flat">Flat</option>
@@ -220,29 +199,18 @@ export default function PropertiesPage() {
                 placeholder="Min Yield (%)"
                 value={minYield}
                 onChange={(e) => setMinYield(Number(e.target.value))}
-                style={{
-                  flex: '1 1 120px',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                }}
+                style={inputStyle}
               />
               <input
                 type="number"
                 placeholder="Min ROI (%)"
                 value={minROI}
                 onChange={(e) => setMinROI(Number(e.target.value))}
-                style={{
-                  flex: '1 1 120px',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #d1d5db',
-                }}
+                style={inputStyle}
               />
             </>
           )}
 
-          {/* Map Toggle */}
           <button
             onClick={() => setShowMap((prev) => !prev)}
             style={{
@@ -276,3 +244,11 @@ export default function PropertiesPage() {
     </div>
   );
 }
+
+// 💡 Optional: style reuse
+const inputStyle = {
+  flex: '1 1 120px',
+  padding: '10px',
+  borderRadius: '6px',
+  border: '1px solid #d1d5db',
+};
