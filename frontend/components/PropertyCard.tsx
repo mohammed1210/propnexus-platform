@@ -3,6 +3,8 @@
 import React from 'react';
 import styles from './PropertyCard.module.css';
 import Link from 'next/link';
+import { useSupabase } from '../lib/supabaseClient'; // Adjust if in different location
+import { useSession } from '@supabase/auth-helpers-react';
 
 interface Property {
   id: string;
@@ -21,7 +23,31 @@ interface Props {
 }
 
 export default function PropertyCard({ property }: Props) {
-  const fallbackImage = '/placeholder.jpg'; // Add this to your /public folder if needed
+  const fallbackImage = '/placeholder.jpg';
+  const supabase = useSupabase();
+  const session = useSession();
+
+  const handleSaveDeal = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault(); // Prevent link navigation
+
+    if (!session?.user) {
+      alert('You must be logged in to save a deal.');
+      return;
+    }
+
+    const { error } = await supabase.from('saved_deals').insert({
+      user_id: session.user.id,
+      property_id: property.id,
+      saved_at: new Date().toISOString(),
+    });
+
+    if (error) {
+      console.error('Error saving deal:', error.message);
+      alert('Failed to save deal. Please try again.');
+    } else {
+      alert('✅ Deal saved!');
+    }
+  };
 
   return (
     <Link href={`/property/${property.id}`} className={styles.card}>
@@ -50,7 +76,9 @@ export default function PropertyCard({ property }: Props) {
         </div>
 
         <div className={styles.buttons}>
-          <button className={styles.save}>💾 Save Deal</button>
+          <button className={styles.save} onClick={handleSaveDeal}>
+            💾 Save Deal
+          </button>
           <button className={styles.detailsBtn}>🔍 View Details</button>
         </div>
       </div>
