@@ -4,7 +4,7 @@
 import React from 'react';
 import styles from './PropertyCard.module.css';
 import Link from 'next/link';
-import { supabase } from '@lib/supabaseClient';
+import supabase from '@lib/supabaseClient'; // ✅ CORRECT
 
 interface Property {
   id: string;
