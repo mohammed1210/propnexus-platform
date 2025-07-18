@@ -4,7 +4,7 @@
 import './globals.css';
 import { ReactNode } from 'react';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
