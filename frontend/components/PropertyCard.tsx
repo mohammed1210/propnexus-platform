@@ -5,7 +5,6 @@ import React from 'react';
 import styles from './PropertyCard.module.css';
 import Link from 'next/link';
 import { supabase } from '@lib/supabaseClient';
-import { useSession } from '@supabase/auth-helpers-nextjs';
 
 interface Property {
   id: string;
@@ -25,17 +24,15 @@ interface Props {
 
 export default function PropertyCard({ property }: Props) {
   const fallbackImage = '/placeholder.jpg';
-  const session = useSession();
 
   const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent Link navigation
-    if (!session) {
-      alert('Please sign in to save deals');
-      return;
-    }
+
+    // 🚧 TEMPORARY: No auth, so we use placeholder user ID
+    const userId = 'demo-user'; // Replace with real session.user.id later
 
     const { error } = await supabase.from('saved_deals').insert({
-      user_id: session.user.id,
+      user_id: userId,
       property_id: property.id,
     });
 
