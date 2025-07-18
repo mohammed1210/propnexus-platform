@@ -9,10 +9,12 @@
   flex-direction: column;
   gap: 10px;
   overflow: hidden;
+  cursor: pointer; /* NEW: reflects Link behavior */
+  text-decoration: none; /* prevents underline from Link */
 }
 
 .card:hover {
-  transform: translateY(-3px);
+  transform: translateY(-3px) scale(1.01);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
 
