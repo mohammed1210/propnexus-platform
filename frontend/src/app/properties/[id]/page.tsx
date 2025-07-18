@@ -5,8 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { Property } from '../../../types';
 
 export default function PropertyDetailsPage() {
-  const params = useParams<{ id: string }>();
-  const id = params?.id;
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
@@ -31,10 +30,10 @@ export default function PropertyDetailsPage() {
       style={{
         maxWidth: '960px',
         margin: '40px auto',
-        padding: '20px',
+        padding: '24px',
         backgroundColor: '#ffffff',
         borderRadius: '12px',
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.06)',
+        boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
       }}
     >
       <button
@@ -60,19 +59,38 @@ export default function PropertyDetailsPage() {
           width: '100%',
           height: 'auto',
           borderRadius: '10px',
-          marginBottom: '20px',
+          marginBottom: '24px',
           backgroundColor: '#f1f5f9',
         }}
       />
-      <h1 style={{ fontSize: '28px', marginBottom: '10px' }}>{property.title}</h1>
-      <p style={{ fontSize: '18px', color: '#64748b' }}>{property.location}</p>
-      <p style={{ fontSize: '20px', fontWeight: 'bold', marginTop: '6px' }}>
+
+      <h1 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '8px' }}>
+        {property.title}
+      </h1>
+      <p style={{ fontSize: '17px', color: '#64748b' }}>{property.location}</p>
+      <p
+        style={{
+          fontSize: '22px',
+          fontWeight: '600',
+          color: '#0f172a',
+          marginTop: '10px',
+        }}
+      >
         £{property.price.toLocaleString()}
       </p>
-      <p style={{ margin: '10px 0', fontSize: '16px' }}>
+
+      <p style={{ marginTop: '10px', fontSize: '16px', color: '#475569' }}>
         🛏 {property.bedrooms} beds • 🛁 {property.bathrooms || 0} bath
       </p>
-      <p style={{ marginBottom: '16px', fontSize: '15px', color: '#334155' }}>
+
+      <p
+        style={{
+          marginTop: '14px',
+          fontSize: '15px',
+          lineHeight: '1.6',
+          color: '#334155',
+        }}
+      >
         {property.description || 'No description available.'}
       </p>
 
@@ -80,10 +98,11 @@ export default function PropertyDetailsPage() {
         style={{
           display: 'flex',
           flexWrap: 'wrap',
-          gap: '12px',
+          gap: '14px',
           backgroundColor: '#ecfdf5',
-          padding: '12px 16px',
+          padding: '16px',
           borderRadius: '10px',
+          marginTop: '24px',
           fontWeight: 500,
           color: '#065f46',
           fontSize: '15px',
