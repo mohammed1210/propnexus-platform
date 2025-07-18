@@ -16,7 +16,10 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@lib/*": ["frontend/lib/*"],
+      "@types/*": ["frontend/types/*"],
+      "@components/*": ["frontend/components/*"]
     },
     "plugins": [
       {
