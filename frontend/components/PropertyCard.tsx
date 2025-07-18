@@ -5,7 +5,7 @@ import React from 'react';
 import styles from './PropertyCard.module.css';
 import Link from 'next/link';
 import { supabase } from '@lib/supabaseClient';
-import { useSession } from '@supabase/auth-helpers-react';
+import { useSession } from '@supabase/auth-helpers-nextjs';
 
 interface Property {
   id: string;
