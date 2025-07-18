@@ -23,7 +23,7 @@ a {
 
 .main-wrapper {
   padding: 20px;
-  max-width: 1280px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -109,9 +109,9 @@ body.dark-mode .filters-row select {
   background: #0284c7;
 }
 
+/* Layout for cards + map */
 .content-layout {
   display: flex;
-  flex-direction: row;
   gap: 20px;
 }
 
@@ -119,10 +119,24 @@ body.dark-mode .filters-row select {
   flex: 1 1 60%;
 }
 
+.map-view {
+  flex: 1 1 40%;
+  min-height: 80vh;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
 /* Responsive: Mobile layout */
 @media (max-width: 768px) {
   .content-layout {
     flex-direction: column;
+  }
+
+  .map-view {
+    order: -1;
+    height: 400px;
+    margin-bottom: 20px;
   }
 
   .header-bar h1 {
