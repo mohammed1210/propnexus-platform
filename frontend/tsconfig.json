@@ -14,7 +14,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": "frontend", // ✅ KEY: tell TypeScript your root folder is /frontend
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
       "@lib/*": ["lib/*"],
