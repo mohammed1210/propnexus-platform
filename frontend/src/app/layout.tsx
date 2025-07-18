@@ -1,8 +1,18 @@
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+// app/layout.tsx
+'use client';
+
+import './globals.css';
+import { ReactNode } from 'react';
+import { SessionContextProvider } from '@supabase/auth-helpers-react';
+import { supabase } from '../lib/supabaseClient';
+
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: 'Arial, sans-serif', background: '#111', color: '#fff' }}>
-        {children}
+      <body>
+        <SessionContextProvider supabaseClient={supabase}>
+          {children}
+        </SessionContextProvider>
       </body>
     </html>
   );
