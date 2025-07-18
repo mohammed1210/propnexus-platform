@@ -14,12 +14,12 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": ".",
+    "baseUrl": "frontend", // ✅ KEY: tell TypeScript your root folder is /frontend
     "paths": {
       "@/*": ["./*"],
-      "@lib/*": ["frontend/lib/*"],
-      "@types/*": ["frontend/types/*"],
-      "@components/*": ["frontend/components/*"]
+      "@lib/*": ["lib/*"],
+      "@types/*": ["types/*"],
+      "@components/*": ["components/*"]
     },
     "plugins": [
       {
@@ -28,6 +28,7 @@
     ]
   },
   "include": [
+    "frontend",
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
