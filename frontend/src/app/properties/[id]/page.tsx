@@ -6,7 +6,7 @@ import { Property } from '../../../types';
 
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
-  const id = params.id;
+  const id = params?.id!;
   const router = useRouter();
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
