@@ -22,7 +22,7 @@ export default function PropertiesPage() {
   const [showMoreFilters, setShowMoreFilters] = useState<boolean>(false);
 
   useEffect(() => {
-    fetch('/api/properties')
+    fetch("https://propnexus-backend-production.up.railway.app/properties")
       .then((res) => res.json())
       .then((data) => {
         setProperties(data);
