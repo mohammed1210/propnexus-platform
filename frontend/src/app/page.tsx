@@ -18,7 +18,7 @@ export default function PropertiesPage() {
   const [investmentType, setInvestmentType] = useState<string>('All');
   const [minYield, setMinYield] = useState<number>(0);
   const [minROI, setMinROI] = useState<number>(0);
-  const [showMap, setShowMap] = useState<boolean>(true); // Map default on for Sprint 3
+  const [showMap, setShowMap] = useState<boolean>(true);
   const [showMoreFilters, setShowMoreFilters] = useState<boolean>(false);
 
   useEffect(() => {
@@ -33,13 +33,25 @@ export default function PropertiesPage() {
 
   useEffect(() => {
     const filtered = properties.filter((property) => {
-      const matchesPrice = property.price >= minPrice && property.price <= maxPrice;
-      const matchesLocation = property.location.toLowerCase().includes(searchLocation.toLowerCase());
-      const matchesBedrooms = bedrooms === 'Any' || property.bedrooms === Number(bedrooms);
-      const matchesPropertyType = propertyType === 'All' || property.propertyType?.toLowerCase() === propertyType.toLowerCase();
-      const matchesYield = property.yield_percent >= minYield;
-      const matchesROI = property.roi_percent >= minROI;
-      const matchesInvestmentType = investmentType === 'All' || property.investmentType?.toLowerCase() === investmentType.toLowerCase();
+      const matchesPrice =
+        property.price >= minPrice && property.price <= maxPrice;
+
+      const matchesLocation =
+        property.location?.toLowerCase().includes(searchLocation.toLowerCase());
+
+      const matchesBedrooms =
+        bedrooms === 'Any' || Number(property.bedrooms) === Number(bedrooms);
+
+      const matchesPropertyType =
+        propertyType === 'All' ||
+        (property.propertyType || '').toLowerCase() === propertyType.toLowerCase();
+
+      const matchesYield = (property.yield_percent || 0) >= minYield;
+      const matchesROI = (property.roi_percent || 0) >= minROI;
+
+      const matchesInvestmentType =
+        investmentType === 'All' ||
+        (property.investmentType || '').toLowerCase() === investmentType.toLowerCase();
 
       return (
         matchesPrice &&
@@ -77,7 +89,6 @@ export default function PropertiesPage() {
         boxSizing: 'border-box',
       }}
     >
-      {/* Left side: Filters + Cards */}
       <div style={{ flex: 1, minWidth: '60%' }}>
         <h1 style={{
           fontSize: '24px',
@@ -91,7 +102,6 @@ export default function PropertiesPage() {
           Find Your Next Investment Property
         </h1>
 
-        {/* Filter Bar */}
         <div
           style={{
             display: 'flex',
@@ -163,7 +173,6 @@ export default function PropertiesPage() {
           )}
         </div>
 
-        {/* Property Cards */}
         {filteredProperties.length > 0 ? (
           filteredProperties.map((property) => (
             <PropertyCard key={property.id} property={property} />
@@ -173,7 +182,6 @@ export default function PropertiesPage() {
         )}
       </div>
 
-      {/* Right side: Map */}
       {showMap && (
         <div style={{
           flex: '0 0 40%',
@@ -189,7 +197,6 @@ export default function PropertiesPage() {
   );
 }
 
-// Reusable input and button styles
 const inputStyle = {
   flex: '1 1 160px',
   padding: '10px',
