@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Property } from '../../../types';
+import supabase from '@lib/supabaseClient'; // ✅ Added for save deal
 
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -21,6 +22,21 @@ export default function PropertyDetailsPage() {
       })
       .catch(() => setLoading(false));
   }, [id]);
+
+  const handleSave = async () => {
+    const userId = 'demo-user'; // Placeholder until auth added
+    const { error } = await supabase.from('saved_deals').insert({
+      user_id: userId,
+      property_id: property?.id,
+    });
+
+    if (error) {
+      console.error('Error saving deal:', error.message);
+      alert('Failed to save deal!');
+    } else {
+      alert('Deal saved!');
+    }
+  };
 
   if (!id) return <p>Invalid property ID.</p>;
   if (loading) return <p>Loading...</p>;
@@ -115,6 +131,23 @@ export default function PropertyDetailsPage() {
         <div>📊 Investment Type: {property.investmentType || 'N/A'}</div>
         <div>🔗 Source: {property.source || 'Unknown'}</div>
       </div>
+
+      <button
+        onClick={handleSave}
+        style={{
+          marginTop: '24px',
+          backgroundColor: '#0ea5e9',
+          color: 'white',
+          padding: '12px 20px',
+          border: 'none',
+          borderRadius: '8px',
+          fontWeight: 600,
+          cursor: 'pointer',
+          transition: 'background-color 0.2s ease',
+        }}
+      >
+        💾 Save Deal
+      </button>
     </div>
   );
 }
