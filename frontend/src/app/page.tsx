@@ -25,6 +25,7 @@ export default function PropertiesPage() {
     fetch("https://propnexus-backend-production.up.railway.app/properties")
       .then((res) => res.json())
       .then((data) => {
+        console.log("Fetched raw properties:", data);
         setProperties(data);
         setFilteredProperties(data);
       })
@@ -49,9 +50,8 @@ export default function PropertiesPage() {
       const matchesYield = (property.yield_percent || 0) >= minYield;
       const matchesROI = (property.roi_percent || 0) >= minROI;
 
-      const matchesInvestmentType =
-        investmentType === 'All' ||
-        (property.investmentType || '').toLowerCase() === investmentType.toLowerCase();
+      // TEMP: Disable investmentType filter for debugging
+      const matchesInvestmentType = true;
 
       return (
         matchesPrice &&
@@ -63,6 +63,19 @@ export default function PropertiesPage() {
         matchesInvestmentType
       );
     });
+
+    console.log("🔎 Filter Values", {
+      minPrice,
+      maxPrice,
+      searchLocation,
+      bedrooms,
+      propertyType,
+      minYield,
+      minROI,
+      investmentType
+    });
+    console.log("✅ Filtered Properties:", filtered);
+
     setFilteredProperties(filtered);
   }, [
     minPrice,
