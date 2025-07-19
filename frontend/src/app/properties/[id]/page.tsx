@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Property } from '../../../types';
-import supabase from '@lib/supabaseClient'; // ✅ Added for save deal
+import supabase from '@lib/supabaseClient';
 
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -24,7 +24,7 @@ export default function PropertyDetailsPage() {
   }, [id]);
 
   const handleSave = async () => {
-    const userId = 'demo-user'; // Placeholder until auth added
+    const userId = 'demo-user';
     const { error } = await supabase.from('saved_deals').insert({
       user_id: userId,
       property_id: property?.id,
@@ -43,111 +43,120 @@ export default function PropertyDetailsPage() {
   if (!property) return <p>Property not found.</p>;
 
   return (
-    <div
-      style={{
-        maxWidth: '960px',
-        margin: '40px auto',
-        padding: '24px',
-        backgroundColor: '#ffffff',
-        borderRadius: '12px',
-        boxShadow: '0 6px 18px rgba(0,0,0,0.06)',
-      }}
-    >
-      <button
-        onClick={() => router.back()}
-        style={{
-          marginBottom: '20px',
-          backgroundColor: '#e2e8f0',
-          border: 'none',
-          padding: '10px 16px',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          color: '#1e293b',
-          fontWeight: '500',
-        }}
-      >
-        ← Back to Listings
-      </button>
+    <div style={{
+      maxWidth: '1280px',
+      margin: '40px auto',
+      padding: '24px',
+      display: 'flex',
+      flexDirection: 'row',
+      gap: '32px',
+    }}>
+      {/* Left Column - Main Content */}
+      <div style={{ flex: 2 }}>
+        <button
+          onClick={() => router.back()}
+          style={{
+            marginBottom: '20px',
+            backgroundColor: '#e2e8f0',
+            border: 'none',
+            padding: '10px 16px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            color: '#1e293b',
+            fontWeight: '500',
+          }}
+        >
+          ← Back to Listings
+        </button>
 
-      <img
-        src={property.imageurl || '/placeholder.jpg'}
-        alt={property.title}
-        style={{
-          width: '100%',
-          height: 'auto',
-          borderRadius: '10px',
-          marginBottom: '24px',
-          backgroundColor: '#f1f5f9',
-        }}
-      />
+        <img
+          src={property.imageurl || '/placeholder.jpg'}
+          alt={property.title}
+          style={{
+            width: '100%',
+            height: 'auto',
+            borderRadius: '10px',
+            marginBottom: '24px',
+            backgroundColor: '#f1f5f9',
+          }}
+        />
 
-      <h1 style={{ fontSize: '28px', fontWeight: '600', marginBottom: '8px' }}>
-        {property.title}
-      </h1>
-      <p style={{ fontSize: '17px', color: '#64748b' }}>{property.location}</p>
-      <p
-        style={{
-          fontSize: '22px',
-          fontWeight: '600',
-          color: '#0f172a',
-          marginTop: '10px',
-        }}
-      >
-        £{property.price.toLocaleString()}
-      </p>
+        <h1 style={{ fontSize: '30px', fontWeight: '700', color: '#0f172a' }}>
+          {property.title}
+        </h1>
+        <p style={{ fontSize: '18px', color: '#64748b', marginBottom: '8px' }}>
+          {property.location}
+        </p>
+        <p style={{ fontSize: '24px', fontWeight: '600', color: '#0f172a' }}>
+          £{property.price.toLocaleString()}
+        </p>
+        <p style={{ marginTop: '10px', fontSize: '16px', color: '#475569' }}>
+          🛏 {property.bedrooms} beds • 🛁 {property.bathrooms || 0} bath
+        </p>
 
-      <p style={{ marginTop: '10px', fontSize: '16px', color: '#475569' }}>
-        🛏 {property.bedrooms} beds • 🛁 {property.bathrooms || 0} bath
-      </p>
-
-      <p
-        style={{
-          marginTop: '14px',
+        <h2 style={{ marginTop: '28px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
+          Description
+        </h2>
+        <p style={{
+          marginTop: '8px',
           fontSize: '15px',
-          lineHeight: '1.6',
-          color: '#334155',
-        }}
-      >
-        {property.description || 'No description available.'}
-      </p>
-
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '14px',
-          backgroundColor: '#ecfdf5',
-          padding: '16px',
-          borderRadius: '10px',
-          marginTop: '24px',
-          fontWeight: 500,
-          color: '#065f46',
-          fontSize: '15px',
-        }}
-      >
-        <div>📈 Yield: {property.yield_percent || 0}%</div>
-        <div>💰 ROI: {property.roi_percent || 0}%</div>
-        <div>🏷 Property Type: {property.propertyType || 'N/A'}</div>
-        <div>📊 Investment Type: {property.investmentType || 'N/A'}</div>
-        <div>🔗 Source: {property.source || 'Unknown'}</div>
+          lineHeight: '1.7',
+          color: '#334155'
+        }}>
+          {property.description || 'No description available.'}
+        </p>
       </div>
 
-      <button
-        onClick={handleSave}
-        style={{
-          marginTop: '24px',
-          backgroundColor: '#0ea5e9',
-          color: 'white',
-          padding: '12px 20px',
-          border: 'none',
-          borderRadius: '8px',
-          fontWeight: 600,
-          cursor: 'pointer',
-          transition: 'background-color 0.2s ease',
-        }}
-      >
-        💾 Save Deal
-      </button>
+      {/* Right Column - Summary Panel */}
+      <div style={{
+        flex: 1,
+        position: 'sticky',
+        top: '40px',
+        alignSelf: 'flex-start',
+        padding: '20px',
+        backgroundColor: '#f8fafc',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+      }}>
+        <h3 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px', color: '#1e293b' }}>
+          Deal Summary
+        </h3>
+
+        <div style={{ marginBottom: '8px', color: '#0f172a' }}>
+          <strong>Yield:</strong> {property.yield_percent || 0}%
+        </div>
+        <div style={{ marginBottom: '8px', color: '#0f172a' }}>
+          <strong>ROI:</strong> {property.roi_percent || 0}%
+        </div>
+        <div style={{ marginBottom: '8px', color: '#0f172a' }}>
+          <strong>Property Type:</strong> {property.propertyType || 'N/A'}
+        </div>
+        <div style={{ marginBottom: '8px', color: '#0f172a' }}>
+          <strong>Investment Type:</strong> {property.investmentType || 'N/A'}
+        </div>
+        <div style={{ marginBottom: '16px', color: '#0f172a' }}>
+          <strong>Source:</strong> {property.source || 'Unknown'}
+        </div>
+
+        <button
+          onClick={handleSave}
+          style={{
+            marginTop: '12px',
+            backgroundColor: '#14b8a6',
+            color: 'white',
+            padding: '12px 20px',
+            border: 'none',
+            borderRadius: '8px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            width: '100%',
+            fontSize: '15px',
+          }}
+        >
+          💾 Save Deal
+        </button>
+      </div>
     </div>
   );
 }
