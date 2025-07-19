@@ -1,66 +1,64 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-import L from 'leaflet';
+import { useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { Icon, LatLngExpression } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Property } from '../types';
 
-interface Props {
+// Fix missing default icon bug in Next.js + Leaflet
+import L from 'leaflet';
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+});
+
+type Props = {
   properties: Property[];
-}
+};
 
 export default function MapView({ properties }: Props) {
-  const mapRef = useRef<L.Map | null>(null);
-  const markerLayerRef = useRef<L.LayerGroup | null>(null);
+  const center: LatLngExpression = [52.5, -1.5]; // Center of UK
 
   useEffect(() => {
-    if (!mapRef.current) {
-      const map = L.map('leaflet-map').setView([51.505, -0.09], 6);
-      mapRef.current = map;
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
-      }).addTo(map);
-
-      markerLayerRef.current = L.layerGroup().addTo(map);
+    // Ensures map styles load properly
+    const leafletStyles = document.getElementById('leaflet-css');
+    if (!leafletStyles) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet/dist/leaflet.css';
+      link.id = 'leaflet-css';
+      document.head.appendChild(link);
     }
-
-    const map = mapRef.current;
-    const markerLayer = markerLayerRef.current;
-
-    if (map && markerLayer) {
-      markerLayer.clearLayers();
-
-      const coords: [number, number][] = [];
-
-      properties.forEach((property) => {
-        if (property.latitude && property.longitude) {
-          const marker = L.marker([property.latitude, property.longitude]);
-          marker.bindPopup(
-            `<strong>${property.title}</strong><br/>£${property.price.toLocaleString()}`
-          );
-          marker.addTo(markerLayer);
-          coords.push([property.latitude, property.longitude]);
-        }
-      });
-
-      if (coords.length > 0) {
-        map.fitBounds(coords, { padding: [30, 30] });
-      }
-    }
-  }, [properties]);
+  }, []);
 
   return (
-    <div
-      id="leaflet-map"
-      className="map-view"
-      style={{
-        width: '100%',
-        height: '100%',
-        minHeight: '500px',
-        backgroundColor: '#f1f5f9',
-      }}
-    />
+    <MapContainer center={center} zoom={6} style={{ height: '100%', width: '100%' }}>
+      <TileLayer
+        attribution='&copy; OpenStreetMap contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+
+      {properties.map((property) => {
+        if (!property.latitude || !property.longitude) return null;
+
+        return (
+          <Marker
+            key={property.id}
+            position={[property.latitude, property.longitude]}
+          >
+            <Popup>
+              <strong>{property.title}</strong><br />
+              £{property.price.toLocaleString()}
+            </Popup>
+          </Marker>
+        );
+      })}
+    </MapContainer>
   );
 }
