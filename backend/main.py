@@ -66,7 +66,9 @@ async def scrape_rightmove():
 
 @app.get("/properties/{property_id}")
 async def get_property_by_id(property_id: str):
-    response = supabase.table("properties").select("*").eq("id", property_id).single().execute()
-    if not response.data:
+    response = supabase.table("properties").select("*").eq("id", property_id).execute()
+
+    if not response.data or len(response.data) == 0:
         return {"detail": "Not Found"}
-    return response.data
+
+    return response.data[0]
