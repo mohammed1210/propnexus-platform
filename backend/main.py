@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from scraper.zoopla_scraper import scrape_zoopla_properties
 from scraper.rightmove_scraper import scrape_rightmove_properties
@@ -18,7 +18,7 @@ app = FastAPI()
 # ✅ CORS setup — allow both production & local
 origins = [
     "https://propnexus-platform.vercel.app",
-    "https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app",  # Your feature branch URL
+    "https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app",
     "http://localhost:3000",
 ]
 
@@ -37,10 +37,23 @@ async def root():
 @app.get("/properties")
 async def get_properties():
     """
-    ✅ Fetch properties from Supabase table
+    ✅ Fetch all properties
     """
     response = supabase.table("properties").select("*").execute()
     return response.data
+
+@app.get("/properties/{property_id}")
+async def get_property_by_id(property_id: str):
+    """
+    ✅ Fetch property by ID (Deal Pack view)
+    """
+    try:
+        response = supabase.table("properties").select("*").eq("id", property_id).execute()
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Property not found")
+        return response.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/scrape-zoopla")
 async def scrape_zoopla():
@@ -63,12 +76,3 @@ async def scrape_rightmove():
         "status": f"Rightmove scrape completed and {len(data)} properties fetched",
         "data": data,
     }
-
-@app.get("/properties/{property_id}")
-async def get_property_by_id(property_id: str):
-    response = supabase.table("properties").select("*").eq("id", property_id).execute()
-
-    if not response.data or len(response.data) == 0:
-        return {"detail": "Not Found"}
-
-    return response.data[0]
