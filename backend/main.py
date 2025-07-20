@@ -63,3 +63,11 @@ async def scrape_rightmove():
         "status": f"Rightmove scrape completed and {len(data)} properties fetched",
         "data": data,
     }
+
+@app.get("/properties/{property_id}")
+async def get_property_by_id(property_id: str):
+    response = supabase.table("properties").select("*").eq("id", property_id).single().execute()
+    if not response.data:
+        return {"detail": "Not Found"}
+    return response.data
+    }
