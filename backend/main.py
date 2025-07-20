@@ -70,4 +70,3 @@ async def get_property_by_id(property_id: str):
     if not response.data:
         return {"detail": "Not Found"}
     return response.data
-    } 
