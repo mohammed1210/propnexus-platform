@@ -7,7 +7,6 @@ import supabase from '@lib/supabaseClient';
 import html2pdf from 'html2pdf.js';
 import dynamic from 'next/dynamic';
 
-// Lazy-load the chatbot to avoid SSR issues
 const AIChatbot = dynamic(() => import('@components/AIChatbot'), { ssr: false });
 
 export default function PropertyDetailsPage() {
@@ -54,7 +53,12 @@ export default function PropertyDetailsPage() {
     const yieldScore = Math.min(property?.yield_percent || 0, 10) * 5;
     const roiScore = Math.min(property?.roi_percent || 0, 20) * 2.5;
     const bonus = (property?.price || 0) < 200000 ? 5 : 0;
-    return Math.min(Math.round(yieldScore + roiScore + bonus), 100);
+    return {
+      total: Math.min(Math.round(yieldScore + roiScore + bonus), 100),
+      yieldScore,
+      roiScore,
+      bonus,
+    };
   };
 
   const getScoreColor = (score: number) => {
@@ -94,8 +98,7 @@ export default function PropertyDetailsPage() {
   if (loading) return <p>Loading...</p>;
   if (!property) return <p>Property not found.</p>;
 
-  const aiScore = getAIScore();
-  const scoreColor = getScoreColor(aiScore);
+  const ai = getAIScore();
   const mortgage = calculateMortgage();
 
   const tooltipStyle: React.CSSProperties = {
@@ -120,22 +123,17 @@ export default function PropertyDetailsPage() {
     width: '80px',
   };
 
-  const sidebarStyle: React.CSSProperties = {
-    flex: 1,
-    position: 'sticky',
-    top: '40px',
-    alignSelf: 'flex-start',
-    padding: '20px',
-    backgroundColor: '#f8fafc',
-    borderRadius: '12px',
-    border: '1px solid #e2e8f0',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '12px',
-  };
+  const barStyle = (score: number, color: string): React.CSSProperties => ({
+    width: `${Math.min(score, 100)}%`,
+    height: '10px',
+    backgroundColor: color,
+    borderRadius: '5px',
+    transition: 'width 0.5s ease-in-out',
+  });
 
-  return (
+  const labelStyle = { fontSize: '14px', color: '#475569', marginTop: '8px' };
+
+    return (
     <>
       <div style={{
         maxWidth: '1280px',
@@ -178,20 +176,22 @@ export default function PropertyDetailsPage() {
             {property.title}
           </h1>
 
-          <div style={{ margin: '8px 0 16px', display: 'flex', gap: '12px', alignItems: 'center', position: 'relative' }}>
+          {/* AI Score */}
+          <div style={{ margin: '16px 0 20px', display: 'flex', flexDirection: 'column' }}>
             <span
               style={{
-                backgroundColor: scoreColor,
+                backgroundColor: getScoreColor(ai.total),
                 color: '#fff',
                 padding: '4px 12px',
                 borderRadius: '6px',
                 fontWeight: 600,
                 fontSize: '14px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                width: 'fit-content'
               }}
               onClick={() => setShowTooltip(!showTooltip)}
             >
-              🔥 AI Score: {aiScore}/100
+              🔥 AI Score: {ai.total}/100
             </span>
             {showTooltip && (
               <div style={tooltipStyle}>
@@ -201,6 +201,21 @@ export default function PropertyDetailsPage() {
                 ✅ Bonus if price under £200k
               </div>
             )}
+            {/* Animated Score Bars */}
+            <div style={{ marginTop: '12px' }}>
+              <div style={labelStyle}>Yield Score: {Math.round(ai.yieldScore)}</div>
+              <div style={{ backgroundColor: '#e2e8f0', borderRadius: '5px', height: '10px' }}>
+                <div style={barStyle(ai.yieldScore, '#3b82f6')} />
+              </div>
+              <div style={labelStyle}>ROI Score: {Math.round(ai.roiScore)}</div>
+              <div style={{ backgroundColor: '#e2e8f0', borderRadius: '5px', height: '10px' }}>
+                <div style={barStyle(ai.roiScore, '#6366f1')} />
+              </div>
+              <div style={labelStyle}>Bonus Score: {Math.round(ai.bonus)}</div>
+              <div style={{ backgroundColor: '#e2e8f0', borderRadius: '5px', height: '10px' }}>
+                <div style={barStyle(ai.bonus, '#10b981')} />
+              </div>
+            </div>
           </div>
 
           <p style={{ fontSize: '18px', color: '#64748b', marginBottom: '8px' }}>
@@ -280,7 +295,20 @@ export default function PropertyDetailsPage() {
           </p>
         </div>
 
-        <div style={sidebarStyle}>
+        <div style={{
+          flex: 1,
+          position: 'sticky',
+          top: '40px',
+          alignSelf: 'flex-start',
+          padding: '20px',
+          backgroundColor: '#f8fafc',
+          borderRadius: '12px',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+        }}>
           <h3 style={{ fontSize: '20px', fontWeight: 600, color: '#1e293b' }}>Deal Summary</h3>
           <div><strong>Yield:</strong> {property.yield_percent || 0}%</div>
           <div><strong>ROI:</strong> {property.roi_percent || 0}%</div>
