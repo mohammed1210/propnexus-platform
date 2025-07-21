@@ -253,3 +253,44 @@ body.dark-mode .filters-row div label {
     display: none !important;
   }
 }
+
+/* 🎯 Fix investment type width */
+.filter-select.investment-type {
+  max-width: 220px;
+}
+
+/* 💻 Show map toggle on desktop now */
+.map-toggle-button-desktop {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: none;
+  background-color: #3b82f6;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.map-toggle-button-desktop:hover {
+  background-color: #2563eb;
+}
+
+@media (max-width: 768px) {
+  .map-toggle-button-desktop {
+    display: none;
+  }
+}
+
+/* ✨ Sticky header fix */
+.sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: #f1f5f9;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+body.dark-mode .sticky-top {
+  background: #1f2937;
+}
