@@ -36,10 +36,10 @@ a {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid #cbd5e1;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.06);
-  z-index: 100;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
   position: sticky;
   top: 0;
+  z-index: 999; /* ↑ Ensures it’s above everything */
 }
 
 body.dark-mode .header-bar {
@@ -70,7 +70,7 @@ body.dark-mode .mode-toggle {
   color: #e2e8f0;
 }
 
-/* 📌 Sticky Filter Row (Search + Investment Type) */
+/* 📌 Sticky Filters */
 .sticky-primary {
   display: flex;
   flex-wrap: wrap;
@@ -79,9 +79,9 @@ body.dark-mode .mode-toggle {
   background: #f8fafc;
   position: sticky;
   top: 72px;
-  z-index: 90;
+  z-index: 998;
   border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 body.dark-mode .sticky-primary {
@@ -89,7 +89,7 @@ body.dark-mode .sticky-primary {
   border-color: #334155;
 }
 
-/* 🎛️ Non-Sticky Filters (Advanced) */
+/* 🎛️ Filters */
 .filters-row {
   display: flex;
   flex-wrap: wrap;
@@ -104,7 +104,6 @@ body.dark-mode .filters-row {
   border-color: #334155;
 }
 
-/* 🔲 Inputs + Buttons */
 .filters-row input,
 .filters-row select,
 .filters-row button,
@@ -147,16 +146,21 @@ body.dark-mode select {
   border: 1px solid #334155;
 }
 
-.filters-row button {
+/* 🟦 Small Button Style */
+.small-button {
+  padding: 6px 12px;
+  font-size: 13px;
   font-weight: 500;
-  background: #0ea5e9;
+  border-radius: 6px;
+  border: none;
+  background-color: #0ea5e9;
   color: white;
   cursor: pointer;
-  font-size: 13px;
+  transition: background 0.2s ease;
 }
 
-.filters-row button:hover {
-  background: #0284c7;
+.small-button:hover {
+  background-color: #0284c7;
 }
 
 /* 🏷 Labels */
