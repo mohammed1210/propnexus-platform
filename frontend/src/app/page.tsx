@@ -57,7 +57,7 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* 🌟 Modern Header */}
+      {/* 🌟 Header */}
       <header className="header-bar">
         <h1>PropNexus</h1>
         <button
@@ -68,7 +68,7 @@ export default function PropertiesPage() {
         </button>
       </header>
 
-      {/* 📌 Sticky Quick Filters Only */}
+      {/* 📌 Sticky Quick Filters */}
       <div className="filters-row sticky-primary">
         <input
           type="text"
@@ -87,7 +87,7 @@ export default function PropertiesPage() {
         </select>
       </div>
 
-      {/* 🎛️ Non-sticky Full Filters */}
+      {/* 🎛️ Advanced Filters */}
       <div className="filters-row">
         <button onClick={() => setShowMoreFilters(!showMoreFilters)}>
           {showMoreFilters ? 'Hide Filters' : 'More Filters'}
@@ -162,7 +162,7 @@ export default function PropertiesPage() {
         )}
       </div>
 
-      {/* 🏘️ Properties + Map */}
+      {/* 🏘️ Layout */}
       <div className="content-layout">
         <div className="property-list">
           {filteredProperties.length > 0 ? (
