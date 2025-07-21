@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { Icon, LatLngExpression } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Property } from '../types';
 
-// ✅ Fix missing default icon bug in Next.js + Leaflet
+// 🔧 Fix Leaflet icon paths for Next.js
 import L from 'leaflet';
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -23,53 +23,65 @@ type Props = {
 };
 
 export default function MapView({ properties }: Props) {
-  const center: LatLngExpression = [52.5, -1.5]; // UK default center
+  const center: LatLngExpression = [52.5, -1.5]; // Center of UK
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    // Ensure Leaflet styles are present for map rendering
-    const leafletStyles = document.getElementById('leaflet-css');
-    if (!leafletStyles) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet/dist/leaflet.css';
-      link.id = 'leaflet-css';
-      document.head.appendChild(link);
-    }
+    const isDesktop = window.innerWidth >= 768;
+    setIsVisible(isDesktop);
   }, []);
 
+  const toggleMap = () => {
+    setIsVisible(!isVisible);
+  };
+
   return (
-    <div style={{ height: '100%', width: '100%' }}>
-      <MapContainer
-        center={center}
-        zoom={6}
+    <div style={{ position: 'relative' }}>
+      {/* 🧭 Toggle button only on mobile */}
+      <button
+        onClick={toggleMap}
+        className="map-toggle-button"
         style={{
-          height: '100%',
-          width: '100%',
-          borderRadius: '10px',
+          position: 'absolute',
+          top: 10,
+          right: 10,
+          zIndex: 1000,
+          padding: '8px 10px',
+          fontSize: '14px',
+          background: '#0ea5e9',
+          color: 'white',
+          border: 'none',
+          borderRadius: '6px',
+          cursor: 'pointer',
         }}
-        scrollWheelZoom={true}
       >
-        <TileLayer
-          attribution='&copy; OpenStreetMap contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        {isVisible ? '🗺️ Hide Map' : '🗺️ Show Map'}
+      </button>
 
-        {properties.map((property) => {
-          if (!property.latitude || !property.longitude) return null;
+      {isVisible && (
+        <MapContainer center={center} zoom={6} style={{ height: '100%', width: '100%' }}>
+          <TileLayer
+            attribution='&copy; OpenStreetMap contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          {properties.map((property) => {
+            if (!property.latitude || !property.longitude) return null;
 
-          return (
-            <Marker
-              key={property.id}
-              position={[property.latitude, property.longitude]}
-            >
-              <Popup>
-                <strong>{property.title}</strong><br />
-                £{property.price.toLocaleString()}
-              </Popup>
-            </Marker>
-          );
-        })}
-      </MapContainer>
+            return (
+              <Marker
+                key={property.id}
+                position={[property.latitude, property.longitude]}
+              >
+                <Popup>
+                  <strong>{property.title}</strong>
+                  <br />
+                  £{property.price.toLocaleString()}
+                </Popup>
+              </Marker>
+            );
+          })}
+        </MapContainer>
+      )}
     </div>
   );
 }
