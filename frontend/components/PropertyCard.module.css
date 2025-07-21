@@ -32,6 +32,11 @@
   object-fit: cover;
   display: block;
   border-radius: 10px;
+  transition: transform 0.2s ease;
+}
+
+.card:hover .image {
+  transform: scale(1.03);
 }
 
 .info {
