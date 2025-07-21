@@ -27,7 +27,6 @@ export default function MapView({ properties }: Props) {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    // Only allow toggle on mobile
     if (window.innerWidth < 768) {
       setIsVisible(false);
     }
@@ -39,24 +38,24 @@ export default function MapView({ properties }: Props) {
 
   return (
     <div style={{ position: 'relative', height: '100%' }}>
-      {/* 🧭 Toggle button only on mobile */}
+      {/* 📱 Mobile toggle */}
       <button
         onClick={toggleMap}
         className="map-toggle-button"
         style={{
           position: 'absolute',
-          top: 10,
-          right: 10,
+          top: 12,
+          right: 12,
           zIndex: 1000,
-          padding: '8px 12px',
+          padding: '10px 14px',
           fontSize: '14px',
-          fontWeight: 500,
-          background: '#0ea5e9',
-          color: 'white',
+          fontWeight: 600,
           border: 'none',
-          borderRadius: '6px',
+          borderRadius: '8px',
           cursor: 'pointer',
-          boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+          backgroundColor: '#0ea5e9',
+          color: '#fff',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
         }}
       >
         {isVisible ? '🗺️ Hide Map' : '🗺️ Show Map'}
