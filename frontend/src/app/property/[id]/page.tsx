@@ -38,9 +38,34 @@ export default function PropertyDetailsPage() {
     }
   };
 
+  const getAIScore = () => {
+    const yieldScore = Math.min(property?.yield_percent || 0, 10) * 5;
+    const roiScore = Math.min(property?.roi_percent || 0, 20) * 2.5;
+    const bonus = (property?.price || 0) < 200000 ? 5 : 0;
+    return Math.min(Math.round(yieldScore + roiScore + bonus), 100);
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return '#10b981';
+    if (score >= 60) return '#facc15';
+    return '#ef4444';
+  };
+
+  const handleDownload = () => {
+    alert('🛠 Export to PDF coming soon...');
+  };
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    alert('🔗 Link copied to clipboard!');
+  };
+
   if (!id) return <p>Invalid property ID.</p>;
   if (loading) return <p>Loading...</p>;
   if (!property) return <p>Property not found.</p>;
+
+  const aiScore = getAIScore();
+  const scoreColor = getScoreColor(aiScore);
 
   return (
     <div style={{
@@ -83,6 +108,20 @@ export default function PropertyDetailsPage() {
         <h1 style={{ fontSize: '30px', fontWeight: '700', color: '#0f172a' }}>
           {property.title}
         </h1>
+
+        <div style={{ margin: '8px 0 16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <span style={{
+            backgroundColor: scoreColor,
+            color: '#fff',
+            padding: '4px 12px',
+            borderRadius: '6px',
+            fontWeight: 600,
+            fontSize: '14px'
+          }}>
+            🔥 AI Score: {aiScore}/100
+          </span>
+        </div>
+
         <p style={{ fontSize: '18px', color: '#64748b', marginBottom: '8px' }}>
           {property.location}
         </p>
@@ -92,6 +131,18 @@ export default function PropertyDetailsPage() {
         <p style={{ marginTop: '10px', fontSize: '16px', color: '#475569' }}>
           🛏 {property.bedrooms} beds • 🛁 {property.bathrooms || 0} bath
         </p>
+
+        {property.latitude && property.longitude && (
+          <div style={{ marginTop: '24px' }}>
+            <iframe
+              width="100%"
+              height="240"
+              style={{ borderRadius: '10px' }}
+              loading="lazy"
+              src={`https://maps.google.com/maps?q=${property.latitude},${property.longitude}&z=15&output=embed`}
+            ></iframe>
+          </div>
+        )}
 
         <h2 style={{ marginTop: '28px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
           Description
@@ -116,45 +167,41 @@ export default function PropertyDetailsPage() {
         borderRadius: '12px',
         border: '1px solid #e2e8f0',
         boxShadow: '0 2px 12px rgba(0,0,0,0.05)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
       }}>
-        <h3 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px', color: '#1e293b' }}>
+        <h3 style={{ fontSize: '20px', fontWeight: 600, color: '#1e293b' }}>
           Deal Summary
         </h3>
 
-        <div style={{ marginBottom: '8px', color: '#0f172a' }}>
-          <strong>Yield:</strong> {property.yield_percent || 0}%
-        </div>
-        <div style={{ marginBottom: '8px', color: '#0f172a' }}>
-          <strong>ROI:</strong> {property.roi_percent || 0}%
-        </div>
-        <div style={{ marginBottom: '8px', color: '#0f172a' }}>
-          <strong>Property Type:</strong> {property.propertyType || 'N/A'}
-        </div>
-        <div style={{ marginBottom: '8px', color: '#0f172a' }}>
-          <strong>Investment Type:</strong> {property.investmentType || 'N/A'}
-        </div>
-        <div style={{ marginBottom: '16px', color: '#0f172a' }}>
-          <strong>Source:</strong> {property.source || 'Unknown'}
-        </div>
+        <div><strong>Yield:</strong> {property.yield_percent || 0}%</div>
+        <div><strong>ROI:</strong> {property.roi_percent || 0}%</div>
+        <div><strong>Property Type:</strong> {property.propertyType || 'N/A'}</div>
+        <div><strong>Investment Type:</strong> {property.investmentType || 'N/A'}</div>
+        <div><strong>Source:</strong> {property.source || 'Unknown'}</div>
 
-        <button
-          onClick={handleSave}
-          style={{
-            marginTop: '12px',
-            backgroundColor: '#14b8a6',
-            color: 'white',
-            padding: '12px 20px',
-            border: 'none',
-            borderRadius: '8px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            width: '100%',
-            fontSize: '15px',
-          }}
-        >
-          💾 Save Deal
+        <button onClick={handleSave} style={btnStyle}>💾 Save Deal</button>
+        <button onClick={handleDownload} style={{ ...btnStyle, backgroundColor: '#3b82f6' }}>
+          📥 Download Deal Pack
+        </button>
+        <button onClick={handleShare} style={{ ...btnStyle, backgroundColor: '#facc15', color: '#1f2937' }}>
+          🔗 Copy Link
         </button>
       </div>
     </div>
   );
 }
+
+const btnStyle = {
+  marginTop: '8px',
+  backgroundColor: '#14b8a6',
+  color: 'white',
+  padding: '12px 20px',
+  border: 'none',
+  borderRadius: '8px',
+  fontWeight: 600,
+  cursor: 'pointer',
+  width: '100%',
+  fontSize: '15px',
+};
