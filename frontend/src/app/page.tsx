@@ -1,3 +1,4 @@
+// app/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -40,7 +41,7 @@ export default function PropertiesPage() {
         propertyType === 'All' || (property.propertyType || '').toLowerCase() === propertyType.toLowerCase();
       const matchesYield = (property.yield_percent || 0) >= minYield;
       const matchesROI = (property.roi_percent || 0) >= minROI;
-      const matchesInvestmentType = true; // currently not filtering
+      const matchesInvestmentType = true; // placeholder for future logic
 
       return (
         matchesPrice &&
@@ -81,7 +82,12 @@ export default function PropertiesPage() {
       </header>
 
       <div className="filters-row">
-        <input type="text" placeholder="Search location" value={searchLocation} onChange={(e) => setSearchLocation(e.target.value)} />
+        <input
+          type="text"
+          placeholder="Search location"
+          value={searchLocation}
+          onChange={(e) => setSearchLocation(e.target.value)}
+        />
         <select value={investmentType} onChange={(e) => setInvestmentType(e.target.value)}>
           <option value="All">All Investment Types</option>
           <option value="HMO">HMO</option>
@@ -93,7 +99,14 @@ export default function PropertiesPage() {
         </button>
         <button
           onClick={() => setShowMap(!showMap)}
-          style={{ backgroundColor: showMap ? '#334155' : '#3b82f6', color: '#fff' }}
+          className="map-toggle-button"
+          style={{
+            backgroundColor: showMap ? '#334155' : '#3b82f6',
+            color: '#fff',
+            fontSize: '13px',
+            padding: '6px 12px',
+            borderRadius: '6px'
+          }}
         >
           {showMap ? 'Hide Map 🗺' : 'Show Map 🗺'}
         </button>
