@@ -23,39 +23,40 @@ type Props = {
 };
 
 export default function MapView({ properties }: Props) {
-  const center: LatLngExpression = [52.5, -1.5]; // Center of UK
+  const center: LatLngExpression = [52.5, -1.5]; // Default UK center
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    if (window.innerWidth < 768) {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setIsVisible(false);
     }
   }, []);
 
   const toggleMap = () => {
-    setIsVisible(!isVisible);
+    setIsVisible((prev) => !prev);
   };
 
   return (
-    <div style={{ position: 'relative', height: '100%' }}>
-      {/* 📱 Mobile toggle */}
+    <div className="map-wrapper">
+      {/* 🧭 Toggle only on mobile */}
       <button
         onClick={toggleMap}
         className="map-toggle-button"
         style={{
+          display: window.innerWidth < 768 ? 'block' : 'none',
           position: 'absolute',
-          top: 12,
-          right: 12,
+          top: 10,
+          right: 10,
           zIndex: 1000,
-          padding: '10px 14px',
+          padding: '8px 12px',
           fontSize: '14px',
-          fontWeight: 600,
+          fontWeight: 500,
+          background: '#0ea5e9',
+          color: 'white',
           border: 'none',
-          borderRadius: '8px',
+          borderRadius: '6px',
           cursor: 'pointer',
-          backgroundColor: '#0ea5e9',
-          color: '#fff',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
         }}
       >
         {isVisible ? '🗺️ Hide Map' : '🗺️ Show Map'}
@@ -78,7 +79,6 @@ export default function MapView({ properties }: Props) {
           />
           {properties.map((property) => {
             if (!property.latitude || !property.longitude) return null;
-
             return (
               <Marker
                 key={property.id}
