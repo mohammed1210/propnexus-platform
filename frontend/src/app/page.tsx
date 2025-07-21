@@ -57,9 +57,9 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* ✅ Sticky Top Header */}
+      {/* 🔝 Sticky container for header + filters */}
       <div className="sticky-top-header">
-        <div className="header-bar">
+        <header className="header-bar">
           <h1 className="header-title">PropNexus</h1>
           <button
             className="mode-toggle"
@@ -67,9 +67,9 @@ export default function PropertiesPage() {
           >
             🌙 Dark Mode
           </button>
-        </div>
+        </header>
 
-        {/* 🔍 Sticky Filter Row */}
+        {/* 🔍 Quick Filters */}
         <div className="sticky-primary">
           <input
             className="filter-input"
@@ -111,7 +111,7 @@ export default function PropertiesPage() {
         </div>
       </div>
 
-      {/* 🔽 Expandable Filters */}
+      {/* 🎛️ Advanced Filters */}
       {showMoreFilters && (
         <div className="filters-row">
           <div>
@@ -179,7 +179,7 @@ export default function PropertiesPage() {
         </div>
       )}
 
-      {/* 🏘️ Properties + Map */}
+      {/* 🏘️ Property + Map View */}
       <div className="content-layout">
         <div className="property-list">
           {filteredProperties.length > 0 ? (
