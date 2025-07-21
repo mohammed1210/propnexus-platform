@@ -57,45 +57,31 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* 🔗 Combined Header */}
+      {/* 🔗 Unified Header */}
       <div style={{ background: '#f1f5f9', padding: '10px 20px' }}>
         <h1 style={{ margin: 0, fontSize: '1.6rem', color: '#0f172a' }}>PropNexus</h1>
       </div>
 
-      {/* 📌 Sticky Filter Row */}
-      <div
-        className="filters-row"
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          background: '#f8fafc',
-          padding: '10px 20px',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '10px',
-          alignItems: 'center',
-          borderBottom: '1px solid #e2e8f0',
-        }}
-      >
+      {/* 📌 Filters Bar */}
+      <div className="filters-row">
         <input
           type="text"
           placeholder="Search location"
           value={searchLocation}
           onChange={(e) => setSearchLocation(e.target.value)}
-          style={{ padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1', flex: '1' }}
+          style={{ minHeight: '38px' }}
         />
 
-        <select value={investmentType} onChange={(e) => setInvestmentType(e.target.value)}>
-          <option value="All">All Investment Types</option>
-          <option value="HMO">HMO</option>
-          <option value="Flips">Flips</option>
-          <option value="Buy to Let">Buy to Let</option>
+        <select value={investmentType} onChange={(e) => setInvestmentType(e.target.value)} style={{ minHeight: '38px' }}>
+          <option value="All">💼 All Investment Types</option>
+          <option value="HMO">🏘️ HMO</option>
+          <option value="Flips">🔁 Flips</option>
+          <option value="Buy to Let">🏠 Buy to Let</option>
         </select>
 
         <button
           onClick={() => setShowMoreFilters(!showMoreFilters)}
-          style={{ padding: '6px 10px', fontSize: '13px', borderRadius: '6px' }}
+          style={{ minHeight: '38px' }}
         >
           {showMoreFilters ? 'Hide Filters' : 'More Filters'}
         </button>
@@ -104,9 +90,7 @@ export default function PropertiesPage() {
           onClick={() => setShowMap(!showMap)}
           className="map-toggle-button"
           style={{
-            padding: '6px 10px',
-            fontSize: '13px',
-            borderRadius: '6px',
+            minHeight: '38px',
             backgroundColor: showMap ? '#334155' : '#3b82f6',
             color: '#fff',
           }}
@@ -117,27 +101,46 @@ export default function PropertiesPage() {
         {showMoreFilters && (
           <>
             <div>
-              <label style={{ fontSize: '12px', color: '#475569' }}>Min Price</label>
-              <input type="number" value={minPrice} onChange={(e) => setMinPrice(Number(e.target.value))} />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', color: '#475569' }}>Max Price</label>
-              <input type="number" value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))} />
+              <label>Min Price</label>
+              <input
+                type="number"
+                value={minPrice}
+                onChange={(e) => setMinPrice(Number(e.target.value))}
+                style={{ minHeight: '38px' }}
+              />
             </div>
 
-            <select value={bedrooms} onChange={(e) => setBedrooms(e.target.value)}>
-              <option value="Any">Any Beds</option>
-              <option value="1">1 Bed</option>
-              <option value="2">2 Beds</option>
-              <option value="3">3 Beds</option>
-              <option value="4">4+ Beds</option>
+            <div>
+              <label>Max Price</label>
+              <input
+                type="number"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(Number(e.target.value))}
+                style={{ minHeight: '38px' }}
+              />
+            </div>
+
+            <select
+              value={bedrooms}
+              onChange={(e) => setBedrooms(e.target.value)}
+              style={{ minHeight: '38px' }}
+            >
+              <option value="Any">🛏️ Any Beds</option>
+              <option value="1">🛏️ 1 Bed</option>
+              <option value="2">🛏️ 2 Beds</option>
+              <option value="3">🛏️ 3 Beds</option>
+              <option value="4">🛏️ 4+ Beds</option>
             </select>
 
-            <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)}>
-              <option value="All">All Types</option>
-              <option value="Flat">Flat</option>
-              <option value="House">House</option>
-              <option value="Studio">Studio</option>
+            <select
+              value={propertyType}
+              onChange={(e) => setPropertyType(e.target.value)}
+              style={{ minHeight: '38px' }}
+            >
+              <option value="All">🏡 All Types</option>
+              <option value="Flat">🏢 Flat</option>
+              <option value="House">🏠 House</option>
+              <option value="Studio">📦 Studio</option>
             </select>
 
             <input
@@ -145,18 +148,21 @@ export default function PropertiesPage() {
               placeholder="Min Yield (%)"
               value={minYield}
               onChange={(e) => setMinYield(Number(e.target.value))}
+              style={{ minHeight: '38px' }}
             />
+
             <input
               type="number"
               placeholder="Min ROI (%)"
               value={minROI}
               onChange={(e) => setMinROI(Number(e.target.value))}
+              style={{ minHeight: '38px' }}
             />
           </>
         )}
       </div>
 
-      {/* 💡 Results & Map */}
+      {/* 💡 Results + Map */}
       <div className="content-layout">
         <div className="property-list">
           {filteredProperties.length > 0 ? (
