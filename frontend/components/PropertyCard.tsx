@@ -1,101 +1,91 @@
-.card {
-  display: flex;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  overflow: hidden;
-  margin-bottom: 20px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  text-decoration: none;
-  color: inherit;
-}
+// components/PropertyCard.tsx
+'use client';
 
-.card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-}
+import React from 'react';
+import styles from './PropertyCard.module.css';
+import Link from 'next/link';
+import supabase from '@lib/supabaseClient'; // ✅ CORRECT
+import supabase from '@lib/supabaseClient';
 
-.imageWrapper {
-  flex: 0 0 160px;
-  height: 160px;
-  overflow: hidden;
-}
+interface Property {
+  id: string;
+@@ -26,10 +25,9 @@
+  const fallbackImage = '/placeholder.jpg';
 
-.image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
+  const handleSave = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent Link navigation
+    e.preventDefault(); // Prevent navigation
 
-.info {
-  padding: 16px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
+    // 🚧 TEMPORARY: No auth, so we use placeholder user ID
+    const userId = 'demo-user'; // Replace with real session.user.id later
+    const userId = 'demo-user'; // 🔐 Replace with session.user.id when ready
 
-.title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: #0f172a;
-}
+    const { error } = await supabase.from('saved_deals').insert({
+      user_id: userId,
+@@ -39,43 +37,46 @@
+    if (error) {
+      console.error('Error saving deal:', error.message);
+    } else {
+      alert('Deal saved!');
+      alert('✅ Deal saved!');
+    }
+  };
 
-.location {
-  font-size: 14px;
-  color: #64748b;
-}
+  return (
+    <Link href={`/property/${property.id}`} className={styles.card}>
+      <img
+        src={property.imageurl || fallbackImage}
+        alt={property.title}
+        className={styles.image}
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = fallbackImage;
+        }}
+      />
+      <div className={styles.imageWrapper}>
+        <img
+          src={property.imageurl || fallbackImage}
+          alt={property.title}
+          className={styles.image}
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = fallbackImage;
+          }}
+        />
+      </div>
 
-.price {
-  font-size: 18px;
-  font-weight: 700;
-  margin-top: 8px;
-  color: #1e293b;
-}
+      <div className={styles.info}>
+        <div className={styles.title}>{property.title}</div>
+        <div className={styles.location}>{property.location}</div>
+        <div className={styles.price}>
+          £{property.price?.toLocaleString?.() || 'N/A'}
+        </div>
+        <h2 className={styles.title}>{property.title}</h2>
+        <p className={styles.location}>{property.location}</p>
 
-.details {
-  font-size: 14px;
-  margin-top: 4px;
-  color: #475569;
-}
+        <div className={styles.details}>
+          🛏 {property.bedrooms} beds • 🛁 {property.bathrooms} bath
+        </div>
+        <p className={styles.price}>
+          £{property.price?.toLocaleString() || 'N/A'}
+        </p>
 
-.metrics {
-  font-size: 14px;
-  color: #0284c7;
-  margin-top: 6px;
-}
+        <div className={styles.metrics}>
+        <p className={styles.details}>
+          🛏 {property.bedrooms} • 🛁 {property.bathrooms}
+        </p>
 
-.buttons {
-  margin-top: 12px;
-  display: flex;
-  gap: 10px;
-}
+        <p className={styles.metrics}>
+          📈 Yield: {property.yield_percent || 0}% | ROI: {property.roi_percent || 0}%
+        </div>
+        </p>
 
-.save,
-.detailsBtn {
-  padding: 8px 12px;
-  font-size: 14px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.save {
-  background: #14b8a6;
-  color: white;
-}
-
-.detailsBtn {
-  background: #e2e8f0;
-  color: #1e293b;
-}
-
-.save:hover {
-  background: #0d9488;
-}
-
-.detailsBtn:hover {
-  background: #cbd5e1;
+        <div className={styles.buttons}>
+          <button className={styles.save} onClick={handleSave}>
+          <button onClick={handleSave} className={styles.save}>
+            💾 Save Deal
+          </button>
+          <button className={styles.detailsBtn}>🔍 View Details</button>
+        </div>
+      </div>
+    </Link>
+  );
 }
