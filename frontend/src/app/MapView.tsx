@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import { Icon, LatLngExpression } from 'leaflet';
+import { LatLngExpression } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Property } from '../types';
 
@@ -27,8 +27,10 @@ export default function MapView({ properties }: Props) {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    const isDesktop = window.innerWidth >= 768;
-    setIsVisible(isDesktop);
+    // Only allow toggle on mobile
+    if (window.innerWidth < 768) {
+      setIsVisible(false);
+    }
   }, []);
 
   const toggleMap = () => {
@@ -36,7 +38,7 @@ export default function MapView({ properties }: Props) {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div style={{ position: 'relative', height: '100%' }}>
       {/* 🧭 Toggle button only on mobile */}
       <button
         onClick={toggleMap}
@@ -46,20 +48,31 @@ export default function MapView({ properties }: Props) {
           top: 10,
           right: 10,
           zIndex: 1000,
-          padding: '8px 10px',
+          padding: '8px 12px',
           fontSize: '14px',
+          fontWeight: 500,
           background: '#0ea5e9',
           color: 'white',
           border: 'none',
           borderRadius: '6px',
           cursor: 'pointer',
+          boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
         }}
       >
         {isVisible ? '🗺️ Hide Map' : '🗺️ Show Map'}
       </button>
 
       {isVisible && (
-        <MapContainer center={center} zoom={6} style={{ height: '100%', width: '100%' }}>
+        <MapContainer
+          center={center}
+          zoom={6}
+          style={{
+            height: '100%',
+            width: '100%',
+            borderRadius: '10px',
+            overflow: 'hidden',
+          }}
+        >
           <TileLayer
             attribution='&copy; OpenStreetMap contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
