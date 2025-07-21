@@ -160,6 +160,7 @@ body.dark-mode .metrics {
   .detailsBtn {
     width: 100%;
   }
+}
 
   @media (min-width: 768px) {
   .map-toggle-button {
