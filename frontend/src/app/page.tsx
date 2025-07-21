@@ -57,29 +57,30 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* 🔗 Unified Header */}
+      {/* 🔗 Upgraded Header */}
       <div
-  style={{
-    background: '#e2e8f0',
-    padding: '16px 24px',
-    borderBottom: '2px solid #cbd5e1',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
-    position: 'sticky',
-    top: 0,
-    zIndex: 60,
-  }}
->
-  <h1
-    style={{
-      margin: 0,
-      fontSize: '1.9rem',
-      fontWeight: 700,
-      color: '#0f172a',
-    }}
-  >
-    PropNexus
-  </h1>
-</div>
+        style={{
+          background: '#e2e8f0',
+          padding: '18px 26px',
+          borderBottom: '3px solid #cbd5e1',
+          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.04)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 60,
+        }}
+      >
+        <h1
+          style={{
+            margin: 0,
+            fontSize: '2rem',
+            fontWeight: 800,
+            color: '#0f172a',
+          }}
+        >
+          PropNexus
+        </h1>
+      </div>
+
       {/* 📌 Filters Bar */}
       <div className="filters-row">
         <input
@@ -90,11 +91,12 @@ export default function PropertiesPage() {
           style={{ minHeight: '38px' }}
         />
 
+        {/* 🔻 Icons removed from this dropdown */}
         <select value={investmentType} onChange={(e) => setInvestmentType(e.target.value)} style={{ minHeight: '38px' }}>
-          <option value="All">💼 All Investment Types</option>
-          <option value="HMO">🏘️ HMO</option>
-          <option value="Flips">🔁 Flips</option>
-          <option value="Buy to Let">🏠 Buy to Let</option>
+          <option value="All">All Investment Types</option>
+          <option value="HMO">HMO</option>
+          <option value="Flips">Flips</option>
+          <option value="Buy to Let">Buy to Let</option>
         </select>
 
         <button
