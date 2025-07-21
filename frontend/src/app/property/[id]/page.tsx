@@ -11,6 +11,9 @@ export default function PropertyDetailsPage() {
   const router = useRouter();
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mortgageRate, setMortgageRate] = useState(5);
+  const [depositPercent, setDepositPercent] = useState(25);
+  const [termYears, setTermYears] = useState(25);
 
   useEffect(() => {
     if (!id) return;
@@ -60,12 +63,29 @@ export default function PropertyDetailsPage() {
     alert('🔗 Link copied to clipboard!');
   };
 
+  const calculateMortgage = () => {
+    if (!property) return null;
+    const price = property.price;
+    const deposit = price * (depositPercent / 100);
+    const loanAmount = price - deposit;
+    const monthlyRate = mortgageRate / 100 / 12;
+    const numPayments = termYears * 12;
+    const monthlyRepayment = (loanAmount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -numPayments));
+    return {
+      deposit,
+      loanAmount,
+      monthlyRepayment,
+      totalRepayment: monthlyRepayment * numPayments,
+    };
+  };
+
   if (!id) return <p>Invalid property ID.</p>;
   if (loading) return <p>Loading...</p>;
   if (!property) return <p>Property not found.</p>;
 
   const aiScore = getAIScore();
   const scoreColor = getScoreColor(aiScore);
+  const mortgage = calculateMortgage();
 
   return (
     <div style={{
@@ -144,7 +164,61 @@ export default function PropertyDetailsPage() {
           </div>
         )}
 
-        <h2 style={{ marginTop: '28px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
+        <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
+          Investment Metrics
+        </h2>
+        <table style={{ marginTop: '10px', width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            <tr>
+              <td>Gross Yield</td>
+              <td><strong>{property.yield_percent}%</strong></td>
+            </tr>
+            <tr>
+              <td>Return on Investment (ROI)</td>
+              <td><strong>{property.roi_percent}%</strong></td>
+            </tr>
+            <tr>
+              <td>Property Type</td>
+              <td>{property.propertyType}</td>
+            </tr>
+            <tr>
+              <td>Investment Type</td>
+              <td>{property.investmentType}</td>
+            </tr>
+            <tr>
+              <td>Listing Source</td>
+              <td>{property.source}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
+          Mortgage Calculator
+        </h2>
+        <div style={{ marginTop: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <label>
+            Deposit (%):
+            <input type="number" value={depositPercent} onChange={(e) => setDepositPercent(Number(e.target.value))} style={inputStyle} />
+          </label>
+          <label>
+            Interest Rate (%):
+            <input type="number" value={mortgageRate} onChange={(e) => setMortgageRate(Number(e.target.value))} style={inputStyle} />
+          </label>
+          <label>
+            Term (years):
+            <input type="number" value={termYears} onChange={(e) => setTermYears(Number(e.target.value))} style={inputStyle} />
+          </label>
+        </div>
+
+        {mortgage && (
+          <div style={{ marginTop: '14px', fontSize: '15px' }}>
+            <p><strong>Loan Amount:</strong> £{Math.round(mortgage.loanAmount).toLocaleString()}</p>
+            <p><strong>Monthly Payment:</strong> £{Math.round(mortgage.monthlyRepayment).toLocaleString()}</p>
+            <p><strong>Total Repayment:</strong> £{Math.round(mortgage.totalRepayment).toLocaleString()}</p>
+          </div>
+        )}
+
+        <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
           Description
         </h2>
         <p style={{
@@ -204,4 +278,13 @@ const btnStyle = {
   cursor: 'pointer',
   width: '100%',
   fontSize: '15px',
+};
+
+const inputStyle = {
+  marginLeft: '8px',
+  marginRight: '16px',
+  padding: '6px',
+  borderRadius: '6px',
+  border: '1px solid #d1d5db',
+  width: '80px',
 };
