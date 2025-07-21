@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Property } from '../../../types';
 import supabase from '@lib/supabaseClient';
 import html2pdf from 'html2pdf.js';
+import dynamic from 'next/dynamic';
+
+// Lazy-load the chatbot to avoid SSR issues
+const AIChatbot = dynamic(() => import('@components/AIChatbot'), { ssr: false });
 
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
@@ -132,165 +136,169 @@ export default function PropertyDetailsPage() {
   };
 
   return (
-    <div style={{
-      maxWidth: '1280px',
-      margin: '40px auto',
-      padding: '24px',
-      display: 'flex',
-      flexDirection: 'row',
-      gap: '32px',
-    }}>
-      <div ref={pdfRef} style={{ flex: 2 }}>
-        <button
-          onClick={() => router.back()}
-          style={{
-            marginBottom: '20px',
-            backgroundColor: '#e2e8f0',
-            border: 'none',
-            padding: '10px 16px',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            color: '#1e293b',
-            fontWeight: '500',
-          }}
-        >
-          ← Back to Listings
-        </button>
-
-        <img
-          src={property.imageurl || '/placeholder.jpg'}
-          alt={property.title}
-          style={{
-            width: '100%',
-            height: 'auto',
-            borderRadius: '10px',
-            marginBottom: '24px',
-            backgroundColor: '#f1f5f9',
-          }}
-        />
-
-        <h1 style={{ fontSize: '30px', fontWeight: '700', color: '#0f172a' }}>
-          {property.title}
-        </h1>
-
-        <div style={{ margin: '8px 0 16px', display: 'flex', gap: '12px', alignItems: 'center', position: 'relative' }}>
-          <span
+    <>
+      <div style={{
+        maxWidth: '1280px',
+        margin: '40px auto',
+        padding: '24px',
+        display: 'flex',
+        flexDirection: 'row',
+        gap: '32px',
+      }}>
+        <div ref={pdfRef} style={{ flex: 2 }}>
+          <button
+            onClick={() => router.back()}
             style={{
-              backgroundColor: scoreColor,
-              color: '#fff',
-              padding: '4px 12px',
-              borderRadius: '6px',
-              fontWeight: 600,
-              fontSize: '14px',
-              cursor: 'pointer'
+              marginBottom: '20px',
+              backgroundColor: '#e2e8f0',
+              border: 'none',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              color: '#1e293b',
+              fontWeight: '500',
             }}
-            onClick={() => setShowTooltip(!showTooltip)}
           >
-            🔥 AI Score: {aiScore}/100
-          </span>
-          {showTooltip && (
-            <div style={tooltipStyle}>
-              <strong>AI Score Breakdown:</strong><br />
-              ✅ Yield up to 10% × 5<br />
-              ✅ ROI up to 20% × 2.5<br />
-              ✅ Bonus if price under £200k
+            ← Back to Listings
+          </button>
+
+          <img
+            src={property.imageurl || '/placeholder.jpg'}
+            alt={property.title}
+            style={{
+              width: '100%',
+              height: 'auto',
+              borderRadius: '10px',
+              marginBottom: '24px',
+              backgroundColor: '#f1f5f9',
+            }}
+          />
+
+          <h1 style={{ fontSize: '30px', fontWeight: '700', color: '#0f172a' }}>
+            {property.title}
+          </h1>
+
+          <div style={{ margin: '8px 0 16px', display: 'flex', gap: '12px', alignItems: 'center', position: 'relative' }}>
+            <span
+              style={{
+                backgroundColor: scoreColor,
+                color: '#fff',
+                padding: '4px 12px',
+                borderRadius: '6px',
+                fontWeight: 600,
+                fontSize: '14px',
+                cursor: 'pointer'
+              }}
+              onClick={() => setShowTooltip(!showTooltip)}
+            >
+              🔥 AI Score: {aiScore}/100
+            </span>
+            {showTooltip && (
+              <div style={tooltipStyle}>
+                <strong>AI Score Breakdown:</strong><br />
+                ✅ Yield up to 10% × 5<br />
+                ✅ ROI up to 20% × 2.5<br />
+                ✅ Bonus if price under £200k
+              </div>
+            )}
+          </div>
+
+          <p style={{ fontSize: '18px', color: '#64748b', marginBottom: '8px' }}>
+            {property.location}
+          </p>
+          <p style={{ fontSize: '24px', fontWeight: '600', color: '#0f172a' }}>
+            £{property.price.toLocaleString()}
+          </p>
+          <p style={{ marginTop: '10px', fontSize: '16px', color: '#475569' }}>
+            🛏 {property.bedrooms} beds • 🛁 {property.bathrooms || 0} bath
+          </p>
+
+          {property.latitude && property.longitude && (
+            <div style={{ marginTop: '24px' }}>
+              <iframe
+                width="100%"
+                height="240"
+                style={{ borderRadius: '10px' }}
+                loading="lazy"
+                src={`https://maps.google.com/maps?q=${property.latitude},${property.longitude}&z=15&output=embed`}
+              ></iframe>
             </div>
           )}
+
+          <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
+            Investment Metrics
+          </h2>
+          <table style={{ marginTop: '10px', width: '100%', borderCollapse: 'collapse' }}>
+            <tbody>
+              <tr><td>Gross Yield</td><td><strong>{property.yield_percent}%</strong></td></tr>
+              <tr><td>Return on Investment (ROI)</td><td><strong>{property.roi_percent}%</strong></td></tr>
+              <tr><td>Property Type</td><td>{property.propertyType}</td></tr>
+              <tr><td>Investment Type</td><td>{property.investmentType}</td></tr>
+              <tr><td>Listing Source</td><td>{property.source}</td></tr>
+            </tbody>
+          </table>
+
+          <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
+            Mortgage Calculator
+          </h2>
+          <div style={{ marginTop: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <label>Deposit (%): <input type="number" value={depositPercent} onChange={(e) => setDepositPercent(Number(e.target.value))} style={inputStyle} /></label>
+            <label>Interest Rate (%): <input type="number" value={mortgageRate} onChange={(e) => setMortgageRate(Number(e.target.value))} style={inputStyle} /></label>
+            <label>Term (years): <input type="number" value={termYears} onChange={(e) => setTermYears(Number(e.target.value))} style={inputStyle} /></label>
+          </div>
+
+          {mortgage && (
+            <div style={{ marginTop: '14px', fontSize: '15px' }}>
+              <p><strong>Loan Amount:</strong> £{Math.round(mortgage.loanAmount).toLocaleString()}</p>
+              <p><strong>Monthly Payment:</strong> £{Math.round(mortgage.monthlyRepayment).toLocaleString()}</p>
+              <p><strong>Total Repayment:</strong> £{Math.round(mortgage.totalRepayment).toLocaleString()}</p>
+            </div>
+          )}
+
+          <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
+            Custom Notes + Fields
+          </h2>
+          <textarea
+            placeholder="Your notes about this deal..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', marginTop: '8px', minHeight: '80px' }}
+          />
+          <input
+            type="text"
+            placeholder="Add custom field (e.g. Agent Name, Renovation Est.)"
+            value={customField}
+            onChange={(e) => setCustomField(e.target.value)}
+            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', marginTop: '8px' }}
+          />
+
+          <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
+            Description
+          </h2>
+          <p style={{ marginTop: '8px', fontSize: '15px', lineHeight: '1.7', color: '#334155' }}>
+            {property.description || 'No description available.'}
+          </p>
         </div>
 
-        <p style={{ fontSize: '18px', color: '#64748b', marginBottom: '8px' }}>
-          {property.location}
-        </p>
-        <p style={{ fontSize: '24px', fontWeight: '600', color: '#0f172a' }}>
-          £{property.price.toLocaleString()}
-        </p>
-        <p style={{ marginTop: '10px', fontSize: '16px', color: '#475569' }}>
-          🛏 {property.bedrooms} beds • 🛁 {property.bathrooms || 0} bath
-        </p>
-
-        {property.latitude && property.longitude && (
-          <div style={{ marginTop: '24px' }}>
-            <iframe
-              width="100%"
-              height="240"
-              style={{ borderRadius: '10px' }}
-              loading="lazy"
-              src={`https://maps.google.com/maps?q=${property.latitude},${property.longitude}&z=15&output=embed`}
-            ></iframe>
-          </div>
-        )}
-
-        <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
-          Investment Metrics
-        </h2>
-        <table style={{ marginTop: '10px', width: '100%', borderCollapse: 'collapse' }}>
-          <tbody>
-            <tr><td>Gross Yield</td><td><strong>{property.yield_percent}%</strong></td></tr>
-            <tr><td>Return on Investment (ROI)</td><td><strong>{property.roi_percent}%</strong></td></tr>
-            <tr><td>Property Type</td><td>{property.propertyType}</td></tr>
-            <tr><td>Investment Type</td><td>{property.investmentType}</td></tr>
-            <tr><td>Listing Source</td><td>{property.source}</td></tr>
-          </tbody>
-        </table>
-
-        <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
-          Mortgage Calculator
-        </h2>
-        <div style={{ marginTop: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-          <label>Deposit (%): <input type="number" value={depositPercent} onChange={(e) => setDepositPercent(Number(e.target.value))} style={inputStyle} /></label>
-          <label>Interest Rate (%): <input type="number" value={mortgageRate} onChange={(e) => setMortgageRate(Number(e.target.value))} style={inputStyle} /></label>
-          <label>Term (years): <input type="number" value={termYears} onChange={(e) => setTermYears(Number(e.target.value))} style={inputStyle} /></label>
+        <div style={sidebarStyle}>
+          <h3 style={{ fontSize: '20px', fontWeight: 600, color: '#1e293b' }}>Deal Summary</h3>
+          <div><strong>Yield:</strong> {property.yield_percent || 0}%</div>
+          <div><strong>ROI:</strong> {property.roi_percent || 0}%</div>
+          <div><strong>Property Type:</strong> {property.propertyType || 'N/A'}</div>
+          <div><strong>Investment Type:</strong> {property.investmentType || 'N/A'}</div>
+          <div><strong>Source:</strong> {property.source || 'Unknown'}</div>
+          <button onClick={handleSave} style={btnStyle}>💾 Save Deal</button>
+          <button onClick={handleDownload} style={{ ...btnStyle, backgroundColor: '#3b82f6' }}>
+            📥 Download Deal Pack
+          </button>
+          <button onClick={handleShare} style={{ ...btnStyle, backgroundColor: '#facc15', color: '#1f2937' }}>
+            🔗 Copy Link
+          </button>
         </div>
-
-        {mortgage && (
-          <div style={{ marginTop: '14px', fontSize: '15px' }}>
-            <p><strong>Loan Amount:</strong> £{Math.round(mortgage.loanAmount).toLocaleString()}</p>
-            <p><strong>Monthly Payment:</strong> £{Math.round(mortgage.monthlyRepayment).toLocaleString()}</p>
-            <p><strong>Total Repayment:</strong> £{Math.round(mortgage.totalRepayment).toLocaleString()}</p>
-          </div>
-        )}
-
-        <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
-          Custom Notes + Fields
-        </h2>
-        <textarea
-          placeholder="Your notes about this deal..."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', marginTop: '8px', minHeight: '80px' }}
-        />
-        <input
-          type="text"
-          placeholder="Add custom field (e.g. Agent Name, Renovation Est.)"
-          value={customField}
-          onChange={(e) => setCustomField(e.target.value)}
-          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', marginTop: '8px' }}
-        />
-
-        <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>
-          Description
-        </h2>
-        <p style={{ marginTop: '8px', fontSize: '15px', lineHeight: '1.7', color: '#334155' }}>
-          {property.description || 'No description available.'}
-        </p>
       </div>
 
-      <div style={sidebarStyle}>
-        <h3 style={{ fontSize: '20px', fontWeight: 600, color: '#1e293b' }}>Deal Summary</h3>
-        <div><strong>Yield:</strong> {property.yield_percent || 0}%</div>
-        <div><strong>ROI:</strong> {property.roi_percent || 0}%</div>
-        <div><strong>Property Type:</strong> {property.propertyType || 'N/A'}</div>
-        <div><strong>Investment Type:</strong> {property.investmentType || 'N/A'}</div>
-        <div><strong>Source:</strong> {property.source || 'Unknown'}</div>
-        <button onClick={handleSave} style={btnStyle}>💾 Save Deal</button>
-        <button onClick={handleDownload} style={{ ...btnStyle, backgroundColor: '#3b82f6' }}>
-          📥 Download Deal Pack
-        </button>
-        <button onClick={handleShare} style={{ ...btnStyle, backgroundColor: '#facc15', color: '#1f2937' }}>
-          🔗 Copy Link
-        </button>
-      </div>
-    </div>
+      <AIChatbot />
+    </>
   );
 }
 
