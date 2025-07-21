@@ -57,8 +57,8 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* ✅ Clean Header */}
-      <header className="header-bar">
+      {/* ✅ Sticky Header */}
+      <header className="header-bar sticky-top">
         <h1 className="header-title">PropNexus</h1>
         <button
           className="mode-toggle"
@@ -68,8 +68,8 @@ export default function PropertiesPage() {
         </button>
       </header>
 
-      {/* 🔍 Quick Filters */}
-      <div className="sticky-primary">
+      {/* 🔍 Sticky Quick Filters */}
+      <div className="filters-row sticky-primary filters-bar">
         <input
           className="filter-input"
           type="text"
@@ -79,7 +79,7 @@ export default function PropertiesPage() {
         />
 
         <select
-          className="filter-select small"
+          className="filter-select investment-type"
           value={investmentType}
           onChange={(e) => setInvestmentType(e.target.value)}
         >
@@ -99,19 +99,15 @@ export default function PropertiesPage() {
 
         <button
           onClick={() => setShowMap(!showMap)}
-          className="map-toggle-button"
-          style={{
-            backgroundColor: showMap ? '#334155' : '#3b82f6',
-            color: '#fff',
-          }}
+          className="map-toggle-button-desktop"
         >
-          {showMap ? 'Hide Map 🗺' : 'Show Map 🗺'}
+          {showMap ? '🗺 Hide Map' : '🗺 Show Map'}
         </button>
       </div>
 
-      {/* 🎛️ Advanced Filters */}
+      {/* 🎛️ Expandable Advanced Filters */}
       {showMoreFilters && (
-        <div className="filters-row">
+        <div className="filters-row expanded-filters">
           <div>
             <label>Min Price</label>
             <input
@@ -177,7 +173,7 @@ export default function PropertiesPage() {
         </div>
       )}
 
-      {/* 🏘️ Property + Map View */}
+      {/* 🏘️ Property Grid + Map */}
       <div className="content-layout">
         <div className="property-list">
           {filteredProperties.length > 0 ? (
