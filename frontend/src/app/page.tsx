@@ -57,8 +57,8 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* ✅ Sleek Fixed Header */}
-      <header className="header-bar sticky-primary">
+      {/* ✅ Clean Header */}
+      <header className="header-bar">
         <h1 className="header-title">PropNexus</h1>
         <button
           className="mode-toggle"
@@ -68,8 +68,8 @@ export default function PropertiesPage() {
         </button>
       </header>
 
-      {/* 🔍 Quick Filters Bar */}
-      <div className="filters-row sticky-primary filters-bar">
+      {/* 🔍 Quick Filters */}
+      <div className="sticky-primary">
         <input
           className="filter-input"
           type="text"
@@ -109,9 +109,9 @@ export default function PropertiesPage() {
         </button>
       </div>
 
-      {/* 🧩 Expandable Filter Options */}
+      {/* 🎛️ Advanced Filters */}
       {showMoreFilters && (
-        <div className="filters-row expanded-filters">
+        <div className="filters-row">
           <div>
             <label>Min Price</label>
             <input
@@ -130,44 +130,54 @@ export default function PropertiesPage() {
             />
           </div>
 
-          <select
-            value={bedrooms}
-            onChange={(e) => setBedrooms(e.target.value)}
-          >
-            <option value="Any">Any Beds</option>
-            <option value="1">1 Bed</option>
-            <option value="2">2 Beds</option>
-            <option value="3">3 Beds</option>
-            <option value="4">4+ Beds</option>
-          </select>
+          <div>
+            <label>Bedrooms</label>
+            <select
+              value={bedrooms}
+              onChange={(e) => setBedrooms(e.target.value)}
+            >
+              <option value="Any">Any Beds</option>
+              <option value="1">1 Bed</option>
+              <option value="2">2 Beds</option>
+              <option value="3">3 Beds</option>
+              <option value="4">4+ Beds</option>
+            </select>
+          </div>
 
-          <select
-            value={propertyType}
-            onChange={(e) => setPropertyType(e.target.value)}
-          >
-            <option value="All">All Types</option>
-            <option value="Flat">Flat</option>
-            <option value="House">House</option>
-            <option value="Studio">Studio</option>
-          </select>
+          <div>
+            <label>Property Type</label>
+            <select
+              value={propertyType}
+              onChange={(e) => setPropertyType(e.target.value)}
+            >
+              <option value="All">All Types</option>
+              <option value="Flat">Flat</option>
+              <option value="House">House</option>
+              <option value="Studio">Studio</option>
+            </select>
+          </div>
 
-          <input
-            type="number"
-            placeholder="Min Yield (%)"
-            value={minYield}
-            onChange={(e) => setMinYield(Number(e.target.value))}
-          />
+          <div>
+            <label>Min Yield (%)</label>
+            <input
+              type="number"
+              value={minYield}
+              onChange={(e) => setMinYield(Number(e.target.value))}
+            />
+          </div>
 
-          <input
-            type="number"
-            placeholder="Min ROI (%)"
-            value={minROI}
-            onChange={(e) => setMinROI(Number(e.target.value))}
-          />
+          <div>
+            <label>Min ROI (%)</label>
+            <input
+              type="number"
+              value={minROI}
+              onChange={(e) => setMinROI(Number(e.target.value))}
+            />
+          </div>
         </div>
       )}
 
-      {/* 🏘️ Main Content Layout */}
+      {/* 🏘️ Property + Map View */}
       <div className="content-layout">
         <div className="property-list">
           {filteredProperties.length > 0 ? (
