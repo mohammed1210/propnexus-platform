@@ -1,4 +1,6 @@
 // app/layout.tsx
+'use client';
+
 import './globals.css';
 import { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
