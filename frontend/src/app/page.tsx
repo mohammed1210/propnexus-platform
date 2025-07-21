@@ -57,57 +57,63 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* ✅ Sticky Header */}
-      <header className="header-bar sticky-top">
-        <h1 className="header-title">PropNexus</h1>
-        <button
-          className="mode-toggle"
-          onClick={() => document.body.classList.toggle('dark-mode')}
-        >
-          🌙 Dark Mode
-        </button>
-      </header>
+      {/* ✅ Sticky Top Header */}
+      <div className="sticky-top-header">
+        <div className="header-bar">
+          <h1 className="header-title">PropNexus</h1>
+          <button
+            className="mode-toggle"
+            onClick={() => document.body.classList.toggle('dark-mode')}
+          >
+            🌙 Dark Mode
+          </button>
+        </div>
 
-      {/* 🔍 Sticky Quick Filters */}
-      <div className="filters-row sticky-primary filters-bar">
-        <input
-          className="filter-input"
-          type="text"
-          placeholder="🔎 Search location"
-          value={searchLocation}
-          onChange={(e) => setSearchLocation(e.target.value)}
-        />
+        {/* 🔍 Sticky Filter Row */}
+        <div className="sticky-primary">
+          <input
+            className="filter-input"
+            type="text"
+            placeholder="🔎 Search location"
+            value={searchLocation}
+            onChange={(e) => setSearchLocation(e.target.value)}
+          />
 
-        <select
-          className="filter-select investment-type"
-          value={investmentType}
-          onChange={(e) => setInvestmentType(e.target.value)}
-        >
-          <option value="All">All Investment Types</option>
-          <option value="HMO">HMO</option>
-          <option value="Flips">Flips</option>
-          <option value="Buy to Let">Buy to Let</option>
-        </select>
+          <select
+            className="filter-select small"
+            value={investmentType}
+            onChange={(e) => setInvestmentType(e.target.value)}
+          >
+            <option value="All">All Investment Types</option>
+            <option value="HMO">HMO</option>
+            <option value="Flips">Flips</option>
+            <option value="Buy to Let">Buy to Let</option>
+          </select>
 
-        <button
-          onClick={() => setShowMoreFilters(!showMoreFilters)}
-          className="small-button"
-          title="Show more filters"
-        >
-          ⚙️ Filters
-        </button>
+          <button
+            onClick={() => setShowMoreFilters(!showMoreFilters)}
+            className="small-button"
+            title="Show more filters"
+          >
+            ⚙️ Filters
+          </button>
 
-        <button
-          onClick={() => setShowMap(!showMap)}
-          className="map-toggle-button-desktop"
-        >
-          {showMap ? '🗺 Hide Map' : '🗺 Show Map'}
-        </button>
+          <button
+            onClick={() => setShowMap(!showMap)}
+            className="map-toggle-button"
+            style={{
+              backgroundColor: showMap ? '#334155' : '#3b82f6',
+              color: '#fff',
+            }}
+          >
+            {showMap ? 'Hide Map 🗺' : 'Show Map 🗺'}
+          </button>
+        </div>
       </div>
 
-      {/* 🎛️ Expandable Advanced Filters */}
+      {/* 🔽 Expandable Filters */}
       {showMoreFilters && (
-        <div className="filters-row expanded-filters">
+        <div className="filters-row">
           <div>
             <label>Min Price</label>
             <input
@@ -173,7 +179,7 @@ export default function PropertiesPage() {
         </div>
       )}
 
-      {/* 🏘️ Property Grid + Map */}
+      {/* 🏘️ Properties + Map */}
       <div className="content-layout">
         <div className="property-list">
           {filteredProperties.length > 0 ? (
