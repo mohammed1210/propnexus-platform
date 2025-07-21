@@ -54,6 +54,7 @@
   font-size: 20px;
   font-weight: 600;
   color: #1e293b;
+  margin-bottom: 2px;
 }
 
 .location {
@@ -72,19 +73,25 @@
   color: #475569;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  margin-top: 2px;
+  font-weight: 400;
 }
 
 .metrics {
-  font-size: 14px;
-  color: #0f766e;
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
+.badge {
   background-color: #ecfdf5;
+  color: #0f766e;
   padding: 4px 10px;
   border-radius: 6px;
-  width: fit-content;
+  font-size: 13.5px;
   font-weight: 500;
-  margin-top: 6px;
-  margin-bottom: 4px; /* 📱 better spacing from buttons */
+  display: inline-block;
+  width: fit-content;
 }
 
 .buttons {
@@ -136,13 +143,13 @@ body.dark-mode .price {
 }
 
 body.dark-mode .location,
-body.dark-mode .details,
-body.dark-mode .metrics {
+body.dark-mode .details {
   color: #94a3b8;
 }
 
-body.dark-mode .metrics {
+body.dark-mode .badge {
   background-color: #064e3b;
+  color: #a7f3d0;
 }
 
 /* 📱 Responsive optimization */
