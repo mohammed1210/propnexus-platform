@@ -57,52 +57,60 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* 🔗 Upgraded Header */}
-      <div
+      {/* 🧠 Modern Header */}
+      <header
+        className="header-bar"
         style={{
-          background: '#e2e8f0',
-          padding: '18px 26px',
-          borderBottom: '3px solid #cbd5e1',
-          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.04)',
-          position: 'sticky',
-          top: 0,
-          zIndex: 60,
+          position: 'relative',
+          borderBottom: '2px solid #cbd5e1',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
         }}
       >
-        <h1
-          style={{
-            margin: 0,
-            fontSize: '2rem',
-            fontWeight: 800,
-            color: '#0f172a',
-          }}
-        >
+        <h1 style={{ fontSize: '26px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
           PropNexus
         </h1>
-      </div>
+        <button
+          className="mode-toggle"
+          onClick={() =>
+            document.body.classList.toggle('dark-mode')
+          }
+        >
+          🌙 Dark Mode
+        </button>
+      </header>
 
-      {/* 📌 Filters Bar */}
-      <div className="filters-row">
+      {/* 📌 Sticky Bar (only key filters) */}
+      <div
+        className="filters-row"
+        style={{
+          position: 'sticky',
+          top: 56,
+          zIndex: 40,
+          background: 'var(--filter-bg)',
+          borderBottom: '1px solid #e2e8f0',
+        }}
+      >
         <input
           type="text"
           placeholder="Search location"
           value={searchLocation}
           onChange={(e) => setSearchLocation(e.target.value)}
-          style={{ minHeight: '38px' }}
         />
 
-        {/* 🔻 Icons removed from this dropdown */}
-        <select value={investmentType} onChange={(e) => setInvestmentType(e.target.value)} style={{ minHeight: '38px' }}>
+        <select
+          value={investmentType}
+          onChange={(e) => setInvestmentType(e.target.value)}
+        >
           <option value="All">All Investment Types</option>
           <option value="HMO">HMO</option>
           <option value="Flips">Flips</option>
           <option value="Buy to Let">Buy to Let</option>
         </select>
+      </div>
 
-        <button
-          onClick={() => setShowMoreFilters(!showMoreFilters)}
-          style={{ minHeight: '38px' }}
-        >
+      {/* 🎛️ Full Filters (non-sticky) */}
+      <div className="filters-row" style={{ marginTop: 10 }}>
+        <button onClick={() => setShowMoreFilters(!showMoreFilters)}>
           {showMoreFilters ? 'Hide Filters' : 'More Filters'}
         </button>
 
@@ -110,7 +118,6 @@ export default function PropertiesPage() {
           onClick={() => setShowMap(!showMap)}
           className="map-toggle-button"
           style={{
-            minHeight: '38px',
             backgroundColor: showMap ? '#334155' : '#3b82f6',
             color: '#fff',
           }}
@@ -126,7 +133,6 @@ export default function PropertiesPage() {
                 type="number"
                 value={minPrice}
                 onChange={(e) => setMinPrice(Number(e.target.value))}
-                style={{ minHeight: '38px' }}
               />
             </div>
 
@@ -136,14 +142,12 @@ export default function PropertiesPage() {
                 type="number"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}
-                style={{ minHeight: '38px' }}
               />
             </div>
 
             <select
               value={bedrooms}
               onChange={(e) => setBedrooms(e.target.value)}
-              style={{ minHeight: '38px' }}
             >
               <option value="Any">🛏️ Any Beds</option>
               <option value="1">🛏️ 1 Bed</option>
@@ -155,7 +159,6 @@ export default function PropertiesPage() {
             <select
               value={propertyType}
               onChange={(e) => setPropertyType(e.target.value)}
-              style={{ minHeight: '38px' }}
             >
               <option value="All">🏡 All Types</option>
               <option value="Flat">🏢 Flat</option>
@@ -168,7 +171,6 @@ export default function PropertiesPage() {
               placeholder="Min Yield (%)"
               value={minYield}
               onChange={(e) => setMinYield(Number(e.target.value))}
-              style={{ minHeight: '38px' }}
             />
 
             <input
@@ -176,13 +178,12 @@ export default function PropertiesPage() {
               placeholder="Min ROI (%)"
               value={minROI}
               onChange={(e) => setMinROI(Number(e.target.value))}
-              style={{ minHeight: '38px' }}
             />
           </>
         )}
       </div>
 
-      {/* 💡 Results + Map */}
+      {/* 🏘️ Properties + Map */}
       <div className="content-layout">
         <div className="property-list">
           {filteredProperties.length > 0 ? (
