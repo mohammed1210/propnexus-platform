@@ -57,46 +57,25 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* 🧠 Modern Header */}
-      <header
-        className="header-bar"
-        style={{
-          position: 'relative',
-          borderBottom: '2px solid #cbd5e1',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
-        }}
-      >
-        <h1 style={{ fontSize: '26px', fontWeight: 700, margin: 0, color: '#0f172a' }}>
-          PropNexus
-        </h1>
+      {/* 🌟 Modern Header */}
+      <header className="header-bar">
+        <h1>PropNexus</h1>
         <button
           className="mode-toggle"
-          onClick={() =>
-            document.body.classList.toggle('dark-mode')
-          }
+          onClick={() => document.body.classList.toggle('dark-mode')}
         >
           🌙 Dark Mode
         </button>
       </header>
 
-      {/* 📌 Sticky Bar (only key filters) */}
-      <div
-        className="filters-row"
-        style={{
-          position: 'sticky',
-          top: 56,
-          zIndex: 40,
-          background: 'var(--filter-bg)',
-          borderBottom: '1px solid #e2e8f0',
-        }}
-      >
+      {/* 📌 Sticky Quick Filters Only */}
+      <div className="filters-row sticky-primary">
         <input
           type="text"
           placeholder="Search location"
           value={searchLocation}
           onChange={(e) => setSearchLocation(e.target.value)}
         />
-
         <select
           value={investmentType}
           onChange={(e) => setInvestmentType(e.target.value)}
@@ -108,8 +87,8 @@ export default function PropertiesPage() {
         </select>
       </div>
 
-      {/* 🎛️ Full Filters (non-sticky) */}
-      <div className="filters-row" style={{ marginTop: 10 }}>
+      {/* 🎛️ Non-sticky Full Filters */}
+      <div className="filters-row">
         <button onClick={() => setShowMoreFilters(!showMoreFilters)}>
           {showMoreFilters ? 'Hide Filters' : 'More Filters'}
         </button>
@@ -149,21 +128,21 @@ export default function PropertiesPage() {
               value={bedrooms}
               onChange={(e) => setBedrooms(e.target.value)}
             >
-              <option value="Any">🛏️ Any Beds</option>
-              <option value="1">🛏️ 1 Bed</option>
-              <option value="2">🛏️ 2 Beds</option>
-              <option value="3">🛏️ 3 Beds</option>
-              <option value="4">🛏️ 4+ Beds</option>
+              <option value="Any">Any Beds</option>
+              <option value="1">1 Bed</option>
+              <option value="2">2 Beds</option>
+              <option value="3">3 Beds</option>
+              <option value="4">4+ Beds</option>
             </select>
 
             <select
               value={propertyType}
               onChange={(e) => setPropertyType(e.target.value)}
             >
-              <option value="All">🏡 All Types</option>
-              <option value="Flat">🏢 Flat</option>
-              <option value="House">🏠 House</option>
-              <option value="Studio">📦 Studio</option>
+              <option value="All">All Types</option>
+              <option value="Flat">Flat</option>
+              <option value="House">House</option>
+              <option value="Studio">Studio</option>
             </select>
 
             <input
