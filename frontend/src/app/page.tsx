@@ -57,9 +57,9 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* 🌟 Header */}
-      <header className="header-bar">
-        <h1>PropNexus</h1>
+      {/* ✅ Sleek Fixed Header */}
+      <header className="header-bar sticky-primary">
+        <h1 className="header-title">PropNexus</h1>
         <button
           className="mode-toggle"
           onClick={() => document.body.classList.toggle('dark-mode')}
@@ -68,15 +68,18 @@ export default function PropertiesPage() {
         </button>
       </header>
 
-      {/* 📌 Sticky Quick Filters */}
-      <div className="filters-row sticky-primary">
+      {/* 🔍 Quick Filters Bar */}
+      <div className="filters-row sticky-primary filters-bar">
         <input
+          className="filter-input"
           type="text"
-          placeholder="Search location"
+          placeholder="🔎 Search location"
           value={searchLocation}
           onChange={(e) => setSearchLocation(e.target.value)}
         />
+
         <select
+          className="filter-select small"
           value={investmentType}
           onChange={(e) => setInvestmentType(e.target.value)}
         >
@@ -85,12 +88,13 @@ export default function PropertiesPage() {
           <option value="Flips">Flips</option>
           <option value="Buy to Let">Buy to Let</option>
         </select>
-      </div>
 
-      {/* 🎛️ Advanced Filters */}
-      <div className="filters-row">
-        <button onClick={() => setShowMoreFilters(!showMoreFilters)}>
-          {showMoreFilters ? 'Hide Filters' : 'More Filters'}
+        <button
+          onClick={() => setShowMoreFilters(!showMoreFilters)}
+          className="small-button"
+          title="Show more filters"
+        >
+          ⚙️ Filters
         </button>
 
         <button
@@ -103,66 +107,67 @@ export default function PropertiesPage() {
         >
           {showMap ? 'Hide Map 🗺' : 'Show Map 🗺'}
         </button>
-
-        {showMoreFilters && (
-          <>
-            <div>
-              <label>Min Price</label>
-              <input
-                type="number"
-                value={minPrice}
-                onChange={(e) => setMinPrice(Number(e.target.value))}
-              />
-            </div>
-
-            <div>
-              <label>Max Price</label>
-              <input
-                type="number"
-                value={maxPrice}
-                onChange={(e) => setMaxPrice(Number(e.target.value))}
-              />
-            </div>
-
-            <select
-              value={bedrooms}
-              onChange={(e) => setBedrooms(e.target.value)}
-            >
-              <option value="Any">Any Beds</option>
-              <option value="1">1 Bed</option>
-              <option value="2">2 Beds</option>
-              <option value="3">3 Beds</option>
-              <option value="4">4+ Beds</option>
-            </select>
-
-            <select
-              value={propertyType}
-              onChange={(e) => setPropertyType(e.target.value)}
-            >
-              <option value="All">All Types</option>
-              <option value="Flat">Flat</option>
-              <option value="House">House</option>
-              <option value="Studio">Studio</option>
-            </select>
-
-            <input
-              type="number"
-              placeholder="Min Yield (%)"
-              value={minYield}
-              onChange={(e) => setMinYield(Number(e.target.value))}
-            />
-
-            <input
-              type="number"
-              placeholder="Min ROI (%)"
-              value={minROI}
-              onChange={(e) => setMinROI(Number(e.target.value))}
-            />
-          </>
-        )}
       </div>
 
-      {/* 🏘️ Layout */}
+      {/* 🧩 Expandable Filter Options */}
+      {showMoreFilters && (
+        <div className="filters-row expanded-filters">
+          <div>
+            <label>Min Price</label>
+            <input
+              type="number"
+              value={minPrice}
+              onChange={(e) => setMinPrice(Number(e.target.value))}
+            />
+          </div>
+
+          <div>
+            <label>Max Price</label>
+            <input
+              type="number"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(Number(e.target.value))}
+            />
+          </div>
+
+          <select
+            value={bedrooms}
+            onChange={(e) => setBedrooms(e.target.value)}
+          >
+            <option value="Any">Any Beds</option>
+            <option value="1">1 Bed</option>
+            <option value="2">2 Beds</option>
+            <option value="3">3 Beds</option>
+            <option value="4">4+ Beds</option>
+          </select>
+
+          <select
+            value={propertyType}
+            onChange={(e) => setPropertyType(e.target.value)}
+          >
+            <option value="All">All Types</option>
+            <option value="Flat">Flat</option>
+            <option value="House">House</option>
+            <option value="Studio">Studio</option>
+          </select>
+
+          <input
+            type="number"
+            placeholder="Min Yield (%)"
+            value={minYield}
+            onChange={(e) => setMinYield(Number(e.target.value))}
+          />
+
+          <input
+            type="number"
+            placeholder="Min ROI (%)"
+            value={minROI}
+            onChange={(e) => setMinROI(Number(e.target.value))}
+          />
+        </div>
+      )}
+
+      {/* 🏘️ Main Content Layout */}
       <div className="content-layout">
         <div className="property-list">
           {filteredProperties.length > 0 ? (
