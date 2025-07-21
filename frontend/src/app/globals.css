@@ -39,7 +39,7 @@ a {
   box-shadow: 0 6px 16px rgba(0,0,0,0.08);
   position: sticky;
   top: 0;
-  z-index: 999; /* ↑ Ensures it’s above everything */
+  z-index: 999;
 }
 
 body.dark-mode .header-bar {
@@ -163,12 +163,13 @@ body.dark-mode select {
   background-color: #0284c7;
 }
 
-/* 🏷 Labels */
+/* 🏷 Labels for Advanced Filters */
 .filters-row div label {
   display: block;
   font-size: 12px;
   margin-bottom: 4px;
   color: #475569;
+  font-weight: 500;
 }
 
 body.dark-mode .filters-row div label {
