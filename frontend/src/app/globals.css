@@ -27,19 +27,20 @@ a {
   margin: 0 auto;
 }
 
-/* Unified Header */
+/* 🌟 Enhanced Header */
 .header-bar {
-  background: #e2e8f0;
+  background: linear-gradient(to right, #e2e8f0, #f1f5f9);
   padding: 14px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   z-index: 50;
   border-bottom: 1px solid #cbd5e1;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
 body.dark-mode .header-bar {
-  background: #1f2937;
+  background: linear-gradient(to right, #1f2937, #0f172a);
   border-color: #334155;
 }
 
@@ -47,6 +48,11 @@ body.dark-mode .header-bar {
   font-size: 24px;
   font-weight: 600;
   margin: 0;
+  color: #0f172a;
+}
+
+body.dark-mode .header-bar h1 {
+  color: #f3f4f6;
 }
 
 .mode-toggle {
@@ -61,8 +67,8 @@ body.dark-mode .mode-toggle {
   color: #e2e8f0;
 }
 
-/* Sticky Filters Bar */
-.filters-row {
+/* 📌 Sticky Top Filter Row */
+.sticky-primary {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -74,25 +80,44 @@ body.dark-mode .mode-toggle {
   border-bottom: 1px solid #e2e8f0;
 }
 
+body.dark-mode .sticky-primary {
+  background: #1e1e1e;
+  border-color: #334155;
+}
+
+/* 🎛️ Normal (non-sticky) Filter Row */
+.filters-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 20px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
 body.dark-mode .filters-row {
   background: #1e1e1e;
   border-color: #334155;
 }
 
+/* 🔲 Form Elements */
 .filters-row input,
 .filters-row select,
-.filters-row button {
+.filters-row button,
+.sticky-primary input,
+.sticky-primary select {
   padding: 8px 10px;
   border-radius: 6px;
   border: 1px solid #d1d5db;
   font-size: 14px;
   min-height: 38px;
   flex: 1 1 140px;
-  transition: all 0.2s ease;
   background: white;
+  transition: all 0.2s ease;
 }
 
-.filters-row select {
+.filters-row select,
+.sticky-primary select {
   appearance: none;
   background-color: white;
   background-image: url("data:image/svg+xml,%3Csvg fill='gray' height='14' viewBox='0 0 24 24' width='14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
@@ -103,14 +128,16 @@ body.dark-mode .filters-row {
 }
 
 .filters-row input:focus,
-.filters-row select:focus {
+.filters-row select:focus,
+.sticky-primary input:focus,
+.sticky-primary select:focus {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-body.dark-mode .filters-row input,
-body.dark-mode .filters-row select {
+body.dark-mode input,
+body.dark-mode select {
   background-color: #1e293b;
   color: #f3f4f6;
   border: 1px solid #334155;
@@ -121,7 +148,6 @@ body.dark-mode .filters-row select {
   background: #0ea5e9;
   color: white;
   cursor: pointer;
-  transition: background-color 0.2s ease;
   font-size: 13px;
 }
 
@@ -129,7 +155,19 @@ body.dark-mode .filters-row select {
   background: #0284c7;
 }
 
-/* Layout for cards + map */
+/* 📐 Filters Labels */
+.filters-row div label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 4px;
+  color: #475569;
+}
+
+body.dark-mode .filters-row div label {
+  color: #cbd5e1;
+}
+
+/* 📍 Layout */
 .content-layout {
   display: flex;
   gap: 20px;
@@ -147,7 +185,7 @@ body.dark-mode .filters-row select {
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 
-/* 📱 Responsive layout */
+/* 📱 Mobile Responsive */
 @media (max-width: 768px) {
   .content-layout {
     flex-direction: column;
@@ -163,8 +201,8 @@ body.dark-mode .filters-row select {
     font-size: 20px;
   }
 
+  .sticky-primary,
   .filters-row {
-    top: 54px;
     flex-direction: column;
     gap: 8px;
     padding: 10px 16px;
@@ -172,31 +210,14 @@ body.dark-mode .filters-row select {
 
   .filters-row input,
   .filters-row select,
-  .filters-row button {
+  .filters-row button,
+  .sticky-primary input,
+  .sticky-primary select {
     flex: 1 1 100%;
   }
 }
 
-/* 🆙 Price Field Labels for clarity */
-.filters-row div label {
-  display: block;
-  font-size: 12px;
-  margin-bottom: 4px;
-  color: #475569;
-}
-
-body.dark-mode .filters-row div label {
-  color: #cbd5e1;
-}
-
-/* 🌒 Dark Mode Overrides */
-body.dark-mode input,
-body.dark-mode select,
-body.dark-mode button {
-  color: #f3f4f6;
-}
-
-/* Back to Top Button */
+/* 🔦 Back to Top */
 .back-to-top {
   position: fixed;
   bottom: 20px;
@@ -210,14 +231,13 @@ body.dark-mode button {
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
   z-index: 15;
-  transition: all 0.2s ease;
 }
 
 .back-to-top:hover {
   background: #0284c7;
 }
 
-/* 📵 Hide map toggle button on desktop */
+/* 🚫 Hide map toggle on desktop */
 @media (min-width: 768px) {
   .map-toggle-button {
     display: none !important;
