@@ -1,3 +1,4 @@
+/* 🌍 Base Styles */
 html, body {
   padding: 0;
   margin: 0;
@@ -22,13 +23,27 @@ a {
   box-sizing: border-box;
 }
 
+/* 🧱 Layout */
 .main-wrapper {
   padding: 0 20px;
   max-width: 1400px;
   margin: 0 auto;
 }
 
-/* 🌟 Prominent Header */
+/* 🔝 Sticky Header Container */
+.sticky-top-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background-color: inherit;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode .sticky-top-header {
+  background-color: #1e1e1e;
+}
+
+/* 🌟 Header Bar */
 .header-bar {
   background: linear-gradient(to right, #e2e8f0, #f1f5f9);
   padding: 20px 26px;
@@ -37,9 +52,6 @@ a {
   align-items: center;
   border-bottom: 1px solid #cbd5e1;
   box-shadow: 0 6px 16px rgba(0,0,0,0.08);
-  position: sticky;
-  top: 0;
-  z-index: 999;
 }
 
 body.dark-mode .header-bar {
@@ -77,9 +89,6 @@ body.dark-mode .mode-toggle {
   gap: 12px;
   padding: 14px 22px;
   background: #f8fafc;
-  position: sticky;
-  top: 72px;
-  z-index: 998;
   border-bottom: 1px solid #e2e8f0;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
@@ -163,7 +172,7 @@ body.dark-mode select {
   background-color: #0284c7;
 }
 
-/* 🏷 Labels for Advanced Filters */
+/* 🏷 Labels */
 .filters-row div label {
   display: block;
   font-size: 12px;
@@ -254,12 +263,7 @@ body.dark-mode .filters-row div label {
   }
 }
 
-/* 🎯 Fix investment type width */
-.filter-select.investment-type {
-  max-width: 220px;
-}
-
-/* 💻 Show map toggle on desktop now */
+/* 💻 Show map toggle on desktop */
 .map-toggle-button-desktop {
   padding: 6px 12px;
   font-size: 13px;
@@ -280,17 +284,4 @@ body.dark-mode .filters-row div label {
   .map-toggle-button-desktop {
     display: none;
   }
-}
-
-/* ✨ Sticky header fix */
-.sticky-top {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  background: #f1f5f9;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-
-body.dark-mode .sticky-top {
-  background: #1f2937;
 }
