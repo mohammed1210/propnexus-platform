@@ -27,7 +27,7 @@ export default function PropertyCard({ property }: Props) {
   const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation
 
-    const userId = 'demo-user'; // 🔐 Replace with session.user.id when ready
+    const userId = 'demo-user'; // Replace with session.user.id when auth is live
 
     const { error } = await supabase.from('saved_deals').insert({
       user_id: userId,
@@ -60,12 +60,19 @@ export default function PropertyCard({ property }: Props) {
         <p className={styles.price}>
           £{property.price?.toLocaleString() || 'N/A'}
         </p>
-        <p className={styles.details}>
-          🛏 {property.bedrooms} • 🛁 {property.bathrooms}
-        </p>
-        <p className={styles.metrics}>
-          📈 Yield: {property.yield_percent || 0}% | ROI: {property.roi_percent || 0}%
-        </p>
+
+        {(property.bedrooms || property.bathrooms) && (
+          <p className={styles.details}>
+            {property.bedrooms ? `🛏 ${property.bedrooms}` : ''}{" "}
+            {property.bathrooms ? `• 🛁 ${property.bathrooms}` : ''}
+          </p>
+        )}
+
+        <div className={styles.metrics}>
+          <span className={styles.badge}>
+            📈 Yield: {property.yield_percent || 0}% | ROI: {property.roi_percent || 0}%
+          </span>
+        </div>
 
         <div className={styles.buttons}>
           <button onClick={handleSave} className={styles.save}>
