@@ -82,12 +82,31 @@ body.dark-mode .filters-row {
 .filters-row input,
 .filters-row select,
 .filters-row button {
-  padding: 10px;
+  padding: 8px 10px;
   border-radius: 6px;
   border: 1px solid #d1d5db;
   font-size: 14px;
+  min-height: 38px;
   flex: 1 1 140px;
   transition: all 0.2s ease;
+  background: white;
+}
+
+.filters-row select {
+  appearance: none;
+  background-color: white;
+  background-image: url("data:image/svg+xml,%3Csvg fill='gray' height='14' viewBox='0 0 24 24' width='14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  padding-right: 30px;
+}
+
+.filters-row input:focus,
+.filters-row select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 body.dark-mode .filters-row input,
@@ -103,7 +122,6 @@ body.dark-mode .filters-row select {
   color: white;
   cursor: pointer;
   transition: background-color 0.2s ease;
-  padding: 8px 10px;
   font-size: 13px;
 }
 
