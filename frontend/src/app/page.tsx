@@ -58,10 +58,28 @@ export default function PropertiesPage() {
   return (
     <div className="main-wrapper">
       {/* 🔗 Unified Header */}
-      <div style={{ background: '#f1f5f9', padding: '10px 20px' }}>
-        <h1 style={{ margin: 0, fontSize: '1.6rem', color: '#0f172a' }}>PropNexus</h1>
-      </div>
-
+      <div
+  style={{
+    background: '#e2e8f0',
+    padding: '16px 24px',
+    borderBottom: '2px solid #cbd5e1',
+    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.04)',
+    position: 'sticky',
+    top: 0,
+    zIndex: 60,
+  }}
+>
+  <h1
+    style={{
+      margin: 0,
+      fontSize: '1.9rem',
+      fontWeight: 700,
+      color: '#0f172a',
+    }}
+  >
+    PropNexus
+  </h1>
+</div>
       {/* 📌 Filters Bar */}
       <div className="filters-row">
         <input
