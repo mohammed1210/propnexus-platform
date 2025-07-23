@@ -16,8 +16,11 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["frontend/*"],
-      "@components/*": ["frontend/components/*"]
+      "@/*": ["*"],
+      "@lib/*": ["frontend/lib/*"],
+      "@types/*": ["frontend/types/*"],
+      "@components/*": ["frontend/components/*"],
+      "@details/*": ["frontend/components/property_details/*"],
       "@map/*": ["frontend/src/app/*"]
     },
     "plugins": [
