@@ -14,11 +14,10 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": "frontend",
+    "baseUrl": ".",
     "paths": {
       "@/*": ["frontend/*"],
-      "@components/*": ["frontend/components/*"],
-      "@components/property-details/*": ["components/property_details/*"]
+      "@components/*": ["frontend/components/*"]
     },
     "plugins": [
       {
