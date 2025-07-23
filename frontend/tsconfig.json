@@ -18,6 +18,7 @@
     "paths": {
       "@/*": ["frontend/*"],
       "@components/*": ["frontend/components/*"]
+      "@map/*": ["frontend/src/app/*"]
     },
     "plugins": [
       {
