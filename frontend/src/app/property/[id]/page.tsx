@@ -3,13 +3,13 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Property } from '@/types';
-import Map from '@/components/Map';
-import InvestmentSummary from '@/components/property_details/InvestmentSummary';
-import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
-import MortgageCalculator from '@/components/property_details/MortgageCalculator';
-import StampDutyCalculator from '@/components/property_details/StampDutyCalculator';
-import NotesFields from '@/components/property_details/NotesFields';
-import AIChatbot from '@/components/property_details/AIChatbot';
+import MapView from '@/src/app/MapView';
+import InvestmentSummary from '@/frontend/components/property_details/InvestmentSummary';
+import ExitStrategyGenerator from '@/frontend/components/property_details/ExitStrategyGenerator';
+import MortgageCalculator from '@/frontend/components/property_details/MortgageCalculator';
+import StampDutyCalculator from '@/frontend/components/property_details/StampDutyCalculator';
+import NotesFields from '@/frontend/components/property_details/NotesFields';
+import AIChatbot from '@/frontend/components/property_details/AIChatbot';
 
 const PropertyDetailsPage = () => {
   const { id } = useParams();
