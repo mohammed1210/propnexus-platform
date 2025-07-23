@@ -1,29 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
+import styles from './ExitStrategyGenerator.module.css';
 
-type ExitStrategyGeneratorProps = {
+interface ExitStrategyProps {
+  title: string;
+  location: string;
   price: number;
   yield_percent: number;
   roi_percent: number;
-  investmentType?: string;
-};
+  propertyType: string;
+  investmentType: string;
+}
 
 export default function ExitStrategyGenerator({
+  title,
+  location,
   price,
   yield_percent,
   roi_percent,
-  investmentType = 'Buy-to-Let',
-}: ExitStrategyGeneratorProps) {
-  const [strategies, setStrategies] = useState<string[] | null>(null);
+  propertyType,
+  investmentType,
+}: ExitStrategyProps) {
+  const [strategies, setStrategies] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleGenerate = async () => {
     setLoading(true);
     setError('');
-    setStrategies(null);
-
     try {
       const res = await fetch('/api/generate-strategy', {
         method: 'POST',
@@ -31,72 +36,48 @@ export default function ExitStrategyGenerator({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          price,
-          yield_percent,
-          roi_percent,
-          investmentType,
+          property: {
+            title,
+            location,
+            price,
+            yield_percent,
+            roi_percent,
+            propertyType,
+            investmentType,
+          },
         }),
       });
 
       const data = await res.json();
-
-      if (res.ok && data.strategies) {
+      if (res.ok) {
         setStrategies(data.strategies);
       } else {
-        setError('Failed to generate strategies.');
+        setError(data.error || 'Something went wrong');
       }
     } catch (err) {
-      setError('Error generating strategies.');
+      console.error('Error:', err);
+      setError('Network error or server not responding.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
-    <div
-      style={{
-        marginTop: '32px',
-        padding: '24px',
-        backgroundColor: '#f8fafc',
-        border: '1px solid #e2e8f0',
-        borderRadius: '10px',
-      }}
-    >
-      <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '12px' }}>
-        📈 Exit Strategy Generator
-      </h2>
-      <p style={{ fontSize: '15px', color: '#475569', marginBottom: '12px' }}>
-        Suggests potential exit routes based on deal figures and investment type.
+    <div className={styles.container}>
+      <h3 className={styles.heading}>💼 Exit Strategy Suggestions</h3>
+      <p className={styles.caption}>
+        Use AI to suggest smart exit plans tailored to this property.
       </p>
-
-      <button
-        onClick={handleGenerate}
-        disabled={loading}
-        style={{
-          padding: '10px 16px',
-          borderRadius: '8px',
-          backgroundColor: '#14b8a6',
-          color: 'white',
-          border: 'none',
-          cursor: 'pointer',
-          fontWeight: 600,
-        }}
-      >
-        {loading ? 'Generating...' : '🔍 Generate Strategies'}
+      <button onClick={handleGenerate} disabled={loading} className={styles.generateButton}>
+        {loading ? 'Thinking...' : 'Generate Exit Strategies'}
       </button>
 
-      {error && (
-        <p style={{ marginTop: '12px', color: '#ef4444' }}>{error}</p>
-      )}
+      {error && <p className={styles.error}>{error}</p>}
 
       {strategies && (
-        <ul style={{ marginTop: '16px', paddingLeft: '20px' }}>
-          {strategies.map((strategy, index) => (
-            <li key={index} style={{ marginBottom: '10px', color: '#1e293b' }}>
-              ✅ {strategy}
-            </li>
-          ))}
-        </ul>
+        <div className={styles.result}>
+          <pre>{strategies}</pre>
+        </div>
       )}
     </div>
   );
