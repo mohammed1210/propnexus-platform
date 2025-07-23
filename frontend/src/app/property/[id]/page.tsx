@@ -8,7 +8,7 @@ import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
 import MortgageCalculator from '@details/MortgageCalculator';
 import StampDutyCalculator from '@details/StampDutyCalculator';
 import NotesFields from '@details/NotesFields';
-import AIChatbot from '@/components/aichatbot';
+import AIChatbot from '@details/AIChatbot';
 import MapView from '@map/MapView';
 
 const PropertyDetailsPage = () => {
