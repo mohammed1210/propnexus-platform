@@ -14,22 +14,17 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": ".",  // 👈 now starts from inside frontend/
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["*"],
-      "@lib/*": ["lib/*"],
-      "@types/*": ["types/*"],
-      "@components/*": ["components/*"],
-      "@details/*": ["components/property_details/*"],
-      "@map/*": ["app/*"]
+      "@/*": ["frontend/src/*"],
+      "@components/*": ["frontend/components/*"],
+      "@details/*": ["frontend/components/property_details/*"],
+      "@map/*": ["frontend/src/app/*"]
     },
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ]
+    "plugins": [{ "name": "next" }]
   },
   "include": [
+    "frontend",
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
