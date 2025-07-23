@@ -14,14 +14,14 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": ".",
+    "baseUrl": "./frontend",
     "paths": {
       "@/*": ["*"],
-      "@lib/*": ["frontend/lib/*"],
-      "@types/*": ["frontend/types/*"],
-      "@components/*": ["frontend/components/*"],
-      "@details/*": ["frontend/components/property_details/*"],
-      "@map/*": ["frontend/src/app/*"]
+      "@lib/*": ["lib/*"],
+      "@types/*": ["types/*"],
+      "@components/*": ["components/*"],
+      "@details/*": ["components/property_details/*"],
+      "@map/*": ["src/app/*"]
     },
     "plugins": [
       {
