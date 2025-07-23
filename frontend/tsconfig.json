@@ -14,12 +14,11 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": "src",
+    "baseUrl": "frontend",
     "paths": {
       "@/*": ["*"],
       "@components/*": ["components/*"],
-      "@lib/*": ["lib/*"],
-      "@types/*": ["types/*"]
+      "@components/property-details/*": ["components/property_details/*"]
     },
     "plugins": [
       {
@@ -28,7 +27,7 @@
     ]
   },
   "include": [
-    "src",
+    "frontend",
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
