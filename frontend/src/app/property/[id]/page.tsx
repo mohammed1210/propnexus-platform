@@ -219,6 +219,16 @@ export default function PropertyDetailsPage() {
             </div>
           )}
 
+          <ExitStrategyGenerator
+  title={property.title}
+  location={property.location}
+  price={property.price}
+  yield_percent={property.yield_percent}
+  roi_percent={property.roi_percent}
+  propertyType={property.property_type}
+  investmentType={property.investment_type}
+/>  
+
           {/* Notes */}
           <h2 style={{ marginTop: '32px', fontSize: '20px', color: '#1e293b', fontWeight: 600 }}>Custom Notes + Fields</h2>
           <textarea placeholder="Your notes about this deal..." value={notes} onChange={(e) => setNotes(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #ccc', marginTop: '8px', minHeight: '80px' }} />
