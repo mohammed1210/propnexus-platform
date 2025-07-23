@@ -19,7 +19,8 @@
       "@/*": ["frontend/src/*"],
       "@components/*": ["frontend/components/*"],
       "@details/*": ["frontend/components/property_details/*"],
-      "@map/*": ["frontend/src/app/*"]
+      "@map/*": ["frontend/src/app/*"],
+      "@lib/*": ["frontend/lib/*"]
     },
     "plugins": [{ "name": "next" }]
   },
