@@ -1,0 +1,35 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 30px;
+  background-color: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.nav {
+  display: flex;
+  gap: 10px;
+}
+
+.button {
+  padding: 8px 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #fff;
+  color: #111827;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.button:hover {
+  background-color: #2563eb;
+  color: #fff;
+  border-color: #2563eb;
+}
