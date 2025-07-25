@@ -21,7 +21,11 @@ export default function MapClient({ properties }: MapProps) {
   }, []);
 
   return (
-    <MapContainer center={[51.505, -0.09]} zoom={5} style={{ height: "500px", width: "100%" }}>
+    <MapContainer
+      center={[51.505, -0.09] as [number, number]}
+      zoom={5}
+      style={{ height: "500px", width: "100%" }}
+    >
       <TileLayer
         attribution='&copy; OpenStreetMap contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
