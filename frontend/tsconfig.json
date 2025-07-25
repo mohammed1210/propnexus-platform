@@ -14,12 +14,12 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "baseUrl": "src",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["*"],
+      "@/*": ["src/*"],
       "@components/*": ["components/*"],
       "@details/*": ["components/property_details/*"],
-      "@map/*": ["app/*"],
+      "@map/*": ["src/app/*"],
       "@lib/*": ["lib/*"],
       "@types": ["types.ts"]
     },
