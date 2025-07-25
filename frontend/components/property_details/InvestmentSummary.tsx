@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Property } from '@types';
+import { Property } from '@/types';
 
 interface InvestmentSummaryProps {
   property: Property;
