@@ -1,15 +1,14 @@
-const path = require('path');
-
+/** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false,
-  webpack(config) {
-    config.resolve.alias['@'] = path.resolve(__dirname, 'frontend/src');
-    config.resolve.alias['@components'] = path.resolve(__dirname, 'frontend/components');
-    config.resolve.alias['@details'] = path.resolve(__dirname, 'frontend/components/property_details');
-    config.resolve.alias['@map'] = path.resolve(__dirname, 'frontend/src/app');
-    config.resolve.alias['@lib'] = path.resolve(__dirname, 'frontend/lib');
+  reactStrictMode: true,
+  webpack: (config) => {
+    config.resolve.alias['@'] = require('path').resolve(__dirname, 'src');
+    config.resolve.alias['@components'] = require('path').resolve(__dirname, 'src/components');
+    config.resolve.alias['@details'] = require('path').resolve(__dirname, 'src/components/property_details');
+    config.resolve.alias['@map'] = require('path').resolve(__dirname, 'src/app');
+    config.resolve.alias['@lib'] = require('path').resolve(__dirname, 'src/lib');
     return config;
-  }
+  },
 };
 
 module.exports = nextConfig;
