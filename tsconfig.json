@@ -16,12 +16,12 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["frontend/src/*"],
-      "@types": ["frontend/src/types.ts"],
-      "@components/*": ["frontend/components/*"],
-      "@details/*": ["frontend/components/property_details/*"],
-      "@map/*": ["frontend/src/app/*"],
-      "@lib/*": ["frontend/lib/*"]
+      "@/*": ["src/*"],
+      "@types": ["src/types.ts"],
+      "@components/*": ["components/*"],
+      "@details/*": ["components/property_details/*"],
+      "@map/*": ["src/app/*"],
+      "@lib/*": ["lib/*"]
     },
     "plugins": [{ "name": "next" }]
   },
