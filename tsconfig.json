@@ -17,7 +17,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["frontend/src/*"],
-      "@types": ["frontend/src/types.ts"]
+      "@types": ["frontend/src/types.ts"],
       "@components/*": ["frontend/components/*"],
       "@details/*": ["frontend/components/property_details/*"],
       "@map/*": ["frontend/src/app/*"],
