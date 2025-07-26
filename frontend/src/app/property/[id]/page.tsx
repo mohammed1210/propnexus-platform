@@ -11,10 +11,13 @@ import StampDutyCalculator from '@details/StampDutyCalculator';
 import NotesFields from '@details/NotesFields';
 import AIChatbot from '@details/AIChatbot';
 
-import MapView from '@map/MapView';
+import dynamic from 'next/dynamic';
+
+const MapView = dynamic(() => import('@/app/MapView'), { ssr: false });
 
 const PropertyDetailsPage = () => {
-  const { id } = useParams();
+  const params = useParams() as { id: string };
+  const id = params.id;
   const [property, setProperty] = useState<Property | null>(null);
 
   useEffect(() => {
@@ -22,16 +25,14 @@ const PropertyDetailsPage = () => {
       try {
         const res = await fetch(`/api/properties/${id}`);
         const data = await res.json();
-        console.log('Fetched property:', data); // ✅ LOG HERE
+        console.log('✅ Fetched property:', data);
         setProperty(data);
       } catch (err) {
-        console.error('Error fetching property:', err);
+        console.error('❌ Error fetching property:', err);
       }
     };
 
-    if (id) {
-      fetchProperty();
-    }
+    if (id) fetchProperty();
   }, [id]);
 
   if (!property) {
@@ -44,38 +45,38 @@ const PropertyDetailsPage = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">
-        {property.title}
-      </h1>
+      {/* 🔹 Title & Location */}
+      <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">{property.title}</h1>
       <p className="text-gray-500 dark:text-gray-300 mb-4">{property.location}</p>
 
-      {property.imageurl && (
-        <img
-          src={property.imageurl}
-          alt="Property"
-          className="w-full h-96 object-cover rounded-lg shadow-md mb-6"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = '/placeholder.jpg';
-          }}
-        />
-      )}
+      {/* 🔹 Property Image */}
+      <img
+        src={property.imageurl || '/placeholder.jpg'}
+        alt="Property"
+        className="w-full h-96 object-cover rounded-lg shadow-md mb-6"
+        onError={(e) => {
+          const target = e.target as HTMLImageElement;
+          target.src = '/placeholder.jpg';
+        }}
+      />
 
+      {/* 🔹 Investment Summary + Strategy */}
       <InvestmentSummary property={property} />
-
       <ExitStrategyGenerator
         title={property.title}
         location={property.location}
         price={property.price}
         yield_percent={property.yield_percent}
         roi_percent={property.roi_percent}
-        propertyType={property.property_type}
-        investmentType={property.investment_type}
+        propertyType={property.propertyType}
+        investmentType={property.investmentType}
       />
 
+      {/* 🔹 Calculators */}
       <MortgageCalculator price={property.price} />
       <StampDutyCalculator price={property.price} />
 
+      {/* 🔹 Area Info */}
       <div className="mt-10">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">📍 Area Intelligence</h3>
         <p className="text-gray-600 dark:text-gray-300">
@@ -83,8 +84,10 @@ const PropertyDetailsPage = () => {
         </p>
       </div>
 
-      <NotesFields propertyId={id as string} />
+      {/* 🔹 Notes Field */}
+      <NotesFields propertyId={id} />
 
+      {/* 🔹 Deal Summary */}
       <div className="mt-10 border-t pt-6">
         <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-4">📊 Deal Summary</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-700 dark:text-gray-300">
@@ -102,15 +105,17 @@ const PropertyDetailsPage = () => {
           </div>
           <div>
             <p className="font-semibold">Strategy</p>
-            <p>{property.investment_type}</p>
+            <p>{property.investmentType}</p>
           </div>
         </div>
       </div>
 
+      {/* 🔹 Map View */}
       <div className="mt-8">
-        <MapView lat={property.latitude} lng={property.longitude} />
+        <MapView properties={[property]} />
       </div>
 
+      {/* 🔹 AI Assistant */}
       <AIChatbot />
     </div>
   );

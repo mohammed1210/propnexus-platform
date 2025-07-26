@@ -23,7 +23,7 @@ export default function MapClient({ properties }: MapProps) {
 
   return (
     <MapContainer
-      center={[51.505, -0.09] as [number, number]}
+      center={[51.505, -0.09]}
       zoom={5}
       style={{ height: "500px", width: "100%" }}
     >
@@ -36,7 +36,7 @@ export default function MapClient({ properties }: MapProps) {
         .map((property) => (
           <Marker
             key={property.id}
-            position={[property.latitude!, property.longitude!] as [number, number]}
+            position={[property.latitude, property.longitude] as [number, number]}
           >
             <Popup>
               <strong>{property.title}</strong>

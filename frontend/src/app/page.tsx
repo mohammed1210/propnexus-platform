@@ -33,13 +33,23 @@ export default function PropertiesPage() {
 
   useEffect(() => {
     const filtered = properties.filter((property) => {
-      const matchesPrice = property.price >= minPrice && property.price <= maxPrice;
-      const matchesLocation = property.location?.toLowerCase().includes(searchLocation.toLowerCase());
-      const matchesBedrooms = bedrooms === 'Any' || Number(property.bedrooms) === Number(bedrooms);
+      const matchesPrice =
+        property.price >= minPrice && property.price <= maxPrice;
+
+      const matchesLocation = property.location
+        ?.toLowerCase()
+        .includes(searchLocation.toLowerCase());
+
+      const matchesBedrooms =
+        bedrooms === 'Any' || Number(property.bedrooms) === Number(bedrooms);
+
       const matchesPropertyType =
-        propertyType === 'All' || (property.propertyType || '').toLowerCase() === propertyType.toLowerCase();
+        propertyType === 'All' ||
+        (property.propertyType || '').toLowerCase() === propertyType.toLowerCase();
+
       const matchesYield = (property.yield_percent || 0) >= minYield;
       const matchesROI = (property.roi_percent || 0) >= minROI;
+
       return (
         matchesPrice &&
         matchesLocation &&
@@ -49,10 +59,18 @@ export default function PropertiesPage() {
         matchesROI
       );
     });
+
     setFilteredProperties(filtered);
   }, [
-    minPrice, maxPrice, searchLocation, properties,
-    bedrooms, propertyType, minYield, minROI, investmentType,
+    minPrice,
+    maxPrice,
+    searchLocation,
+    properties,
+    bedrooms,
+    propertyType,
+    minYield,
+    minROI,
+    investmentType,
   ]);
 
   return (
@@ -191,8 +209,8 @@ export default function PropertiesPage() {
           )}
         </div>
 
-        {showMap && (
-          <div className="map-view">
+        {showMap && filteredProperties.length > 0 && (
+          <div className="map-view mt-8">
             <MapView properties={filteredProperties} />
           </div>
         )}
