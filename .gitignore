@@ -1,0 +1,27 @@
+# macOS system files
+.DS_Store
+
+# Node dependencies and build output
+node_modules/
+.next/
+out/
+.vercel/
+
+# Python-related
+__pycache__/
+*.pyc
+venv/
+
+# Logs and local configs
+*.log
+.env
+.env.local
+.env.*
+
+# GitHub/Vercel junk
+*.swp
+.vercel/
+
+# IDE/editor
+.vscode/
+.idea/
