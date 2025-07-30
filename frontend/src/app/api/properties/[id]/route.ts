@@ -9,10 +9,10 @@ const supabase = createClient(
 );
 
 export async function GET(
-  req: NextRequest,
-  context: { params: { id: string } }
-) {
-  const { id } = context.params;
+  request: NextRequest,
+  { params }: { params: { id: string } }
+): Promise<Response> {
+  const { id } = params;
   console.log("🔍 Property API called with ID:", id);
 
   const { data, error } = await supabase
@@ -20,8 +20,6 @@ export async function GET(
     .select('*')
     .eq('id', id)
     .single();
-
-  console.log("🎯 Supabase returned:", data);
 
   if (error || !data) {
     return new Response(
