@@ -1,27 +1,33 @@
-// /pages/api/generate-strategies.ts
+// /pages/api/generate-summary.ts
 
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { Configuration, OpenAIApi } from 'openai'
+import type { NextApiRequest, NextApiResponse } from 'next';
+import OpenAI from 'openai';
 
-const configuration = new Configuration({
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-})
-const openai = new OpenAIApi(configuration)
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { property } = req.body
+  const { property } = req.body;
 
-  if (!property || !property.price || !property.yield_percent || !property.roi_percent) {
-    return res.status(400).json({ strategies: ['Unable to generate strategies.'] })
+  if (
+    !property ||
+    !property.price ||
+    !property.yield_percent ||
+    !property.roi_percent
+  ) {
+    return res
+      .status(400)
+      .json({ strategies: ['Unable to generate strategies.'] });
   }
 
   try {
     const prompt = `
-You are an expert property investment advisor. Based on the following deal data, suggest 3 smart exit strategies tailored to this property.
+You are an expert property investment advisor. Based on the following deal data, write a short summary (2-3 sentences) of this investment opportunity.
 
 Property Details:
 - Location: ${property.location}
@@ -30,25 +36,29 @@ Property Details:
 - ROI: ${property.roi_percent}%
 - Bedrooms: ${property.bedrooms}
 - Bathrooms: ${property.bathrooms}
+- Type: ${property.property_type || 'Not specified'}
 
-Include strategy type and 1 sentence explanation for each.`;
+Respond with a short, engaging investment summary.
+`;
 
-    const completion = await openai.createChatCompletion({
+    const chatResponse = await openai.chat.completions.create({
       model: 'gpt-4',
       messages: [{ role: 'user', content: prompt }],
-    })
+      temperature: 0.7,
+      max_tokens: 300,
+    });
 
-    const responseText = completion.data.choices[0].message?.content || ''
+    const responseText = chatResponse.choices[0]?.message?.content?.trim();
 
-    // Convert GPT output into an array (split by linebreak or bullet)
-    const strategies = responseText
-      .split('\n')
-      .filter(line => line.trim() !== '')
-      .map(line => line.replace(/^\d+\.\s*/, '').trim())
+    if (!responseText) {
+      return res
+        .status(500)
+        .json({ summary: 'Unable to generate summary.' });
+    }
 
-    res.status(200).json({ strategies })
-  } catch (error) {
-    console.error('OpenAI error:', error)
-    res.status(500).json({ strategies: ['Unable to generate strategies.'] })
+    res.status(200).json({ summary: responseText });
+  } catch (error: any) {
+    console.error('❌ OpenAI error:', error.message || error);
+    res.status(500).json({ summary: 'Unable to generate summary.' });
   }
 }
