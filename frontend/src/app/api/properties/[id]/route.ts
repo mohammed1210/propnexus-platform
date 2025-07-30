@@ -7,10 +7,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export async function GET(
-  request: Request,
-  context: { params: { id: string } }
-): Promise<Response> {
+export async function GET(request: Request, context: any): Promise<Response> {
   const id = context.params.id;
   console.log("🔍 Property API called with ID:", id);
 
