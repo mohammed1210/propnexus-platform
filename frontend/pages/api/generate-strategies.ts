@@ -1,10 +1,10 @@
-// pages/api/generate-strategies.ts
+// /pages/api/generate-strategies.ts
 
 import type { NextApiRequest, NextApiResponse } from 'next';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || '',
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -23,13 +23,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } = req.body;
 
     if (!price || !roi_percent || !yield_percent || !location) {
-      return res
-        .status(400)
-        .json({ error: 'Missing required property data.' });
+      return res.status(400).json({
+        error: 'Missing required property data.',
+      });
     }
 
     const prompt = `
-Based on the following investment property details, suggest 3 smart exit strategies for a UK property investor:
+You are a UK-based property investment strategist. Based on the following deal data, suggest 3 smart exit strategies for an investor:
 
 - Price: £${price}
 - ROI: ${roi_percent}%
@@ -38,7 +38,7 @@ Based on the following investment property details, suggest 3 smart exit strateg
 - Property Type: ${property_type || 'Not specified'}
 - Description: ${description || 'Not available'}
 
-List the strategies in bullet points with 1-sentence explanations.
+Use bullet points and 1-sentence explanations.
 `;
 
     const chatResponse = await openai.chat.completions.create({
@@ -48,26 +48,20 @@ List the strategies in bullet points with 1-sentence explanations.
       max_tokens: 300,
     });
 
-    const reply = chatResponse.choices[0]?.message?.content;
+    const reply = chatResponse.choices?.[0]?.message?.content ?? '';
 
     if (!reply) {
-      return res
-        .status(500)
-        .json({ strategies: ['Unable to generate strategies.'] });
+      return res.status(500).json({ strategies: ['No strategies generated.'] });
     }
 
     const strategies = reply
       .split('\n')
-      .filter(
-        (line) =>
-          line.trim().startsWith('-') || line.trim().match(/^\d+\./)
-      );
+      .filter((line) => line.trim().startsWith('-') || line.trim().match(/^\d+\./))
+      .map((line) => line.trim());
 
-    res.status(200).json({ strategies });
+    return res.status(200).json({ strategies });
   } catch (error: any) {
-    console.error('❌ Error generating strategies:', error.message);
-    res
-      .status(500)
-      .json({ strategies: ['Unable to generate strategies.'] });
+    console.error('❌ Strategy generation failed:', error.message);
+    return res.status(500).json({ strategies: ['Unable to generate strategies.'] });
   }
 }
