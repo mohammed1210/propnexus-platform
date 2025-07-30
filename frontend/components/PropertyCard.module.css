@@ -1,0 +1,189 @@
+.card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  padding: 20px;
+  margin-bottom: 24px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.card:hover {
+  transform: translateY(-3px) scale(1.01);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.card:focus-within {
+  outline: 2px solid #3b82f6;
+  outline-offset: 4px;
+}
+
+.imageWrapper {
+  width: 100%;
+  height: 220px;
+  overflow: hidden;
+  border-radius: 10px;
+  background-color: #f1f5f9;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 10px;
+  transition: transform 0.2s ease;
+}
+
+.card:hover .image {
+  transform: scale(1.03);
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 2px;
+}
+
+.location {
+  font-size: 15px;
+  color: #64748b;
+}
+
+.price {
+  font-size: 18px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.details {
+  font-size: 14px;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+.metrics {
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
+.badge {
+  background-color: #ecfdf5;
+  color: #0f766e;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+  display: inline-block;
+  width: fit-content;
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.save,
+.detailsBtn {
+  border: none;
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.save {
+  background-color: #0ea5e9;
+  color: white;
+}
+
+.save:hover {
+  background-color: #0284c7;
+  transform: scale(1.02);
+}
+
+.detailsBtn {
+  background-color: #10b981;
+  color: white;
+}
+
+.detailsBtn:hover {
+  background-color: #059669;
+  transform: scale(1.02);
+}
+
+/* 🌒 Dark mode support */
+body.dark-mode .card {
+  background-color: #1e293b;
+}
+
+body.dark-mode .title,
+body.dark-mode .price {
+  color: #f9fafb;
+}
+
+body.dark-mode .location,
+body.dark-mode .details {
+  color: #94a3b8;
+}
+
+body.dark-mode .badge {
+  background-color: #064e3b;
+  color: #a7f3d0;
+}
+
+/* 📱 Responsive optimization */
+@media (max-width: 768px) {
+  .card {
+    padding: 16px;
+  }
+
+  .imageWrapper {
+    height: 180px;
+  }
+
+  .title {
+    font-size: 18px;
+  }
+
+  .price {
+    font-size: 16px;
+  }
+
+  .buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .save,
+  .detailsBtn {
+    width: 100%;
+  }
+}
+
+/* 🗺 Hide map toggle button on desktop */
+@media (min-width: 768px) {
+  .map-toggle-button {
+    display: none;
+  }
+}

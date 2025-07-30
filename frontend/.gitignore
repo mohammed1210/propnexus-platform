@@ -1,0 +1,5 @@
+.vercel
+.ENV
+.env.local
+node_modules
+/frontend/.env.local
