@@ -11,7 +11,7 @@ interface ExitStrategyProps {
   roi_percent: number;
   propertyType: string;
   investmentType: string;
-  description?
+  description?: string;
 }
 
 export default function ExitStrategyGenerator({
