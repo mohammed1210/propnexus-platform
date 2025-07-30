@@ -1,6 +1,6 @@
 // /frontend/src/app/api/properties/[id]/route.ts
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -9,23 +9,29 @@ const supabase = createClient(
 );
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  context: { params: { id: string } }
 ) {
-  const { id } = params;
+  const { id } = context.params;
   console.log("🔍 Property API called with ID:", id);
 
   const { data, error } = await supabase
     .from('properties')
     .select('*')
     .eq('id', id)
-    .single(); // returns a single object or throws error
+    .single();
 
   console.log("🎯 Supabase returned:", data);
 
   if (error || !data) {
-    return NextResponse.json({ error: error?.message || 'Property not found' }, { status: 404 });
+    return new Response(
+      JSON.stringify({ error: error?.message || 'Property not found' }),
+      { status: 404 }
+    );
   }
 
-  return NextResponse.json(data);
+  return new Response(JSON.stringify(data), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
