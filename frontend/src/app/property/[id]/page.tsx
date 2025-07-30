@@ -48,13 +48,17 @@ const PropertyDetailsPage = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            title: property.title,
-            location: property.location,
-            price: property.price,
-            yield_percent: property.yield_percent,
-            roi_percent: property.roi_percent,
-            investmentType: property.investmentType,
-            propertyType: property.propertyType,
+            property: {
+              title: property.title,
+              location: property.location,
+              price: property.price,
+              yield_percent: property.yield_percent,
+              roi_percent: property.roi_percent,
+              bedrooms: property.bedrooms,
+              bathrooms: property.bathrooms,
+              investmentType: property.investmentType,
+              propertyType: property.propertyType,
+            }
           }),
         });
 
@@ -112,6 +116,7 @@ const PropertyDetailsPage = () => {
         roi_percent={property.roi_percent}
         propertyType={property.propertyType}
         investmentType={property.investmentType}
+        description={property.description}
       />
 
       {/* 🔹 Calculators */}
