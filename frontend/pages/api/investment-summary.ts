@@ -1,9 +1,8 @@
-// Make sure to install OpenAI SDK if not done yet: npm install openai
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { OpenAI } from 'openai';
+import OpenAI from 'openai';
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // Ensure this is set in your .env.local
+  apiKey: process.env.OPENAI_API_KEY, // Must be set in your Vercel env
 });
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -13,31 +12,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { prompt } = req.body;
 
-  if (!prompt) {
-    return res.status(400).json({ error: 'Prompt is required' });
+  if (!prompt || typeof prompt !== 'string') {
+    return res.status(400).json({ error: 'A valid prompt is required.' });
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4',
       messages: [
         {
           role: 'system',
-          content: 'You are an investment analyst summarizing property deals for investors in 1–2 sentences.',
+          content: 'You are an expert investment analyst. Summarize UK property deals for investors in 2–3 short, punchy sentences. Highlight ROI, yield, and area strength.',
         },
         {
           role: 'user',
           content: prompt,
         },
       ],
-      max_tokens: 100,
+      max_tokens: 150,
       temperature: 0.7,
     });
 
-    const summary = completion.choices[0]?.message?.content ?? 'Summary unavailable.';
+    const summary = response.choices[0]?.message?.content?.trim() || 'Summary unavailable.';
     res.status(200).json({ summary });
   } catch (error: any) {
-    console.error('OpenAI API error:', error);
+    console.error('❌ OpenAI API error:', error.message || error);
     res.status(500).json({ error: 'Failed to generate summary.' });
   }
 }
