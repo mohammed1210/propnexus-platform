@@ -24,7 +24,7 @@ const PropertyDetailsPage = () => {
   useEffect(() => {
     const fetchProperty = async () => {
       try {
-        const res = await fetch(`/api/properties/${id}`);
+        const res = await fetch(`https://propnexus-backend-production.up.railway.app/api/properties/${id}`);
         const data = await res.json();
         setProperty(data);
         console.log('✅ Property loaded:', data);
