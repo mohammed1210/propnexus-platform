@@ -1,0 +1,46 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "next.config.js",
+  "dependencies": {
+    "agentkeepalive": "^4.6.0",
+    "browserslist": "^4.25.1",
+    "callsites": "^3.1.0",
+    "define-data-property": "^1.1.4",
+    "functions-have-names": "^1.2.3",
+    "globals": "^13.24.0",
+    "humanize-ms": "^1.2.1",
+    "is-bigint": "^1.1.0",
+    "next": "^15.4.5",
+    "path-is-absolute": "^1.0.1",
+    "pirates": "^4.0.7",
+    "queue-microtask": "^1.2.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "reusify": "^1.1.0",
+    "shebang-regex": "^3.0.0",
+    "simple-swizzle": "^0.2.2",
+    "styled-jsx": "^5.1.6",
+    "thenify": "^3.3.1",
+    "tinyglobby": "^0.2.14",
+    "utrie": "^1.0.2",
+    "web-streams-polyfill": "^4.0.0-beta.3",
+    "which-boxed-primitive": "^1.1.1"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "@types/react": "^19.1.9",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.11",
+    "typescript": "^5.8.3"
+  }
+}
