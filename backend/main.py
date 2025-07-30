@@ -20,6 +20,7 @@ origins = [
     "https://propnexus-platform.vercel.app",
     "https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app",
     "http://localhost:3000",
+    "http://localhost:3001",
 ]
 
 app.add_middleware(
@@ -76,3 +77,13 @@ async def scrape_rightmove():
         "status": f"Rightmove scrape completed and {len(data)} properties fetched",
         "data": data,
     }
+    
+@app.get("/api/properties/{property_id}")
+async def get_property_by_id_alias(property_id: str):
+    try:
+        response = supabase.table("properties").select("*").eq("id", property_id).execute()
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Property not found")
+        return response.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
