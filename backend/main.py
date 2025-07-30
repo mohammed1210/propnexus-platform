@@ -5,6 +5,8 @@ from scraper.rightmove_scraper import scrape_rightmove_properties
 import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from routes import gpt_routes
+app.include_router(gpt_routes.router)
 
 # ✅ Load .env variables
 load_dotenv()
