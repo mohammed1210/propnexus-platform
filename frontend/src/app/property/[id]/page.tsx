@@ -135,19 +135,32 @@ const PropertyDetailsPage = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-700 dark:text-gray-300">
           <div>
             <p className="font-semibold">Price</p>
-            <p>£{property.price ? property.price.toLocaleString() : 'N/A'}</p>
+            <p>
+              £
+              {typeof property.price === 'number'
+                ? property.price.toLocaleString()
+                : 'N/A'}
+            </p>
           </div>
           <div>
             <p className="font-semibold">Yield</p>
-            <p>{property.yield_percent ? property.yield_percent : 'N/A'}%</p>
+            <p>
+              {typeof property.yield_percent === 'number'
+                ? `${property.yield_percent}%`
+                : 'N/A'}
+            </p>
           </div>
           <div>
             <p className="font-semibold">ROI</p>
-            <p>{property.roi_percent ? property.roi_percent : 'N/A'}%</p>
+            <p>
+              {typeof property.roi_percent === 'number'
+                ? `${property.roi_percent}%`
+                : 'N/A'}
+            </p>
           </div>
           <div>
             <p className="font-semibold">Strategy</p>
-            <p>{property.investmentType ? property.investmentType : 'N/A'}</p>
+            <p>{property.investmentType || 'N/A'}</p>
           </div>
         </div>
       </div>
