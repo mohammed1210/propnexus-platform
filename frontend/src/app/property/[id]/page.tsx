@@ -37,7 +37,7 @@ const PropertyDetailsPage = () => {
     if (id) fetchProperty();
   }, [id]);
 
-  // 🔹 Step 2: Generate GPT Summary after property is loaded
+    // 🔹 Step 2: Generate GPT Summary after property is loaded
   useEffect(() => {
     const generateSummary = async () => {
       if (!property) return;
@@ -49,17 +49,13 @@ const PropertyDetailsPage = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            property: {
-              title: property.title,
-              location: property.location,
-              price: property.price,
-              yield_percent: property.yield_percent,
-              roi_percent: property.roi_percent,
-              bedrooms: property.bedrooms,
-              bathrooms: property.bathrooms,
-              investmentType: property.investmentType,
-              propertyType: property.propertyType,
-            }
+            title: property.title,
+            location: property.location,
+            price: property.price,
+            yield_percent: property.yield_percent,
+            roi_percent: property.roi_percent,
+            investmentType: property.investmentType,
+            propertyType: property.propertyType,
           }),
         });
 
