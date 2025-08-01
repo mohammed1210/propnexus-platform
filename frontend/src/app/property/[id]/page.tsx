@@ -19,6 +19,7 @@ const PropertyDetailsPage = () => {
   const id = params.id;
   const [property, setProperty] = useState<Property | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
+  const [strategies, setStrategies] = useState<string[]>([]);
 
   // 🔹 Step 1: Fetch Property by ID
   useEffect(() => {
@@ -73,7 +74,7 @@ const PropertyDetailsPage = () => {
     generateSummary();
   }, [property]);
 
-    // 🔹 Step 3: Generate Exit Strategies after property is loaded
+  // 🔹 Step 3: Generate Exit Strategies after property is loaded
   useEffect(() => {
     const generateStrategies = async () => {
       if (!property) return;
@@ -96,7 +97,7 @@ const PropertyDetailsPage = () => {
 
         const data = await res.json();
         console.log("📌 Strategies:", data.strategies);
-        // (Optional) You can call setStrategies(data.strategies) here to display them
+        setStrategies(data.strategies || []);
       } catch (err) {
         console.error("❌ Error generating strategies:", err);
       }
@@ -135,6 +136,18 @@ const PropertyDetailsPage = () => {
         <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-md p-4 mb-6 shadow-sm">
           <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">📘 GPT Investment Summary</h3>
           <p className="text-blue-700 dark:text-blue-100 whitespace-pre-wrap">{summary}</p>
+        </div>
+      )}
+
+      {/* 🔹 Live Exit Strategies */}
+      {strategies.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">💼 GPT Exit Strategies</h3>
+          <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 space-y-1">
+            {strategies.map((strategy, i) => (
+              <li key={i}>{strategy}</li>
+            ))}
+          </ul>
         </div>
       )}
 
