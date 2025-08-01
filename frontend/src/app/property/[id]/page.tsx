@@ -73,6 +73,38 @@ const PropertyDetailsPage = () => {
     generateSummary();
   }, [property]);
 
+    // 🔹 Step 3: Generate Exit Strategies after property is loaded
+  useEffect(() => {
+    const generateStrategies = async () => {
+      if (!property) return;
+
+      try {
+        const res = await fetch("https://propnexus-backend-production.up.railway.app/generate-strategies", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            price: property.price,
+            roi_percent: property.roi_percent,
+            yield_percent: property.yield_percent,
+            location: property.location,
+            property_type: property.propertyType,
+            description: property.description,
+          }),
+        });
+
+        const data = await res.json();
+        console.log("📌 Strategies:", data.strategies);
+        // (Optional) You can call setStrategies(data.strategies) here to display them
+      } catch (err) {
+        console.error("❌ Error generating strategies:", err);
+      }
+    };
+
+    generateStrategies();
+  }, [property]);
+
   if (!property) {
     return (
       <div className="p-8 text-center text-gray-600 dark:text-gray-300">
