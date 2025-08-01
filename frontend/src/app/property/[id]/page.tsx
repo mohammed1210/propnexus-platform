@@ -182,6 +182,3 @@ const PropertyDetailsPage = () => {
 };
 
 export default PropertyDetailsPage;
-"""
-
-from IPython.display import display, Markdown
