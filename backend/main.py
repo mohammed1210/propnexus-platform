@@ -1,23 +1,25 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+from supabase import create_client, Client
+import os
+
+# Custom route modules
+from routes import gpt_routes
 from scraper.zoopla_scraper import scrape_zoopla_properties
 from scraper.rightmove_scraper import scrape_rightmove_properties
-import os
-from supabase import create_client, Client
-from dotenv import load_dotenv
-from routes import gpt_routes
-app.include_router(gpt_routes.router)
 
-# ✅ Load .env variables
+# ✅ Load environment variables
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# ✅ Create FastAPI app
 app = FastAPI()
 
-# ✅ CORS setup — allow both production & local
+# ✅ CORS setup
 origins = [
     "https://propnexus-platform.vercel.app",
     "https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app",
@@ -33,59 +35,56 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ✅ Include GPT routes
+app.include_router(gpt_routes.router)
+
+# ✅ Health check
 @app.get("/")
 async def root():
     return {"message": "PropNexus backend is running."}
 
+# ✅ Get all properties
 @app.get("/properties")
 async def get_properties():
-    """
-    ✅ Fetch all properties
-    """
     response = supabase.table("properties").select("*").execute()
     return response.data
 
+# ✅ Get property by ID
 @app.get("/properties/{property_id}")
 async def get_property_by_id(property_id: str):
-    """
-    ✅ Fetch property by ID (Deal Pack view)
-    """
     try:
         response = supabase.table("properties").select("*").eq("id", property_id).execute()
-        if not response.data or len(response.data) == 0:
+        if not response.data:
             raise HTTPException(status_code=404, detail="Property not found")
         return response.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# ✅ Alias route (Next.js fetch expects /api/)
+@app.get("/api/properties/{property_id}")
+async def get_property_by_id_alias(property_id: str):
+    try:
+        response = supabase.table("properties").select("*").eq("id", property_id).execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Property not found")
+        return response.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ✅ Scrape Zoopla
 @app.post("/scrape-zoopla")
 async def scrape_zoopla():
-    """
-    ✅ Trigger Zoopla scraper
-    """
     data = await scrape_zoopla_properties()
     return {
         "status": f"Zoopla scrape completed and {len(data)} properties fetched",
         "data": data,
     }
 
+# ✅ Scrape Rightmove
 @app.post("/scrape-rightmove")
 async def scrape_rightmove():
-    """
-    ✅ Trigger Rightmove scraper
-    """
     data = await scrape_rightmove_properties()
     return {
         "status": f"Rightmove scrape completed and {len(data)} properties fetched",
         "data": data,
     }
-    
-@app.get("/api/properties/{property_id}")
-async def get_property_by_id_alias(property_id: str):
-    try:
-        response = supabase.table("properties").select("*").eq("id", property_id).execute()
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(status_code=404, detail="Property not found")
-        return response.data[0]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
