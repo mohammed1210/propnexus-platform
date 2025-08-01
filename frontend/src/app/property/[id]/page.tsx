@@ -43,7 +43,7 @@ const PropertyDetailsPage = () => {
       if (!property) return;
 
       try {
-        const res = await fetch('https://propnexus-backend-production.up.railway.app/generate-summary', {
+        const res = await fetch('https://propnexus-backend.up.railway.app/generate-summary', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -80,7 +80,7 @@ const PropertyDetailsPage = () => {
       if (!property) return;
 
       try {
-        const res = await fetch("https://propnexus-backend-production.up.railway.app/generate-strategies", {
+        const res = await fetch('https://propnexus-backend.up.railway.app/generate-summary', {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
