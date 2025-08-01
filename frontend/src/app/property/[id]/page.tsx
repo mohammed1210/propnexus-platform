@@ -42,7 +42,7 @@ const PropertyDetailsPage = () => {
       if (!property) return;
 
       try {
-        const res = await fetch('/api/generate-summary', {
+        const res = await fetch('https://propnexus-backend-production.up.railway.app/generate-summary', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -182,3 +182,6 @@ const PropertyDetailsPage = () => {
 };
 
 export default PropertyDetailsPage;
+"""
+
+from IPython.display import display, Markdown
