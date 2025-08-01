@@ -59,7 +59,6 @@ const PropertyDetailsPage = () => {
               bathrooms: property.bathrooms,
               investmentType: property.investmentType,
               propertyType: property.propertyType,
-            }
           }),
         });
 
