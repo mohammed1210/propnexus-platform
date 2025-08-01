@@ -80,7 +80,7 @@ const PropertyDetailsPage = () => {
       if (!property) return;
 
       try {
-        const res = await fetch('https://propnexus-backend.up.railway.app/generate-strategies', { {
+        const res = await fetch('https://propnexus-backend.up.railway.app/generate-strategies', {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
