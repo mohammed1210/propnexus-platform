@@ -44,21 +44,25 @@ const PropertyDetailsPage = () => {
       if (!property) return;
 
       try {
-const res = await fetch('https://propnexus-backend-production.up.railway.app/generate-summary', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            title: property.title,
-            location: property.location,
-            price: property.price,
-            yield_percent: property.yield_percent,
-            roi_percent: property.roi_percent,
-            investmentType: property.investmentType,
-            propertyType: property.propertyType,
-          }),
-        });
+const res = await fetch(`${BACKEND_BASE_URL}/generate-summary`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    property: {
+      title: property.title,
+      location: property.location,
+      price: property.price,
+      yield_percent: property.yield_percent,
+      roi_percent: property.roi_percent,
+      bedrooms: property.bedrooms,
+      bathrooms: property.bathrooms,
+      investmentType: property.investmentType,
+      propertyType: property.propertyType,
+    }
+  }),
+});
 
         const data = await res.json();
         setSummary(data.summary);
@@ -77,20 +81,20 @@ const res = await fetch('https://propnexus-backend-production.up.railway.app/gen
       if (!property) return;
 
       try {
-const res = await fetch('https://propnexus-backend-production.up.railway.app/generate-strategies', {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            price: property.price,
-            roi_percent: property.roi_percent,
-            yield_percent: property.yield_percent,
-            location: property.location,
-            property_type: property.propertyType,
-            description: property.description,
-          }),
-        });
+const res = await fetch(`${BACKEND_BASE_URL}/generate-strategies`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    price: property.price,
+    roi_percent: property.roi_percent,
+    yield_percent: property.yield_percent,
+    location: property.location,
+    property_type: property.propertyType,
+    description: property.description,
+  }),
+});
 
         const data = await res.json();
         console.log("📌 Strategies:", data.strategies);
