@@ -4,11 +4,6 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 import os
 
-# Custom route modules
-from routes import gpt_routes
-from scraper.zoopla_scraper import scrape_zoopla_properties
-from scraper.rightmove_scraper import scrape_rightmove_properties
-
 # ✅ Load environment variables
 load_dotenv()
 
@@ -35,8 +30,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Include GPT routes
+# ✅ Route imports
+from routes import gpt_routes
+from routes.ai_routes import router as ai_routes  # NEW
+from scraper.zoopla_scraper import scrape_zoopla_properties
+from scraper.rightmove_scraper import scrape_rightmove_properties
+
+# ✅ Include routes
 app.include_router(gpt_routes.router)
+app.include_router(ai_routes)  # ✅ Register new AI route module
 
 # ✅ Health check
 @app.get("/")
