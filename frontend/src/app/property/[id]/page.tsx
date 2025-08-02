@@ -20,6 +20,7 @@ const PropertyDetailsPage = () => {
   const [property, setProperty] = useState<Property | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [strategies, setStrategies] = useState<string[]>([]);
+  const BACKEND_BASE_URL = 'https://propnexus-backend-production.up.railway.app';
 
   // 🔹 Step 1: Fetch Property by ID
   useEffect(() => {
