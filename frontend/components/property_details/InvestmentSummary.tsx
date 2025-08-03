@@ -16,16 +16,30 @@ export default function InvestmentSummary({ property }: InvestmentSummaryProps) 
 
     const fetchSummary = async () => {
       try {
-        const res = await fetch('/api/generate-summary', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-summary`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ property }),
+          body: JSON.stringify({
+            title: property.title,
+            location: property.location,
+            price: property.price,
+            yield_percent: property.yield_percent,
+            roi_percent: property.roi_percent,
+            investmentType: property.investmentType || '',
+            propertyType: property.property_type || '',
+          }),
         });
+
+        if (!res.ok) {
+          console.error(`Failed to fetch summary: ${res.status}`);
+          setSummary('An error occurred while generating the summary.');
+          return;
+        }
 
         const data = await res.json();
         setSummary(data.summary || 'No summary available.');
       } catch (err) {
-        console.error('Failed to fetch summary:', err);
+        console.error('Fetch summary error:', err);
         setSummary('An error occurred while generating the summary.');
       } finally {
         setLoading(false);
