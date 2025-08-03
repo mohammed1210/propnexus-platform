@@ -22,42 +22,41 @@ export default function ExitStrategyGenerator({
   roi_percent,
   propertyType,
   investmentType,
+  description = '',
 }: ExitStrategyProps) {
-  const [strategies, setStrategies] = useState('');
+  const [strategies, setStrategies] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleGenerate = async () => {
     setLoading(true);
     setError('');
+    setStrategies([]);
+
     try {
-      const res = await fetch('/api/generate-strategy', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/generate-strategies`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          property: {
-            title,
-            location,
-            price,
-            yield_percent,
-            roi_percent,
-            propertyType,
-            investmentType,
-          },
+          price,
+          roi_percent,
+          yield_percent,
+          location,
+          property_type: propertyType,
+          description,
         }),
       });
 
-      const data = await res.json();
-      if (res.ok) {
-        setStrategies(data.strategies);
-      } else {
-        setError(data.error || 'Something went wrong');
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || 'Failed to fetch strategies');
       }
-    } catch (err) {
+
+      const data = await res.json();
+      setStrategies(data.strategies || []);
+    } catch (err: any) {
       console.error('Error:', err);
-      setError('Network error or server not responding.');
+      setError(err.message || 'An error occurred');
     } finally {
       setLoading(false);
     }
@@ -69,15 +68,20 @@ export default function ExitStrategyGenerator({
       <p className={styles.caption}>
         Use AI to suggest smart exit plans tailored to this property.
       </p>
+
       <button onClick={handleGenerate} disabled={loading} className={styles.generateButton}>
         {loading ? 'Thinking...' : 'Generate Exit Strategies'}
       </button>
 
       {error && <p className={styles.error}>{error}</p>}
 
-      {strategies && (
+      {strategies.length > 0 && (
         <div className={styles.result}>
-          <pre>{strategies}</pre>
+          <ul>
+            {strategies.map((strat, idx) => (
+              <li key={idx}>{strat}</li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
