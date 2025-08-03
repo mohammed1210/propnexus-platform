@@ -1,6 +1,6 @@
 # /backend/routes/gpt_routes.py
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os
 from openai import OpenAI
@@ -11,7 +11,7 @@ load_dotenv()
 router = APIRouter()
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# ✅ Schema for summary
+# ✅ Summary schema
 class SummaryRequest(BaseModel):
     title: str
     location: str
@@ -50,7 +50,7 @@ async def generate_summary(req: SummaryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ✅ Schema for strategies
+# ✅ Strategy schema
 class StrategyRequest(BaseModel):
     price: float
     roi_percent: float
@@ -88,6 +88,31 @@ async def generate_strategies(req: StrategyRequest):
         ]
 
         return {"strategies": strategies}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ✅ Investment summary freeform prompt
+class InvestmentPrompt(BaseModel):
+    prompt: str
+
+@router.post("/investment-summary")
+async def investment_summary(req: InvestmentPrompt):
+    try:
+        if not req.prompt:
+            raise HTTPException(status_code=400, detail="Prompt cannot be empty.")
+
+        chat = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "You are an expert UK property investment analyst."},
+                {"role": "user", "content": req.prompt},
+            ],
+            temperature=0.7,
+            max_tokens=150,
+        )
+
+        return {"summary": chat.choices[0].message.content.strip()}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
