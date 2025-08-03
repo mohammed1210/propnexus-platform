@@ -14,19 +14,22 @@ import AIChatbot from '@details/AIChatbot';
 import dynamic from 'next/dynamic';
 const MapView = dynamic(() => import('@/app/MapView'), { ssr: false });
 
+// ✅ Set backend base URL from env
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+console.log("✅ Backend API URL:", BACKEND_BASE_URL);
+
 const PropertyDetailsPage = () => {
   const params = useParams() as { id: string };
   const id = params.id;
   const [property, setProperty] = useState<Property | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [strategies, setStrategies] = useState<string[]>([]);
-  const BACKEND_BASE_URL = 'https://propnexus-backend-production.up.railway.app';
 
   // 🔹 Step 1: Fetch Property by ID
   useEffect(() => {
     const fetchProperty = async () => {
       try {
-        const res = await fetch(`https://propnexus-backend-production.up.railway.app/api/properties/${id}`);
+        const res = await fetch(`${BACKEND_BASE_URL}/api/properties/${id}`);
         const data = await res.json();
         setProperty(data);
         console.log('✅ Property loaded:', data);
@@ -35,34 +38,34 @@ const PropertyDetailsPage = () => {
       }
     };
 
-    if (id) fetchProperty();
+    if (id && BACKEND_BASE_URL) fetchProperty();
   }, [id]);
 
-    // 🔹 Step 2: Generate GPT Summary after property is loaded
+  // 🔹 Step 2: Generate GPT Summary after property is loaded
   useEffect(() => {
     const generateSummary = async () => {
-      if (!property) return;
+      if (!property || !BACKEND_BASE_URL) return;
 
       try {
-const res = await fetch(`${BACKEND_BASE_URL}/generate-summary`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    property: {
-      title: property.title,
-      location: property.location,
-      price: property.price,
-      yield_percent: property.yield_percent,
-      roi_percent: property.roi_percent,
-      bedrooms: property.bedrooms,
-      bathrooms: property.bathrooms,
-      investmentType: property.investmentType,
-      propertyType: property.propertyType,
-    }
-  }),
-});
+        const res = await fetch(`${BACKEND_BASE_URL}/generate-summary`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            property: {
+              title: property.title,
+              location: property.location,
+              price: property.price,
+              yield_percent: property.yield_percent,
+              roi_percent: property.roi_percent,
+              bedrooms: property.bedrooms,
+              bathrooms: property.bathrooms,
+              investmentType: property.investmentType,
+              propertyType: property.propertyType,
+            }
+          }),
+        });
 
         const data = await res.json();
         setSummary(data.summary);
@@ -78,23 +81,23 @@ const res = await fetch(`${BACKEND_BASE_URL}/generate-summary`, {
   // 🔹 Step 3: Generate Exit Strategies after property is loaded
   useEffect(() => {
     const generateStrategies = async () => {
-      if (!property) return;
+      if (!property || !BACKEND_BASE_URL) return;
 
       try {
-const res = await fetch(`${BACKEND_BASE_URL}/generate-strategies`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    price: property.price,
-    roi_percent: property.roi_percent,
-    yield_percent: property.yield_percent,
-    location: property.location,
-    property_type: property.propertyType,
-    description: property.description,
-  }),
-});
+        const res = await fetch(`${BACKEND_BASE_URL}/generate-strategies`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            price: property.price,
+            roi_percent: property.roi_percent,
+            yield_percent: property.yield_percent,
+            location: property.location,
+            property_type: property.propertyType,
+            description: property.description,
+          }),
+        });
 
         const data = await res.json();
         console.log("📌 Strategies:", data.strategies);
