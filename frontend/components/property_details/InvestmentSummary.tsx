@@ -26,7 +26,7 @@ export default function InvestmentSummary({ property }: InvestmentSummaryProps) 
             yield_percent: property.yield_percent,
             roi_percent: property.roi_percent,
             investmentType: property.investmentType || '',
-            propertyType: property.property_type || '',
+            propertyType: property.propertyType || '',
           }),
         });
 
