@@ -195,7 +195,11 @@ body.dark-mode .filters-row div label {
   top: 140px;
 }
 
-/* Responsive */
+body.dark-mode .map-view {
+  box-shadow: 0 2px 6px rgba(255, 255, 255, 0.05);
+}
+
+/* Responsive Layout */
 @media (max-width: 768px) {
   .dashboard-layout {
     flex-direction: column;
@@ -225,6 +229,11 @@ body.dark-mode .filters-row div label {
   .filters-row > div {
     flex: 1 1 100%;
   }
+
+  .back-to-top {
+    right: 16px;
+    bottom: 16px;
+  }
 }
 
 /* 🔝 Back to Top Button (Only When Scrolling) */
@@ -253,11 +262,25 @@ body.dark-mode .filters-row div label {
   display: block;
 }
 
-/* 🧠 Dark Mode Header Cleanups */
-body.dark-mode .map-view {
-  box-shadow: 0 2px 6px rgba(255, 255, 255, 0.05);
-}
-
+/* 🧠 Dark Mode Element Styling */
 body.dark-mode .property-list {
   color: #e2e8f0;
+}
+
+body.dark-mode .small-button {
+  background-color: #0284c7;
+  color: #e2e8f0;
+}
+
+body.dark-mode .small-button:hover {
+  background-color: #0ea5e9;
+}
+
+body.dark-mode .map-toggle-button {
+  background-color: #1e293b;
+  color: #e2e8f0;
+}
+
+body.dark-mode .map-toggle-button:hover {
+  background-color: #334155;
 }
