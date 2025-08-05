@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Property } from '../types';
 import PropertyCard from '../../components/PropertyCard';
 import dynamic from 'next/dynamic';
+import './globals.css'; // If not already imported
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
@@ -75,7 +76,7 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* 🔝 Sticky container for header + filters */}
+      {/* ✅ Sticky Header Bar */}
       <div className="sticky-top-header">
         <header className="header-bar">
           <h1 className="header-title">PropNexus</h1>
@@ -87,7 +88,7 @@ export default function PropertiesPage() {
           </button>
         </header>
 
-        {/* 🔍 Quick Filters */}
+        {/* 🔍 Filter Row */}
         <div className="sticky-primary">
           <input
             className="filter-input"
@@ -129,7 +130,7 @@ export default function PropertiesPage() {
         </div>
       </div>
 
-      {/* 🎛️ Advanced Filters */}
+      {/* 🧮 Advanced Filters */}
       {showMoreFilters && (
         <div className="filters-row">
           <div>
@@ -197,9 +198,13 @@ export default function PropertiesPage() {
         </div>
       )}
 
-      {/* 🏘️ Property + Map View */}
-      <div className="content-layout">
+      {/* 🏘️ Property + Map Layout */}
+      <div className="dashboard-layout">
         <div className="property-list">
+          <h3 style={{ margin: '1rem 0', color: '#475569' }}>
+            Showing {filteredProperties.length} properties
+          </h3>
+
           {filteredProperties.length > 0 ? (
             filteredProperties.map((property) => (
               <PropertyCard key={property.id} property={property} />
@@ -210,7 +215,22 @@ export default function PropertiesPage() {
         </div>
 
         {showMap && filteredProperties.length > 0 && (
-          <div className="map-view mt-8">
+          <div className="fixed-map-container">
+            <div className="map-toggle-corner">
+              <button
+                onClick={() => setShowMap(false)}
+                style={{
+                  backgroundColor: '#334155',
+                  color: '#fff',
+                  fontSize: '0.8rem',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  marginBottom: '8px',
+                }}
+              >
+                ❌ Hide Map
+              </button>
+            </div>
             <MapView properties={filteredProperties} />
           </div>
         )}
@@ -218,3 +238,4 @@ export default function PropertiesPage() {
     </div>
   );
 }
+
