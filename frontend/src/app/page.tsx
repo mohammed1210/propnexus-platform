@@ -75,19 +75,8 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* 🔝 Sticky container for header + filters */}
+      {/* 🔝 Sticky Filter Bar */}
       <div className="sticky-top-header">
-        <header className="header-bar">
-          <h1 className="header-title">PropNexus</h1>
-          <button
-            className="mode-toggle"
-            onClick={() => document.body.classList.toggle('dark-mode')}
-          >
-            🌙 Dark Mode
-          </button>
-        </header>
-
-        {/* 🔍 Quick Filters */}
         <div className="sticky-primary">
           <input
             className="filter-input large"
@@ -125,6 +114,13 @@ export default function PropertiesPage() {
             }}
           >
             {showMap ? 'Hide Map 🗺' : 'Show Map 🗺'}
+          </button>
+
+          <button
+            className="mode-toggle"
+            onClick={() => document.body.classList.toggle('dark-mode')}
+          >
+            🌙 Dark Mode
           </button>
         </div>
       </div>
@@ -215,6 +211,40 @@ export default function PropertiesPage() {
           </div>
         )}
       </div>
+
+      {/* 🔝 Back to Top Button */}
+      <button
+        id="backToTop"
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          backgroundColor: '#1e40af',
+          color: 'white',
+          padding: '10px 14px',
+          borderRadius: '6px',
+          cursor: 'pointer',
+          zIndex: 1000,
+          display: 'none',
+        }}
+      >
+        ⬆ Back to Top
+      </button>
+
+      <script dangerouslySetInnerHTML={{
+        __html: `
+        window.addEventListener('scroll', () => {
+          const btn = document.getElementById('backToTop');
+          if (!btn) return;
+          if (window.scrollY > 300) {
+            btn.style.display = 'block';
+          } else {
+            btn.style.display = 'none';
+          }
+        });
+      `
+      }} />
     </div>
   );
 }
