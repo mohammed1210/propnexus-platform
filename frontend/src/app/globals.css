@@ -33,28 +33,32 @@ a {
 .dashboard-layout {
   display: flex;
   flex-direction: row;
+  align-items: flex-start;
   gap: 1rem;
+  margin-top: 0;
 }
 
+/* Scrollable property list */
 .property-list {
   flex: 1;
   overflow-y: auto;
-  max-height: calc(100vh - 200px);
+  max-height: calc(100vh - 160px);
   padding-right: 1rem;
+  margin-top: 0;
 }
 
-/* 🗺️ Fixed Map Layout */
+/* Fixed vertical map on the right */
 .fixed-map-container {
   width: 40%;
   min-width: 320px;
-  max-height: calc(100vh - 160px);
+  height: calc(100vh - 160px);
   position: sticky;
   top: 140px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 6px rgba(0,0,0,0.08);
-  margin-top: -1rem;
+  margin-top: 0;
 }
 
 /* 🔝 Sticky Header Container */
@@ -109,7 +113,7 @@ body.dark-mode .mode-toggle {
   color: #e2e8f0;
 }
 
-/* 📌 Filters Row (Sticky & Expanded) */
+/* 📌 Filters (Sticky + Expanded) */
 .sticky-primary,
 .filters-row {
   display: flex;
@@ -127,22 +131,19 @@ body.dark-mode .filters-row {
   border-color: #334155;
 }
 
-.filters-row > div,
-.sticky-primary > * {
+.sticky-primary > *,
+.filters-row > div {
   display: flex;
   flex-direction: column;
   font-size: 0.875rem;
-  min-width: 140px;
 }
 
-/* 🔽 Inputs, Dropdowns, Buttons */
+/* 🔽 Dropdowns & Inputs */
 .filter-input,
 .filter-select,
 .small-button,
-.map-toggle-button,
 .filters-row input,
-.filters-row select,
-.filters-row button {
+.filters-row select {
   height: 2.5rem;
   font-size: 0.875rem;
   border: 1px solid #cbd5e1;
@@ -151,25 +152,11 @@ body.dark-mode .filters-row {
   background-color: white;
   color: #334155;
   transition: all 0.2s ease;
-  min-width: 100px;
+  min-width: 180px;
 }
 
-.filters-row input[type="text"] {
-  font-size: 1rem;
-  font-weight: 500;
-  flex: 2;
-}
-
-body.dark-mode input,
-body.dark-mode select,
-body.dark-mode .filter-input,
-body.dark-mode .filter-select {
-  background-color: #1e293b;
-  border-color: #475569;
-  color: #f1f5f9;
-}
-
-.filters-row select {
+.filters-row select,
+.sticky-primary select {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg fill='gray' height='14' viewBox='0 0 24 24' width='14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -179,18 +166,28 @@ body.dark-mode .filter-select {
 }
 
 .filters-row input:focus,
-.filters-row select:focus {
+.filters-row select:focus,
+.sticky-primary input:focus,
+.sticky-primary select:focus {
   outline: none;
   border-color: #3b82f6;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-/* 🟦 Small Button */
+body.dark-mode input,
+body.dark-mode select {
+  background-color: #1e293b;
+  color: #f3f4f6;
+  border: 1px solid #475569;
+}
+
+/* 🟦 Small Button Style */
 .small-button {
   font-weight: 500;
   background-color: #0ea5e9;
   color: white;
   cursor: pointer;
+  padding: 0 1rem;
 }
 
 .small-button:hover {
@@ -210,15 +207,7 @@ body.dark-mode .filters-row div label {
   color: #cbd5e1;
 }
 
-/* 🧭 Map Toggle */
-.map-toggle-corner {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.25rem 1rem;
-}
-
+/* 🧭 Map Toggle - Now in filter bar */
 .map-toggle-button-desktop {
   padding: 6px 14px;
   font-size: 14px;
@@ -229,25 +218,17 @@ body.dark-mode .filters-row div label {
   color: white;
   cursor: pointer;
   transition: background 0.2s ease;
+  margin-left: auto;
 }
 
 .map-toggle-button-desktop:hover {
   background-color: #2563eb;
 }
 
+/* Hide map toggle on mobile (already placed differently) */
 @media (max-width: 768px) {
   .map-toggle-button-desktop {
     display: none;
-  }
-
-  .map-toggle-corner {
-    justify-content: center;
-  }
-}
-
-@media (min-width: 768px) {
-  .map-toggle-button {
-    display: none !important;
   }
 }
 
@@ -259,7 +240,6 @@ body.dark-mode .filters-row div label {
   overflow: hidden;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
   position: relative;
-  margin-top: -1rem;
 }
 
 /* 📱 Mobile */
@@ -278,7 +258,7 @@ body.dark-mode .filters-row div label {
     position: relative;
     top: 0;
     margin-top: 1rem;
-    max-height: 400px;
+    height: 400px;
   }
 
   .header-bar h1 {
