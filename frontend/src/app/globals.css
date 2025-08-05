@@ -30,6 +30,31 @@ a {
   margin: 0 auto;
 }
 
+.dashboard-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+}
+
+.property-list {
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+  padding-right: 1rem;
+}
+
+.fixed-map-container {
+  width: 40%;
+  min-width: 320px;
+  max-height: calc(100vh - 160px);
+  position: sticky;
+  top: 140px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
 /* 🔝 Sticky Header Container */
 .sticky-top-header {
   position: sticky;
@@ -82,56 +107,50 @@ body.dark-mode .mode-toggle {
   color: #e2e8f0;
 }
 
-/* 📌 Sticky Filters */
-.sticky-primary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 14px 22px;
-  background: #f8fafc;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-body.dark-mode .sticky-primary {
-  background: #1e1e1e;
-  border-color: #334155;
-}
-
-/* 🎛️ Filters */
+/* 📌 Filters (Sticky + Expanded) */
+.sticky-primary,
 .filters-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 14px 22px;
-  background: #f8fafc;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background-color: #f8fafc;
   border-bottom: 1px solid #e2e8f0;
 }
 
+body.dark-mode .sticky-primary,
 body.dark-mode .filters-row {
   background: #1e1e1e;
   border-color: #334155;
 }
 
+.sticky-primary > *,
+.filters-row > div {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.875rem;
+}
+
+/* 🔽 Dropdowns & Inputs */
+.filter-input,
+.filter-select,
+.small-button,
+.map-toggle-button,
 .filters-row input,
-.filters-row select,
-.filters-row button,
-.sticky-primary input,
-.sticky-primary select {
-  padding: 8px 10px;
+.filters-row select {
+  height: 2.25rem;
+  font-size: 0.875rem;
+  border: 1px solid #cbd5e1;
   border-radius: 6px;
-  border: 1px solid #d1d5db;
-  font-size: 14px;
-  min-height: 38px;
-  flex: 1 1 140px;
-  background: white;
+  padding: 0 0.5rem;
+  background-color: white;
+  color: #334155;
   transition: all 0.2s ease;
 }
 
 .filters-row select,
 .sticky-primary select {
   appearance: none;
-  background-color: white;
   background-image: url("data:image/svg+xml,%3Csvg fill='gray' height='14' viewBox='0 0 24 24' width='14' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
@@ -152,20 +171,15 @@ body.dark-mode input,
 body.dark-mode select {
   background-color: #1e293b;
   color: #f3f4f6;
-  border: 1px solid #334155;
+  border: 1px solid #475569;
 }
 
 /* 🟦 Small Button Style */
 .small-button {
-  padding: 6px 12px;
-  font-size: 13px;
   font-weight: 500;
-  border-radius: 6px;
-  border: none;
   background-color: #0ea5e9;
   color: white;
   cursor: pointer;
-  transition: background 0.2s ease;
 }
 
 .small-button:hover {
@@ -185,16 +199,46 @@ body.dark-mode .filters-row div label {
   color: #cbd5e1;
 }
 
-/* 📍 Layout */
-.content-layout {
+/* 🧭 Map Toggle */
+.map-toggle-corner {
   display: flex;
-  gap: 20px;
+  justify-content: flex-end;
+  padding: 0.5rem;
 }
 
-.property-list {
-  flex: 1 1 60%;
+.map-toggle-button-desktop {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 6px;
+  border: none;
+  background-color: #3b82f6;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s ease;
 }
 
+.map-toggle-button-desktop:hover {
+  background-color: #2563eb;
+}
+
+@media (max-width: 768px) {
+  .map-toggle-button-desktop {
+    display: none;
+  }
+
+  .map-toggle-corner {
+    justify-content: center;
+  }
+}
+
+@media (min-width: 768px) {
+  .map-toggle-button {
+    display: none !important;
+  }
+}
+
+/* 🖼 Map View */
 .map-view {
   flex: 1 1 40%;
   min-height: 80vh;
@@ -205,15 +249,22 @@ body.dark-mode .filters-row div label {
 }
 
 /* 📱 Mobile */
-@media (max-width: 768px) {
-  .content-layout {
+@media screen and (max-width: 768px) {
+  .dashboard-layout {
     flex-direction: column;
   }
 
-  .map-view {
-    order: -1;
-    height: 400px;
-    margin-bottom: 20px;
+  .property-list {
+    max-height: none;
+    padding-right: 0;
+  }
+
+  .fixed-map-container {
+    width: 100%;
+    position: relative;
+    top: 0;
+    margin-top: 1rem;
+    max-height: 400px;
   }
 
   .header-bar h1 {
@@ -254,34 +305,4 @@ body.dark-mode .filters-row div label {
 
 .back-to-top:hover {
   background: #0284c7;
-}
-
-/* 🖥 Hide map toggle on desktop */
-@media (min-width: 768px) {
-  .map-toggle-button {
-    display: none !important;
-  }
-}
-
-/* 💻 Show map toggle on desktop */
-.map-toggle-button-desktop {
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: 6px;
-  border: none;
-  background-color: #3b82f6;
-  color: white;
-  cursor: pointer;
-  transition: background 0.2s ease;
-}
-
-.map-toggle-button-desktop:hover {
-  background-color: #2563eb;
-}
-
-@media (max-width: 768px) {
-  .map-toggle-button-desktop {
-    display: none;
-  }
 }
