@@ -75,7 +75,6 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* 🔝 Sticky container for header + filters */}
       <div className="sticky-top-header">
         <header className="header-bar">
           <h1 className="header-title">PropNexus</h1>
@@ -87,7 +86,6 @@ export default function PropertiesPage() {
           </button>
         </header>
 
-        {/* 🔍 Quick Filters */}
         <div className="sticky-primary">
           <input
             className="filter-input large"
@@ -118,18 +116,13 @@ export default function PropertiesPage() {
 
           <button
             onClick={() => setShowMap(!showMap)}
-            className="small-button"
-            style={{
-              backgroundColor: showMap ? '#334155' : '#3b82f6',
-              color: '#fff',
-            }}
+            className="small-button map-toggle-button-desktop"
           >
             {showMap ? 'Hide Map 🗺' : 'Show Map 🗺'}
           </button>
         </div>
       </div>
 
-      {/* 🎛️ Advanced Filters */}
       {showMoreFilters && (
         <div className="filters-row">
           <div>
@@ -164,7 +157,7 @@ export default function PropertiesPage() {
             </select>
           </div>
 
-          <div>
+                    <div>
             <label>Property Type</label>
             <select
               value={propertyType}
@@ -197,23 +190,27 @@ export default function PropertiesPage() {
         </div>
       )}
 
-      {/* 🏘️ Property + Map View */}
-      <div className="content-layout">
+      {/* 📍 Map + Property Card Layout */}
+      <div className="dashboard-layout">
+        {/* 🗺️ Static Map on the Right (Desktop) */}
+        {showMap && filteredProperties.length > 0 && (
+          <div className="fixed-map-container">
+            <MapView properties={filteredProperties} />
+          </div>
+        )}
+
+        {/* 🏘️ Property Listings */}
         <div className="property-list">
           {filteredProperties.length > 0 ? (
             filteredProperties.map((property) => (
               <PropertyCard key={property.id} property={property} />
             ))
           ) : (
-            <p style={{ color: '#64748b' }}>No matching properties found.</p>
+            <p style={{ color: '#64748b', padding: '1rem' }}>
+              No matching properties found.
+            </p>
           )}
         </div>
-
-        {showMap && filteredProperties.length > 0 && (
-          <div className="map-view">
-            <MapView properties={filteredProperties} />
-          </div>
-        )}
       </div>
     </div>
   );
