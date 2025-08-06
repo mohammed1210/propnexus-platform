@@ -1,5 +1,8 @@
-
-/* 🌐 GLOBAL RESET & BASE STYLES */
+/* 
+========================================
+1️⃣ GLOBAL RESET & BASE STYLES
+======================================== 
+*/
 body {
   margin: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -16,7 +19,11 @@ h1, h2, h3, p {
   padding: 0;
 }
 
-/* 📦 CONTAINER LAYOUTS */
+/* 
+========================================
+2️⃣ CONTAINER LAYOUTS
+======================================== 
+*/
 .main-wrapper {
   padding: 1rem;
 }
@@ -40,7 +47,11 @@ h1, h2, h3, p {
   border: 1px solid #334155;
 }
 
-/* 🎛️ FILTER BAR */
+/* 
+========================================
+3️⃣ FILTER BAR
+======================================== 
+*/
 .sticky-primary {
   position: sticky;
   top: 0;
@@ -57,7 +68,11 @@ h1, h2, h3, p {
   border-color: #334155;
 }
 
-/* 🔎 SEARCH + SELECT FILTERS */
+/* 
+========================================
+4️⃣ SEARCH + SELECT FILTERS
+======================================== 
+*/
 .filter-input.large {
   flex: 1;
   padding: 0.5rem;
@@ -88,7 +103,11 @@ h1, h2, h3, p {
   color: white;
 }
 
-/* 🎛️ ADVANCED FILTER ROW */
+/* 
+========================================
+5️⃣ ADVANCED FILTER ROW
+======================================== 
+*/
 .filters-row {
   display: flex;
   flex-wrap: wrap;
@@ -117,7 +136,11 @@ h1, h2, h3, p {
   color: white;
 }
 
-/* 🔝 BACK TO TOP BUTTON */
+/* 
+========================================
+6️⃣ BACK TO TOP BUTTON
+======================================== 
+*/
 .back-to-top {
   position: fixed;
   bottom: 1rem;
@@ -138,31 +161,11 @@ h1, h2, h3, p {
   background-color: #0f172a;
 }
 
-/* 📱 MEDIA QUERIES: MOBILE RESPONSIVE */
-@media (max-width: 768px) {
-  .content-layout {
-    flex-direction: column;
-  }
-  .map-view {
-    position: relative;
-    height: 300px;
-    top: unset;
-  }
-  .sticky-primary {
-    flex-wrap: wrap;
-    justify-content: space-between;
-  }
-  .filters-row {
-    flex-direction: column;
-  }
-  .back-to-top {
-    bottom: 0.5rem;
-    right: 0.5rem;
-  }
-
-  /* === 📍 SECTION: Final Layout Patch === */
-
-/* Tighten map padding / eliminate white gap */
+/* 
+========================================
+7️⃣ FINAL LAYOUT PATCH + DARK MODE
+======================================== 
+*/
 .fixed-map-container {
   padding-bottom: 0 !important;
   margin-bottom: 0 !important;
@@ -170,63 +173,56 @@ h1, h2, h3, p {
 .map-view {
   padding-bottom: 0 !important;
 }
-
-/* Better position for back-to-top button */
 .back-to-top {
-  position: fixed;
   bottom: 20px;
   right: 20px;
   z-index: 1000;
   background-color: #1e1e1e;
-  color: white;
-  padding: 8px 12px;
-  border-radius: 5px;
   font-size: 14px;
   opacity: 0.85;
 }
 .back-to-top:hover {
   opacity: 1;
 }
-
-/* Dark mode overrides (apply to background, cards, map container) */
 .dark-mode {
   background-color: #111827 !important;
   color: #e5e7eb;
 }
-
 .dark-mode .property-card {
   background-color: #1f2937 !important;
   border: 1px solid #374151;
   color: #f3f4f6;
 }
-
 .dark-mode .filters-container {
   background-color: #1f2937;
 }
-
 .dark-mode .map-view,
 .dark-mode .fixed-map-container {
   background-color: #1f2937 !important;
   border-left: 1px solid #374151;
 }
-
-/* Dark mode for sticky filter bar */
 .dark-mode .sticky-filters {
   background-color: #111827 !important;
   border-bottom: 1px solid #374151;
 }
 
-/* Fix double sticky header visual clash */
+/* 
+========================================
+8️⃣ HEADER & SCROLL BEHAVIOUR
+======================================== 
+*/
 .header-shadow {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-
-/* Scroll behavior improvement */
 html {
   scroll-behavior: smooth;
 }
 
-/* === 📱 MEDIA QUERIES: MOBILE RESPONSIVE === */
+/* 
+========================================
+9️⃣ MEDIA QUERIES: MOBILE RESPONSIVE
+======================================== 
+*/
 @media (max-width: 768px) {
   .content-layout {
     flex-direction: column;
@@ -236,7 +232,17 @@ html {
     width: 100% !important;
     height: 300px !important;
     position: relative !important;
+    top: unset;
     border-left: none;
+  }
+
+  .sticky-primary {
+    flex-wrap: wrap;
+    justify-content: space-between;
+  }
+
+  .filters-row {
+    flex-direction: column;
   }
 
   .back-to-top {
