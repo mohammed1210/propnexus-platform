@@ -26,7 +26,7 @@ const PropertyDetailsPage = () => {
   const [showMap, setShowMap] = useState(true);
   const [showExplanation, setShowExplanation] = useState(false);
 
-  // === [2] FETCH PROPERTY DATA ===
+    // === [2] FETCH PROPERTY DATA ===
   useEffect(() => {
     const fetchProperty = async () => {
       try {
@@ -85,7 +85,7 @@ const PropertyDetailsPage = () => {
     generateStrategies();
   }, [property]);
 
-  // === [5] SAVE DEAL TO FASTAPI BACKEND ===
+  // === [5] SAVE DEAL TO BACKEND ===
   const handleSaveDeal = async () => {
     if (!property || !BACKEND_BASE_URL) return;
     try {
@@ -113,7 +113,7 @@ const PropertyDetailsPage = () => {
     }
   };
 
-  // === [6] DOWNLOAD DEAL PACK TO PDF ===
+  // === [6] DOWNLOAD DEAL PACK ===
   const handleDownloadPDF = () => {
     if (!property) return;
     const element = document.getElementById('deal-pack');
@@ -121,14 +121,14 @@ const PropertyDetailsPage = () => {
     html2pdf().set({ margin: 0.5, filename: `${property.title}_deal_pack.pdf` }).from(element).save();
   };
 
-  // === [7] EXPORT TO CRM / COPY JSON ===
+  // === [7] COPY JSON TO CRM ===
   const handleCopyJSON = () => {
     if (!property) return;
     navigator.clipboard.writeText(JSON.stringify(property, null, 2));
     alert('Property JSON copied to clipboard!');
   };
 
-  // === [8] LOADING STATE ===
+    // === [8] LOADING STATE ===
   if (!property) {
     return <div className="p-8 text-center text-gray-600 dark:text-gray-300">Loading property details...</div>;
   }
@@ -201,7 +201,7 @@ const PropertyDetailsPage = () => {
           )}
         </div>
 
-        {/* === [15] MODULES === */}
+                {/* === [15] MODULES === */}
         <InvestmentSummary property={property} />
         <ExitStrategyGenerator {...property} />
         <MortgageCalculator price={property.price} />
@@ -210,7 +210,9 @@ const PropertyDetailsPage = () => {
         {/* === [16] AREA INTELLIGENCE === */}
         <div className="mt-10">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">📍 Area Intelligence</h3>
-          <p className="text-gray-600 dark:text-gray-300">Avg. rental yield: 5.2% | Crime rate: Low | Transport: Good | Schools: Rated Good+</p>
+          <p className="text-gray-600 dark:text-gray-300">
+            Avg. rental yield: 5.2% | Crime rate: Low | Transport: Good | Schools: Rated Good+
+          </p>
         </div>
 
         {/* === [17] NOTES FIELD === */}
@@ -219,26 +221,61 @@ const PropertyDetailsPage = () => {
 
       {/* === [18] RIGHT COLUMN: DEAL SUMMARY + MAP === */}
       <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-8 md:mt-0">
-        <div id="deal-pack" className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6 shadow-sm">
+        <div
+          id="deal-pack"
+          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6 shadow-sm"
+        >
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">📊 Deal Summary</h2>
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-800 dark:text-gray-200">
-            <div><p className="font-semibold">Price</p><p>£{property.price?.toLocaleString() || 'N/A'}</p></div>
-            <div><p className="font-semibold">Yield</p><p>{property.yield_percent || 'N/A'}%</p></div>
-            <div><p className="font-semibold">ROI</p><p>{property.roi_percent || 'N/A'}%</p></div>
-            <div><p className="font-semibold">Type</p><p>{property.investmentType || 'N/A'}</p></div>
+            <div>
+              <p className="font-semibold">Price</p>
+              <p>£{property.price?.toLocaleString() || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="font-semibold">Yield</p>
+              <p>{property.yield_percent || 'N/A'}%</p>
+            </div>
+            <div>
+              <p className="font-semibold">ROI</p>
+              <p>{property.roi_percent || 'N/A'}%</p>
+            </div>
+            <div>
+              <p className="font-semibold">Type</p>
+              <p>{property.investmentType || 'N/A'}</p>
+            </div>
           </div>
 
           <div className="mt-4 flex flex-col gap-2">
-            <button onClick={handleSaveDeal} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm">💾 Save Deal </button>
-            <button onClick={handleDownloadPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">📄 Download Deal Pack</button>
-            <button onClick={handleCopyJSON} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm">🔗 Copy to CRM</button>
+            <button
+              onClick={handleSaveDeal}
+              className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm"
+            >
+              💾 Save Deal
+            </button>
+            <button
+              onClick={handleDownloadPDF}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm"
+            >
+              📄 Download Deal Pack
+            </button>
+            <button
+              onClick={handleCopyJSON}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm"
+            >
+              🔗 Copy to CRM
+            </button>
           </div>
         </div>
 
-        {showMap && <div className="h-72"><MapView properties={[property]} /></div>}
+        {/* === [19] MAP VIEW === */}
+        {showMap && (
+          <div className="h-72">
+            <MapView properties={[property]} />
+          </div>
+        )}
       </div>
 
-      {/* === [19] FLOATING AI CHATBOT === */}
+      {/* === [20] FLOATING AI CHATBOT === */}
       <AIChatbot />
     </div>
   );
