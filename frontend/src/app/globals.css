@@ -33,24 +33,7 @@ a {
 .dashboard-layout {
   display: flex;
   flex-direction: row;
-  gap: 1rem;
-}
-
-.property-list {
-  flex: 1;
-  padding-right: 1rem; /* Removed overflow-y to allow full body scroll */
-}
-
-.fixed-map-container {
-  width: 40%;
-  min-width: 320px;
-  max-height: calc(100vh - 160px);
-  position: sticky;
-  top: 140px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  gap: 1.5rem;
 }
 
 /* 🔝 Filters Sticky Bar (Only This is Sticky Now) */
@@ -80,7 +63,7 @@ body.dark-mode .sticky-primary {
   min-width: 140px;
 }
 
-/* 🎛 Advanced Filters Row */
+/* 🎛 Filters Row */
 .filters-row {
   display: flex;
   flex-wrap: wrap;
@@ -164,6 +147,8 @@ body.dark-mode .filters-row div label {
   color: white;
   cursor: pointer;
   height: 2.5rem;
+  padding: 0 1rem;
+  border: none;
 }
 
 .small-button:hover {
@@ -176,65 +161,57 @@ body.dark-mode .filters-row div label {
   font-weight: 600;
   height: 2.5rem;
   cursor: pointer;
+  border: none;
+  padding: 0 1rem;
 }
 
 .map-toggle-button:hover {
   background-color: #1e293b;
 }
 
+/* 📏 Filter & Layout Sizing Consistency */
+.filter-input.large {
+  flex: 2;
+  min-width: 220px;
+}
+
+.filter-select.small {
+  flex: 1;
+  min-width: 180px;
+}
+
+/* ⚙️ Sticky bar refinement (Prevent stacking) */
+.sticky-primary button {
+  min-width: 120px;
+}
+
 /* 🧭 Map View */
-.map-view {
-  flex: 0 0 40%;
-  height: calc(100vh - 180px);
-  border-radius: 8px;
-  overflow: hidden;
+.fixed-map-container {
+  width: 40%;
+  min-width: 320px;
+  max-height: calc(100vh - 160px);
   position: sticky;
   top: 140px;
   border: 1px solid #e2e8f0;
-  background-color: #f8fafc;
-  margin-top: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
-body.dark-mode .map-view {
-  background-color: #1e1e1e;
+body.dark-mode .fixed-map-container {
   border-color: #334155;
   box-shadow: 0 2px 6px rgba(255, 255, 255, 0.05);
 }
 
-/* 📱 Responsive Layout */
-@media (max-width: 768px) {
-  .dashboard-layout {
-    flex-direction: column;
-  }
+.fixed-map-container .leaflet-container {
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+  scrollbar-width: none;
+}
 
-  .property-list {
-    padding-right: 0;
-  }
-
-  .map-view {
-    width: 100%;
-    height: 400px;
-    position: relative;
-    top: 0;
-    margin-top: 1rem;
-  }
-
-  .sticky-primary,
-  .filters-row {
-    flex-direction: column;
-    gap: 10px;
-    padding: 12px 16px;
-  }
-
-  .sticky-primary > *,
-  .filters-row > div {
-    flex: 1 1 100%;
-  }
-
-  .back-to-top {
-    right: 16px;
-    bottom: 16px;
-  }
+.fixed-map-container .leaflet-container::-webkit-scrollbar {
+  display: none;
 }
 
 /* 🔝 Back to Top Button (Only When Scrolling) */
@@ -263,6 +240,13 @@ body.dark-mode .map-view {
   display: block;
 }
 
+/* 📦 Property Card Buttons */
+.property-card-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
 /* 🧠 Dark Mode Element Styling */
 body.dark-mode .property-list {
   color: #e2e8f0;
@@ -286,7 +270,6 @@ body.dark-mode .map-toggle-button:hover {
   background-color: #334155;
 }
 
-/* 🌑 Dark Mode Polishing */
 body.dark-mode .filter-input,
 body.dark-mode .filter-select,
 body.dark-mode .small-button,
@@ -305,22 +288,6 @@ body.dark-mode .map-toggle-button:hover {
   background-color: #475569;
 }
 
-/* 📏 Filter & Layout Sizing Consistency */
-.filter-input.large {
-  flex: 2;
-  min-width: 220px;
-}
-
-.filter-select.small {
-  flex: 1;
-  min-width: 180px;
-}
-
-/* ⚙️ Sticky bar refinement (Prevent stacking) */
-.sticky-primary button {
-  min-width: 120px;
-}
-
 /* 🧩 Layout Row Container */
 .content-layout {
   display: flex;
@@ -329,23 +296,47 @@ body.dark-mode .map-toggle-button:hover {
   margin-top: 1rem;
 }
 
+/* 📱 Responsive adjustments */
 @media (max-width: 768px) {
-  .sticky-primary {
+  .dashboard-layout {
     flex-direction: column;
   }
 
-  .content-layout {
-    flex-direction: column;
+  .property-list {
+    max-height: none;
+    padding-right: 0;
   }
 
+  .sticky-primary,
+  .filters-row {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 16px;
+  }
+
+  .sticky-primary > *,
+  .filters-row > div,
   .filter-input.large,
   .filter-select.small,
   .sticky-primary button {
     width: 100%;
   }
 
-  .map-view {
-    height: 300px;
+  .fixed-map-container {
+    width: 100%;
+    height: 400px;
+    position: relative;
+    top: 0;
+    margin-top: 1rem;
+  }
+
+  .back-to-top {
+    right: 16px;
+    bottom: 16px;
+  }
+
+  .content-layout {
+    flex-direction: column;
   }
 }
 
@@ -358,26 +349,4 @@ body.dark-mode .map-toggle-button:hover {
 .small-button:hover,
 .map-toggle-button:hover {
   transform: scale(1.03);
-}
-
-/* 📍 Map Pin Cleanup */
-.leaflet-container {
-  z-index: 0;
-}
-
-/* 📦 Property Card Button Alignment */
-.property-card-buttons {
-  display: flex;
-  gap: 1rem;
-  margin-top: 0.75rem;
-}
-
-/* 🧭 Map Scrollbar Hidden */
-.map-view::-webkit-scrollbar {
-  display: none;
-}
-
-.map-view {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
 }
