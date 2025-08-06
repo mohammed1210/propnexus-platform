@@ -284,3 +284,106 @@ body.dark-mode .map-toggle-button {
 body.dark-mode .map-toggle-button:hover {
   background-color: #334155;
 }
+
+/* 🌑 Dark Mode Polishing */
+body.dark-mode .filter-input,
+body.dark-mode .filter-select,
+body.dark-mode .small-button,
+body.dark-mode .map-toggle-button {
+  background-color: #1e293b;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+body.dark-mode .property-list p {
+  color: #cbd5e1;
+}
+
+body.dark-mode .small-button:hover,
+body.dark-mode .map-toggle-button:hover {
+  background-color: #475569;
+}
+
+/* 📏 Filter & Layout Sizing Consistency */
+.filter-input.large {
+  flex: 2;
+  min-width: 220px;
+}
+
+.filter-select.small {
+  flex: 1;
+  min-width: 180px;
+}
+
+/* ⚙️ Sticky bar refinement (Prevent stacking) */
+.sticky-primary button {
+  min-width: 120px;
+}
+
+/* 🧭 Map should start flush below filters */
+.map-view,
+.fixed-map-container {
+  margin-top: 0;
+}
+
+/* 🧩 Layout Row Container */
+.content-layout {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+/* 📱 Responsive adjustments */
+@media (max-width: 768px) {
+  .sticky-primary {
+    flex-direction: column;
+  }
+
+  .content-layout {
+    flex-direction: column;
+  }
+
+  .filter-input.large,
+  .filter-select.small,
+  .sticky-primary button {
+    width: 100%;
+  }
+
+  .map-view {
+    height: 300px;
+  }
+}
+
+/* 🎯 Button Hover Animation */
+.small-button,
+.map-toggle-button {
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.small-button:hover,
+.map-toggle-button:hover {
+  transform: scale(1.03);
+}
+
+/* 📍 Map Pin Cleanup */
+.leaflet-container {
+  z-index: 0;
+}
+
+/* 📦 Property Card Button Alignment */
+.property-card-buttons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+/* 🧭 Map Scrollbar Hidden */
+.map-view::-webkit-scrollbar {
+  display: none;
+}
+
+.map-view {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
