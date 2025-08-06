@@ -217,7 +217,8 @@ const PropertyDetailsPage = () => {
           </div>
 
           <div className="mt-4 flex flex-col gap-2">
-            <button onClick={handleSaveDeal} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm">💾 Save Deal</button>
+            {/* Save Deal Button with API call */}
+            <button onClick={handleSaveDeal} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm">💾 Save Deal </button>
             <button onClick={handleDownloadPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">📄 Download Deal Pack</button>
             <button onClick={handleCopyJSON} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm">🔗 Copy to CRM</button>
           </div>
