@@ -14,7 +14,6 @@ import dynamic from 'next/dynamic';
 import html2pdf from 'html2pdf.js';
 
 const MapView = dynamic(() => import('@/app/MapView'), { ssr: false });
-
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // === [1] MAIN COMPONENT ===
@@ -86,18 +85,31 @@ const PropertyDetailsPage = () => {
     generateStrategies();
   }, [property]);
 
-  // === [5] SAVE DEAL TO SUPABASE ===
+  // === [5] SAVE DEAL TO FASTAPI BACKEND ===
   const handleSaveDeal = async () => {
-    if (!property) return;
+    if (!property || !BACKEND_BASE_URL) return;
     try {
-      await fetch('/api/save-deal', {
+      const res = await fetch(`${BACKEND_BASE_URL}/save-deal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(property),
+        body: JSON.stringify({
+          property_id: property.id,
+          title: property.title,
+          location: property.location,
+          price: property.price,
+          yield_percent: property.yield_percent,
+          roi_percent: property.roi_percent,
+          saved_at: new Date().toISOString(),
+        }),
       });
-      alert('Deal saved!');
-    } catch (err) {
-      console.error('Error saving deal:', err);
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      alert('✅ Deal saved successfully!');
+    } catch (error) {
+      console.error('Error saving deal:', error);
+      alert('❌ Failed to save deal.');
     }
   };
 
@@ -217,7 +229,6 @@ const PropertyDetailsPage = () => {
           </div>
 
           <div className="mt-4 flex flex-col gap-2">
-            {/* Save Deal Button with API call */}
             <button onClick={handleSaveDeal} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm">💾 Save Deal </button>
             <button onClick={handleDownloadPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">📄 Download Deal Pack</button>
             <button onClick={handleCopyJSON} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm">🔗 Copy to CRM</button>
