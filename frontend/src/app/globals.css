@@ -159,4 +159,69 @@ h1, h2, h3, p {
     bottom: 0.5rem;
     right: 0.5rem;
   }
+
+  /* === 📍 SECTION: Final Layout Patch === */
+
+/* Tighten map padding / eliminate white gap */
+.fixed-map-container {
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+.map-view {
+  padding-bottom: 0 !important;
+}
+
+/* Better position for back-to-top button */
+.back-to-top {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  background-color: #1e1e1e;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 5px;
+  font-size: 14px;
+  opacity: 0.85;
+}
+.back-to-top:hover {
+  opacity: 1;
+}
+
+/* Dark mode overrides (apply to background, cards, map container) */
+.dark-mode {
+  background-color: #111827 !important;
+  color: #e5e7eb;
+}
+
+.dark-mode .property-card {
+  background-color: #1f2937 !important;
+  border: 1px solid #374151;
+  color: #f3f4f6;
+}
+
+.dark-mode .filters-container {
+  background-color: #1f2937;
+}
+
+.dark-mode .map-view,
+.dark-mode .fixed-map-container {
+  background-color: #1f2937 !important;
+  border-left: 1px solid #374151;
+}
+
+/* Dark mode for sticky filter bar */
+.dark-mode .sticky-filters {
+  background-color: #111827 !important;
+  border-bottom: 1px solid #374151;
+}
+
+/* Fix double sticky header visual clash */
+.header-shadow {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Scroll behavior improvement */
+html {
+  scroll-behavior: smooth;
 }
