@@ -33,8 +33,7 @@ export default function PropertiesPage() {
 
   useEffect(() => {
     const filtered = properties.filter((property) => {
-      const matchesPrice =
-        property.price >= minPrice && property.price <= maxPrice;
+      const matchesPrice = property.price >= minPrice && property.price <= maxPrice;
 
       const matchesLocation = property.location
         ?.toLowerCase()
@@ -75,54 +74,53 @@ export default function PropertiesPage() {
 
   return (
     <div className="main-wrapper">
-      {/* 🔝 Sticky Filter Bar */}
-      <div className="sticky-top-header">
-        <div className="sticky-primary">
-          <input
-            className="filter-input large"
-            type="text"
-            placeholder="🔎 Search location"
-            value={searchLocation}
-            onChange={(e) => setSearchLocation(e.target.value)}
-          />
+      {/* 🔝 Filters Only (Sticky) */}
+      <div className="sticky-primary">
+        <input
+          className="filter-input large"
+          type="text"
+          placeholder="🔎 Search location"
+          value={searchLocation}
+          onChange={(e) => setSearchLocation(e.target.value)}
+        />
 
-          <select
-            className="filter-select small"
-            value={investmentType}
-            onChange={(e) => setInvestmentType(e.target.value)}
-          >
-            <option value="All">All Investment Types</option>
-            <option value="HMO">HMO</option>
-            <option value="Flips">Flips</option>
-            <option value="Buy to Let">Buy to Let</option>
-          </select>
+        <select
+          className="filter-select small"
+          value={investmentType}
+          onChange={(e) => setInvestmentType(e.target.value)}
+        >
+          <option value="All">All Investment Types</option>
+          <option value="HMO">HMO</option>
+          <option value="Flips">Flips</option>
+          <option value="Buy to Let">Buy to Let</option>
+        </select>
 
-          <button
-            onClick={() => setShowMoreFilters(!showMoreFilters)}
-            className="small-button"
-            title="Show more filters"
-          >
-            ⚙️ Filters
-          </button>
+        <button
+          onClick={() => setShowMoreFilters(!showMoreFilters)}
+          className="small-button"
+          title="Show more filters"
+        >
+          ⚙️ Filters
+        </button>
 
-          <button
-            onClick={() => setShowMap(!showMap)}
-            className="small-button"
-            style={{
-              backgroundColor: showMap ? '#334155' : '#3b82f6',
-              color: '#fff',
-            }}
-          >
-            {showMap ? 'Hide Map 🗺' : 'Show Map 🗺'}
-          </button>
+        <button
+          onClick={() => setShowMap(!showMap)}
+          className="small-button"
+          style={{
+            backgroundColor: showMap ? '#334155' : '#3b82f6',
+            color: '#fff',
+          }}
+        >
+          {showMap ? 'Hide Map 🗺' : 'Show Map 🗺'}
+        </button>
 
-          <button
-            className="mode-toggle"
-            onClick={() => document.body.classList.toggle('dark-mode')}
-          >
-            🌙 Dark Mode
-          </button>
-        </div>
+        <button
+          className="small-button"
+          style={{ marginLeft: 'auto' }}
+          onClick={() => document.body.classList.toggle('dark-mode')}
+        >
+          🌙 Dark Mode
+        </button>
       </div>
 
       {/* 🎛️ Advanced Filters */}
@@ -212,39 +210,13 @@ export default function PropertiesPage() {
         )}
       </div>
 
-      {/* 🔝 Back to Top Button */}
+      {/* 🔝 Back to Top (Still Works) */}
       <button
-        id="backToTop"
+        className="back-to-top"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          backgroundColor: '#1e40af',
-          color: 'white',
-          padding: '10px 14px',
-          borderRadius: '6px',
-          cursor: 'pointer',
-          zIndex: 1000,
-          display: 'none',
-        }}
       >
         ⬆ Back to Top
       </button>
-
-      <script dangerouslySetInnerHTML={{
-        __html: `
-        window.addEventListener('scroll', () => {
-          const btn = document.getElementById('backToTop');
-          if (!btn) return;
-          if (window.scrollY > 300) {
-            btn.style.display = 'block';
-          } else {
-            btn.style.display = 'none';
-          }
-        });
-      `
-      }} />
     </div>
   );
 }
