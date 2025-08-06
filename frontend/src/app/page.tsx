@@ -97,7 +97,7 @@ export default function PropertiesPage() {
 
         <button
           onClick={() => setShowMoreFilters(!showMoreFilters)}
-          className="small-button"
+          className="filter-button"
           title="Show more filters"
         >
           ⚙️ Filters
@@ -105,17 +105,17 @@ export default function PropertiesPage() {
 
         <button
           onClick={() => setShowMap(!showMap)}
-          className="small-button"
+          className="toggle-button"
           style={{
             backgroundColor: showMap ? '#334155' : '#3b82f6',
             color: '#fff',
           }}
         >
-          {showMap ? 'Hide Map 🗺' : 'Show Map 🗺'}
+          {showMap ? 'Hide Map 🗺️' : 'Show Map 🗺️'}
         </button>
 
         <button
-          className="small-button"
+          className="toggle-button"
           style={{ marginLeft: 'auto' }}
           onClick={() => document.body.classList.toggle('dark-mode')}
         >
