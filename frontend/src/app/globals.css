@@ -225,3 +225,22 @@ h1, h2, h3, p {
 html {
   scroll-behavior: smooth;
 }
+
+/* === 📱 MEDIA QUERIES: MOBILE RESPONSIVE === */
+@media (max-width: 768px) {
+  .content-layout {
+    flex-direction: column;
+  }
+
+  .map-view {
+    width: 100% !important;
+    height: 300px !important;
+    position: relative !important;
+    border-left: none;
+  }
+
+  .back-to-top {
+    bottom: 80px;
+    right: 16px;
+  }
+}
