@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 import os
 from routes.save_deal import router as save_deal_router
-app.include_router(save_deal_router)
 
 # ✅ Load environment variables
 load_dotenv()
@@ -15,6 +14,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ✅ Create FastAPI app
 app = FastAPI()
+app.include_router(save_deal_router)
 
 # ✅ CORS setup
 origins = [
