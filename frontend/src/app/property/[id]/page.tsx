@@ -1,21 +1,23 @@
 'use client';
 
+// === [0] IMPORTS ===
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Property } from '@/types';
-
 import InvestmentSummary from '@details/InvestmentSummary';
 import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
 import MortgageCalculator from '@details/MortgageCalculator';
 import StampDutyCalculator from '@details/StampDutyCalculator';
 import NotesFields from '@details/NotesFields';
 import AIChatbot from '@details/AIChatbot';
-
 import dynamic from 'next/dynamic';
+import html2pdf from 'html2pdf.js';
+
 const MapView = dynamic(() => import('@/app/MapView'), { ssr: false });
 
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
+// === [1] MAIN COMPONENT ===
 const PropertyDetailsPage = () => {
   const params = useParams() as { id: string };
   const id = params.id;
@@ -23,7 +25,9 @@ const PropertyDetailsPage = () => {
   const [summary, setSummary] = useState<string | null>(null);
   const [strategies, setStrategies] = useState<string[]>([]);
   const [showMap, setShowMap] = useState(true);
+  const [showExplanation, setShowExplanation] = useState(false);
 
+  // === [2] FETCH PROPERTY DATA ===
   useEffect(() => {
     const fetchProperty = async () => {
       try {
@@ -37,6 +41,7 @@ const PropertyDetailsPage = () => {
     if (id && BACKEND_BASE_URL) fetchProperty();
   }, [id]);
 
+  // === [3] GPT INVESTMENT SUMMARY ===
   useEffect(() => {
     const generateSummary = async () => {
       if (!property || !BACKEND_BASE_URL) return;
@@ -44,19 +49,7 @@ const PropertyDetailsPage = () => {
         const res = await fetch(`${BACKEND_BASE_URL}/generate-summary`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            property: {
-              title: property.title,
-              location: property.location,
-              price: property.price,
-              yield_percent: property.yield_percent,
-              roi_percent: property.roi_percent,
-              bedrooms: property.bedrooms,
-              bathrooms: property.bathrooms,
-              investmentType: property.investmentType,
-              propertyType: property.propertyType,
-            },
-          }),
+          body: JSON.stringify({ property }),
         });
         const data = await res.json();
         setSummary(data.summary);
@@ -67,6 +60,7 @@ const PropertyDetailsPage = () => {
     generateSummary();
   }, [property]);
 
+  // === [4] GPT EXIT STRATEGIES ===
   useEffect(() => {
     const generateStrategies = async () => {
       if (!property || !BACKEND_BASE_URL) return;
@@ -92,17 +86,46 @@ const PropertyDetailsPage = () => {
     generateStrategies();
   }, [property]);
 
+  // === [5] SAVE DEAL TO SUPABASE ===
+  const handleSaveDeal = async () => {
+    if (!property) return;
+    try {
+      await fetch('/api/save-deal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(property),
+      });
+      alert('Deal saved!');
+    } catch (err) {
+      console.error('Error saving deal:', err);
+    }
+  };
+
+  // === [6] DOWNLOAD DEAL PACK TO PDF ===
+  const handleDownloadPDF = () => {
+    if (!property) return;
+    const element = document.getElementById('deal-pack');
+    if (!element) return;
+    html2pdf().set({ margin: 0.5, filename: `${property.title}_deal_pack.pdf` }).from(element).save();
+  };
+
+  // === [7] EXPORT TO CRM / COPY JSON ===
+  const handleCopyJSON = () => {
+    if (!property) return;
+    navigator.clipboard.writeText(JSON.stringify(property, null, 2));
+    alert('Property JSON copied to clipboard!');
+  };
+
+  // === [8] LOADING STATE ===
   if (!property) {
-    return (
-      <div className="p-8 text-center text-gray-600 dark:text-gray-300">
-        Loading property details...
-      </div>
-    );
+    return <div className="p-8 text-center text-gray-600 dark:text-gray-300">Loading property details...</div>;
   }
 
+  // === [9] RENDER ===
   return (
     <div className="relative flex flex-col md:flex-row max-w-7xl mx-auto px-4 py-6">
-      {/* Left Column */}
+      
+      {/* === [10] LEFT COLUMN === */}
       <div className="md:w-2/3 md:pr-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{property.title}</h1>
         <p className="text-gray-600 dark:text-gray-300 mb-2">{property.location}</p>
@@ -111,140 +134,99 @@ const PropertyDetailsPage = () => {
           src={property.imageurl || '/placeholder.jpg'}
           alt="Property"
           className="w-full h-80 object-cover rounded-md shadow-sm mb-4"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.src = '/placeholder.jpg';
-          }}
+          onError={(e) => (e.target as HTMLImageElement).src = '/placeholder.jpg'}
         />
 
-        {/* Toggle for MapView */}
+        {/* === [11] TOGGLE MAP VIEW === */}
         <div className="mb-4">
           <label className="inline-flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              className="form-checkbox"
-              checked={showMap}
-              onChange={() => setShowMap(!showMap)}
-            />
+            <input type="checkbox" className="form-checkbox" checked={showMap} onChange={() => setShowMap(!showMap)} />
             <span className="text-sm text-gray-700 dark:text-gray-300">Show Map View</span>
           </label>
         </div>
 
-                {/* GPT Investment Summary */}
+        {/* === [12] GPT INVESTMENT SUMMARY === */}
         {summary && (
           <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-md p-4 mb-6">
-            <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">
-              📘 GPT Investment Summary
-            </h3>
-            <p className="text-blue-700 dark:text-blue-100 whitespace-pre-wrap">
-              {summary}
-            </p>
+            <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">📘 GPT Investment Summary</h3>
+            <p className="text-blue-700 dark:text-blue-100 whitespace-pre-wrap">{summary}</p>
           </div>
         )}
 
-        {/* GPT Exit Strategies */}
+        {/* === [13] GPT EXIT STRATEGIES === */}
         {strategies.length > 0 && (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">
-              💼 GPT Exit Strategies
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">💼 GPT Exit Strategies</h3>
             <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 space-y-1">
-              {strategies.map((strategy, i) => (
-                <li key={i}>{strategy}</li>
-              ))}
+              {strategies.map((s, i) => (<li key={i}>{s}</li>))}
             </ul>
           </div>
         )}
 
+        {/* === [14] AI SCORING BREAKDOWN === */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">🤖 AI Deal Score</h3>
+          <div className="space-y-2">
+            <div className="text-sm text-gray-600 dark:text-gray-300">ROI Strength</div>
+            <div className="w-full bg-gray-300 rounded h-2">
+              <div className="bg-green-500 h-2 rounded" style={{ width: `${property.roi_percent}%` }} />
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-300">Yield Potential</div>
+            <div className="w-full bg-gray-300 rounded h-2">
+              <div className="bg-blue-500 h-2 rounded" style={{ width: `${property.yield_percent}%` }} />
+            </div>
+          </div>
+          <button
+            onClick={() => setShowExplanation(true)}
+            className="text-xs text-blue-600 mt-2 underline"
+          >
+            What do these scores mean?
+          </button>
+          {showExplanation && (
+            <div className="text-sm mt-2 text-gray-700 dark:text-gray-300">
+              ROI and Yield scores are based on projected returns. Higher is better.
+            </div>
+          )}
+        </div>
+
+        {/* === [15] MODULES === */}
         <InvestmentSummary property={property} />
-
-        <ExitStrategyGenerator
-          title={property.title}
-          location={property.location}
-          price={property.price}
-          yield_percent={property.yield_percent}
-          roi_percent={property.roi_percent}
-          propertyType={property.propertyType}
-          investmentType={property.investmentType}
-          description={property.description}
-        />
-
+        <ExitStrategyGenerator {...property} />
         <MortgageCalculator price={property.price} />
         <StampDutyCalculator price={property.price} />
 
-        {/* Area Intelligence */}
+        {/* === [16] AREA INTELLIGENCE === */}
         <div className="mt-10">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
-            📍 Area Intelligence
-          </h3>
-          <p className="text-gray-600 dark:text-gray-300">
-            Avg. rental yield: 5.2% | Crime rate: Low | Transport: Good | Schools: Rated Good+
-          </p>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">📍 Area Intelligence</h3>
+          <p className="text-gray-600 dark:text-gray-300">Avg. rental yield: 5.2% | Crime rate: Low | Transport: Good | Schools: Rated Good+</p>
         </div>
 
+        {/* === [17] NOTES FIELD === */}
         <NotesFields propertyId={id} />
       </div>
 
-      {/* Right Column — Static Map + Deal Summary */}
+      {/* === [18] RIGHT COLUMN: DEAL SUMMARY + MAP === */}
       <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-8 md:mt-0">
-        {/* Deal Summary Box */}
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6 shadow-sm">
+        <div id="deal-pack" className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6 shadow-sm">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">📊 Deal Summary</h2>
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-800 dark:text-gray-200">
-            <div>
-              <p className="font-semibold">Price</p>
-              <p>
-                £
-                {typeof property.price === 'number'
-                  ? property.price.toLocaleString()
-                  : 'N/A'}
-              </p>
-            </div>
-            <div>
-              <p className="font-semibold">Yield</p>
-              <p>
-                {typeof property.yield_percent === 'number'
-                  ? `${property.yield_percent}%`
-                  : 'N/A'}
-              </p>
-            </div>
-            <div>
-              <p className="font-semibold">ROI</p>
-              <p>
-                {typeof property.roi_percent === 'number'
-                  ? `${property.roi_percent}%`
-                  : 'N/A'}
-              </p>
-            </div>
-            <div>
-              <p className="font-semibold">Type</p>
-              <p>{property.investmentType || 'N/A'}</p>
-            </div>
+            <div><p className="font-semibold">Price</p><p>£{property.price?.toLocaleString() || 'N/A'}</p></div>
+            <div><p className="font-semibold">Yield</p><p>{property.yield_percent || 'N/A'}%</p></div>
+            <div><p className="font-semibold">ROI</p><p>{property.roi_percent || 'N/A'}%</p></div>
+            <div><p className="font-semibold">Type</p><p>{property.investmentType || 'N/A'}</p></div>
           </div>
 
-          {/* Buttons */}
           <div className="mt-4 flex flex-col gap-2">
-            <button className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm">
-              💾 Save Deal
-            </button>
-            <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">
-              📄 Download Deal Pack
-            </button>
-            <button className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm">
-              🔗 Copy Link
-            </button>
+            <button onClick={handleSaveDeal} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm">💾 Save Deal</button>
+            <button onClick={handleDownloadPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">📄 Download Deal Pack</button>
+            <button onClick={handleCopyJSON} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm">🔗 Copy to CRM</button>
           </div>
         </div>
 
-        {/* Map View */}
-        {showMap && (
-          <div className="h-72">
-            <MapView properties={[property]} />
-          </div>
-        )}
+        {showMap && <div className="h-72"><MapView properties={[property]} /></div>}
       </div>
 
-      {/* AI Assistant Floating Modal */}
+      {/* === [19] FLOATING AI CHATBOT === */}
       <AIChatbot />
     </div>
   );
