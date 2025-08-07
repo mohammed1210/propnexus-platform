@@ -249,4 +249,16 @@ html {
     bottom: 80px;
     right: 16px;
   }
+
+  .section-box {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+  background-color: white;
+}
+.dark .section-box {
+  background-color: #1a1a1a;
+  border-color: #333;
+}
 }
