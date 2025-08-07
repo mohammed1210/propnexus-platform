@@ -1,122 +1,223 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import AIChatbot from '@details/AIChatbot';
-import InvestmentSummary from '@details/InvestmentSummary';
-import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
-import MortgageCalculator from '@details/MortgageCalculator';
-import StampDutyCalculator from '@details/StampDutyCalculator';
-import NotesFields from '@details/NotesFields';
-import AreaIntel from '@details/AreaIntel';
-import MapSingle from '@details/MapSingle';
-import { Property } from '@/types';
+import { Property } from '../types';
+import PropertyCard from '../../components/PropertyCard';
+import dynamic from 'next/dynamic';
 
-export default function PropertyDetailsPage() {
-  const { id } = useParams();
-  const [property, setProperty] = useState<Property | null>(null);
+const MapView = dynamic(() => import('./MapView'), { ssr: false });
+
+export default function PropertiesPage() {
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
+  const [minPrice, setMinPrice] = useState<number>(0);
+  const [maxPrice, setMaxPrice] = useState<number>(2000000);
+  const [searchLocation, setSearchLocation] = useState<string>('');
+  const [bedrooms, setBedrooms] = useState<string>('Any');
+  const [propertyType, setPropertyType] = useState<string>('All');
+  const [investmentType, setInvestmentType] = useState<string>('All');
+  const [minYield, setMinYield] = useState<number>(0);
+  const [minROI, setMinROI] = useState<number>(0);
+  const [showMap, setShowMap] = useState<boolean>(true);
+  const [showMoreFilters, setShowMoreFilters] = useState<boolean>(false);
 
   useEffect(() => {
-    const fetchProperty = async () => {
-      try {
-        const res = await fetch(`/api/properties/${id}`);
-        const data = await res.json();
-        setProperty(data);
-      } catch (err) {
-        console.error('Failed to fetch property:', err);
-      }
-    };
-    fetchProperty();
-  }, [id]);
+    fetch("https://propnexus-backend-production.up.railway.app/properties")
+      .then((res) => res.json())
+      .then((data) => {
+        setProperties(data);
+        setFilteredProperties(data);
+      })
+      .catch((err) => console.error('Error fetching properties:', err));
+  }, []);
 
-  if (!property) return <div className="p-6 text-center text-gray-600">Loading property...</div>;
+  useEffect(() => {
+    const filtered = properties.filter((property) => {
+      const matchesPrice = property.price >= minPrice && property.price <= maxPrice;
+
+      const matchesLocation = property.location
+        ?.toLowerCase()
+        .includes(searchLocation.toLowerCase());
+
+      const matchesBedrooms =
+        bedrooms === 'Any' || Number(property.bedrooms) === Number(bedrooms);
+
+      const matchesPropertyType =
+        propertyType === 'All' ||
+        (property.propertyType || '').toLowerCase() === propertyType.toLowerCase();
+
+      const matchesYield = (property.yield_percent || 0) >= minYield;
+      const matchesROI = (property.roi_percent || 0) >= minROI;
+
+      return (
+        matchesPrice &&
+        matchesLocation &&
+        matchesBedrooms &&
+        matchesPropertyType &&
+        matchesYield &&
+        matchesROI
+      );
+    });
+
+    setFilteredProperties(filtered);
+  }, [
+    minPrice,
+    maxPrice,
+    searchLocation,
+    properties,
+    bedrooms,
+    propertyType,
+    minYield,
+    minROI,
+    investmentType,
+  ]);
 
   return (
-    <div className="flex flex-col md:flex-row px-4 md:px-12 py-6">
-      {/* ===== Left Column ===== */}
-      <div className="md:w-2/3 md:pr-8">
-        {/* Title */}
-        <h1 className="text-2xl font-bold mb-1">{property.title}</h1>
-        <p className="text-gray-500 mb-3">{property.postcode}</p>
-        <img
-          src={property.imageurl || '/placeholder.jpg'}
-          alt={property.title}
-          className="w-full h-64 object-cover rounded-lg mb-4"
+    <div className="main-wrapper">
+      {/* 🔝 Filters Only (Sticky) */}
+      <div className="sticky-primary">
+        <input
+          className="filter-input large"
+          type="text"
+          placeholder="🔎 Search location"
+          value={searchLocation}
+          onChange={(e) => setSearchLocation(e.target.value)}
         />
 
-        {/* Investment Summary */}
-        <div className="section-box">
-          <InvestmentSummary property={property} />
-        </div>
+        <select
+          className="filter-select small"
+          value={investmentType}
+          onChange={(e) => setInvestmentType(e.target.value)}
+        >
+          <option value="All">All Investment Types</option>
+          <option value="HMO">HMO</option>
+          <option value="Flips">Flips</option>
+          <option value="Buy to Let">Buy to Let</option>
+        </select>
 
-        {/* Exit Strategy */}
-        <div className="section-box">
-          <ExitStrategyGenerator property={property} />
-        </div>
+        <button
+          onClick={() => setShowMoreFilters(!showMoreFilters)}
+          className="small-button"
+          title="Show more filters"
+        >
+          ⚙️ Filters
+        </button>
 
-        {/* AI Deal Score */}
-        <div className="section-box">
-          <h2 className="text-lg font-semibold mb-1">🧠 AI Deal Score</h2>
-          <div className="mb-2">
-            <p><strong>ROI Strength</strong></p>
-            <p><strong>Yield Potential</strong></p>
+        <button
+          onClick={() => setShowMap(!showMap)}
+          className="small-button"
+          style={{
+            backgroundColor: showMap ? '#334155' : '#3b82f6',
+            color: '#fff',
+          }}
+        >
+          {showMap ? 'Hide Map 🗺' : 'Show Map 🗺'}
+        </button>
+
+        <button
+          className="small-button"
+          style={{ marginLeft: 'auto' }}
+          onClick={() => document.body.classList.toggle('dark-mode')}
+        >
+          🌙 Dark Mode
+        </button>
+      </div>
+
+      {/* 🎛️ Advanced Filters */}
+      {showMoreFilters && (
+        <div className="filters-row">
+          <div>
+            <label>Min Price</label>
+            <input
+              type="number"
+              value={minPrice}
+              onChange={(e) => setMinPrice(Number(e.target.value))}
+            />
           </div>
-          <button className="text-sm underline text-gray-500 mt-2">❓ What do these scores mean?</button>
+
+          <div>
+            <label>Max Price</label>
+            <input
+              type="number"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(Number(e.target.value))}
+            />
+          </div>
+
+          <div>
+            <label>Bedrooms</label>
+            <select
+              value={bedrooms}
+              onChange={(e) => setBedrooms(e.target.value)}
+            >
+              <option value="Any">Any Beds</option>
+              <option value="1">1 Bed</option>
+              <option value="2">2 Beds</option>
+              <option value="3">3 Beds</option>
+              <option value="4">4+ Beds</option>
+            </select>
+          </div>
+
+          <div>
+            <label>Property Type</label>
+            <select
+              value={propertyType}
+              onChange={(e) => setPropertyType(e.target.value)}
+            >
+              <option value="All">All Types</option>
+              <option value="Flat">Flat</option>
+              <option value="House">House</option>
+              <option value="Studio">Studio</option>
+            </select>
+          </div>
+
+          <div>
+            <label>Min Yield (%)</label>
+            <input
+              type="number"
+              value={minYield}
+              onChange={(e) => setMinYield(Number(e.target.value))}
+            />
+          </div>
+
+          <div>
+            <label>Min ROI (%)</label>
+            <input
+              type="number"
+              value={minROI}
+              onChange={(e) => setMinROI(Number(e.target.value))}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* 🏘️ Property + Map View */}
+      <div className="content-layout">
+        <div className="property-list">
+          {filteredProperties.length > 0 ? (
+            filteredProperties.map((property) => (
+              <PropertyCard key={property.id} property={property} />
+            ))
+          ) : (
+            <p style={{ color: '#64748b' }}>No matching properties found.</p>
+          )}
         </div>
 
-        {/* Mortgage Calculator */}
-        <div className="section-box">
-          <MortgageCalculator propertyPrice={property.price} />
-        </div>
-
-        {/* Stamp Duty Calculator */}
-        <div className="section-box">
-          <StampDutyCalculator propertyPrice={property.price} />
-        </div>
-
-        {/* Area Intelligence */}
-        <div className="section-box">
-          <AreaIntel property={property} />
-        </div>
-
-        {/* Investor Notes */}
-        <div className="section-box">
-          <NotesFields />
-        </div>
+        {showMap && filteredProperties.length > 0 && (
+          <div className="map-view">
+            <MapView properties={filteredProperties} />
+          </div>
+        )}
       </div>
 
-      {/* ===== Right Column ===== */}
-      <div className="md:w-1/3 md:pl-6 mt-8 md:mt-0">
-        {/* Deal Summary */}
-        <div className="section-box">
-          <h3 className="text-lg font-semibold mb-2">📊 Deal Summary</h3>
-          <p><strong>Price:</strong> £{property.price.toLocaleString()}</p>
-          <p><strong>Yield:</strong> {property.yield_percent}%</p>
-          <p><strong>ROI:</strong> {property.roi_percent}%</p>
-          <p><strong>Property Type:</strong> {property.property_type}</p>
-          <p><strong>Investment Type:</strong> {property.investment_type}</p>
-          <p><strong>Source:</strong> {property.source}</p>
-        </div>
-
-        {/* Save/Download/Share Buttons */}
-        <div className="mt-4 flex flex-col gap-3">
-          <button className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded">💾 Save Deal</button>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">📄 Download Deal Pack</button>
-          <button className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">🔗 Copy to CRM</button>
-        </div>
-
-        {/* Static Map */}
-        <div className="mt-6 section-box">
-          <MapSingle
-            latitude={property.latitude}
-            longitude={property.longitude}
-            title={property.title}
-          />
-        </div>
-      </div>
-
-      {/* Floating AI Assistant */}
-      <AIChatbot />
+      {/* 🔝 Back to Top (Still Works) */}
+      <button
+        className="back-to-top"
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+      >
+        ⬆ Back to Top
+      </button>
     </div>
   );
 }
