@@ -89,11 +89,10 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
           <AreaIntel property={property} />
         </div>
 
-        {/* Investor Notes */}
-        <div className="section-box">
-          <NotesFields />
-        </div>
-      </div>
+        {/* ===== [13] Investor Notes ===== */}
+<div className="section-box">
+  <NotesFields propertyId={id} />
+</div>
 
       {/* ===== Right Column ===== */}
       <div className="md:w-1/3 md:pl-6 mt-8 md:mt-0">
