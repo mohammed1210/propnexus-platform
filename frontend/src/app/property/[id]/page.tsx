@@ -114,18 +114,23 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
           <button className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">🔗 Copy to CRM</button>
         </div>
 
-        {/* Static Map */}
-        <div className="mt-6 section-box">
-          <MapSingle
-            latitude={property.latitude}
-            longitude={property.longitude}
-            title={property.title}
-          />
-        </div>
+              {/* === [14] RIGHT COLUMN: Static Map === */}
+      <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-8 md:mt-0">
+        <MapView
+          latitude={property.latitude}
+          longitude={property.longitude}
+          title={property.title}
+        />
       </div>
-
-      {/* Floating AI Assistant */}
-      <AIChatbot />
     </div>
+
+    {/* === [15] Floating AI Assistant === */}
+    <AIChatbot />
+  </div>
+);
+
+}
+
+export default PropertyDetailsPage;
   );
 }
