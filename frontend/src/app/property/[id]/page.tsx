@@ -123,7 +123,5 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 <AIChatbot /> {/* Floating AI Assistant */}
 </div> {/* closes #property-detail-page wrapper */}
 );
-      
-}
 
 export default PropertyDetailsPage;
