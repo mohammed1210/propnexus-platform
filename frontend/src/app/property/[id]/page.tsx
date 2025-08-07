@@ -18,7 +18,7 @@ import {
   FaCopy,
   FaInfoCircle,
 } from 'react-icons/fa'
-import MapSingle from '@/components/property-details/MapSingle';
+import MapSingle from '@details/MapSingle';
 
 const MapView = dynamic(() => import('@/app/MapView'), { ssr: false })
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL
