@@ -18,6 +18,7 @@ import {
   FaCopy,
   FaInfoCircle,
 } from 'react-icons/fa'
+import MapSingle from '@/components/property-details/MapSingle';
 
 const MapView = dynamic(() => import('@/app/MapView'), { ssr: false })
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL
@@ -178,7 +179,7 @@ export default function PropertyDetailsPage() {
 
         {/* === [14] RIGHT COLUMN: Static Map === */}
         <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-8 md:mt-0">
-          <MapView
+          <MapSingle
             latitude={property.latitude}
             longitude={property.longitude}
             title={property.title}
