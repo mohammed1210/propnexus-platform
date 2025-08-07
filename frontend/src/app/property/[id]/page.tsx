@@ -135,7 +135,7 @@ export default function PropertyDetailsPage() {
 
         {/* Static Map */}
         <div className="mt-8">
-          <MapSingle latitude={property.latitude} longitude={property.longitude} />
+          <MapSingle property={property} />
         </div>
       </div>
 
