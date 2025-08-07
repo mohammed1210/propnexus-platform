@@ -81,7 +81,7 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
         {/* Stamp Duty Calculator */}
         <div className="section-box">
-          <StampDutyCalculator propertyPrice={property.price} />
+          <StampDutyCalculator price={property.price} />
         </div>
 
         {/* Area Intelligence */}
