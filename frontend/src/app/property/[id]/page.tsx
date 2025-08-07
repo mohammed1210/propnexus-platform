@@ -12,6 +12,7 @@ import NotesFields from '@details/NotesFields';
 import AIChatbot from '@details/AIChatbot';
 import dynamic from 'next/dynamic';
 import html2pdf from 'html2pdf.js';
+import { FaSave, FaDownload, FaCopy } from 'react-icons/fa';
 
 const MapView = dynamic(() => import('@/app/MapView'), { ssr: false });
 const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
