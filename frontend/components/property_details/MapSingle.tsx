@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L, { LatLngExpression } from 'leaflet';
 
-// ✅ Fix Leaflet marker icons for Next.js (no /public images needed)
+// ✅ Leaflet icon fix for Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -16,35 +16,25 @@ L.Icon.Default.mergeOptions({
     'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Types
 type MinimalProperty = {
   latitude: number;
   longitude: number;
   title: string;
 };
 
-// Accept EITHER a full property OR raw coords
-type MapSingleProps =
-  | { property: MinimalProperty }
-  | { latitude: number; longitude: number; title: string };
+type MapSingleProps = {
+  property?: MinimalProperty;
+  latitude?: number;
+  longitude?: number;
+  title?: string;
+};
 
 export default function MapSingle(props: MapSingleProps) {
-  // ---- Normalize inputs from either prop shape ----
-  let latitude: number | undefined;
-  let longitude: number | undefined;
-  let title: string | undefined;
+  // ✅ Pull values from either property object or direct props
+  const latitude = props.property?.latitude ?? props.latitude;
+  const longitude = props.property?.longitude ?? props.longitude;
+  const title = props.property?.title ?? props.title ?? 'Unknown Property';
 
-  if ('property' in props && props.property) {
-    latitude = props.property.latitude;
-    longitude = props.property.longitude;
-    title = props.property.title;
-  } else {
-    latitude = props.latitude;
-    longitude = props.longitude;
-    title = props.title;
-  }
-
-  // Fallback if we still don't have coords
   const hasCoords =
     typeof latitude === 'number' &&
     !Number.isNaN(latitude) &&
@@ -53,7 +43,7 @@ export default function MapSingle(props: MapSingleProps) {
 
   const position: LatLngExpression = hasCoords ? [latitude!, longitude!] : [52.5, -1.5];
 
-  // Prevent SSR issues
+  // ✅ Prevent SSR rendering issues
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
@@ -61,7 +51,7 @@ export default function MapSingle(props: MapSingleProps) {
   if (!hasCoords) {
     return (
       <div className="w-full rounded-md border border-gray-200 p-3 text-sm text-gray-600">
-        Map unavailable — no coordinates for this property.
+        Map unavailable — no coordinates provided.
       </div>
     );
   }
