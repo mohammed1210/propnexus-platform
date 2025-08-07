@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import AIChatbot from '@/components/property-details/AIChatbot';
-import InvestmentSummary from '@/components/property-details/InvestmentSummary';
+import AIChatbot from '@etails/AIChatbot';
+import InvestmentSummary from '@details/InvestmentSummary';
 import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
 import MortgageCalculator from '@details/MortgageCalculator';
 import StampDutyCalculator from '@details/StampDutyCalculator';
 import NotesFields from '@details/NotesFields';
 import AreaIntel from '@details/AreaIntel';
-import MapSingle from '@/components/property-details/MapSingle';
+import MapSingle from '@details/MapSingle';
 import { Property } from '@/types';
 
 export default function PropertyDetailsPage() {
