@@ -92,29 +92,28 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
         {/* ===== [13] Investor Notes ===== */}
 <div className="section-box">
   <NotesFields propertyId={id} />
-</div>
+  
+{/* ===== Right Column ===== */}
+<div className="md:w-1/3 md:pl-6 mt-8 md:mt-0 md:sticky md:top-4">
+  {/* Deal Summary */}
+  <div className="section-box">
+    <h3 className="text-lg font-semibold mb-2">📊 Deal Summary</h3>
+    <p><strong>Price:</strong> £{typeof property.price === 'number' ? property.price.toLocaleString() : 'N/A'}</p>
+    <p><strong>Yield:</strong> {property.yield_percent ?? 'N/A'}%</p>
+    <p><strong>ROI:</strong> {property.roi_percent ?? 'N/A'}%</p>
+    <p><strong>Property Type:</strong> {property.propertyType || 'N/A'}</p>
+    <p><strong>Investment Type:</strong> {property.investmentType || 'N/A'}</p>
+    <p><strong>Source:</strong> {property.source || 'N/A'}</p>
+  </div>
 
-      {/* ===== Right Column ===== */}
-      <div className="md:w-1/3 md:pl-6 mt-8 md:mt-0">
-        {/* Deal Summary */}
-        <div className="section-box">
-          <h3 className="text-lg font-semibold mb-2">📊 Deal Summary</h3>
-          <p><strong>Price:</strong> £{property.price.toLocaleString()}</p>
-          <p><strong>Yield:</strong> {property.yield_percent}%</p>
-          <p><strong>ROI:</strong> {property.roi_percent}%</p>
-          <p><strong>Property Type:</strong> {property.property_type}</p>
-          <p><strong>Investment Type:</strong> {property.investment_type}</p>
-          <p><strong>Source:</strong> {property.source}</p>
-        </div>
+  {/* Save/Download/Share Buttons */}
+  <div className="mt-4 flex flex-col gap-3">
+    <button className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded">💾 Save Deal</button>
+    <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">📄 Download Deal Pack</button>
+    <button className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">🔗 Copy to CRM</button>
+  </div>
 
-        {/* Save/Download/Share Buttons */}
-        <div className="mt-4 flex flex-col gap-3">
-          <button className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded">💾 Save Deal</button>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">📄 Download Deal Pack</button>
-          <button className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">🔗 Copy to CRM</button>
-        </div>
-
-              {/* === [14] RIGHT COLUMN: Static Map === */}
+  {/* === [14] RIGHT COLUMN: Static Map === */}
       <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-8 md:mt-0">
         <MapView
           latitude={property.latitude}
@@ -124,11 +123,10 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
       </div>
     </div>
 
-    {/* === [15] Floating AI Assistant === */}
-    <AIChatbot />
-  </div>
+</div> {/* closes the main 2‑column row */}
+<AIChatbot /> {/* Floating AI Assistant */}
+</div> {/* closes #property-detail-page wrapper */}
 );
-
 }
 
 export default PropertyDetailsPage;
