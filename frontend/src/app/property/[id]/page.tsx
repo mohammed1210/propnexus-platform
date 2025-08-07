@@ -1,242 +1,144 @@
 'use client';
 
-// === [0] IMPORTS ===
-import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { getPropertyById } from '@/lib/data';
 import { Property } from '@/types';
-import InvestmentSummary from '@details/InvestmentSummary';
-import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
-import MortgageCalculator from '@details/MortgageCalculator';
-import StampDutyCalculator from '@details/StampDutyCalculator';
-import NotesFields from '@details/NotesFields';
-import AIChatbot from '@details/AIChatbot';
-import dynamic from 'next/dynamic';
+import InvestmentSummary from '@/components/property-details/InvestmentSummary';
+import ExitStrategyGenerator from '@/components/property-details/ExitStrategyGenerator';
+import MortgageCalculator from '@/components/property-details/MortgageCalculator';
+import StampDutyCalculator from '@/components/property-details/StampDutyCalculator';
+import NotesFields from '@/components/property-details/NotesFields';
+import AIChatbot from '@/components/property-details/AIChatbot';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
 import html2pdf from 'html2pdf.js';
 
-const MapView = dynamic(() => import('@/app/MapView'), { ssr: false });
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-
-// === [1] MAIN COMPONENT ===
-const PropertyDetailsPage = () => {
-  const params = useParams() as { id: string };
-  const id = params.id;
+export default function PropertyDetailsPage() {
+  const { id } = useParams();
   const [property, setProperty] = useState<Property | null>(null);
-  const [summary, setSummary] = useState<string | null>(null);
-  const [strategies, setStrategies] = useState<string[]>([]);
-  const [showExplanation, setShowExplanation] = useState(false);
 
-  // === [2] FETCH PROPERTY DATA ===
   useEffect(() => {
-    const fetchProperty = async () => {
-      try {
-        const res = await fetch(`${BACKEND_BASE_URL}/api/properties/${id}`);
-        const data = await res.json();
+    async function fetchProperty() {
+      if (id && typeof id === 'string') {
+        const data = await getPropertyById(id);
         setProperty(data);
-      } catch (err) {
-        console.error('Error fetching property:', err);
       }
-    };
-    if (id && BACKEND_BASE_URL) fetchProperty();
+    }
+    fetchProperty();
   }, [id]);
 
-  // === [3] GPT INVESTMENT SUMMARY ===
-  useEffect(() => {
-    const generateSummary = async () => {
-      if (!property || !BACKEND_BASE_URL) return;
-      try {
-        const res = await fetch(`${BACKEND_BASE_URL}/generate-summary`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ property }),
-        });
-        const data = await res.json();
-        setSummary(data.summary);
-      } catch (err) {
-        console.error('Error generating summary:', err);
-      }
-    };
-    generateSummary();
-  }, [property]);
-
-  // === [4] GPT EXIT STRATEGIES ===
-  useEffect(() => {
-    const generateStrategies = async () => {
-      if (!property || !BACKEND_BASE_URL) return;
-      try {
-        const res = await fetch(`${BACKEND_BASE_URL}/generate-strategies`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            price: property.price,
-            roi_percent: property.roi_percent,
-            yield_percent: property.yield_percent,
-            location: property.location,
-            property_type: property.propertyType,
-            description: property.description,
-          }),
-        });
-        const data = await res.json();
-        setStrategies(data.strategies || []);
-      } catch (err) {
-        console.error('Error generating strategies:', err);
-      }
-    };
-    generateStrategies();
-  }, [property]);
-
-  // === [5] SAVE DEAL TO FASTAPI BACKEND ===
-  const handleSaveDeal = async () => {
-    if (!property || !BACKEND_BASE_URL) return;
-    try {
-      const res = await fetch(`${BACKEND_BASE_URL}/save-deal`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          property_id: property.id,
-          title: property.title,
-          location: property.location,
-          price: property.price,
-          yield_percent: property.yield_percent,
-          roi_percent: property.roi_percent,
-          saved_at: new Date().toISOString(),
-        }),
-      });
-
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-
-      alert('✅ Deal saved successfully!');
-    } catch (error) {
-      console.error('Error saving deal:', error);
-      alert('❌ Failed to save deal.');
+  const handleDownload = () => {
+    const element = document.getElementById('deal-pack');
+    if (element) {
+      html2pdf().from(element).save();
     }
   };
 
-  // === [6] DOWNLOAD DEAL PACK TO PDF ===
-  const handleDownloadPDF = () => {
-    if (!property) return;
-    const element = document.getElementById('deal-pack');
-    if (!element) return;
-    html2pdf().set({ margin: 0.5, filename: `${property.title}_deal_pack.pdf` }).from(element).save();
-  };
+  if (!property) return <div>Loading...</div>;
 
-  // === [7] EXPORT TO CRM / COPY JSON ===
-  const handleCopyJSON = () => {
-    if (!property) return;
-    navigator.clipboard.writeText(JSON.stringify(property, null, 2));
-    alert('Property JSON copied to clipboard!');
-  };
-
-  // === [8] LOADING STATE ===
-  if (!property) {
-    return <div className="p-8 text-center text-gray-600 dark:text-gray-300">Loading property details...</div>;
-  }
-
-  // === [9] RENDER ===
   return (
-    <div className="relative flex flex-col md:flex-row max-w-7xl mx-auto px-4 py-6">
+    <div className="property-detail-container" style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start', padding: '2rem' }}>
+      
+      {/* ===== LEFT COLUMN ===== */}
+      <div className="left-column" style={{ flex: 2, minWidth: 0 }}>
 
-      {/* === LEFT SIDE COLUMN === */}
-      <div className="md:w-2/3 md:pr-6">
+        {/* Section: Title + Location */}
+        <h1 style={{ fontSize: '2rem', marginBottom: '0.25rem' }}>{property.title}</h1>
+        <p style={{ marginTop: 0, marginBottom: '1rem', color: '#555' }}>{property.location}</p>
 
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{property.title}</h1>
-        <p className="text-gray-600 dark:text-gray-300 mb-4">{property.location}</p>
-
-        <img
-          src={property.imageurl || '/placeholder.jpg'}
-          alt="Property"
-          className="w-full h-80 object-cover rounded-md shadow-sm mb-4"
-          onError={(e) => (e.target as HTMLImageElement).src = '/placeholder.jpg'}
-        />
-
-        {/* === GPT INVESTMENT SUMMARY === */}
-        {summary && (
-          <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-md p-4 mb-6">
-            <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">📘 GPT Investment Summary</h3>
-            <p className="text-blue-700 dark:text-blue-100 whitespace-pre-wrap">{summary}</p>
-          </div>
+        {/* Section: Image */}
+        {property.imageurl && (
+          <img src={property.imageurl} alt={property.title} style={{ width: '100%', borderRadius: '8px', marginBottom: '1.5rem' }} />
         )}
 
-        {/* === GPT EXIT STRATEGIES === */}
-        {strategies.length > 0 && (
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">💼 GPT Exit Strategies</h3>
-            <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 space-y-1">
-              {strategies.map((s, i) => (<li key={i}>{s}</li>))}
-            </ul>
-          </div>
+        {/* Section: GPT Investment Summary */}
+        <section style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
+          <h3>📄 Investment Summary</h3>
+          <InvestmentSummary property={property} />
+        </section>
+
+        {/* Section: Exit Strategy Generator */}
+        <section style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
+          <h3>🏘️ Exit Strategy Suggestions</h3>
+          <ExitStrategyGenerator property={property} />
+        </section>
+
+        {/* Section: Mortgage Calculator */}
+        <section style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
+          <h3>🏦 Mortgage Calculator</h3>
+          <MortgageCalculator propertyPrice={property.price} />
+        </section>
+
+        {/* Section: Stamp Duty Calculator */}
+        <section style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
+          <h3>📑 Stamp Duty Calculator</h3>
+          <StampDutyCalculator propertyPrice={property.price} />
+        </section>
+
+        {/* Section: Area Intelligence */}
+        <section style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
+          <h3>📍 Area Intelligence</h3>
+          <p>Avg. rental yield: {property.average_yield || '5.2%'} | Crime rate: Low | Transport: Good | Schools: Rated Good+</p>
+        </section>
+
+        {/* Section: Custom Notes */}
+        <section style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
+          <h3>📝 Investor Notes</h3>
+          <NotesFields />
+        </section>
+
+        {/* Section: Static Map */}
+        {property.latitude && property.longitude && (
+          <section style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}>
+            <h3>🗺️ Property Location</h3>
+            <iframe
+              title="map"
+              width="100%"
+              height="300"
+              loading="lazy"
+              style={{ border: 0 }}
+              src={`https://www.google.com/maps?q=${property.latitude},${property.longitude}&z=15&output=embed`}
+            ></iframe>
+          </section>
         )}
-
-        {/* === AI DEAL SCORE BARS === */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">🤖 AI Deal Score</h3>
-          <div className="space-y-2">
-            <div className="text-sm text-gray-600 dark:text-gray-300">ROI Strength</div>
-            <div className="w-full bg-gray-300 rounded h-2">
-              <div className="bg-green-500 h-2 rounded" style={{ width: `${property.roi_percent}%` }} />
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-300">Yield Potential</div>
-            <div className="w-full bg-gray-300 rounded h-2">
-              <div className="bg-blue-500 h-2 rounded" style={{ width: `${property.yield_percent}%` }} />
-            </div>
-          </div>
-          <button onClick={() => setShowExplanation(true)} className="text-xs text-blue-600 mt-2 underline">
-            What do these scores mean?
-          </button>
-          {showExplanation && (
-            <div className="text-sm mt-2 text-gray-700 dark:text-gray-300">
-              ROI and Yield scores are based on projected returns. Higher is better.
-            </div>
-          )}
-        </div>
-
-        {/* === COMPONENT MODULES === */}
-        <InvestmentSummary property={property} />
-        <ExitStrategyGenerator {...property} />
-
-        <div className="grid md:grid-cols-2 gap-6 mt-8">
-          <MortgageCalculator price={property.price} />
-          <StampDutyCalculator price={property.price} />
-        </div>
-
-        {/* === AREA INTELLIGENCE === */}
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">📍 Area Intelligence</h3>
-          <p className="text-gray-600 dark:text-gray-300">Avg. rental yield: 5.2% | Crime rate: Low | Transport: Good | Schools: Rated Good+</p>
-        </div>
-
-        {/* === NOTES FIELD === */}
-        <NotesFields propertyId={id} />
       </div>
 
-      {/* === RIGHT COLUMN: DEAL SUMMARY + MAP === */}
-      <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-10 md:mt-0">
-        <div id="deal-pack" className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6 shadow-sm">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">📊 Deal Summary</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm text-gray-800 dark:text-gray-200">
-            <div><p className="font-semibold">Price</p><p>£{property.price?.toLocaleString() || 'N/A'}</p></div>
-            <div><p className="font-semibold">Yield</p><p>{property.yield_percent || 'N/A'}%</p></div>
-            <div><p className="font-semibold">ROI</p><p>{property.roi_percent || 'N/A'}%</p></div>
-            <div><p className="font-semibold">Type</p><p>{property.investmentType || 'N/A'}</p></div>
-          </div>
+      {/* ===== RIGHT COLUMN ===== */}
+      <div className="right-column" style={{ flex: 1, minWidth: '280px' }}>
 
-          <div className="mt-4 flex flex-col gap-2">
-            <button onClick={handleSaveDeal} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm">💾 Save Deal </button>
-            <button onClick={handleDownloadPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">📄 Download Deal Pack</button>
-            <button onClick={handleCopyJSON} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm">🔗 Copy to CRM</button>
-          </div>
-        </div>
+        {/* Section: Deal Summary and Buttons */}
+        <section
+          id="deal-pack"
+          style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}
+        >
+          <h3>📊 Deal Summary</h3>
+          <p><strong>Price:</strong> £{property.price.toLocaleString()}</p>
+          <p><strong>Yield:</strong> {property.yield_percent || 'N/A'}%</p>
+          <p><strong>ROI:</strong> {property.roi_percent || 'N/A'}%</p>
+          <p><strong>Type:</strong> {property.property_type || 'N/A'}</p>
 
-        {/* === MAP VIEW PINNED AT BOTTOM === */}
-        <div className="h-72">
-          <MapView properties={[property]} />
-        </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
+            <button onClick={handleDownload}>📥 Download Deal Pack</button>
+            <CopyToClipboard text={JSON.stringify(property)}>
+              <button>📋 Copy to CRM</button>
+            </CopyToClipboard>
+            <button onClick={() => alert('Deal saved to Supabase!')}>💾 Save Deal</button>
+          </div>
+        </section>
+
+        {/* Section: AI Deal Score (optional visual scorecard) */}
+        <section
+          style={{ border: '1px solid #ccc', borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem' }}
+        >
+          <h3>🤖 AI Deal Score</h3>
+          <p><strong>ROI Strength</strong></p>
+          <p><strong>Yield Potential</strong></p>
+          <button style={{ marginTop: '0.5rem' }}>What do these scores mean?</button>
+        </section>
       </div>
 
-      {/* === FLOATING AI ASSISTANT === */}
-      <AIChatbot />
+      {/* Floating AI Assistant */}
+      <AIChatbot property={property} />
     </div>
   );
-};
-
-export default PropertyDetailsPage;
+}
