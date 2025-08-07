@@ -1,249 +1,124 @@
-'use client';
+'use client'
 
-// === [0] IMPORTS ===
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { Property } from '@/types';
-import InvestmentSummary from '@details/InvestmentSummary';
-import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
-import MortgageCalculator from '@details/MortgageCalculator';
-import StampDutyCalculator from '@details/StampDutyCalculator';
-import NotesFields from '@details/NotesFields';
-import AIChatbot from '@details/AIChatbot';
-import dynamic from 'next/dynamic';
-import html2pdf from 'html2pdf.js';
+import { useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { Property } from '@/types'
+import InvestmentSummary from '@/components/property-details/InvestmentSummary'
+import ExitStrategyGenerator from '@/components/property-details/ExitStrategyGenerator'
+import MortgageCalculator from '@/components/property-details/MortgageCalculator'
+import StampDutyCalculator from '@/components/property-details/StampDutyCalculator'
+import NotesFields from '@/components/property-details/NotesFields'
+import AIChatbot from '@/components/property-details/AIChatbot'
+import dynamic from 'next/dynamic'
+import { FaLightbulb, FaFilePdf, FaDownload, FaSave, FaCopy } from 'react-icons/fa'
 
-const MapView = dynamic(() => import('@/app/MapView'), { ssr: false });
-const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
 
-// === [1] MAIN COMPONENT ===
-const PropertyDetailsPage = () => {
-  const params = useParams() as { id: string };
-  const id = params.id;
-  const [property, setProperty] = useState<Property | null>(null);
-  const [summary, setSummary] = useState<string | null>(null);
-  const [strategies, setStrategies] = useState<string[]>([]);
-  const [showExplanation, setShowExplanation] = useState(false);
+export default function PropertyDetailsPage() {
+  const params = useParams()
+  const [property, setProperty] = useState<Property | null>(null)
 
-  // === [2] FETCH PROPERTY DATA ===
+  // ===== Fetch Property Data =====
   useEffect(() => {
     const fetchProperty = async () => {
-      try {
-        const res = await fetch(`${BACKEND_BASE_URL}/api/properties/${id}`);
-        const data = await res.json();
-        setProperty(data);
-      } catch (err) {
-        console.error('Error fetching property:', err);
-      }
-    };
-    if (id && BACKEND_BASE_URL) fetchProperty();
-  }, [id]);
-
-  // === [3] GPT INVESTMENT SUMMARY ===
-  useEffect(() => {
-    const generateSummary = async () => {
-      if (!property || !BACKEND_BASE_URL) return;
-      try {
-        const res = await fetch(`${BACKEND_BASE_URL}/generate-summary`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ property }),
-        });
-        const data = await res.json();
-        setSummary(data.summary);
-      } catch (err) {
-        console.error('Error generating summary:', err);
-      }
-    };
-    generateSummary();
-  }, [property]);
-
-  // === [4] GPT EXIT STRATEGIES ===
-  useEffect(() => {
-    const generateStrategies = async () => {
-      if (!property || !BACKEND_BASE_URL) return;
-      try {
-        const res = await fetch(`${BACKEND_BASE_URL}/generate-strategies`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            price: property.price,
-            roi_percent: property.roi_percent,
-            yield_percent: property.yield_percent,
-            location: property.location,
-            property_type: property.propertyType,
-            description: property.description,
-          }),
-        });
-        const data = await res.json();
-        setStrategies(data.strategies || []);
-      } catch (err) {
-        console.error('Error generating strategies:', err);
-      }
-    };
-    generateStrategies();
-  }, [property]);
-
-  // === [5] SAVE DEAL TO FASTAPI ===
-  const handleSaveDeal = async () => {
-    if (!property || !BACKEND_BASE_URL) return;
-    try {
-      const res = await fetch(`${BACKEND_BASE_URL}/save-deal`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          property_id: property.id,
-          title: property.title,
-          location: property.location,
-          price: property.price,
-          yield_percent: property.yield_percent,
-          roi_percent: property.roi_percent,
-          saved_at: new Date().toISOString(),
-        }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      alert('✅ Deal saved successfully!');
-    } catch (error) {
-      console.error('Error saving deal:', error);
-      alert('❌ Failed to save deal.');
+      const id = params.id
+      const res = await fetch(`/api/properties/${id}`)
+      const data = await res.json()
+      setProperty(data)
     }
-  };
+    fetchProperty()
+  }, [params.id])
 
-  // === [6] DOWNLOAD DEAL PACK TO PDF ===
-  const handleDownloadPDF = () => {
-    if (!property) return;
-    const element = document.getElementById('deal-pack');
-    if (!element) return;
-    html2pdf().set({ margin: 0.5, filename: `${property.title}_deal_pack.pdf` }).from(element).save();
-  };
+  if (!property) return <div>Loading...</div>
 
-  // === [7] EXPORT TO CRM / COPY JSON ===
-  const handleCopyJSON = () => {
-    if (!property) return;
-    navigator.clipboard.writeText(JSON.stringify(property, null, 2));
-    alert('Property JSON copied to clipboard!');
-  };
-
-  // === [8] LOADING STATE ===
-  if (!property) {
-    return <div className="p-8 text-center text-gray-600 dark:text-gray-300">Loading property details...</div>;
-  }
-
-  // === [9] RENDER ===
   return (
-    <div className="relative flex flex-col md:flex-row max-w-7xl mx-auto px-4 py-6 gap-6">
-      
-      {/* === [10] LEFT COLUMN === */}
-      <div className="md:w-2/3">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{property.title}</h1>
-        <p className="text-gray-600 dark:text-gray-300 mb-2">{property.location}</p>
-
-        <img
-          src={property.imageurl || '/placeholder.jpg'}
-          alt="Property"
-          className="w-full h-80 object-cover rounded-md shadow-sm mb-4"
-          onError={(e) => (e.target as HTMLImageElement).src = '/placeholder.jpg'}
-        />
-
-        {/* === [11] GPT INVESTMENT SUMMARY === */}
-        {summary && (
-          <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-md p-4 mb-6">
-            <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">📘 GPT Investment Summary</h3>
-            <p className="text-blue-700 dark:text-blue-100 whitespace-pre-wrap">{summary}</p>
-          </div>
-        )}
-
-        {/* === [12] GPT EXIT STRATEGIES === */}
-        {strategies.length > 0 && (
-          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">💼 GPT Exit Strategies</h3>
-            <ul className="list-disc list-inside text-gray-700 dark:text-gray-300 space-y-1">
-              {strategies.map((s, i) => (<li key={i}>{s}</li>))}
-            </ul>
-          </div>
-        )}
-
-        {/* === [13] AI SCORE BREAKDOWN === */}
-        <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">🤖 AI Deal Score</h3>
-          <div className="space-y-2">
-            <div className="text-sm text-gray-600 dark:text-gray-300">ROI Strength</div>
-            <div className="w-full bg-gray-300 rounded h-2">
-              <div className="bg-green-500 h-2 rounded" style={{ width: `${property.roi_percent}%` }} />
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-300">Yield Potential</div>
-            <div className="w-full bg-gray-300 rounded h-2">
-              <div className="bg-blue-500 h-2 rounded" style={{ width: `${property.yield_percent}%` }} />
-            </div>
-          </div>
-          <button onClick={() => setShowExplanation(true)} className="text-xs text-blue-600 mt-2 underline">
-            What do these scores mean?
-          </button>
-          {showExplanation && (
-            <div className="text-sm mt-2 text-gray-700 dark:text-gray-300">
-              ROI and Yield scores are based on projected returns. Higher is better.
-            </div>
+    <div className="property-detail-page" style={{ padding: '2rem' }}>
+      {/* ===== Title and Header Row ===== */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: '300px' }}>
+          <h1>{property.title}</h1>
+          <p style={{ color: '#666' }}>{property.location}</p>
+          {property.imageurl && (
+            <img
+              src={property.imageurl}
+              alt={property.title}
+              style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', marginTop: '1rem' }}
+            />
           )}
         </div>
 
-        {/* === [14] MODULES === */}
-        <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6">
-          <InvestmentSummary property={property} />
-        </div>
+        {/* ===== Sidebar Buttons & Summary ===== */}
+        <div style={{ flex: 1, minWidth: '280px', paddingLeft: '2rem' }}>
+          <div style={{ background: '#f9f9f9', border: '1px solid #ccc', padding: '1rem', borderRadius: '8px' }}>
+            <h3>📊 Deal Summary</h3>
+            <p><strong>Price:</strong> £{property.price.toLocaleString()}</p>
+            <p><strong>Yield:</strong> {property.yield_percent}%</p>
+            <p><strong>ROI:</strong> {property.roi_percent}%</p>
+            <p><strong>Type:</strong> {property.investment_type || 'N/A'}</p>
 
-        <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6">
-          <ExitStrategyGenerator {...property} />
-        </div>
-
-        <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6">
-          <MortgageCalculator price={property.price} />
-        </div>
-
-        <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6">
-          <StampDutyCalculator price={property.price} />
-        </div>
-
-        {/* === [15] AREA INTELLIGENCE === */}
-        <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">📍 Area Intelligence</h3>
-          <p className="text-gray-600 dark:text-gray-300">Avg. rental yield: 5.2% | Crime rate: Low | Transport: Good | Schools: Rated Good+</p>
-        </div>
-
-        {/* === [16] NOTES === */}
-        <div className="border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-10">
-          <NotesFields propertyId={id} />
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+              <button className="button-primary"><FaSave /> Save Deal</button>
+              <button className="button-secondary"><FaDownload /> Download Deal Pack</button>
+              <button className="button-tertiary"><FaCopy /> Copy to CRM</button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* === [17] RIGHT COLUMN (SUMMARY + MAP) === */}
-      <div className="md:w-1/3 md:sticky md:top-4 space-y-6">
-        <div id="deal-pack" className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 shadow-sm">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">📊 Deal Summary</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm text-gray-800 dark:text-gray-200">
-            <div><p className="font-semibold">Price</p><p>£{property.price?.toLocaleString() || 'N/A'}</p></div>
-            <div><p className="font-semibold">Yield</p><p>{property.yield_percent || 'N/A'}%</p></div>
-            <div><p className="font-semibold">ROI</p><p>{property.roi_percent || 'N/A'}%</p></div>
-            <div><p className="font-semibold">Type</p><p>{property.investmentType || 'N/A'}</p></div>
-          </div>
-
-          <div className="mt-4 flex flex-col gap-2">
-            <button onClick={handleSaveDeal} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm">💾 Save Deal </button>
-            <button onClick={handleDownloadPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">📄 Download Deal Pack</button>
-            <button onClick={handleCopyJSON} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm">🔗 Copy to CRM</button>
-          </div>
-        </div>
-
-        {/* Static Map */}
-        <div className="h-72">
-          <MapView properties={[property]} />
-        </div>
+      {/* ===== GPT Investment Summary ===== */}
+      <div style={{ marginTop: '2rem' }}>
+        <InvestmentSummary property={property} />
       </div>
 
-      {/* === [18] FLOATING AI CHATBOT === */}
-      <AIChatbot />
+      {/* ===== Exit Strategy Generator ===== */}
+      <div style={{ marginTop: '2rem' }}>
+        <ExitStrategyGenerator property={property} />
+      </div>
+
+      {/* ===== AI Deal Score Breakdown ===== */}
+      <div style={{ marginTop: '2rem' }}>
+        <h3>🤖 AI Deal Score</h3>
+        <p><strong>ROI Strength</strong></p>
+        <p><strong>Yield Potential</strong></p>
+        <button className="button-tertiary" style={{ marginTop: '0.5rem' }}>What do these scores mean?</button>
+      </div>
+
+      {/* ===== Mortgage Calculator ===== */}
+      <div style={{ marginTop: '2rem' }}>
+        <MortgageCalculator price={property.price} />
+      </div>
+
+      {/* ===== Stamp Duty Calculator ===== */}
+      <div style={{ marginTop: '2rem' }}>
+        <StampDutyCalculator price={property.price} />
+      </div>
+
+      {/* ===== Area Intelligence Block ===== */}
+      <div style={{ marginTop: '2rem' }}>
+        <h3>📍 Area Intelligence</h3>
+        <p><strong>Avg. rental yield:</strong> 5.2%</p>
+        <p><strong>Crime rate:</strong> Low</p>
+        <p><strong>Transport:</strong> Good</p>
+        <p><strong>Schools:</strong> Rated Good+</p>
+      </div>
+
+      {/* ===== Notes Fields ===== */}
+      <div style={{ marginTop: '2rem' }}>
+        <NotesFields />
+      </div>
+
+      {/* ===== Static Map View (Bottom) ===== */}
+      {property.latitude && property.longitude && (
+        <div style={{ marginTop: '2rem' }}>
+          <h3>🗺️ Location</h3>
+          <div style={{ height: '400px' }}>
+            <MapView properties={[property]} />
+          </div>
+        </div>
+      )}
+
+      {/* ===== Floating AI Chatbot ===== */}
+      <AIChatbot property={property} />
     </div>
-  );
-};
-
-export default PropertyDetailsPage;
+  )
+}
