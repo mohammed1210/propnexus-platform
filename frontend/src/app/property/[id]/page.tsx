@@ -1,18 +1,20 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
-import { Property } from '@/types'
-import InvestmentSummary from '@/components/property-details/InvestmentSummary'
-import ExitStrategyGenerator from '@/components/property-details/ExitStrategyGenerator'
-import MortgageCalculator from '@/components/property-details/MortgageCalculator'
-import StampDutyCalculator from '@/components/property-details/StampDutyCalculator'
-import NotesFields from '@/components/property-details/NotesFields'
-import AIChatbot from '@/components/property-details/AIChatbot'
-import dynamic from 'next/dynamic'
-import { FaLightbulb, FaFilePdf, FaDownload, FaSave, FaCopy } from 'react-icons/fa'
+// === [0] IMPORTS ===
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import { Property } from '@/types';
+import InvestmentSummary from '@details/InvestmentSummary';
+import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
+import MortgageCalculator from '@details/MortgageCalculator';
+import StampDutyCalculator from '@details/StampDutyCalculator';
+import NotesFields from '@details/NotesFields';
+import AIChatbot from '@details/AIChatbot';
+import dynamic from 'next/dynamic';
+import html2pdf from 'html2pdf.js';
 
-const MapView = dynamic(() => import('@/components/MapView'), { ssr: false })
+const MapView = dynamic(() => import('@/app/MapView'), { ssr: false });
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function PropertyDetailsPage() {
   const params = useParams()
