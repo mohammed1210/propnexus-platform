@@ -106,22 +106,36 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
     <p><strong>Source:</strong> {property.source || 'N/A'}</p>
   </div>
 
-  {/* Save/Download/Share Buttons */}
-  <div className="mt-4 flex flex-col gap-3">
-    <button className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded">💾 Save Deal</button>
-    <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">📄 Download Deal Pack</button>
-    <button className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">🔗 Copy to CRM</button>
-  </div>
+        {/* Save/Download/Share Buttons */}
+      <div className="mt-4 flex flex-col gap-3">
+        <button className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded">
+          💾 Save Deal
+        </button>
+        <button
+          className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
+          onClick={handleDownloadPDF}
+        >
+          📄 Download Deal Pack
+        </button>
+        <button
+          className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded"
+          onClick={handleCopyToCRM}
+        >
+          🔗 Copy to CRM
+        </button>
+      </div>
+    </div>{/* closes LEFT column */}
 
-  {/* === [14] RIGHT COLUMN: Static Map === */}
-      <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-8 md:mt-0">
-        <MapView properties={[property]} />
-  </div>
-</div>
+    {/* === [14] RIGHT COLUMN: Static Map === */}
+    <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-8 md:mt-0">
+      {/* MapView expects an array of properties */}
+      <MapView properties={[property]} />
+    </div>
+  </div>{/* closes the main 2‑column row */}
 
-</div> {/* closes the main 2‑column row */}
-<AIChatbot /> {/* Floating AI Assistant */}
-</div> {/* closes #property-detail-page wrapper */}
+  {/* === [15] Floating AI Assistant === */}
+  <AIChatbot />
+</div>{/* closes #property-detail-page wrapper */}
 );
 }
 
