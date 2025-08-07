@@ -76,7 +76,7 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
         {/* Mortgage Calculator */}
         <div className="section-box">
-          <MortgageCalculator Price={property.price} />
+          <MortgageCalculator price={property.price} />
         </div>
 
         {/* Stamp Duty Calculator */}
