@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import AIChatbot from '@etails/AIChatbot';
+import AIChatbot from '@details/AIChatbot';
 import InvestmentSummary from '@details/InvestmentSummary';
 import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
 import MortgageCalculator from '@details/MortgageCalculator';
