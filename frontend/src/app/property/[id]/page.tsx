@@ -115,13 +115,9 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
   {/* === [14] RIGHT COLUMN: Static Map === */}
       <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-8 md:mt-0">
-        <MapView
-          latitude={property.latitude}
-          longitude={property.longitude}
-          title={property.title}
-        />
-      </div>
-    </div>
+        <MapView properties={[property]} />
+  </div>
+</div>
 
 </div> {/* closes the main 2‑column row */}
 <AIChatbot /> {/* Floating AI Assistant */}
