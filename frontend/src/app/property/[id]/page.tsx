@@ -38,7 +38,7 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
       <div className="md:w-2/3 md:pr-8">
         {/* Title */}
         <h1 className="text-2xl font-bold mb-1">{property.title}</h1>
-        <p className="text-gray-500 mb-3">{property.postcode}</p>
+        <p className="text-gray-500 mb-3">{property.location}</p>
         <img
           src={property.imageurl || '/placeholder.jpg'}
           alt={property.title}
