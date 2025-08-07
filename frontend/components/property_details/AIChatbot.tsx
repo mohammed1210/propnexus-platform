@@ -1,17 +1,25 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-
+import { Property } from '@/types'; // ✅ Add this
 interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
 
-const AIChatbot = () => {
+interface AIChatbotProps {
+  property: Property;
+}
+
+const AIChatbot = ({ property }: AIChatbotProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hi! I\'m your AI Investment Assistant. Ask me anything about this deal.' },
+    {
+      role: 'assistant',
+      content:
+        'Hi! I\'m your AI Investment Assistant. Ask me anything about this deal.',
+    },
   ]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -27,7 +35,8 @@ const AIChatbot = () => {
     setTimeout(() => {
       const botMsg: Message = {
         role: 'assistant',
-        content: '🤖 This deal looks promising based on ROI and yield. Make sure to check mortgage terms and area demand!',
+        content:
+          '🤖 This deal looks promising based on ROI and yield. Make sure to check mortgage terms and area demand!',
       };
       setMessages((prev) => [...prev, botMsg]);
     }, 800);
@@ -56,13 +65,21 @@ const AIChatbot = () => {
           {/* Header */}
           <div className="bg-gray-800 text-white px-4 py-2 flex justify-between items-center text-sm font-semibold">
             AI Assistant
-            <button onClick={() => setIsOpen(false)} className="text-white text-xl leading-none">×</button>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-white text-xl leading-none"
+            >
+              ×
+            </button>
           </div>
 
           {/* Messages */}
           <div className="flex-1 p-3 overflow-y-auto bg-gray-50 text-sm">
             {messages.map((msg, i) => (
-              <div key={i} className={`mb-2 text-${msg.role === 'user' ? 'right' : 'left'}`}>
+              <div
+                key={i}
+                className={`mb-2 text-${msg.role === 'user' ? 'right' : 'left'}`}
+              >
                 <span
                   className={`inline-block px-3 py-2 rounded-xl max-w-[80%] ${
                     msg.role === 'user'
@@ -79,7 +96,11 @@ const AIChatbot = () => {
 
           {/* Quick Prompts */}
           <div className="bg-slate-100 px-2 py-1 flex flex-wrap gap-2 justify-center">
-            {['Is this a good investment?', 'Suggest exit strategies', 'Risk factors?'].map((text) => (
+            {[
+              'Is this a good investment?',
+              'Suggest exit strategies',
+              'Risk factors?',
+            ].map((text) => (
               <button
                 key={text}
                 onClick={() => handleQuickPrompt(text)}
