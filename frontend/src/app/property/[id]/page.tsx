@@ -21,17 +21,24 @@ export default function PropertyDetailsPage() {
   const [property, setProperty] = useState<Property | null>(null)
 
   // ===== Fetch Property Data =====
-  useEffect(() => {
-    const fetchProperty = async () => {
-      const id = params.id
-      const res = await fetch(`/api/properties/${id}`)
-      const data = await res.json()
-      setProperty(data)
-    }
-    fetchProperty()
-  }, [params.id])
+useEffect(() => {
+  const fetchProperty = async () => {
+    const id = (params as { id?: string })?.id;
+    if (!id) return;
 
-  if (!property) return <div>Loading...</div>
+    try {
+      const res = await fetch(`${BACKEND_BASE_URL}/api/properties/${id}`);
+      const data = await res.json();
+      setProperty(data);
+    } catch (error) {
+      console.error("Error fetching property:", error);
+    }
+  };
+
+  fetchProperty();
+}, [params]);
+
+  if (!property) return <div style={{ padding: '2rem' }}>Loading property details...</div>;
 
   return (
     <div className="property-detail-page" style={{ padding: '2rem' }}>
