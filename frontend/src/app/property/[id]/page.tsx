@@ -63,7 +63,7 @@ useEffect(() => {
             <p><strong>Price:</strong> £{property.price.toLocaleString()}</p>
             <p><strong>Yield:</strong> {property.yield_percent}%</p>
             <p><strong>ROI:</strong> {property.roi_percent}%</p>
-            <p><strong>Type:</strong> {property.investment_type || 'N/A'}</p>
+            <p><strong>Type:</strong> {property.investmentType || 'N/A'}</p>
 
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
               <button className="button-primary"><FaSave /> Save Deal</button>
