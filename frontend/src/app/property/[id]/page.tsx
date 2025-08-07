@@ -52,7 +52,16 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
 
         {/* Exit Strategy */}
         <div className="section-box">
-          <ExitStrategyGenerator property={property} />
+          <ExitStrategyGenerator
+  title={property.title}
+  location={property.location}
+  price={property.price}
+  yield_percent={property.yield_percent}
+  roi_percent={property.roi_percent}
+  propertyType={property.propertyType}
+  investmentType={property.investmentType}
+  description={property.description}
+/>
         </div>
 
         {/* AI Deal Score */}
