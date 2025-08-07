@@ -140,7 +140,7 @@ export default function PropertyDetailsPage() {
       </div>
 
       {/* Floating AI Assistant */}
-      <AIChatbot />
+{property && <AIChatbot property={property} />}
     </div>
   );
 }
