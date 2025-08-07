@@ -126,8 +126,8 @@ const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
     </div>
   </div> {/* closes the main 2-column row */}
 
-        {/* === [15] Floating AI Assistant === */}
+              {/* === [15] Floating AI Assistant === */}
       <AIChatbot />
-    </div> {/* closes #property-detail-page wrapper */}
-  ); // closes return
-} // closes function
+    </div>
+  );
+}
