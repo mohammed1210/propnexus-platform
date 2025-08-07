@@ -13,7 +13,8 @@ import MapSingle from '@details/MapSingle';
 import { Property } from '@/types';
 
 export default function PropertyDetailsPage() {
-  const { id } = useParams();
+  const params = useParams();
+const id = Array.isArray(params?.id) ? params.id[0] : params?.id;
   const [property, setProperty] = useState<Property | null>(null);
 
   useEffect(() => {
