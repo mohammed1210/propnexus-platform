@@ -23,10 +23,9 @@ const PropertyDetailsPage = () => {
   const [property, setProperty] = useState<Property | null>(null);
   const [summary, setSummary] = useState<string | null>(null);
   const [strategies, setStrategies] = useState<string[]>([]);
-  const [showMap, setShowMap] = useState(true);
   const [showExplanation, setShowExplanation] = useState(false);
 
-    // === [2] FETCH PROPERTY DATA ===
+  // === [2] FETCH PROPERTY DATA ===
   useEffect(() => {
     const fetchProperty = async () => {
       try {
@@ -85,7 +84,7 @@ const PropertyDetailsPage = () => {
     generateStrategies();
   }, [property]);
 
-  // === [5] SAVE DEAL TO BACKEND ===
+  // === [5] SAVE DEAL TO FASTAPI BACKEND ===
   const handleSaveDeal = async () => {
     if (!property || !BACKEND_BASE_URL) return;
     try {
@@ -113,7 +112,7 @@ const PropertyDetailsPage = () => {
     }
   };
 
-  // === [6] DOWNLOAD DEAL PACK ===
+  // === [6] DOWNLOAD DEAL PACK TO PDF ===
   const handleDownloadPDF = () => {
     if (!property) return;
     const element = document.getElementById('deal-pack');
@@ -121,14 +120,14 @@ const PropertyDetailsPage = () => {
     html2pdf().set({ margin: 0.5, filename: `${property.title}_deal_pack.pdf` }).from(element).save();
   };
 
-  // === [7] COPY JSON TO CRM ===
+  // === [7] EXPORT TO CRM / COPY JSON ===
   const handleCopyJSON = () => {
     if (!property) return;
     navigator.clipboard.writeText(JSON.stringify(property, null, 2));
     alert('Property JSON copied to clipboard!');
   };
 
-    // === [8] LOADING STATE ===
+  // === [8] LOADING STATE ===
   if (!property) {
     return <div className="p-8 text-center text-gray-600 dark:text-gray-300">Loading property details...</div>;
   }
@@ -136,11 +135,12 @@ const PropertyDetailsPage = () => {
   // === [9] RENDER ===
   return (
     <div className="relative flex flex-col md:flex-row max-w-7xl mx-auto px-4 py-6">
-      
-      {/* === [10] LEFT COLUMN === */}
+
+      {/* === LEFT SIDE COLUMN === */}
       <div className="md:w-2/3 md:pr-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{property.title}</h1>
-        <p className="text-gray-600 dark:text-gray-300 mb-2">{property.location}</p>
+
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{property.title}</h1>
+        <p className="text-gray-600 dark:text-gray-300 mb-4">{property.location}</p>
 
         <img
           src={property.imageurl || '/placeholder.jpg'}
@@ -149,15 +149,7 @@ const PropertyDetailsPage = () => {
           onError={(e) => (e.target as HTMLImageElement).src = '/placeholder.jpg'}
         />
 
-        {/* === [11] TOGGLE MAP VIEW === */}
-        <div className="mb-4">
-          <label className="inline-flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" className="form-checkbox" checked={showMap} onChange={() => setShowMap(!showMap)} />
-            <span className="text-sm text-gray-700 dark:text-gray-300">Show Map View</span>
-          </label>
-        </div>
-
-        {/* === [12] GPT INVESTMENT SUMMARY === */}
+        {/* === GPT INVESTMENT SUMMARY === */}
         {summary && (
           <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-md p-4 mb-6">
             <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">📘 GPT Investment Summary</h3>
@@ -165,7 +157,7 @@ const PropertyDetailsPage = () => {
           </div>
         )}
 
-        {/* === [13] GPT EXIT STRATEGIES === */}
+        {/* === GPT EXIT STRATEGIES === */}
         {strategies.length > 0 && (
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">💼 GPT Exit Strategies</h3>
@@ -175,7 +167,7 @@ const PropertyDetailsPage = () => {
           </div>
         )}
 
-        {/* === [14] AI SCORING BREAKDOWN === */}
+        {/* === AI DEAL SCORE BARS === */}
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">🤖 AI Deal Score</h3>
           <div className="space-y-2">
@@ -188,10 +180,7 @@ const PropertyDetailsPage = () => {
               <div className="bg-blue-500 h-2 rounded" style={{ width: `${property.yield_percent}%` }} />
             </div>
           </div>
-          <button
-            onClick={() => setShowExplanation(true)}
-            className="text-xs text-blue-600 mt-2 underline"
-          >
+          <button onClick={() => setShowExplanation(true)} className="text-xs text-blue-600 mt-2 underline">
             What do these scores mean?
           </button>
           {showExplanation && (
@@ -201,81 +190,50 @@ const PropertyDetailsPage = () => {
           )}
         </div>
 
-                {/* === [15] MODULES === */}
+        {/* === COMPONENT MODULES === */}
         <InvestmentSummary property={property} />
         <ExitStrategyGenerator {...property} />
-        <MortgageCalculator price={property.price} />
-        <StampDutyCalculator price={property.price} />
 
-        {/* === [16] AREA INTELLIGENCE === */}
-        <div className="mt-10">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">📍 Area Intelligence</h3>
-          <p className="text-gray-600 dark:text-gray-300">
-            Avg. rental yield: 5.2% | Crime rate: Low | Transport: Good | Schools: Rated Good+
-          </p>
+        <div className="grid md:grid-cols-2 gap-6 mt-8">
+          <MortgageCalculator price={property.price} />
+          <StampDutyCalculator price={property.price} />
         </div>
 
-        {/* === [17] NOTES FIELD === */}
+        {/* === AREA INTELLIGENCE === */}
+        <div className="mt-8">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-2">📍 Area Intelligence</h3>
+          <p className="text-gray-600 dark:text-gray-300">Avg. rental yield: 5.2% | Crime rate: Low | Transport: Good | Schools: Rated Good+</p>
+        </div>
+
+        {/* === NOTES FIELD === */}
         <NotesFields propertyId={id} />
       </div>
 
-      {/* === [18] RIGHT COLUMN: DEAL SUMMARY + MAP === */}
-      <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-8 md:mt-0">
-        <div
-          id="deal-pack"
-          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6 shadow-sm"
-        >
+      {/* === RIGHT COLUMN: DEAL SUMMARY + MAP === */}
+      <div className="md:w-1/3 md:pl-6 md:sticky md:top-4 mt-10 md:mt-0">
+        <div id="deal-pack" className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md p-4 mb-6 shadow-sm">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">📊 Deal Summary</h2>
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-800 dark:text-gray-200">
-            <div>
-              <p className="font-semibold">Price</p>
-              <p>£{property.price?.toLocaleString() || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="font-semibold">Yield</p>
-              <p>{property.yield_percent || 'N/A'}%</p>
-            </div>
-            <div>
-              <p className="font-semibold">ROI</p>
-              <p>{property.roi_percent || 'N/A'}%</p>
-            </div>
-            <div>
-              <p className="font-semibold">Type</p>
-              <p>{property.investmentType || 'N/A'}</p>
-            </div>
+            <div><p className="font-semibold">Price</p><p>£{property.price?.toLocaleString() || 'N/A'}</p></div>
+            <div><p className="font-semibold">Yield</p><p>{property.yield_percent || 'N/A'}%</p></div>
+            <div><p className="font-semibold">ROI</p><p>{property.roi_percent || 'N/A'}%</p></div>
+            <div><p className="font-semibold">Type</p><p>{property.investmentType || 'N/A'}</p></div>
           </div>
 
           <div className="mt-4 flex flex-col gap-2">
-            <button
-              onClick={handleSaveDeal}
-              className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm"
-            >
-              💾 Save Deal
-            </button>
-            <button
-              onClick={handleDownloadPDF}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm"
-            >
-              📄 Download Deal Pack
-            </button>
-            <button
-              onClick={handleCopyJSON}
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm"
-            >
-              🔗 Copy to CRM
-            </button>
+            <button onClick={handleSaveDeal} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md text-sm">💾 Save Deal </button>
+            <button onClick={handleDownloadPDF} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm">📄 Download Deal Pack</button>
+            <button onClick={handleCopyJSON} className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-md text-sm">🔗 Copy to CRM</button>
           </div>
         </div>
 
-        {/* === [19] MAP VIEW === */}
-        {showMap && (
-          <div className="h-72">
-            <MapView properties={[property]} />
-          </div>
-        )}
+        {/* === MAP VIEW PINNED AT BOTTOM === */}
+        <div className="h-72">
+          <MapView properties={[property]} />
+        </div>
       </div>
 
-      {/* === [20] FLOATING AI CHATBOT === */}
+      {/* === FLOATING AI ASSISTANT === */}
       <AIChatbot />
     </div>
   );
