@@ -1,19 +1,10 @@
 .container {
-  margin-top: 2rem;
-  padding: 1.25rem;
+  margin-top: 1.25rem;
+  padding: 1rem 1.25rem;
   border: 1px solid var(--border);
   border-radius: 8px;
   background-color: var(--card-bg);
   box-shadow: var(--shadow);
-}
-
-/* If parent already has a card */
-.container.flat {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  margin-top: 1.25rem;
 }
 
 .headerRow {
@@ -23,96 +14,103 @@
 }
 
 .heading {
-  font-size: 1.2rem;
+  font-size: 1.05rem; /* a touch smaller so it fits the page rhythm */
   font-weight: 600;
+  line-height: 1.2;
   margin: 0;
-  flex: 1;
 }
 
-.actions {
+.toolbar {
+  margin-left: auto;
   display: flex;
   gap: .5rem;
 }
 
-.caption {
-  font-size: 0.9rem;
-  margin-top: .35rem;
-  margin-bottom: .9rem;
-  color: var(--text-muted);
-}
-
-/* Primary */
-.generateButton {
-  padding: 0.5rem 1rem;
-  background-color: #2563eb;
-  color: #fff;
-  border: none;
+/* buttons */
+.btn {
+  appearance: none;
+  border: 1px solid transparent;
   border-radius: 6px;
   font-weight: 600;
-  cursor: pointer;
-  transition: transform .08s ease, background-color .15s ease, box-shadow .15s ease;
-}
-.generateButton:hover { background-color: #1d4ed8; }
-.generateButton:active { transform: translateY(1px); }
-.generateButton:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
-.generateButton:disabled { background-color: #9ca3af; cursor: not-allowed; box-shadow: none; }
-
-/* Secondary */
-.secondaryBtn {
+  font-size: .9rem;
   padding: .45rem .75rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: inherit;
   cursor: pointer;
+  transition: transform .08s ease, background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
 }
-.secondaryBtn:hover { background: #f3f4f6; }
-.dark-mode .secondaryBtn:hover { background: #111827; }
 
-/* Results */
-.result {
-  margin-top: 1rem;
-  background-color: #f9fafb;       /* gray-50 */
-  border: 1px dashed var(--border);
-  padding: 1rem;
-  border-radius: 8px;
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .7; cursor: not-allowed; }
+
+.btnPrimary {
+  background-color: #2563eb;       /* blue-600 */
+  color: #fff;
+}
+.btnPrimary:hover { background-color: #1d4ed8; } /* blue-700 */
+
+.btnGhost {
+  background: transparent;
+  border-color: var(--border);
   color: inherit;
+}
+.btnGhost:hover { background-color: rgba(148, 163, 184, .12); } /* slate-400 @ 12% */
+
+.caption {
+  font-size: .9rem;
+  color: var(--text-muted);
+  margin: .5rem 0 1rem;
+}
+
+/* results */
+.result {
+  margin-top: .75rem;
+  background-color: #f9fafb;   /* gray-50 */
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  animation: fadeIn .25s ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; translate: 0 4px; }
+  to   { opacity: 1; translate: 0 0; }
 }
 
 .list {
   margin: 0;
-  padding-left: 1.25rem;
-  list-style: decimal;
+  padding-left: 1.25rem;         /* keep standard <ol> indent tidy */
+  display: grid;
+  gap: .75rem;
 }
 
-.item {
-  margin: .4rem 0 .75rem;
+.list > li {
+  line-height: 1.5;
 }
 
-.itemTitle {
+.titleLine {
   font-weight: 600;
-  display: block;
   margin-bottom: .15rem;
 }
 
-.itemSummary {
-  display: block;
-  line-height: 1.45;
+.descLine {
   color: var(--text-muted);
 }
 
-.meta {
+/* timestamp */
+.timestamp {
   margin-top: .5rem;
-  font-size: .8rem;
+  font-size: .78rem;
   color: var(--text-muted);
+  text-align: right;
 }
 
+/* errors */
 .error {
-  color: #dc2626;
-  margin-top: 1rem;
+  color: #dc2626;                /* red-600 */
+  margin-top: .5rem;
 }
 
-/* Motion pref */
+/* respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .generateButton { transition: none; }
+  .btn { transition: none; }
+  .result { animation: none; }
 }
