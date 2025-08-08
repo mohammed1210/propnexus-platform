@@ -10,6 +10,9 @@ const MapView = dynamic(() => import('./MapView'), { ssr: false });
 export default function PropertiesPage() {
   // ===== Data =====
   const [properties, setProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   const [searchLocation, setSearchLocation] = useState('');
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(2_000_000);
@@ -25,28 +28,43 @@ export default function PropertiesPage() {
 
   // Prefer env over hardcoded URL
   const BACKEND_BASE =
-    process.env.NEXT_PUBLIC_API_URL ||
-    'https://propnexus-backend-production.up.railway.app';
+    (process.env.NEXT_PUBLIC_API_URL ||
+      'https://propnexus-backend-production.up.railway.app').replace(/\/+$/, '');
 
-  // Hide map by default on smaller screens
+  // Hide map by default on smaller screens & on resize
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-      setShowMap(false);
-    }
+    const apply = () => {
+      if (typeof window !== 'undefined') setShowMap(window.innerWidth >= 1024);
+    };
+    apply();
+    window.addEventListener('resize', apply);
+    return () => window.removeEventListener('resize', apply);
   }, []);
 
   // Fetch listings
   useEffect(() => {
+    let active = true;
     (async () => {
       try {
+        setLoading(true);
+        setError(null);
         const res = await fetch(`${BACKEND_BASE}/properties`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        if (!active) return;
         setProperties(Array.isArray(data) ? data : []);
-      } catch (e) {
+      } catch (e: any) {
+        if (!active) return;
         console.error('Error fetching properties:', e);
+        setError('Could not load properties. Please try again.');
         setProperties([]);
+      } finally {
+        if (active) setLoading(false);
       }
     })();
+    return () => {
+      active = false;
+    };
   }, [BACKEND_BASE]);
 
   // Derived filtered list (no extra setState loop)
@@ -54,11 +72,10 @@ export default function PropertiesPage() {
     const q = searchLocation.trim().toLowerCase();
 
     return properties.filter((p) => {
-      const matchesPrice = (p.price ?? 0) >= minPrice && (p.price ?? 0) <= maxPrice;
+      const price = p.price ?? 0;
+      const matchesPrice = price >= minPrice && price <= maxPrice;
 
-      const matchesLocation = q
-        ? (p.location ?? '').toLowerCase().includes(q)
-        : true;
+      const matchesLocation = q ? (p.location ?? '').toLowerCase().includes(q) : true;
 
       const matchesBedrooms =
         bedrooms === 'Any' ? true : Number(p.bedrooms) === Number(bedrooms);
@@ -101,7 +118,7 @@ export default function PropertiesPage() {
   return (
     <div className="main-wrapper">
       {/* ===== Filters (sticky) ===== */}
-      <div className="sticky-primary">
+      <div className="sticky-primary" role="region" aria-label="Filters">
         <input
           className="filter-input large"
           type="text"
@@ -128,6 +145,7 @@ export default function PropertiesPage() {
           onClick={() => setShowMoreFilters((v) => !v)}
           className="small-button"
           title="Show more filters"
+          aria-expanded={showMoreFilters}
         >
           ⚙️ Filters
         </button>
@@ -136,7 +154,7 @@ export default function PropertiesPage() {
           onClick={() => setShowMap((v) => !v)}
           className="small-button"
           style={{ backgroundColor: showMap ? '#334155' : '#3b82f6', color: '#fff' }}
-          aria-pressed={showMap ? 'true' : 'false'}
+          aria-pressed={showMap}
         >
           {showMap ? 'Hide Map 🗺️' : 'Show Map 🗺️'}
         </button>
@@ -145,6 +163,7 @@ export default function PropertiesPage() {
           className="small-button"
           style={{ marginLeft: 'auto' }}
           onClick={() => document.body.classList.toggle('dark-mode')}
+          aria-label="Toggle dark mode"
         >
           🌙 Dark Mode
         </button>
@@ -152,10 +171,11 @@ export default function PropertiesPage() {
 
       {/* ===== Advanced filters ===== */}
       {showMoreFilters && (
-        <div className="filters-row">
+        <div className="filters-row" role="region" aria-label="Advanced filters">
           <div>
-            <label>Min Price</label>
+            <label htmlFor="minPrice">Min Price</label>
             <input
+              id="minPrice"
               type="number"
               value={minPrice}
               onChange={(e) => setMinPrice(Number(e.target.value))}
@@ -163,8 +183,9 @@ export default function PropertiesPage() {
           </div>
 
           <div>
-            <label>Max Price</label>
+            <label htmlFor="maxPrice">Max Price</label>
             <input
+              id="maxPrice"
               type="number"
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
@@ -172,8 +193,8 @@ export default function PropertiesPage() {
           </div>
 
           <div>
-            <label>Bedrooms</label>
-            <select value={bedrooms} onChange={(e) => setBedrooms(e.target.value)}>
+            <label htmlFor="beds">Bedrooms</label>
+            <select id="beds" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)}>
               <option value="Any">Any Beds</option>
               <option value="1">1 Bed</option>
               <option value="2">2 Beds</option>
@@ -183,8 +204,12 @@ export default function PropertiesPage() {
           </div>
 
           <div>
-            <label>Property Type</label>
-            <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)}>
+            <label htmlFor="ptype">Property Type</label>
+            <select
+              id="ptype"
+              value={propertyType}
+              onChange={(e) => setPropertyType(e.target.value)}
+            >
               <option value="All">All Types</option>
               <option value="Flat">Flat</option>
               <option value="House">House</option>
@@ -193,8 +218,9 @@ export default function PropertiesPage() {
           </div>
 
           <div>
-            <label>Min Yield (%)</label>
+            <label htmlFor="minYield">Min Yield (%)</label>
             <input
+              id="minYield"
               type="number"
               value={minYield}
               onChange={(e) => setMinYield(Number(e.target.value))}
@@ -202,8 +228,9 @@ export default function PropertiesPage() {
           </div>
 
           <div>
-            <label>Min ROI (%)</label>
+            <label htmlFor="minRoi">Min ROI (%)</label>
             <input
+              id="minRoi"
               type="number"
               value={minROI}
               onChange={(e) => setMinROI(Number(e.target.value))}
@@ -214,16 +241,19 @@ export default function PropertiesPage() {
 
       {/* ===== Content: list + optional map ===== */}
       <div className={`content-layout ${showMap ? '' : 'hide-map'}`}>
-        <div className="property-list">
-          {filteredProperties.length > 0 ? (
-            filteredProperties.map((p) => <PropertyCard key={p.id} property={p} />)
-          ) : (
+        <div className="property-list" aria-live="polite">
+          {loading && <p style={{ color: '#64748b' }}>Loading properties…</p>}
+          {!loading && error && <p style={{ color: '#b91c1c' }}>{error}</p>}
+          {!loading && !error && filteredProperties.length === 0 && (
             <p style={{ color: '#64748b' }}>No matching properties found.</p>
           )}
+          {!loading &&
+            !error &&
+            filteredProperties.map((p) => <PropertyCard key={p.id} property={p} />)}
         </div>
 
-        {showMap && filteredProperties.length > 0 && (
-          <aside className="map-view">
+        {showMap && !loading && !error && filteredProperties.length > 0 && (
+          <aside className="map-view" aria-label="Map of filtered properties">
             <MapView properties={filteredProperties} />
           </aside>
         )}
@@ -233,6 +263,7 @@ export default function PropertiesPage() {
       <button
         className="back-to-top"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        aria-label="Back to top"
       >
         ⬆ Back to Top
       </button>
