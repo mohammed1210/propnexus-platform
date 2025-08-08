@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 
 import AIChatbot from '@details/AIChatbot';
@@ -17,50 +17,74 @@ export default function PropertyDetailsPage() {
   const params = useParams();
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string | undefined);
 
-  const BACKEND_BASE =
-    process.env.NEXT_PUBLIC_API_URL ||
-    process.env.NEXT_PUBLIC_BACKEND_URL ||
-    '';
+  const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
 
-  // ✅ missing in your snippet
   const [property, setProperty] = useState<Property | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
 
     const fetchProperty = async () => {
       try {
-        const url = BACKEND_BASE
-          ? `${BACKEND_BASE}/api/properties/${id}`
-          : `/api/properties/${id}`;
+        setLoading(true);
+        setError(null);
+
+        const useBackend = Boolean(BACKEND_BASE && BACKEND_BASE.startsWith('http'));
+        const url = useBackend ? `${BACKEND_BASE}/api/properties/${id}` : `/api/properties/${id}`;
 
         const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
         const raw = await res.json();
 
-        // Normalise data to avoid NaN / undefined issues
         const p: Property = {
           ...raw,
           price: Number(raw.price ?? 0),
           yield_percent: Number(raw.yield_percent ?? raw.yield ?? 0),
           roi_percent: Number(raw.roi_percent ?? raw.roi ?? 0),
-          latitude: raw.latitude ? Number(raw.latitude) : undefined,
-          longitude: raw.longitude ? Number(raw.longitude) : undefined,
-          // keep both shapes happy
+          latitude: raw.latitude != null ? Number(raw.latitude) : undefined,
+          longitude: raw.longitude != null ? Number(raw.longitude) : undefined,
           propertyType: raw.propertyType ?? raw.property_type ?? '',
           investmentType: raw.investmentType ?? raw.investment_type ?? '',
         };
 
         setProperty(p);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to fetch property:', err);
+        setError('Sorry — we couldn’t load this property.');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchProperty();
   }, [id, BACKEND_BASE]);
 
-  if (!property) {
-    return <div className="p-6 text-center text-gray-600">Loading property...</div>;
+  const hasCoords = useMemo(
+    () => Boolean(property?.latitude != null && property?.longitude != null),
+    [property?.latitude, property?.longitude]
+  );
+
+  if (loading) {
+    return (
+      <div className="px-4 md:px-12 py-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 w-2/3 bg-slate-200 rounded" />
+          <div className="h-4 w-1/3 bg-slate-200 rounded" />
+          <div className="h-64 w-full bg-slate-200 rounded" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !property) {
+    return (
+      <div className="p-6 text-center text-red-600">
+        {error ?? 'Property not found.'}
+      </div>
+    );
   }
 
   return (
@@ -70,6 +94,7 @@ export default function PropertyDetailsPage() {
         {/* Title / Image */}
         <h1 className="text-2xl font-bold mb-1">{property.title}</h1>
         <p className="text-gray-500 mb-3">{property.location}</p>
+
         <img
           src={property.imageurl || '/placeholder.jpg'}
           alt={property.title}
@@ -103,7 +128,7 @@ export default function PropertyDetailsPage() {
             <p><strong>ROI Strength</strong></p>
             <p><strong>Yield Potential</strong></p>
           </div>
-          <button className="text-sm underline text-gray-500 mt-2">
+          <button className="text-sm underline text-gray-500 mt-2" aria-label="Learn more about scores">
             ❓ What do these scores mean?
           </button>
         </div>
@@ -130,7 +155,7 @@ export default function PropertyDetailsPage() {
       </div>
 
       {/* ===== Right Column ===== */}
-      <div className="md:w-1/3 md:pl-6 mt-8 md:mt-0 md:sticky md:top-4">
+      <aside className="md:w-1/3 md:pl-6 mt-8 md:mt-0 md:sticky md:top-4">
         {/* Deal Summary */}
         <div className="section-box">
           <h3 className="text-lg font-semibold mb-2">📊 Deal Summary</h3>
@@ -153,17 +178,17 @@ export default function PropertyDetailsPage() {
         </div>
 
         {/* Static Map */}
-        {property.latitude && property.longitude ? (
+        {hasCoords ? (
           <div className="mt-8">
             <MapSingle property={property} />
           </div>
         ) : (
           <p className="mt-8 text-gray-500">Map unavailable — no coordinates provided.</p>
         )}
-      </div>
+      </aside>
 
       {/* Floating AI Assistant */}
-      {property && <AIChatbot property={property} />}
+      <AIChatbot property={property} />
     </div>
   );
 }
