@@ -70,11 +70,18 @@ h1, h2, h3, p { margin: 0; padding: 0; }
   flex: 0 1 52%;                 /* ↓ narrower than before */
   position: sticky;
   top: 96px;                      /* sits below header/filters */
-  height: calc(100vh - 120px);
+  height: 100%;
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
   background: var(--card-bg);
+}
+
+.fixed-map-container {
+  height: 100%;
+  min-height: auto; /* remove forced space */
+  display: flex;
+  flex-direction: column;
 }
 
 /* When map is hidden, remove the empty column */
