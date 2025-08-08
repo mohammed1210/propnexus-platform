@@ -94,6 +94,10 @@ h1, h2, h3, p {
   display: none;
 }
 
+.hide-map .property-list {
+  flex: 1 1 100%;
+}
+
 /* 
 ========================================
 3️⃣ FILTER BAR
