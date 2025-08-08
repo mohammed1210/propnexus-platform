@@ -7,13 +7,9 @@
   --text-muted: #6b7280;
   --border: #e5e7eb;
   --shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.1);
-
-  /* Accents */
-  --accent: #3b82f6;
-  --accent-dark: #2563eb;
 }
 
-/* Dark theme overrides (toggled via .dark-mode on <body>) */
+/* Dark theme overrides */
 .dark-mode {
   --page-bg: #111827;
   --text: #e5e7eb;
@@ -21,25 +17,23 @@
   --card-bg: #1f2937;
   --text-muted: #94a3b8;
   --border: #374151;
-  --shadow: 0 1px 2px rgba(0,0,0,.4);
+  --shadow: 0 2px 8px rgba(0,0,0,.45);
 }
 
 /* ========================================
 1️⃣ GLOBAL RESET & BASE STYLES
 ======================================== */
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; height: 100%; }
 body {
   margin: 0;
-  min-height: 100%;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   background-color: var(--page-bg);
   color: var(--text);
+  scroll-behavior: smooth;
 }
-h1, h2, h3, p { margin: 0; padding: 0; }
-img { max-width: 100%; display: block; }
 
-/* Nicely styled “card section” used across pages */
+h1, h2, h3, p { margin: 0; padding: 0; }
+
+/* Cardy sections used on details page */
 .section-box {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -57,61 +51,52 @@ img { max-width: 100%; display: block; }
   max-width: 1200px;
   margin: 0 auto;
 }
+
 .content-layout {
   display: flex;
   gap: 1rem;
-  align-items: flex-start; /* prevents the map column from stretching into blank space */
+  align-items: flex-start; /* prevents map column stretching if empty */
 }
+
+/* Make list slightly wider, map slightly narrower */
 .property-list {
-  flex: 2 1 0;
+  flex: 1 1 48%;
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
 
-/* Right column / map panel */
 .map-view {
-  flex: 1 1 360px;
+  flex: 0 1 52%;                 /* ↓ narrower than before */
   position: sticky;
-  top: 96px; /* sits under header + filters */
+  top: 96px;                      /* sits below header/filters */
   height: calc(100vh - 120px);
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
   background: var(--card-bg);
-  box-shadow: var(--shadow);
 }
 
-/* 💡 Leaflet needs explicit heights to avoid white gaps */
-.map-view .leaflet-container,
-.map-view .leaflet-pane,
-.map-view .leaflet-map-pane {
-  height: 100% !important;
-  width: 100%;
-}
-.map-view > * { height: 100%; }
-
-/* When map is hidden, no blank space remains */
+/* When map is hidden, remove the empty column */
 .hide-map .map-view { display: none; }
-.hide-map .content-layout { align-items: stretch; }
 .hide-map .property-list { flex: 1 1 100%; }
 
 /* ========================================
-3️⃣ FILTER BAR
+3️⃣ FILTER BAR (sticky, highlighted)
 ======================================== */
 .sticky-primary {
   position: sticky;
   top: 0;
   z-index: 100;
-  background-color: var(--card-bg);
-  padding: 0.75rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: .75rem;
+
+  padding: .55rem .75rem;         /* tighter vertical space */
+  background-color: var(--card-bg);
   border-bottom: 1px solid var(--border);
-  box-shadow: var(--shadow);
   border-radius: 10px;
-  margin-bottom: 0.75rem;
+  box-shadow: var(--shadow);      /* subtle pop while scrolling */
 }
 
 /* ========================================
@@ -119,21 +104,31 @@ img { max-width: 100%; display: block; }
 ======================================== */
 .filter-input.large,
 .filter-select.small {
-  padding: 0.5rem .65rem;
+  padding: .55rem .65rem;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--card-bg);
   color: var(--text);
 }
+
+/* Make search prominent (~half width on desktop) */
+.filter-input.large {
+  flex: 1 1 48%;
+  min-width: 320px;
+  max-width: 680px;
+}
+
+/* Buttons */
 .small-button {
-  padding: 0.5rem .75rem;
+  padding: .55rem .8rem;
   border-radius: 6px;
-  background-color: var(--accent);
+  background-color: #3b82f6;
   color: #fff;
   border: none;
   cursor: pointer;
+  line-height: 1;
 }
-.small-button:hover { background-color: var(--accent-dark); }
+.small-button:hover { background-color: #2563eb; }
 
 /* ========================================
 5️⃣ ADVANCED FILTER ROW
@@ -146,13 +141,13 @@ img { max-width: 100%; display: block; }
 }
 .filters-row > div { display: flex; flex-direction: column; }
 .filters-row label {
-  font-size: 0.8rem;
-  margin-bottom: 0.25rem;
+  font-size: .8rem;
+  margin-bottom: .25rem;
   color: var(--text-muted);
 }
 .filters-row input,
 .filters-row select {
-  padding: 0.5rem;
+  padding: .5rem;
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--card-bg);
@@ -170,44 +165,50 @@ img { max-width: 100%; display: block; }
   background-color: #334155;
   color: #fff;
   font-size: 14px;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
+  padding: .5rem .75rem;
+  border-radius: 4px;
   border: none;
   cursor: pointer;
-  opacity: 0.85;
-  transition: opacity .25s ease;
+  opacity: .85;
+  transition: opacity .3s;
 }
 .back-to-top:hover { opacity: 1; }
 
 /* ========================================
-7️⃣ HEADER & UTILS
+8️⃣ HEADER & SCROLL BEHAVIOUR
 ======================================== */
 .header-shadow { box-shadow: 0 2px 4px rgba(0,0,0,.1); }
+html { scroll-behavior: smooth; }
 
 /* ========================================
-8️⃣ MOBILE
+9️⃣ MOBILE
 ======================================== */
 @media (max-width: 768px) {
   .content-layout { flex-direction: column; }
 
   .map-view {
     width: 100% !important;
-    height: 320px !important;
+    height: 300px !important;
     position: relative !important;
     top: unset;
     border-left: none;
+    flex: 1 1 auto;
   }
 
   .sticky-primary {
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: .5rem .5rem;
+    gap: .5rem;
+  }
+
+  /* Search goes full-width on small screens for usability */
+  .filter-input.large {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
   }
 
   .filters-row { flex-direction: column; }
 
-  .back-to-top {
-    bottom: 80px;
-    right: 16px;
-  }
+  .back-to-top { bottom: 80px; right: 16px; }
 }
