@@ -16,21 +16,39 @@ export default function PropertyDetailsPage() {
   const params = useParams();
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string | undefined);
 
-  const [property, setProperty] = useState<Property | null>(null);
+  const BACKEND_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  '';
 
-  useEffect(() => {
-    if (!id) return;
-    const fetchProperty = async () => {
-      try {
-        const res = await fetch(`/api/properties/${id}`);
-        const data = await res.json();
-        setProperty(data);
-      } catch (err) {
-        console.error('Failed to fetch property:', err);
-      }
-    };
-    fetchProperty();
-  }, [id]);
+useEffect(() => {
+  if (!id || !BACKEND_BASE) return;
+
+  const fetchProperty = async () => {
+    try {
+      const res = await fetch(`${BACKEND_BASE}/api/properties/${id}`);
+      const raw = await res.json();
+
+      // Normalize data to prevent NaN / N/A
+      const p = {
+        ...raw,
+        price: Number(raw.price ?? 0),
+        yield_percent: Number(raw.yield_percent ?? raw.yield ?? 0),
+        roi_percent: Number(raw.roi_percent ?? raw.roi ?? 0),
+        latitude: raw.latitude ? Number(raw.latitude) : undefined,
+        longitude: raw.longitude ? Number(raw.longitude) : undefined,
+        propertyType: raw.propertyType ?? raw.property_type ?? '',
+        investmentType: raw.investmentType ?? raw.investment_type ?? '',
+      };
+
+      setProperty(p);
+    } catch (err) {
+      console.error('Failed to fetch property:', err);
+    }
+  };
+
+  fetchProperty();
+}, [id, BACKEND_BASE]);
 
   if (!property) {
     return <div className="p-6 text-center text-gray-600">Loading property...</div>;
