@@ -1,25 +1,15 @@
 // /frontend/components/property_details/MapSingle.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L, { LatLngExpression } from 'leaflet';
-
-// ✅ Leaflet icon fix for Next.js
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl:
-    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
+import 'leaflet/dist/leaflet.css';
 
 type MinimalProperty = {
-  latitude: number;
-  longitude: number;
-  title: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  title?: string | null;
 };
 
 type MapSingleProps = {
@@ -30,22 +20,42 @@ type MapSingleProps = {
 };
 
 export default function MapSingle(props: MapSingleProps) {
-  // ✅ Pull values from either property object or direct props
-  const latitude = props.property?.latitude ?? props.latitude;
-  const longitude = props.property?.longitude ?? props.longitude;
-  const title = props.property?.title ?? props.title ?? 'Unknown Property';
+  // Pull from either shape
+  const lat = props.property?.latitude ?? props.latitude;
+  const lng = props.property?.longitude ?? props.longitude;
+  const title = props.property?.title ?? props.title ?? 'Property';
 
   const hasCoords =
-    typeof latitude === 'number' &&
-    !Number.isNaN(latitude) &&
-    typeof longitude === 'number' &&
-    !Number.isNaN(longitude);
+    typeof lat === 'number' && !Number.isNaN(lat) &&
+    typeof lng === 'number' && !Number.isNaN(lng);
 
-  const position: LatLngExpression = hasCoords ? [latitude!, longitude!] : [52.5, -1.5];
+  const position: LatLngExpression = useMemo<LatLngExpression>(
+    () => (hasCoords ? [lat as number, lng as number] : [52.5, -1.5]), // UK-ish fallback
+    [hasCoords, lat, lng]
+  );
 
-  // ✅ Prevent SSR rendering issues
+  // Avoid SSR hiccups + set up icon paths after mount
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+
+    // Leaflet default icon fix for Next.js
+    try {
+      // @ts-ignore
+      delete L.Icon.Default.prototype._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl:
+          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+        iconUrl:
+          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+        shadowUrl:
+          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+      });
+    } catch {
+      /* no-op */
+    }
+  }, []);
+
   if (!mounted) return null;
 
   if (!hasCoords) {
@@ -57,7 +67,7 @@ export default function MapSingle(props: MapSingleProps) {
   }
 
   return (
-    <div style={{ height: 320, width: '100%', borderRadius: 10, overflow: 'hidden' }}>
+    <div className="rounded-lg overflow-hidden" style={{ height: 320, width: '100%' }}>
       <MapContainer
         center={position}
         zoom={13}
