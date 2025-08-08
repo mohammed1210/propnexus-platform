@@ -1,49 +1,56 @@
+/* Property Card
+   - Uses CSS variables from globals.css
+   - Works in light/dark automatically (no extra selectors needed)
+   - Keeps your existing class names intact
+*/
+
 .card {
-  background-color: #ffffff;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow);
   padding: 20px;
   margin-bottom: 24px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  overflow: hidden;
-  cursor: pointer;
+  gap: 12px;
+
   text-decoration: none;
-}
+  cursor: pointer;
 
+  /* Motion + hover */
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
 .card:hover {
-  transform: translateY(-3px) scale(1.01);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,.08);
+  border-color: #cbd5e1;
 }
-
 .card:focus-within {
   outline: 2px solid #3b82f6;
   outline-offset: 4px;
 }
 
+/* Image */
 .imageWrapper {
   width: 100%;
   height: 220px;
   overflow: hidden;
   border-radius: 10px;
-  background-color: #f1f5f9;
+  background-color: #f1f5f9; /* subtle skeleton bg */
 }
-
 .image {
   width: 100%;
   height: 100%;
-  object-fit: cover;
   display: block;
+  object-fit: cover;
   border-radius: 10px;
-  transition: transform 0.2s ease;
+  transition: transform 0.18s ease;
 }
+.card:hover .image { transform: scale(1.03); }
 
-.card:hover .image {
-  transform: scale(1.03);
-}
-
+/* Text blocks */
 .info {
   display: flex;
   flex-direction: column;
@@ -53,24 +60,22 @@
 .title {
   font-size: 20px;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text);
   margin-bottom: 2px;
 }
-
 .location {
   font-size: 15px;
-  color: #64748b;
+  color: var(--text-muted);
 }
-
 .price {
   font-size: 18px;
-  font-weight: 500;
-  color: #0f172a;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .details {
   font-size: 14px;
-  color: #475569;
+  color: #475569; /* a tad darker than --text-muted for contrast */
   display: flex;
   align-items: center;
   gap: 8px;
@@ -79,8 +84,7 @@
 }
 
 .metrics {
-  margin-top: 6px;
-  margin-bottom: 6px;
+  margin: 6px 0;
 }
 
 .badge {
@@ -92,8 +96,10 @@
   font-weight: 500;
   display: inline-block;
   width: fit-content;
+  border: 1px solid rgba(16,185,129,.15);
 }
 
+/* Buttons */
 .buttons {
   display: flex;
   gap: 10px;
@@ -107,83 +113,50 @@
   padding: 10px 14px;
   border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: 500;
+  transition: transform 0.18s ease, background-color 0.18s ease, box-shadow 0.18s ease;
+  font-weight: 600;
   font-size: 14px;
+  color: #fff;
+  box-shadow: 0 1px 1px rgba(0,0,0,.04);
 }
 
-.save {
-  background-color: #0ea5e9;
-  color: white;
+.save { background-color: #0ea5e9; }
+.save:hover { background-color: #0284c7; transform: translateY(-1px); }
+
+.detailsBtn { background-color: #10b981; }
+.detailsBtn:hover { background-color: #059669; transform: translateY(-1px); }
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .image,
+  .save,
+  .detailsBtn {
+    transition: none;
+  }
+  .card:hover .image,
+  .save:hover,
+  .detailsBtn:hover {
+    transform: none;
+  }
 }
 
-.save:hover {
-  background-color: #0284c7;
-  transform: scale(1.02);
-}
-
-.detailsBtn {
-  background-color: #10b981;
-  color: white;
-}
-
-.detailsBtn:hover {
-  background-color: #059669;
-  transform: scale(1.02);
-}
-
-/* 🌒 Dark mode support */
-body.dark-mode .card {
-  background-color: #1e293b;
-}
-
-body.dark-mode .title,
-body.dark-mode .price {
-  color: #f9fafb;
-}
-
-body.dark-mode .location,
-body.dark-mode .details {
-  color: #94a3b8;
-}
-
-body.dark-mode .badge {
-  background-color: #064e3b;
-  color: #a7f3d0;
-}
-
-/* 📱 Responsive optimization */
+/* 📱 Responsive */
 @media (max-width: 768px) {
-  .card {
-    padding: 16px;
-  }
-
-  .imageWrapper {
-    height: 180px;
-  }
-
-  .title {
-    font-size: 18px;
-  }
-
-  .price {
-    font-size: 16px;
-  }
+  .card { padding: 16px; }
+  .imageWrapper { height: 180px; }
+  .title { font-size: 18px; }
+  .price { font-size: 16px; }
 
   .buttons {
     flex-direction: column;
     gap: 8px;
   }
-
   .save,
-  .detailsBtn {
-    width: 100%;
-  }
+  .detailsBtn { width: 100%; }
 }
 
-/* 🗺 Hide map toggle button on desktop */
+/* 🗺 Hide map toggle button on desktop (kept for parity with the page) */
 @media (min-width: 768px) {
-  .map-toggle-button {
-    display: none;
-  }
+  .map-toggle-button { display: none; }
 }
