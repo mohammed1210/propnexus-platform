@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import PropertyCard from '../../components/PropertyCard';
-import { Property } from '../types';
+import PropertyCard from '../components/PropertyCard';
+import { Property } from './types';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
