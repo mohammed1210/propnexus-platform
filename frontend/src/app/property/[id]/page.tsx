@@ -152,10 +152,13 @@ useEffect(() => {
         </div>
 
         {/* Static Map */}
-        <div className="mt-8">
-          <MapSingle property={property} />
-        </div>
-      </div>
+{property?.latitude && property?.longitude ? (
+  <div className="mt-8">
+    <MapSingle property={property} />
+  </div>
+) : (
+  <p className="mt-8 text-gray-500">Map unavailable — no coordinates provided.</p>
+)}
 
       {/* Floating AI Assistant */}
 {property && <AIChatbot property={property} />}
