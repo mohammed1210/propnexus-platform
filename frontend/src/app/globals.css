@@ -78,7 +78,7 @@ h1, h2, h3, p { margin: 0; padding: 0; }
 
 /* the actual card that holds the Leaflet map */
 .map-panel {
-  height: clamp(420px, 60vh, 640px);   /* stable height, responsive */
+  height: clamp(520px, 60vh, 600px);   /* stable height, responsive */
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
