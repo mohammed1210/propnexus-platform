@@ -17,13 +17,30 @@ type MapSingleProps = {
   latitude?: number;
   longitude?: number;
   title?: string;
+
+  /** Container height in px (default 320) */
+  height?: number;
+
+  /** Initial zoom (default 13) */
+  zoom?: number;
+
+  /** Enable/disable wheel zoom (default false) */
+  scrollWheelZoom?: boolean;
+
+  /** Extra class names for the outer container */
+  className?: string;
 };
 
+// ---- Component ----
 export default function MapSingle(props: MapSingleProps) {
-  // Pull from either shape
+  // Pull coords/title from either shape
   const lat = props.property?.latitude ?? props.latitude;
   const lng = props.property?.longitude ?? props.longitude;
   const title = props.property?.title ?? props.title ?? 'Property';
+
+  const height = props.height ?? 320;
+  const zoom = props.zoom ?? 13;
+  const scrollWheelZoom = props.scrollWheelZoom ?? false;
 
   const hasCoords =
     typeof lat === 'number' && !Number.isNaN(lat) &&
@@ -34,12 +51,10 @@ export default function MapSingle(props: MapSingleProps) {
     [hasCoords, lat, lng]
   );
 
-  // Avoid SSR hiccups + set up icon paths after mount
+  // SSR safety + Leaflet icon fix
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
-
-    // Leaflet default icon fix for Next.js
     try {
       // @ts-ignore
       delete L.Icon.Default.prototype._getIconUrl;
@@ -51,32 +66,50 @@ export default function MapSingle(props: MapSingleProps) {
         shadowUrl:
           'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
       });
-    } catch {
-      /* no-op */
-    }
+    } catch { /* no-op */ }
+  }, []);
+
+  // Dark-mode tile switching (reacts to your body class toggle)
+  const [darkMode, setDarkMode] = useState(false);
+  useEffect(() => {
+    const isDark = () => document.body.classList.contains('dark-mode');
+    setDarkMode(isDark());
+    const obs = new MutationObserver(() => setDarkMode(isDark()));
+    obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
   }, []);
 
   if (!mounted) return null;
 
   if (!hasCoords) {
     return (
-      <div className="w-full rounded-md border border-gray-200 p-3 text-sm text-gray-600">
+      <div className={`w-full rounded-md border border-gray-200 p-3 text-sm text-gray-600 ${props.className ?? ''}`}>
         Map unavailable — no coordinates provided.
       </div>
     );
   }
 
+  // Basemap URLs + attribution
+  const lightUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+  const lightAttr = '&copy; OpenStreetMap contributors';
+  const darkUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  const darkAttr =
+    '&copy; OpenStreetMap contributors, &copy; CARTO';
+
   return (
-    <div className="rounded-lg overflow-hidden" style={{ height: 320, width: '100%' }}>
+    <div
+      className={`rounded-lg overflow-hidden ${props.className ?? ''}`}
+      style={{ height, width: '100%' }}
+    >
       <MapContainer
         center={position}
-        zoom={13}
-        scrollWheelZoom={false}
+        zoom={zoom}
+        scrollWheelZoom={scrollWheelZoom}
         style={{ height: '100%', width: '100%' }}
       >
         <TileLayer
-          attribution="&copy; OpenStreetMap contributors"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={darkMode ? darkAttr : lightAttr}
+          url={darkMode ? darkUrl : lightUrl}
         />
         <Marker position={position}>
           <Popup>{title}</Popup>
