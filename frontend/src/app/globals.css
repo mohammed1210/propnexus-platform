@@ -53,15 +53,21 @@ h1, h2, h3, p {
 }
 
 /* 
-========================================
-2️⃣ CONTAINER LAYOUTS
-======================================== 
+==================================================
+2 CONTAINER LAYOUTS
+==================================================
 */
-.main-wrapper { padding: 1rem; }
+
+.main-wrapper {
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
 
 .content-layout {
-  display: flex; 
+  display: flex;
   gap: 1rem;
+  align-items: flex-start; /* prevents map column stretching down empty */
 }
 
 .property-list {
@@ -71,13 +77,21 @@ h1, h2, h3, p {
   gap: 1rem;
 }
 
+/* Right column / map panel */
 .map-view {
   flex: 1;
-  height: calc(100vh - 150px);
   position: sticky;
-  top: 120px;
+  top: 96px; /* sits nicely under your header + filters */
+  height: calc(100vh - 120px);
   border: 1px solid var(--border);
-  background: var(--card-bg);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff; /* cleaner than grey default */
+}
+
+/* When map is hidden, no blank space remains */
+.hide-map .map-view {
+  display: none;
 }
 
 /* 
