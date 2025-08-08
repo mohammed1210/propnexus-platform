@@ -1,143 +1,190 @@
-.container {
-  margin-top: 2rem;
-  padding: 1.25rem 1.25rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background-color: var(--card-bg);
-  box-shadow: var(--shadow);
+'use client';
+
+import React, { useMemo, useState } from 'react';
+import styles from './ExitStrategyGenerator.module.css';
+
+interface ExitStrategyProps {
+  title: string;
+  location: string;
+  price: number;
+  yield_percent: number;
+  roi_percent: number;
+  propertyType: string;
+  investmentType: string;
+  description?: string;
 }
 
-/* Use this if the parent already draws a card/border */
-.container.flat {
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  margin-top: 1.25rem;
+type ParsedStrategy = {
+  title: string;
+  summary: string;
+};
+
+/* ---------- Helpers ---------- */
+
+// strip basic markdown & bullets
+function stripMarkdown(s: string): string {
+  return s
+    .replace(/\*\*(.*?)\*\*/g, '$1')       // **bold**
+    .replace(/__(.*?)__/g, '$1')           // __bold__
+    .replace(/`{1,3}(.*?)`{1,3}/g, '$1')   // `code`
+    .replace(/^\s*[-*•]\s*/gm, '')         // bullet prefixes
+    .replace(/\s+/g, ' ')                  // collapse whitespace
+    .trim();
 }
 
-.headerRow {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  justify-content: space-between;
+// Try to parse: "Title: details" or "Title – details"
+function parseOne(raw: string): ParsedStrategy {
+  const cleaned = stripMarkdown(raw);
+  const m = cleaned.match(/^([^:.–—-]{3,100})\s*[:–—-]\s*(.+)$/); // title : summary
+  if (m) {
+    return { title: m[1].trim(), summary: m[2].trim() };
+  }
+  // fallback: first sentence as title
+  const firstSentence = cleaned.split(/(?<=[.!?])\s+/)[0] ?? cleaned;
+  const rest = cleaned.slice(firstSentence.length).trim();
+  return {
+    title: firstSentence.replace(/^\d+\.\s*/, '').trim(),
+    summary: rest,
+  };
 }
 
-.heading {
-  font-size: 1.125rem;
-  line-height: 1.4;
-  font-weight: 700;
-  margin: 0 0 0.25rem 0;
+// Normalise any backend shape into string[]
+function normaliseItems(data: unknown): string[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data.map(String);
+  if (typeof data === 'string') {
+    return data
+      .split(/\n+/)
+      .map((s) => s.replace(/^\s*\d+\.\s*/, '').trim())
+      .filter(Boolean);
+  }
+  // common wrapper { strategies: [...] }
+  const maybe = (data as any)?.strategies;
+  if (Array.isArray(maybe)) return maybe.map(String);
+  try {
+    return [String(data)];
+  } catch {
+    return [];
+  }
 }
 
-.caption {
-  font-size: 0.9rem;
-  margin: 0 0 0.75rem 0;
-  color: var(--text-muted);
-}
+export default function ExitStrategyGenerator(props: ExitStrategyProps) {
+  const {
+    title,
+    location,
+    price,
+    yield_percent,
+    roi_percent,
+    propertyType,
+    investmentType,
+    description = '',
+  } = props;
 
-.actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  white-space: nowrap;
-}
+  const [rawItems, setRawItems] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
 
-.generateButton {
-  padding: 0.55rem 0.9rem;
-  background-color: #2563eb; /* blue-600 */
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform .08s ease, background-color .15s ease, box-shadow .15s ease;
-}
+  const BACKEND_BASE = process.env.NEXT_PUBLIC_API_URL;
 
-.generateButton:hover { background-color: #1d4ed8; } /* blue-700 */
+  const parsed = useMemo(() => rawItems.map(parseOne), [rawItems]);
 
-.generateButton:active { transform: translateY(1px); }
+  const handleGenerate = async () => {
+    setLoading(true);
+    setError('');
+    setRawItems([]);
+    setGeneratedAt(null);
 
-.generateButton:focus-visible {
-  outline: 2px solid #93c5fd;           /* blue-300 */
-  outline-offset: 2px;
-}
+    try {
+      if (!BACKEND_BASE) throw new Error('Missing NEXT_PUBLIC_API_URL');
 
-.generateButton:disabled {
-  background-color: #9ca3af;            /* gray-400 */
-  cursor: not-allowed;
-  box-shadow: none;
-}
+      const res = await fetch(`${BACKEND_BASE}/generate-strategies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          location,
+          price,
+          yield_percent,
+          roi_percent,
+          property_type: propertyType,
+          investment_type: investmentType,
+          description,
+        }),
+      });
 
-.secondaryBtn {
-  padding: 0.5rem 0.7rem;
-  background: #f3f4f6; /* gray-100 */
-  color: #111827;      /* gray-900 */
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-}
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Strategies API ${res.status}: ${text}`);
+      }
 
-.secondaryBtn:hover { background: #e5e7eb; } /* gray-200 */
+      const data = await res.json();
+      const items = normaliseItems(data);
+      setRawItems(items);
+      setGeneratedAt(new Date());
+    } catch (err: any) {
+      console.error('Exit strategies error:', err);
+      setError(err?.message || 'An error occurred while generating strategies.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-@media (prefers-reduced-motion: reduce) {
-  .generateButton { transition: none; }
-}
+  const handleCopy = async () => {
+    const text = parsed
+      .map((p, i) => `${i + 1}. ${p.title}${p.summary ? ` — ${p.summary}` : ''}`)
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // ignore
+    }
+  };
 
-.result {
-  margin-top: 0.75rem;
-  background-color: #f9fafb;            /* gray-50 */
-  padding: 0.85rem;
-  border-radius: 8px;
-  color: inherit;
-}
+  return (
+    <div className={styles.container}>
+      <div className={styles.headerRow}>
+        <h3 className={styles.heading}>💼 Exit Strategy Suggestions</h3>
+        <div className={styles.actions}>
+          {parsed.length > 0 && (
+            <button className={styles.secondaryBtn} onClick={handleCopy} type="button">
+              Copy
+            </button>
+          )}
+          <button
+            onClick={handleGenerate}
+            disabled={loading}
+            className={styles.generateButton}
+            type="button"
+          >
+            {loading ? 'Thinking…' : 'Generate Exit Strategies'}
+          </button>
+        </div>
+      </div>
 
-.empty {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: 0.95rem;
-}
+      <p className={styles.caption}>
+        Use AI to suggest smart exit plans tailored to this property.
+      </p>
 
-.list {
-  margin: 0.25rem 0 0;
-  padding-left: 1.25rem;
-}
+      {error && <p className={styles.error}>{error}</p>}
 
-.listItem {
-  margin: 0.25rem 0;
-  line-height: 1.5;
-  position: relative;
-}
-
-.listItem::marker {
-  color: #94a3b8; /* slate-400 */
-}
-
-.timestamp {
-  margin-top: 0.6rem;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-}
-
-/* Spinner inside the Generate button */
-.spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  border: 2px solid rgba(255,255,255,0.6);
-  border-top-color: #fff;
-  display: inline-block;
-  margin-right: 8px;
-  vertical-align: -2px;
-  animation: spin .8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.error {
-  color: #dc2626;                        /* red-600 */
-  margin-top: 0.75rem;
+      {parsed.length > 0 && (
+        <div className={styles.result}>
+          <ol className={styles.list}>
+            {parsed.map((item, idx) => (
+              <li key={idx} className={styles.item}>
+                <span className={styles.itemTitle}>{item.title}</span>
+                {item.summary && <span className={styles.itemSummary}>{item.summary}</span>}
+              </li>
+            ))}
+          </ol>
+          {generatedAt && (
+            <div className={styles.meta}>
+              Last generated at {generatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
