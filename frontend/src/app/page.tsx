@@ -253,11 +253,13 @@ export default function PropertiesPage() {
             filteredProperties.map((p) => <PropertyCard key={p.id} property={p} />)}
         </div>
 
-        {showMap && !loading && !error && filteredProperties.length > 0 && (
-          <aside className="map-view" aria-label="Map of filtered properties">
-            <MapView properties={filteredProperties} />
-          </aside>
-        )}
+        {showMap && filteredProperties.length > 0 && (
+  <aside className="map-view">
+    <div className="map-panel">
+      <MapView properties={filteredProperties} />
+    </div>
+  </aside>
+)}
       </div>
 
       {/* Back to top */}
