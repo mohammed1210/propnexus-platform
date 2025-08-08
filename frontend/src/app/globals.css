@@ -99,6 +99,22 @@ h1, h2, h3, p { margin: 0; padding: 0; }
   box-shadow: var(--shadow);      /* subtle pop while scrolling */
 }
 
+.filter-bar {
+  background-color: var(--filter-bar-bg, #f8f9fa); /* light grey in light mode */
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.dark .filter-bar {
+  background-color: rgba(255, 255, 255, 0.05); /* subtle dark highlight */
+}
+
 /* ========================================
 4️⃣ SEARCH + SELECT FILTERS
 ======================================== */
