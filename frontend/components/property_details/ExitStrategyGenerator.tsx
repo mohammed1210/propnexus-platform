@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import styles from './ExitStrategyGenerator.module.css';
 
-interface ExitStrategyProps {
+type Props = {
   title: string;
   location: string;
   price: number;
@@ -12,93 +12,91 @@ interface ExitStrategyProps {
   propertyType: string;
   investmentType: string;
   description?: string;
-}
-
-type ParsedStrategy = {
-  title: string;
-  summary: string;
 };
 
-/* ---------- Helpers ---------- */
+type StrategyInput =
+  | string
+  | { strategy?: string; text?: string; title?: string; content?: string; description?: string }
+  | unknown;
 
-// strip basic markdown & bullets
+/* --- Helpers ------------------------------------------------------------- */
+
+const API = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+
 function stripMarkdown(s: string): string {
+  // remove **bold**, *italic*, stray bullets/dashes, and squash whitespace
   return s
-    .replace(/\*\*(.*?)\*\*/g, '$1')       // **bold**
-    .replace(/__(.*?)__/g, '$1')           // __bold__
-    .replace(/`{1,3}(.*?)`{1,3}/g, '$1')   // `code`
-    .replace(/^\s*[-*•]\s*/gm, '')         // bullet prefixes
-    .replace(/\s+/g, ' ')                  // collapse whitespace
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/^\s*[-•]\s*/gm, '')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
-// Try to parse: "Title: details" or "Title – details"
-function parseOne(raw: string): ParsedStrategy {
-  const cleaned = stripMarkdown(raw);
-  const m = cleaned.match(/^([^:.–—-]{3,100})\s*[:–—-]\s*(.+)$/); // title : summary
-  if (m) {
-    return { title: m[1].trim(), summary: m[2].trim() };
+function normalize(item: StrategyInput): string {
+  if (!item) return '';
+  if (typeof item === 'string') return stripMarkdown(item);
+
+  if (typeof item === 'object') {
+    const o = item as Record<string, unknown>;
+    const fields = [o.strategy, o.text, o.title, o.content, o.description];
+    const str = fields.find((v) => typeof v === 'string') as string | undefined;
+    if (str) return stripMarkdown(str);
+    try {
+      return stripMarkdown(JSON.stringify(o));
+    } catch {
+      return String(o);
+    }
   }
-  // fallback: first sentence as title
-  const firstSentence = cleaned.split(/(?<=[.!?])\s+/)[0] ?? cleaned;
-  const rest = cleaned.slice(firstSentence.length).trim();
-  return {
-    title: firstSentence.replace(/^\d+\.\s*/, '').trim(),
-    summary: rest,
-  };
+  return String(item);
 }
 
-// Normalise any backend shape into string[]
-function normaliseItems(data: unknown): string[] {
-  if (!data) return [];
-  if (Array.isArray(data)) return data.map(String);
-  if (typeof data === 'string') {
-    return data
-      .split(/\n+/)
-      .map((s) => s.replace(/^\s*\d+\.\s*/, '').trim())
-      .filter(Boolean);
-  }
-  // common wrapper { strategies: [...] }
-  const maybe = (data as any)?.strategies;
-  if (Array.isArray(maybe)) return maybe.map(String);
-  try {
-    return [String(data)];
-  } catch {
-    return [];
-  }
+function splitBlobToList(blob: string): string[] {
+  // Accepts a single text blob and returns clean bullet paragraphs
+  const lines = blob
+    .split(/\n+/)
+    .map((l) => l.replace(/^\s*(\d+\.|[-•])\s*/, '').trim())
+    .filter(Boolean);
+
+  // If it already looks like paragraphs, keep; otherwise join into a single item
+  if (lines.length > 1) return lines.map(stripMarkdown);
+  return [stripMarkdown(blob)];
 }
 
-export default function ExitStrategyGenerator(props: ExitStrategyProps) {
-  const {
-    title,
-    location,
-    price,
-    yield_percent,
-    roi_percent,
-    propertyType,
-    investmentType,
-    description = '',
-  } = props;
+/* --- Component ----------------------------------------------------------- */
 
-  const [rawItems, setRawItems] = useState<string[]>([]);
+export default function ExitStrategyGenerator({
+  title,
+  location,
+  price,
+  yield_percent,
+  roi_percent,
+  propertyType,
+  investmentType,
+  description = '',
+}: Props) {
+  const [items, setItems] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
 
-  const BACKEND_BASE = process.env.NEXT_PUBLIC_API_URL;
+  const timeLabel = useMemo(
+    () =>
+      generatedAt
+        ? generatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : '',
+    [generatedAt]
+  );
 
-  const parsed = useMemo(() => rawItems.map(parseOne), [rawItems]);
-
-  const handleGenerate = async () => {
+  async function handleGenerate() {
     setLoading(true);
     setError('');
-    setRawItems([]);
-    setGeneratedAt(null);
+    setItems([]);
 
     try {
-      if (!BACKEND_BASE) throw new Error('Missing NEXT_PUBLIC_API_URL');
+      if (!API) throw new Error('Missing NEXT_PUBLIC_API_URL');
 
-      const res = await fetch(`${BACKEND_BASE}/generate-strategies`, {
+      const res = await fetch(`${API}/generate-strategies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -113,75 +111,93 @@ export default function ExitStrategyGenerator(props: ExitStrategyProps) {
         }),
       });
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Strategies API ${res.status}: ${text}`);
-      }
+      if (!res.ok) throw new Error(`Strategies API ${res.status}: ${await res.text()}`);
 
       const data = await res.json();
-      const items = normaliseItems(data);
-      setRawItems(items);
+
+      let out: string[] = [];
+      if (Array.isArray(data)) {
+        out = data.map(normalize).filter(Boolean);
+      } else if (Array.isArray((data as any)?.strategies)) {
+        out = (data as any).strategies.map(normalize).filter(Boolean);
+      } else if (typeof data === 'string') {
+        out = splitBlobToList(data);
+      } else {
+        const maybe = normalize(data);
+        if (maybe) out = [maybe];
+      }
+
+      setItems(out);
       setGeneratedAt(new Date());
-    } catch (err: any) {
-      console.error('Exit strategies error:', err);
-      setError(err?.message || 'An error occurred while generating strategies.');
+    } catch (e: any) {
+      console.error('Exit strategies error:', e);
+      setError(e?.message || 'An error occurred while generating strategies.');
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleCopy = async () => {
-    const text = parsed
-      .map((p, i) => `${i + 1}. ${p.title}${p.summary ? ` — ${p.summary}` : ''}`)
-      .join('\n');
+  async function handleCopy() {
+    if (!items.length) return;
+    const text = items.map((s, i) => `${i + 1}. ${s}`).join('\n\n');
     try {
       await navigator.clipboard.writeText(text);
     } catch {
       // ignore
     }
-  };
+  }
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} aria-live="polite">
       <div className={styles.headerRow}>
-        <h3 className={styles.heading}>💼 Exit Strategy Suggestions</h3>
-        <div className={styles.actions}>
-          {parsed.length > 0 && (
-            <button className={styles.secondaryBtn} onClick={handleCopy} type="button">
-              Copy
-            </button>
-          )}
+        <div>
+          <h3 className={styles.heading}>💼 Exit Strategy Suggestions</h3>
+          <p className={styles.caption}>
+            Use AI to suggest smart exit plans tailored to this property.
+          </p>
+        </div>
+
+        <div className={styles.toolbar}>
           <button
+            className={`${styles.btn} ${styles.btnGhost}`}
+            onClick={handleCopy}
+            disabled={!items.length || loading}
+            aria-label="Copy strategies to clipboard"
+          >
+            Copy
+          </button>
+          <button
+            className={`${styles.btn} ${styles.btnPrimary}`}
             onClick={handleGenerate}
             disabled={loading}
-            className={styles.generateButton}
-            type="button"
           >
             {loading ? 'Thinking…' : 'Generate Exit Strategies'}
           </button>
         </div>
       </div>
 
-      <p className={styles.caption}>
-        Use AI to suggest smart exit plans tailored to this property.
-      </p>
-
       {error && <p className={styles.error}>{error}</p>}
 
-      {parsed.length > 0 && (
+      {items.length > 0 && (
         <div className={styles.result}>
           <ol className={styles.list}>
-            {parsed.map((item, idx) => (
-              <li key={idx} className={styles.item}>
-                <span className={styles.itemTitle}>{item.title}</span>
-                {item.summary && <span className={styles.itemSummary}>{item.summary}</span>}
-              </li>
-            ))}
+            {items.map((s, i) => {
+              // Split "Title: detail" into two lines for readability
+              const [t, ...rest] = s.split(':');
+              const titleLine = t?.trim();
+              const descLine = rest.join(':').trim();
+
+              return (
+                <li key={i}>
+                  <div className={styles.titleLine}>{titleLine || `Strategy ${i + 1}`}</div>
+                  {!!descLine && <div className={styles.descLine}>{descLine}</div>}
+                </li>
+              );
+            })}
           </ol>
-          {generatedAt && (
-            <div className={styles.meta}>
-              Last generated at {generatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </div>
+
+          {!!timeLabel && (
+            <div className={styles.timestamp}>Last generated at {timeLabel}</div>
           )}
         </div>
       )}
