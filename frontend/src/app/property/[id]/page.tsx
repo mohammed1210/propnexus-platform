@@ -199,15 +199,19 @@ export default function PropertyDetailsPage() {
         </div>
 
         {/* Static Map — compact so it doesn’t dominate the sidebar */}
-        {hasCoords ? (
-          <div className="mt-8">
-            <div style={{ height: 260 }}>
-              <MapSingle property={property} />
-            </div>
-          </div>
-        ) : (
-          <p className="mt-8 text-gray-500">Map unavailable — no coordinates provided.</p>
-        )}
+{hasCoords ? (
+  <MapSingle
+    property={property}
+    height={260}       // same height you had before
+    zoom={14}          // a touch closer
+    scrollWheelZoom={false} // keep it off for sidebar
+    className="mt-8"
+  />
+) : (
+  <p className="mt-8 text-gray-500">
+    Map unavailable — no coordinates provided.
+  </p>
+)}
       </aside>
 
       {/* Floating AI Assistant */}
