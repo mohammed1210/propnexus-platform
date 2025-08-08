@@ -120,13 +120,14 @@ export default function PropertiesPage() {
       {/* ===== Filters (sticky) ===== */}
       <div className="sticky-primary" role="region" aria-label="Filters">
         <input
-          className="filter-input large"
-          type="text"
-          placeholder="🔎 Search location"
-          value={searchLocation}
-          onChange={(e) => setSearchLocation(e.target.value)}
-          aria-label="Search location"
-        />
+  className="filter-input large"
+  style={{ flex: '0 1 48%' }} // makes it take about half the bar
+  type="text"
+  placeholder="🔎 Search location"
+  value={searchLocation}
+  onChange={(e) => setSearchLocation(e.target.value)}
+  aria-label="Search location"
+/>
 
         <select
           className="filter-select small"
