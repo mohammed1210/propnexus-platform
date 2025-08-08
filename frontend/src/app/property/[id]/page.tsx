@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
+
 import AIChatbot from '@details/AIChatbot';
 import InvestmentSummary from '@details/InvestmentSummary';
 import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
@@ -17,38 +18,46 @@ export default function PropertyDetailsPage() {
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string | undefined);
 
   const BACKEND_BASE =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  '';
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    '';
 
-useEffect(() => {
-  if (!id || !BACKEND_BASE) return;
+  // ✅ missing in your snippet
+  const [property, setProperty] = useState<Property | null>(null);
 
-  const fetchProperty = async () => {
-    try {
-      const res = await fetch(`${BACKEND_BASE}/api/properties/${id}`);
-      const raw = await res.json();
+  useEffect(() => {
+    if (!id) return;
 
-      // Normalize data to prevent NaN / N/A
-      const p = {
-        ...raw,
-        price: Number(raw.price ?? 0),
-        yield_percent: Number(raw.yield_percent ?? raw.yield ?? 0),
-        roi_percent: Number(raw.roi_percent ?? raw.roi ?? 0),
-        latitude: raw.latitude ? Number(raw.latitude) : undefined,
-        longitude: raw.longitude ? Number(raw.longitude) : undefined,
-        propertyType: raw.propertyType ?? raw.property_type ?? '',
-        investmentType: raw.investmentType ?? raw.investment_type ?? '',
-      };
+    const fetchProperty = async () => {
+      try {
+        const url = BACKEND_BASE
+          ? `${BACKEND_BASE}/api/properties/${id}`
+          : `/api/properties/${id}`;
 
-      setProperty(p);
-    } catch (err) {
-      console.error('Failed to fetch property:', err);
-    }
-  };
+        const res = await fetch(url);
+        const raw = await res.json();
 
-  fetchProperty();
-}, [id, BACKEND_BASE]);
+        // Normalise data to avoid NaN / undefined issues
+        const p: Property = {
+          ...raw,
+          price: Number(raw.price ?? 0),
+          yield_percent: Number(raw.yield_percent ?? raw.yield ?? 0),
+          roi_percent: Number(raw.roi_percent ?? raw.roi ?? 0),
+          latitude: raw.latitude ? Number(raw.latitude) : undefined,
+          longitude: raw.longitude ? Number(raw.longitude) : undefined,
+          // keep both shapes happy
+          propertyType: raw.propertyType ?? raw.property_type ?? '',
+          investmentType: raw.investmentType ?? raw.investment_type ?? '',
+        };
+
+        setProperty(p);
+      } catch (err) {
+        console.error('Failed to fetch property:', err);
+      }
+    };
+
+    fetchProperty();
+  }, [id, BACKEND_BASE]);
 
   if (!property) {
     return <div className="p-6 text-center text-gray-600">Loading property...</div>;
@@ -58,16 +67,14 @@ useEffect(() => {
     <div className="flex flex-col md:flex-row px-4 md:px-12 py-6">
       {/* ===== Left Column ===== */}
       <div className="md:w-2/3 md:pr-8">
-        {/* Title */}
+        {/* Title / Image */}
         <h1 className="text-2xl font-bold mb-1">{property.title}</h1>
         <p className="text-gray-500 mb-3">{property.location}</p>
         <img
           src={property.imageurl || '/placeholder.jpg'}
           alt={property.title}
           className="w-full h-64 object-cover rounded-lg mb-4"
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = '/placeholder.jpg';
-          }}
+          onError={(e) => ((e.target as HTMLImageElement).src = '/placeholder.jpg')}
         />
 
         {/* Investment Summary */}
@@ -140,28 +147,23 @@ useEffect(() => {
 
         {/* Save/Download/Share Buttons */}
         <div className="mt-4 flex flex-col gap-3">
-          <button className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded">
-            💾 Save Deal
-          </button>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">
-            📄 Download Deal Pack
-          </button>
-          <button className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">
-            🔗 Copy to CRM
-          </button>
+          <button className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded">💾 Save Deal</button>
+          <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">📄 Download Deal Pack</button>
+          <button className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">🔗 Copy to CRM</button>
         </div>
 
         {/* Static Map */}
-{property?.latitude && property?.longitude ? (
-  <div className="mt-8">
-    <MapSingle property={property} />
-  </div>
-) : (
-  <p className="mt-8 text-gray-500">Map unavailable — no coordinates provided.</p>
-)}
+        {property.latitude && property.longitude ? (
+          <div className="mt-8">
+            <MapSingle property={property} />
+          </div>
+        ) : (
+          <p className="mt-8 text-gray-500">Map unavailable — no coordinates provided.</p>
+        )}
+      </div>
 
       {/* Floating AI Assistant */}
-{property && <AIChatbot property={property} />}
+      {property && <AIChatbot property={property} />}
     </div>
   );
 }
