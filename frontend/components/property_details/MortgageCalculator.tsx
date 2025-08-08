@@ -1,264 +1,217 @@
 'use client';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 type Props = { price: number };
 
-const gbp = new Intl.NumberFormat('en-GB', {
-  style: 'currency',
-  currency: 'GBP',
-  maximumFractionDigits: 0,
-});
-const gbp2 = new Intl.NumberFormat('en-GB', {
-  style: 'currency',
-  currency: 'GBP',
-  maximumFractionDigits: 2,
-});
-
 export default function MortgageCalculator({ price }: Props) {
   // Inputs
-  const [repaymentType, setRepaymentType] = useState<'repayment' | 'interestOnly'>('repayment');
-  const [depositPct, setDepositPct] = useState<number>(25);
-  const [rate, setRate] = useState<number>(4.5);       // APR %
-  const [termYears, setTermYears] = useState<number>(25);
+  const [depositPct, setDepositPct] = useState(10);      // %
+  const [apr, setApr] = useState(4.5);                   // annual %
+  const [years, setYears] = useState(25);                // years
+  const [interestOnly, setInterestOnly] = useState(false);
   const [monthlyRent, setMonthlyRent] = useState<number | ''>(''); // optional
 
   // Derived
-  const depositAmt = useMemo(() => (price * (depositPct / 100)), [price, depositPct]);
-  const loanAmt = useMemo(() => Math.max(0, price - depositAmt), [price, depositAmt]);
-  const ltv = useMemo(() => (loanAmt / price) * 100, [loanAmt, price]);
+  const deposit = useMemo(() => (price * depositPct) / 100, [price, depositPct]);
+  const loan = useMemo(() => Math.max(price - deposit, 0), [price, deposit]);
+  const ltvPct = useMemo(() => (loan / price) * 100 || 0, [loan, price]);
 
-  const monthlyRate = useMemo(() => rate / 100 / 12, [rate]);
-  const n = useMemo(() => termYears * 12, [termYears]);
+  const monthlyRate = useMemo(() => apr / 100 / 12, [apr]);
+  const n = useMemo(() => years * 12, [years]);
 
-  // Monthly payment
   const monthlyPayment = useMemo(() => {
-    if (repaymentType === 'interestOnly') {
-      return loanAmt * monthlyRate; // if rate is 0 -> £0 interest
-    }
-    if (monthlyRate === 0) return loanAmt / n;
-    return (loanAmt * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -n));
-  }, [repaymentType, loanAmt, monthlyRate, n]);
+    if (loan <= 0) return 0;
+    if (interestOnly) return loan * monthlyRate; // IO = interest only
+    if (monthlyRate === 0) return loan / n;
+    return (loan * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -n));
+  }, [loan, monthlyRate, n, interestOnly]);
 
-  // Totals (repayment only)
-  const totalRepaid = useMemo(() => {
-    if (repaymentType === 'interestOnly') return monthlyPayment * n; // interest paid over term (principal not repaid)
-    return monthlyPayment * n;
-  }, [repaymentType, monthlyPayment, n]);
+  // Totals (for repayment only – IO has no capital paydown)
+  const totalRepaid = useMemo(() => (interestOnly ? loan + monthlyPayment * n : monthlyPayment * n), [monthlyPayment, n, interestOnly, loan]);
+  const totalInterest = useMemo(() => Math.max(totalRepaid - loan, 0), [totalRepaid, loan]);
 
-  const totalInterest = useMemo(() => {
-    if (repaymentType === 'interestOnly') return monthlyPayment * n; // all interest, principal not included
-    return totalRepaid - loanAmt;
-  }, [repaymentType, monthlyPayment, n, totalRepaid, loanAmt]);
+  // Income side (optional)
+  const rent = typeof monthlyRent === 'number' ? monthlyRent : 0;
+  const cashflow = rent - monthlyPayment;
+  const dscr = monthlyPayment > 0 ? rent / monthlyPayment : 0;
 
-  // Cash flow / coverage (if rent provided)
-  const cashflow = useMemo(() => {
-    if (monthlyRent === '' || monthlyRent == null) return null;
-    return (monthlyRent as number) - monthlyPayment;
-  }, [monthlyRent, monthlyPayment]);
+  // helpers
+  const fmt = (v: number) => `£${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  const fmt2 = (v: number) => `£${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const pct = (v: number) => `${v.toFixed(1)}%`;
 
-  const coverage = useMemo(() => {
-    if (monthlyRent === '' || monthlyRent == null || monthlyPayment === 0) return null;
-    return (monthlyRent as number) / monthlyPayment;
-  }, [monthlyRent, monthlyPayment]);
-
-  // Helpers
-  const presetDeposits = [10, 15, 20, 25, 30, 40];
+  const quickSet = (p: number) => setDepositPct(p);
 
   return (
-    <section className="section-box">
+    <div className="section-box">
       <h3 className="text-xl font-semibold mb-3">🏦 Mortgage Calculator</h3>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* LEFT: inputs */}
-        <div>
-          <div className="text-sm text-slate-500 mb-2">Property Price</div>
-          <div className="mb-4">
+      {/* Inputs */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <Field label="Purchase Price">
             <input
+              type="number"
               value={price}
               readOnly
-              className="w-full rounded border border-slate-300 bg-slate-100 px-3 py-2 dark:bg-neutral-800"
+              className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 dark:bg-neutral-800"
             />
-          </div>
+          </Field>
 
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium">Deposit (%)</label>
-              <div className="flex gap-1">
-                {presetDeposits.map((p) => (
+          <Field label={`Deposit (${pct(depositPct)})`}>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={depositPct}
+                onChange={(e) => setDepositPct(Number(e.target.value))}
+                className="w-28 rounded border px-3 py-2"
+              />
+              <div className="flex flex-wrap gap-1">
+                {[10, 15, 20, 25, 40].map((p) => (
                   <button
                     key={p}
-                    onClick={() => setDepositPct(p)}
-                    className={`text-xs px-2 py-1 rounded border ${
-                      depositPct === p
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'border-slate-300 hover:bg-slate-100'
-                    }`}
                     type="button"
+                    onClick={() => quickSet(p)}
+                    className={`px-2 py-1 rounded border text-sm ${depositPct === p ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 hover:bg-gray-50'}`}
                   >
                     {p}%
                   </button>
                 ))}
               </div>
             </div>
-            <input
-              type="number"
-              min={0}
-              max={95}
-              step={1}
-              value={depositPct}
-              onChange={(e) => setDepositPct(Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-2"
-            />
-            <p className="text-xs text-slate-500 mt-1">Max 95% deposit.</p>
-          </div>
+            <div className="text-sm text-slate-500 mt-1">Deposit: <b>{fmt(deposit)}</b></div>
+          </Field>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Interest Rate (APR %)</label>
-            <input
-              type="number"
-              step="0.01"
-              value={rate}
-              onChange={(e) => setRate(Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-2"
-            />
-          </div>
+          <Field label="Interest Rate (APR)">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.01"
+                value={apr}
+                onChange={(e) => setApr(Number(e.target.value))}
+                className="w-28 rounded border px-3 py-2"
+              />
+              <span className="text-sm text-slate-500">%</span>
+            </div>
+          </Field>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Loan Term (years)</label>
+          <Field label="Loan Term (years)">
             <input
               type="number"
               min={1}
               max={40}
-              step={1}
-              value={termYears}
-              onChange={(e) => setTermYears(Number(e.target.value))}
-              className="w-full rounded border border-slate-300 px-3 py-2"
+              value={years}
+              onChange={(e) => setYears(Number(e.target.value))}
+              className="w-28 rounded border px-3 py-2"
             />
-          </div>
+          </Field>
 
-          <div className="mb-4">
-            <span className="block text-sm font-medium mb-1">Repayment Type</span>
-            <div className="inline-flex rounded border border-slate-300 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setRepaymentType('repayment')}
-                className={`px-3 py-2 text-sm ${
-                  repaymentType === 'repayment' ? 'bg-blue-600 text-white' : 'bg-white'
-                }`}
-              >
-                Repayment
-              </button>
-              <button
-                type="button"
-                onClick={() => setRepaymentType('interestOnly')}
-                className={`px-3 py-2 text-sm border-l border-slate-300 ${
-                  repaymentType === 'interestOnly' ? 'bg-blue-600 text-white' : 'bg-white'
-                }`}
-              >
-                Interest‑only
-              </button>
-            </div>
-          </div>
+          <label className="inline-flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={interestOnly}
+              onChange={(e) => setInterestOnly(e.target.checked)}
+              className="h-4 w-4"
+            />
+            Interest‑only
+          </label>
 
-          <details className="mt-2">
-            <summary className="text-sm cursor-pointer select-none text-slate-600">
-              Advanced (optional): monthly rent
-            </summary>
-            <div className="mt-2">
-              <label className="block text-sm font-medium mb-1">Monthly Rent (£)</label>
-              <input
-                type="number"
-                min={0}
-                value={monthlyRent === '' ? '' : monthlyRent}
-                onChange={(e) => setMonthlyRent(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full rounded border border-slate-300 px-3 py-2"
-              />
-            </div>
-          </details>
+          <Field label="Monthly Rent (optional)">
+            <input
+              type="number"
+              placeholder="e.g. 1,200"
+              value={monthlyRent}
+              onChange={(e) => setMonthlyRent(e.target.value === '' ? '' : Number(e.target.value))}
+              className="w-40 rounded border px-3 py-2"
+            />
+          </Field>
         </div>
 
-        {/* RIGHT: outputs */}
-        <div className="rounded-md border border-slate-200 p-4 bg-slate-50 dark:bg-neutral-900">
-          <div className="text-sm text-slate-600 mb-1">Key Numbers</div>
+        {/* Outputs */}
+        <div className="space-y-3">
+          <KPI label="Loan Amount" value={fmt(loan)} />
+          <KPI label="LTV" value={pct(ltvPct)} />
+          <KPI label="Monthly Payment" value={fmt2(monthlyPayment)} highlight />
 
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <Stat label="Deposit" value={gbp.format(Math.round(depositAmt))} />
-            <Stat label="Loan Amount" value={gbp.format(Math.round(loanAmt))} />
-            <Stat label="LTV" value={`${ltv.toFixed(1)}%`} />
-            <Stat label="APR" value={`${rate.toFixed(2)}%`} />
-          </div>
+          {!interestOnly && (
+            <>
+              <KPI label="Total Interest (life of loan)" value={fmt(totalInterest)} />
+              <KPI label="Total Repaid" value={fmt(totalRepaid)} />
+            </>
+          )}
 
-          <div className="rounded bg-white dark:bg-neutral-800 border border-slate-200 p-4 mb-3">
-            <div className="text-sm text-slate-600">Estimated Monthly Repayment</div>
-            <div className="text-2xl font-semibold">
-              {gbp2.format(isFinite(monthlyPayment) ? monthlyPayment : 0)}
-            </div>
-            {repaymentType === 'interestOnly' ? (
-              <p className="text-xs text-slate-500 mt-1">
-                Interest‑only: payment is interest only; principal not repaid during term.
-              </p>
-            ) : (
-              <p className="text-xs text-slate-500 mt-1">
-                Capital‑and‑interest repayment over {termYears} years.
-              </p>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <Stat
-              label={repaymentType === 'interestOnly' ? 'Interest over term' : 'Total Repaid'}
-              value={gbp.format(Math.round(totalRepaid))}
-            />
-            <Stat label="Total Interest" value={gbp.format(Math.round(totalInterest))} />
-          </div>
-
-          {monthlyRent !== '' && (
-            <div className="rounded bg-white dark:bg-neutral-800 border border-slate-200 p-3">
-              <div className="text-sm text-slate-600 mb-1">Rent & Cash Flow</div>
-              <div className="grid grid-cols-2 gap-3">
-                <Stat label="Monthly Rent" value={gbp2.format(monthlyRent as number)} />
-                <Stat
-                  label="Cash Flow (pre‑tax)"
-                  value={gbp2.format((cashflow ?? 0))}
-                  tone={(cashflow ?? 0) >= 0 ? 'good' : 'bad'}
-                />
-                <Stat
-                  label="Coverage (DSCR)"
-                  value={coverage ? `${coverage.toFixed(2)}×` : '—'}
-                />
-                <Stat label="Payment Type" value={repaymentType === 'repayment' ? 'Repayment' : 'Interest‑only'} />
-              </div>
+          {rent > 0 && (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <MiniKPI label="Cash Flow / mo" value={fmt2(cashflow)} positive={cashflow >= 0} />
+              <MiniKPI label="Coverage (DSCR)" value={dscr.toFixed(2) + '×'} positive={dscr >= 1.25} />
             </div>
           )}
 
           <p className="text-xs text-slate-500 mt-3">
-            These figures are estimates. Actual offers depend on lender underwriting and your circumstances.
+            Figures are estimates only. Always verify with your lender/broker.
           </p>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-function Stat({
+/* ---------- tiny presentational helpers ---------- */
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="block text-sm font-medium mb-1">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function KPI({
   label,
   value,
-  tone,
+  highlight = false,
 }: {
   label: string;
   value: string;
-  tone?: 'good' | 'bad';
+  highlight?: boolean;
 }) {
-  const color =
-    tone === 'good'
-      ? 'text-emerald-700 dark:text-emerald-400'
-      : tone === 'bad'
-      ? 'text-rose-700 dark:text-rose-400'
-      : 'text-slate-800 dark:text-slate-200';
   return (
-    <div className="rounded border border-slate-200 bg-white dark:bg-neutral-800 p-3">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={`text-lg font-semibold ${color}`}>{value}</div>
+    <div
+      className={`rounded border px-3 py-2 flex items-center justify-between ${
+        highlight ? 'bg-blue-50 border-blue-200 dark:bg-neutral-800' : 'bg-white dark:bg-neutral-900'
+      }`}
+    >
+      <span className="text-sm text-slate-600">{label}</span>
+      <span className={`font-semibold ${highlight ? 'text-blue-700 dark:text-blue-400' : ''}`}>{value}</span>
+    </div>
+  );
+}
+
+function MiniKPI({
+  label,
+  value,
+  positive,
+}: {
+  label: string;
+  value: string;
+  positive?: boolean;
+}) {
+  return (
+    <div className="rounded border px-3 py-2 text-sm">
+      <div className="text-slate-600">{label}</div>
+      <div className={`font-semibold ${positive ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>
+        {value}
+      </div>
     </div>
   );
 }
