@@ -212,3 +212,50 @@ html { scroll-behavior: smooth; }
 
   .back-to-top { bottom: 80px; right: 16px; }
 }
+
+/* ===== Filter bar highlight ===== */
+.sticky-primary {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  margin-bottom: 12px;           /* keeps it off the content */
+}
+
+/* Subtle “frosted” when it sticks (optional but nice) */
+.sticky-primary {
+  backdrop-filter: saturate(140%) blur(2px);
+}
+
+/* ===== Desktop layout: make map narrower ===== */
+@media (min-width: 1024px) {
+  .content-layout {
+    /* keep your flex behavior, but constrain the map column */
+    align-items: flex-start;
+  }
+
+  .map-view {
+    flex: 0 0 34%;               /* ~one‑third width */
+    max-width: 520px;            /* don’t let it get huge on wide screens */
+    min-width: 360px;            /* still readable */
+  }
+
+  .property-list {
+    flex: 1 1 auto;              /* take the rest */
+  }
+}
+
+/* ===== Kill the sticky jiggle ===== */
+/* Use a fixed offset so the map’s sticky height doesn’t keep recalculating */
+:root { --sticky-offset: 96px; } /* matches your header+bar height */
+.map-view {
+  position: sticky;
+  top: var(--sticky-offset);
+  height: calc(100vh - var(--sticky-offset) - 24px); /* minus a tiny gap */
+}
+
+/* Leaflet sanity: make the canvas always fill the box */
+.map-view .leaflet-container {
+  width: 100%;
+  height: 100%;
+}
