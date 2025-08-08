@@ -66,11 +66,19 @@ h1, h2, h3, p { margin: 0; padding: 0; }
   gap: 1rem;
 }
 
+/* right column container (no border/background so no grey gap) */
 .map-view {
-  flex: 0 1 52%;                 /* ↓ narrower than before */
+  flex: 0 0 48%;        /* narrower column */
   position: sticky;
-  top: 96px;                      /* sits below header/filters */
-  height: 100%;
+  top: 86px;            /* below header+filters */
+  align-self: flex-start;
+  background: transparent;
+  border: 0;
+}
+
+/* the actual card that holds the Leaflet map */
+.map-panel {
+  height: clamp(420px, 60vh, 640px);   /* stable height, responsive */
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
