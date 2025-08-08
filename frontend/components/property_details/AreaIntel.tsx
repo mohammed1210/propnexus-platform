@@ -1,86 +1,84 @@
 import React from 'react';
 import { Property } from '@/types';
+import { FaChartLine, FaShieldAlt, FaBus, FaSchool } from 'react-icons/fa';
 
-type Props = { property: Property };
+type Props = {
+  property: Property;
+};
 
-export default function AreaIntel({ property }: Props) {
-  // Temporary/dummy values until live feed is wired
-  const intel = {
+const AreaIntel = ({ property }: Props) => {
+  const defaultIntel = {
     yield: '5.2%',
     crime: 'Low vs national',
     transport: 'Excellent · ~18 mins to centre',
     schools: 'Ofsted Good',
   };
 
-  // try to pull postcode-ish tail for the callout
-  const areaTag =
-    (property?.location || '')
-      .split(' ')
-      .slice(-2)
-      .join(' ')
-      .replace(/[,\.]+$/, '') || 'Local area';
-
   return (
-    <div>
-      <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 border border-gray-200 dark:border-gray-700">
+      <h2 className="text-lg font-semibold mb-2 flex items-center">
         📍 Area Intelligence
       </h2>
-
-      <p className="text-sm text-slate-600 mb-4">
+      <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
         A quick snapshot of rental demand and liveability around{" "}
-        <span className="font-semibold">{areaTag}</span>.
+        <span className="font-semibold">{property.postcode || "postcode"}</span>.
       </p>
 
-      <ul className="divide-y divide-slate-200 dark:divide-slate-700 rounded-md border">
-        <li className="p-3 flex items-start gap-3">
-          <span className="text-lg">💷</span>
-          <div className="flex-1">
+      <div className="space-y-4">
+        {/* Yield */}
+        <div className="flex items-start">
+          <FaChartLine className="text-blue-500 mt-1 mr-3" size={20} />
+          <div>
             <p className="font-medium">Avg. rental yield</p>
-            <p className="text-slate-600">{intel.yield}</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Useful for quick rent‑vs‑price sense‑check.
+            <p>{defaultIntel.yield}</p>
+            <p className="text-xs text-gray-500">
+              Useful for quick rent-vs-price sense-check.
             </p>
           </div>
-        </li>
+        </div>
 
-        <li className="p-3 flex items-start gap-3">
-          <span className="text-lg">🔒</span>
-          <div className="flex-1">
+        {/* Crime */}
+        <div className="flex items-start">
+          <FaShieldAlt className="text-green-500 mt-1 mr-3" size={20} />
+          <div>
             <p className="font-medium">Crime rate</p>
-            <p className="text-slate-600">{intel.crime}</p>
-            <p className="text-xs text-slate-500 mt-1">
+            <p>{defaultIntel.crime}</p>
+            <p className="text-xs text-gray-500">
               Lower crime can support stronger tenant demand and lower void risk.
             </p>
           </div>
-        </li>
+        </div>
 
-        <li className="p-3 flex items-start gap-3">
-          <span className="text-lg">🚆</span>
-          <div className="flex-1">
+        {/* Transport */}
+        <div className="flex items-start">
+          <FaBus className="text-purple-500 mt-1 mr-3" size={20} />
+          <div>
             <p className="font-medium">Transport</p>
-            <p className="text-slate-600">{intel.transport}</p>
-            <p className="text-xs text-slate-500 mt-1">
-              Good links typically increase rental pool and reduce time‑to‑let.
+            <p>{defaultIntel.transport}</p>
+            <p className="text-xs text-gray-500">
+              Good links typically increase rental pool and reduce time-to-let.
             </p>
           </div>
-        </li>
+        </div>
 
-        <li className="p-3 flex items-start gap-3">
-          <span className="text-lg">🏫</span>
-          <div className="flex-1">
+        {/* Schools */}
+        <div className="flex items-start">
+          <FaSchool className="text-yellow-500 mt-1 mr-3" size={20} />
+          <div>
             <p className="font-medium">Schools</p>
-            <p className="text-slate-600">{intel.schools}</p>
-            <p className="text-xs text-slate-500 mt-1">
+            <p>{defaultIntel.schools}</p>
+            <p className="text-xs text-gray-500">
               Strong schools often support family demand and longer tenancies.
             </p>
           </div>
-        </li>
-      </ul>
+        </div>
+      </div>
 
-      <p className="text-[11px] text-slate-500 mt-3">
-        Figures are illustrative for product design. Live data sources coming soon (ONS, Police,
-        Ofsted, TfL/National Rail).
+      <p className="mt-4 text-xs text-gray-400">
+        Figures are illustrative for product design. Live data sources coming soon (ONS, Police, Ofsted, TfL/National Rail).
       </p>
     </div>
   );
-}
+};
+
+export default AreaIntel;
