@@ -212,19 +212,19 @@ export default function PropertyDetailsPage() {
         </section>
 
         {/* Area Intelligence */}
-        <section className="section-box">
-          <AreaIntel
-            locationLabel={property?.location}
-            postcode={postcode}
-            data={{
-              avgYieldPct: property?.yield_percent,
-              avgRent: (property as any)?.avg_rent,
-              crimeRateIndex: (property as any)?.crime_index,
-              ofstedSummary: (property as any)?.ofsted_summary,
-              transportSummary: (property as any)?.transport_summary
-            }}
-          />
-        </section>
+<section className="section-box">
+  <AreaIntel
+    locationLabel={property?.location}
+    postcode={postcode} // 🔹 will trigger live backend fetch
+    data={{
+      avgYieldPct: property?.yield_percent,
+      avgRent: (property as any)?.avg_rent,
+      crimeRateIndex: (property as any)?.crime_index,
+      ofstedSummary: (property as any)?.ofsted_summary,
+      transportSummary: (property as any)?.transport_summary
+    }}
+  />
+</section>
 
         {/* Investor Notes */}
         <div className="w-full p-4 border rounded-lg bg-white dark:bg-neutral-900">
