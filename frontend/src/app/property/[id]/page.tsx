@@ -11,6 +11,7 @@ import StampDutyCalculator from '@details/StampDutyCalculator';
 import NotesFields from '@details/NotesFields';
 import AreaIntel from '@details/AreaIntel';
 import MapSingle from '@details/MapSingle';
+import AIScoreBars, { ScoreItem } from '@details/AIScoreBars'; // 🔹 NEW
 import { Property } from '@/types';
 
 export default function PropertyDetailsPage() {
@@ -69,6 +70,46 @@ export default function PropertyDetailsPage() {
     [property?.latitude, property?.longitude]
   );
 
+  // 🔹 NEW: Safe postcode resolver
+  const postcode: string | undefined =
+    (property as any)?.postcode ??
+    (property as any)?.post_code ??
+    (property as any)?.postal_code ??
+    undefined;
+
+  // 🔹 NEW: AI score bars (demo values — replace with real scoring later)
+  const aiOverall: number =
+    typeof (property as any)?.ai_score === 'number'
+      ? (property as any).ai_score
+      : 72;
+
+  const aiItems: ScoreItem[] = [
+    {
+      key: 'yield',
+      label: 'Yield Strength',
+      value: Math.min(100, Math.max(0, Math.round((property?.yield_percent ?? 0) * 10))),
+      hint: 'Estimated gross yield vs local averages.'
+    },
+    {
+      key: 'roi',
+      label: 'ROI Potential',
+      value: Math.min(100, Math.max(0, Math.round((property?.roi_percent ?? 0) * 5))),
+      hint: 'Projected ROI given refurb & exit assumptions.'
+    },
+    {
+      key: 'demand',
+      label: 'Area Demand',
+      value: 68,
+      hint: 'Rental demand and stock turnover (illustrative).'
+    },
+    {
+      key: 'risk',
+      label: 'Risk Adjusted',
+      value: 40,
+      hint: 'Down valuation / cost overrun / void risk (illustrative).'
+    }
+  ];
+
   /* ================================
    * Loading / error states
    * ================================ */
@@ -118,13 +159,15 @@ export default function PropertyDetailsPage() {
           <InvestmentSummary property={property} />
         </section>
 
-        {/* Exit Strategy (collapsible by default) */}
+        {/* Exit Strategy */}
         <section className="section-box">
           <details open>
             <summary className="cursor-pointer select-none text-lg font-semibold mb-2 list-none">
               <span className="inline-block align-middle mr-1">💼</span> Exit Strategy Suggestions
             </summary>
-            <p className="text-slate-600 mb-3">Use AI to suggest smart exit plans tailored to this property.</p>
+            <p className="text-slate-600 mb-3">
+              Use AI to suggest smart exit plans tailored to this property.
+            </p>
             <ExitStrategyGenerator
               title={property.title}
               location={property.location}
@@ -138,7 +181,7 @@ export default function PropertyDetailsPage() {
           </details>
         </section>
 
-        {/* AI Deal Score (toggle to keep page compact) */}
+        {/* AI Deal Score */}
         <section className="section-box">
           <details>
             <summary className="cursor-pointer select-none text-lg font-semibold mb-2 list-none">
@@ -152,6 +195,11 @@ export default function PropertyDetailsPage() {
             <button className="text-sm underline text-gray-500 mt-2" aria-label="Learn more about scores">
               ❓ What do these scores mean?
             </button>
+
+            {/* NEW: Detailed score breakdown */}
+            <div className="mt-4">
+              <AIScoreBars overall={aiOverall} items={aiItems} />
+            </div>
           </details>
         </section>
 
@@ -159,41 +207,37 @@ export default function PropertyDetailsPage() {
         <section className="section-box">
           <MortgageCalculator price={property.price} />
         </section>
-
         <section className="section-box">
           <StampDutyCalculator price={property.price} />
         </section>
 
         {/* Area Intelligence */}
-<section className="section-box">
-  <AreaIntel
-    locationLabel={property?.location}
-    postcode={property?.postcode}
-    data={{
-      avgYieldPct: property?.yield_percent,
-      avgRent: property?.avg_rent,
-      crimeRateIndex: property?.crime_index,
-      ofstedSummary: property?.ofsted_summary,
-      transportSummary: property?.transport_summary
-    }}
-  />
-</section>
+        <section className="section-box">
+          <AreaIntel
+            locationLabel={property?.location}
+            postcode={postcode}
+            data={{
+              avgYieldPct: property?.yield_percent,
+              avgRent: (property as any)?.avg_rent,
+              crimeRateIndex: (property as any)?.crime_index,
+              ofstedSummary: (property as any)?.ofsted_summary,
+              transportSummary: (property as any)?.transport_summary
+            }}
+          />
+        </section>
 
         {/* Investor Notes */}
-<div className="w-full p-4 border rounded-lg bg-white dark:bg-neutral-900">
-  <NotesFields propertyId={id ?? ''} />
-</div>
-</main>
+        <div className="w-full p-4 border rounded-lg bg-white dark:bg-neutral-900">
+          <NotesFields propertyId={id ?? ''} />
+        </div>
+      </main>
 
-      {/* ===== Right Column (sticky) ===== */}
+      {/* ===== Right Column ===== */}
       <aside className="md:w-1/3 md:pl-2 md:sticky md:top-4 self-start">
         {/* Deal Summary */}
         <section className="section-box">
           <h3 className="text-lg font-semibold mb-2">📊 Deal Summary</h3>
-          <p>
-            <strong>Price:</strong>{' '}
-            £{typeof property.price === 'number' ? property.price.toLocaleString() : 'N/A'}
-          </p>
+          <p><strong>Price:</strong> £{typeof property.price === 'number' ? property.price.toLocaleString() : 'N/A'}</p>
           <p><strong>Yield:</strong> {property.yield_percent ?? 'N/A'}%</p>
           <p><strong>ROI:</strong> {property.roi_percent ?? 'N/A'}%</p>
           <p><strong>Property Type:</strong> {property.propertyType || 'N/A'}</p>
@@ -208,20 +252,18 @@ export default function PropertyDetailsPage() {
           <button className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">🔗 Copy to CRM</button>
         </div>
 
-        {/* Static Map — compact so it doesn’t dominate the sidebar */}
-{hasCoords ? (
-  <MapSingle
-    property={property}
-    height={260}       // same height you had before
-    zoom={14}          // a touch closer
-    scrollWheelZoom={false} // keep it off for sidebar
-    className="mt-8"
-  />
-) : (
-  <p className="mt-8 text-gray-500">
-    Map unavailable — no coordinates provided.
-  </p>
-)}
+        {/* Static Map */}
+        {hasCoords ? (
+          <MapSingle
+            property={property}
+            height={260}
+            zoom={14}
+            scrollWheelZoom={false}
+            className="mt-8"
+          />
+        ) : (
+          <p className="mt-8 text-gray-500">Map unavailable — no coordinates provided.</p>
+        )}
       </aside>
 
       {/* Floating AI Assistant */}
