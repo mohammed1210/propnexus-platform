@@ -170,7 +170,7 @@ export default function PropertyDetailsPage() {
         </section>
 
         {/* Investor Notes */}
-<div className="w-full">
+<div className="w-full p-4 border rounded-lg bg-white dark:bg-neutral-900">
   <NotesFields propertyId={id ?? ''} />
 </div>
 </main>
