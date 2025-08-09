@@ -1,13 +1,11 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-type Props = { propertyId: string };
+type NotesFieldsProps = { propertyId: string };
 
-const QUICK_TAGS = ['#Refurb', '#Risks', '#Offer', '#FollowUp', '#Comps'] as const;
-const MAX_CHARS = 2000;
+const QUICK_TAGS = ['#Refurb', '#Risks', '#Offer', '#FollowUp', '#Comps'];
 
-// Templates
 const VIEWING_TEMPLATE = `- [ ] Exterior photos
 - [ ] Roof / gutters
 - [ ] Damp / mould check
@@ -40,68 +38,55 @@ const OFFER_TEMPLATE = `**Assumptions**
 - ARV: £
 - Target equity: £`;
 
-function formatTime(d = new Date()) {
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function timeNow() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function NotesFields({ propertyId }: Props) {
+const NotesFields: React.FC<NotesFieldsProps> = ({ propertyId }) => {
   // Core fields
-  const [title, setTitle] = useState('');
+  const [customField, setCustomField] = useState('');
   const [importance, setImportance] = useState<'Low' | 'Medium' | 'High'>('Medium');
   const [pinned, setPinned] = useState(false);
   const [notes, setNotes] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showTools, setShowTools] = useState(true);
 
-  // Load from localStorage
+  const maxChars = 2000;
+
+  // Load persisted
   useEffect(() => {
     const get = (k: string) => localStorage.getItem(k) ?? '';
-    setTitle(get(`title-${propertyId}`));
-    const imp = get(`importance-${propertyId}`) as 'Low' | 'Medium' | 'High';
-    setImportance(imp || 'Medium');
+    setCustomField(get(`customField-${propertyId}`));
+    setImportance(((get(`importance-${propertyId}`) as 'Low' | 'Medium' | 'High') || 'Medium'));
     setPinned(get(`pinned-${propertyId}`) === '1');
     setNotes(get(`notes-${propertyId}`));
+    setSaveMsg(get(`saveMsg-${propertyId}`) || '');
   }, [propertyId]);
 
-  // Save with light debounce
+  // Save (light debounce)
   useEffect(() => {
     const id = setTimeout(() => {
-      localStorage.setItem(`title-${propertyId}`, title);
+      localStorage.setItem(`customField-${propertyId}`, customField);
       localStorage.setItem(`importance-${propertyId}`, importance);
       localStorage.setItem(`pinned-${propertyId}`, pinned ? '1' : '0');
       localStorage.setItem(`notes-${propertyId}`, notes);
-      setSaveMsg(`Saved ${formatTime()}`);
+      const msg = `Saved ${timeNow()}`;
+      setSaveMsg(msg);
+      localStorage.setItem(`saveMsg-${propertyId}`, msg);
     }, 300);
     return () => clearTimeout(id);
-  }, [title, importance, pinned, notes, propertyId]);
+  }, [customField, importance, pinned, notes, propertyId]);
 
-  // Preview renderer (very light markdown-ish)
-  const previewHtml = useMemo(() => {
-    let t = notes
-      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/~~(.*?)~~/g, '<s>$1</s>')
-      .replace(/^- \[ \] (.*)$/gim, '<li><input type="checkbox" disabled /> $1</li>')
-      .replace(/^- \[x\] (.*)$/gim, '<li><input type="checkbox" checked disabled /> $1</li>')
-      .replace(/^- (.*)$/gim, '<li>$1</li>')
-      .replace(/\n$/g, '<br/>');
-    t = t.replace(/(<li>[\s\S]*?<\/li>)/gim, '<ul>$1</ul>');
-    return t;
-  }, [notes]);
-
-  // Helpers
-  const insert = (snippet: string) =>
+  // Actions
+  const addSnippet = (snippet: string) =>
     setNotes((prev) => (prev ? `${prev}\n\n${snippet}` : snippet));
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(
       [
         pinned ? '📌 Pinned' : '',
-        title ? `Title: ${title}` : '',
         `Importance: ${importance}`,
+        customField ? `Title/Field: ${customField}` : '',
         '',
         notes,
       ]
@@ -109,13 +94,13 @@ export default function NotesFields({ propertyId }: Props) {
         .join('\n')
     );
     setSaveMsg('Copied to clipboard');
-    setTimeout(() => setSaveMsg(`Saved ${formatTime()}`), 1200);
+    setTimeout(() => setSaveMsg(`Saved ${timeNow()}`), 1200);
   };
 
   const handleDownload = () => {
     const blob = new Blob(
       [
-        `Title: ${title}\nImportance: ${importance}\nPinned: ${pinned ? 'Yes' : 'No'}\n\n${notes}`,
+        `Pinned: ${pinned ? 'Yes' : 'No'}\nImportance: ${importance}\nTitle/Field: ${customField}\n\n${notes}`,
       ],
       { type: 'text/plain' }
     );
@@ -129,15 +114,14 @@ export default function NotesFields({ propertyId }: Props) {
 
   const handleClear = () => {
     if (!confirm('Clear all notes for this property?')) return;
-    setTitle('');
+    setCustomField('');
     setImportance('Medium');
     setPinned(false);
     setNotes('');
-    localStorage.removeItem(`title-${propertyId}`);
-    localStorage.removeItem(`importance-${propertyId}`);
-    localStorage.removeItem(`pinned-${propertyId}`);
-    localStorage.removeItem(`notes-${propertyId}`);
     setSaveMsg('Cleared');
+    ['customField', 'importance', 'pinned', 'notes', 'saveMsg'].forEach((k) =>
+      localStorage.removeItem(`${k}-${propertyId}`)
+    );
   };
 
   return (
@@ -149,24 +133,24 @@ export default function NotesFields({ propertyId }: Props) {
           <span>{saveMsg}</span>
           <button
             className="underline"
-            onClick={() => setShowAdvanced((s) => !s)}
-            aria-expanded={showAdvanced}
+            onClick={() => setShowTools((s) => !s)}
+            aria-expanded={showTools}
           >
-            {showAdvanced ? 'Hide tools' : 'Show tools'}
+            {showTools ? 'Hide tools' : 'Show tools'}
           </button>
         </div>
       </div>
 
-      {/* Top row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+      {/* Top row (no inner borders to avoid double-border look) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
         <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          value={customField}
+          onChange={(e) => setCustomField(e.target.value)}
           placeholder="Title / custom field (e.g. Viewing, Offer calc)"
-          className="w-full border rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800"
+          className="w-full rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800 border"
         />
         <select
-          className="w-full border rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800"
+          className="w-full rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800 border"
           value={importance}
           onChange={(e) => setImportance(e.target.value as 'Low' | 'Medium' | 'High')}
         >
@@ -184,39 +168,39 @@ export default function NotesFields({ propertyId }: Props) {
         </label>
       </div>
 
-      {/* Quick Tags */}
-      <div className="mb-3 -mt-2">
-        {QUICK_TAGS.map((tag) => (
-          <button
-            key={tag}
-            type="button"
-            className="text-xs bg-gray-200 dark:bg-neutral-700 px-2 py-1 rounded mr-2 mb-2 hover:bg-gray-300"
-            onClick={() => setNotes((prev) => (prev ? `${prev} ${tag}` : tag))}
-          >
-            {tag}
-          </button>
-        ))}
-      </div>
+      {/* Quick tags */}
+      {showTools && (
+        <div className="mb-3 -mt-1">
+          {QUICK_TAGS.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              className="text-xs bg-gray-200 dark:bg-neutral-700 px-2 py-1 rounded mr-2 mb-2 hover:bg-gray-300"
+              onClick={() => setNotes((prev) => (prev ? `${prev} ${tag}` : tag))}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {/* Editor + optional tools/preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Editor */}
+      {/* Editor & tools (no inner card borders; rely on padding/bg only) */}
+      <div className="grid grid-cols-1 gap-3">
         <div>
           <textarea
             value={notes}
             onChange={(e) => {
-              if (e.target.value.length <= MAX_CHARS) setNotes(e.target.value);
+              if (e.target.value.length <= maxChars) setNotes(e.target.value);
             }}
-            className="w-full border rounded px-3 py-3 bg-gray-50 dark:bg-neutral-800 leading-6 resize-vertical min-h-[280px] md:min-h-[340px]"
+            className="w-full rounded px-3 py-3 bg-gray-50 dark:bg-neutral-800 border leading-6 resize-vertical min-h-[340px] md:min-h-[420px]"
             placeholder="Add your thoughts or deal analysis… (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
-            rows={12}
-            aria-label="Investor notes"
+            rows={14}
           />
           <div className="flex justify-between text-xs mt-1 text-gray-500">
-            <span>{notes.length}/{MAX_CHARS} chars</span>
+            <span>{notes.length}/{maxChars} chars</span>
+            <span className="opacity-70">Autosaves locally</span>
           </div>
 
-          {/* Actions */}
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               onClick={handleCopy}
@@ -239,36 +223,33 @@ export default function NotesFields({ propertyId }: Props) {
           </div>
         </div>
 
-        {/* Tools + Live preview */}
-        {showAdvanced && (
-          <div className="card-flat">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
+        {showTools && (
+          <div className="pt-2">
+            <div className="flex flex-wrap gap-2">
               <button
                 className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-                onClick={() => insert(VIEWING_TEMPLATE)}
+                onClick={() => addSnippet(VIEWING_TEMPLATE)}
               >
                 Insert: Viewing checklist
               </button>
               <button
                 className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-                onClick={() => insert(RISKS_TEMPLATE)}
+                onClick={() => addSnippet(RISKS_TEMPLATE)}
               >
                 Insert: Risks & mitigations
               </button>
               <button
                 className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-                onClick={() => insert(OFFER_TEMPLATE)}
+                onClick={() => addSnippet(OFFER_TEMPLATE)}
               >
                 Insert: Offer assumptions
               </button>
-            </div>
-
-            <div className="border rounded p-3 bg-gray-50 dark:bg-neutral-900 text-sm overflow-auto min-h-[220px]">
-              <div dangerouslySetInnerHTML={{ __html: previewHtml }} />
             </div>
           </div>
         )}
       </div>
     </section>
   );
-}
+};
+
+export default NotesFields;
