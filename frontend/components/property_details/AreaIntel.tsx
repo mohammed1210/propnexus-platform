@@ -24,23 +24,38 @@ export default function AreaIntel({
   className = "",
 }: AreaIntelProps) {
   const [liveData, setLiveData] = useState<AreaIntelData | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // stays false unless we fetch
 
-  // Fetch from backend if postcode is provided
+  // Fetch from backend only if postcode is provided
   useEffect(() => {
-    if (!postcode) return;
+    if (!postcode) {
+      setLoading(false);
+      setLiveData(null);
+      return;
+    }
+
+    let cancelled = false;
     setLoading(true);
+
     fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/area-intel/${encodeURIComponent(postcode)}`)
       .then((res) => res.json())
-      .then((json) => setLiveData(json))
+      .then((json) => {
+        if (!cancelled) setLiveData(json);
+      })
       .catch((err) => {
         console.error("AreaIntel fetch error:", err);
-        setLiveData(null);
+        if (!cancelled) setLiveData(null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [postcode]);
 
-  // Fallback demo values until live data arrives
+  // Merge live data, passed data, and fallback demo values
   const d = {
     avgYieldPct: liveData?.avgYieldPct ?? data?.avgYieldPct ?? 5.8,
     avgRent: liveData?.avgRent ?? data?.avgRent ?? 1350,
