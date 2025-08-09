@@ -281,3 +281,4 @@ export default function NotesFields({ propertyId }: Props) {
     </div>
   </section>
 );
+}
