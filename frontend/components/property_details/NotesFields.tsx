@@ -1,127 +1,57 @@
-'use client';
+import { useEffect, useState } from 'react';
 
-import React, { useEffect, useState } from 'react';
-
-type Props = { propertyId: string };
-
-const QUICK_TAGS = ['#Refurb', '#Risks', '#Offer', '#FollowUp', '#Comps'];
-
-const VIEWING_TEMPLATE = `- [ ] Exterior photos
-- [ ] Roof / gutters
-- [ ] Damp / mould check
-- [ ] Electrics (EICR?)
-- [ ] Boiler age & service
-- [ ] Windows & glazing
-- [ ] Room measurements
-- [ ] Neighbours / noise`;
-
-const RISKS_TEMPLATE = `**Risks**
-- Planning:
-- Structural:
-- Damp:
-- Market/exit:
-
-**Mitigations**
-- 
-- 
-- `;
-
-const OFFER_TEMPLATE = `**Assumptions**
-- Purchase: £
-- Works: £
-- Fees (legals/SDLT/etc): £
-- Contingency: %
-- Target rent: £/m
-- Target yield on cost: %
-
-**Exit**
-- Strategy:
-- ARV: £
-- Target equity: £`;
-
-const timeNow = () =>
-  new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+interface Props {
+  propertyId: string;
+}
 
 export default function NotesFields({ propertyId }: Props) {
-  const [title, setTitle] = useState('');
-  const [importance, setImportance] = useState<'Low' | 'Medium' | 'High'>('Medium');
-  const [pinned, setPinned] = useState(false);
   const [notes, setNotes] = useState('');
+  const [title, setTitle] = useState('');
+  const [priority, setPriority] = useState('Medium');
+  const [pin, setPin] = useState(false);
+  const [showTools, setShowTools] = useState(false); // default hidden
   const [saveMsg, setSaveMsg] = useState('');
-  const [showTools, setShowTools] = useState(true);
   const maxChars = 2000;
 
-  // Load
   useEffect(() => {
-    const get = (k: string) => localStorage.getItem(k) ?? '';
-    setTitle(get(`title-${propertyId}`));
-    setImportance(((get(`importance-${propertyId}`) as any) || 'Medium') as 'Low' | 'Medium' | 'High');
-    setPinned(get(`pinned-${propertyId}`) === '1');
-    setNotes(get(`notes-${propertyId}`));
+    const saved = localStorage.getItem(`notes-${propertyId}`);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      setNotes(parsed.notes || '');
+      setTitle(parsed.title || '');
+      setPriority(parsed.priority || 'Medium');
+      setPin(parsed.pin || false);
+    }
   }, [propertyId]);
 
-  // Save (debounced)
   useEffect(() => {
-    const id = setTimeout(() => {
-      localStorage.setItem(`title-${propertyId}`, title);
-      localStorage.setItem(`importance-${propertyId}`, importance);
-      localStorage.setItem(`pinned-${propertyId}`, pinned ? '1' : '0');
-      localStorage.setItem(`notes-${propertyId}`, notes);
-      setSaveMsg(`Saved ${timeNow()}`);
-    }, 300);
-    return () => clearTimeout(id);
-  }, [title, importance, pinned, notes, propertyId]);
+    const timer = setTimeout(() => {
+      localStorage.setItem(
+        `notes-${propertyId}`,
+        JSON.stringify({ notes, title, priority, pin })
+      );
+      setSaveMsg('Saved ' + new Date().toLocaleTimeString());
+    }, 400);
 
-  const addSnippet = (snippet: string) =>
-    setNotes((prev) => (prev ? `${prev}\n\n${snippet}` : snippet));
-
-  const handleCopy = async () => {
-    await navigator.clipboard.writeText(
-      [
-        pinned ? '📌 Pinned' : '',
-        `Title: ${title}`,
-        `Importance: ${importance}`,
-        '',
-        notes,
-      ]
-        .filter(Boolean)
-        .join('\n')
-    );
-    setSaveMsg('Copied to clipboard');
-    setTimeout(() => setSaveMsg(`Saved ${timeNow()}`), 1200);
-  };
-
-  const handleDownload = () => {
-    const blob = new Blob(
-      [
-        `Title: ${title}\nImportance: ${importance}\nPinned: ${pinned ? 'Yes' : 'No'}\n\n${notes}`,
-      ],
-      { type: 'text/plain' }
-    );
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `notes-${propertyId}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+    return () => clearTimeout(timer);
+  }, [notes, title, priority, pin, propertyId]);
 
   const handleClear = () => {
-    if (!confirm('Clear all notes for this property?')) return;
-    setTitle('');
-    setImportance('Medium');
-    setPinned(false);
-    setNotes('');
-    localStorage.removeItem(`title-${propertyId}`);
-    localStorage.removeItem(`importance-${propertyId}`);
-    localStorage.removeItem(`pinned-${propertyId}`);
     localStorage.removeItem(`notes-${propertyId}`);
+    setNotes('');
+    setTitle('');
+    setPriority('Medium');
+    setPin(false);
     setSaveMsg('Cleared');
+  };
+
+  const insertTemplate = (template: string) => {
+    setNotes((prev) => prev + template);
   };
 
   return (
     <div className="w-full">
-      {/* Header (keep light; the outer card comes from the page) */}
+      {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-lg font-semibold">📝 Investor Notes</h3>
         <div className="flex items-center gap-3 text-xs text-slate-500">
@@ -142,74 +72,116 @@ export default function NotesFields({ propertyId }: Props) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title / custom field"
-          className="w-full rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700"
+          className="w-full rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700"
         />
         <select
-          className="w-full rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700"
-          value={importance}
-          onChange={(e) => setImportance(e.target.value as 'Low' | 'Medium' | 'High')}
+          value={priority}
+          onChange={(e) => setPriority(e.target.value)}
+          className="w-full rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700"
         >
-          <option>Low</option>
-          <option>Medium</option>
           <option>High</option>
+          <option>Medium</option>
+          <option>Low</option>
         </select>
         <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
-            checked={pinned}
-            onChange={(e) => setPinned(e.target.checked)}
+            checked={pin}
+            onChange={(e) => setPin(e.target.checked)}
           />
           Pin to top
         </label>
       </div>
 
-      {/* Quick tags */}
-      {showTools && (
-        <div className="flex flex-wrap gap-2 mb-2">
-          {QUICK_TAGS.map((t) => (
-            <button
-              key={t}
-              className="px-2 py-1 bg-gray-100 dark:bg-neutral-700 rounded text-xs"
-              onClick={() => addSnippet(t)}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Notes area – full width */}
-      <textarea
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        rows={12}
-        maxLength={maxChars}
-        className="w-full rounded px-3 py-2 bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 font-mono text-sm min-h-[280px]"
-        placeholder="Add your thoughts or deal analysis…  (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
-      />
-
-      <div className="text-xs text-right text-slate-500 mt-1">
-        {notes.length}/{maxChars} chars — Autosaves locally
+      {/* Tag buttons */}
+      <div className="flex flex-wrap gap-2 mb-2">
+        {['#Refurb', '#Risks', '#Offer', '#FollowUp', '#Comps'].map((tag) => (
+          <button
+            key={tag}
+            className="px-2 py-1 bg-gray-200 dark:bg-neutral-700 rounded text-sm"
+            onClick={() => setNotes((prev) => `${prev}${tag} `)}
+          >
+            {tag}
+          </button>
+        ))}
       </div>
 
-      {/* Actions */}
+      {/* Tools row */}
       {showTools && (
-        <div className="flex flex-wrap gap-2 mt-2">
-          <button onClick={handleCopy} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded">Copy</button>
-          <button onClick={handleDownload} className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded">Download</button>
-          <button onClick={handleClear} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded">Clear</button>
-
-          <button onClick={() => addSnippet(VIEWING_TEMPLATE)} className="px-3 py-1 bg-gray-100 dark:bg-neutral-800 border rounded text-sm">
+        <div className="flex flex-wrap gap-2 mb-2">
+          <button
+            className="px-2 py-1 bg-gray-200 dark:bg-neutral-700 rounded text-xs"
+            onClick={() =>
+              insertTemplate(
+                '- [ ] Exterior photos\n- [ ] Roof / gutters\n- [ ] Damp / mould check\n'
+              )
+            }
+          >
             Insert: Viewing checklist
           </button>
-          <button onClick={() => addSnippet(RISKS_TEMPLATE)} className="px-3 py-1 bg-gray-100 dark:bg-neutral-800 border rounded text-sm">
+          <button
+            className="px-2 py-1 bg-gray-200 dark:bg-neutral-700 rounded text-xs"
+            onClick={() => insertTemplate('- Risk: \n- Mitigation: \n')}
+          >
             Insert: Risks & mitigations
           </button>
-          <button onClick={() => addSnippet(OFFER_TEMPLATE)} className="px-3 py-1 bg-gray-100 dark:bg-neutral-800 border rounded text-sm">
+          <button
+            className="px-2 py-1 bg-gray-200 dark:bg-neutral-700 rounded text-xs"
+            onClick={() => insertTemplate('- Offer assumption: \n')}
+          >
             Insert: Offer assumptions
           </button>
         </div>
       )}
+
+      {/* Textarea */}
+      <textarea
+        value={notes}
+        onChange={(e) =>
+          e.target.value.length <= maxChars && setNotes(e.target.value)
+        }
+        className="w-full rounded px-3 py-3 bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700 leading-6 min-h-[320px] md:min-h-[360px] font-[system-ui]"
+        placeholder="Add your thoughts or deal analysis… (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
+        rows={14}
+      />
+
+      {/* Save/Clear row */}
+      <div className="flex justify-between text-xs mt-1 text-gray-500">
+        <span>Autosaves locally</span>
+        <span>
+          {notes.length}/{maxChars} chars
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mt-2">
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(notes);
+            setSaveMsg('Copied!');
+          }}
+          className="px-3 py-1 bg-gray-200 dark:bg-neutral-700 rounded text-xs"
+        >
+          Copy
+        </button>
+        <button
+          onClick={() => {
+            const blob = new Blob([notes], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'notes.txt';
+            link.click();
+          }}
+          className="px-3 py-1 bg-gray-200 dark:bg-neutral-700 rounded text-xs"
+        >
+          Download
+        </button>
+        <button
+          onClick={handleClear}
+          className="px-3 py-1 bg-gray-200 dark:bg-neutral-700 rounded text-xs"
+        >
+          Clear
+        </button>
+      </div>
     </div>
   );
 }
