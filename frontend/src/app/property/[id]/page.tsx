@@ -170,10 +170,10 @@ export default function PropertyDetailsPage() {
         </section>
 
         {/* Investor Notes */}
-        <section className="section-box">
-          <NotesFields propertyId={id ?? ''} />
-        </section>
-      </main>
+<div className="w-full">
+  <NotesFields propertyId={id ?? ''} />
+</div>
+</main>
 
       {/* ===== Right Column (sticky) ===== */}
       <aside className="md:w-1/3 md:pl-2 md:sticky md:top-4 self-start">
