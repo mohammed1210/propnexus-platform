@@ -4,8 +4,7 @@ import React, { useEffect, useState } from 'react';
 
 type Props = { propertyId: string };
 
-const MAX_CHARS = 2000;
-const TAGS = ['#Refurb', '#Risks', '#Offer', '#FollowUp', '#Comps'];
+const QUICK_TAGS = ['#Refurb', '#Risks', '#Offer', '#FollowUp', '#Comps'];
 
 const VIEWING_TEMPLATE = `- [ ] Exterior photos
 - [ ] Roof / gutters
@@ -24,6 +23,7 @@ const RISKS_TEMPLATE = `**Risks**
 
 **Mitigations**
 - 
+- 
 - `;
 
 const OFFER_TEMPLATE = `**Assumptions**
@@ -39,8 +39,8 @@ const OFFER_TEMPLATE = `**Assumptions**
 - ARV: £
 - Target equity: £`;
 
-function fmtTime(d = new Date()) {
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function timeNow() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 export default function NotesFields({ propertyId }: Props) {
@@ -50,29 +50,31 @@ export default function NotesFields({ propertyId }: Props) {
   const [notes, setNotes] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
   const [showTools, setShowTools] = useState(true);
+  const maxChars = 2000;
 
-  // Load from localStorage
+  // Load saved
   useEffect(() => {
     const get = (k: string) => localStorage.getItem(k) ?? '';
     setTitle(get(`title-${propertyId}`));
-    setImportance((get(`importance-${propertyId}`) as any) || 'Medium');
+    setImportance(((get(`importance-${propertyId}`) as any) || 'Medium') as 'Low' | 'Medium' | 'High');
     setPinned(get(`pinned-${propertyId}`) === '1');
     setNotes(get(`notes-${propertyId}`));
   }, [propertyId]);
 
-  // Save (light debounce)
+  // Save debounced
   useEffect(() => {
     const id = setTimeout(() => {
       localStorage.setItem(`title-${propertyId}`, title);
       localStorage.setItem(`importance-${propertyId}`, importance);
       localStorage.setItem(`pinned-${propertyId}`, pinned ? '1' : '0');
       localStorage.setItem(`notes-${propertyId}`, notes);
-      setSaveMsg(`Saved ${fmtTime()}`);
+      setSaveMsg(`Saved ${timeNow()}`);
     }, 300);
     return () => clearTimeout(id);
   }, [title, importance, pinned, notes, propertyId]);
 
-  const addSnippet = (s: string) => setNotes((prev) => (prev ? `${prev}\n\n${s}` : s));
+  const addSnippet = (snippet: string) =>
+    setNotes((prev) => (prev ? `${prev}\n\n${snippet}` : snippet));
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(
@@ -87,15 +89,13 @@ export default function NotesFields({ propertyId }: Props) {
         .join('\n')
     );
     setSaveMsg('Copied to clipboard');
-    setTimeout(() => setSaveMsg(`Saved ${fmtTime()}`), 1200);
+    setTimeout(() => setSaveMsg(`Saved ${timeNow()}`), 1200);
   };
 
   const handleDownload = () => {
     const blob = new Blob(
       [
-        `Title: ${title}\nImportance: ${importance}\nPinned: ${
-          pinned ? 'Yes' : 'No'
-        }\n\n${notes}`,
+        `Title: ${title}\nImportance: ${importance}\nPinned: ${pinned ? 'Yes' : 'No'}\n\n${notes}`,
       ],
       { type: 'text/plain' }
     );
@@ -121,9 +121,9 @@ export default function NotesFields({ propertyId }: Props) {
   };
 
   return (
-    <section className="section-box">
+    <section className="section-box max-w-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         <h3 className="text-lg font-semibold">📝 Investor Notes</h3>
         <div className="flex items-center gap-3 text-xs text-slate-500">
           <span>{saveMsg}</span>
@@ -137,18 +137,18 @@ export default function NotesFields({ propertyId }: Props) {
         </div>
       </div>
 
-      {/* Controls row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+      {/* Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-2">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Title / custom field (e.g. Viewing, Offer calc)"
-          className="w-full border rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800"
+          placeholder="Title / custom field"
+          className="w-full rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700"
         />
         <select
-          className="w-full border rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800"
+          className="w-full rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700"
           value={importance}
-          onChange={(e) => setImportance(e.target.value as any)}
+          onChange={(e) => setImportance(e.target.value as 'Low' | 'Medium' | 'High')}
         >
           <option>Low</option>
           <option>Medium</option>
@@ -166,87 +166,43 @@ export default function NotesFields({ propertyId }: Props) {
 
       {/* Quick tags */}
       {showTools && (
-        <div className="-mt-1 mb-2 flex flex-wrap gap-2">
-          {TAGS.map((tag) => (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {QUICK_TAGS.map((t) => (
             <button
-              key={tag}
-              type="button"
-              className="text-xs bg-gray-200 dark:bg-neutral-700 px-2 py-1 rounded hover:bg-gray-300"
-              onClick={() => setNotes((prev) => (prev ? `${prev} ${tag}` : tag))}
+              key={t}
+              className="px-2 py-1 bg-gray-100 dark:bg-neutral-700 rounded text-xs"
+              onClick={() => addSnippet(t)}
             >
-              {tag}
+              {t}
             </button>
           ))}
         </div>
       )}
 
-      {/* Editor (single column to avoid empty right space) */}
-      <div className="grid grid-cols-1 gap-3">
-        <div>
-          <textarea
-            value={notes}
-            onChange={(e) => {
-              if (e.target.value.length <= MAX_CHARS) setNotes(e.target.value);
-            }}
-            className="w-full rounded px-3 py-3 bg-gray-50 dark:bg-neutral-800 border leading-6 resize-vertical min-h-[360px]"
-            placeholder="Add your thoughts or deal analysis… (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
-            rows={16}
-          />
-          <div className="flex justify-between text-[11px] mt-1 text-gray-500">
-            <span>
-              {notes.length}/{MAX_CHARS} chars
-            </span>
-            <span className="opacity-70">Autosaves locally</span>
-          </div>
+      {/* Notes area */}
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        rows={10}
+        maxLength={maxChars}
+        className="w-full rounded px-3 py-2 bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 font-mono text-sm"
+      />
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              onClick={handleCopy}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded"
-            >
-              Copy
-            </button>
-            <button
-              onClick={handleDownload}
-              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded"
-            >
-              Download
-            </button>
-            <button
-              onClick={handleClear}
-              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-
-        {/* Optional helpers (still single-column) */}
-        {showTools && (
-          <div className="pt-2">
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-                onClick={() => addSnippet(VIEWING_TEMPLATE)}
-              >
-                Insert: Viewing checklist
-              </button>
-              <button
-                className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-                onClick={() => addSnippet(RISKS_TEMPLATE)}
-              >
-                Insert: Risks & mitigations
-              </button>
-              <button
-                className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-                onClick={() => addSnippet(OFFER_TEMPLATE)}
-              >
-                Insert: Offer assumptions
-              </button>
-            </div>
-          </div>
-        )}
+      <div className="text-xs text-right text-slate-500 mt-1">
+        {notes.length}/{maxChars} chars — Autosaves locally
       </div>
+
+      {/* Action buttons */}
+      {showTools && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          <button onClick={handleCopy} className="px-3 py-1 bg-blue-500 text-white rounded">Copy</button>
+          <button onClick={handleDownload} className="px-3 py-1 bg-green-500 text-white rounded">Download</button>
+          <button onClick={handleClear} className="px-3 py-1 bg-red-500 text-white rounded">Clear</button>
+          <button onClick={() => addSnippet(VIEWING_TEMPLATE)} className="px-3 py-1 bg-gray-200 rounded">Insert: Viewing checklist</button>
+          <button onClick={() => addSnippet(RISKS_TEMPLATE)} className="px-3 py-1 bg-gray-200 rounded">Insert: Risks & mitigations</button>
+          <button onClick={() => addSnippet(OFFER_TEMPLATE)} className="px-3 py-1 bg-gray-200 rounded">Insert: Offer assumptions</button>
+        </div>
+      )}
     </section>
   );
 }
