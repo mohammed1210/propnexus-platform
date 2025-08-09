@@ -2,10 +2,12 @@
 
 import React, { useEffect, useState } from 'react';
 
-type NotesFieldsProps = { propertyId: string };
+type Props = { propertyId: string };
 
-const QUICK_TAGS = ['#Refurb', '#Risks', '#Offer', '#FollowUp', '#Comps'];
+// Quick tags shown above the editor
+const QUICK_TAGS = ['#Refurb', '#Risks', '#Offer', '#FollowUp', '#Comps'] as const;
 
+// Snippet templates
 const VIEWING_TEMPLATE = `- [ ] Exterior photos
 - [ ] Roof / gutters
 - [ ] Damp / mould check
@@ -38,13 +40,12 @@ const OFFER_TEMPLATE = `**Assumptions**
 - ARV: £
 - Target equity: £`;
 
-function timeNow() {
-  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
+const fmtTime = (d = new Date()) =>
+  d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-const NotesFields: React.FC<NotesFieldsProps> = ({ propertyId }) => {
-  // Core fields
-  const [customField, setCustomField] = useState('');
+export default function NotesFields({ propertyId }: Props) {
+  // Core state
+  const [customField, setCustomField] = useState(''); // title/custom field
   const [importance, setImportance] = useState<'Low' | 'Medium' | 'High'>('Medium');
   const [pinned, setPinned] = useState(false);
   const [notes, setNotes] = useState('');
@@ -53,40 +54,38 @@ const NotesFields: React.FC<NotesFieldsProps> = ({ propertyId }) => {
 
   const maxChars = 2000;
 
-  // Load persisted
+  // Load from localStorage on mount / id change
   useEffect(() => {
     const get = (k: string) => localStorage.getItem(k) ?? '';
-    setCustomField(get(`customField-${propertyId}`));
+    setCustomField(get(`title-${propertyId}`));
     setImportance(((get(`importance-${propertyId}`) as 'Low' | 'Medium' | 'High') || 'Medium'));
     setPinned(get(`pinned-${propertyId}`) === '1');
     setNotes(get(`notes-${propertyId}`));
-    setSaveMsg(get(`saveMsg-${propertyId}`) || '');
+    setSaveMsg(`Loaded ${fmtTime()}`);
   }, [propertyId]);
 
-  // Save (light debounce)
+  // Debounced autosave
   useEffect(() => {
-    const id = setTimeout(() => {
-      localStorage.setItem(`customField-${propertyId}`, customField);
+    const t = setTimeout(() => {
+      localStorage.setItem(`title-${propertyId}`, customField);
       localStorage.setItem(`importance-${propertyId}`, importance);
       localStorage.setItem(`pinned-${propertyId}`, pinned ? '1' : '0');
       localStorage.setItem(`notes-${propertyId}`, notes);
-      const msg = `Saved ${timeNow()}`;
-      setSaveMsg(msg);
-      localStorage.setItem(`saveMsg-${propertyId}`, msg);
+      setSaveMsg(`Saved ${fmtTime()}`);
     }, 300);
-    return () => clearTimeout(id);
+    return () => clearTimeout(t);
   }, [customField, importance, pinned, notes, propertyId]);
 
-  // Actions
+  // Helpers
   const addSnippet = (snippet: string) =>
-    setNotes((prev) => (prev ? `${prev}\n\n${snippet}` : snippet));
+    setNotes(prev => (prev ? `${prev}\n\n${snippet}` : snippet));
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(
       [
         pinned ? '📌 Pinned' : '',
+        `Title: ${customField}`,
         `Importance: ${importance}`,
-        customField ? `Title/Field: ${customField}` : '',
         '',
         notes,
       ]
@@ -94,13 +93,15 @@ const NotesFields: React.FC<NotesFieldsProps> = ({ propertyId }) => {
         .join('\n')
     );
     setSaveMsg('Copied to clipboard');
-    setTimeout(() => setSaveMsg(`Saved ${timeNow()}`), 1200);
+    setTimeout(() => setSaveMsg(`Saved ${fmtTime()}`), 1200);
   };
 
   const handleDownload = () => {
     const blob = new Blob(
       [
-        `Pinned: ${pinned ? 'Yes' : 'No'}\nImportance: ${importance}\nTitle/Field: ${customField}\n\n${notes}`,
+        `Title: ${customField}\nImportance: ${importance}\nPinned: ${
+          pinned ? 'Yes' : 'No'
+        }\n\n${notes}`,
       ],
       { type: 'text/plain' }
     );
@@ -118,22 +119,23 @@ const NotesFields: React.FC<NotesFieldsProps> = ({ propertyId }) => {
     setImportance('Medium');
     setPinned(false);
     setNotes('');
+    localStorage.removeItem(`title-${propertyId}`);
+    localStorage.removeItem(`importance-${propertyId}`);
+    localStorage.removeItem(`pinned-${propertyId}`);
+    localStorage.removeItem(`notes-${propertyId}`);
     setSaveMsg('Cleared');
-    ['customField', 'importance', 'pinned', 'notes', 'saveMsg'].forEach((k) =>
-      localStorage.removeItem(`${k}-${propertyId}`)
-    );
   };
 
   return (
     <section className="section-box">
-      {/* Header */}
+      {/* Header + tools toggle */}
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold">📝 Investor Notes</h3>
         <div className="flex items-center gap-3 text-xs text-slate-500">
           <span>{saveMsg}</span>
           <button
             className="underline"
-            onClick={() => setShowTools((s) => !s)}
+            onClick={() => setShowTools(s => !s)}
             aria-expanded={showTools}
           >
             {showTools ? 'Hide tools' : 'Show tools'}
@@ -141,8 +143,8 @@ const NotesFields: React.FC<NotesFieldsProps> = ({ propertyId }) => {
         </div>
       </div>
 
-      {/* Top row (no inner borders to avoid double-border look) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+      {/* Top controls */}
+      <div className="grid grid-cols-1 md:grid-cols-[1fr,160px,110px] gap-3 mb-3">
         <input
           value={customField}
           onChange={(e) => setCustomField(e.target.value)}
@@ -170,13 +172,13 @@ const NotesFields: React.FC<NotesFieldsProps> = ({ propertyId }) => {
 
       {/* Quick tags */}
       {showTools && (
-        <div className="mb-3 -mt-1">
-          {QUICK_TAGS.map((tag) => (
+        <div className="mb-2 -mt-1">
+          {QUICK_TAGS.map(tag => (
             <button
               key={tag}
               type="button"
               className="text-xs bg-gray-200 dark:bg-neutral-700 px-2 py-1 rounded mr-2 mb-2 hover:bg-gray-300"
-              onClick={() => setNotes((prev) => (prev ? `${prev} ${tag}` : tag))}
+              onClick={() => setNotes(prev => (prev ? `${prev} ${tag}` : tag))}
             >
               {tag}
             </button>
@@ -184,71 +186,71 @@ const NotesFields: React.FC<NotesFieldsProps> = ({ propertyId }) => {
         </div>
       )}
 
-      {/* Editor & tools (single column to avoid empty bordered panel) */}
-<div className="space-y-3">
-  <div>
-    <textarea
-      value={notes}
-      onChange={(e) => {
-        if (e.target.value.length <= maxChars) setNotes(e.target.value);
-      }}
-      className="w-full rounded px-3 py-3 bg-gray-50 dark:bg-neutral-800 border leading-6 resize-vertical min-h-[420px]"
-      placeholder="Add your thoughts or deal analysis… (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
-      rows={14}
-    />
-    <div className="flex justify-between text-xs mt-1 text-gray-500">
-      <span>{notes.length}/{maxChars} chars</span>
-      <span>Autosaves locally</span>
-    </div>
+      {/* Editor & actions (no inner card borders) */}
+      <div className="grid grid-cols-1 gap-3">
+        <div>
+          <textarea
+            value={notes}
+            onChange={(e) => {
+              if (e.target.value.length <= maxChars) setNotes(e.target.value);
+            }}
+            className="w-full rounded px-3 py-3 bg-gray-50 dark:bg-neutral-800 border leading-6 resize-vertical min-h-[260px] md:min-h-[320px]"
+            placeholder="Add your thoughts or deal analysis…  (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
+            rows={14}
+          />
+          <div className="flex justify-between text-xs mt-1 text-gray-500">
+            <span>{notes.length}/{maxChars} chars</span>
+            <span className="opacity-70">Autosaves locally</span>
+          </div>
 
-    {/* Actions */}
-    <div className="mt-4 flex flex-wrap gap-2">
-      <button
-        onClick={handleCopy}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded"
-      >
-        Copy
-      </button>
-      <button
-        onClick={handleDownload}
-        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded"
-      >
-        Download
-      </button>
-      <button
-        onClick={handleClear}
-        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded"
-      >
-        Clear
-      </button>
-    </div>
-  </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={handleCopy}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded"
+            >
+              Copy
+            </button>
+            <button
+              onClick={handleDownload}
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded"
+            >
+              Download
+            </button>
+            <button
+              onClick={handleClear}
+              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
 
-  {/* Optional tools (compact row) */}
-  {showTools && (
-    <>
-      <div className="flex flex-wrap gap-2">
-        <button
-          className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-          onClick={() => addSnippet(VIEWING_TEMPLATE)}
-        >
-          Insert: Viewing checklist
-        </button>
-        <button
-          className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-          onClick={() => addSnippet(RISKS_TEMPLATE)}
-        >
-          Insert: Risks & mitigations
-        </button>
-        <button
-          className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-          onClick={() => addSnippet(OFFER_TEMPLATE)}
-        >
-          Insert: Offer assumptions
-        </button>
+        {/* Snippet buttons (optional) */}
+        {showTools && (
+          <div className="pt-2">
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
+                onClick={() => addSnippet(VIEWING_TEMPLATE)}
+              >
+                Insert: Viewing checklist
+              </button>
+              <button
+                className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
+                onClick={() => addSnippet(RISKS_TEMPLATE)}
+              >
+                Insert: Risks & mitigations
+              </button>
+              <button
+                className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
+                onClick={() => addSnippet(OFFER_TEMPLATE)}
+              >
+                Insert: Offer assumptions
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-    </>
-  )}
-</div>
-
-export default NotesFields;
+    </section>
+  );
+}
