@@ -165,9 +165,19 @@ export default function PropertyDetailsPage() {
         </section>
 
         {/* Area Intelligence */}
-        <section className="section-box">
-          <AreaIntel property={property} />
-        </section>
+<section className="section-box">
+  <AreaIntel
+    locationLabel={property?.location}
+    postcode={property?.postcode}
+    data={{
+      avgYieldPct: property?.yield_percent,
+      avgRent: property?.avg_rent,
+      crimeRateIndex: property?.crime_index,
+      ofstedSummary: property?.ofsted_summary,
+      transportSummary: property?.transport_summary
+    }}
+  />
+</section>
 
         {/* Investor Notes */}
 <div className="w-full p-4 border rounded-lg bg-white dark:bg-neutral-900">
