@@ -143,7 +143,7 @@ export default function NotesFields({ propertyId }: Props) {
     <div className="flex items-center justify-between mb-3">
       <h3 className="text-lg font-semibold">📝 Investor Notes</h3>
       <div className="flex items-center gap-3 text-xs text-slate-500">
-        <span>{saveStatus}</span>
+        <span>{saveMsg}</span>
         <button
           className="underline"
           onClick={() => setShowAdvanced((s) => !s)}
