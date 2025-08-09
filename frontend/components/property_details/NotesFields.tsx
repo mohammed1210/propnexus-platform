@@ -184,72 +184,71 @@ const NotesFields: React.FC<NotesFieldsProps> = ({ propertyId }) => {
         </div>
       )}
 
-      {/* Editor & tools (no inner card borders; rely on padding/bg only) */}
-      <div className="grid grid-cols-1 gap-3">
-        <div>
-          <textarea
-            value={notes}
-            onChange={(e) => {
-              if (e.target.value.length <= maxChars) setNotes(e.target.value);
-            }}
-            className="w-full rounded px-3 py-3 bg-gray-50 dark:bg-neutral-800 border leading-6 resize-vertical min-h-[340px] md:min-h-[420px]"
-            placeholder="Add your thoughts or deal analysis… (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
-            rows={14}
-          />
-          <div className="flex justify-between text-xs mt-1 text-gray-500">
-            <span>{notes.length}/{maxChars} chars</span>
-            <span className="opacity-70">Autosaves locally</span>
-          </div>
+      {/* Editor & tools (single column to avoid empty bordered panel) */}
+<div className="space-y-3">
+  <div>
+    <textarea
+      value={notes}
+      onChange={(e) => {
+        if (e.target.value.length <= maxChars) setNotes(e.target.value);
+      }}
+      className="w-full rounded px-3 py-3 bg-gray-50 dark:bg-neutral-800 border leading-6 resize-vertical min-h-[420px]"
+      placeholder="Add your thoughts or deal analysis… (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
+      rows={14}
+    />
+    <div className="flex justify-between text-xs mt-1 text-gray-500">
+      <span>{notes.length}/{maxChars} chars</span>
+      <span>Autosaves locally</span>
+    </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              onClick={handleCopy}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded"
-            >
-              Copy
-            </button>
-            <button
-              onClick={handleDownload}
-              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded"
-            >
-              Download
-            </button>
-            <button
-              onClick={handleClear}
-              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
+    {/* Actions */}
+    <div className="mt-4 flex flex-wrap gap-2">
+      <button
+        onClick={handleCopy}
+        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded"
+      >
+        Copy
+      </button>
+      <button
+        onClick={handleDownload}
+        className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded"
+      >
+        Download
+      </button>
+      <button
+        onClick={handleClear}
+        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded"
+      >
+        Clear
+      </button>
+    </div>
+  </div>
 
-        {showTools && (
-          <div className="pt-2">
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-                onClick={() => addSnippet(VIEWING_TEMPLATE)}
-              >
-                Insert: Viewing checklist
-              </button>
-              <button
-                className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-                onClick={() => addSnippet(RISKS_TEMPLATE)}
-              >
-                Insert: Risks & mitigations
-              </button>
-              <button
-                className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-                onClick={() => addSnippet(OFFER_TEMPLATE)}
-              >
-                Insert: Offer assumptions
-              </button>
-            </div>
-          </div>
-        )}
+  {/* Optional tools (compact row) */}
+  {showTools && (
+    <>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
+          onClick={() => addSnippet(VIEWING_TEMPLATE)}
+        >
+          Insert: Viewing checklist
+        </button>
+        <button
+          className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
+          onClick={() => addSnippet(RISKS_TEMPLATE)}
+        >
+          Insert: Risks & mitigations
+        </button>
+        <button
+          className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
+          onClick={() => addSnippet(OFFER_TEMPLATE)}
+        >
+          Insert: Offer assumptions
+        </button>
       </div>
-    </section>
-  );
-};
+    </>
+  )}
+</div>
 
 export default NotesFields;
