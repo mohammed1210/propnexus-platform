@@ -39,9 +39,8 @@ const OFFER_TEMPLATE = `**Assumptions**
 - ARV: £
 - Target equity: £`;
 
-function timeNow() {
-  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
+const timeNow = () =>
+  new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 export default function NotesFields({ propertyId }: Props) {
   const [title, setTitle] = useState('');
@@ -52,7 +51,7 @@ export default function NotesFields({ propertyId }: Props) {
   const [showTools, setShowTools] = useState(true);
   const maxChars = 2000;
 
-  // Load saved
+  // Load
   useEffect(() => {
     const get = (k: string) => localStorage.getItem(k) ?? '';
     setTitle(get(`title-${propertyId}`));
@@ -61,7 +60,7 @@ export default function NotesFields({ propertyId }: Props) {
     setNotes(get(`notes-${propertyId}`));
   }, [propertyId]);
 
-  // Save debounced
+  // Save (debounced)
   useEffect(() => {
     const id = setTimeout(() => {
       localStorage.setItem(`title-${propertyId}`, title);
@@ -121,8 +120,8 @@ export default function NotesFields({ propertyId }: Props) {
   };
 
   return (
-    <section className="section-box max-w-full">
-      {/* Header */}
+    <div className="w-full">
+      {/* Header (keep light; the outer card comes from the page) */}
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-lg font-semibold">📝 Investor Notes</h3>
         <div className="flex items-center gap-3 text-xs text-slate-500">
@@ -179,30 +178,38 @@ export default function NotesFields({ propertyId }: Props) {
         </div>
       )}
 
-      {/* Notes area */}
+      {/* Notes area – full width */}
       <textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
-        rows={10}
+        rows={12}
         maxLength={maxChars}
-        className="w-full rounded px-3 py-2 bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 font-mono text-sm"
+        className="w-full rounded px-3 py-2 bg-white dark:bg-neutral-900 border border-gray-300 dark:border-neutral-700 font-mono text-sm min-h-[280px]"
+        placeholder="Add your thoughts or deal analysis…  (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
       />
 
       <div className="text-xs text-right text-slate-500 mt-1">
         {notes.length}/{maxChars} chars — Autosaves locally
       </div>
 
-      {/* Action buttons */}
+      {/* Actions */}
       {showTools && (
         <div className="flex flex-wrap gap-2 mt-2">
-          <button onClick={handleCopy} className="px-3 py-1 bg-blue-500 text-white rounded">Copy</button>
-          <button onClick={handleDownload} className="px-3 py-1 bg-green-500 text-white rounded">Download</button>
-          <button onClick={handleClear} className="px-3 py-1 bg-red-500 text-white rounded">Clear</button>
-          <button onClick={() => addSnippet(VIEWING_TEMPLATE)} className="px-3 py-1 bg-gray-200 rounded">Insert: Viewing checklist</button>
-          <button onClick={() => addSnippet(RISKS_TEMPLATE)} className="px-3 py-1 bg-gray-200 rounded">Insert: Risks & mitigations</button>
-          <button onClick={() => addSnippet(OFFER_TEMPLATE)} className="px-3 py-1 bg-gray-200 rounded">Insert: Offer assumptions</button>
+          <button onClick={handleCopy} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded">Copy</button>
+          <button onClick={handleDownload} className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded">Download</button>
+          <button onClick={handleClear} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded">Clear</button>
+
+          <button onClick={() => addSnippet(VIEWING_TEMPLATE)} className="px-3 py-1 bg-gray-100 dark:bg-neutral-800 border rounded text-sm">
+            Insert: Viewing checklist
+          </button>
+          <button onClick={() => addSnippet(RISKS_TEMPLATE)} className="px-3 py-1 bg-gray-100 dark:bg-neutral-800 border rounded text-sm">
+            Insert: Risks & mitigations
+          </button>
+          <button onClick={() => addSnippet(OFFER_TEMPLATE)} className="px-3 py-1 bg-gray-100 dark:bg-neutral-800 border rounded text-sm">
+            Insert: Offer assumptions
+          </button>
         </div>
       )}
-    </section>
+    </div>
   );
 }
