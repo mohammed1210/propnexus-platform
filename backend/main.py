@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from supabase import create_client, Client
 import os
-from backend.routes.save_deal import router as save_deal_router
-from backend.routes.notes import router as notes_router  # adjust import to your layout
+from routes.save_deal import router as save_deal_router
+from routes.notes import router as notes_router
 
 # ✅ Load environment variables
 load_dotenv()
