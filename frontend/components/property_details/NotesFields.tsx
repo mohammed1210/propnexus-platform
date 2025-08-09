@@ -1,293 +1,327 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from "react";
 
-type Props = { propertyId: string };
+type Size = "Small" | "Medium" | "High";
 
-// -------- Quick helpers --------
-const maxChars = 2000;
-
-function nowTime() {
-  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+interface NotesFieldsProps {
+  propertyId: string;
+  className?: string;
 }
 
-function safeGet(key: string): string {
-  if (typeof window === 'undefined') return '';
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return '';
-    // In case older versions stored JSON, try parse, otherwise return raw
-    try {
-      const parsed = JSON.parse(raw);
-      return typeof parsed === 'string' ? parsed : raw;
-    } catch {
-      return raw;
-    }
-  } catch {
-    return '';
-  }
-}
+type StoredNotes = {
+  title: string;
+  size: Size;
+  pinned: boolean;
+  text: string;
+  tags: string[];
+  savedAt: number; // epoch ms
+};
 
-function safeSet(key: string, value: string) {
-  if (typeof window === 'undefined') return;
-  try {
-    // store as plain string (no JSON) to avoid parse errors on retrieval
-    localStorage.setItem(key, value);
-  } catch {
-    /* ignore quota or private mode errors */
-  }
-}
+const TAGS = ["#Refurb", "#Risks", "#Offer", "#FollowUp", "#Comps"];
 
-// -------- Snippet templates --------
-const VIEWING_TEMPLATE = `- [ ] Exterior photos
+const VIEWING_CHECKLIST = `#Refurb #Risks
+- [ ] Exterior photos
 - [ ] Roof / gutters
 - [ ] Damp / mould check
 - [ ] Electrics (EICR?)
 - [ ] Boiler age & service
 - [ ] Windows & glazing
 - [ ] Room measurements
-- [ ] Neighbours / noise`;
+`;
 
-const RISKS_TEMPLATE = `**Risks**
-- Planning:
-- Structural:
-- Damp:
-- Market/exit:
+const RISKS_AND_MITS = `#Risks
+- [ ] Valuation risk — add 5% buffer
+- [ ] Refurb overrun — add 10–15% contingency
+- [ ] Void period — assume 1 month
+- [ ] Down valuation — line up 2nd lender
+- [ ] Exit risk — confirm 2+ viable exit strategies
+`;
 
-**Mitigations**
-- 
-- `;
+const OFFER_ASSUMPTIONS = `#Offer
+- Purchase price: £
+- Refurb budget: £
+- GDV: £
+- Target yield: %
+- Target ROI: %
+- Exit strategies: (Let / Refi / Flip)
+`;
 
-const OFFER_TEMPLATE = `**Assumptions**
-- Purchase: £
-- Works: £
-- Fees (legals/SDLT/etc): £
-- Contingency: %
-- Target rent: £/m
-- Target yield on cost: %
+function fmtSavedTime(ts?: number) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
 
-**Exit**
-- Strategy:
-- ARV: £
-- Target equity: £`;
+export default function NotesFields({ propertyId, className }: NotesFieldsProps) {
+  const storageKey = useMemo(() => `propnexus:notes:${propertyId}`, [propertyId]);
 
-// -------- Component --------
-export default function NotesFields({ propertyId }: Props) {
-  // core fields
-  const [title, setTitle] = useState('');
-  const [importance, setImportance] = useState<'Low' | 'Medium' | 'High'>('Medium');
-  const [pinned, setPinned] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [saveMsg, setSaveMsg] = useState('');        // “Saved 15:41”
-  const [showTools, setShowTools] = useState(true);  // toggle tool row visibility
+  const [title, setTitle] = useState<string>("");
+  const [size, setSize] = useState<Size>("Medium");
+  const [pinned, setPinned] = useState<boolean>(false);
+  const [text, setText] = useState<string>("");
+  const [tags, setTags] = useState<string[]>([]);
+  const [savedAt, setSavedAt] = useState<number | undefined>();
+  const [showTools, setShowTools] = useState<boolean>(true);
 
-  // Load on mount
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const MAX = 2000;
+
+  // Load from localStorage
   useEffect(() => {
-    setTitle(safeGet(`title-${propertyId}`));
-    const imp = safeGet(`importance-${propertyId}`);
-    setImportance((imp as 'Low' | 'Medium' | 'High') || 'Medium');
-    setPinned(safeGet(`pinned-${propertyId}`) === '1');
-    setNotes(safeGet(`notes-${propertyId}`));
-    setSaveMsg(`Loaded ${nowTime()}`);
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed: StoredNotes = JSON.parse(raw);
+        setTitle(parsed.title ?? "");
+        setSize(parsed.size ?? "Medium");
+        setPinned(Boolean(parsed.pinned));
+        setText(parsed.text ?? "");
+        setTags(Array.isArray(parsed.tags) ? parsed.tags : []);
+        setSavedAt(parsed.savedAt);
+      }
+    } catch {
+      // ignore
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [propertyId]);
+  }, [storageKey]);
 
-  // Autosave (light debounce)
+  // Debounced autosave
   useEffect(() => {
-    const id = setTimeout(() => {
-      safeSet(`title-${propertyId}`, title);
-      safeSet(`importance-${propertyId}`, importance);
-      safeSet(`pinned-${propertyId}`, pinned ? '1' : '0');
-      safeSet(`notes-${propertyId}`, notes);
-      setSaveMsg(`Saved ${nowTime()}`);
-    }, 300);
-    return () => clearTimeout(id);
-  }, [title, importance, pinned, notes, propertyId]);
+    const payload: StoredNotes = {
+      title,
+      size,
+      pinned,
+      text,
+      tags,
+      savedAt: Date.now(),
+    };
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      localStorage.setItem(storageKey, JSON.stringify(payload));
+      setSavedAt(payload.savedAt);
+    }, 500);
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [title, size, pinned, text, tags, storageKey]);
 
-  // Actions
-  const addTag = (tag: string) =>
-    setNotes((prev) => (prev ? `${prev} ${tag}` : tag));
-
-  const addSnippet = (snippet: string) =>
-    setNotes((prev) => (prev ? `${prev}\n\n${snippet}` : snippet));
-
-  const handleCopy = async () => {
-    const blob = [
-      pinned ? '📌 Pinned' : '',
-      `Title: ${title}`,
-      `Importance: ${importance}`,
-      '',
-      notes,
-    ]
-      .filter(Boolean)
-      .join('\n');
-    await navigator.clipboard.writeText(blob);
-    setSaveMsg('Copied to clipboard');
-    setTimeout(() => setSaveMsg(`Saved ${nowTime()}`), 1200);
+  const insertText = (snippet: string) => {
+    setText((t) => {
+      const joiner = t && !t.endsWith("\n") ? "\n" : "";
+      return `${t}${joiner}${snippet}`;
+    });
   };
 
-  const handleDownload = () => {
-    const file = [
-      `Title: ${title}`,
-      `Importance: ${importance}`,
-      `Pinned: ${pinned ? 'Yes' : 'No'}`,
-      '',
-      notes,
-    ].join('\n');
-    const b = new Blob([file], { type: 'text/plain' });
-    const url = URL.createObjectURL(b);
-    const a = document.createElement('a');
+  const onCopy = async () => {
+    const composed = buildExport(title, size, pinned, tags, text);
+    try {
+      await navigator.clipboard.writeText(composed);
+    } catch {
+      // no-op
+    }
+  };
+
+  const onDownload = () => {
+    const composed = buildExport(title, size, pinned, tags, text);
+    const blob = new Blob([composed], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const stamp = new Date().toISOString().slice(0, 10);
     a.href = url;
-    a.download = `notes-${propertyId}.txt`;
+    a.download = `propnexus-notes-${propertyId}-${stamp}.txt`;
+    document.body.appendChild(a);
     a.click();
+    a.remove();
     URL.revokeObjectURL(url);
   };
 
-  const handleClear = () => {
-    if (!confirm('Clear all notes for this property?')) return;
-    setTitle('');
-    setImportance('Medium');
+  const onClear = () => {
+    const ok = window.confirm("Clear notes? This only clears your local copy.");
+    if (!ok) return;
+    setTitle("");
+    setSize("Medium");
     setPinned(false);
-    setNotes('');
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(`title-${propertyId}`);
-      localStorage.removeItem(`importance-${propertyId}`);
-      localStorage.removeItem(`pinned-${propertyId}`);
-      localStorage.removeItem(`notes-${propertyId}`);
-    }
-    setSaveMsg('Cleared');
+    setText("");
+    setTags([]);
+    setSavedAt(undefined);
+    localStorage.removeItem(storageKey);
   };
 
-  // UI
+  const toggleTag = (tag: string) => {
+    setTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+    // also insert the tag text if not present in text body
+    setText((t) => (t.includes(tag) ? t : (t ? `${t} ` : "") + tag));
+  };
+
+  const remaining = Math.max(0, MAX - text.length);
+
   return (
-    // No inner border/shadow here — the page provides the outer "section-box"
-    <div className="w-full">
+    <div
+      className={[
+        "w-full rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm",
+        pinned ? "ring-1 ring-blue-500" : "",
+        className ?? "",
+      ].join(" ")}
+      data-pinned={pinned}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-semibold">📝 Investor Notes</h3>
-        <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span>{saveMsg}</span>
-          <button
-            className="underline"
-            onClick={() => setShowTools((s) => !s)}
-            aria-expanded={showTools}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4">
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-semibold">📝 Investor Notes</span>
+          <span className="text-xs text-neutral-500">
+            {savedAt ? `Saved ${fmtSavedTime(savedAt)}` : "Autosaves locally"}
+          </span>
+        </div>
+
+        <button
+          type="button"
+          className="text-xs underline text-neutral-600 dark:text-neutral-300 hover:opacity-80"
+          onClick={() => setShowTools((s) => !s)}
+          aria-expanded={showTools}
+        >
+          {showTools ? "Hide tools" : "Show tools"}
+        </button>
+      </div>
+
+      {/* Tools */}
+      {showTools && (
+        <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
+          <input
+            className="min-w-[220px] flex-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm outline-none"
+            placeholder="Title / custom field (e.g. Viewing notes)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+
+          <select
+            className="rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-2 text-sm"
+            value={size}
+            onChange={(e) => setSize(e.target.value as Size)}
+            aria-label="Priority"
           >
-            {showTools ? 'Hide tools' : 'Show tools'}
+            <option>Small</option>
+            <option>Medium</option>
+            <option>High</option>
+          </select>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={pinned}
+              onChange={(e) => setPinned(e.target.checked)}
+            />
+            Pin to top
+          </label>
+        </div>
+      )}
+
+      {/* Tags */}
+      {showTools && (
+        <div className="flex flex-wrap gap-2 px-4 pt-3">
+          {TAGS.map((tag) => (
+            <button
+              key={tag}
+              type="button"
+              onClick={() => toggleTag(tag)}
+              className={[
+                "rounded-full border px-3 py-1 text-xs",
+                tags.includes(tag)
+                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                  : "border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200",
+              ].join(" ")}
+              aria-pressed={tags.includes(tag)}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Textarea block with inner border (double-border look) */}
+      <div className="px-4 pt-3">
+        <div className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+          <textarea
+            className="h-40 w-full resize-vertical rounded-lg bg-transparent px-3 py-2 text-sm leading-5 outline-none"
+            placeholder="Add your thoughts or deal analysis… (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
+            maxLength={MAX}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* Footer actions */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+        <div className="text-xs text-neutral-500">{MAX - remaining}/{MAX} chars</div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={onCopy}
+            type="button"
+            className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+          >
+            Copy
+          </button>
+          <button
+            onClick={onDownload}
+            type="button"
+            className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+          >
+            Download
+          </button>
+          <button
+            onClick={onClear}
+            type="button"
+            className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+          >
+            Clear
           </button>
         </div>
       </div>
 
-      {/* Tools row */}
-      {showTools && (
-        <div className="space-y-2 mb-2">
-          {/* Title / Importance / Pin */}
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Title / custom field (e.g. Viewing, Offer calc)"
-              className="w-[min(520px,100%)] rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700"
-            />
-            <select
-              className="rounded px-3 py-2 bg-gray-50 dark:bg-neutral-800 border border-gray-300 dark:border-neutral-700"
-              value={importance}
-              onChange={(e) =>
-                setImportance(e.target.value as 'Low' | 'Medium' | 'High')
-              }
-            >
-              <option>Low</option>
-              <option>Medium</option>
-              <option>High</option>
-            </select>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={pinned}
-                onChange={(e) => setPinned(e.target.checked)}
-              />
-              Pin to top
-            </label>
-          </div>
-
-          {/* Quick tags */}
-          <div className="flex flex-wrap gap-2">
-            {['#Refurb', '#Risks', '#Offer', '#FollowUp', '#Comps'].map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                className="text-xs bg-gray-200 dark:bg-neutral-700 px-2 py-1 rounded hover:bg-gray-300"
-                onClick={() => addTag(tag)}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Editor (single column, wide, taller) */}
-      <div className="grid grid-cols-1 gap-3">
-        <div>
-          <textarea
-            value={notes}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (v.length <= maxChars) setNotes(v);
-            }}
-            className="w-full rounded px-3 py-3 bg-gray-50 dark:bg-neutral-800 leading-6 resize-vertical min-h-[340px] md:min-h-[380px] border border-gray-300 dark:border-neutral-700"
-            placeholder="Add your thoughts or deal analysis…  (supports **bold**, *italics*, - bullets, - [ ] checkboxes)"
-            rows={14}
-          />
-          <div className="flex justify-between text-xs mt-1 text-gray-500">
-            <span>{notes.length}/{maxChars} chars</span>
-            <span className="opacity-70">Autosaves locally</span>
-          </div>
-
-          {/* Actions */}
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              onClick={handleCopy}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded"
-            >
-              Copy
-            </button>
-            <button
-              onClick={handleDownload}
-              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded"
-            >
-              Download
-            </button>
-            <button
-              onClick={handleClear}
-              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded"
-            >
-              Clear
-            </button>
-          </div>
-
-          {/* Snippet buttons */}
-          <div className="pt-2 flex flex-wrap gap-2">
-            <button
-              className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-              onClick={() => addSnippet(VIEWING_TEMPLATE)}
-            >
-              Insert: Viewing checklist
-            </button>
-            <button
-              className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-              onClick={() => addSnippet(RISKS_TEMPLATE)}
-            >
-              Insert: Risks & mitigations
-            </button>
-            <button
-              className="text-xs border px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-neutral-800"
-              onClick={() => addSnippet(OFFER_TEMPLATE)}
-            >
-              Insert: Offer assumptions
-            </button>
-          </div>
-        </div>
+      {/* Quick inserts */}
+      <div className="flex flex-wrap gap-2 border-t border-neutral-200 dark:border-neutral-800 px-4 py-3">
+        <button
+          onClick={() => insertText(VIEWING_CHECKLIST)}
+          className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        >
+          Insert: Viewing checklist
+        </button>
+        <button
+          onClick={() => insertText(RISKS_AND_MITS)}
+          className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        >
+          Insert: Risks & mitigations
+        </button>
+        <button
+          onClick={() => insertText(OFFER_ASSUMPTIONS)}
+          className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        >
+          Insert: Offer assumptions
+        </button>
       </div>
     </div>
   );
+}
+
+function buildExport(
+  title: string,
+  size: Size,
+  pinned: boolean,
+  tags: string[],
+  text: string
+) {
+  const header = `Investor Notes
+Title: ${title || "-"}
+Priority: ${size}
+Pinned: ${pinned ? "Yes" : "No"}
+Tags: ${tags.join(" ") || "-"}
+-----------------------------
+`;
+  return `${header}\n${text}\n`;
 }
