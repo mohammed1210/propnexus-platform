@@ -39,10 +39,12 @@ from routes import gpt_routes
 from routes.ai_routes import router as ai_routes  # NEW
 from scraper.zoopla_scraper import scrape_zoopla_properties
 from scraper.rightmove_scraper import scrape_rightmove_properties
+from routes import area_routes
 
 # ✅ Include routes
 app.include_router(gpt_routes.router)
 app.include_router(ai_routes)  # ✅ Register new AI route module
+app.include_router(area_routes.router)
 
 # ✅ Health check
 @app.get("/")
