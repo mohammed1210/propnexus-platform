@@ -77,38 +77,46 @@ export default function PropertyDetailsPage() {
     (property as any)?.postal_code ??
     undefined;
 
-  // 🔹 NEW: AI score bars (demo values — replace with real scoring later)
-  const aiOverall: number =
-    typeof (property as any)?.ai_score === 'number'
-      ? (property as any).ai_score
-      : 72;
+  // 🔹 AI score bars (demo values — swap to real scoring when ready)
+const aiOverall: number =
+  typeof (property as any)?.ai_score === "number"
+    ? (property as any).ai_score
+    : Math.round(
+        [
+          Math.min(100, Math.max(0, Math.round((property?.yield_percent ?? 0) * 10))), // yield
+          Math.min(100, Math.max(0, Math.round((property?.roi_percent ?? 0) * 5))),   // ROI
+          68,  // area demand (placeholder)
+          60,  // risk inverted-ish placeholder (lower risk → higher score)
+        ].reduce((a, b) => a + b, 0) / 4
+      );
 
-  const aiItems: ScoreItem[] = [
-    {
-      key: 'yield',
-      label: 'Yield Strength',
-      value: Math.min(100, Math.max(0, Math.round((property?.yield_percent ?? 0) * 10))),
-      hint: 'Estimated gross yield vs local averages.'
-    },
-    {
-      key: 'roi',
-      label: 'ROI Potential',
-      value: Math.min(100, Math.max(0, Math.round((property?.roi_percent ?? 0) * 5))),
-      hint: 'Projected ROI given refurb & exit assumptions.'
-    },
-    {
-      key: 'demand',
-      label: 'Area Demand',
-      value: 68,
-      hint: 'Rental demand and stock turnover (illustrative).'
-    },
-    {
-      key: 'risk',
-      label: 'Risk Adjusted',
-      value: 40,
-      hint: 'Down valuation / cost overrun / void risk (illustrative).'
-    }
-  ];
+// Keep this untyped to avoid TS import needs here
+const aiItems = [
+  {
+    key: "yield",
+    label: "Yield Strength",
+    value: Math.min(100, Math.max(0, Math.round((property?.yield_percent ?? 0) * 10))),
+    hint: "Estimated gross yield vs local averages.",
+  },
+  {
+    key: "roi",
+    label: "ROI Potential",
+    value: Math.min(100, Math.max(0, Math.round((property?.roi_percent ?? 0) * 5))),
+    hint: "Projected ROI given refurb & exit assumptions.",
+  },
+  {
+    key: "demand",
+    label: "Area Demand",
+    value: 68,
+    hint: "Rental demand and stock turnover (illustrative).",
+  },
+  {
+    key: "risk",
+    label: "Risk Adjusted",
+    value: 60,
+    hint: "Lower risk → higher score (illustrative).",
+  },
+];
 
   /* ================================
    * Loading / error states
