@@ -12,7 +12,7 @@ type AreaIntelData = {
 
 interface AreaIntelProps {
   locationLabel?: string;
-  postcode?: string; // NEW: postcode for live lookup
+  postcode?: string; // postcode for live lookup
   data?: AreaIntelData;
   className?: string;
 }
@@ -24,27 +24,66 @@ export default function AreaIntel({
   className = "",
 }: AreaIntelProps) {
   const [liveData, setLiveData] = useState<AreaIntelData | null>(null);
-  const [loading, setLoading] = useState(false); // stays false unless we fetch
+  const [loading, setLoading] = useState(false); // only true when we actually fetch
+  const [err, setErr] = useState<string | null>(null);
 
-  // Fetch from backend only if postcode is provided
+  // Fetch from backend only if postcode & backend URL are provided
   useEffect(() => {
-    if (!postcode) {
+    const backend = (process.env.NEXT_PUBLIC_BACKEND_URL || "").trim();
+    // Normalise postcode (trim, uppercase); allow spaces
+    const pc = (postcode ?? "").trim().toUpperCase();
+    const validPostcode = pc.length >= 3; // cheap guard, avoids empty/undefined
+
+    // If no postcode or no backend URL → no fetch, no loader, no error
+    if (!backend || !validPostcode) {
       setLoading(false);
+      setErr(null);
       setLiveData(null);
       return;
     }
 
     let cancelled = false;
+    const ctrl = new AbortController();
     setLoading(true);
+    setErr(null);
 
-    fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/area-intel/${encodeURIComponent(postcode)}`)
-      .then((res) => res.json())
-      .then((json) => {
-        if (!cancelled) setLiveData(json);
+    // Simple session cache to avoid repeated fetches during navigation
+    const cacheKey = `area-intel:${pc}`;
+    const cached = sessionStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        setLiveData(parsed);
+        setLoading(false);
+        return () => {
+          ctrl.abort();
+        };
+      } catch {
+        // ignore parse errors and continue to fetch fresh
+      }
+    }
+
+    fetch(`${backend}/area-intel/${encodeURIComponent(pc)}`, {
+      signal: ctrl.signal,
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
       })
-      .catch((err) => {
-        console.error("AreaIntel fetch error:", err);
-        if (!cancelled) setLiveData(null);
+      .then((json) => {
+        if (cancelled) return;
+        setLiveData(json);
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(json));
+        } catch {
+          // ignore storage errors
+        }
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        console.error("AreaIntel fetch error:", e);
+        setLiveData(null);
+        setErr("Couldn’t load live area data.");
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -52,6 +91,7 @@ export default function AreaIntel({
 
     return () => {
       cancelled = true;
+      ctrl.abort();
     };
   }, [postcode]);
 
@@ -82,12 +122,19 @@ export default function AreaIntel({
         <div className="p-4 text-sm text-neutral-500">Loading live data…</div>
       ) : (
         <>
+          {err && (
+            <div className="mb-3 text-xs text-amber-600">
+              {err} Showing illustrative figures instead.
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <InfoCard label="Average Yield" value={`${d.avgYieldPct.toFixed(1)}%`} hint="Local average gross yield" />
-            <InfoCard label="Average Rent" value={`£${Math.round(d.avgRent).toLocaleString()}`} hint="Median monthly rent" />
+            <InfoCard label="Average Yield" value={`${Number(d.avgYieldPct).toFixed(1)}%`} hint="Local average gross yield" />
+            <InfoCard label="Average Rent" value={`£${Math.round(Number(d.avgRent)).toLocaleString()}`} hint="Median monthly rent" />
             <InfoCard label="Crime (Index)" value={String(d.crimeRateIndex)} hint="Composite index (0–100). Lower is better." />
             <InfoCard label="Schools" value={d.ofstedSummary} hint="Ofsted ratings summary" />
           </div>
+
           <div className="mt-3 rounded-md border border-neutral-200 dark:border-neutral-800 p-3 text-sm">
             <div className="mb-1 font-medium">Transport</div>
             <div>{d.transportSummary}</div>
