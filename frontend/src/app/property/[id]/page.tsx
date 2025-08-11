@@ -207,6 +207,16 @@ const aiItems = [
             {/* NEW: Detailed score breakdown */}
             <div className="mt-4">
               <AIScoreBars overall={aiOverall} items={aiItems} />
+        <p className="mt-2 text-sm text-slate-600">
+  Scores are indicative. We combine yield, ROI, area demand and risk to form the overall AI score.
+</p>
+<button
+  className="mt-2 inline-flex items-center gap-1 text-sm underline text-gray-600"
+  aria-label="Learn more about how the AI score is calculated"
+  onClick={() => alert('Coming soon: detailed score methodology')}
+>
+  ❓ What do these scores mean?
+</button>
             </div>
           </details>
         </section>
