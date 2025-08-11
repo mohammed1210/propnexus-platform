@@ -13,6 +13,7 @@ import AreaIntel from '@details/AreaIntel';
 import MapSingle from '@details/MapSingle';
 import AIScoreBars, { ScoreItem } from '@details/AIScoreBars'; // 🔹 NEW
 import { Property } from '@/types';
+import AIScoreInfo from '@details/AIScoreInfo';
 
 export default function PropertyDetailsPage() {
   const params = useParams();
@@ -163,9 +164,20 @@ const aiItems = [
         />
 
         {/* Investment Summary */}
-        <section className="section-box">
-          <InvestmentSummary property={property} />
-        </section>
+<section className="section-box">
+  <InvestmentSummary property={property} />
+
+  <details className="mt-2">
+    <summary className="cursor-pointer text-sm text-gray-600">
+      ❓ What do these scores mean?
+    </summary>
+    <div className="mt-2 text-sm text-slate-700">
+      These bars are a simple visual based on the ROI and gross yield figures for this listing.
+      They’re scaled to typical residential ranges (ROI ≈ 0–25%, Yield ≈ 0–12%) to give a quick sense
+      of strength at a glance. Always validate with your own numbers.
+    </div>
+  </details>
+</section>
 
         {/* Exit Strategy */}
         <section className="section-box">
@@ -210,16 +222,21 @@ const aiItems = [
         <p className="mt-2 text-sm text-slate-600">
   Scores are indicative. We combine yield, ROI, area demand and risk to form the overall AI score.
 </p>
-<button
-  className="mt-2 inline-flex items-center gap-1 text-sm underline text-gray-600"
-  aria-label="Learn more about how the AI score is calculated"
-  onClick={() => alert('Coming soon: detailed score methodology')}
->
-  ❓ What do these scores mean?
-</button>
-            </div>
-          </details>
-        </section>
+
+{/* AI Deal Score — always visible */}
+<section className="section-box">
+  <h3 className="text-lg font-semibold mb-3">
+    🧠 AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500 align-middle">beta</span>
+  </h3>
+
+  <AIScoreBars overall={aiOverall} items={aiItems} />
+
+  <p className="mt-2 text-sm text-slate-600">
+    Scores are indicative. We combine yield, ROI, area demand and risk to form the overall AI score.
+  </p>
+
+  <AIScoreInfo />
+</section>
 
         {/* Calculators */}
         <section className="section-box">
