@@ -1,84 +1,83 @@
-"use client";
+import React from "react";
 
-import { useEffect, useState } from "react";
-
-export type ScoreItem = {
-  key: string;
+interface ScoreItem {
   label: string;
-  value: number; // 0–100
-  hint?: string; // tooltip/help text
-};
+  value: number;
+  color?: string;
+  tooltip?: string;
+}
 
 export default function AIScoreBars({
   overall = 0,
   items = [],
   className = "",
+  showHeader = true, // NEW: lets you hide the header
 }: {
   overall?: number;
   items?: ScoreItem[];
   className?: string;
+  showHeader?: boolean;
 }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   return (
     <section
       className={`rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 ${className}`}
       aria-labelledby="ai-score-breakdown"
     >
-      <div className="mb-3 flex items-center justify-between">
-        <h3 id="ai-score-breakdown" className="text-lg font-semibold">
-          🤖 AI Deal Score — Breakdown
-        </h3>
-        <div
-          className="rounded-md border border-neutral-300 dark:border-neutral-700 px-2 py-1 text-sm"
-          title="Overall AI score (0–100)"
-          aria-label="Overall AI score"
-        >
-          Overall: <span className="font-semibold">{overall}</span>
+      {showHeader && (
+        <div className="mb-3 flex items-center justify-between">
+          <h3
+            id="ai-score-breakdown"
+            className="text-lg font-semibold"
+          >
+            🤖 AI Deal Score — Breakdown
+          </h3>
+          <div className="rounded-md border px-2 py-1 text-sm">
+            Overall: <span className="font-semibold">{overall}</span>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="space-y-3">
-        {items.map((it) => {
-          const width = mounted ? Math.max(0, Math.min(100, it.value)) : 0;
-          const color =
-            it.value >= 67 ? "bg-green-500"
-            : it.value >= 34 ? "bg-amber-500"
-            : "bg-red-500";
-
+      <div className="space-y-2 sm:space-y-3">
+        {items.map((it, idx) => {
+          const width = Math.min(100, Math.max(0, it.value));
+          const color = it.color || "bg-blue-500";
           return (
-            <div key={it.key}>
+            <div key={idx}>
               <div className="mb-1 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">{it.label}</span>
-                  {it.hint && (
+                <span className="text-sm font-medium">
+                  {it.label}
+                  {it.tooltip && (
                     <span
-                      className="cursor-help text-xs text-neutral-500"
-                      title={it.hint}
-                      aria-label={`${it.label} info`}
+                      className="ml-1 cursor-help text-xs text-gray-400"
+                      title={it.tooltip}
                     >
                       ⓘ
                     </span>
                   )}
-                </div>
-                <span className="text-xs text-neutral-500">{it.value}%</span>
+                </span>
+                <span className="text-sm">{width}%</span>
               </div>
 
-              <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-800">
+              {/* Updated bar track & fill */}
+              <div className="h-3 w-full overflow-hidden rounded-full border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800">
                 <div
                   className={`h-full ${color} transition-all duration-700 ease-out`}
                   style={{ width: `${width}%` }}
+                  role="progressbar"
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-valuenow={it.value}
-                  role="progressbar"
                 />
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Shortened disclaimer */}
+      <p className="mt-2 text-sm text-slate-600">
+        Indicative only — based on yield, ROI, area demand and risk.
+      </p>
     </section>
   );
 }
