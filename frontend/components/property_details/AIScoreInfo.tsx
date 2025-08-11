@@ -2,6 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 
+// Allow other components to open this modal programmatically
+export function triggerAIScoreInfo() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("open-aiscore-info"));
+  }
+}
+
 export default function AIScoreInfo({
   triggerClassName = "mt-2 inline-flex items-center gap-1 text-sm underline text-gray-600",
 }: { triggerClassName?: string }) {
@@ -9,6 +16,14 @@ export default function AIScoreInfo({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
 
+  // Open on global event
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    window.addEventListener("open-aiscore-info", handler);
+    return () => window.removeEventListener("open-aiscore-info", handler);
+  }, []);
+
+  // Esc to close
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -16,6 +31,7 @@ export default function AIScoreInfo({
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // Focus management
   useEffect(() => {
     if (open && dialogRef.current) {
       const el = dialogRef.current.querySelector<HTMLElement>('[data-autofocus="true"]');
@@ -27,12 +43,14 @@ export default function AIScoreInfo({
 
   return (
     <>
+      {/* Optional inline trigger (you can render or ignore this) */}
       <button
         ref={btnRef}
         className={triggerClassName}
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
         aria-expanded={open}
+        type="button"
       >
         ❓ What do these scores mean?
       </button>
@@ -70,8 +88,9 @@ export default function AIScoreInfo({
               </p>
             </div>
 
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-4 flex justify-end">
               <button
+                type="button"
                 data-autofocus="true"
                 className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-sm"
                 onClick={() => setOpen(false)}
