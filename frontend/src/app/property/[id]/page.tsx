@@ -185,11 +185,12 @@ export default function PropertyDetailsPage() {
             🧠 AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500 align-middle">beta</span>
           </h3>
 
-          <AIScoreBars overall={aiOverall} items={aiItems} />
-
-          <p className="mt-2 text-sm text-slate-600">
-            Scores are indicative. We combine yield, ROI, area demand and risk to form the overall AI score.
-          </p>
+          <AIScoreBars
+  overall={aiOverall}
+  items={aiItems}
+  showHeader={false} // hides the second header
+  className="mt-4"
+/>
 
           {/* Single shared modal lives here */}
           <AIScoreInfo />
