@@ -14,6 +14,9 @@ import MapSingle from '@details/MapSingle';
 import AIScoreBars from '@details/AIScoreBars';
 import AIScoreInfo, { triggerAIScoreInfo } from '@details/AIScoreInfo';
 import { Property } from '@/types';
+import InvestmentInsights from '@details/InvestmentInsights';
+import CompsMini from '@details/CompsMini';
+import ExportActions from '@details/ExportActions';
 
 export default function PropertyDetailsPage() {
   const params = useParams();
@@ -246,11 +249,27 @@ export default function PropertyDetailsPage() {
         </section>
 
         {/* Actions */}
-        <div className="grid grid-cols-1 gap-3 mt-4">
-          <button className="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded">💾 Save Deal</button>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded">📄 Download Deal Pack</button>
-          <button className="bg-yellow-500 hover:bg-yellow-600 text-white py-2 px-4 rounded">🔗 Copy to CRM</button>
-        </div>
+<ExportActions
+  className="mt-4"
+  onSave={() => alert("Saving to Supabase (coming next)…")}
+  onPdf={() => alert("Generating PDF v2 (coming next)…")}
+  onCrm={() => alert("Sending to CRM (Zapier/Airtable/Pipedrive)…")}
+/>
+
+        {/* AI Investment Insights */}
+<InvestmentInsights
+  className="mt-4"
+  price={property.price}
+  yield_percent={property.yield_percent}
+  roi_percent={property.roi_percent}
+  postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
+/>
+
+{/* Quick Comps */}
+<CompsMini
+  className="mt-4"
+  postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
+/>
 
         {/* Static Map — compact so it doesn’t dominate the sidebar */}
         {hasCoords ? (
