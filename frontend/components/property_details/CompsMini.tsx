@@ -10,26 +10,39 @@ export default function CompsMini({
 }: { postcode?: string; className?: string }) {
   const [sales, setSales] = useState<Comp[] | null>(null);
   const [rents, setRents] = useState<Comp[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    // Placeholder: when backend ready, call /comps/{postcode}
-    // For now we just mock a tiny list so UI is live.
-    if (!postcode) return;
-    setSales([
-      { address: "12 Sample Rd", price: 445000, date: "2024-11-18", type: "Terraced", distance_km: 0.4 },
-      { address: "8 Mason St", price: 462000, date: "2025-02-07", type: "Semi", distance_km: 0.7 },
-      { address: "21 Brook Ave", price: 439000, date: "2025-03-15", type: "Flat", distance_km: 0.9 },
-    ]);
-    setRents([
-      { address: "42 King Way", price: 1450, date: "2025-06-01", type: "2‑bed", distance_km: 0.6 },
-      { address: "18 Vale Cl", price: 1525, date: "2025-05-12", type: "2‑bed", distance_km: 0.8 },
-      { address: "1 Park Ct", price: 1400, date: "2025-04-20", type: "2‑bed", distance_km: 0.5 },
-    ]);
+    const pc = (postcode ?? "").trim();
+    if (!pc) { setSales(null); setRents(null); return; }
+
+    let cancelled = false;
+    setLoading(true);
+    setErr(null);
+
+    fetch(`/api/comps/${encodeURIComponent(pc)}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then(j => {
+        if (cancelled) return;
+        setSales(j?.sales ?? null);
+        setRents(j?.rents ?? null);
+      })
+      .catch(e => {
+        console.error("CompsMini fetch error", e);
+        if (!cancelled) setErr("Could not load comps");
+      })
+      .finally(() => !cancelled && setLoading(false));
+
+    return () => { cancelled = true; };
   }, [postcode]);
 
   return (
     <section className={`rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 ${className}`}>
       <h3 className="text-lg font-semibold mb-3">📈 Nearby Comps (beta)</h3>
+
+      {loading && <p className="text-sm text-neutral-500 mb-2">Fetching comps…</p>}
+      {err && <p className="text-sm text-red-600 mb-2">{err}</p>}
 
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
@@ -41,7 +54,7 @@ export default function CompsMini({
                 <span>£{c.price.toLocaleString()}</span>
               </li>
             ))}
-            {!sales && <li className="text-neutral-500 text-sm">Add postcode to load sales.</li>}
+            {!sales && !loading && <li className="text-neutral-500 text-sm">Add postcode to load sales.</li>}
           </ul>
         </div>
 
@@ -54,7 +67,7 @@ export default function CompsMini({
                 <span>£{c.price.toLocaleString()}</span>
               </li>
             ))}
-            {!rents && <li className="text-neutral-500 text-sm">Add postcode to load rents.</li>}
+            {!rents && !loading && <li className="text-neutral-500 text-sm">Add postcode to load rents.</li>}
           </ul>
         </div>
       </div>
