@@ -19,7 +19,8 @@
     "react-dom": "^18.2.0",
     "react-icons": "^4.12.0",
     "react-leaflet": "^4.2.1",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "pdf-lib": "^1.17.1"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.20",
