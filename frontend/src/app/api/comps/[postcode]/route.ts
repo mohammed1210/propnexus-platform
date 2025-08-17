@@ -2,17 +2,13 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { postcode: string } }
-) {
-  const postcode = params?.postcode;
+export async function GET(_req: Request, ctx: any) {
+  const postcode = ctx?.params?.postcode as string | undefined;
 
   if (!postcode) {
     return NextResponse.json({ error: 'Missing postcode' }, { status: 400 });
   }
 
-  // Prefer public API URL; fall back to backend URL
   const BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
 
   try {
@@ -28,12 +24,7 @@ export async function GET(
 
     // Fallback payload so builds still succeed without a backend
     return NextResponse.json(
-      {
-        postcode,
-        sales: [],
-        rents: [],
-        note: 'Demo data — backend URL not configured',
-      },
+      { postcode, sales: [], rents: [], note: 'Demo data — backend URL not configured' },
       { status: 200 }
     );
   } catch (err: any) {
