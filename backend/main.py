@@ -11,7 +11,9 @@ from routes.notes import router as notes_router
 from routes import gpt_routes
 from routes.ai_routes import router as ai_routes
 from routes import area_routes
-from routes import comps_routes  # <-- provides comps_routes.router
+from routes import comps_routes
+from scraper.zoopla_scraper import scrape_zoopla_properties
+from scraper.rightmove_scraper import scrape_rightmove_properties
 
 # ===============================
 # Env & Supabase client
@@ -49,9 +51,9 @@ app.add_middleware(
 app.include_router(save_deal_router)
 app.include_router(notes_router)
 app.include_router(gpt_routes.router)
-app.include_router(ai_routes)             # ai routes module exposes a router
+app.include_router(ai_routes)
 app.include_router(area_routes.router)
-app.include_router(comps_routes.router)   # <-- FIXED: closing parenthesis
+app.include_router(comps_routes.router)
 
 # ===============================
 # Health
@@ -98,3 +100,22 @@ async def get_property_by_id_alias(property_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ===============================
+# Scraper endpoints
+# ===============================
+@app.post("/scrape-zoopla")
+async def scrape_zoopla():
+    data = await scrape_zoopla_properties()
+    return {
+        "status": f"Zoopla scrape completed and {len(data)} properties fetched",
+        "data": data,
+    }
+
+@app.post("/scrape-rightmove")
+async def scrape_rightmove():
+    data = await scrape_rightmove_properties()
+    return {
+        "status": f"Rightmove scrape completed and {len(data)} properties fetched",
+        "data": data,
+    }
