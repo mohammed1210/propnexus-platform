@@ -1,10 +1,10 @@
 'use client';
-import React from 'react';
+import React, { ReactNode } from 'react';
 
 type Props = React.HTMLAttributes<HTMLDivElement> & {
-  title?: React.ReactNode;
-  subtitle?: React.ReactNode;
-  dense?: boolean;     // tighter padding when true
+  title?: ReactNode;        // ✅ allows JSX, not just string
+  subtitle?: ReactNode;
+  dense?: boolean;
 };
 
 export default function Section({ title, subtitle, dense, className = '', children, ...rest }: Props) {
