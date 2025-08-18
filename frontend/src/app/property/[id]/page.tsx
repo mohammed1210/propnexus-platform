@@ -14,7 +14,6 @@ import MapSingle from '@details/MapSingle';
 import AIScoreBars from '@details/AIScoreBars';
 import AIScoreInfo, { triggerAIScoreInfo } from '@details/AIScoreInfo';
 import InvestmentInsights from '@details/InvestmentInsights';
-import CompsMini from '@details/CompsMini';
 import ExportActions from '@details/ExportActions';
 
 import { Property } from '@/types';
@@ -332,18 +331,12 @@ export default function PropertyDetailsPage() {
           onCrm={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
         />
 
-        {/* AI Investment Insights */}
+        {/* AI Investment Insights (now the single source of comps) */}
         <InvestmentInsights
           className="mt-4"
           price={property.price}
           yield_percent={property.yield_percent}
           roi_percent={property.roi_percent}
-          postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
-        />
-
-        {/* Quick Comps */}
-        <CompsMini
-          className="mt-4"
           postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
         />
 
