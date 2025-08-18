@@ -284,18 +284,21 @@ export default function PropertyDetailsPage() {
           </Section>
 
           {/* Exit Strategy */}
-          <Section title={<><span className="mr-1">💼</span>Exit Strategy Suggestions</>} subtitle="Use AI to suggest smart exit plans tailored to this property.">
-            <ExitStrategyGenerator
-              title={property.title}
-              location={property.location}
-              price={property.price}
-              yield_percent={property.yield_percent}
-              roi_percent={property.roi_percent}
-              propertyType={property.propertyType}
-              investmentType={property.investmentType}
-              description={property.description}
-            />
-          </Section>
+<Section title="💼 Exit Strategy Suggestions" className="mb-6">
+  <p className="text-slate-600 mb-3">
+    Use AI to suggest smart exit plans tailored to this property.
+  </p>
+  <ExitStrategyGenerator
+    title={property.title}
+    location={property.location}
+    price={property.price}
+    yield_percent={property.yield_percent}
+    roi_percent={property.roi_percent}
+    propertyType={property.propertyType}
+    investmentType={property.investmentType}
+    description={property.description}
+  />
+</Section>
 
           {/* AI Deal Score */}
           <Section id="ai-score-section" title={<>🧠 AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500 align-middle">beta</span></>}>
