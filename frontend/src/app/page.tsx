@@ -25,6 +25,7 @@ export default function PropertiesPage() {
   // ===== UI state =====
   const [showMap, setShowMap] = useState(true);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [scraping, setScraping] = useState<'rightmove' | 'zoopla' | null>(null);
 
   // Prefer env over hardcoded URL
   const BACKEND_BASE =
@@ -67,29 +68,24 @@ export default function PropertiesPage() {
     };
   }, [BACKEND_BASE]);
 
-  // Derived filtered list (no extra setState loop)
+  // Derived filtered list
   const filteredProperties = useMemo(() => {
     const q = searchLocation.trim().toLowerCase();
 
     return properties.filter((p) => {
       const price = p.price ?? 0;
       const matchesPrice = price >= minPrice && price <= maxPrice;
-
       const matchesLocation = q ? (p.location ?? '').toLowerCase().includes(q) : true;
-
       const matchesBedrooms =
         bedrooms === 'Any' ? true : Number(p.bedrooms) === Number(bedrooms);
-
       const matchesPropertyType =
         propertyType === 'All'
           ? true
           : (p.propertyType ?? '').toLowerCase() === propertyType.toLowerCase();
-
       const matchesInvestmentType =
         investmentType === 'All'
           ? true
           : (p.investmentType ?? '').toLowerCase() === investmentType.toLowerCase();
-
       const matchesYield = (p.yield_percent ?? 0) >= minYield;
       const matchesROI = (p.roi_percent ?? 0) >= minROI;
 
@@ -114,6 +110,25 @@ export default function PropertiesPage() {
     minYield,
     minROI,
   ]);
+
+  // ===== Scraper action =====
+  async function runScraper(type: 'rightmove' | 'zoopla') {
+    try {
+      setScraping(type);
+      const res = await fetch(`${BACKEND_BASE}/scrape-${type}`, { method: 'POST' });
+      const data = await res.json();
+      alert(
+        `✅ ${type.charAt(0).toUpperCase() + type.slice(1)} scrape done: ${
+          data.data?.length || 0
+        } properties fetched`
+      );
+    } catch (err) {
+      console.error(`${type} scrape failed:`, err);
+      alert(`❌ ${type} scrape failed. Check console/logs.`);
+    } finally {
+      setScraping(null);
+    }
+  }
 
   return (
     <div className="main-wrapper">
@@ -177,36 +192,40 @@ export default function PropertiesPage() {
       >
         <button
           className="small-button"
-          onClick={async () => {
-            try {
-              const res = await fetch(`${BACKEND_BASE}/scrape-rightmove`, { method: 'POST' });
-              const data = await res.json();
-              alert(`✅ Rightmove scrape done: ${data.data?.length || 0} properties fetched`);
-            } catch (err) {
-              console.error('Rightmove scrape failed:', err);
-              alert('❌ Rightmove scrape failed. Check console/logs.');
-            }
-          }}
+          disabled={!!scraping}
+          onClick={() => runScraper('rightmove')}
         >
-          🔄 Scrape Rightmove
+          {scraping === 'rightmove' ? '⏳ Scraping Rightmove…' : '🔄 Scrape Rightmove'}
         </button>
 
         <button
           className="small-button"
-          onClick={async () => {
-            try {
-              const res = await fetch(`${BACKEND_BASE}/scrape-zoopla`, { method: 'POST' });
-              const data = await res.json();
-              alert(`✅ Zoopla scrape done: ${data.data?.length || 0} properties fetched`);
-            } catch (err) {
-              console.error('Zoopla scrape failed:', err);
-              alert('❌ Zoopla scrape failed. Check console/logs.');
-            }
-          }}
+          disabled={!!scraping}
+          onClick={() => runScraper('zoopla')}
         >
-          🔄 Scrape Zoopla
+          {scraping === 'zoopla' ? '⏳ Scraping Zoopla…' : '🔄 Scrape Zoopla'}
         </button>
       </div>
+
+      {/* ===== Fullscreen overlay when scraping ===== */}
+      {scraping && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            fontSize: '1.5rem',
+            fontWeight: 'bold',
+          }}
+        >
+          {scraping === 'rightmove' ? 'Scraping Rightmove…' : 'Scraping Zoopla…'}
+        </div>
+      )}
 
       {/* ===== Advanced filters ===== */}
       {showMoreFilters && (
