@@ -14,8 +14,7 @@ import MapSingle from '@details/MapSingle';
 import AIScoreBars from '@details/AIScoreBars';
 import AIScoreInfo, { triggerAIScoreInfo } from '@details/AIScoreInfo';
 import InvestmentInsights from '@details/InvestmentInsights';
-// (CompsMini removed)
-import ExportActions from '@details/ExportActions';
+// ExportActions removed (we render native buttons in the header)
 
 import { Property } from '@/types';
 
@@ -227,6 +226,7 @@ export default function PropertyDetailsPage() {
           <h1 className="text-2xl font-bold mb-1">{property.title}</h1>
           <p className="text-gray-500">{property.location}</p>
 
+          {/* Actions row */}
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
@@ -273,7 +273,7 @@ export default function PropertyDetailsPage() {
           </button>
         </section>
 
-        {/* Exit Strategy (single block) */}
+        {/* Exit Strategy */}
         <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <details open>
             <summary className="cursor-pointer select-none text-lg font-semibold mb-2 list-none">
@@ -293,8 +293,11 @@ export default function PropertyDetailsPage() {
           </details>
         </section>
 
-        {/* AI Deal Score — always visible */}
-        <section id="ai-score-section" className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+        {/* AI Deal Score */}
+        <section
+          id="ai-score-section"
+          className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6"
+        >
           <h3 className="text-lg font-semibold mb-3">
             🧠 AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500 align-middle">beta</span>
           </h3>
@@ -336,8 +339,7 @@ export default function PropertyDetailsPage() {
         <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <h3 className="text-lg font-semibold mb-2">📊 Deal Summary</h3>
           <p>
-            <strong>Price:</strong>{' '}
-            £{typeof property.price === 'number' ? property.price.toLocaleString() : 'N/A'}
+            <strong>Price:</strong> £{typeof property.price === 'number' ? property.price.toLocaleString() : 'N/A'}
           </p>
           <p><strong>Yield:</strong> {property.yield_percent ?? 'N/A'}%</p>
           <p><strong>ROI:</strong> {property.roi_percent ?? 'N/A'}%</p>
@@ -346,16 +348,7 @@ export default function PropertyDetailsPage() {
           <p><strong>Source:</strong> {property.source || 'N/A'}</p>
         </section>
 
-        {/* Actions (kept here too via component if you want quick access) */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
-          <ExportActions
-            onSave={handleSaveDeal}
-            onPdf={handleDownloadPdf}
-            onCrm={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
-          />
-        </section>
-
-        {/* AI Investment Insights (single source of insights, no comps sub-block) */}
+        {/* AI Investment Insights */}
         <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <InvestmentInsights
             price={property.price}
