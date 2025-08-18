@@ -1,55 +1,80 @@
 'use client';
 
-/* ──────────────────────────────────────────────────────────────────
-   Property Details Page
-   - Fetches a single property
-   - Renders left content (summary, calculators, area intel, notes)
-   - Renders right rail (deal summary, actions, insights, map)
-   - Uses shared <Button> component for consistent actions
-   ────────────────────────────────────────────────────────────────── */
+/* =========================================================
+   Property details page (polished)
+   - Two-column layout (sticky right sidebar on desktop)
+   - Consistent card styling & section spacing
+   - Action buttons in header + compact mobile action bar
+   ========================================================= */
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 
-/* Components (left content) */
+import Button from '@/components/ui/Button';
+
+import AIChatbot from '@details/AIChatbot';
 import InvestmentSummary from '@details/InvestmentSummary';
 import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
 import MortgageCalculator from '@details/MortgageCalculator';
 import StampDutyCalculator from '@details/StampDutyCalculator';
-import AreaIntel from '@details/AreaIntel';
 import NotesFields from '@details/NotesFields';
+import AreaIntel from '@details/AreaIntel';
+import MapSingle from '@details/MapSingle';
 import AIScoreBars from '@details/AIScoreBars';
 import AIScoreInfo, { triggerAIScoreInfo } from '@details/AIScoreInfo';
-
-/* Right rail */
 import InvestmentInsights from '@details/InvestmentInsights';
-import ExportActions from '@details/ExportActions';
-import MapSingle from '@details/MapSingle';
 
-/* Floating assistant */
-import AIChatbot from '@details/AIChatbot';
+import type { Property } from '@/types';
 
-/* UI primitives */
-import Button from '@/components/ui/Button';
+/* ---------- Convenience UI wrappers ---------- */
 
-/* Types */
-import { Property } from '@/types';
+function SectionCard(props: React.PropsWithChildren<{ className?: string; id?: string; title?: string; icon?: string }>) {
+  const { className = '', id, title, icon, children } = props;
+  return (
+    <section
+      id={id}
+      className={[
+        'rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900',
+        'p-4 md:p-5 shadow-sm',
+        className,
+      ].join(' ')}
+    >
+      {title ? (
+        <h3 className="text-lg font-semibold mb-3">
+          {icon ? <span className="inline-block mr-2">{icon}</span> : null}
+          {title}
+        </h3>
+      ) : null}
+      {children}
+    </section>
+  );
+}
 
-/* ──────────────────────────────────────────────────────────────────
+function KeyRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3 text-sm py-1">
+      <span className="text-slate-600">{label}</span>
+      <span className="font-medium">{value}</span>
+    </div>
+  );
+}
+
+/* =========================================================
    Component
-   ────────────────────────────────────────────────────────────────── */
+   ========================================================= */
+
 export default function PropertyDetailsPage() {
-  /* ── Routing / env ─────────────────────────────────────────────── */
+  // ----- Routing & env
   const params = useParams();
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string | undefined);
   const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
 
-  /* ── State ─────────────────────────────────────────────────────── */
+  // ----- State
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  /* ── Data fetch ────────────────────────────────────────────────── */
+  // ----- Fetch property
   useEffect(() => {
     if (!id) return;
 
@@ -63,7 +88,6 @@ export default function PropertyDetailsPage() {
 
         const res = await fetch(url, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
         const raw = await res.json();
 
         const p: Property = {
@@ -89,13 +113,13 @@ export default function PropertyDetailsPage() {
     fetchProperty();
   }, [id, BACKEND_BASE]);
 
-  /* ── Derived ───────────────────────────────────────────────────── */
+  // ----- Derived
   const hasCoords = useMemo(
     () => Boolean(property?.latitude != null && property?.longitude != null),
     [property?.latitude, property?.longitude]
   );
 
-  // Temporary AI score model (until backend scoring is wired)
+  // AI score (still demo until backend scoring is wired)
   const aiOverall: number =
     typeof (property as any)?.ai_score === 'number'
       ? (property as any).ai_score
@@ -103,44 +127,30 @@ export default function PropertyDetailsPage() {
           [
             Math.min(100, Math.max(0, Math.round((property?.yield_percent ?? 0) * 10))),
             Math.min(100, Math.max(0, Math.round((property?.roi_percent ?? 0) * 5))),
-            68, // area demand (illustrative)
-            60, // risk adjusted (illustrative)
+            68,
+            60,
           ].reduce((a, b) => a + b, 0) / 4
         );
 
   const aiItems = [
-    {
-      key: 'yield',
-      label: 'Yield Strength',
-      value: Math.min(100, Math.max(0, Math.round((property?.yield_percent ?? 0) * 10))),
-      hint: 'Estimated gross yield vs local averages.',
-    },
-    {
-      key: 'roi',
-      label: 'ROI Potential',
-      value: Math.min(100, Math.max(0, Math.round((property?.roi_percent ?? 0) * 5))),
-      hint: 'Projected ROI given refurb & exit assumptions.',
-    },
-    { key: 'demand', label: 'Area Demand', value: 68, hint: 'Rental demand & turnover (illustrative).' },
+    { key: 'yield', label: 'Yield Strength', value: Math.min(100, Math.max(0, Math.round((property?.yield_percent ?? 0) * 10))), hint: 'Estimated gross yield vs local averages.' },
+    { key: 'roi', label: 'ROI Potential', value: Math.min(100, Math.max(0, Math.round((property?.roi_percent ?? 0) * 5))), hint: 'Projected ROI given refurb & exit assumptions.' },
+    { key: 'demand', label: 'Area Demand', value: 68, hint: 'Rental demand and stock turnover (illustrative).' },
     { key: 'risk', label: 'Risk Adjusted', value: 60, hint: 'Lower risk → higher score (illustrative).' },
   ];
 
+  // Postcode
   const postcode: string | undefined =
     (property as any)?.postcode ??
     (property as any)?.post_code ??
     (property as any)?.postal_code ??
     undefined;
 
-  /* ── Actions ───────────────────────────────────────────────────── */
+  // ----- Actions
   async function handleSaveDeal() {
     try {
       if (!property || !id) return;
-
-      const pc =
-        (property as any)?.postcode ??
-        (property as any)?.post_code ??
-        (property as any)?.postal_code ??
-        null;
+      const pc = postcode ?? null;
 
       const res = await fetch('/api/save-deal', {
         method: 'POST',
@@ -170,12 +180,7 @@ export default function PropertyDetailsPage() {
   async function handleDownloadPdf() {
     try {
       if (!property) return;
-
-      const pc =
-        (property as any)?.postcode ??
-        (property as any)?.post_code ??
-        (property as any)?.postal_code ??
-        null;
+      const pc = postcode ?? null;
 
       const res = await fetch('/api/deal-pack', {
         method: 'POST',
@@ -214,7 +219,8 @@ export default function PropertyDetailsPage() {
     }
   }
 
-  /* ── Loading / Error ───────────────────────────────────────────── */
+  /* ---------- Loading / Error states ---------- */
+
   if (loading) {
     return (
       <div className="px-4 md:px-12 py-6" aria-busy="true" aria-live="polite">
@@ -237,29 +243,40 @@ export default function PropertyDetailsPage() {
     );
   }
 
-  /* ── View ──────────────────────────────────────────────────────── */
+  /* ---------- Page layout ---------- */
+
   return (
     <div className="flex flex-col md:flex-row px-4 md:px-12 py-6 gap-6">
-      {/* ───────────────────── Left Column ───────────────────── */}
+      {/* ===== Left column ===== */}
       <main className="md:w-2/3 md:pr-2">
         {/* Header */}
-        <header className="mb-3">
-          <h1 className="text-2xl font-bold mb-1">{property.title}</h1>
-          <p className="text-gray-500">{property.location}</p>
+        <header className="mb-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold leading-tight">{property.title}</h1>
+              <p className="text-gray-500">{property.location}</p>
+              {postcode ? <p className="text-gray-400 text-sm mt-0.5">{postcode}</p> : null}
+            </div>
+            {/* Price top-right on wide screens */}
+            <div className="hidden md:block text-right">
+              <div className="text-sm text-slate-500">Price</div>
+              <div className="text-2xl font-semibold">£{(property.price ?? 0).toLocaleString()}</div>
+            </div>
+          </div>
 
-          {/* Actions */}
+          {/* Action buttons */}
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onClick={handleSaveDeal} leadingIcon={<span>💾</span>}>
+            <Button onClick={handleSaveDeal} variant="primary" size="md" leadingIcon="💾">
               Save Deal
             </Button>
-            <Button variant="secondary" size="sm" onClick={handleDownloadPdf} leadingIcon={<span>🗂️</span>}>
+            <Button onClick={handleDownloadPdf} variant="secondary" size="md" leadingIcon="📑">
               Deal Pack (v2)
             </Button>
             <Button
-              variant="ghost"
-              size="sm"
               onClick={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
-              leadingIcon={<span>🔗</span>}
+              variant="ghost"
+              size="md"
+              leadingIcon="🔗"
             >
               Export to CRM
             </Button>
@@ -270,13 +287,13 @@ export default function PropertyDetailsPage() {
         <img
           src={property.imageurl || '/placeholder.jpg'}
           alt={property.title}
-          className="w-full aspect-video object-cover rounded-lg mb-4"
+          className="w-full aspect-video object-cover rounded-lg mb-5"
           loading="eager"
           onError={(e) => ((e.target as HTMLImageElement).src = '/placeholder.jpg')}
         />
 
         {/* Investment Summary */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+        <SectionCard title="Investment Summary" icon="🧾">
           <InvestmentSummary property={property} />
           <button
             type="button"
@@ -286,52 +303,45 @@ export default function PropertyDetailsPage() {
               triggerAIScoreInfo();
             }}
           >
-            ❓ What do these scores mean?
+            What do these scores mean?
           </button>
-        </section>
+        </SectionCard>
 
         {/* Exit Strategy */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
-          <details open>
-            <summary className="cursor-pointer select-none text-lg font-semibold mb-2 list-none">
-              <span className="inline-block align-middle mr-1">💼</span> Exit Strategy Suggestions
-            </summary>
-            <p className="text-slate-600 mb-3">Use AI to suggest smart exit plans tailored to this property.</p>
-            <ExitStrategyGenerator
-              title={property.title}
-              location={property.location}
-              price={property.price}
-              yield_percent={property.yield_percent}
-              roi_percent={property.roi_percent}
-              propertyType={property.propertyType}
-              investmentType={property.investmentType}
-              description={property.description}
-            />
-          </details>
-        </section>
+        <SectionCard title="Exit Strategy Suggestions" icon="💼" className="mt-6">
+          <p className="text-slate-600 mb-3">Use AI to suggest smart exit plans tailored to this property.</p>
+          <ExitStrategyGenerator
+            title={property.title}
+            location={property.location}
+            price={property.price}
+            yield_percent={property.yield_percent}
+            roi_percent={property.roi_percent}
+            propertyType={property.propertyType}
+            investmentType={property.investmentType}
+            description={property.description}
+          />
+        </SectionCard>
 
         {/* AI Deal Score */}
-        <section
-          id="ai-score-section"
-          className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6"
-        >
-          <h3 className="text-lg font-semibold mb-3">
-            🧠 AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500 align-middle">beta</span>
-          </h3>
-          <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-4" />
+        <SectionCard id="ai-score-section" title="AI Deal Score" icon="🧠" className="mt-6">
+          <div className="mb-2">
+            <span className="ml-1 text-xs font-medium text-slate-500 align-middle">beta</span>
+          </div>
+          <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-1" />
           <AIScoreInfo />
-        </section>
+        </SectionCard>
 
         {/* Calculators */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+        <SectionCard title="Mortgage & BRRR Calculator" icon="🏦" className="mt-6">
           <MortgageCalculator price={property.price} />
-        </section>
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+        </SectionCard>
+
+        <SectionCard title="Stamp Duty Calculator" icon="🧮" className="mt-6">
           <StampDutyCalculator price={property.price} />
-        </section>
+        </SectionCard>
 
         {/* Area Intelligence */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+        <SectionCard title="Area Intelligence" icon="📍" className="mt-6">
           <AreaIntel
             locationLabel={property?.location}
             postcode={postcode}
@@ -343,62 +353,70 @@ export default function PropertyDetailsPage() {
               transportSummary: (property as any)?.transport_summary,
             }}
           />
-        </section>
+        </SectionCard>
 
-        {/* Investor Notes */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm">
+        {/* Notes */}
+        <SectionCard title="Investor Notes" icon="📝" className="mt-6">
           <NotesFields propertyId={id ?? ''} />
-        </section>
+        </SectionCard>
       </main>
 
-      {/* ───────────────────── Right Column ───────────────────── */}
+      {/* ===== Right column (sticky) ===== */}
       <aside className="md:w-1/3 md:pl-2 md:sticky md:top-4 self-start">
-        {/* Summary */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
-          <h3 className="text-lg font-semibold mb-2">📊 Deal Summary</h3>
-          <p>
-            <strong>Price:</strong> £{typeof property.price === 'number' ? property.price.toLocaleString() : 'N/A'}
-          </p>
-          <p><strong>Yield:</strong> {property.yield_percent ?? 'N/A'}%</p>
-          <p><strong>ROI:</strong> {property.roi_percent ?? 'N/A'}%</p>
-          <p><strong>Property Type:</strong> {property.propertyType || 'N/A'}</p>
-          <p><strong>Investment Type:</strong> {property.investmentType || 'N/A'}</p>
-          <p><strong>Source:</strong> {property.source || 'N/A'}</p>
-        </section>
+        {/* Deal Summary */}
+        <SectionCard title="Deal Summary" icon="📊">
+          <KeyRow label="Price" value={`£${(property.price ?? 0).toLocaleString()}`} />
+          <KeyRow label="Yield" value={`${property.yield_percent ?? 'N/A'}%`} />
+          <KeyRow label="ROI" value={`${property.roi_percent ?? 'N/A'}%`} />
+          <KeyRow label="Property Type" value={property.propertyType || 'N/A'} />
+          <KeyRow label="Investment Type" value={property.investmentType || 'N/A'} />
+          <KeyRow label="Source" value={property.source || 'N/A'} />
+        </SectionCard>
 
-        {/* Consolidated actions (kept for quick access) */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
-          <ExportActions
-            onSave={handleSaveDeal}
-            onPdf={handleDownloadPdf}
-            onCrm={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
-          />
-        </section>
-
-        {/* Investment Insights (incl. Nearby Comps + optional AI breakdown) */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+        {/* Insights card */}
+        <SectionCard title="Investment Insights" icon="💡" className="mt-6">
           <InvestmentInsights
             price={property.price}
             yield_percent={property.yield_percent}
             roi_percent={property.roi_percent}
-            postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
+            postcode={postcode}
             aiOverall={aiOverall}
             aiItems={aiItems}
           />
-        </section>
+        </SectionCard>
 
-        {/* Static Map */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm">
+        {/* Map */}
+        <SectionCard title="Location" icon="🗺️" className="mt-6">
           {hasCoords ? (
             <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
           ) : (
             <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
           )}
-        </section>
+        </SectionCard>
       </aside>
 
       {/* Floating AI Assistant */}
       <AIChatbot property={property} />
+
+      {/* Mobile action bar */}
+      <div className="fixed md:hidden bottom-3 left-0 right-0 px-3">
+        <div className="mx-auto max-w-[720px] bg-white/90 dark:bg-neutral-900/90 backdrop-blur rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-lg p-2 flex items-center justify-between gap-2">
+          <Button onClick={handleSaveDeal} variant="primary" size="sm" leadingIcon="💾">
+            Save
+          </Button>
+          <Button onClick={handleDownloadPdf} variant="secondary" size="sm" leadingIcon="📑">
+            Deal Pack
+          </Button>
+          <Button
+            onClick={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
+            variant="ghost"
+            size="sm"
+            leadingIcon="🔗"
+          >
+            Export
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
