@@ -42,33 +42,29 @@ export default function PropertiesPage() {
     return () => window.removeEventListener('resize', apply);
   }, []);
 
-  // Fetch listings
+  // ===== Fetch listings =====
+  async function fetchProperties() {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(`${BACKEND_BASE}/properties`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setProperties(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      console.error('Error fetching properties:', e);
+      setError('Could not load properties. Please try again.');
+      setProperties([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(`${BACKEND_BASE}/properties`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (!active) return;
-        setProperties(Array.isArray(data) ? data : []);
-      } catch (e: any) {
-        if (!active) return;
-        console.error('Error fetching properties:', e);
-        setError('Could not load properties. Please try again.');
-        setProperties([]);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
+    fetchProperties();
   }, [BACKEND_BASE]);
 
-  // Derived filtered list
+  // ===== Derived filtered list =====
   const filteredProperties = useMemo(() => {
     const q = searchLocation.trim().toLowerCase();
 
@@ -117,16 +113,20 @@ export default function PropertiesPage() {
       setScraping(type);
       const res = await fetch(`${BACKEND_BASE}/scrape-${type}`, { method: 'POST' });
       const data = await res.json();
+
       alert(
         `✅ ${type.charAt(0).toUpperCase() + type.slice(1)} scrape done: ${
           data.data?.length || 0
         } properties fetched`
       );
+
+      // Refresh property list after scrape
+      await fetchProperties();
     } catch (err) {
       console.error(`${type} scrape failed:`, err);
       alert(`❌ ${type} scrape failed. Check console/logs.`);
     } finally {
-      setScraping(null);
+      setScraping(null); // close overlay
     }
   }
 
