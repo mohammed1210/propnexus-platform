@@ -2,12 +2,19 @@
 import React, { ReactNode } from 'react';
 
 type Props = React.HTMLAttributes<HTMLDivElement> & {
-  title?: ReactNode;        // ✅ allows JSX, not just string
-  subtitle?: ReactNode;
+  title?: ReactNode;      // ✅ allow JSX, not just string
+  subtitle?: ReactNode;   // ✅ allow JSX, not just string
   dense?: boolean;
 };
 
-export default function Section({ title, subtitle, dense, className = '', children, ...rest }: Props) {
+export default function Section({
+  title,
+  subtitle,
+  dense,
+  className = '',
+  children,
+  ...rest
+}: Props) {
   return (
     <section
       className={[
