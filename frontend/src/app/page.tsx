@@ -7,6 +7,27 @@ import { Property } from '../types';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
+// ===== Toast Component =====
+function Toast({ message, type }: { message: string; type: 'success' | 'error' }) {
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: '20px',
+        right: '20px',
+        backgroundColor: type === 'success' ? '#16a34a' : '#dc2626',
+        color: 'white',
+        padding: '10px 16px',
+        borderRadius: '6px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+        zIndex: 1000,
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
 export default function PropertiesPage() {
   // ===== Data =====
   const [properties, setProperties] = useState<Property[]>([]);
@@ -25,7 +46,14 @@ export default function PropertiesPage() {
   // ===== UI state =====
   const [showMap, setShowMap] = useState(true);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
-  const [scraping, setScraping] = useState<'rightmove' | 'zoopla' | null>(null);
+
+  // ===== Toast state =====
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   // Prefer env over hardcoded URL
   const BACKEND_BASE =
@@ -42,46 +70,78 @@ export default function PropertiesPage() {
     return () => window.removeEventListener('resize', apply);
   }, []);
 
-  // ===== Fetch listings =====
-  async function fetchProperties() {
+  // Initial fetch of existing properties in DB
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await fetch(`${BACKEND_BASE}/properties`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!active) return;
+        setProperties(Array.isArray(data) ? data : []);
+      } catch (e: any) {
+        if (!active) return;
+        console.error('Error fetching properties:', e);
+        setError('Could not load properties. Please try again.');
+        setProperties([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [BACKEND_BASE]);
+
+  // Unified scrape + search
+  async function handleSearch() {
+    if (!searchLocation.trim()) {
+      showToast('⚠️ Enter a location first', 'error');
+      return;
+    }
     try {
-      setLoading(true);
-      setError(null);
-      const res = await fetch(`${BACKEND_BASE}/properties`);
+      showToast(`🔍 Scraping ${searchLocation}…`, 'success');
+      const res = await fetch(`${BACKEND_BASE}/scrape`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location: searchLocation }),
+      });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setProperties(Array.isArray(data) ? data : []);
-    } catch (e: any) {
-      console.error('Error fetching properties:', e);
-      setError('Could not load properties. Please try again.');
-      setProperties([]);
-    } finally {
-      setLoading(false);
+      setProperties(data.properties || []);
+      showToast(`✅ Found ${data.count} properties in ${searchLocation}`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('❌ Scrape failed. Please try again.', 'error');
     }
   }
 
-  useEffect(() => {
-    fetchProperties();
-  }, [BACKEND_BASE]);
-
-  // ===== Derived filtered list =====
+  // Derived filtered list (no extra setState loop)
   const filteredProperties = useMemo(() => {
     const q = searchLocation.trim().toLowerCase();
 
     return properties.filter((p) => {
       const price = p.price ?? 0;
       const matchesPrice = price >= minPrice && price <= maxPrice;
+
       const matchesLocation = q ? (p.location ?? '').toLowerCase().includes(q) : true;
+
       const matchesBedrooms =
         bedrooms === 'Any' ? true : Number(p.bedrooms) === Number(bedrooms);
+
       const matchesPropertyType =
         propertyType === 'All'
           ? true
           : (p.propertyType ?? '').toLowerCase() === propertyType.toLowerCase();
+
       const matchesInvestmentType =
         investmentType === 'All'
           ? true
           : (p.investmentType ?? '').toLowerCase() === investmentType.toLowerCase();
+
       const matchesYield = (p.yield_percent ?? 0) >= minYield;
       const matchesROI = (p.roi_percent ?? 0) >= minROI;
 
@@ -107,42 +167,23 @@ export default function PropertiesPage() {
     minROI,
   ]);
 
-  // ===== Scraper action =====
-  async function runScraper(type: 'rightmove' | 'zoopla') {
-    try {
-      setScraping(type);
-      const res = await fetch(`${BACKEND_BASE}/scrape-${type}`, { method: 'POST' });
-      const data = await res.json();
-
-      alert(
-        `✅ ${type.charAt(0).toUpperCase() + type.slice(1)} scrape done: ${
-          data.data?.length || 0
-        } properties fetched`
-      );
-
-      // Refresh property list after scrape
-      await fetchProperties();
-    } catch (err) {
-      console.error(`${type} scrape failed:`, err);
-      alert(`❌ ${type} scrape failed. Check console/logs.`);
-    } finally {
-      setScraping(null); // close overlay
-    }
-  }
-
   return (
     <div className="main-wrapper">
       {/* ===== Filters (sticky) ===== */}
       <div className="sticky-primary" role="region" aria-label="Filters">
         <input
           className="filter-input large"
-          style={{ flex: '0 1 48%' }}
+          style={{ flex: '0 1 40%' }}
           type="text"
           placeholder="🔎 Search location"
           value={searchLocation}
           onChange={(e) => setSearchLocation(e.target.value)}
           aria-label="Search location"
         />
+
+        <button onClick={handleSearch} className="small-button" title="Search properties">
+          🔍 Search
+        </button>
 
         <select
           className="filter-select small"
@@ -185,52 +226,73 @@ export default function PropertiesPage() {
         </button>
       </div>
 
-      {/* ===== Scraper controls ===== */}
-      <div
-        className="scraper-controls"
-        style={{ margin: '1rem 0', display: 'flex', gap: '0.5rem' }}
-      >
-        <button
-          className="small-button"
-          disabled={!!scraping}
-          onClick={() => runScraper('rightmove')}
-        >
-          {scraping === 'rightmove' ? '⏳ Scraping Rightmove…' : '🔄 Scrape Rightmove'}
-        </button>
-
-        <button
-          className="small-button"
-          disabled={!!scraping}
-          onClick={() => runScraper('zoopla')}
-        >
-          {scraping === 'zoopla' ? '⏳ Scraping Zoopla…' : '🔄 Scrape Zoopla'}
-        </button>
-      </div>
-
-      {/* ===== Fullscreen overlay when scraping ===== */}
-      {scraping && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.5)',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            fontSize: '1.5rem',
-            fontWeight: 'bold',
-          }}
-        >
-          {scraping === 'rightmove' ? 'Scraping Rightmove…' : 'Scraping Zoopla…'}
-        </div>
-      )}
-
       {/* ===== Advanced filters ===== */}
       {showMoreFilters && (
         <div className="filters-row" role="region" aria-label="Advanced filters">
-          {/* ... existing advanced filter inputs ... */}
+          <div>
+            <label htmlFor="minPrice">Min Price</label>
+            <input
+              id="minPrice"
+              type="number"
+              value={minPrice}
+              onChange={(e) => setMinPrice(Number(e.target.value))}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="maxPrice">Max Price</label>
+            <input
+              id="maxPrice"
+              type="number"
+              value={maxPrice}
+              onChange={(e) => setMaxPrice(Number(e.target.value))}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="beds">Bedrooms</label>
+            <select id="beds" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)}>
+              <option value="Any">Any Beds</option>
+              <option value="1">1 Bed</option>
+              <option value="2">2 Beds</option>
+              <option value="3">3 Beds</option>
+              <option value="4">4+ Beds</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="ptype">Property Type</label>
+            <select
+              id="ptype"
+              value={propertyType}
+              onChange={(e) => setPropertyType(e.target.value)}
+            >
+              <option value="All">All Types</option>
+              <option value="Flat">Flat</option>
+              <option value="House">House</option>
+              <option value="Studio">Studio</option>
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="minYield">Min Yield (%)</label>
+            <input
+              id="minYield"
+              type="number"
+              value={minYield}
+              onChange={(e) => setMinYield(Number(e.target.value))}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="minRoi">Min ROI (%)</label>
+            <input
+              id="minRoi"
+              type="number"
+              value={minROI}
+              onChange={(e) => setMinROI(Number(e.target.value))}
+            />
+          </div>
         </div>
       )}
 
@@ -264,6 +326,9 @@ export default function PropertiesPage() {
       >
         ⬆ Back to Top
       </button>
+
+      {/* Toast */}
+      {toast && <Toast message={toast.message} type={toast.type} />}
     </div>
   );
 }
