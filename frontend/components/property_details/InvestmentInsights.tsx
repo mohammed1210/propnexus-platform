@@ -20,27 +20,63 @@ export default function InvestmentInsights({
   yield_percent,
   roi_percent,
   postcode,
+  compsHref = '#comps', // link target for "View comps"
 }: {
   className?: string;
   price: number;
   yield_percent?: number;
   roi_percent?: number;
   postcode?: string;
+  compsHref?: string;
 }) {
   const [comps, setComps] = useState<CompsPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   // Debounce + abort setup for comps fetch
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<number | null>(null);
 
+  // shared fetcher so “Refresh” can reuse it
+  const fetchComps = async (pc: string, opts?: { signal?: AbortSignal }) => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const res = await fetch(`/api/comps/${encodeURIComponent(pc)}`, {
+        cache: 'no-store',
+        signal: opts?.signal,
+      });
+      if (!res.ok) {
+        setFetchError(`HTTP ${res.status}`);
+        setComps(null);
+        return;
+      }
+      const data: CompsPayload = await res.json();
+      if (data?.error) {
+        setFetchError(data.error);
+        setComps(null);
+        return;
+      }
+      setComps(data);
+      setLastUpdated(new Date());
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        setFetchError('Failed to load comps.');
+        setComps(null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // reset state when postcode is missing
+    // reset when no postcode
     if (!postcode) {
       setComps(null);
       setFetchError(null);
       setLoading(false);
+      setLastUpdated(null);
       return;
     }
 
@@ -51,44 +87,14 @@ export default function InvestmentInsights({
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
-
-      setLoading(true);
-      setFetchError(null);
-
-      try {
-        const res = await fetch(`/api/comps/${encodeURIComponent(postcode)}`, {
-          cache: 'no-store',
-          signal: ctrl.signal,
-        });
-
-        if (!res.ok) {
-          const msg = `HTTP ${res.status}`;
-          setFetchError(msg);
-          setComps(null);
-        } else {
-          const data: CompsPayload = await res.json();
-          if (data?.error) {
-            setFetchError(data.error);
-            setComps(null);
-          } else {
-            setComps(data);
-          }
-        }
-      } catch (err: any) {
-        if (err?.name !== 'AbortError') {
-          setFetchError('Failed to load comps.');
-          setComps(null);
-        }
-      } finally {
-        setLoading(false);
-      }
+      fetchComps(postcode, { signal: ctrl.signal });
     }, 350);
 
     return () => {
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
       abortRef.current?.abort();
     };
-  }, [postcode]);
+  }, [postcode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ===== Derived signals
   const avgRent = useMemo(() => {
@@ -162,29 +168,50 @@ export default function InvestmentInsights({
       </p>
 
       <div className="rounded-md border border-neutral-200 dark:border-neutral-800 p-3">
-        <div className="font-medium">📉 Nearby Comps (beta)</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="font-medium">📉 Nearby Comps</div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+              beta
+            </span>
+            <a
+              href={compsHref}
+              className="text-xs underline text-blue-600 hover:text-blue-700"
+            >
+              View comps
+            </a>
+          </div>
 
-        {/* State: no postcode */}
+          <button
+            type="button"
+            className="text-xs px-2 py-1 rounded border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+            onClick={() => postcode && fetchComps(postcode)}
+            disabled={!postcode || loading}
+            aria-disabled={!postcode || loading}
+            title="Refresh comps"
+          >
+            ↻ Refresh
+          </button>
+        </div>
+
+        {/* States */}
         {!postcode && (
-          <div className="text-sm text-neutral-500 mt-1">Add postcode to load sales & rents.</div>
+          <div className="text-sm text-neutral-500 mt-2">Add postcode to load sales & rents.</div>
         )}
 
-        {/* State: loading */}
         {postcode && loading && (
-          <div className="text-sm text-neutral-500 mt-1">
+          <div className="text-sm text-neutral-500 mt-2">
             <span className="inline-block h-3 w-24 bg-neutral-200 dark:bg-neutral-800 rounded animate-pulse mr-2" />
             Loading {postcode}…
           </div>
         )}
 
-        {/* State: error */}
         {postcode && !loading && fetchError && (
-          <div className="text-sm text-red-600 mt-1">Couldn’t load comps: {fetchError}</div>
+          <div className="text-sm text-red-600 mt-2">Couldn’t load comps: {fetchError}</div>
         )}
 
-        {/* State: data */}
         {postcode && !loading && !fetchError && (
-          <div className="text-sm mt-1">
+          <div className="text-sm mt-2">
             <div className="flex flex-wrap gap-4">
               <span>
                 Recent Sales: <strong>{salesCount}</strong>
@@ -202,10 +229,16 @@ export default function InvestmentInsights({
             {!salesCount && !rentsCount && (
               <div className="text-neutral-500 mt-1">No comps found for this postcode.</div>
             )}
+
+            {lastUpdated && (
+              <div className="text-[10px] text-neutral-500 mt-2">
+                Last updated {lastUpdated.toLocaleTimeString()}
+              </div>
+            )}
           </div>
         )}
 
-        <div className="text-xs text-neutral-500 mt-2">
+        <div className="text-xs text-neutral-500 mt-3">
           Live Land Registry & rent sources coming next.
         </div>
       </div>
