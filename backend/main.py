@@ -14,6 +14,7 @@ from routes import area_routes
 from routes import comps_routes
 from scraper.zoopla_scraper import scrape_zoopla_properties
 from scraper.rightmove_scraper import scrape_rightmove_properties
+from routes import scrape_routes
 
 # ===============================
 # Env & Supabase client
@@ -54,6 +55,7 @@ app.include_router(gpt_routes.router)
 app.include_router(ai_routes)
 app.include_router(area_routes.router)
 app.include_router(comps_routes.router)
+app.include_router(scrape_routes.router)
 
 # ===============================
 # Health
