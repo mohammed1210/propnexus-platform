@@ -20,7 +20,7 @@ export default function InvestmentInsights({
   yield_percent,
   roi_percent,
   postcode,
-  compsHref = '#comps', // link target for "View comps"
+  compsHref = '#comps',
 }: {
   className?: string;
   price: number;
@@ -33,12 +33,12 @@ export default function InvestmentInsights({
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [showExplain, setShowExplain] = useState(false);
 
-  // Debounce + abort setup for comps fetch
+  // === Debounced/abortable fetch for comps ===
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<number | null>(null);
 
-  // shared fetcher so “Refresh” can reuse it
   const fetchComps = async (pc: string, opts?: { signal?: AbortSignal }) => {
     setLoading(true);
     setFetchError(null);
@@ -71,7 +71,6 @@ export default function InvestmentInsights({
   };
 
   useEffect(() => {
-    // reset when no postcode
     if (!postcode) {
       setComps(null);
       setFetchError(null);
@@ -79,11 +78,8 @@ export default function InvestmentInsights({
       setLastUpdated(null);
       return;
     }
-
-    // debounce typing by 350ms
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(async () => {
-      // cancel any in-flight request
+    debounceRef.current = window.setTimeout(() => {
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -96,7 +92,7 @@ export default function InvestmentInsights({
     };
   }, [postcode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ===== Derived signals
+  // === Derived comps signals ===
   const avgRent = useMemo(() => {
     const rs =
       comps?.rents
@@ -109,7 +105,23 @@ export default function InvestmentInsights({
   const salesCount = comps?.sales?.length ?? 0;
   const rentsCount = comps?.rents?.length ?? 0;
 
-  // ===== Heuristics
+  // === AI Score Breakdown (simple, transparent heuristics for now) ===
+  const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+
+  const scoreYield = clamp((yield_percent ?? 0) * 10);     // 7.2% → 72
+  const scoreROI = clamp((roi_percent ?? 0) * 5);          // 14% → 70
+  const scoreDemand = 68;                                   // placeholder until live feeds
+  const scoreRisk = 60;                                     // placeholder: higher = safer
+  const overall = Math.round([scoreYield, scoreROI, scoreDemand, scoreRisk].reduce((a, b) => a + b, 0) / 4);
+
+  const scoreItems = [
+    { key: 'yield', label: 'Yield Strength', value: scoreYield, hint: 'Estimated gross yield vs local averages.' },
+    { key: 'roi', label: 'ROI Potential', value: scoreROI, hint: 'Projected ROI given refurb & exit assumptions.' },
+    { key: 'demand', label: 'Area Demand', value: scoreDemand, hint: 'Rental demand & stock turnover (illustrative).' },
+    { key: 'risk', label: 'Risk Adjusted', value: scoreRisk, hint: 'Higher = lower perceived risk (illustrative).' },
+  ];
+
+  // === Insights heuristics ===
   const upsides: string[] = [];
   const risks: string[] = [];
   const nextSteps: string[] = [
@@ -131,35 +143,67 @@ export default function InvestmentInsights({
   if (!risks.length) risks.push('No obvious red flags from current inputs.');
 
   return (
-    <section
-      className={`rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 ${className}`}
-    >
+    <section className={`rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 ${className}`}>
       <h3 className="text-lg font-semibold mb-2">💡 Investment Insights</h3>
 
+      {/* === AI Score Breakdown === */}
+      <div className="mb-4 rounded-md border border-neutral-200 dark:border-neutral-800 p-3">
+        <div className="flex items-center justify-between mb-2">
+          <div className="font-medium">🧠 AI Score Breakdown</div>
+          <button
+            type="button"
+            className="text-xs underline text-blue-600 hover:text-blue-700"
+            onClick={() => setShowExplain(true)}
+          >
+            What do these mean?
+          </button>
+        </div>
+
+        <div className="text-sm mb-2">
+          Overall: <span className="font-semibold">{overall}</span>
+        </div>
+
+        <div className="space-y-2">
+          {scoreItems.map((s) => (
+            <div key={s.key} className="text-sm">
+              <div className="flex justify-between mb-1">
+                <span>{s.label}</span>
+                <span className="font-medium">{s.value}%</span>
+              </div>
+              <div className="h-2 w-full bg-neutral-200 dark:bg-neutral-800 rounded">
+                <div
+                  className="h-2 rounded"
+                  style={{
+                    width: `${s.value}%`,
+                    background:
+                      'linear-gradient(90deg, rgba(59,130,246,1) 0%, rgba(34,197,94,1) 100%)',
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* === Upsides / Risks / Next Steps === */}
       <div className="mb-2">
         <div className="font-medium">Upsides</div>
         <ul className="list-disc ml-5 space-y-1 text-sm">
-          {upsides.map((u, i) => (
-            <li key={`up-${i}`}>{u}</li>
-          ))}
+          {upsides.map((u, i) => <li key={`up-${i}`}>{u}</li>)}
         </ul>
       </div>
 
       <div className="mb-2">
         <div className="font-medium">Risks</div>
         <ul className="list-disc ml-5 space-y-1 text-sm">
-          {risks.map((r, i) => (
-            <li key={`rk-${i}`}>{r}</li>
-          ))}
+          {risks.map((r, i) => <li key={`rk-${i}`}>{r}</li>)}
         </ul>
       </div>
 
       <div className="mb-3">
         <div className="font-medium">Suggested Next Steps</div>
         <ul className="list-disc ml-5 space-y-1 text-sm">
-          {nextSteps.map((n, i) => (
-            <li key={`ns-${i}`}>{n}</li>
-          ))}
+          {nextSteps.map((n, i) => <li key={`ns-${i}`}>{n}</li>)}
         </ul>
       </div>
 
@@ -167,6 +211,7 @@ export default function InvestmentInsights({
         Generated from property metrics and local intel. Indicative only — validate with your own due diligence.
       </p>
 
+      {/* === Nearby Comps === */}
       <div className="rounded-md border border-neutral-200 dark:border-neutral-800 p-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -174,10 +219,7 @@ export default function InvestmentInsights({
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
               beta
             </span>
-            <a
-              href={compsHref}
-              className="text-xs underline text-blue-600 hover:text-blue-700"
-            >
+            <a href={compsHref} className="text-xs underline text-blue-600 hover:text-blue-700">
               View comps
             </a>
           </div>
@@ -194,7 +236,6 @@ export default function InvestmentInsights({
           </button>
         </div>
 
-        {/* States */}
         {!postcode && (
           <div className="text-sm text-neutral-500 mt-2">Add postcode to load sales & rents.</div>
         )}
@@ -213,17 +254,9 @@ export default function InvestmentInsights({
         {postcode && !loading && !fetchError && (
           <div className="text-sm mt-2">
             <div className="flex flex-wrap gap-4">
-              <span>
-                Recent Sales: <strong>{salesCount}</strong>
-              </span>
-              <span>
-                Recent Rents: <strong>{rentsCount}</strong>
-              </span>
-              {avgRent ? (
-                <span>
-                  Avg Rent: <strong>£{avgRent.toLocaleString()}</strong>
-                </span>
-              ) : null}
+              <span>Recent Sales: <strong>{salesCount}</strong></span>
+              <span>Recent Rents: <strong>{rentsCount}</strong></span>
+              {avgRent ? <span>Avg Rent: <strong>£{avgRent.toLocaleString()}</strong></span> : null}
             </div>
 
             {!salesCount && !rentsCount && (
@@ -242,6 +275,42 @@ export default function InvestmentInsights({
           Live Land Registry & rent sources coming next.
         </div>
       </div>
+
+      {/* === Explain modal === */}
+      {showExplain && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowExplain(false)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative max-w-lg w-[92%] rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="font-semibold">How we calculate these scores</h4>
+              <button
+                className="text-sm px-2 py-1 rounded border border-neutral-300 dark:border-neutral-700"
+                onClick={() => setShowExplain(false)}
+              >
+                Close
+              </button>
+            </div>
+            <ul className="list-disc ml-5 space-y-1 text-sm">
+              <li><strong>Yield Strength</strong>: gross yield vs local typical ranges.</li>
+              <li><strong>ROI Potential</strong>: projected ROI given refurb & exit assumptions.</li>
+              <li><strong>Area Demand</strong>: rental demand & turnover (illustrative placeholder).</li>
+              <li><strong>Risk Adjusted</strong>: lighter risk → higher score (illustrative placeholder).</li>
+            </ul>
+            <p className="text-xs text-neutral-500 mt-3">
+              Overall score is an average of the above. These are indicative only — always validate
+              with your own numbers and due diligence.
+            </p>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
