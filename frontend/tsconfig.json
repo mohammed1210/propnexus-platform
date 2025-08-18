@@ -23,8 +23,7 @@
       "@details/*": ["components/property_details/*"],
       "@map/*": ["src/app/*"],
       "@lib/*": ["lib/*"],
-      "@types": ["types.ts"],
-      "@/types": ["types.ts"]
+      "@/types": ["src/types.ts"]
     },
 
     "plugins": [{ "name": "next" }],
