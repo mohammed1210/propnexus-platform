@@ -1,33 +1,55 @@
 'use client';
 
+/* ──────────────────────────────────────────────────────────────────
+   Property Details Page
+   - Fetches a single property
+   - Renders left content (summary, calculators, area intel, notes)
+   - Renders right rail (deal summary, actions, insights, map)
+   - Uses shared <Button> component for consistent actions
+   ────────────────────────────────────────────────────────────────── */
+
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 
-import AIChatbot from '@details/AIChatbot';
+/* Components (left content) */
 import InvestmentSummary from '@details/InvestmentSummary';
 import ExitStrategyGenerator from '@details/ExitStrategyGenerator';
 import MortgageCalculator from '@details/MortgageCalculator';
 import StampDutyCalculator from '@details/StampDutyCalculator';
-import NotesFields from '@details/NotesFields';
 import AreaIntel from '@details/AreaIntel';
-import MapSingle from '@details/MapSingle';
+import NotesFields from '@details/NotesFields';
 import AIScoreBars from '@details/AIScoreBars';
 import AIScoreInfo, { triggerAIScoreInfo } from '@details/AIScoreInfo';
-import InvestmentInsights from '@details/InvestmentInsights';
-// ExportActions removed (we render native buttons in the header)
 
+/* Right rail */
+import InvestmentInsights from '@details/InvestmentInsights';
+import ExportActions from '@details/ExportActions';
+import MapSingle from '@details/MapSingle';
+
+/* Floating assistant */
+import AIChatbot from '@details/AIChatbot';
+
+/* UI primitives */
+import Button from '@/components/ui/Button';
+
+/* Types */
 import { Property } from '@/types';
 
+/* ──────────────────────────────────────────────────────────────────
+   Component
+   ────────────────────────────────────────────────────────────────── */
 export default function PropertyDetailsPage() {
+  /* ── Routing / env ─────────────────────────────────────────────── */
   const params = useParams();
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string | undefined);
-
   const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
 
+  /* ── State ─────────────────────────────────────────────────────── */
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /* ── Data fetch ────────────────────────────────────────────────── */
   useEffect(() => {
     if (!id) return;
 
@@ -67,12 +89,13 @@ export default function PropertyDetailsPage() {
     fetchProperty();
   }, [id, BACKEND_BASE]);
 
+  /* ── Derived ───────────────────────────────────────────────────── */
   const hasCoords = useMemo(
     () => Boolean(property?.latitude != null && property?.longitude != null),
     [property?.latitude, property?.longitude]
   );
 
-  // ----- AI score (demo calc until backend scoring is wired)
+  // Temporary AI score model (until backend scoring is wired)
   const aiOverall: number =
     typeof (property as any)?.ai_score === 'number'
       ? (property as any).ai_score
@@ -80,8 +103,8 @@ export default function PropertyDetailsPage() {
           [
             Math.min(100, Math.max(0, Math.round((property?.yield_percent ?? 0) * 10))),
             Math.min(100, Math.max(0, Math.round((property?.roi_percent ?? 0) * 5))),
-            68,
-            60,
+            68, // area demand (illustrative)
+            60, // risk adjusted (illustrative)
           ].reduce((a, b) => a + b, 0) / 4
         );
 
@@ -98,18 +121,17 @@ export default function PropertyDetailsPage() {
       value: Math.min(100, Math.max(0, Math.round((property?.roi_percent ?? 0) * 5))),
       hint: 'Projected ROI given refurb & exit assumptions.',
     },
-    { key: 'demand', label: 'Area Demand', value: 68, hint: 'Rental demand and stock turnover (illustrative).' },
+    { key: 'demand', label: 'Area Demand', value: 68, hint: 'Rental demand & turnover (illustrative).' },
     { key: 'risk', label: 'Risk Adjusted', value: 60, hint: 'Lower risk → higher score (illustrative).' },
   ];
 
-  // ----- Postcode resolver
   const postcode: string | undefined =
     (property as any)?.postcode ??
     (property as any)?.post_code ??
     (property as any)?.postal_code ??
     undefined;
 
-  // ----- Save Deal → /api/save-deal → Supabase
+  /* ── Actions ───────────────────────────────────────────────────── */
   async function handleSaveDeal() {
     try {
       if (!property || !id) return;
@@ -145,7 +167,6 @@ export default function PropertyDetailsPage() {
     }
   }
 
-  // ----- Deal Pack (PDF v2) → /api/deal-pack
   async function handleDownloadPdf() {
     try {
       if (!property) return;
@@ -193,7 +214,7 @@ export default function PropertyDetailsPage() {
     }
   }
 
-  // ----- Loading / error
+  /* ── Loading / Error ───────────────────────────────────────────── */
   if (loading) {
     return (
       <div className="px-4 md:px-12 py-6" aria-busy="true" aria-live="polite">
@@ -216,36 +237,32 @@ export default function PropertyDetailsPage() {
     );
   }
 
-  // ----- Page
+  /* ── View ──────────────────────────────────────────────────────── */
   return (
     <div className="flex flex-col md:flex-row px-4 md:px-12 py-6 gap-6">
-      {/* ===== Left Column ===== */}
+      {/* ───────────────────── Left Column ───────────────────── */}
       <main className="md:w-2/3 md:pr-2">
         {/* Header */}
         <header className="mb-3">
           <h1 className="text-2xl font-bold mb-1">{property.title}</h1>
           <p className="text-gray-500">{property.location}</p>
 
-          {/* Actions row */}
+          {/* Actions */}
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
-              onClick={handleSaveDeal}
-            >
-              💾 Save Deal
-            </button>
-            <button
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
-              onClick={handleDownloadPdf}
-            >
-              🗂️ Deal Pack (v2)
-            </button>
-            <button
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
+            <Button variant="secondary" size="sm" onClick={handleSaveDeal} leadingIcon={<span>💾</span>}>
+              Save Deal
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleDownloadPdf} leadingIcon={<span>🗂️</span>}>
+              Deal Pack (v2)
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
+              leadingIcon={<span>🔗</span>}
             >
-              🔗 Export to CRM
-            </button>
+              Export to CRM
+            </Button>
           </div>
         </header>
 
@@ -334,8 +351,9 @@ export default function PropertyDetailsPage() {
         </section>
       </main>
 
-      {/* ===== Right Column (sticky) ===== */}
+      {/* ───────────────────── Right Column ───────────────────── */}
       <aside className="md:w-1/3 md:pl-2 md:sticky md:top-4 self-start">
+        {/* Summary */}
         <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <h3 className="text-lg font-semibold mb-2">📊 Deal Summary</h3>
           <p>
@@ -348,13 +366,24 @@ export default function PropertyDetailsPage() {
           <p><strong>Source:</strong> {property.source || 'N/A'}</p>
         </section>
 
-        {/* AI Investment Insights */}
+        {/* Consolidated actions (kept for quick access) */}
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+          <ExportActions
+            onSave={handleSaveDeal}
+            onPdf={handleDownloadPdf}
+            onCrm={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
+          />
+        </section>
+
+        {/* Investment Insights (incl. Nearby Comps + optional AI breakdown) */}
         <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <InvestmentInsights
             price={property.price}
             yield_percent={property.yield_percent}
             roi_percent={property.roi_percent}
             postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
+            aiOverall={aiOverall}
+            aiItems={aiItems}
           />
         </section>
 
