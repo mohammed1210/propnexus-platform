@@ -1,12 +1,4 @@
-// src/app/property/[id]/page.tsx
 'use client';
-
-/* ───────────────────────────────────────────────────────────────────
-   Property Details Page (Part 1/4)
-   - Imports & setup
-   - Data fetch + parsing
-   - Header + hero image + action buttons
-   ─────────────────────────────────────────────────────────────────── */
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -24,14 +16,12 @@ import AIScoreInfo, { triggerAIScoreInfo } from '@details/AIScoreInfo';
 import InvestmentInsights from '@details/InvestmentInsights';
 import ExportActions from '@details/ExportActions';
 
-import Button from '@/components/ui/Button';
 import { Property } from '@/types';
 
-/* ───────────────────────────────────────────────────────────────────
-   Component
-   ─────────────────────────────────────────────────────────────────── */
-
 export default function PropertyDetailsPage() {
+  // ────────────────────────────────────────────────────────────────
+  // Params / state
+  // ────────────────────────────────────────────────────────────────
   const params = useParams();
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string | undefined);
 
@@ -41,11 +31,13 @@ export default function PropertyDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load property
+  // ────────────────────────────────────────────────────────────────
+  // Fetch property
+  // ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!id) return;
 
-    (async () => {
+    const fetchProperty = async () => {
       try {
         setLoading(true);
         setError(null);
@@ -76,15 +68,20 @@ export default function PropertyDetailsPage() {
       } finally {
         setLoading(false);
       }
-    })();
+    };
+
+    fetchProperty();
   }, [id, BACKEND_BASE]);
 
+  // ────────────────────────────────────────────────────────────────
+  // Derived values
+  // ────────────────────────────────────────────────────────────────
   const hasCoords = useMemo(
     () => Boolean(property?.latitude != null && property?.longitude != null),
     [property?.latitude, property?.longitude]
   );
 
-  // Demo AI score (until backend scoring is wired)
+  // AI score (front-end demo calc until backend scoring is wired)
   const aiOverall: number =
     typeof (property as any)?.ai_score === 'number'
       ? (property as any).ai_score
@@ -121,7 +118,9 @@ export default function PropertyDetailsPage() {
     (property as any)?.postal_code ??
     undefined;
 
+  // ────────────────────────────────────────────────────────────────
   // Actions
+  // ────────────────────────────────────────────────────────────────
   async function handleSaveDeal() {
     try {
       if (!property || !id) return;
@@ -204,7 +203,9 @@ export default function PropertyDetailsPage() {
     }
   }
 
-  // Loading / error fallbacks
+  // ────────────────────────────────────────────────────────────────
+  // Loading / Error
+  // ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="px-4 md:px-12 py-6" aria-busy="true" aria-live="polite">
@@ -227,9 +228,9 @@ export default function PropertyDetailsPage() {
     );
   }
 
-  /* ───────────────────────────────────────────────────────────────
-     MAIN LAYOUT (Left column + Right sticky column)
-     ─────────────────────────────────────────────────────────────── */
+  // ────────────────────────────────────────────────────────────────
+  // Page
+  // ────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col md:flex-row px-4 md:px-12 py-6 gap-6">
       {/* ===== Left Column ===== */}
@@ -239,21 +240,25 @@ export default function PropertyDetailsPage() {
           <h1 className="text-2xl font-bold mb-1">{property.title}</h1>
           <p className="text-gray-500">{property.location}</p>
 
-          {/* Actions under title */}
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" onClick={handleSaveDeal}>
+            <button
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
+              onClick={handleSaveDeal}
+            >
               💾 Save Deal
-            </Button>
-            <Button variant="secondary" size="sm" onClick={handleDownloadPdf}>
+            </button>
+            <button
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
+              onClick={handleDownloadPdf}
+            >
               🗂️ Deal Pack (v2)
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
+            </button>
+            <button
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
               onClick={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
             >
               🔗 Export to CRM
-            </Button>
+            </button>
           </div>
         </header>
 
@@ -285,12 +290,9 @@ export default function PropertyDetailsPage() {
         <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <details open>
             <summary className="cursor-pointer select-none text-lg font-semibold mb-2 list-none">
-              <span className="inline-block align-middle mr-1">💼</span>
-              Exit Strategy Suggestions
+              <span className="inline-block align-middle mr-1">💼</span> Exit Strategy Suggestions
             </summary>
-            <p className="text-slate-600 mb-3">
-              Use AI to suggest smart exit plans tailored to this property.
-            </p>
+            <p className="text-slate-600 mb-3">Use AI to suggest smart exit plans tailored to this property.</p>
             <ExitStrategyGenerator
               title={property.title}
               location={property.location}
@@ -312,113 +314,88 @@ export default function PropertyDetailsPage() {
           <h3 className="text-lg font-semibold mb-3">
             🧠 AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500 align-middle">beta</span>
           </h3>
-
           <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-4" />
           <AIScoreInfo />
         </section>
 
-        {/* Mortgage Calculator */}
+        {/* Calculators */}
         <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
-          <h3 className="text-lg font-semibold mb-3">🏦 Mortgage Calculator</h3>
-          <MortgageCalculator
-            price={property.price}
-            depositPercent={25}
-            interestRate={5}
-            termYears={25}
-            rent={avgRent}
-          />
+          <MortgageCalculator price={property.price} />
         </section>
-
-        {/* Stamp Duty Calculator */}
         <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
-          <h3 className="text-lg font-semibold mb-3">💰 Stamp Duty Calculator</h3>
-          <StampDutyCalculator price={property.price} isAdditional={true} />
+          <StampDutyCalculator price={property.price} />
         </section>
 
         {/* Area Intelligence */}
         <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
-          <h3 className="text-lg font-semibold mb-3">📊 Area Intelligence</h3>
-          <div className="text-sm text-slate-600 mb-3">
-            Key local stats and insights based on postcode and market data.
-          </div>
+          <AreaIntel
+            locationLabel={property?.location}
+            postcode={postcode}
+            data={{
+              avgYieldPct: property?.yield_percent,
+              avgRent: (property as any)?.avg_rent,
+              crimeRateIndex: (property as any)?.crime_index,
+              ofstedSummary: (property as any)?.ofsted_summary,
+              transportSummary: (property as any)?.transport_summary,
+            }}
+          />
+        </section>
+
+        {/* Investor Notes */}
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm">
+          <NotesFields propertyId={id ?? ''} />
+        </section>
+      </main>
+
+      {/* ===== Right Column (sticky) ===== */}
+      <aside className="md:w-1/3 md:pl-2 md:sticky md:top-4 self-start">
+        {/* Deal Summary */}
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+          <h3 className="text-lg font-semibold mb-2">📊 Deal Summary</h3>
+          <p>
+            <strong>Price:</strong> £
+            {typeof property.price === 'number' ? property.price.toLocaleString() : 'N/A'}
+          </p>
+          <p><strong>Yield:</strong> {property.yield_percent ?? 'N/A'}%</p>
+          <p><strong>ROI:</strong> {property.roi_percent ?? 'N/A'}%</p>
+          <p><strong>Property Type:</strong> {property.propertyType || 'N/A'}</p>
+          <p><strong>Investment Type:</strong> {property.investmentType || 'N/A'}</p>
+          <p><strong>Source:</strong> {property.source || 'N/A'}</p>
+        </section>
+
+        {/* Actions */}
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+          <ExportActions
+            onSave={handleSaveDeal}
+            onPdf={handleDownloadPdf}
+            onCrm={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
+          />
+        </section>
+
+        {/* Investment Insights (single source of insights) */}
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <InvestmentInsights
             price={property.price}
             yield_percent={property.yield_percent}
             roi_percent={property.roi_percent}
-            postcode={property.postcode}
+            postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
             aiOverall={aiOverall}
             aiItems={aiItems}
           />
         </section>
 
-        {/* Custom Notes & Fields */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
-          <h3 className="text-lg font-semibold mb-3">📝 Custom Notes</h3>
-          <NotesFields propertyId={property.id} />
-        </section>
-
-      </div>
-
-      {/* ── Right Column ─────────────────────────────── */}
-      <aside className="md:w-1/3 space-y-6">
-        {/* Deal Summary + Buttons */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm">
-          <h3 className="text-lg font-semibold mb-3">📑 Deal Summary</h3>
-          <div className="space-y-2 text-sm">
-            <p>
-              <strong>Price:</strong> £{property.price.toLocaleString()}
-            </p>
-            <p>
-              <strong>Yield:</strong> {property.yield_percent ?? "N/A"}%
-            </p>
-            <p>
-              <strong>ROI:</strong> {property.roi_percent ?? "N/A"}%
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2 mt-4">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => handleSave(property)}
-            >
-              💾 Save Deal
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => handleDownload(property)}
-            >
-              ⬇️ Download PDF
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => handleExportCRM(property)}
-            >
-              🔗 Export CRM
-            </Button>
-          </div>
-        </section>
-
         {/* Static Map */}
-        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-3 md:p-4 shadow-sm">
-          <h3 className="text-lg font-semibold mb-3">📍 Location</h3>
-          <MapView
-            properties={[property]}
-            className="h-64 rounded-lg overflow-hidden"
-          />
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm">
+          {hasCoords ? (
+            <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
+          ) : (
+            <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
+          )}
         </section>
       </aside>
-    </div>
 
-    {/* Floating AI Assistant */}
-    <AIChatbot
-      propertyId={property.id}
-      propertyTitle={property.title}
-      propertyLocation={property.location}
-      aiOverall={aiOverall}
-    />
-  </main>
+      {/* Floating AI Assistant */}
+      <AIChatbot property={property} />
+    </div>
   );
 }
