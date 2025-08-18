@@ -1,25 +1,54 @@
-# in backend/routes/scrape_routes.py
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from scraper.zoopla_scraper import scrape_zoopla_properties
 from scraper.rightmove_scraper import scrape_rightmove_properties
+from supabase import create_client, Client
+import os
+
+# ✅ Load Supabase client
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 router = APIRouter()
 
+class ScrapeRequest(BaseModel):
+    location: str
+
 @router.post("/scrape")
-async def scrape_all(location: str):
-    """Scrape both Zoopla & Rightmove for a given location."""
-    zoopla_results = await scrape_zoopla_properties(location)
-    rightmove_results = await scrape_rightmove_properties(location)
+async def scrape_all_sources(req: ScrapeRequest):
+    """
+    Unified scrape endpoint — runs Zoopla + Rightmove scrapers,
+    merges results, saves to Supabase, and returns them.
+    """
+    location = req.location.strip()
+    if not location:
+        raise HTTPException(status_code=400, detail="Location is required")
 
-    # Combine + deduplicate by e.g. address or URL
-    seen = set()
-    merged = []
-    for p in zoopla_results + rightmove_results:
-        key = (p.get("title"), p.get("location"))
-        if key not in seen:
-            seen.add(key)
-            merged.append(p)
+    try:
+        # Run both scrapers
+        zoopla_results = scrape_zoopla_properties(location) or []
+        rightmove_results = scrape_rightmove_properties(location) or []
 
-    # Save into Supabase here if needed
+        # Merge + deduplicate
+        combined = zoopla_results + rightmove_results
+        seen = set()
+        unique_props = []
+        for p in combined:
+            key = (p.get("title"), p.get("price"), p.get("location"))
+            if key not in seen:
+                seen.add(key)
+                unique_props.append(p)
 
-    return {"count": len(merged), "properties": merged}
+        # Save to Supabase (ignore errors if already exists)
+        if unique_props:
+            try:
+                supabase.table("properties").upsert(unique_props).execute()
+            except Exception as db_err:
+                print("⚠️ DB insert skipped:", db_err)
+
+        return {"count": len(unique_props), "properties": unique_props}
+
+    except Exception as e:
+        print("❌ Scrape failed:", e)
+        raise HTTPException(status_code=500, detail=f"Scraping failed: {str(e)}")
