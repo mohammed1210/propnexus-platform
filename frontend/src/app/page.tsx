@@ -70,30 +70,32 @@ export default function PropertiesPage() {
     return () => window.removeEventListener('resize', apply);
   }, []);
 
-  // Initial fetch of existing properties in DB
+  // === Fetch helper
+  async function fetchProperties() {
+    try {
+      setError(null);
+      const res = await fetch(`${BACKEND_BASE}/properties`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setProperties(Array.isArray(data) ? data : []);
+    } catch (e: any) {
+      console.error('Error fetching properties:', e);
+      setError('Could not load properties. Please try again.');
+      setProperties([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Initial fetch
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch(`${BACKEND_BASE}/properties`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-        if (!active) return;
-        setProperties(Array.isArray(data) ? data : []);
-      } catch (e: any) {
-        if (!active) return;
-        console.error('Error fetching properties:', e);
-        setError('Could not load properties. Please try again.');
-        setProperties([]);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
+    fetchProperties();
+  }, [BACKEND_BASE]);
+
+  // 🔄 Auto-refresh every 60s
+  useEffect(() => {
+    const interval = setInterval(fetchProperties, 60000);
+    return () => clearInterval(interval);
   }, [BACKEND_BASE]);
 
   // Unified scrape + search
@@ -128,20 +130,16 @@ export default function PropertiesPage() {
       const matchesPrice = price >= minPrice && price <= maxPrice;
 
       const matchesLocation = q ? (p.location ?? '').toLowerCase().includes(q) : true;
-
       const matchesBedrooms =
         bedrooms === 'Any' ? true : Number(p.bedrooms) === Number(bedrooms);
-
       const matchesPropertyType =
         propertyType === 'All'
           ? true
           : (p.propertyType ?? '').toLowerCase() === propertyType.toLowerCase();
-
       const matchesInvestmentType =
         investmentType === 'All'
           ? true
           : (p.investmentType ?? '').toLowerCase() === investmentType.toLowerCase();
-
       const matchesYield = (p.yield_percent ?? 0) >= minYield;
       const matchesROI = (p.roi_percent ?? 0) >= minROI;
 
@@ -229,6 +227,7 @@ export default function PropertiesPage() {
       {/* ===== Advanced filters ===== */}
       {showMoreFilters && (
         <div className="filters-row" role="region" aria-label="Advanced filters">
+          {/* Min/Max Price, Beds, Property Type, Yield, ROI */}
           <div>
             <label htmlFor="minPrice">Min Price</label>
             <input
@@ -238,7 +237,6 @@ export default function PropertiesPage() {
               onChange={(e) => setMinPrice(Number(e.target.value))}
             />
           </div>
-
           <div>
             <label htmlFor="maxPrice">Max Price</label>
             <input
@@ -248,7 +246,6 @@ export default function PropertiesPage() {
               onChange={(e) => setMaxPrice(Number(e.target.value))}
             />
           </div>
-
           <div>
             <label htmlFor="beds">Bedrooms</label>
             <select id="beds" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)}>
@@ -259,7 +256,6 @@ export default function PropertiesPage() {
               <option value="4">4+ Beds</option>
             </select>
           </div>
-
           <div>
             <label htmlFor="ptype">Property Type</label>
             <select
@@ -273,7 +269,6 @@ export default function PropertiesPage() {
               <option value="Studio">Studio</option>
             </select>
           </div>
-
           <div>
             <label htmlFor="minYield">Min Yield (%)</label>
             <input
@@ -283,7 +278,6 @@ export default function PropertiesPage() {
               onChange={(e) => setMinYield(Number(e.target.value))}
             />
           </div>
-
           <div>
             <label htmlFor="minRoi">Min ROI (%)</label>
             <input
