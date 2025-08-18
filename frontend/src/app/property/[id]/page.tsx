@@ -1,7 +1,16 @@
-// /src/app/property/[id]/page.tsx
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+/* ──────────────────────────────────────────────────────────────────────────────
+   Property Details Page
+   - Fetches property by id (works with local API or external BACKEND_BASE)
+   - Responsive 2-column layout (stack on mobile)
+   - Uses shared UI primitives: Section, SectionTitle, KeyValue, DividerRow,
+     CardActions, Badge, and Button
+   - Keeps: AI Score, Exit Strategy, Calculators, Area Intel, Notes, Map
+   - Single source of “comps/insights” via <InvestmentInsights>
+   ────────────────────────────────────────────────────────────────────────────── */
+
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 
 import AIChatbot from '@details/AIChatbot';
@@ -15,78 +24,32 @@ import MapSingle from '@details/MapSingle';
 import AIScoreBars from '@details/AIScoreBars';
 import AIScoreInfo, { triggerAIScoreInfo } from '@details/AIScoreInfo';
 import InvestmentInsights from '@details/InvestmentInsights';
-import ExportActions from '@details/ExportActions';
 
-import type { Property } from '@/types';
+import Section from '@/components/ui/Section';
+import SectionTitle from '@/components/ui/SectionTitle';
+import KeyValue from '@/components/ui/KeyValue';
+import DividerRow from '@/components/ui/DividerRow';
+import CardActions from '@/components/ui/CardActions';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
 
-/* ──────────────────────────────────────────────────────────────────
-   Local UI helpers (inline so you don't need extra files)
-   ────────────────────────────────────────────────────────────────── */
-function Section({
-  children,
-  className = '',
-}: React.PropsWithChildren<{ className?: string }>) {
-  return (
-    <section
-      className={`rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm ${className}`}
-    >
-      {children}
-    </section>
-  );
-}
+import { Property } from '@/types';
 
-function SectionTitle({
-  icon,
-  children,
-  aside,
-  className = '',
-}: {
-  icon?: React.ReactNode;
-  children: React.ReactNode;
-  aside?: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`mb-3 flex items-center justify-between ${className}`}>
-      <h3 className="text-lg font-semibold flex items-center gap-2 tracking-tight">
-        {icon ? <span className="inline-block">{icon}</span> : null}
-        <span>{children}</span>
-      </h3>
-      {aside ? <div className="shrink-0">{aside}</div> : null}
-    </div>
-  );
-}
-
-function KeyValue({
-  label,
-  value,
-  className = '',
-}: { label: string; value: React.ReactNode; className?: string }) {
-  return (
-    <div className={`grid grid-cols-12 items-baseline gap-3 ${className}`}>
-      <div className="col-span-5 text-slate-500">{label}</div>
-      <div className="col-span-7 font-medium">{value}</div>
-    </div>
-  );
-}
-
-function DividerRow() {
-  return <div className="my-3 h-px bg-neutral-200 dark:bg-neutral-800" />;
-}
-
-/* ──────────────────────────────────────────────────────────────────
-   Page
-   ────────────────────────────────────────────────────────────────── */
+/* ── Page Component ─────────────────────────────────────────────────────────── */
 export default function PropertyDetailsPage() {
+  /* Routing */
   const params = useParams();
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string | undefined);
 
+  /* Config */
   const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
 
+  /* State */
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /* Fetch property */
   useEffect(() => {
     if (!id) return;
 
@@ -97,7 +60,6 @@ export default function PropertyDetailsPage() {
 
         const useBackend = Boolean(BACKEND_BASE && BACKEND_BASE.startsWith('http'));
         const url = useBackend ? `${BACKEND_BASE}/api/properties/${id}` : `/api/properties/${id}`;
-
         const res = await fetch(url, { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
@@ -106,8 +68,8 @@ export default function PropertyDetailsPage() {
         const p: Property = {
           ...raw,
           price: Number(raw.price ?? 0),
-          yield_percent: Number(raw.yield_percent ?? raw.yield ?? 0),
-          roi_percent: Number(raw.roi_percent ?? raw.roi ?? 0),
+          yield_percent: Number(raw.yield_percent ?? (raw as any).yield ?? 0),
+          roi_percent: Number(raw.roi_percent ?? (raw as any).roi ?? 0),
           latitude: raw.latitude != null ? Number(raw.latitude) : undefined,
           longitude: raw.longitude != null ? Number(raw.longitude) : undefined,
           propertyType: raw.propertyType ?? raw.property_type ?? '',
@@ -126,12 +88,13 @@ export default function PropertyDetailsPage() {
     fetchProperty();
   }, [id, BACKEND_BASE]);
 
+  /* Derived flags */
   const hasCoords = useMemo(
     () => Boolean(property?.latitude != null && property?.longitude != null),
     [property?.latitude, property?.longitude]
   );
 
-  // ----- AI score (demo calc until backend scoring is wired)
+  /* AI score (demo calc until backend scoring is wired) */
   const aiOverall: number =
     typeof (property as any)?.ai_score === 'number'
       ? (property as any).ai_score
@@ -161,14 +124,14 @@ export default function PropertyDetailsPage() {
     { key: 'risk', label: 'Risk Adjusted', value: 60, hint: 'Lower risk → higher score (illustrative).' },
   ];
 
-  // ----- Postcode resolver
+  /* Postcode resolver */
   const postcode: string | undefined =
     (property as any)?.postcode ??
     (property as any)?.post_code ??
     (property as any)?.postal_code ??
     undefined;
 
-  // ----- Save Deal → /api/save-deal → Supabase
+  /* Actions */
   async function handleSaveDeal() {
     try {
       if (!property || !id) return;
@@ -204,7 +167,6 @@ export default function PropertyDetailsPage() {
     }
   }
 
-  // ----- Deal Pack (PDF v2) → /api/deal-pack
   async function handleDownloadPdf() {
     try {
       if (!property) return;
@@ -252,7 +214,7 @@ export default function PropertyDetailsPage() {
     }
   }
 
-  // ----- Loading / error
+  /* Loading / Error */
   if (loading) {
     return (
       <div className="px-4 md:px-12 py-6" aria-busy="true" aria-live="polite">
@@ -275,72 +237,59 @@ export default function PropertyDetailsPage() {
     );
   }
 
-  // ----- Page
+  /* ── Render ───────────────────────────────────────────────────────────────── */
   return (
     <div className="flex flex-col md:flex-row px-4 md:px-12 py-6 gap-6">
-      {/* ===== Left Column ===== */}
-      <main className="md:w-2/3 md:pr-2 space-y-6">
+      {/* ── Left Column ───────────────────────────────────────────── */}
+      <main className="md:w-2/3 md:pr-2">
+
         {/* Header */}
-        <header className="mb-1">
-          <h1 className="text-2xl md:text-3xl font-bold leading-tight tracking-tight">{property.title}</h1>
-          <div className="mt-1 text-slate-500">{property.location}</div>
+        <header className="mb-3">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{property.title}</h1>
+          {property.location ? <p className="text-gray-500 mt-1">{property.location}</p> : null}
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center rounded-md border border-neutral-300 dark:border-neutral-700 px-2.5 py-1 text-sm bg-white dark:bg-neutral-900">
-              £{property.price.toLocaleString()}
-            </span>
-
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
-                onClick={handleSaveDeal}
-              >
-                💾 Save Deal
-              </button>
-              <button
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
-                onClick={handleDownloadPdf}
-              >
-                🗂️ Deal Pack (v2)
-              </button>
-              <button
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
-                onClick={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
-              >
-                🔗 Export to CRM
-              </button>
-            </div>
-          </div>
+          <CardActions className="mt-3">
+            <Button variant="secondary" size="sm" onClick={handleSaveDeal}>💾 Save Deal</Button>
+            <Button variant="secondary" size="sm" onClick={handleDownloadPdf}>🗂️ Deal Pack (v2)</Button>
+            <Button variant="ghost" size="sm" onClick={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}>
+              🔗 Export to CRM
+            </Button>
+          </CardActions>
         </header>
 
         {/* Hero image */}
         <img
           src={property.imageurl || '/placeholder.jpg'}
           alt={property.title}
-          className="w-full aspect-video object-cover rounded-lg"
+          className="w-full aspect-video object-cover rounded-lg mb-4"
           loading="eager"
           onError={(e) => ((e.target as HTMLImageElement).src = '/placeholder.jpg')}
         />
 
-        {/* Investment Summary (component already renders its own title) */}
+        {/* Investment Summary */}
         <Section>
-          <div className="leading-[1.35] text-[15px] text-neutral-800 dark:text-neutral-200">
-            <InvestmentSummary property={property} />
-          </div>
-          <button
-            type="button"
-            className="mt-2 inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 underline"
-            onClick={() => {
-              document.getElementById('ai-score-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              triggerAIScoreInfo();
-            }}
-          >
-            ❓ What do these scores mean?
-          </button>
+          <SectionTitle icon={<span>🧾</span>}>
+            Investment Summary
+          </SectionTitle>
+          <InvestmentSummary property={property} />
+          <CardActions>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                document.getElementById('ai-score-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                triggerAIScoreInfo();
+              }}
+            >
+              ❓ What do these scores mean?
+            </Button>
+          </CardActions>
         </Section>
 
-        {/* Exit Strategy (component already renders its own title) */}
+        {/* Exit Strategy */}
         <Section>
+          <SectionTitle icon={<span>💼</span>}>Exit Strategy Suggestions</SectionTitle>
+          <p className="text-slate-600 mb-3">Use AI to suggest smart exit plans tailored to this property.</p>
           <ExitStrategyGenerator
             title={property.title}
             location={property.location}
@@ -353,32 +302,33 @@ export default function PropertyDetailsPage() {
           />
         </Section>
 
-        {/* AI Deal Score — with explicit title */}
+        {/* AI Deal Score – explicit title so the badge can sit beside it */}
         <Section id="ai-score-section">
-          <SectionTitle icon={<span>🧠</span>}>
-            AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500 align-middle">beta</span>
+          <SectionTitle
+            icon={<span>🧠</span>}
+            aside={<Badge variant="info">beta</Badge>}
+          >
+            AI Deal Score
           </SectionTitle>
           <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-2" />
           <AIScoreInfo />
         </Section>
 
-        {/* Calculators (components already print headers) */}
+        {/* Calculators */}
         <Section>
-          <div className="rounded-lg bg-neutral-50 dark:bg-neutral-900/40 p-3">
-            <MortgageCalculator price={property.price} />
-          </div>
+          <SectionTitle icon={<span>🏦</span>}>Mortgage & BRRR Calculator</SectionTitle>
+          <MortgageCalculator price={property.price} />
         </Section>
 
         <Section>
-          <div className="rounded-lg bg-neutral-50 dark:bg-neutral-900/40 p-3">
-            <StampDutyCalculator price={property.price} />
-          </div>
+          <SectionTitle icon={<span>🏛️</span>}>Stamp Duty Calculator</SectionTitle>
+          <StampDutyCalculator price={property.price} />
         </Section>
 
-        {/* Area Intelligence (avoid duplicate internal title) */}
+        {/* Area Intelligence */}
         <Section>
+          <SectionTitle icon={<span>📍</span>}>Area Intelligence</SectionTitle>
           <AreaIntel
-            // If AreaIntel supports it later: showTitle={false}
             locationLabel={property?.location}
             postcode={postcode}
             data={{
@@ -393,17 +343,21 @@ export default function PropertyDetailsPage() {
 
         {/* Investor Notes */}
         <Section>
+          <SectionTitle icon={<span>📝</span>}>Investor Notes</SectionTitle>
           <NotesFields propertyId={id ?? ''} />
         </Section>
       </main>
 
-      {/* ===== Right Column (sticky) ===== */}
+      {/* ── Right Column ──────────────────────────────────────────── */}
       <aside className="md:w-1/3 md:pl-2 md:sticky md:top-4 self-start space-y-6">
+
         {/* Deal Summary */}
         <Section>
           <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
-          <div className="space-y-2.5">
-            <KeyValue label="Price" value={`£${property.price.toLocaleString()}`} />
+
+          <div className="space-y-2">
+            <KeyValue label="Price" value={`£${(property.price ?? 0).toLocaleString()}`} />
+            <DividerRow />
             <KeyValue label="Yield" value={`${property.yield_percent ?? 'N/A'}%`} />
             <KeyValue label="ROI" value={`${property.roi_percent ?? 'N/A'}%`} />
             <DividerRow />
@@ -413,19 +367,22 @@ export default function PropertyDetailsPage() {
           </div>
         </Section>
 
-        {/* Actions */}
+        {/* Actions (secondary access) */}
         <Section>
-          <ExportActions
-            onSave={handleSaveDeal}
-            onPdf={handleDownloadPdf}
-            onCrm={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
-          />
+          <SectionTitle icon={<span>⚡</span>}>Quick Actions</SectionTitle>
+          <CardActions align="between">
+            <Button variant="secondary" onClick={handleSaveDeal}>💾 Save Deal</Button>
+            <Button variant="secondary" onClick={handleDownloadPdf}>🗂️ Deal Pack (v2)</Button>
+            <Button variant="ghost" onClick={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}>
+              🔗 Export to CRM
+            </Button>
+          </CardActions>
         </Section>
 
-        {/* Investment Insights (keeps its own internal header) */}
+        {/* AI Investment Insights */}
         <Section>
+          <SectionTitle icon={<span>💡</span>}>Investment Insights</SectionTitle>
           <InvestmentInsights
-            className="mt-1"
             price={property.price}
             yield_percent={property.yield_percent}
             roi_percent={property.roi_percent}
@@ -439,7 +396,7 @@ export default function PropertyDetailsPage() {
         <Section>
           <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
           {hasCoords ? (
-            <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} className="rounded-md overflow-hidden" />
+            <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
           ) : (
             <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
           )}
