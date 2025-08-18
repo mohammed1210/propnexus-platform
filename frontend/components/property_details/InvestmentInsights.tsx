@@ -1,7 +1,7 @@
+// frontend/components/property_details/InvestmentInsights.tsx
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import AIScoreBars from '@details/AIScoreBars';
 
 type RentComp = { monthly_rent?: number | string };
 type SalesComp = Record<string, unknown>;
@@ -14,7 +14,7 @@ type CompsPayload = {
   error?: string;
 };
 
-type ScoreItem = { key: string; label: string; value: number; hint?: string };
+type AIItem = { key?: string; label: string; value: number; hint?: string };
 
 export default function InvestmentInsights({
   className = '',
@@ -32,42 +32,19 @@ export default function InvestmentInsights({
   roi_percent?: number;
   postcode?: string;
   compsHref?: string;
-  /** Optional: pass in the page’s AI score numbers; falls back to local calc */
   aiOverall?: number;
-  aiItems?: ScoreItem[];
+  aiItems?: AIItem[];
 }) {
-  // ===== Derived AI scores (fallback if not provided) =====
-  const localItems: ScoreItem[] = [
-    {
-      key: 'yield',
-      label: 'Yield Strength',
-      value: Math.min(100, Math.max(0, Math.round((yield_percent ?? 0) * 10))),
-      hint: 'Estimated gross yield vs local averages.',
-    },
-    {
-      key: 'roi',
-      label: 'ROI Potential',
-      value: Math.min(100, Math.max(0, Math.round((roi_percent ?? 0) * 5))),
-      hint: 'Projected ROI given refurb & exit assumptions.',
-    },
-    { key: 'demand', label: 'Area Demand', value: 68, hint: 'Rental demand and stock turnover (illustrative).' },
-    { key: 'risk', label: 'Risk Adjusted', value: 60, hint: 'Lower risk → higher score (illustrative).' },
-  ];
-  const items = aiItems && aiItems.length ? aiItems : localItems;
-  const overall =
-    typeof aiOverall === 'number'
-      ? aiOverall
-      : Math.round(items.reduce((a, b) => a + b.value, 0) / items.length);
-
-  // ===== Comps state/fetch =====
   const [comps, setComps] = useState<CompsPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
+  // Debounce + abort setup for comps fetch
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<number | null>(null);
 
+  // shared fetcher so “Refresh” can reuse it
   const fetchComps = async (pc: string, opts?: { signal?: AbortSignal }) => {
     setLoading(true);
     setFetchError(null);
@@ -100,6 +77,7 @@ export default function InvestmentInsights({
   };
 
   useEffect(() => {
+    // reset when no postcode
     if (!postcode) {
       setComps(null);
       setFetchError(null);
@@ -107,8 +85,11 @@ export default function InvestmentInsights({
       setLastUpdated(null);
       return;
     }
+
+    // debounce typing by 350ms
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
-    debounceRef.current = window.setTimeout(() => {
+    debounceRef.current = window.setTimeout(async () => {
+      // cancel any in-flight request
       abortRef.current?.abort();
       const ctrl = new AbortController();
       abortRef.current = ctrl;
@@ -121,7 +102,7 @@ export default function InvestmentInsights({
     };
   }, [postcode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ===== Derived from comps =====
+  // ===== Derived signals
   const avgRent = useMemo(() => {
     const rs =
       comps?.rents
@@ -134,7 +115,7 @@ export default function InvestmentInsights({
   const salesCount = comps?.sales?.length ?? 0;
   const rentsCount = comps?.rents?.length ?? 0;
 
-  // ===== Insight heuristics =====
+  // ===== Heuristics
   const upsides: string[] = [];
   const risks: string[] = [];
   const nextSteps: string[] = [
@@ -155,28 +136,38 @@ export default function InvestmentInsights({
   if (!upsides.length) upsides.push('No obvious positives from current inputs.');
   if (!risks.length) risks.push('No obvious red flags from current inputs.');
 
-  // ===== UI =====
   return (
     <section
       className={`rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 ${className}`}
     >
       <h3 className="text-lg font-semibold mb-2">💡 Investment Insights</h3>
 
-      {/* AI Score breakdown (mini) */}
-      <div className="mb-3">
-        <div className="flex items-center justify-between">
-          <div className="font-medium">🧠 AI Score Breakdown</div>
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
-            beta
-          </span>
-        </div>
-        <AIScoreBars overall={overall} items={items} showHeader={false} className="mt-2" />
-        <p className="text-[11px] text-neutral-500 mt-1">
-          Indicative only — based on yield, ROI, area demand and risk.
-        </p>
-      </div>
+      {/* Compact AI Score Breakdown (optional) */}
+      {typeof aiOverall === 'number' && Array.isArray(aiItems) && (
+        <details className="mb-3 group">
+          <summary className="cursor-pointer select-none text-sm font-medium list-none flex items-center gap-2">
+            <span className="inline-block">🤖 AI Score Breakdown</span>
+            <span className="text-xs text-neutral-500">(indicative)</span>
+          </summary>
+          <div className="mt-2 text-sm">
+            <div className="mb-2">
+              Overall: <strong>{aiOverall}</strong>
+            </div>
+            <ul className="space-y-1">
+              {aiItems.map((it, idx) => (
+                <li key={it.key ?? idx}>
+                  {it.label}
+                  <span className="ml-1 font-semibold">{it.value}%</span>
+                </li>
+              ))}
+            </ul>
+            <div className="text-xs text-neutral-500 mt-2">
+              Based on yield, ROI and area/risk proxies. Validate with your own numbers.
+            </div>
+          </div>
+        </details>
+      )}
 
-      {/* Upsides/Risks/Next steps */}
       <div className="mb-2">
         <div className="font-medium">Upsides</div>
         <ul className="list-disc ml-5 space-y-1 text-sm">
@@ -208,15 +199,18 @@ export default function InvestmentInsights({
         Generated from property metrics and local intel. Indicative only — validate with your own due diligence.
       </p>
 
-      {/* Nearby Comps (inline) */}
       <div className="rounded-md border border-neutral-200 dark:border-neutral-800 p-3">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <div className="font-medium">📉 Nearby Comps</div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+              beta
+            </span>
             <a href={compsHref} className="text-xs underline text-blue-600 hover:text-blue-700">
-              View full comps
+              View comps
             </a>
           </div>
+
           <button
             type="button"
             className="text-xs px-2 py-1 rounded border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
@@ -229,7 +223,10 @@ export default function InvestmentInsights({
           </button>
         </div>
 
-        {!postcode && <div className="text-sm text-neutral-500 mt-2">Add postcode to load sales & rents.</div>}
+        {/* States */}
+        {!postcode && (
+          <div className="text-sm text-neutral-500 mt-2">Add postcode to load sales & rents.</div>
+        )}
 
         {postcode && loading && (
           <div className="text-sm text-neutral-500 mt-2">
@@ -263,12 +260,16 @@ export default function InvestmentInsights({
             )}
 
             {lastUpdated && (
-              <div className="text-[10px] text-neutral-500 mt-2">Last updated {lastUpdated.toLocaleTimeString()}</div>
+              <div className="text-[10px] text-neutral-500 mt-2">
+                Last updated {lastUpdated.toLocaleTimeString()}
+              </div>
             )}
           </div>
         )}
 
-        <div className="text-xs text-neutral-500 mt-3">Live Land Registry & rent sources coming next.</div>
+        <div className="text-xs text-neutral-500 mt-3">
+          Live Land Registry & rent sources coming next.
+        </div>
       </div>
     </section>
   );
