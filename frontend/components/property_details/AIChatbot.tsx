@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Property } from '@types'; // ✅ Add this
+import { Property } from '@/types'; // ✅ Add this
 interface Message {
   role: 'user' | 'assistant';
   content: string;
