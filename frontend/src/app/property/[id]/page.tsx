@@ -301,10 +301,11 @@ export default function PropertyDetailsPage() {
 </Section>
 
           {/* AI Deal Score */}
-          <Section id="ai-score-section" title={<>🧠 AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500 align-middle">beta</span></>}>
-            <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-2" />
-            <AIScoreInfo />
-          </Section>
+<Section id="ai-score-section" title="🧠 AI Deal Score">
+  <p className="text-xs text-slate-500 -mt-2 mb-2">beta</p>
+  <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-2" />
+  <AIScoreInfo />
+</Section>
 
           {/* Calculators */}
           <Section title="🏦 Mortgage & BRRR Calculator"><MortgageCalculator price={property.price} /></Section>
