@@ -5,6 +5,7 @@
    - Generates Upsides/Risks/Next Steps based on inputs
    - Fetches nearby comps by postcode with debounce + abort
    - Optional compact AI Score breakdown (aiOverall + aiItems)
+   - Inline sparklines for each AI item
    - Uses shared <Button> for refresh
    ────────────────────────────────────────────────────────────────── */
 
@@ -35,6 +36,25 @@ type Props = {
   aiOverall?: number;
   aiItems?: AIItem[];
 };
+
+/* ── Tiny inline spark bar ───────────────────────────────────────── */
+function SparkBar({ value }: { value: number }) {
+  const v = Math.max(0, Math.min(100, Math.round(value)));
+  return (
+    <span
+      className="ml-2 inline-flex items-center align-middle"
+      aria-hidden="true"
+      title={`${v}%`}
+    >
+      <span className="relative inline-block h-[6px] w-[60px] rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+        <span
+          className="absolute left-0 top-0 h-full rounded-full bg-blue-500 dark:bg-blue-400"
+          style={{ width: `${v}%` }}
+        />
+      </span>
+    </span>
+  );
+}
 
 /* ── Component ──────────────────────────────────────────────────── */
 export default function InvestmentInsights({
@@ -146,7 +166,7 @@ export default function InvestmentInsights({
     risks.push('Limited nearby comps — validate pricing with local agents.');
 
   if (!upsides.length) upsides.push('No obvious positives from current inputs.');
-  if (!risks.length) risks.push('No obvious red flags from current inputs.');
+  if (!risks.length) upsides.push('No obvious red flags from current inputs.');
 
   /* ── View ────────────────────────────────────────────────────── */
   return (
@@ -155,7 +175,7 @@ export default function InvestmentInsights({
     >
       <h3 className="text-lg font-semibold mb-2">💡 Investment Insights</h3>
 
-      {/* AI Score Breakdown (optional, compact) */}
+      {/* AI Score Breakdown (optional, compact with inline sparklines) */}
       {typeof aiOverall === 'number' && Array.isArray(aiItems) && (
         <details className="mb-3 group">
           <summary className="cursor-pointer select-none text-sm font-medium list-none flex items-center gap-2">
@@ -167,12 +187,20 @@ export default function InvestmentInsights({
               Overall: <strong>{aiOverall}</strong>
             </div>
             <ul className="space-y-1">
-              {aiItems.map((it, idx) => (
-                <li key={it.key ?? idx}>
-                  {it.label}
-                  <span className="ml-1 font-semibold">{it.value}%</span>
-                </li>
-              ))}
+              {aiItems.map((it, idx) => {
+                const v = Number.isFinite(it.value) ? it.value : 0;
+                return (
+                  <li
+                    key={it.key ?? idx}
+                    className="flex items-center justify-between gap-3"
+                    title={it.hint || it.label}
+                  >
+                    <span className="min-w-[8rem]">{it.label}</span>
+                    <span className="shrink-0 tabular-nums">{v}%</span>
+                    <SparkBar value={v} />
+                  </li>
+                );
+              })}
             </ul>
             <div className="text-xs text-neutral-500 mt-2">
               Based on yield, ROI and area/risk proxies. Validate with your own numbers.
