@@ -9,7 +9,7 @@
    ────────────────────────────────────────────────────────────────── */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Button from '@/components/ui/Button';
+import Button from '@components/ui/Button';
 
 /* ── Types ──────────────────────────────────────────────────────── */
 type RentComp = { monthly_rent?: number | string };
@@ -23,7 +23,18 @@ type CompsPayload = {
   error?: string;
 };
 
-type AIItem = { key?: string; label: string; value: number; hint?: string };
+export type AIItem = { key?: string; label: string; value: number; hint?: string };
+
+type Props = {
+  className?: string;
+  price: number;
+  yield_percent?: number;
+  roi_percent?: number;
+  postcode?: string;
+  compsHref?: string;
+  aiOverall?: number;
+  aiItems?: AIItem[];
+};
 
 /* ── Component ──────────────────────────────────────────────────── */
 export default function InvestmentInsights({
@@ -35,16 +46,7 @@ export default function InvestmentInsights({
   compsHref = '#comps',
   aiOverall,
   aiItems,
-}: {
-  className?: string;
-  price: number;
-  yield_percent?: number;
-  roi_percent?: number;
-  postcode?: string;
-  compsHref?: string;
-  aiOverall?: number;
-  aiItems?: AIItem[];
-}) {
+}: Props) {
   /* ── State ───────────────────────────────────────────────────── */
   const [comps, setComps] = useState<CompsPayload | null>(null);
   const [loading, setLoading] = useState(false);
@@ -219,7 +221,11 @@ export default function InvestmentInsights({
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
               beta
             </span>
-            <a href={compsHref} className="text-xs underline text-blue-600 hover:text-blue-700">
+            <a
+              href={compsHref}
+              className="text-xs underline text-blue-600 hover:text-blue-700"
+              aria-label="View comparables section"
+            >
               View comps
             </a>
           </div>
@@ -231,6 +237,7 @@ export default function InvestmentInsights({
             disabled={!postcode || loading}
             aria-disabled={!postcode || loading}
             loading={loading}
+            title="Refresh nearby sales & rent comps"
           >
             ↻ Refresh
           </Button>
@@ -238,7 +245,9 @@ export default function InvestmentInsights({
 
         {/* States */}
         {!postcode && (
-          <div className="text-sm text-neutral-500 mt-2">Add postcode to load sales & rents.</div>
+          <div className="text-sm text-neutral-500 mt-2">
+            Add a postcode to load recent sales & rents.
+          </div>
         )}
 
         {postcode && loading && (
@@ -254,28 +263,30 @@ export default function InvestmentInsights({
 
         {postcode && !loading && !fetchError && (
           <div className="text-sm mt-2">
-            <div className="flex flex-wrap gap-4">
-              <span>
-                Recent Sales: <strong>{salesCount}</strong>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800">
+                <span className="opacity-70">Sales</span>
+                <strong>{salesCount}</strong>
               </span>
-              <span>
-                Recent Rents: <strong>{rentsCount}</strong>
+              <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800">
+                <span className="opacity-70">Rents</span>
+                <strong>{rentsCount}</strong>
               </span>
-              {avgRent ? (
-                <span>
-                  Avg Rent: <strong>£{avgRent.toLocaleString()}</strong>
+              {typeof avgRent === 'number' && (
+                <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800">
+                  <span className="opacity-70">Avg Rent</span>
+                  <strong>£{avgRent.toLocaleString()}</strong>
                 </span>
-              ) : null}
+              )}
+              {lastUpdated && (
+                <span className="ml-auto text-[10px] text-neutral-500">
+                  Updated {lastUpdated.toLocaleTimeString()}
+                </span>
+              )}
             </div>
 
             {!salesCount && !rentsCount && (
-              <div className="text-neutral-500 mt-1">No comps found for this postcode.</div>
-            )}
-
-            {lastUpdated && (
-              <div className="text-[10px] text-neutral-500 mt-2">
-                Last updated {lastUpdated.toLocaleTimeString()}
-              </div>
+              <div className="text-neutral-500 mt-2">No comps found for this postcode.</div>
             )}
           </div>
         )}
