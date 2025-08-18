@@ -14,6 +14,7 @@ import MapSingle from '@details/MapSingle';
 import AIScoreBars from '@details/AIScoreBars';
 import AIScoreInfo, { triggerAIScoreInfo } from '@details/AIScoreInfo';
 import InvestmentInsights from '@details/InvestmentInsights';
+// (CompsMini removed)
 import ExportActions from '@details/ExportActions';
 
 import { Property } from '@/types';
@@ -221,19 +222,44 @@ export default function PropertyDetailsPage() {
     <div className="flex flex-col md:flex-row px-4 md:px-12 py-6 gap-6">
       {/* ===== Left Column ===== */}
       <main className="md:w-2/3 md:pr-2">
-        <h1 className="text-2xl font-bold mb-1">{property.title}</h1>
-        <p className="text-gray-500 mb-3">{property.location}</p>
+        {/* Header */}
+        <header className="mb-3">
+          <h1 className="text-2xl font-bold mb-1">{property.title}</h1>
+          <p className="text-gray-500">{property.location}</p>
 
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
+              onClick={handleSaveDeal}
+            >
+              💾 Save Deal
+            </button>
+            <button
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
+              onClick={handleDownloadPdf}
+            >
+              🗂️ Deal Pack (v2)
+            </button>
+            <button
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-800 text-sm"
+              onClick={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
+            >
+              🔗 Export to CRM
+            </button>
+          </div>
+        </header>
+
+        {/* Hero image */}
         <img
           src={property.imageurl || '/placeholder.jpg'}
           alt={property.title}
-          className="w-full h-64 object-cover rounded-lg mb-4"
+          className="w-full aspect-video object-cover rounded-lg mb-4"
           loading="eager"
           onError={(e) => ((e.target as HTMLImageElement).src = '/placeholder.jpg')}
         />
 
         {/* Investment Summary */}
-        <section className="section-box">
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <InvestmentSummary property={property} />
           <button
             type="button"
@@ -247,8 +273,8 @@ export default function PropertyDetailsPage() {
           </button>
         </section>
 
-        {/* Exit Strategy (kept) */}
-        <section className="section-box">
+        {/* Exit Strategy (single block) */}
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <details open>
             <summary className="cursor-pointer select-none text-lg font-semibold mb-2 list-none">
               <span className="inline-block align-middle mr-1">💼</span> Exit Strategy Suggestions
@@ -268,7 +294,7 @@ export default function PropertyDetailsPage() {
         </section>
 
         {/* AI Deal Score — always visible */}
-        <section id="ai-score-section" className="section-box">
+        <section id="ai-score-section" className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <h3 className="text-lg font-semibold mb-3">
             🧠 AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500 align-middle">beta</span>
           </h3>
@@ -277,15 +303,15 @@ export default function PropertyDetailsPage() {
         </section>
 
         {/* Calculators */}
-        <section className="section-box">
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <MortgageCalculator price={property.price} />
         </section>
-        <section className="section-box">
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <StampDutyCalculator price={property.price} />
         </section>
 
         {/* Area Intelligence */}
-        <section className="section-box">
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <AreaIntel
             locationLabel={property?.location}
             postcode={postcode}
@@ -300,22 +326,19 @@ export default function PropertyDetailsPage() {
         </section>
 
         {/* Investor Notes */}
-        <div className="w-full p-4 border rounded-lg bg-white dark:bg-neutral-900">
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm">
           <NotesFields propertyId={id ?? ''} />
-        </div>
+        </section>
       </main>
 
       {/* ===== Right Column (sticky) ===== */}
       <aside className="md:w-1/3 md:pl-2 md:sticky md:top-4 self-start">
-        <section className="section-box">
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
           <h3 className="text-lg font-semibold mb-2">📊 Deal Summary</h3>
           <p>
             <strong>Price:</strong>{' '}
             £{typeof property.price === 'number' ? property.price.toLocaleString() : 'N/A'}
           </p>
-        </section>
-
-        <section className="section-box">
           <p><strong>Yield:</strong> {property.yield_percent ?? 'N/A'}%</p>
           <p><strong>ROI:</strong> {property.roi_percent ?? 'N/A'}%</p>
           <p><strong>Property Type:</strong> {property.propertyType || 'N/A'}</p>
@@ -323,37 +346,33 @@ export default function PropertyDetailsPage() {
           <p><strong>Source:</strong> {property.source || 'N/A'}</p>
         </section>
 
-        {/* Actions */}
-        <ExportActions
-          className="mt-4"
-          onSave={handleSaveDeal}
-          onPdf={handleDownloadPdf}
-          onCrm={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
-        />
+        {/* Actions (kept here too via component if you want quick access) */}
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+          <ExportActions
+            onSave={handleSaveDeal}
+            onPdf={handleDownloadPdf}
+            onCrm={() => alert('Sending to CRM (Zapier/Airtable/Pipedrive)…')}
+          />
+        </section>
 
-        {/* AI Investment Insights (now the single source of comps) */}
-        <InvestmentInsights
-  className="mt-4"
-  price={property.price}
-  yield_percent={property.yield_percent}
-  roi_percent={property.roi_percent}
-  postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
-  aiOverall={aiOverall}
-  aiItems={aiItems}
-/>
+        {/* AI Investment Insights (single source of insights, no comps sub-block) */}
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm mb-6">
+          <InvestmentInsights
+            price={property.price}
+            yield_percent={property.yield_percent}
+            roi_percent={property.roi_percent}
+            postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
+          />
+        </section>
 
         {/* Static Map */}
-        {hasCoords ? (
-          <MapSingle
-            property={property}
-            height={260}
-            zoom={14}
-            scrollWheelZoom={false}
-            className="mt-8"
-          />
-        ) : (
-          <p className="mt-8 text-gray-500">Map unavailable — no coordinates provided.</p>
-        )}
+        <section className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 md:p-5 shadow-sm">
+          {hasCoords ? (
+            <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
+          ) : (
+            <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
+          )}
+        </section>
       </aside>
 
       {/* Floating AI Assistant */}
