@@ -44,6 +44,8 @@ export default function InvestmentInsights({
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<number | null>(null);
 
+  const fmt = useMemo(() => new Intl.NumberFormat('en-GB'), []);
+
   // shared fetcher so “Refresh” can reuse it
   const fetchComps = async (pc: string, opts?: { signal?: AbortSignal }) => {
     setLoading(true);
@@ -126,7 +128,7 @@ export default function InvestmentInsights({
 
   if ((yield_percent ?? 0) >= 6) upsides.push('Strong gross yield vs typical 4–6% band.');
   if ((roi_percent ?? 0) >= 12) upsides.push('Healthy ROI potential on current assumptions.');
-  if (avgRent) upsides.push(`Local median rent around £${avgRent.toLocaleString()}.`);
+  if (avgRent) upsides.push(`Local median rent around £${fmt.format(avgRent)}.`);
 
   if ((yield_percent ?? 0) < 4) risks.push('Below-average gross yield — pressure-test rent or price.');
   if ((roi_percent ?? 0) < 8) risks.push('ROI looks light — review refurb scope and exit options.');
@@ -144,7 +146,7 @@ export default function InvestmentInsights({
 
       {/* Compact AI Score Breakdown (optional) */}
       {typeof aiOverall === 'number' && Array.isArray(aiItems) && (
-        <details className="mb-3 group">
+        <details className="mb-3">
           <summary className="cursor-pointer select-none text-sm font-medium list-none flex items-center gap-2">
             <span className="inline-block">🤖 AI Score Breakdown</span>
             <span className="text-xs text-neutral-500">(indicative)</span>
@@ -158,6 +160,7 @@ export default function InvestmentInsights({
                 <li key={it.key ?? idx}>
                   {it.label}
                   <span className="ml-1 font-semibold">{it.value}%</span>
+                  {it.hint ? <span className="ml-2 text-xs text-neutral-500">— {it.hint}</span> : null}
                 </li>
               ))}
             </ul>
@@ -199,27 +202,32 @@ export default function InvestmentInsights({
         Generated from property metrics and local intel. Indicative only — validate with your own due diligence.
       </p>
 
+      {/* Nearby comps */}
       <div className="rounded-md border border-neutral-200 dark:border-neutral-800 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="font-medium">📉 Nearby Comps</div>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+        <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+          <div className="flex items-center gap-2 shrink">
+            <div className="font-medium whitespace-nowrap">📉 Nearby Comps</div>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 whitespace-nowrap">
               beta
             </span>
-            <a href={compsHref} className="text-xs underline text-blue-600 hover:text-blue-700">
+            <a
+              href={compsHref}
+              className="text-xs underline text-blue-600 hover:text-blue-700 whitespace-nowrap"
+            >
               View comps
             </a>
           </div>
 
           <button
             type="button"
-            className="text-xs px-2 py-1 rounded border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+            className="text-xs px-2 py-1 rounded border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 whitespace-nowrap"
             onClick={() => postcode && fetchComps(postcode)}
             disabled={!postcode || loading}
             aria-disabled={!postcode || loading}
+            aria-busy={loading}
             title="Refresh comps"
           >
-            ↻ Refresh
+            {loading ? '… Loading' : '↻ Refresh'}
           </button>
         </div>
 
@@ -250,7 +258,7 @@ export default function InvestmentInsights({
               </span>
               {avgRent ? (
                 <span>
-                  Avg Rent: <strong>£{avgRent.toLocaleString()}</strong>
+                  Avg Rent: <strong>£{fmt.format(avgRent)}</strong>
                 </span>
               ) : null}
             </div>
