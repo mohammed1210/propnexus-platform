@@ -12,9 +12,7 @@ from routes import gpt_routes
 from routes.ai_routes import router as ai_routes
 from routes import area_routes
 from routes import comps_routes
-from scraper.zoopla_scraper import scrape_zoopla_properties
-from scraper.rightmove_scraper import scrape_rightmove_properties
-from routes import scrape_routes
+from routes import scrape_routes   # ✅ unified scraper routes
 
 # ===============================
 # Env & Supabase client
@@ -48,14 +46,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ===============================
 # Register routers
+# ===============================
 app.include_router(save_deal_router)
 app.include_router(notes_router)
 app.include_router(gpt_routes.router)
 app.include_router(ai_routes)
 app.include_router(area_routes.router)
 app.include_router(comps_routes.router)
-app.include_router(scrape_routes.router)
+app.include_router(scrape_routes.router)  # ✅ NEW unified scrape
 
 # ===============================
 # Health
@@ -102,22 +102,3 @@ async def get_property_by_id_alias(property_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-# ===============================
-# Scraper endpoints
-# ===============================
-@app.post("/scrape-zoopla")
-async def scrape_zoopla():
-    data = await scrape_zoopla_properties()
-    return {
-        "status": f"Zoopla scrape completed and {len(data)} properties fetched",
-        "data": data,
-    }
-
-@app.post("/scrape-rightmove")
-async def scrape_rightmove():
-    data = await scrape_rightmove_properties()
-    return {
-        "status": f"Rightmove scrape completed and {len(data)} properties fetched",
-        "data": data,
-    }
