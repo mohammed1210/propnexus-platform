@@ -333,12 +333,14 @@ export default function PropertyDetailsPage() {
 
         {/* AI Investment Insights (now the single source of comps) */}
         <InvestmentInsights
-          className="mt-4"
-          price={property.price}
-          yield_percent={property.yield_percent}
-          roi_percent={property.roi_percent}
-          postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
-        />
+  className="mt-4"
+  price={property.price}
+  yield_percent={property.yield_percent}
+  roi_percent={property.roi_percent}
+  postcode={(property as any)?.postcode ?? (property as any)?.post_code ?? (property as any)?.postal_code}
+  aiOverall={aiOverall}
+  aiItems={aiItems}
+/>
 
         {/* Static Map */}
         {hasCoords ? (
