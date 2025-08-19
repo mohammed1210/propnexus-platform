@@ -12,15 +12,15 @@ import CardActions from "@/components/ui/CardActions";
 import Badge from "@/components/ui/Badge";
 
 // Property detail components
-import MortgageCalculator from "@/components/property-details/MortgageCalculator";
-import StampDutyCalculator from "@/components/property-details/StampDutyCalculator";
-import AreaIntel from "@/components/property-details/AreaIntel";
-import NotesFields from "@/components/property-details/NotesFields";
-import InvestmentInsights from "@/components/property-details/InvestmentInsights";
-import AIScoreBars from "@/components/property-details/AIScoreBars";
-import AIScoreInfo from "@/components/property-details/AIScoreInfo";
-import ExitStrategyGenerator from "@/components/property-details/ExitStrategyGenerator";
-import AIChatbot from "@/components/property-details/AIChatbot";
+import MortgageCalculator from "@/components/property_details/MortgageCalculator";
+import StampDutyCalculator from "@/components/property_details/StampDutyCalculator";
+import AreaIntel from "@/components/property_details/AreaIntel";
+import NotesFields from "@/components/property_details/NotesFields";
+import InvestmentInsights from "@/components/property_details/InvestmentInsights";
+import AIScoreBars from "@/components/property_details/AIScoreBars";
+import AIScoreInfo from "@/components/property_details/AIScoreInfo";
+import ExitStrategyGenerator from "@/components/property_details/ExitStrategyGenerator";
+import AIChatbot from "@/components/property_details/AIChatbot";
 
 // map (dynamic import to avoid SSR crash)
 const MapSingle = dynamic(() => import("@/components/MapSingle"), { ssr: false });
