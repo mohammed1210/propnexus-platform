@@ -75,9 +75,9 @@ export default function AIChatbot({ property, defaultOpen = false }: AIChatbotPr
 
     // Simulated AI reply — replace with your backend later
     const hints: string[] = [];
-    if (property?.yield_percent != null) hints.push(`yield ≈ ${property.yield_percent}%`);
-    if (property?.roi_percent != null) hints.push(`ROI ≈ ${property.roi_percent}%`);
-    if (property?.avg_rent != null) hints.push(`avg rent ≈ £${Number(property.avg_rent).toLocaleString()}`);
+if (property?.yield_percent != null) hints.push(`yield ≈ ${property.yield_percent}%`);
+if (property?.roi_percent != null) hints.push(`ROI ≈ ${property.roi_percent}%`);
+// ⛔ remove avg_rent since it doesn’t exist in your Property type
 
     setTimeout(() => {
       const botMsg: Message = {
