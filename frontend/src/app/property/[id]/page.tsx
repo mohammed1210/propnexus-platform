@@ -23,7 +23,7 @@ import ExitStrategyGenerator from "@/components/property_details/ExitStrategyGen
 import AIChatbot from "@/components/property_details/AIChatbot";
 
 // map (dynamic import to avoid SSR crash)
-const MapSingle = dynamic(() => import("@/components/MapSingle"), { ssr: false });
+const MapSingle = dynamic(() => import("@/components/property_details/MapSingle"), { ssr: false });
 
 // Supabase client
 const supabase = createClient(
