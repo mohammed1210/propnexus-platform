@@ -1,16 +1,17 @@
+// frontend/components/property_details/InvestmentInsights.tsx
 'use client';
 
 /* ──────────────────────────────────────────────────────────────────
    InvestmentInsights
-   - Generates Upsides/Risks/Next Steps based on inputs
-   - Fetches nearby comps by postcode with debounce + abort
+   - Generates Upsides / Risks / Next Steps from inputs
+   - Fetches nearby comps by postcode (debounce + abort-safe)
    - Optional compact AI Score breakdown (aiOverall + aiItems)
-   - Inline sparklines for each AI item
    - Uses shared <Button> for refresh
+   - NEW: hideTitle prop to suppress the internal heading
    ────────────────────────────────────────────────────────────────── */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Button from '@components/ui/Button';
+import Button from '@/components/ui/Button';
 
 /* ── Types ──────────────────────────────────────────────────────── */
 type RentComp = { monthly_rent?: number | string };
@@ -24,37 +25,7 @@ type CompsPayload = {
   error?: string;
 };
 
-export type AIItem = { key?: string; label: string; value: number; hint?: string };
-
-type Props = {
-  className?: string;
-  price: number;
-  yield_percent?: number;
-  roi_percent?: number;
-  postcode?: string;
-  compsHref?: string;
-  aiOverall?: number;
-  aiItems?: AIItem[];
-};
-
-/* ── Tiny inline spark bar ───────────────────────────────────────── */
-function SparkBar({ value }: { value: number }) {
-  const v = Math.max(0, Math.min(100, Math.round(value)));
-  return (
-    <span
-      className="ml-2 inline-flex items-center align-middle"
-      aria-hidden="true"
-      title={`${v}%`}
-    >
-      <span className="relative inline-block h-[6px] w-[60px] rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
-        <span
-          className="absolute left-0 top-0 h-full rounded-full bg-blue-500 dark:bg-blue-400"
-          style={{ width: `${v}%` }}
-        />
-      </span>
-    </span>
-  );
-}
+type AIItem = { key?: string; label: string; value: number; hint?: string };
 
 /* ── Component ──────────────────────────────────────────────────── */
 export default function InvestmentInsights({
@@ -66,7 +37,19 @@ export default function InvestmentInsights({
   compsHref = '#comps',
   aiOverall,
   aiItems,
-}: Props) {
+  hideTitle = false,
+}: {
+  className?: string;
+  price: number;
+  yield_percent?: number;
+  roi_percent?: number;
+  postcode?: string;
+  compsHref?: string;
+  aiOverall?: number;
+  aiItems?: AIItem[];
+  /** If true, do not render the internal “Investment Insights” heading */
+  hideTitle?: boolean;
+}) {
   /* ── State ───────────────────────────────────────────────────── */
   const [comps, setComps] = useState<CompsPayload | null>(null);
   const [loading, setLoading] = useState(false);
@@ -77,7 +60,7 @@ export default function InvestmentInsights({
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<number | null>(null);
 
-  /* ── Fetchers ─────────────────────────────────────────────────── */
+  /* ── Fetcher ──────────────────────────────────────────────────── */
   const fetchComps = async (pc: string, opts?: { signal?: AbortSignal }) => {
     setLoading(true);
     setFetchError(null);
@@ -110,7 +93,6 @@ export default function InvestmentInsights({
   };
 
   useEffect(() => {
-    // Reset if no postcode
     if (!postcode) {
       setComps(null);
       setFetchError(null);
@@ -119,7 +101,6 @@ export default function InvestmentInsights({
       return;
     }
 
-    // Debounce typing by 350ms
     if (debounceRef.current) window.clearTimeout(debounceRef.current);
     debounceRef.current = window.setTimeout(() => {
       abortRef.current?.abort();
@@ -132,9 +113,10 @@ export default function InvestmentInsights({
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
       abortRef.current?.abort();
     };
-  }, [postcode]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postcode]);
 
-  /* ── Derived signals ─────────────────────────────────────────── */
+  /* ── Derived ─────────────────────────────────────────────────── */
   const avgRent = useMemo(() => {
     const rs =
       comps?.rents
@@ -166,16 +148,16 @@ export default function InvestmentInsights({
     risks.push('Limited nearby comps — validate pricing with local agents.');
 
   if (!upsides.length) upsides.push('No obvious positives from current inputs.');
-  if (!risks.length) upsides.push('No obvious red flags from current inputs.');
+  if (!risks.length) risks.push('No obvious red flags from current inputs.');
 
   /* ── View ────────────────────────────────────────────────────── */
   return (
     <section
       className={`rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 ${className}`}
     >
-      <h3 className="text-lg font-semibold mb-2">💡 Investment Insights</h3>
+      {!hideTitle && <h3 className="text-lg font-semibold mb-2">💡 Investment Insights</h3>}
 
-      {/* AI Score Breakdown (optional, compact with inline sparklines) */}
+      {/* Compact AI Score Breakdown (optional) */}
       {typeof aiOverall === 'number' && Array.isArray(aiItems) && (
         <details className="mb-3 group">
           <summary className="cursor-pointer select-none text-sm font-medium list-none flex items-center gap-2">
@@ -187,20 +169,12 @@ export default function InvestmentInsights({
               Overall: <strong>{aiOverall}</strong>
             </div>
             <ul className="space-y-1">
-              {aiItems.map((it, idx) => {
-                const v = Number.isFinite(it.value) ? it.value : 0;
-                return (
-                  <li
-                    key={it.key ?? idx}
-                    className="flex items-center justify-between gap-3"
-                    title={it.hint || it.label}
-                  >
-                    <span className="min-w-[8rem]">{it.label}</span>
-                    <span className="shrink-0 tabular-nums">{v}%</span>
-                    <SparkBar value={v} />
-                  </li>
-                );
-              })}
+              {aiItems.map((it, idx) => (
+                <li key={it.key ?? idx}>
+                  {it.label}
+                  <span className="ml-1 font-semibold">{it.value}%</span>
+                </li>
+              ))}
             </ul>
             <div className="text-xs text-neutral-500 mt-2">
               Based on yield, ROI and area/risk proxies. Validate with your own numbers.
@@ -249,11 +223,7 @@ export default function InvestmentInsights({
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
               beta
             </span>
-            <a
-              href={compsHref}
-              className="text-xs underline text-blue-600 hover:text-blue-700"
-              aria-label="View comparables section"
-            >
+            <a href={compsHref} className="text-xs underline text-blue-600 hover:text-blue-700">
               View comps
             </a>
           </div>
@@ -265,18 +235,13 @@ export default function InvestmentInsights({
             disabled={!postcode || loading}
             aria-disabled={!postcode || loading}
             loading={loading}
-            title="Refresh nearby sales & rent comps"
           >
             ↻ Refresh
           </Button>
         </div>
 
         {/* States */}
-        {!postcode && (
-          <div className="text-sm text-neutral-500 mt-2">
-            Add a postcode to load recent sales & rents.
-          </div>
-        )}
+        {!postcode && <div className="text-sm text-neutral-500 mt-2">Add postcode to load sales & rents.</div>}
 
         {postcode && loading && (
           <div className="text-sm text-neutral-500 mt-2">
@@ -291,37 +256,31 @@ export default function InvestmentInsights({
 
         {postcode && !loading && !fetchError && (
           <div className="text-sm mt-2">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800">
-                <span className="opacity-70">Sales</span>
-                <strong>{salesCount}</strong>
+            <div className="flex flex-wrap gap-4">
+              <span>
+                Recent Sales: <strong>{salesCount}</strong>
               </span>
-              <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800">
-                <span className="opacity-70">Rents</span>
-                <strong>{rentsCount}</strong>
+              <span>
+                Recent Rents: <strong>{rentsCount}</strong>
               </span>
-              {typeof avgRent === 'number' && (
-                <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800">
-                  <span className="opacity-70">Avg Rent</span>
-                  <strong>£{avgRent.toLocaleString()}</strong>
+              {avgRent ? (
+                <span>
+                  Avg Rent: <strong>£{avgRent.toLocaleString()}</strong>
                 </span>
-              )}
-              {lastUpdated && (
-                <span className="ml-auto text-[10px] text-neutral-500">
-                  Updated {lastUpdated.toLocaleTimeString()}
-                </span>
-              )}
+              ) : null}
             </div>
 
             {!salesCount && !rentsCount && (
-              <div className="text-neutral-500 mt-2">No comps found for this postcode.</div>
+              <div className="text-neutral-500 mt-1">No comps found for this postcode.</div>
+            )}
+
+            {lastUpdated && (
+              <div className="text-[10px] text-neutral-500 mt-2">Last updated {lastUpdated.toLocaleTimeString()}</div>
             )}
           </div>
         )}
 
-        <div className="text-xs text-neutral-500 mt-3">
-          Live Land Registry & rent sources coming next.
-        </div>
+        <div className="text-xs text-neutral-500 mt-3">Live Land Registry & rent sources coming next.</div>
       </div>
     </section>
   );
