@@ -151,7 +151,6 @@ export default function PropertyDetailsPage() {
 
           <div className="mt-3">
             <CardActions
-              size="sm"
               onSave={handleSaveDeal}
               onPdf={handleDownloadPdf}
               onCrm={() => alert('Sending to CRM…')}
