@@ -189,19 +189,19 @@ export default function PropertyDetailsPage() {
         </Section>
 
         {/* Exit Strategy Generator */}
-        <Section>
-          <SectionTitle icon={<span>💼</span>}>Exit Strategy Suggestions</SectionTitle>
-          <ExitStrategyGenerator
-            title={property.title}
-            location={property.location}
-            price={property.price}
-            yield_percent={property.yield_percent}
-            roi_percent={property.roi_percent}
-            propertyType={property.propertyType}
-            investmentType={property.investmentType}
-            description={property.description}
-          />
-        </Section>
+<Section>
+  <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
+  <ExitStrategyGenerator
+    title={property.title}
+    location={property.location}
+    price={Number(property.price ?? 0)}
+    yield_percent={Number(property.yield_percent ?? 0)}
+    roi_percent={Number(property.roi_percent ?? 0)}
+    propertyType={(property as any).propertyType ?? (property as any).property_type ?? ''}
+    investmentType={(property as any).investmentType ?? (property as any).investment_type ?? ''}
+    description={property.description ?? ''}
+  />
+</Section>
 
         {/* Mortgage */}
         <Section>
