@@ -239,7 +239,7 @@ export default function PropertyDetailsPage() {
 </Section>
 
 </div>
-{/* closes: {"<div className='md:col-span-2 space-y-6'>"} */}
+{/* closes left column div (md:col-span-2 space-y-6) */}
 
 /* RIGHT — Sidebar */
 <aside className="md:col-span-1 space-y-6">
