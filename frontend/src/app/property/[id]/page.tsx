@@ -34,16 +34,15 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-// If you already have a shared type in "@/types", feel free to import it instead.
 type Property = {
-  id: string | number;
+  id: string;
   title: string;
   location: string;
   price: number;
-  bedrooms: number;
-  bathrooms: number;
-  yield_percent?: number | null;
-  roi_percent?: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  yield_percent: number | null;
+  roi_percent: number | null;
   description?: string | null;
   imageurl?: string | null;
   latitude?: number | null;
@@ -57,77 +56,53 @@ type Property = {
 };
 
 export default function PropertyDetailsPage() {
-  const params = useParams();
-  const rawId = (params as Record<string, string | string[] | undefined>)?.id;
-  const id = Array.isArray(rawId) ? rawId[0] : rawId;
+  // Typed/safe params usage
+  const params = useParams<{ id: string }>();
+  const id = (params?.id as string | undefined) ?? undefined;
 
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // AI Score state
+  // AI Score state — NOTE: items use `{ label, value }`
   const [aiOverall, setAiOverall] = useState(0);
-  const [aiItems, setAiItems] = useState<{ label: string; score: number }[]>(
+  const [aiItems, setAiItems] = useState<{ label: string; value: number }[]>(
     []
   );
 
   useEffect(() => {
     if (!id) return;
-    fetchProperty();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchProperty(id);
   }, [id]);
 
-  async function fetchProperty() {
+  async function fetchProperty(propId: string) {
     setLoading(true);
-    try {
-      // 1) Try matching id as a string (uuid-like)
-      let { data, error } = await supabase
-        .from("properties")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+    const { data, error } = await supabase
+      .from("properties")
+      .select("*")
+      .eq("id", propId)
+      .single();
 
-      // 2) If empty and id is numeric-looking, try numeric match
-      if (!data && Number.isFinite(Number(id))) {
-        const numeric = Number(id);
-        const { data: dataNum, error: errNum } = await supabase
-          .from("properties")
-          .select("*")
-          .eq("id", numeric)
-          .maybeSingle();
-        data = dataNum ?? null;
-        error = errNum ?? null;
-      }
-
-      if (error) {
-        console.error("[property details] fetch error:", error);
-      }
-
-      if (!data) {
-        setProperty(null);
-        setLoading(false);
-        return;
-      }
-
+    if (error) {
+      console.error("Error fetching property:", error);
+      setProperty(null);
+    } else {
       setProperty(data as Property);
       computeAIScore(data as Property);
-    } catch (err) {
-      console.error("[property details] unexpected error:", err);
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }
 
   function computeAIScore(p: Property) {
     if (!p) return;
     const items = [
-      { label: "Yield", score: Math.min(100, Number(p.yield_percent ?? 0) * 10) },
-      { label: "ROI", score: Math.min(100, Number(p.roi_percent ?? 0) * 10) },
-      { label: "Bedrooms", score: Math.min(100, Number(p.bedrooms ?? 0) * 20) },
-      { label: "Bathrooms", score: Math.min(100, Number(p.bathrooms ?? 0) * 25) },
+      { label: "Yield", value: Math.min(100, Number(p.yield_percent ?? 0) * 10) },
+      { label: "ROI", value: Math.min(100, Number(p.roi_percent ?? 0) * 10) },
+      { label: "Bedrooms", value: Math.min(100, Number(p.bedrooms ?? 0) * 20) },
+      { label: "Bathrooms", value: Math.min(100, Number(p.bathrooms ?? 0) * 25) },
     ];
     setAiItems(items);
     const overall = Math.round(
-      items.reduce((sum, i) => sum + i.score, 0) / items.length
+      items.reduce((sum, i) => sum + i.value, 0) / items.length
     );
     setAiOverall(overall);
   }
@@ -152,11 +127,11 @@ export default function PropertyDetailsPage() {
     Number.isFinite(property.longitude);
 
   const postcode =
-    property.location?.trim()?.split(/\s+/)?.slice(-1)?.[0] ?? undefined;
+    property.location?.trim().split(/\s+/).pop() ?? undefined;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
-      {/* ───────────────────────── Left (Main) ───────────────────────── */}
+      {/* LEFT — Main Content */}
       <div className="md:col-span-2 space-y-6">
         {/* Header */}
         <header className="mb-4 md:mb-6">
@@ -164,7 +139,8 @@ export default function PropertyDetailsPage() {
             {property.title}
           </h1>
           <p className="text-slate-600 mt-1">{property.location}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
+
+          <div className="mt-3">
             <CardActions
               onSave={handleSaveDeal}
               onPdf={handleDownloadPdf}
@@ -195,15 +171,16 @@ export default function PropertyDetailsPage() {
         {/* AI Deal Score */}
         <Section id="ai-score-section">
           <SectionTitle icon={<span>🧠</span>}>
-            AI Deal Score{" "}
-            <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
+            AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
+
           <AIScoreBars
             overall={aiOverall}
             items={aiItems}
             showHeader={false}
             className="mt-3"
           />
+
           <div className="mt-3">
             <AIScoreInfo />
           </div>
@@ -228,14 +205,14 @@ export default function PropertyDetailsPage() {
         {/* Area Intelligence */}
         <Section>
           <AreaIntel
-            locationLabel={property?.location}
+            locationLabel={property.location}
             postcode={postcode}
             data={{
-              avgYieldPct: property?.yield_percent ?? undefined,
-              avgRent: property?.avg_rent ?? undefined,
-              crimeRateIndex: property?.crime_index ?? undefined,
-              ofstedSummary: property?.ofsted_summary ?? undefined,
-              transportSummary: property?.transport_summary ?? undefined,
+              avgYieldPct: property.yield_percent ?? undefined,
+              avgRent: property.avg_rent ?? undefined,
+              crimeRateIndex: property.crime_index ?? undefined,
+              ofstedSummary: property.ofsted_summary ?? undefined,
+              transportSummary: property.transport_summary ?? undefined,
             }}
           />
         </Section>
@@ -248,10 +225,7 @@ export default function PropertyDetailsPage() {
             roi_percent={property.roi_percent ?? undefined}
             postcode={postcode}
             aiOverall={aiOverall}
-            aiItems={aiItems.map((i) => ({
-              label: i.label,
-              value: i.score,
-            }))}
+            aiItems={aiItems}
             hideTitle
           />
         </Section>
@@ -259,11 +233,11 @@ export default function PropertyDetailsPage() {
         {/* Notes */}
         <Section>
           <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
-          <NotesFields propertyId={String(property.id)} />
+          <NotesFields propertyId={property.id} />
         </Section>
       </div>
 
-      {/* ───────────────────────── Right (Sidebar) ───────────────────────── */}
+      {/* RIGHT — Sidebar */}
       <aside className="md:col-span-1 space-y-6">
         <Section>
           <SectionTitle icon={<span>⚡</span>}>Quick Actions</SectionTitle>
@@ -289,18 +263,33 @@ export default function PropertyDetailsPage() {
               {property.roi_percent != null ? `${property.roi_percent}%` : "—"}
             </li>
             <li>
-              <Badge>Beds</Badge> {property.bedrooms}
+              <Badge>Beds</Badge> {property.bedrooms ?? "—"}
             </li>
             <li>
-              <Badge>Baths</Badge> {property.bathrooms}
+              <Badge>Baths</Badge> {property.bathrooms ?? "—"}
             </li>
+            {property.propertyType && (
+              <li>
+                <Badge>Type</Badge> {property.propertyType}
+              </li>
+            )}
+            {property.investmentType && (
+              <li>
+                <Badge>Investment</Badge> {property.investmentType}
+              </li>
+            )}
           </ul>
         </Section>
 
         <Section>
           <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
           {hasCoords ? (
-            <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
+            <MapSingle
+              property={property}
+              height={260}
+              zoom={14}
+              scrollWheelZoom={false}
+            />
           ) : (
             <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
           )}
@@ -308,7 +297,8 @@ export default function PropertyDetailsPage() {
       </aside>
 
       {/* Floating Chatbot */}
-      <AIChatbot property={property as Partial<Property>} />
+      {/* Cast to avoid strict incompatibility when some numeric fields can be null */}
+      <AIChatbot property={property as unknown as Partial<Property>} />
     </div>
   );
 }
