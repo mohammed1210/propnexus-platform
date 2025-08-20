@@ -299,7 +299,7 @@ export default function PropertyDetailsPage() {
           )}
         </Section>
       </aside>
-
+          
       {/* Floating Chatbot (fixed position) */}
       <AIChatbot property={property} />
     </div>
