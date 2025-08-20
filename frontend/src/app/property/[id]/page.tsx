@@ -238,7 +238,7 @@ export default function PropertyDetailsPage() {
           <NotesFields propertyId={property.id} />
         </Section>
 
-      {/* RIGHT — Sidebar */}
+            {/* RIGHT — Sidebar */}
       <aside className="md:col-span-1 space-y-6">
         <Section>
           <SectionTitle icon={<span>⚡</span>}>Quick Actions</SectionTitle>
@@ -285,21 +285,13 @@ export default function PropertyDetailsPage() {
         <Section>
           <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
           {hasCoords ? (
-            <MapSingle
-              property={property}
-              height={260}
-              zoom={14}
-              scrollWheelZoom={false}
-            />
+            <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
           ) : (
             <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
           )}
         </Section>
       </aside>
 
-      {/* Floating Chatbot */}
-      {/* Cast to avoid strict incompatibility when some numeric fields can be null */}
-      <AIChatbot property={property as unknown as Partial<Property>} />
+      {/* Floating Chatbot (fixed position; can be sibling inside same grid wrapper) */}
+      <AIChatbot property={property as Partial<Property>} />
     </div>
-  );
-}
