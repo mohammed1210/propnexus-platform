@@ -237,7 +237,6 @@ export default function PropertyDetailsPage() {
           <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
           <NotesFields propertyId={property.id} />
         </Section>
-      </div>
 
       {/* RIGHT — Sidebar */}
       <aside className="md:col-span-1 space-y-6">
