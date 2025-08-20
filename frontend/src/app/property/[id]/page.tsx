@@ -282,7 +282,8 @@ export default function PropertyDetailsPage() {
           </ul>
         </Section>
 
-                <Section>
+                       {/* Location */}
+        <Section>
           <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
           {hasCoords ? (
             <MapSingle
@@ -292,7 +293,9 @@ export default function PropertyDetailsPage() {
               scrollWheelZoom={false}
             />
           ) : (
-            <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
+            <p className="text-gray-500">
+              Map unavailable — no coordinates provided.
+            </p>
           )}
         </Section>
       </aside>
