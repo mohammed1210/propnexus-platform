@@ -189,8 +189,10 @@ export default function PropertyDetailsPage() {
         {/* Exit Strategy Generator */}
         <Section>
           <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
-          <ExitStrategyGenerator property={property} />
-        </Section>
+          <ExitStrategyGenerator
+  title={property.title}
+  location={property.location}
+/>
 
         {/* Mortgage */}
         <Section>
