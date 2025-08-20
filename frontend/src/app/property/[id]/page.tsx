@@ -232,48 +232,49 @@ export default function PropertyDetailsPage() {
           />
         </Section>
 
-                {/* Notes */}
-        <Section>
-          <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
-          <NotesFields propertyId={property.id} />
-        </Section>
-      </div> {/* ← close the left column container */}
+          {/* Notes */}
+<Section>
+  <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
+  <NotesFields propertyId={property.id} />
+</Section>
 
-      {/* RIGHT — Sidebar */}
-      <aside className="md:col-span-1 space-y-6">
-        <Section>
-          <SectionTitle icon={<span>⚡</span>}>Quick Actions</SectionTitle>
-          <CardActions
-            onSave={handleSaveDeal}
-            onPdf={handleDownloadPdf}
-            onCrm={() => alert("Sending to CRM…")}
-          />
-        </Section>
+</div>  {/* closes: <div className="md:col-span-2 space-y-6"> */}
 
-        <Section>
-          <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
-          <ul className="space-y-2 text-sm">
-            <li><Badge>Price</Badge> £{Number(property.price).toLocaleString()}</li>
-            <li><Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : "—"}</li>
-            <li><Badge>ROI</Badge> {property.roi_percent != null ? `${property.roi_percent}%` : "—"}</li>
-            <li><Badge>Beds</Badge> {property.bedrooms ?? "—"}</li>
-            <li><Badge>Baths</Badge> {property.bathrooms ?? "—"}</li>
-            {property.propertyType && <li><Badge>Type</Badge> {property.propertyType}</li>}
-            {property.investmentType && <li><Badge>Investment</Badge> {property.investmentType}</li>}
-          </ul>
-        </Section>
+{/* RIGHT — Sidebar */}
+<aside className="md:col-span-1 space-y-6">
+  <Section>
+    <SectionTitle icon={<span>⚡</span>}>Quick Actions</SectionTitle>
+    <CardActions
+      onSave={handleSaveDeal}
+      onPdf={handleDownloadPdf}
+      onCrm={() => alert('Sending to CRM…')}
+    />
+  </Section>
 
-        {/* Location */}
-        <Section>
-          <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
-          {hasCoords ? (
-            <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
-          ) : (
-            <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
-          )}
-        </Section>
-      </aside>
+  <Section>
+    <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
+    <ul className="space-y-2 text-sm">
+      <li><Badge>Price</Badge> £{Number(property.price).toLocaleString()}</li>
+      <li><Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}</li>
+      <li><Badge>ROI</Badge> {property.roi_percent != null ? `${property.roi_percent}%` : '—'}</li>
+      <li><Badge>Beds</Badge> {property.bedrooms ?? '—'}</li>
+      <li><Badge>Baths</Badge> {property.bathrooms ?? '—'}</li>
+      {property.propertyType && <li><Badge>Type</Badge> {property.propertyType}</li>}
+      {property.investmentType && <li><Badge>Investment</Badge> {property.investmentType}</li>}
+    </ul>
+  </Section>
 
-      {/* Floating Chatbot (fixed position) */}
-      <AIChatbot property={property} />
-    </div>
+  {/* Location */}
+  <Section>
+    <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
+    {hasCoords ? (
+      <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
+    ) : (
+      <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
+    )}
+  </Section>
+</aside>
+
+{/* Floating Chatbot (fixed position) */}
+<AIChatbot property={property} />
+</div>  {/* closes: outer grid wrapper */}
