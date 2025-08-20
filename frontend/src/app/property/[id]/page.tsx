@@ -282,7 +282,7 @@ export default function PropertyDetailsPage() {
           </ul>
         </Section>
 
-                       {/* Location */}
+        {/* Location */}
         <Section>
           <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
           {hasCoords ? (
@@ -299,7 +299,7 @@ export default function PropertyDetailsPage() {
           )}
         </Section>
       </aside>
-          
+
       {/* Floating Chatbot (fixed position) */}
       <AIChatbot property={property} />
     </div>
