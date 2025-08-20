@@ -4,9 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { Property } from '@/types';
 
 /** Allow latitude/longitude to be null (as your DB returns) */
-type LooseProperty = Omit<Property, 'latitude' | 'longitude'> & {
+type LooseProperty = Property & {
   latitude?: number | null;
   longitude?: number | null;
+  avg_rent?: number | null;
+  crime_index?: number | null;
+  ofsted_summary?: string | null;
+  transport_summary?: string | null;
 };
 
 type Message = { role: 'user' | 'assistant'; content: string };
