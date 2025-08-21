@@ -238,10 +238,9 @@ export default function PropertyDetailsPage() {
   <NotesFields propertyId={property.id} />
 </Section>
 
-</div>
-{/* closes left column div (md:col-span-2 space-y-6) */}
+</div> {/* end left column (md:col-span-2 space-y-6) */}
 
-/* RIGHT — Sidebar */
+{/* RIGHT — Sidebar */}
 <aside className="md:col-span-1 space-y-6">
   <Section>
     <SectionTitle icon={<span>⚡</span>}>Quick Actions</SectionTitle>
@@ -298,4 +297,4 @@ export default function PropertyDetailsPage() {
 
 {/* Floating Chatbot (fixed position) */}
 <AIChatbot property={property} />
-</div>
+</div>  {/* closes outer grid wrapper */}
