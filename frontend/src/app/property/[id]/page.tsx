@@ -184,13 +184,11 @@ export default function PropertyDetailsPage() {
         </Section>
 
         {/* Exit Strategy Generator */}
-        <Section>
-          <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
-          <ExitStrategyGenerator
-            title={property.title}
-            location={property.location}
-          />
-        </Section> {/* ✅ CLOSE THIS SECTION */}
+<Section>
+  <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
+  {/* Pass full property; cast keeps TS happy until we align types */}
+  <ExitStrategyGenerator property={property as any} />
+</Section>
 
         {/* Mortgage */}
         <Section>
