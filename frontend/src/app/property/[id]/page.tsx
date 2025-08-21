@@ -56,14 +56,14 @@ type Property = {
 };
 
 export default function PropertyDetailsPage() {
-  // Typed/safe params usage
+  // Typed params
   const params = useParams<{ id: string }>();
-  const id = (params?.id as string | undefined) ?? undefined;
+  const id = params?.id;
 
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // AI Score state — NOTE: items use `{ label, value }`
+  // AI Score state — items = { label, value }
   const [aiOverall, setAiOverall] = useState(0);
   const [aiItems, setAiItems] = useState<{ label: string; value: number }[]>(
     []
@@ -86,14 +86,14 @@ export default function PropertyDetailsPage() {
       console.error("Error fetching property:", error);
       setProperty(null);
     } else {
-      setProperty(data as Property);
-      computeAIScore(data as Property);
+      const p = data as Property;
+      setProperty(p);
+      computeAIScore(p);
     }
     setLoading(false);
   }
 
   function computeAIScore(p: Property) {
-    if (!p) return;
     const items = [
       { label: "Yield", value: Math.min(100, Number(p.yield_percent ?? 0) * 10) },
       { label: "ROI", value: Math.min(100, Number(p.roi_percent ?? 0) * 10) },
@@ -101,9 +101,7 @@ export default function PropertyDetailsPage() {
       { label: "Bathrooms", value: Math.min(100, Number(p.bathrooms ?? 0) * 25) },
     ];
     setAiItems(items);
-    const overall = Math.round(
-      items.reduce((sum, i) => sum + i.value, 0) / items.length
-    );
+    const overall = Math.round(items.reduce((s, i) => s + i.value, 0) / items.length);
     setAiOverall(overall);
   }
 
@@ -126,8 +124,7 @@ export default function PropertyDetailsPage() {
     Number.isFinite(property.latitude) &&
     Number.isFinite(property.longitude);
 
-  const postcode =
-    property.location?.trim().split(/\s+/).pop() ?? undefined;
+  const postcode = property.location?.trim().split(/\s+/).pop() ?? undefined;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -190,9 +187,10 @@ export default function PropertyDetailsPage() {
         <Section>
           <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
           <ExitStrategyGenerator
-  title={property.title}
-  location={property.location}
-/>
+            title={property.title}
+            location={property.location}
+          />
+        </Section> {/* ✅ CLOSE THIS SECTION */}
 
         {/* Mortgage */}
         <Section>
@@ -232,69 +230,77 @@ export default function PropertyDetailsPage() {
           />
         </Section>
 
-          {/* Notes */}
-<Section>
-  <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
-  <NotesFields propertyId={property.id} />
-</Section>
+        {/* Notes */}
+        <Section>
+          <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
+          <NotesFields propertyId={property.id} />
+        </Section>
+      </div> {/* ✅ end left column */}
 
-</div>
-{/* closes left column md:col-span-2 space-y-6 */}
+      {/* RIGHT - Sidebar */}
+      <aside className="md:col-span-1 space-y-6">
+        <Section>
+          <SectionTitle icon={<span>⚡</span>}>Quick Actions</SectionTitle>
+          <CardActions
+            onSave={handleSaveDeal}
+            onPdf={handleDownloadPdf}
+            onCrm={() => alert("Sending to CRM…")}
+          />
+        </Section>
 
-{/* RIGHT - Sidebar */}
-<aside className="md:col-span-1 space-y-6">
-  <Section>
-    <SectionTitle icon={<span>⚡</span>}>Quick Actions</SectionTitle>
-    <CardActions
-      onSave={handleSaveDeal}
-      onPdf={handleDownloadPdf}
-      onCrm={() => alert('Sending to CRM…')}
-    />
-  </Section>
+        <Section>
+          <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
+          <ul className="space-y-2 text-sm">
+            <li>
+              <Badge>Price</Badge> £{Number(property.price).toLocaleString()}
+            </li>
+            <li>
+              <Badge>Yield</Badge>{" "}
+              {property.yield_percent != null ? `${property.yield_percent}%` : "—"}
+            </li>
+            <li>
+              <Badge>ROI</Badge>{" "}
+              {property.roi_percent != null ? `${property.roi_percent}%` : "—"}
+            </li>
+            <li>
+              <Badge>Beds</Badge> {property.bedrooms ?? "—"}
+            </li>
+            <li>
+              <Badge>Baths</Badge> {property.bathrooms ?? "—"}
+            </li>
+            {property.propertyType && (
+              <li>
+                <Badge>Type</Badge> {property.propertyType}
+              </li>
+            )}
+            {property.investmentType && (
+              <li>
+                <Badge>Investment</Badge> {property.investmentType}
+              </li>
+            )}
+          </ul>
+        </Section>
 
-  <Section>
-    <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
-    <ul className="space-y-2 text-sm">
-      <li>
-        <Badge>Price</Badge> £{Number(property.price).toLocaleString()}
-      </li>
-      <li>
-        <Badge>Yield</Badge>{' '}
-        {property.yield_percent != null ? `${property.yield_percent}%` : '—'}
-      </li>
-      <li>
-        <Badge>ROI</Badge>{' '}
-        {property.roi_percent != null ? `${property.roi_percent}%` : '—'}
-      </li>
-      <li>
-        <Badge>Beds</Badge> {property.bedrooms ?? '—'}
-      </li>
-      <li>
-        <Badge>Baths</Badge> {property.bathrooms ?? '—'}
-      </li>
-      {property.propertyType && (
-        <li>
-          <Badge>Type</Badge> {property.propertyType}
-        </li>
-      )}
-      {property.investmentType && (
-        <li>
-          <Badge>Investment</Badge> {property.investmentType}
-        </li>
-      )}
-    </ul>
-  </Section>
+        {/* Location */}
+        <Section>
+          <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
+          {hasCoords ? (
+            <MapSingle
+              property={property}
+              height={260}
+              zoom={14}
+              scrollWheelZoom={false}
+            />
+          ) : (
+            <p className="text-gray-500">
+              Map unavailable — no coordinates provided.
+            </p>
+          )}
+        </Section>
+      </aside>
 
-  <Section>
-    <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
-    {hasCoords ? (
-      <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
-    ) : (
-      <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
-    )}
-  </Section>
-</aside>
-
-{/* Floating Chatbot (fixed position) */}
-<AIChatbot property={property} />
-</div> {/* closes outer grid wrapper */}
+      {/* Floating Chatbot (fixed position) — keep inside the same root */}
+      <AIChatbot property={property} />
+    </div>
+  );
+}
