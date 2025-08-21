@@ -186,7 +186,6 @@ export default function PropertyDetailsPage() {
         {/* Exit Strategy Generator */}
 <Section>
   <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
-  {/* @ts-expect-error – temporarily allow loose props while we align types */}
   <ExitStrategyGenerator {...(property as any)} />
 </Section>
 
