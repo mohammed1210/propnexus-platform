@@ -297,7 +297,15 @@ export default function PropertyDetailsPage() {
       </aside>
 
       {/* Floating Chatbot (fixed position) — keep inside the same root */}
-      <AIChatbot property={property} />
+<AIChatbot
+        property={{
+          ...(property as any),
+          bedrooms: property.bedrooms ?? undefined,
+          bathrooms: property.bathrooms ?? undefined,
+          roi_percent: property.roi_percent ?? undefined,
+          yield_percent: property.yield_percent ?? undefined,
+        }}
+      />
     </div>
   );
 }
