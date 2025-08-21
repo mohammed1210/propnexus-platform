@@ -1,0 +1,59 @@
+name: E2E Smoke
+on:
+  pull_request:
+    paths: ["frontend/**","backend/**",".github/workflows/e2e-smoke.yml"]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Backend
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Backend deps
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt uvicorn
+      - name: Start backend
+        working-directory: backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://example.supabase.co' }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY || 'service-key-placeholder' }}
+        run: nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
+
+      # Frontend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install + Build
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_API_BASE: "http://localhost:8000"
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://example.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'anon-key-placeholder' }}
+        run: |
+          npm ci
+          npm run build
+      - name: Start frontend
+        working-directory: frontend
+        run: nohup npm start -- -p 3000 &
+
+      # Smokes
+      - name: Wait for servers
+        run: |
+          for i in {1..30}; do
+            curl -fsS http://localhost:8000/properties && break || sleep 1
+          done
+          for i in {1..30}; do
+            curl -fsS http://localhost:3000 && break || sleep 1
+          done
+      - name: Check /properties
+        run: curl -fsS http://localhost:8000/properties | head
+      - name: Check frontend HTML
+        run: curl -fsS http://localhost:3000 | head

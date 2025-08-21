@@ -25,3 +25,4 @@ venv/
 # IDE/editor
 .vscode/
 .idea/
+.vercel
