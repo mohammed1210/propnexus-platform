@@ -11,21 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Use Node 20
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
-
-      - name: Install Vercel CLI
-        run: npm i -g vercel@latest
-
-      # Optional: pull Vercel envs (not strictly needed if you build on Vercel)
-      # - run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }} --cwd frontend
-
+      - run: npm i -g vercel@latest
       - name: Deploy to Vercel (Production)
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: vercel deploy --prod --confirm --token $VERCEL_TOKEN --cwd frontend
+        run: vercel deploy --prod --yes --token $VERCEL_TOKEN --cwd frontend
