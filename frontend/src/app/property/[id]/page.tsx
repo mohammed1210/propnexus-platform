@@ -162,7 +162,7 @@ export default function PropertyDetailsPage() {
           src={url}
           alt={`Thumbnail ${idx}`}
           onClick={() => setSelectedImage(url)}
-          className={`cursor-pointer w-24 h-16 md:w-full md:h-24 object-cover rounded-md ${selectedImage === url ? 'ring-2 ring-primary' : ''}`}
+    ing-2 ring-primary' : ''}`}
         />
       ))}
     </div>
@@ -183,7 +183,7 @@ export default function PropertyDetailsPage() {
         alt={property.title}
         className="w-full h-72 md:h-96 object-cover rounded-xl shadow-sm"
       />
-    </div>
+    </d`v>
     <div className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-2 overflow-x-auto">
       {images.map((url, idx) => (
         <img
@@ -200,18 +200,6 @@ export default function PropertyDetailsPage() {
           <SectionTitle icon={<span>🧠</span>}>
             AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
-
-          <AIScoreBars
-            overall={aiOverall}
-            items={aiItems}
-            showHeader={false}
-            className="mt-3"
-          />
-
-          <div className="mt-3">
-            <AIScoreInfo />
-          </div>
-        </Section>
 
         {/* Exit Strategy Generator */}
 <Section>
