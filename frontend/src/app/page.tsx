@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import PropertyCard from '../../components/PropertyCard';
 import { Property } from '../types';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
-// ===== Toast Component =====
 function Toast({ message, type }: { message: string; type: 'success' | 'error' }) {
   return (
     <div
@@ -28,8 +27,25 @@ function Toast({ message, type }: { message: string; type: 'success' | 'error' }
   );
 }
 
+// Helper to normalize any incoming object to the Property shape your UI expects
+function normalize(p: any): Property {
+  return {
+    id: p.id ?? p.property_id ?? p.uuid ?? p._id ?? null,
+    title: p.title ?? p.address ?? 'Untitled',
+    location: p.location ?? p.postcode ?? '',
+    price: p.price ?? null,
+    bedrooms: p.bedrooms ?? null,
+    bathrooms: p.bathrooms ?? null,
+    yield_percent: p.yield_percent ?? null,
+    roi_percent: p.roi_percent ?? null,
+    imageurl: p.imageurl ?? p.image ?? null,
+    // propertyType / investmentType may exist in your global type
+    propertyType: (p as any).propertyType ?? (p as any).property_type ?? undefined,
+    investmentType: (p as any).investmentType ?? (p as any).investment_type ?? undefined,
+  } as any;
+}
+
 export default function PropertiesPage() {
-  // ===== Data =====
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,24 +59,17 @@ export default function PropertiesPage() {
   const [minYield, setMinYield] = useState(0);
   const [minROI, setMinROI] = useState(0);
 
-  // ===== UI state =====
   const [showMap, setShowMap] = useState(true);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
 
-  // ===== Toast state =====
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Prefer env over hardcoded URL
-  const BACKEND_BASE =
-    (process.env.NEXT_PUBLIC_API_URL ||
-      'https://propnexus-backend-production.up.railway.app').replace(/\/+$/, '');
+  const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://propnexus-backend-production.up.railway.app').replace(/\/+$/, '');
 
-  // Hide map by default on smaller screens & on resize
   useEffect(() => {
     const apply = () => {
       if (typeof window !== 'undefined') setShowMap(window.innerWidth >= 1024);
@@ -70,14 +79,14 @@ export default function PropertiesPage() {
     return () => window.removeEventListener('resize', apply);
   }, []);
 
-  // === Fetch helper
-  async function fetchProperties() {
+  const fetchProperties = useCallback(async () => {
     try {
       setError(null);
       const res = await fetch(`${BACKEND_BASE}/properties`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setProperties(Array.isArray(data) ? data : []);
+      const normalized = (Array.isArray(data) ? data : []).map(normalize);
+      setProperties(normalized);
     } catch (e: any) {
       console.error('Error fetching properties:', e);
       setError('Could not load properties. Please try again.');
@@ -85,71 +94,52 @@ export default function PropertiesPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  // Initial fetch
-  useEffect(() => {
-    fetchProperties();
   }, [BACKEND_BASE]);
 
-  // 🔄 Auto-refresh every 60s
+  useEffect(() => { fetchProperties(); }, [fetchProperties]);
   useEffect(() => {
-    const interval = setInterval(fetchProperties, 60000);
-    return () => clearInterval(interval);
-  }, [BACKEND_BASE]);
+    const i = setInterval(fetchProperties, 60000);
+    return () => clearInterval(i);
+  }, [fetchProperties]);
 
-  // Unified scrape + search
   async function handleSearch() {
     if (!searchLocation.trim()) {
       showToast('⚠️ Enter a location first', 'error');
       return;
     }
-try {
-  showToast(`🔍 Scraping ${searchLocation}…`, 'success');
-  const res = await fetch(`${BACKEND_BASE}/scrape`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ location: searchLocation }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-
-  // 🔹 Normalize the shape of properties so IDs are consistent
-  const normalized = (Array.isArray(data.properties) ? data.properties : []).map((p: any) => ({
-    ...p,
-    id: p.id ?? p.property_id ?? p.uuid ?? p._id ?? null,
-  }));
-
-  setProperties(normalized);
-
-  showToast(`✅ Found ${normalized.length} properties in ${searchLocation}`, 'success');
-} catch (e: any) {
-  console.error('Error scraping/searching:', e);
-  showToast('❌ Error searching properties. Please try again.', 'error');
-}
+    try {
+      showToast(`🔍 Scraping ${searchLocation}…`, 'success');
+      const res = await fetch(`${BACKEND_BASE}/scrape`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location: searchLocation }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const normalized = (Array.isArray(data.properties) ? data.properties : []).map(normalize);
+      setProperties(normalized);
+      showToast(`✅ Found ${normalized.length} properties in ${searchLocation}`, 'success');
+    } catch (e) {
+      console.error('Error scraping/searching:', e);
+      showToast('❌ Error searching properties. Please try again.', 'error');
+    }
   }
 
-  // Derived filtered list (no extra setState loop)
   const filteredProperties = useMemo(() => {
     const q = searchLocation.trim().toLowerCase();
 
     return properties.filter((p) => {
-      const price = p.price ?? 0;
+      const price = Number(p.price ?? 0);
       const matchesPrice = price >= minPrice && price <= maxPrice;
 
       const matchesLocation = q ? (p.location ?? '').toLowerCase().includes(q) : true;
-      const matchesBedrooms =
-        bedrooms === 'Any' ? true : Number(p.bedrooms) === Number(bedrooms);
+      const matchesBedrooms = bedrooms === 'Any' ? true : Number(p.bedrooms) === Number(bedrooms);
       const matchesPropertyType =
-        propertyType === 'All'
-          ? true
-          : (p.propertyType ?? '').toLowerCase() === propertyType.toLowerCase();
+        propertyType === 'All' ? true : (p as any).propertyType?.toLowerCase() === propertyType.toLowerCase();
       const matchesInvestmentType =
-        investmentType === 'All'
-          ? true
-          : (p.investmentType ?? '').toLowerCase() === investmentType.toLowerCase();
-      const matchesYield = (p.yield_percent ?? 0) >= minYield;
-      const matchesROI = (p.roi_percent ?? 0) >= minROI;
+        investmentType === 'All' ? true : (p as any).investmentType?.toLowerCase() === investmentType.toLowerCase();
+      const matchesYield = Number(p.yield_percent ?? 0) >= minYield;
+      const matchesROI = Number(p.roi_percent ?? 0) >= minROI;
 
       return (
         matchesPrice &&
@@ -161,21 +151,11 @@ try {
         matchesROI
       );
     });
-  }, [
-    properties,
-    searchLocation,
-    minPrice,
-    maxPrice,
-    bedrooms,
-    propertyType,
-    investmentType,
-    minYield,
-    minROI,
-  ]);
+  }, [properties, searchLocation, minPrice, maxPrice, bedrooms, propertyType, investmentType, minYield, minROI]);
 
   return (
     <div className="main-wrapper">
-      {/* ===== Filters (sticky) ===== */}
+      {/* Filters */}
       <div className="sticky-primary" role="region" aria-label="Filters">
         <input
           className="filter-input large"
@@ -232,27 +212,16 @@ try {
         </button>
       </div>
 
-      {/* ===== Advanced filters ===== */}
+      {/* Advanced filters */}
       {showMoreFilters && (
         <div className="filters-row" role="region" aria-label="Advanced filters">
-          {/* Min/Max Price, Beds, Property Type, Yield, ROI */}
           <div>
             <label htmlFor="minPrice">Min Price</label>
-            <input
-              id="minPrice"
-              type="number"
-              value={minPrice}
-              onChange={(e) => setMinPrice(Number(e.target.value))}
-            />
+            <input id="minPrice" type="number" value={minPrice} onChange={(e) => setMinPrice(Number(e.target.value))} />
           </div>
           <div>
             <label htmlFor="maxPrice">Max Price</label>
-            <input
-              id="maxPrice"
-              type="number"
-              value={maxPrice}
-              onChange={(e) => setMaxPrice(Number(e.target.value))}
-            />
+            <input id="maxPrice" type="number" value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))} />
           </div>
           <div>
             <label htmlFor="beds">Bedrooms</label>
@@ -266,11 +235,7 @@ try {
           </div>
           <div>
             <label htmlFor="ptype">Property Type</label>
-            <select
-              id="ptype"
-              value={propertyType}
-              onChange={(e) => setPropertyType(e.target.value)}
-            >
+            <select id="ptype" value={propertyType} onChange={(e) => setPropertyType(e.target.value)}>
               <option value="All">All Types</option>
               <option value="Flat">Flat</option>
               <option value="House">House</option>
@@ -279,26 +244,16 @@ try {
           </div>
           <div>
             <label htmlFor="minYield">Min Yield (%)</label>
-            <input
-              id="minYield"
-              type="number"
-              value={minYield}
-              onChange={(e) => setMinYield(Number(e.target.value))}
-            />
+            <input id="minYield" type="number" value={minYield} onChange={(e) => setMinYield(Number(e.target.value))} />
           </div>
           <div>
             <label htmlFor="minRoi">Min ROI (%)</label>
-            <input
-              id="minRoi"
-              type="number"
-              value={minROI}
-              onChange={(e) => setMinROI(Number(e.target.value))}
-            />
+            <input id="minRoi" type="number" value={minROI} onChange={(e) => setMinROI(Number(e.target.value))} />
           </div>
         </div>
       )}
 
-      {/* ===== Content: list + optional map ===== */}
+      {/* Content */}
       <div className={`content-layout ${showMap ? '' : 'hide-map'}`}>
         <div className="property-list" aria-live="polite">
           {loading && <p style={{ color: '#64748b' }}>Loading properties…</p>}
@@ -306,21 +261,19 @@ try {
           {!loading && !error && filteredProperties.length === 0 && (
             <p style={{ color: '#64748b' }}>No matching properties found.</p>
           )}
-          {!loading &&
-            !error &&
-            filteredProperties.map((p) => <PropertyCard key={p.id} property={p} />)}
+          {!loading && !error &&
+            filteredProperties.map((p) => <PropertyCard key={String(p.id)} property={p as any} />)}
         </div>
 
         {showMap && filteredProperties.length > 0 && (
           <aside className="map-view">
             <div className="map-panel">
-              <MapView properties={filteredProperties} />
+              <MapView properties={filteredProperties as any[]} />
             </div>
           </aside>
         )}
       </div>
 
-      {/* Back to top */}
       <button
         className="back-to-top"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -329,7 +282,6 @@ try {
         ⬆ Back to Top
       </button>
 
-      {/* Toast */}
       {toast && <Toast message={toast.message} type={toast.type} />}
     </div>
   );
