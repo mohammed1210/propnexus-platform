@@ -1,16 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import PropertyCard from '../../components/PropertyCard';
 import { Property } from '../types';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
-// ===== Toast Component =====
+/* ------------------------------- Toast UI ------------------------------- */
 function Toast({ message, type }: { message: string; type: 'success' | 'error' }) {
   return (
     <div
+      role="status"
+      aria-live="polite"
       style={{
         position: 'fixed',
         bottom: '20px',
@@ -28,12 +30,14 @@ function Toast({ message, type }: { message: string; type: 'success' | 'error' }
   );
 }
 
+/* ------------------------------ Page Component ------------------------------ */
 export default function PropertiesPage() {
-  // ===== Data =====
+  /* Data */
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /* Filters */
   const [searchLocation, setSearchLocation] = useState('');
   const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(2_000_000);
@@ -43,105 +47,156 @@ export default function PropertiesPage() {
   const [minYield, setMinYield] = useState(0);
   const [minROI, setMinROI] = useState(0);
 
-  // ===== UI state =====
+  /* UI state */
   const [showMap, setShowMap] = useState(true);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
 
-  // ===== Toast state =====
+  /* Toast */
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    window.setTimeout(() => setToast(null), 3000);
   };
 
-  // Prefer env over hardcoded URL
-  const BACKEND_BASE =
-    (process.env.NEXT_PUBLIC_API_URL ||
-      'https://propnexus-backend-production.up.railway.app').replace(/\/+$/, '');
+  /* Derived config */
+  const BACKEND_BASE = (
+    process.env.NEXT_PUBLIC_API_URL || 'https://propnexus-backend-production.up.railway.app'
+  ).replace(/\/+$/, '');
 
-  // Hide map by default on smaller screens & on resize
+  /* Persist map toggle across sessions + hide by default on small screens */
   useEffect(() => {
-    const apply = () => {
-      if (typeof window !== 'undefined') setShowMap(window.innerWidth >= 1024);
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('pn:showMap') : null;
+    if (saved !== null) {
+      setShowMap(saved === '1');
+    } else if (typeof window !== 'undefined') {
+      setShowMap(window.innerWidth >= 1024);
+    }
+  }, []);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('pn:showMap', showMap ? '1' : '0');
+    }
+  }, [showMap]);
+  useEffect(() => {
+    const onResize = () => {
+      // only auto-hide when there’s no explicit user preference saved
+      const saved = window.localStorage.getItem('pn:showMap');
+      if (saved === null) setShowMap(window.innerWidth >= 1024);
     };
-    apply();
-    window.addEventListener('resize', apply);
-    return () => window.removeEventListener('resize', apply);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // === Fetch helper
-  async function fetchProperties() {
+  /* Fetch helpers with AbortController (avoid race conditions) */
+  const listAbortRef = useRef<AbortController | null>(null);
+
+  const fetchProperties = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    listAbortRef.current?.abort();
+    const controller = new AbortController();
+    listAbortRef.current = controller;
+
     try {
-      setError(null);
-      const res = await fetch(`${BACKEND_BASE}/properties`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const res = await fetch(`${BACKEND_BASE}/properties`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw new Error(`List failed: HTTP ${res.status}`);
+      }
+
       const data = await res.json();
       setProperties(Array.isArray(data) ? data : []);
     } catch (e: any) {
+      if (e?.name === 'AbortError') return;
       console.error('Error fetching properties:', e);
       setError('Could not load properties. Please try again.');
       setProperties([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, [BACKEND_BASE]);
 
-  // Initial fetch
+  /* Initial fetch + periodic refresh */
   useEffect(() => {
     fetchProperties();
-  }, [BACKEND_BASE]);
+  }, [fetchProperties]);
 
-  // 🔄 Auto-refresh every 60s
   useEffect(() => {
-    const interval = setInterval(fetchProperties, 60000);
-    return () => clearInterval(interval);
-  }, [BACKEND_BASE]);
+    const id = window.setInterval(fetchProperties, 60_000);
+    return () => window.clearInterval(id);
+  }, [fetchProperties]);
 
-  // Unified scrape + search
-  async function handleSearch() {
-    if (!searchLocation.trim()) {
+  /* Unified scrape + search */
+  const handleSearch = useCallback(async () => {
+    const q = searchLocation.trim();
+    if (!q) {
       showToast('⚠️ Enter a location first', 'error');
       return;
     }
+
     try {
-      showToast(`🔍 Scraping ${searchLocation}…`, 'success');
+      showToast(`🔍 Scraping ${q}…`, 'success');
+
       const res = await fetch(`${BACKEND_BASE}/scrape`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location: searchLocation }),
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ location: q }),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      if (!res.ok) throw new Error(`Scrape failed: HTTP ${res.status}`);
+
       const data = await res.json();
-      setProperties(data.properties || []);
-      showToast(`✅ Found ${data.count} properties in ${searchLocation}`, 'success');
+      const list: Property[] = Array.isArray(data?.properties) ? data.properties : [];
+      setProperties(list);
+
+      const count =
+        typeof data?.count === 'number'
+          ? data.count
+          : Array.isArray(data?.properties)
+          ? data.properties.length
+          : 0;
+
+      showToast(`✅ Found ${count} properties in ${q}`, 'success');
     } catch (err) {
       console.error(err);
       showToast('❌ Scrape failed. Please try again.', 'error');
     }
-  }
+  }, [BACKEND_BASE, searchLocation]);
 
-  // Derived filtered list (no extra setState loop)
+  /* Filtered results (memoized) */
   const filteredProperties = useMemo(() => {
     const q = searchLocation.trim().toLowerCase();
 
     return properties.filter((p) => {
-      const price = p.price ?? 0;
+      const price = Number(p.price ?? 0);
       const matchesPrice = price >= minPrice && price <= maxPrice;
 
-      const matchesLocation = q ? (p.location ?? '').toLowerCase().includes(q) : true;
+      const matchesLocation = q ? String(p.location ?? '').toLowerCase().includes(q) : true;
       const matchesBedrooms =
         bedrooms === 'Any' ? true : Number(p.bedrooms) === Number(bedrooms);
+
       const matchesPropertyType =
         propertyType === 'All'
           ? true
-          : (p.propertyType ?? '').toLowerCase() === propertyType.toLowerCase();
+          : String(p.propertyType ?? '').toLowerCase() === propertyType.toLowerCase();
+
       const matchesInvestmentType =
         investmentType === 'All'
           ? true
-          : (p.investmentType ?? '').toLowerCase() === investmentType.toLowerCase();
-      const matchesYield = (p.yield_percent ?? 0) >= minYield;
-      const matchesROI = (p.roi_percent ?? 0) >= minROI;
+          : String(p.investmentType ?? '').toLowerCase() === investmentType.toLowerCase();
+
+      const matchesYield = Number(p.yield_percent ?? 0) >= minYield;
+      const matchesROI = Number(p.roi_percent ?? 0) >= minROI;
 
       return (
         matchesPrice &&
@@ -165,6 +220,15 @@ export default function PropertiesPage() {
     minROI,
   ]);
 
+  /* Small loading skeleton while first load runs */
+  const Skeleton = () => (
+    <div style={{ display: 'grid', gap: '12px' }}>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} style={{ height: 120, background: '#e5e7eb', borderRadius: 12 }} />
+      ))}
+    </div>
+  );
+
   return (
     <div className="main-wrapper">
       {/* ===== Filters (sticky) ===== */}
@@ -176,6 +240,7 @@ export default function PropertiesPage() {
           placeholder="🔎 Search location"
           value={searchLocation}
           onChange={(e) => setSearchLocation(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           aria-label="Search location"
         />
 
@@ -201,6 +266,7 @@ export default function PropertiesPage() {
           className="small-button"
           title="Show more filters"
           aria-expanded={showMoreFilters}
+          aria-controls="advanced-filters"
         >
           ⚙️ Filters
         </button>
@@ -226,8 +292,12 @@ export default function PropertiesPage() {
 
       {/* ===== Advanced filters ===== */}
       {showMoreFilters && (
-        <div className="filters-row" role="region" aria-label="Advanced filters">
-          {/* Min/Max Price, Beds, Property Type, Yield, ROI */}
+        <div
+          id="advanced-filters"
+          className="filters-row"
+          role="region"
+          aria-label="Advanced filters"
+        >
           <div>
             <label htmlFor="minPrice">Min Price</label>
             <input
@@ -235,6 +305,7 @@ export default function PropertiesPage() {
               type="number"
               value={minPrice}
               onChange={(e) => setMinPrice(Number(e.target.value))}
+              min={0}
             />
           </div>
           <div>
@@ -244,6 +315,7 @@ export default function PropertiesPage() {
               type="number"
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
+              min={0}
             />
           </div>
           <div>
@@ -276,6 +348,7 @@ export default function PropertiesPage() {
               type="number"
               value={minYield}
               onChange={(e) => setMinYield(Number(e.target.value))}
+              min={0}
             />
           </div>
           <div>
@@ -285,6 +358,7 @@ export default function PropertiesPage() {
               type="number"
               value={minROI}
               onChange={(e) => setMinROI(Number(e.target.value))}
+              min={0}
             />
           </div>
         </div>
@@ -293,11 +367,20 @@ export default function PropertiesPage() {
       {/* ===== Content: list + optional map ===== */}
       <div className={`content-layout ${showMap ? '' : 'hide-map'}`}>
         <div className="property-list" aria-live="polite">
-          {loading && <p style={{ color: '#64748b' }}>Loading properties…</p>}
+          {loading && <Skeleton />}
           {!loading && error && <p style={{ color: '#b91c1c' }}>{error}</p>}
+
+          {!loading && !error && (
+            <p style={{ color: '#64748b', marginBottom: 12 }}>
+              Showing <strong>{filteredProperties.length}</strong> result
+              {filteredProperties.length === 1 ? '' : 's'}
+            </p>
+          )}
+
           {!loading && !error && filteredProperties.length === 0 && (
             <p style={{ color: '#64748b' }}>No matching properties found.</p>
           )}
+
           {!loading &&
             !error &&
             filteredProperties.map((p) => <PropertyCard key={p.id} property={p} />)}
