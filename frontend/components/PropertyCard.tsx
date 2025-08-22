@@ -1,20 +1,21 @@
 'use client';
 
-import React from 'react';
-import styles from './PropertyCard.module.css';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
+import styles from './PropertyCard.module.css';
 import supabase from '../lib/supabaseClient';
 
 interface Property {
-  id: string;
+  id: string | null;
   title: string;
   location: string;
-  price: number;
-  bedrooms: number;
-  bathrooms: number;
-  yield_percent: number;
-  roi_percent: number;
-  imageurl?: string;
+  price: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  yield_percent?: number | null;
+  roi_percent?: number | null;
+  imageurl?: string | null;
 }
 
 interface Props {
@@ -23,11 +24,13 @@ interface Props {
 
 export default function PropertyCard({ property }: Props) {
   const fallbackImage = '/placeholder.jpg';
+  const [imgSrc, setImgSrc] = useState(property.imageurl || fallbackImage);
 
   const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation
 
-    const userId = 'demo-user'; // Replace with session.user.id when auth is live
+    // TODO: replace with real session.user.id when auth is live
+    const userId = 'demo-user';
 
     const { error } = await supabase.from('saved_deals').insert({
       user_id: userId,
@@ -36,41 +39,44 @@ export default function PropertyCard({ property }: Props) {
 
     if (error) {
       console.error('Error saving deal:', error.message);
+      alert('❌ Could not save this deal.');
     } else {
       alert('✅ Deal saved!');
     }
   };
 
   return (
-    <Link href={`/property/${property.id}`} className={styles.card}>
-      <div className={styles.imageWrapper}>
-        <img
-          src={property.imageurl || fallbackImage}
-          alt={property.title}
+    <Link href={`/property/${property.id ?? ''}`} className={styles.card} prefetch>
+      <div className={styles.imageWrapper} style={{ position: 'relative', overflow: 'hidden', borderRadius: 12 }}>
+        <Image
+          src={imgSrc || fallbackImage}
+          alt={property.title || 'Property'}
+          fill
+          sizes="(max-width: 768px) 100vw, 50vw"
           className={styles.image}
-          onError={(e) => {
-            (e.target as HTMLImageElement).src = fallbackImage;
-          }}
+          onError={() => setImgSrc(fallbackImage)}
+          priority={false}
         />
       </div>
 
       <div className={styles.info}>
         <h2 className={styles.title}>{property.title}</h2>
         <p className={styles.location}>{property.location}</p>
+
         <p className={styles.price}>
-          £{property.price?.toLocaleString() || 'N/A'}
+          £{Number(property.price ?? 0).toLocaleString()}
         </p>
 
-        {(property.bedrooms || property.bathrooms) && (
+        {(property.bedrooms != null || property.bathrooms != null) && (
           <p className={styles.details}>
-            {property.bedrooms ? `🛏 ${property.bedrooms}` : ''}{" "}
-            {property.bathrooms ? `• 🛁 ${property.bathrooms}` : ''}
+            {property.bedrooms != null ? `🛏 ${property.bedrooms}` : ''}{' '}
+            {property.bathrooms != null ? `• 🛁 ${property.bathrooms}` : ''}
           </p>
         )}
 
         <div className={styles.metrics}>
           <span className={styles.badge}>
-            📈 Yield: {property.yield_percent || 0}% | ROI: {property.roi_percent || 0}%
+            📈 Yield: {property.yield_percent ?? 0}% | ROI: {property.roi_percent ?? 0}%
           </span>
         </div>
 
