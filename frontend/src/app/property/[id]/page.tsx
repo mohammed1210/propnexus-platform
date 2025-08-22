@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js"; // make sure this exists in /frontend deps
 import dynamic from "next/dynamic";
 
-// UI helpers
+// UI
 import Section from "@/components/ui/Section";
 import SectionTitle from "@/components/ui/SectionTitle";
 import CardActions from "@/components/ui/CardActions";
 import Badge from "@/components/ui/Badge";
 
-// Property detail components
+// Details widgets
 import MortgageCalculator from "@/components/property_details/MortgageCalculator";
 import StampDutyCalculator from "@/components/property_details/StampDutyCalculator";
 import AreaIntel from "@/components/property_details/AreaIntel";
@@ -22,18 +22,10 @@ import AIScoreInfo from "@/components/property_details/AIScoreInfo";
 import ExitStrategyGenerator from "@/components/property_details/ExitStrategyGenerator";
 import AIChatbot from "@/components/property_details/AIChatbot";
 
-// map (dynamic import to avoid SSR crash)
-const MapSingle = dynamic(
-  () => import("@/components/property_details/MapSingle"),
-  { ssr: false }
-);
+// Map (avoid SSR)
+const MapSingle = dynamic(() => import("@/components/property_details/MapSingle"), { ssr: false });
 
-// Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
+// --- Local type used by this page (matches your DB, null-safe) ---
 type Property = {
   id: string;
   title: string;
@@ -55,19 +47,22 @@ type Property = {
   investmentType?: string | null;
 };
 
+// Supabase client
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
 export default function PropertyDetailsPage() {
-  // Typed params
   const params = useParams<{ id: string }>();
-  const id = params?.id;
+  const id = (params?.id as string | undefined) ?? undefined;
 
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // AI Score state — items = { label, value }
+  // AI score state
   const [aiOverall, setAiOverall] = useState(0);
-  const [aiItems, setAiItems] = useState<{ label: string; value: number }[]>(
-    []
-  );
+  const [aiItems, setAiItems] = useState<{ label: string; value: number }[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -101,8 +96,7 @@ export default function PropertyDetailsPage() {
       { label: "Bathrooms", value: Math.min(100, Number(p.bathrooms ?? 0) * 25) },
     ];
     setAiItems(items);
-    const overall = Math.round(items.reduce((s, i) => s + i.value, 0) / items.length);
-    setAiOverall(overall);
+    setAiOverall(Math.round(items.reduce((s, i) => s + i.value, 0) / items.length));
   }
 
   async function handleSaveDeal() {
@@ -128,7 +122,7 @@ export default function PropertyDetailsPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
-      {/* LEFT — Main Content */}
+      {/* LEFT — Main */}
       <div className="md:col-span-2 space-y-6">
         {/* Header */}
         <header className="mb-4 md:mb-6">
@@ -146,7 +140,7 @@ export default function PropertyDetailsPage() {
           </div>
         </header>
 
-        {/* Hero Image */}
+        {/* Hero */}
         {property.imageurl && (
           <img
             src={property.imageurl}
@@ -171,23 +165,18 @@ export default function PropertyDetailsPage() {
             AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
 
-          <AIScoreBars
-            overall={aiOverall}
-            items={aiItems}
-            showHeader={false}
-            className="mt-3"
-          />
-
+          <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-3" />
           <div className="mt-3">
             <AIScoreInfo />
           </div>
         </Section>
 
         {/* Exit Strategy Generator */}
-<Section>
-  <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
-  <ExitStrategyGenerator {...(property as any)} />
-</Section>
+        <Section>
+          <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
+          {/* Pass full property; light cast avoids a big refactor of that component's props */}
+          <ExitStrategyGenerator property={property as any} />
+        </Section>
 
         {/* Mortgage */}
         <Section>
@@ -232,9 +221,9 @@ export default function PropertyDetailsPage() {
           <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
           <NotesFields propertyId={property.id} />
         </Section>
-      </div> {/* ✅ end left column */}
+      </div>
 
-      {/* RIGHT - Sidebar */}
+      {/* RIGHT — Sidebar */}
       <aside className="md:col-span-1 space-y-6">
         <Section>
           <SectionTitle icon={<span>⚡</span>}>Quick Actions</SectionTitle>
@@ -282,30 +271,16 @@ export default function PropertyDetailsPage() {
         <Section>
           <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
           {hasCoords ? (
-            <MapSingle
-              property={property}
-              height={260}
-              zoom={14}
-              scrollWheelZoom={false}
-            />
+            <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
           ) : (
-            <p className="text-gray-500">
-              Map unavailable — no coordinates provided.
-            </p>
+            <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
           )}
         </Section>
       </aside>
 
-      {/* Floating Chatbot (fixed position) — keep inside the same root */}
-<AIChatbot
-        property={{
-          ...(property as any),
-          bedrooms: property.bedrooms ?? undefined,
-          bathrooms: property.bathrooms ?? undefined,
-          roi_percent: property.roi_percent ?? undefined,
-          yield_percent: property.yield_percent ?? undefined,
-        }}
-      />
+      {/* Floating Chatbot */}
+      {/* Cast to a loose/partial shape so nullables don’t fight the component’s type */}
+      <AIChatbot property={property as unknown as Partial<any>} />
     </div>
   );
 }
