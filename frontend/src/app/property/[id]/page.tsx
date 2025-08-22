@@ -186,18 +186,13 @@ export default function PropertyDetailsPage() {
     </d`v>
     <div className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-2 overflow-x-auto">
       {images.map((url, idx) => (
-        <img
-          key={idx}
-          src={url}
-          alt={`Thumbnail ${idx}`}
-          onClick={() => setSelectedImage(url)}
-          className={`cursor-pointer w-24 h-16 md:w-full md:h-24 object-cover rounded-md ${selectedImage === url ? 'ring-2 ring-primary' : ''}`}
-        />
-      ))}
-    </div>
-  </div>
-   <Section id="ai-score-section">
-          <SectionTitle icon={<span>🧠</span>}>
+        <im<i<i<<img
+      key={idx}
+      src={url}
+      alt={`Thumbnail ${idx}`}
+      onClick={() => setSelectedImage(url)}
+      className="cursor-pointer w-24 h-16 md:w-full md:h-24 object-cover rounded-md"
+    />
             AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
 
@@ -207,15 +202,15 @@ export default function PropertyDetailsPage() {
   <ExitStrategyGenerator {...(property as any)} />
 </Section>
 
-        {/* Mortgage */}
-        <Section>
-          <MortgageCalculator price={Number(property.price)} />
-        </Section>
+        {/* Calculators */}
+<Section>
+  <SectionTitle icon={<span>💰</span>}>Calculators</SectionTitle>
+  <div className="space-y-4">
+    <MortgageCalculator price={Number(property.price)} />
+    <StampDutyCalculator price={Number(property.price)} />
+  </div>
+</Section>
 
-        {/* Stamp Duty */}
-        <Section>
-          <StampDutyCalculator price={Number(property.price)} />
-        </Section>
 
         {/* Area Intelligence */}
         <Section>
