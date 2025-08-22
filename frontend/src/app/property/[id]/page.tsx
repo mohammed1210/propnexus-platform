@@ -172,11 +172,9 @@ export default function PropertyDetailsPage() {
         </Section>
 
         {/* Exit Strategy Generator */}
-        <Section>
-          <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
-          {/* Pass full property; light cast avoids a big refactor of that component's props */}
-          <Section>
+<Section>
   <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
+  {/* Pass full property; light cast avoids a big refactor of that component's props */}
   <ExitStrategyGenerator
     title={property.title}
     location={property.location}
