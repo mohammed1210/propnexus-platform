@@ -69,7 +69,7 @@ export default function AnalyticsPage() {
           ((init.avgYield * init.count) + Number(d.yield_percent ?? 0)) / (init.count + 1),
       });
     });
-    const labels = [...map.keys()].sort();
+    const labels = Array.from(map.keys()).sort();
     return {
       labels,
       countSeries: labels.map(l => map.get(l)!.count),
