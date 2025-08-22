@@ -17,7 +17,7 @@ jobs:
           curl -fsSL https://railway.app/install.sh | sh
           echo "$HOME/.railway/bin" >> $GITHUB_PATH
 
-      # Optional sanity check: does backend still install?
+      # Optional sanity check
       - name: Backend deps (check)
         working-directory: backend
         run: |
@@ -27,4 +27,4 @@ jobs:
       - name: Deploy with Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service "propnexus-backend" --yes
+        run: railway up --service "propnexus-backend" --path backend --ci
