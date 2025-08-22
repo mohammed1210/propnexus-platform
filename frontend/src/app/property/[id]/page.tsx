@@ -175,8 +175,19 @@ export default function PropertyDetailsPage() {
         <Section>
           <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
           {/* Pass full property; light cast avoids a big refactor of that component's props */}
-          <ExitStrategyGenerator property={property as any} />
-        </Section>
+          <Section>
+  <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
+  <ExitStrategyGenerator
+    title={property.title}
+    location={property.location}
+    price={Number(property.price)}
+    yield_percent={property.yield_percent ?? 0}
+    roi_percent={property.roi_percent ?? 0}
+    propertyType={property.propertyType ?? ''}
+    investmentType={property.investmentType ?? ''}
+    description={property.description ?? ''}
+  />
+</Section>
 
         {/* Mortgage */}
         <Section>
