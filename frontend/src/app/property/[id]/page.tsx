@@ -53,6 +53,8 @@ type Property = {
   transport_summary?: string | null;
   propertyType?: string | null;
   investmentType?: string | null;
+  // optional array if we add multiple images later
+  images?: string[] | null;
 };
 
 export default function PropertyDetailsPage() {
@@ -101,7 +103,9 @@ export default function PropertyDetailsPage() {
       { label: "Bathrooms", value: Math.min(100, Number(p.bathrooms ?? 0) * 25) },
     ];
     setAiItems(items);
-    const overall = Math.round(items.reduce((s, i) => s + i.value, 0) / items.length);
+    const overall = Math.round(
+      items.reduce((s, i) => s + i.value, 0) / items.length
+    );
     setAiOverall(overall);
   }
 
@@ -125,9 +129,22 @@ export default function PropertyDetailsPage() {
     Number.isFinite(property.longitude);
 
   const postcode = property.location?.trim().split(/\s+/).pop() ?? undefined;
-    const images = (property as any)?.images || (property?.imageurl ? [property.imageurl] : []);
-  const [selectedImage, setSelectedImage] = useState<string | null>(images[0] ?? null);
 
+  // --- Gallery data/state ---
+  const images: string[] =
+    property.images && property.images.length
+      ? property.images
+      : property.imageurl
+      ? [property.imageurl]
+      : [];
+
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  // Set/refresh selected image when property/images change
+  useEffect(() => {
+    setSelectedImage(images[0] ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [property?.id, images.length]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -149,25 +166,34 @@ export default function PropertyDetailsPage() {
           </div>
         </header>
 
-        {/* Hero Image */}
-       {images.length > 0 && (
-  <div className="md:grid md:grid-cols-3 gap-4 sticky top-20">
-    <div className="md:col-span-2">
-      <img src={selectedImage || images[0]} alt={property.title} className="w-full h-72 md:h-96 object-cover rounded-xl shadow-sm" />
-    </div>
-    <div className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-2 overflow-x-auto">
-      {images.map((url, idx) => (
-        <img
-          key={idx}
-          src={url}
-          alt={`Thumbnail ${idx}`}
-          onClick={() => setSelectedImage(url)}
-    ing-2 ring-primary' : ''}`}
-        />
-      ))}
-    </div>
-  </div>
-)} )}
+        {/* Hero Gallery — sticky like Rightmove */}
+        {images.length > 0 && (
+          <div className="md:grid md:grid-cols-3 gap-4 md:sticky md:top-4">
+            <div className="md:col-span-2">
+              <img
+                src={(selectedImage ?? images[0]) as string}
+                alt={property.title}
+                className="w-full h-72 md:h-96 object-cover rounded-xl shadow-sm"
+              />
+            </div>
+
+            <div className="flex md:flex-col gap-2 overflow-x-auto">
+              {images.map((url, idx) => (
+                <img
+                  key={idx}
+                  src={url}
+                  alt={`Thumbnail ${idx + 1}`}
+                  onClick={() => setSelectedImage(url)}
+                  className={`cursor-pointer w-24 h-16 md:w-full md:h-24 object-cover rounded-md ${
+                    (selectedImage ?? images[0]) === url
+                      ? "ring-2 ring-primary"
+                      : ""
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Description */}
         {property.description && (
@@ -176,41 +202,42 @@ export default function PropertyDetailsPage() {
             <p className="text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">
               {property.description}
             </p>
-       <div className="md:grid md:grid-cols-3 gap-4 sticky top-20">
-    <div className="md:col-span-2">
-      <img
-        src={selectedImage || images[0]}
-        alt={property.title}
-        className="w-full h-72 md:h-96 object-cover rounded-xl shadow-sm"
-      />
-    </d`v>
-    <div className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-2 overflow-x-auto">
-      {images.map((url, idx) => (
-        <im<i<i<<img
-      key={idx}
-      src={url}
-      alt={`Thumbnail ${idx}`}
-      onClick={() => setSelectedImage(url)}
-      className="cursor-pointer w-24 h-16 md:w-full md:h-24 object-cover rounded-md"
-    />
-            AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
+          </Section>
+        )}
+
+        {/* AI Deal Score */}
+        <Section id="ai-score-section">
+          <SectionTitle icon={<span>🧠</span>}>
+            AI Deal Score{" "}
+            <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
 
+          <AIScoreBars
+            overall={aiOverall}
+            items={aiItems}
+            showHeader={false}
+            className="mt-3"
+          />
+
+          <div className="mt-3">
+            <AIScoreInfo />
+          </div>
+        </Section>
+
         {/* Exit Strategy Generator */}
-<Section>
-  <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
-  <ExitStrategyGenerator {...(property as any)} />
-</Section>
+        <Section>
+          <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
+          <ExitStrategyGenerator {...(property as any)} />
+        </Section>
 
-        {/* Calculators */}
-<Section>
-  <SectionTitle icon={<span>💰</span>}>Calculators</SectionTitle>
-  <div className="space-y-4">
-    <MortgageCalculator price={Number(property.price)} />
-    <StampDutyCalculator price={Number(property.price)} />
-  </div>
-</Section>
-
+        {/* Calculators (unified) */}
+        <Section>
+          <SectionTitle icon={<span>💰</span>}>Calculators</SectionTitle>
+          <div className="space-y-4">
+            <MortgageCalculator price={Number(property.price)} />
+            <StampDutyCalculator price={Number(property.price)} />
+          </div>
+        </Section>
 
         {/* Area Intelligence */}
         <Section>
@@ -245,7 +272,7 @@ export default function PropertyDetailsPage() {
           <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
           <NotesFields propertyId={property.id} />
         </Section>
-      </div> {/* ✅ end left column */}
+      </div>
 
       {/* RIGHT - Sidebar */}
       <aside className="md:col-span-1 space-y-6">
@@ -309,8 +336,8 @@ export default function PropertyDetailsPage() {
         </Section>
       </aside>
 
-      {/* Floating Chatbot (fixed position) — keep inside the same root */}
-<AIChatbot
+      {/* Floating Chatbot (fixed position) */}
+      <AIChatbot
         property={{
           ...(property as any),
           bedrooms: property.bedrooms ?? undefined,
