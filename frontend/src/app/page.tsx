@@ -104,21 +104,29 @@ export default function PropertiesPage() {
       showToast('⚠️ Enter a location first', 'error');
       return;
     }
-    try {
-      showToast(`🔍 Scraping ${searchLocation}…`, 'success');
-      const res = await fetch(`${BACKEND_BASE}/scrape`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location: searchLocation }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setProperties(data.properties || []);
-      showToast(`✅ Found ${data.count} properties in ${searchLocation}`, 'success');
-    } catch (err) {
-      console.error(err);
-      showToast('❌ Scrape failed. Please try again.', 'error');
-    }
+try {
+  showToast(`🔍 Scraping ${searchLocation}…`, 'success');
+  const res = await fetch(`${BACKEND_BASE}/scrape`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ location: searchLocation }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+
+  // 🔹 Normalize the shape of properties so IDs are consistent
+  const normalized = (Array.isArray(data.properties) ? data.properties : []).map((p: any) => ({
+    ...p,
+    id: p.id ?? p.property_id ?? p.uuid ?? p._id ?? null,
+  }));
+
+  setProperties(normalized);
+
+  showToast(`✅ Found ${normalized.length} properties in ${searchLocation}`, 'success');
+} catch (e: any) {
+  console.error('Error scraping/searching:', e);
+  showToast('❌ Error searching properties. Please try again.', 'error');
+}
   }
 
   // Derived filtered list (no extra setState loop)
