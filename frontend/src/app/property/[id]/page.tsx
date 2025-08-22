@@ -125,6 +125,9 @@ export default function PropertyDetailsPage() {
     Number.isFinite(property.longitude);
 
   const postcode = property.location?.trim().split(/\s+/).pop() ?? undefined;
+    const images = (property as any)?.images || (property?.imageurl ? [property.imageurl] : []);
+  const [selectedImage, setSelectedImage] = useState<string | null>(images[0] ?? null);
+
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -147,13 +150,24 @@ export default function PropertyDetailsPage() {
         </header>
 
         {/* Hero Image */}
-        {property.imageurl && (
-          <img
-            src={property.imageurl}
-            alt={property.title}
-            className="w-full h-72 md:h-96 object-cover rounded-xl shadow-sm"
-          />
-        )}
+       {images.length > 0 && (
+  <div className="md:grid md:grid-cols-3 gap-4 sticky top-20">
+    <div className="md:col-span-2">
+      <img src={selectedImage || images[0]} alt={property.title} className="w-full h-72 md:h-96 object-cover rounded-xl shadow-sm" />
+    </div>
+    <div className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-2 overflow-x-auto">
+      {images.map((url, idx) => (
+        <img
+          key={idx}
+          src={url}
+          alt={`Thumbnail ${idx}`}
+          onClick={() => setSelectedImage(url)}
+          className={`cursor-pointer w-24 h-16 md:w-full md:h-24 object-cover rounded-md ${selectedImage === url ? 'ring-2 ring-primary' : ''}`}
+        />
+      ))}
+    </div>
+  </div>
+)} )}
 
         {/* Description */}
         {property.description && (
@@ -162,11 +176,27 @@ export default function PropertyDetailsPage() {
             <p className="text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">
               {property.description}
             </p>
-          </Section>
-        )}
-
-        {/* AI Deal Score */}
-        <Section id="ai-score-section">
+       <div className="md:grid md:grid-cols-3 gap-4 sticky top-20">
+    <div className="md:col-span-2">
+      <img
+        src={selectedImage || images[0]}
+        alt={property.title}
+        className="w-full h-72 md:h-96 object-cover rounded-xl shadow-sm"
+      />
+    </div>
+    <div className="flex md:flex-col space-x-2 md:space-x-0 md:space-y-2 overflow-x-auto">
+      {images.map((url, idx) => (
+        <img
+          key={idx}
+          src={url}
+          alt={`Thumbnail ${idx}`}
+          onClick={() => setSelectedImage(url)}
+          className={`cursor-pointer w-24 h-16 md:w-full md:h-24 object-cover rounded-md ${selectedImage === url ? 'ring-2 ring-primary' : ''}`}
+        />
+      ))}
+    </div>
+  </div>
+   <Section id="ai-score-section">
           <SectionTitle icon={<span>🧠</span>}>
             AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
