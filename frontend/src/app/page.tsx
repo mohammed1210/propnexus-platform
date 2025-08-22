@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import PropertyCard from '../../components/PropertyCard';
 import { Property } from '../types';
@@ -22,6 +22,8 @@ function Toast({ message, type }: { message: string; type: 'success' | 'error' }
         boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
         zIndex: 1000,
       }}
+      role="status"
+      aria-live="polite"
     >
       {message}
     </div>
@@ -50,15 +52,20 @@ export default function PropertiesPage() {
   // ===== Toast state =====
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const showToast = (message: string, type: 'success' | 'error') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
+    const id = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(id);
+  }, []);
 
   // Prefer env over hardcoded URL
-  const BACKEND_BASE =
-    (process.env.NEXT_PUBLIC_API_URL ||
-      'https://propnexus-backend-production.up.railway.app').replace(/\/+$/, '');
+  const BACKEND_BASE = useMemo(
+    () =>
+      (process.env.NEXT_PUBLIC_API_URL ||
+        'https://propnexus-backend-production.up.railway.app'
+      ).replace(/\/+$/, ''),
+    []
+  );
 
   // Hide map by default on smaller screens & on resize
   useEffect(() => {
@@ -70,14 +77,21 @@ export default function PropertiesPage() {
     return () => window.removeEventListener('resize', apply);
   }, []);
 
-  // === Fetch helper
-  async function fetchProperties() {
+  // === Fetch helper (wrapped to satisfy eslint deps)
+  const fetchProperties = useCallback(async () => {
     try {
       setError(null);
-      const res = await fetch(`${BACKEND_BASE}/properties`);
+      const res = await fetch(`${BACKEND_BASE}/properties`, { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setProperties(Array.isArray(data) ? data : []);
+
+      // 🔹 Normalize the shape of properties so IDs are consistent
+      const normalized = (Array.isArray(data) ? data : []).map((p: any) => ({
+        ...p,
+        id: p.id ?? p.property_id ?? p.uuid ?? p._id ?? null,
+      }));
+
+      setProperties(normalized);
     } catch (e: any) {
       console.error('Error fetching properties:', e);
       setError('Could not load properties. Please try again.');
@@ -85,49 +99,48 @@ export default function PropertiesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [BACKEND_BASE]);
 
   // Initial fetch
   useEffect(() => {
     fetchProperties();
-  }, [BACKEND_BASE]);
+  }, [fetchProperties]);
 
   // 🔄 Auto-refresh every 60s
   useEffect(() => {
-    const interval = setInterval(fetchProperties, 60000);
+    const interval = setInterval(fetchProperties, 60_000);
     return () => clearInterval(interval);
-  }, [BACKEND_BASE]);
+  }, [fetchProperties]);
 
   // Unified scrape + search
-  async function handleSearch() {
+  const handleSearch = useCallback(async () => {
     if (!searchLocation.trim()) {
       showToast('⚠️ Enter a location first', 'error');
       return;
     }
-try {
-  showToast(`🔍 Scraping ${searchLocation}…`, 'success');
-  const res = await fetch(`${BACKEND_BASE}/scrape`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ location: searchLocation }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
+    try {
+      showToast(`🔍 Scraping ${searchLocation}…`, 'success');
+      const res = await fetch(`${BACKEND_BASE}/scrape`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location: searchLocation }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
 
-  // 🔹 Normalize the shape of properties so IDs are consistent
-  const normalized = (Array.isArray(data.properties) ? data.properties : []).map((p: any) => ({
-    ...p,
-    id: p.id ?? p.property_id ?? p.uuid ?? p._id ?? null,
-  }));
+      // 🔹 Normalize the shape of properties so IDs are consistent
+      const normalized = (Array.isArray(data.properties) ? data.properties : []).map((p: any) => ({
+        ...p,
+        id: p.id ?? p.property_id ?? p.uuid ?? p._id ?? null,
+      }));
 
-  setProperties(normalized);
-
-  showToast(`✅ Found ${normalized.length} properties in ${searchLocation}`, 'success');
-} catch (e: any) {
-  console.error('Error scraping/searching:', e);
-  showToast('❌ Error searching properties. Please try again.', 'error');
-}
-  }
+      setProperties(normalized);
+      showToast(`✅ Found ${normalized.length} properties in ${searchLocation}`, 'success');
+    } catch (e: any) {
+      console.error('Error scraping/searching:', e);
+      showToast('❌ Error searching properties. Please try again.', 'error');
+    }
+  }, [BACKEND_BASE, searchLocation, showToast]);
 
   // Derived filtered list (no extra setState loop)
   const filteredProperties = useMemo(() => {
@@ -187,7 +200,7 @@ try {
           aria-label="Search location"
         />
 
-        <button onClick={handleSearch} className="small-button" title="Search properties">
+        <button onClick={handleSearch} className="small-button" title="Search properties" type="button">
           🔍 Search
         </button>
 
@@ -209,6 +222,7 @@ try {
           className="small-button"
           title="Show more filters"
           aria-expanded={showMoreFilters}
+          type="button"
         >
           ⚙️ Filters
         </button>
@@ -218,6 +232,7 @@ try {
           className="small-button"
           style={{ backgroundColor: showMap ? '#334155' : '#3b82f6', color: '#fff' }}
           aria-pressed={showMap}
+          type="button"
         >
           {showMap ? 'Hide Map 🗺️' : 'Show Map 🗺️'}
         </button>
@@ -227,6 +242,7 @@ try {
           style={{ marginLeft: 'auto' }}
           onClick={() => document.body.classList.toggle('dark-mode')}
           aria-label="Toggle dark mode"
+          type="button"
         >
           🌙 Dark Mode
         </button>
@@ -325,6 +341,7 @@ try {
         className="back-to-top"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         aria-label="Back to top"
+        type="button"
       >
         ⬆ Back to Top
       </button>
