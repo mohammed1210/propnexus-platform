@@ -7,7 +7,7 @@ import styles from './PropertyCard.module.css';
 import supabase from '../lib/supabaseClient';
 
 interface Property {
-  id: string | null;
+  id: string | null;             // ✅ use id only
   title: string;
   location: string;
   price: number | null;
@@ -28,19 +28,18 @@ export default function PropertyCard({ property }: Props) {
     property.imageurl && property.imageurl.startsWith('http')
       ? property.imageurl
       : fallbackImage;
+
   const [imgSrc, setImgSrc] = useState(initial);
 
-  const pid = property.id ?? ''; // ✅ use only id
+  const pid = property.id ?? ''; // ✅ route & save with id
 
   const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation
-
-    // TODO: replace with real session.user.id when auth is live
-    const userId = 'demo-user';
+    const userId = 'demo-user'; // TODO: replace with real session.user.id
 
     const { error } = await supabase.from('saved_deals').insert({
       user_id: userId,
-      property_id: pid, // ✅ save the same id we route with
+      property_id: pid,
     });
 
     if (error) {
@@ -61,8 +60,6 @@ export default function PropertyCard({ property }: Props) {
           sizes="(max-width: 768px) 100vw, 50vw"
           className={styles.image}
           onError={() => setImgSrc(fallbackImage)}
-          // If any hosts still 400 through the optimizer, uncomment the next line temporarily:
-          // unoptimized
           priority={false}
         />
       </div>
