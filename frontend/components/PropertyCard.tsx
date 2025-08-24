@@ -8,7 +8,6 @@ import supabase from '../lib/supabaseClient';
 
 interface Property {
   id: string | null;
-  uuid?: string | null; // ✅ some rows use uuid
   title: string;
   location: string;
   price: number | null;
@@ -31,7 +30,7 @@ export default function PropertyCard({ property }: Props) {
       : fallbackImage;
   const [imgSrc, setImgSrc] = useState(initial);
 
-  const pid = property.uuid ?? property.id ?? ''; // ✅ prefer uuid
+  const pid = property.id ?? ''; // ✅ use only id
 
   const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation
