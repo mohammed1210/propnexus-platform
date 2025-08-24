@@ -26,6 +26,7 @@ const MapSingle = dynamic(() => import('@/components/property_details/MapSingle'
 
 type Property = {
   id: string;
+  uuid?: string | null;
   title: string;
   location: string;
   price: number;
@@ -62,13 +63,31 @@ export default function PropertyDetailsPage() {
 
   const fetchProperty = useCallback(async (propId: string) => {
     setLoading(true);
-    const { data, error } = await supabase.from('properties').select('*').eq('id', propId).single();
+
+    // ✅ Try uuid first
+    let { data, error } = await supabase
+      .from('properties')
+      .select('*')
+      .eq('uuid', propId)
+      .maybeSingle();
+
+    // ✅ Fallback to id if no row found
+    if (!data) {
+      const res = await supabase
+        .from('properties')
+        .select('*')
+        .eq('id', propId)
+        .maybeSingle();
+      data = res.data;
+      error = res.error ?? error;
+    }
+
     if (error) {
       console.error('Error fetching property:', error);
       setProperty(null);
     } else {
       setProperty(data as Property);
-      computeAIScore(data as Property);
+      if (data) computeAIScore(data as Property);
     }
     setLoading(false);
   }, []);
@@ -90,7 +109,8 @@ export default function PropertyDetailsPage() {
 
   async function handleSaveDeal() {
     if (!property) return;
-    await supabase.from('saved_deals').insert([{ property_id: property.id }]);
+    const pid = property.uuid ?? property.id;
+    await supabase.from('saved_deals').insert([{ property_id: pid }]);
     alert('Deal saved!');
   }
 
@@ -225,7 +245,7 @@ export default function PropertyDetailsPage() {
         {/* Notes */}
         <Section>
           <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
-          <NotesFields propertyId={property.id} />
+          <NotesFields propertyId={(property.uuid ?? property.id) as string} />
         </Section>
       </div>
 
