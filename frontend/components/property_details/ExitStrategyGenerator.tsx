@@ -3,20 +3,41 @@
 import { useMemo, useState } from 'react';
 import styles from './ExitStrategyGenerator.module.css';
 
-type Props = {
-  title: string;
-  location: string;
-  price: number;
-  yield_percent: number;
-  roi_percent: number;
-  propertyType: string;
-  investmentType: string;
-  description?: string;
+/** Minimal shape we care about (loose + nullable for safety) */
+type LooseProperty = {
+  title?: string | null;
+  location?: string | null;
+  price?: number | null;
+  yield_percent?: number | null;
+  roi_percent?: number | null;
+  propertyType?: string | null;
+  investmentType?: string | null;
+  description?: string | null;
 };
+
+/** Props: either pass a single `property` OR the individual fields */
+type Props =
+  | { property: LooseProperty }
+  | {
+      title?: string;
+      location?: string;
+      price?: number;
+      yield_percent?: number;
+      roi_percent?: number;
+      propertyType?: string;
+      investmentType?: string;
+      description?: string;
+    };
 
 type StrategyInput =
   | string
-  | { strategy?: string; text?: string; title?: string; content?: string; description?: string }
+  | {
+      strategy?: string;
+      text?: string;
+      title?: string;
+      content?: string;
+      description?: string;
+    }
   | unknown;
 
 /* --- Helpers ------------------------------------------------------------- */
@@ -24,7 +45,6 @@ type StrategyInput =
 const API = (process.env.NEXT_PUBLIC_API_URL || '').trim();
 
 function stripMarkdown(s: string): string {
-  // remove **bold**, *italic*, stray bullets/dashes, and squash whitespace
   return s
     .replace(/\*\*(.*?)\*\*/g, '$1')
     .replace(/\*(.*?)\*/g, '$1')
@@ -52,29 +72,32 @@ function normalize(item: StrategyInput): string {
 }
 
 function splitBlobToList(blob: string): string[] {
-  // Accepts a single text blob and returns clean bullet paragraphs
   const lines = blob
     .split(/\n+/)
     .map((l) => l.replace(/^\s*(\d+\.|[-•])\s*/, '').trim())
     .filter(Boolean);
 
-  // If it already looks like paragraphs, keep; otherwise join into a single item
   if (lines.length > 1) return lines.map(stripMarkdown);
   return [stripMarkdown(blob)];
 }
 
 /* --- Component ----------------------------------------------------------- */
 
-export default function ExitStrategyGenerator({
-  title,
-  location,
-  price,
-  yield_percent,
-  roi_percent,
-  propertyType,
-  investmentType,
-  description = '',
-}: Props) {
+export default function ExitStrategyGenerator(props: Props) {
+  // Support both calling styles:
+  // 1) <ExitStrategyGenerator property={property} />
+  // 2) <ExitStrategyGenerator title="..." location="..." ... />
+  const merged: LooseProperty = 'property' in props ? props.property ?? {} : props;
+
+  const title = merged.title ?? '';
+  const location = merged.location ?? '';
+  const price = merged.price ?? 0;
+  const yield_percent = merged.yield_percent ?? 0;
+  const roi_percent = merged.roi_percent ?? 0;
+  const propertyType = merged.propertyType ?? '';
+  const investmentType = merged.investmentType ?? '';
+  const description = merged.description ?? '';
+
   const [items, setItems] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -143,7 +166,7 @@ export default function ExitStrategyGenerator({
     try {
       await navigator.clipboard.writeText(text);
     } catch {
-      // ignore
+      /* ignore */
     }
   }
 
@@ -182,7 +205,6 @@ export default function ExitStrategyGenerator({
         <div className={styles.result}>
           <ol className={styles.list}>
             {items.map((s, i) => {
-              // Split "Title: detail" into two lines for readability
               const [t, ...rest] = s.split(':');
               const titleLine = t?.trim();
               const descLine = rest.join(':').trim();
