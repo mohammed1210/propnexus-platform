@@ -7,7 +7,7 @@ import styles from './PropertyCard.module.css';
 import supabase from '../lib/supabaseClient';
 
 interface Property {
-  id: string | null;             // ✅ use id only
+  id: string | null;             // use id only
   title: string;
   location: string;
   price: number | null;
@@ -30,8 +30,7 @@ export default function PropertyCard({ property }: Props) {
       : fallbackImage;
 
   const [imgSrc, setImgSrc] = useState(initial);
-
-  const pid = property.id ?? ''; // ✅ route & save with id
+  const pid = property.id ?? ''; // route & save with id
 
   const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault(); // Prevent navigation

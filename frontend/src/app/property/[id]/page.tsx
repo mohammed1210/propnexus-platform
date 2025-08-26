@@ -25,7 +25,7 @@ import AIChatbot from '@/components/property_details/AIChatbot';
 const MapSingle = dynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
 
 type Property = {
-  id: string; // ✅ id only
+  id: string; // id only
   title: string;
   location: string;
   price: number;
@@ -66,8 +66,8 @@ export default function PropertyDetailsPage() {
     const { data, error } = await supabase
       .from('properties')
       .select('*')
-      .eq('id', propId)       // ✅ query by id
-      .maybeSingle();         // ✅ avoids 406 on 0 rows
+      .eq('id', propId)       // query by id
+      .maybeSingle();         // avoids 406 on 0 rows
 
     if (error) {
       console.error('Error fetching property:', error);
