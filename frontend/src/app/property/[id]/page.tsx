@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
 import dynamic from 'next/dynamic';
+
+// --- Types-only shim so Codespaces/TS won't complain if @types/node isn't installed.
+declare const process: { env?: Record<string, string | undefined> };
 
 // UI
 import Section from '@/components/ui/Section';
@@ -25,7 +27,7 @@ import AIChatbot from '@/components/property_details/AIChatbot';
 const MapSingle = dynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
 
 type Property = {
-  id: string; // id only
+  id: string;
   title: string;
   location: string;
   price: number;
@@ -45,11 +47,6 @@ type Property = {
   investmentType?: string | null;
 };
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string | undefined;
@@ -62,21 +59,26 @@ export default function PropertyDetailsPage() {
 
   const fetchProperty = useCallback(async (propId: string) => {
     setLoading(true);
+    try {
+      const base = process.env?.NEXT_PUBLIC_BACKEND_URL;
+      if (!base) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
 
-    const { data, error } = await supabase
-      .from('properties')
-      .select('*')
-      .eq('id', propId)       // query by id
-      .maybeSingle();         // avoids 406 on 0 rows
+      // ✅ Call your FastAPI route (matches backend: /api/properties/{property_id})
+      const resp = await fetch(`${base}/api/properties/${propId}`, { cache: 'no-store' });
 
-    if (error) {
-      console.error('Error fetching property:', error);
+      if (!resp.ok) {
+        setProperty(null);
+      } else {
+        const data = (await resp.json()) as Property;
+        setProperty(data);
+        computeAIScore(data);
+      }
+    } catch (e) {
+      console.error('Error fetching property:', e);
       setProperty(null);
-    } else {
-      setProperty(data as Property);
-      if (data) computeAIScore(data as Property);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -96,8 +98,21 @@ export default function PropertyDetailsPage() {
 
   async function handleSaveDeal() {
     if (!property) return;
-    await supabase.from('saved_deals').insert([{ property_id: property.id }]);
-    alert('Deal saved!');
+    try {
+      const base = process.env?.NEXT_PUBLIC_BACKEND_URL;
+      if (!base) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
+
+      // Adjust this to your actual save-deal endpoint when ready.
+      await fetch(`${base}/api/saved-deals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: property.id, user_id: 'demo-user' }),
+      });
+      alert('Deal saved!');
+    } catch (e) {
+      console.error(e);
+      alert('Could not save this deal.');
+    }
   }
 
   function handleDownloadPdf() {
