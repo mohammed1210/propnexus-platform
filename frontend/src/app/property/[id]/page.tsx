@@ -58,28 +58,31 @@ export default function PropertyDetailsPage() {
   const [aiItems, setAiItems] = useState<{ label: string; value: number }[]>([]);
 
   const fetchProperty = useCallback(async (propId: string) => {
-    setLoading(true);
-    try {
-      const base = process.env?.NEXT_PUBLIC_BACKEND_URL;
-      if (!base) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
+  setLoading(true);
+  try {
+    const rawBase = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!rawBase) throw new Error("NEXT_PUBLIC_BACKEND_URL is not set");
 
-      // ✅ Call your FastAPI route (matches backend: /api/properties/{property_id})
-      const resp = await fetch(`${base}/api/properties/${propId}`, { cache: 'no-store' });
+    const base = rawBase.replace(/\/+$/, ""); // strip trailing slashes
+    const url = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
-      if (!resp.ok) {
-        setProperty(null);
-      } else {
-        const data = (await resp.json()) as Property;
-        setProperty(data);
-        computeAIScore(data);
-      }
-    } catch (e) {
-      console.error('Error fetching property:', e);
+    const resp = await fetch(url, { cache: "no-store" });
+
+    if (!resp.ok) {
+      console.error("Property fetch failed", resp.status, await resp.text());
       setProperty(null);
-    } finally {
-      setLoading(false);
+    } else {
+      const data = (await resp.json()) as Property;
+      setProperty(data);
+      computeAIScore(data);
     }
-  }, []);
+  } catch (e) {
+    console.error("Error fetching property:", e);
+    setProperty(null);
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => {
     if (id) fetchProperty(id);
