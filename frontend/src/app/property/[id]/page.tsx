@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
-// --- Types-only shim so Codespaces/TS won't complain if @types/node isn't installed.
+// (Types-only shim for Codespaces TS hints; safe to keep or remove)
 declare const process: { env?: Record<string, string | undefined> };
 
 // UI
@@ -58,31 +58,30 @@ export default function PropertyDetailsPage() {
   const [aiItems, setAiItems] = useState<{ label: string; value: number }[]>([]);
 
   const fetchProperty = useCallback(async (propId: string) => {
-  setLoading(true);
-  try {
-    const rawBase = (process.env.NEXT_PUBLIC_BACKEND_URL ?? '') as string; // TS-safe
-if (!rawBase) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
+    setLoading(true);
+    try {
+      const rawBase = (process.env.NEXT_PUBLIC_BACKEND_URL ?? '') as string;
+      if (!rawBase) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
 
-const base = rawBase.replace(/\/+$/, ''); // strip trailing slash(es)
-const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
+      const base = rawBase.replace(/\/+$/, ''); // strip trailing slash(es)
+      const url = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
-    const resp = await fetch(url, { cache: "no-store" });
-
-    if (!resp.ok) {
-      console.error("Property fetch failed", resp.status, await resp.text());
+      const resp = await fetch(url, { cache: 'no-store' });
+      if (!resp.ok) {
+        console.error('Property fetch failed', resp.status, await resp.text());
+        setProperty(null);
+      } else {
+        const data = (await resp.json()) as Property;
+        setProperty(data);
+        computeAIScore(data);
+      }
+    } catch (e) {
+      console.error('Error fetching property:', e);
       setProperty(null);
-    } else {
-      const data = (await resp.json()) as Property;
-      setProperty(data);
-      computeAIScore(data);
+    } finally {
+      setLoading(false);
     }
-  } catch (e) {
-    console.error("Error fetching property:", e);
-    setProperty(null);
-  } finally {
-    setLoading(false);
-  }
-}, []);
+  }, []);
 
   useEffect(() => {
     if (id) fetchProperty(id);
@@ -102,10 +101,9 @@ const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
   async function handleSaveDeal() {
     if (!property) return;
     try {
-      const base = process.env?.NEXT_PUBLIC_BACKEND_URL;
-      if (!base) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
-
-      // Adjust this to your actual save-deal endpoint when ready.
+      const rawBase = (process.env.NEXT_PUBLIC_BACKEND_URL ?? '') as string;
+      if (!rawBase) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
+      const base = rawBase.replace(/\/+$/, '');
       await fetch(`${base}/api/saved-deals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -165,6 +163,7 @@ const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
         {/* Hero Image */}
         {property.imageurl && (
+          // Note: Next warns about <img>. If you want to silence it, swap to next/image.
           <img
             src={property.imageurl}
             alt={property.title}
@@ -175,7 +174,7 @@ const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
         {/* Overview */}
         {property.description && (
           <Section>
-            <SectionTitle icon={<span>📋</span>} children={undefined}>Overview</SectionTitle>
+            <SectionTitle icon={<span>📋</span>}>Overview</SectionTitle>
             <p className="text-slate-700 whitespace-pre-line leading-relaxed">
               {property.description}
             </p>
@@ -184,7 +183,7 @@ const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
         {/* AI Deal Score */}
         <Section id="ai-score-section">
-          <SectionTitle icon={<span>🧠</span>} children={undefined}>
+          <SectionTitle icon={<span>🧠</span>}>
             AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
           <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-3" />
@@ -195,7 +194,7 @@ const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
         {/* Exit Strategies */}
         <Section>
-          <SectionTitle icon={<span>🚪</span>} children={undefined}>Exit Strategies</SectionTitle>
+          <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
           <ExitStrategyGenerator
             title={property.title}
             location={property.location}
@@ -220,6 +219,7 @@ const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
         {/* Area Intelligence */}
         <Section>
+          <SectionTitle icon={<span>🗺️</span>}>Area Intelligence</SectionTitle>
           <AreaIntel
             locationLabel={property.location}
             postcode={postcode}
@@ -248,7 +248,7 @@ const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
         {/* Notes */}
         <Section>
-          <SectionTitle icon={<span>📝</span>} children={undefined}>Notes</SectionTitle>
+          <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
           <NotesFields propertyId={property.id} />
         </Section>
       </div>
@@ -256,7 +256,7 @@ const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
       {/* RIGHT — Sidebar */}
       <aside className="md:col-span-1 space-y-6">
         <Section>
-          <SectionTitle icon={<span>📊</span>} children={undefined}>Deal Summary</SectionTitle>
+          <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
           <ul className="space-y-2 text-sm">
             <li><Badge>Price</Badge> £{Number(property.price).toLocaleString()}</li>
             <li><Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}</li>
@@ -269,7 +269,7 @@ const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
         </Section>
 
         <Section>
-          <SectionTitle icon={<span>🗺️</span>} children={undefined}>Location</SectionTitle>
+          <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
           {hasCoords ? (
             <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
           ) : (
