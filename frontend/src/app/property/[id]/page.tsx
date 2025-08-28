@@ -60,11 +60,11 @@ export default function PropertyDetailsPage() {
   const fetchProperty = useCallback(async (propId: string) => {
   setLoading(true);
   try {
-    const rawBase = process.env.NEXT_PUBLIC_BACKEND_URL;
-    if (!rawBase) throw new Error("NEXT_PUBLIC_BACKEND_URL is not set");
+    const rawBase = (process.env.NEXT_PUBLIC_BACKEND_URL ?? '') as string; // TS-safe
+if (!rawBase) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
 
-    const base = rawBase.replace(/\/+$/, ""); // strip trailing slashes
-    const url = `${base}/api/properties/${encodeURIComponent(propId)}`;
+const base = rawBase.replace(/\/+$/, ''); // strip trailing slash(es)
+const url  = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
     const resp = await fetch(url, { cache: "no-store" });
 
@@ -175,7 +175,7 @@ export default function PropertyDetailsPage() {
         {/* Overview */}
         {property.description && (
           <Section>
-            <SectionTitle icon={<span>📋</span>}>Overview</SectionTitle>
+            <SectionTitle icon={<span>📋</span>} children={undefined}>Overview</SectionTitle>
             <p className="text-slate-700 whitespace-pre-line leading-relaxed">
               {property.description}
             </p>
@@ -184,7 +184,7 @@ export default function PropertyDetailsPage() {
 
         {/* AI Deal Score */}
         <Section id="ai-score-section">
-          <SectionTitle icon={<span>🧠</span>}>
+          <SectionTitle icon={<span>🧠</span>} children={undefined}>
             AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
           <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-3" />
@@ -195,7 +195,7 @@ export default function PropertyDetailsPage() {
 
         {/* Exit Strategies */}
         <Section>
-          <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
+          <SectionTitle icon={<span>🚪</span>} children={undefined}>Exit Strategies</SectionTitle>
           <ExitStrategyGenerator
             title={property.title}
             location={property.location}
@@ -248,7 +248,7 @@ export default function PropertyDetailsPage() {
 
         {/* Notes */}
         <Section>
-          <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
+          <SectionTitle icon={<span>📝</span>} children={undefined}>Notes</SectionTitle>
           <NotesFields propertyId={property.id} />
         </Section>
       </div>
@@ -256,7 +256,7 @@ export default function PropertyDetailsPage() {
       {/* RIGHT — Sidebar */}
       <aside className="md:col-span-1 space-y-6">
         <Section>
-          <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
+          <SectionTitle icon={<span>📊</span>} children={undefined}>Deal Summary</SectionTitle>
           <ul className="space-y-2 text-sm">
             <li><Badge>Price</Badge> £{Number(property.price).toLocaleString()}</li>
             <li><Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}</li>
@@ -269,7 +269,7 @@ export default function PropertyDetailsPage() {
         </Section>
 
         <Section>
-          <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
+          <SectionTitle icon={<span>🗺️</span>} children={undefined}>Location</SectionTitle>
           {hasCoords ? (
             <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
           ) : (
