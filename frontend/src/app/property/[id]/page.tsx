@@ -74,24 +74,29 @@ export default function PropertyDetailsPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Fetch property (memoized so we can safely put it in deps)
-  const fetchProperty = useCallback(async (propId: string) => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from("properties")
-      .select("*")
-      .eq("id", propId)
-      .single();
+const fetchProperty = useCallback(async (propId: string) => {
+  setLoading(true);
 
-    if (error) {
-      console.error("Error fetching property:", error);
-      setProperty(null);
-    } else {
-      const p = data as Property;
-      setProperty(p);
-      computeAIScore(p);
-    }
-    setLoading(false);
-  }, []);
+  const { data, error, status } = await supabase
+    .from("properties")
+    .select("*")
+    .eq("id", propId.trim())
+    .maybeSingle();              // ← avoids 406 when no rows
+
+  if (error && status !== 406) {
+    console.error("Error fetching property:", error);
+    setProperty(null);
+  } else if (!data) {
+    // 0 rows -> show "Property not found"
+    setProperty(null);
+  } else {
+    const p = data as Property;
+    setProperty(p);
+    computeAIScore(p);
+  }
+
+  setLoading(false);
+}, []);
 
   // Trigger fetch
   useEffect(() => {
