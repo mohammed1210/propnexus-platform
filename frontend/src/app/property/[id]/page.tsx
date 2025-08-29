@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
-// (Types-only shim for Codespaces TS hints; safe to keep or remove)
+// Types-only shim so Codespaces/TS won't complain if @types/node isn't installed.
 declare const process: { env?: Record<string, string | undefined> };
 
 // UI
@@ -47,6 +47,15 @@ type Property = {
   investmentType?: string | null;
 };
 
+/** Safe helper for reading/normalizing the backend base URL */
+function getBackendBase(): string {
+  const raw = (process?.env?.NEXT_PUBLIC_BACKEND_URL ?? '') as string;
+  if (!raw) {
+    throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
+  }
+  return raw.replace(/\/+$/, ''); // strip trailing slash(es)
+}
+
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string | undefined;
@@ -60,10 +69,7 @@ export default function PropertyDetailsPage() {
   const fetchProperty = useCallback(async (propId: string) => {
     setLoading(true);
     try {
-      const rawBase = (process.env.NEXT_PUBLIC_BACKEND_URL ?? '') as string;
-      if (!rawBase) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
-
-      const base = rawBase.replace(/\/+$/, ''); // strip trailing slash(es)
+      const base = getBackendBase();
       const url = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
       const resp = await fetch(url, { cache: 'no-store' });
@@ -101,9 +107,8 @@ export default function PropertyDetailsPage() {
   async function handleSaveDeal() {
     if (!property) return;
     try {
-      const rawBase = (process.env.NEXT_PUBLIC_BACKEND_URL ?? '') as string;
-      if (!rawBase) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
-      const base = rawBase.replace(/\/+$/, '');
+      const base = getBackendBase();
+      // Adjust endpoint when your backend route is ready
       await fetch(`${base}/api/saved-deals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -163,7 +168,7 @@ export default function PropertyDetailsPage() {
 
         {/* Hero Image */}
         {property.imageurl && (
-          // Note: Next warns about <img>. If you want to silence it, swap to next/image.
+          // Replace with next/image to silence Next's <img> warning if desired
           <img
             src={property.imageurl}
             alt={property.title}
@@ -209,11 +214,13 @@ export default function PropertyDetailsPage() {
 
         {/* Mortgage */}
         <Section>
+          <SectionTitle icon={<span>🏦</span>}>Mortgage</SectionTitle>
           <MortgageCalculator price={Number(property.price)} />
         </Section>
 
         {/* Stamp Duty */}
         <Section>
+          <SectionTitle icon={<span>🧾</span>}>Stamp Duty</SectionTitle>
           <StampDutyCalculator price={Number(property.price)} />
         </Section>
 
