@@ -27,7 +27,7 @@ import AIChatbot from '@/components/property_details/AIChatbot';
 const MapSingle = dynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
 
 type Property = {
-  id: string;
+  id: string; // id only
   title: string;
   location: string;
   price: number;
