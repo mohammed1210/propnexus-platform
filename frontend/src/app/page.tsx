@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import PropertyCard from '../../components/PropertyCard';
-import { Property } from '../types';
+import type { Property } from '../types';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
@@ -52,13 +52,17 @@ export default function PropertiesPage() {
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    window.setTimeout(() => setToast(null), 3000);
   };
 
-  // Prefer env over hardcoded URL
-  const BACKEND_BASE =
-    (process.env.NEXT_PUBLIC_API_URL ||
-      'https://propnexus-backend-production.up.railway.app').replace(/\/+$/, '');
+  // Prefer env over hardcoded URL (memoized to satisfy exhaustive-deps)
+  const BACKEND_BASE = useMemo(
+    () =>
+      (process.env.NEXT_PUBLIC_API_URL ||
+        'https://propnexus-backend-production.up.railway.app'
+      ).replace(/\/+$/, ''),
+    []
+  );
 
   // Hide map by default on smaller screens & on resize
   useEffect(() => {
@@ -70,33 +74,34 @@ export default function PropertiesPage() {
     return () => window.removeEventListener('resize', apply);
   }, []);
 
-  // === Fetch helper
-  async function fetchProperties() {
+  // === Fetch helper (memoized)
+  const fetchProperties = useCallback(async () => {
     try {
+      setLoading(true);
       setError(null);
       const res = await fetch(`${BACKEND_BASE}/properties`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setProperties(Array.isArray(data) ? data : []);
-    } catch (e: any) {
+    } catch (e) {
       console.error('Error fetching properties:', e);
       setError('Could not load properties. Please try again.');
       setProperties([]);
     } finally {
       setLoading(false);
     }
-  }
+  }, [BACKEND_BASE]);
 
   // Initial fetch
   useEffect(() => {
     fetchProperties();
-  }, [BACKEND_BASE]);
+  }, [fetchProperties]);
 
   // 🔄 Auto-refresh every 60s
   useEffect(() => {
-    const interval = setInterval(fetchProperties, 60000);
-    return () => clearInterval(interval);
-  }, [BACKEND_BASE]);
+    const interval = window.setInterval(fetchProperties, 60_000);
+    return () => window.clearInterval(interval);
+  }, [fetchProperties]);
 
   // Unified scrape + search
   async function handleSearch() {
@@ -227,7 +232,6 @@ export default function PropertiesPage() {
       {/* ===== Advanced filters ===== */}
       {showMoreFilters && (
         <div className="filters-row" role="region" aria-label="Advanced filters">
-          {/* Min/Max Price, Beds, Property Type, Yield, ROI */}
           <div>
             <label htmlFor="minPrice">Min Price</label>
             <input
