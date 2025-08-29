@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import dynamic from "next/dynamic";
@@ -53,7 +53,6 @@ type Property = {
   transport_summary?: string | null;
   propertyType?: string | null;
   investmentType?: string | null;
-  // optional array if we add multiple images later
   images?: string[] | null;
 };
 
@@ -71,12 +70,11 @@ export default function PropertyDetailsPage() {
     []
   );
 
-  useEffect(() => {
-    if (!id) return;
-    fetchProperty(id);
-  }, [id]);
+  // ---------- GALLERY STATE (hooks must be before any early returns)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  async function fetchProperty(propId: string) {
+  // Fetch property (memoized so we can safely put it in deps)
+  const fetchProperty = useCallback(async (propId: string) => {
     setLoading(true);
     const { data, error } = await supabase
       .from("properties")
@@ -93,7 +91,12 @@ export default function PropertyDetailsPage() {
       computeAIScore(p);
     }
     setLoading(false);
-  }
+  }, []);
+
+  // Trigger fetch
+  useEffect(() => {
+    if (id) fetchProperty(id);
+  }, [id, fetchProperty]); // <-- include fetchProperty
 
   function computeAIScore(p: Property) {
     const items = [
@@ -119,32 +122,30 @@ export default function PropertyDetailsPage() {
     alert("Export to PDF coming soon!");
   }
 
-  if (loading) return <p className="p-6">Loading…</p>;
-  if (!property) return <p className="p-6">Property not found.</p>;
-
+  // ----- derived values (not hooks)
   const hasCoords =
-    property.latitude != null &&
-    property.longitude != null &&
+    property?.latitude != null &&
+    property?.longitude != null &&
     Number.isFinite(property.latitude) &&
     Number.isFinite(property.longitude);
 
-  const postcode = property.location?.trim().split(/\s+/).pop() ?? undefined;
+  const postcode = property?.location?.trim().split(/\s+/).pop() ?? undefined;
 
-  // --- Gallery data/state ---
   const images: string[] =
-    property.images && property.images.length
+    property?.images && property.images.length
       ? property.images
-      : property.imageurl
+      : property?.imageurl
       ? [property.imageurl]
       : [];
 
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
-  // Set/refresh selected image when property/images change
+  // Keep selected image in sync with data
   useEffect(() => {
     setSelectedImage(images[0] ?? null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [property?.id, images.length]);
+
+  // ----- early returns BELOW all hooks
+  if (loading) return <p className="p-6">Loading…</p>;
+  if (!property) return <p className="p-6">Property not found.</p>;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
