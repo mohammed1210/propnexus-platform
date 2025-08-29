@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
+// Types-only shim so Codespaces/TS won't complain if @types/node isn't installed.
+declare const process: { env?: Record<string, string | undefined> };
+
 // UI
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
@@ -44,6 +47,15 @@ type Property = {
   investmentType?: string | null;
 };
 
+/** Safe helper for reading/normalizing the backend base URL */
+function getBackendBase(): string {
+  const raw = (process?.env?.NEXT_PUBLIC_BACKEND_URL ?? '') as string;
+  if (!raw) {
+    throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
+  }
+  return raw.replace(/\/+$/, ''); // strip trailing slash(es)
+}
+
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string | undefined;
@@ -57,12 +69,12 @@ export default function PropertyDetailsPage() {
   const fetchProperty = useCallback(async (propId: string) => {
     setLoading(true);
     try {
-      const base = process.env.NEXT_PUBLIC_BACKEND_URL; // e.g. https://propnexus-backend-production.up.railway.app
-      if (!base) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
+      const base = getBackendBase();
+      const url = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
-      const resp = await fetch(`${base}/api/properties/${propId}`, { cache: 'no-store' });
-
+      const resp = await fetch(url, { cache: 'no-store' });
       if (!resp.ok) {
+        console.error('Property fetch failed', resp.status, await resp.text());
         setProperty(null);
       } else {
         const data = (await resp.json()) as Property;
@@ -95,16 +107,16 @@ export default function PropertyDetailsPage() {
   async function handleSaveDeal() {
     if (!property) return;
     try {
-      const base = process.env.NEXT_PUBLIC_BACKEND_URL;
-      // If you store saved deals via Supabase directly, restore that call;
-      // otherwise, post to your backend when you add that route.
+      const base = getBackendBase();
+      // Adjust endpoint when your backend route is ready
       await fetch(`${base}/api/saved-deals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ property_id: property.id, user_id: 'demo-user' }),
       });
       alert('Deal saved!');
-    } catch {
+    } catch (e) {
+      console.error(e);
       alert('Could not save this deal.');
     }
   }
@@ -156,6 +168,7 @@ export default function PropertyDetailsPage() {
 
         {/* Hero Image */}
         {property.imageurl && (
+          // Replace with next/image to silence Next's <img> warning if desired
           <img
             src={property.imageurl}
             alt={property.title}
@@ -201,16 +214,19 @@ export default function PropertyDetailsPage() {
 
         {/* Mortgage */}
         <Section>
+          <SectionTitle icon={<span>🏦</span>}>Mortgage</SectionTitle>
           <MortgageCalculator price={Number(property.price)} />
         </Section>
 
         {/* Stamp Duty */}
         <Section>
+          <SectionTitle icon={<span>🧾</span>}>Stamp Duty</SectionTitle>
           <StampDutyCalculator price={Number(property.price)} />
         </Section>
 
         {/* Area Intelligence */}
         <Section>
+          <SectionTitle icon={<span>🗺️</span>}>Area Intelligence</SectionTitle>
           <AreaIntel
             locationLabel={property.location}
             postcode={postcode}
