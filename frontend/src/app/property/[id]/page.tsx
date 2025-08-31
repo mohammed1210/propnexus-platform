@@ -1,33 +1,33 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { createClient } from "@supabase/supabase-js"; // make sure this exists in /frontend deps
-import dynamic from "next/dynamic";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
+
+// Types-only shim so Codespaces/TS won't complain if @types/node isn't installed.
+declare const process: { env?: Record<string, string | undefined> };
 
 // UI
-import Section from "@/components/ui/Section";
-import SectionTitle from "@/components/ui/SectionTitle";
-import CardActions from "@/components/ui/CardActions";
-import Badge from "@/components/ui/Badge";
+import Section from '@/components/ui/Section';
+import SectionTitle from '@/components/ui/SectionTitle';
+import CardActions from '@/components/ui/CardActions';
+import Badge from '@/components/ui/Badge';
 
-// Details widgets
-import MortgageCalculator from "@/components/property_details/MortgageCalculator";
-import StampDutyCalculator from "@/components/property_details/StampDutyCalculator";
-import AreaIntel from "@/components/property_details/AreaIntel";
-import NotesFields from "@/components/property_details/NotesFields";
-import InvestmentInsights from "@/components/property_details/InvestmentInsights";
-import AIScoreBars from "@/components/property_details/AIScoreBars";
-import AIScoreInfo from "@/components/property_details/AIScoreInfo";
-import ExitStrategyGenerator from "@/components/property_details/ExitStrategyGenerator";
-import AIChatbot from "@/components/property_details/AIChatbot";
+// Property detail components
+import MortgageCalculator from '@/components/property_details/MortgageCalculator';
+import StampDutyCalculator from '@/components/property_details/StampDutyCalculator';
+import AreaIntel from '@/components/property_details/AreaIntel';
+import NotesFields from '@/components/property_details/NotesFields';
+import InvestmentInsights from '@/components/property_details/InvestmentInsights';
+import AIScoreBars from '@/components/property_details/AIScoreBars';
+import AIScoreInfo from '@/components/property_details/AIScoreInfo';
+import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
+import AIChatbot from '@/components/property_details/AIChatbot';
 
-// Map (avoid SSR)
-const MapSingle = dynamic(() => import("@/components/property_details/MapSingle"), { ssr: false });
+const MapSingle = dynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
 
-// --- Local type used by this page (matches your DB, null-safe) ---
 type Property = {
-  id: string;
+  id: string; // id only
   title: string;
   location: string;
   price: number;
@@ -47,53 +47,58 @@ type Property = {
   investmentType?: string | null;
 };
 
-// Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+/** Safe helper for reading/normalizing the backend base URL */
+function getBackendBase(): string {
+  const raw = (process?.env?.NEXT_PUBLIC_BACKEND_URL ?? '') as string;
+  if (!raw) {
+    throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
+  }
+  return raw.replace(/\/+$/, ''); // strip trailing slash(es)
+}
 
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
-  const id = (params?.id as string | undefined) ?? undefined;
+  const id = params?.id as string | undefined;
 
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // AI score state
   const [aiOverall, setAiOverall] = useState(0);
   const [aiItems, setAiItems] = useState<{ label: string; value: number }[]>([]);
 
-  useEffect(() => {
-    if (!id) return;
-    fetchProperty(id);
-  }, [id]);
-
-  async function fetchProperty(propId: string) {
+  const fetchProperty = useCallback(async (propId: string) => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("properties")
-      .select("*")
-      .eq("id", propId)
-      .single();
+    try {
+      const base = getBackendBase();
+      const url = `${base}/api/properties/${encodeURIComponent(propId)}`;
 
-    if (error) {
-      console.error("Error fetching property:", error);
+      const resp = await fetch(url, { cache: 'no-store' });
+      if (!resp.ok) {
+        console.error('Property fetch failed', resp.status, await resp.text());
+        setProperty(null);
+      } else {
+        const data = (await resp.json()) as Property;
+        setProperty(data);
+        computeAIScore(data);
+      }
+    } catch (e) {
+      console.error('Error fetching property:', e);
       setProperty(null);
-    } else {
-      const p = data as Property;
-      setProperty(p);
-      computeAIScore(p);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (id) fetchProperty(id);
+  }, [id, fetchProperty]);
 
   function computeAIScore(p: Property) {
     const items = [
-      { label: "Yield", value: Math.min(100, Number(p.yield_percent ?? 0) * 10) },
-      { label: "ROI", value: Math.min(100, Number(p.roi_percent ?? 0) * 10) },
-      { label: "Bedrooms", value: Math.min(100, Number(p.bedrooms ?? 0) * 20) },
-      { label: "Bathrooms", value: Math.min(100, Number(p.bathrooms ?? 0) * 25) },
+      { label: 'Yield', value: Math.min(100, Number(p.yield_percent ?? 0) * 10) },
+      { label: 'ROI', value: Math.min(100, Number(p.roi_percent ?? 0) * 10) },
+      { label: 'Bedrooms', value: Math.min(100, Number(p.bedrooms ?? 0) * 20) },
+      { label: 'Bathrooms', value: Math.min(100, Number(p.bathrooms ?? 0) * 25) },
     ];
     setAiItems(items);
     setAiOverall(Math.round(items.reduce((s, i) => s + i.value, 0) / items.length));
@@ -101,28 +106,49 @@ export default function PropertyDetailsPage() {
 
   async function handleSaveDeal() {
     if (!property) return;
-    await supabase.from("saved_deals").insert([{ property_id: property.id }]);
-    alert("Deal saved!");
+    try {
+      const base = getBackendBase();
+      // Adjust endpoint when your backend route is ready
+      await fetch(`${base}/api/saved-deals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: property.id, user_id: 'demo-user' }),
+      });
+      alert('Deal saved!');
+    } catch (e) {
+      console.error(e);
+      alert('Could not save this deal.');
+    }
   }
 
   function handleDownloadPdf() {
-    alert("Export to PDF coming soon!");
+    alert('Export to PDF coming soon!');
   }
 
+  const hasCoords = useMemo(() => {
+    return (
+      property?.latitude != null &&
+      property?.longitude != null &&
+      Number.isFinite(property.latitude) &&
+      Number.isFinite(property.longitude)
+    );
+  }, [property]);
+
+  const postcode = useMemo(() => property?.location?.trim().split(/\s+/).pop(), [property]);
+
   if (loading) return <p className="p-6">Loading…</p>;
-  if (!property) return <p className="p-6">Property not found.</p>;
-
-  const hasCoords =
-    property.latitude != null &&
-    property.longitude != null &&
-    Number.isFinite(property.latitude) &&
-    Number.isFinite(property.longitude);
-
-  const postcode = property.location?.trim().split(/\s+/).pop() ?? undefined;
+  if (!property) {
+    return (
+      <div className="p-6">
+        <p>Property not found.</p>
+        <a href="/" className="text-blue-600 underline">← Back to dashboard</a>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
-      {/* LEFT — Main */}
+      {/* LEFT */}
       <div className="md:col-span-2 space-y-6">
         {/* Header */}
         <header className="mb-4 md:mb-6">
@@ -135,13 +161,14 @@ export default function PropertyDetailsPage() {
             <CardActions
               onSave={handleSaveDeal}
               onPdf={handleDownloadPdf}
-              onCrm={() => alert("Sending to CRM…")}
+              onCrm={() => alert('Sending to CRM…')}
             />
           </div>
         </header>
 
-        {/* Hero */}
+        {/* Hero Image */}
         {property.imageurl && (
+          // Replace with next/image to silence Next's <img> warning if desired
           <img
             src={property.imageurl}
             alt={property.title}
@@ -149,11 +176,11 @@ export default function PropertyDetailsPage() {
           />
         )}
 
-        {/* Description */}
+        {/* Overview */}
         {property.description && (
           <Section>
             <SectionTitle icon={<span>📋</span>}>Overview</SectionTitle>
-            <p className="text-slate-700 dark:text-slate-300 whitespace-pre-line leading-relaxed">
+            <p className="text-slate-700 whitespace-pre-line leading-relaxed">
               {property.description}
             </p>
           </Section>
@@ -164,41 +191,42 @@ export default function PropertyDetailsPage() {
           <SectionTitle icon={<span>🧠</span>}>
             AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
-
           <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-3" />
           <div className="mt-3">
             <AIScoreInfo />
           </div>
         </Section>
 
-        {/* Exit Strategy Generator */}
-<Section>
-  <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
-  {/* Pass full property; light cast avoids a big refactor of that component's props */}
-  <ExitStrategyGenerator
-    title={property.title}
-    location={property.location}
-    price={Number(property.price)}
-    yield_percent={property.yield_percent ?? 0}
-    roi_percent={property.roi_percent ?? 0}
-    propertyType={property.propertyType ?? ''}
-    investmentType={property.investmentType ?? ''}
-    description={property.description ?? ''}
-  />
-</Section>
+        {/* Exit Strategies */}
+        <Section>
+          <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
+          <ExitStrategyGenerator
+            title={property.title}
+            location={property.location}
+            price={Number(property.price)}
+            yield_percent={Number(property.yield_percent ?? 0)}
+            roi_percent={Number(property.roi_percent ?? 0)}
+            propertyType={property.propertyType ?? ''}
+            investmentType={property.investmentType ?? ''}
+            description={property.description ?? ''}
+          />
+        </Section>
 
         {/* Mortgage */}
         <Section>
+          <SectionTitle icon={<span>🏦</span>}>Mortgage</SectionTitle>
           <MortgageCalculator price={Number(property.price)} />
         </Section>
 
         {/* Stamp Duty */}
         <Section>
+          <SectionTitle icon={<span>🧾</span>}>Stamp Duty</SectionTitle>
           <StampDutyCalculator price={Number(property.price)} />
         </Section>
 
         {/* Area Intelligence */}
         <Section>
+          <SectionTitle icon={<span>🗺️</span>}>Area Intelligence</SectionTitle>
           <AreaIntel
             locationLabel={property.location}
             postcode={postcode}
@@ -235,48 +263,18 @@ export default function PropertyDetailsPage() {
       {/* RIGHT — Sidebar */}
       <aside className="md:col-span-1 space-y-6">
         <Section>
-          <SectionTitle icon={<span>⚡</span>}>Quick Actions</SectionTitle>
-          <CardActions
-            onSave={handleSaveDeal}
-            onPdf={handleDownloadPdf}
-            onCrm={() => alert("Sending to CRM…")}
-          />
-        </Section>
-
-        <Section>
           <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
           <ul className="space-y-2 text-sm">
-            <li>
-              <Badge>Price</Badge> £{Number(property.price).toLocaleString()}
-            </li>
-            <li>
-              <Badge>Yield</Badge>{" "}
-              {property.yield_percent != null ? `${property.yield_percent}%` : "—"}
-            </li>
-            <li>
-              <Badge>ROI</Badge>{" "}
-              {property.roi_percent != null ? `${property.roi_percent}%` : "—"}
-            </li>
-            <li>
-              <Badge>Beds</Badge> {property.bedrooms ?? "—"}
-            </li>
-            <li>
-              <Badge>Baths</Badge> {property.bathrooms ?? "—"}
-            </li>
-            {property.propertyType && (
-              <li>
-                <Badge>Type</Badge> {property.propertyType}
-              </li>
-            )}
-            {property.investmentType && (
-              <li>
-                <Badge>Investment</Badge> {property.investmentType}
-              </li>
-            )}
+            <li><Badge>Price</Badge> £{Number(property.price).toLocaleString()}</li>
+            <li><Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}</li>
+            <li><Badge>ROI</Badge> {property.roi_percent != null ? `${property.roi_percent}%` : '—'}</li>
+            <li><Badge>Beds</Badge> {property.bedrooms ?? '—'}</li>
+            <li><Badge>Baths</Badge> {property.bathrooms ?? '—'}</li>
+            {property.propertyType && (<li><Badge>Type</Badge> {property.propertyType}</li>)}
+            {property.investmentType && (<li><Badge>Investment</Badge> {property.investmentType}</li>)}
           </ul>
         </Section>
 
-        {/* Location */}
         <Section>
           <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
           {hasCoords ? (
@@ -288,8 +286,7 @@ export default function PropertyDetailsPage() {
       </aside>
 
       {/* Floating Chatbot */}
-      {/* Cast to a loose/partial shape so nullables don’t fight the component’s type */}
-      <AIChatbot property={property as unknown as Partial<any>} />
+      <AIChatbot property={property as any} />
     </div>
   );
 }

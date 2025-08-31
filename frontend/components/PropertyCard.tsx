@@ -1,16 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import supabase from '../lib/supabaseClient';
 import styles from './PropertyCard.module.css';
+import supabase from '../lib/supabaseClient';
 
 interface Property {
-  id: string;
+  id: string | null;             // use id only
   title: string;
   location: string;
-  price: number;
+  price: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
   yield_percent?: number | null;
@@ -24,54 +24,41 @@ interface Props {
 
 export default function PropertyCard({ property }: Props) {
   const fallbackImage = '/placeholder.jpg';
+  const initial =
+    property.imageurl && property.imageurl.startsWith('http')
+      ? property.imageurl
+      : fallbackImage;
 
-  const handleSave = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault(); // prevent Link navigation on click
+  const [imgSrc, setImgSrc] = useState(initial);
+  const pid = property.id ?? ''; // route & save with id
 
-    const userId = 'demo-user'; // TODO: replace with session.user.id once auth is live
+  const handleSave = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent navigation
+    const userId = 'demo-user'; // TODO: replace with real session.user.id
+
     const { error } = await supabase.from('saved_deals').insert({
       user_id: userId,
-      property_id: property.id,
+      property_id: pid,
     });
 
     if (error) {
       console.error('Error saving deal:', error.message);
-      alert('❌ Could not save — try again.');
+      alert('❌ Could not save this deal.');
     } else {
       alert('✅ Deal saved!');
     }
   };
 
-  const priceLabel =
-    typeof property.price === 'number'
-      ? `£${property.price.toLocaleString()}`
-      : '£—';
-
-  const bedsBaths =
-    (property.bedrooms ?? null) || (property.bathrooms ?? null)
-      ? `${property.bedrooms ? `🛏 ${property.bedrooms}` : ''}${
-          property.bedrooms && property.bathrooms ? ' • ' : ''
-        }${property.bathrooms ? `🛁 ${property.bathrooms}` : ''}`
-      : '';
-
-  const yieldRoi = `📈 Yield: ${property.yield_percent ?? 0}% | ROI: ${
-    property.roi_percent ?? 0
-  }%`;
-
   return (
-    <Link href={`/property/${property.id}`} className={styles.card} prefetch>
-      <div className={styles.imageWrapper}>
+    <Link href={`/property/${pid}`} className={styles.card} prefetch>
+      <div className={styles.imageWrapper} style={{ position: 'relative', overflow: 'hidden', borderRadius: 12 }}>
         <Image
-          src={property.imageurl || fallbackImage}
+          src={imgSrc || fallbackImage}
           alt={property.title || 'Property'}
-          width={640}
-          height={400}
-          className={styles.image}
-          // graceful fallback if remote image 404s
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).src = fallbackImage;
-          }}
+          fill
           sizes="(max-width: 768px) 100vw, 50vw"
+          className={styles.image}
+          onError={() => setImgSrc(fallbackImage)}
           priority={false}
         />
       </div>
@@ -79,21 +66,29 @@ export default function PropertyCard({ property }: Props) {
       <div className={styles.info}>
         <h2 className={styles.title}>{property.title}</h2>
         <p className={styles.location}>{property.location}</p>
-        <p className={styles.price}>{priceLabel}</p>
 
-        {!!bedsBaths && <p className={styles.details}>{bedsBaths}</p>}
+        <p className={styles.price}>
+          £{Number(property.price ?? 0).toLocaleString()}
+        </p>
+
+        {(property.bedrooms != null || property.bathrooms != null) && (
+          <p className={styles.details}>
+            {property.bedrooms != null ? `🛏 ${property.bedrooms}` : ''}{' '}
+            {property.bathrooms != null ? `• 🛁 ${property.bathrooms}` : ''}
+          </p>
+        )}
 
         <div className={styles.metrics}>
-          <span className={styles.badge}>{yieldRoi}</span>
+          <span className={styles.badge}>
+            📈 Yield: {property.yield_percent ?? 0}% | ROI: {property.roi_percent ?? 0}%
+          </span>
         </div>
 
         <div className={styles.buttons}>
-          <button type="button" onClick={handleSave} className={styles.save}>
+          <button onClick={handleSave} className={styles.save}>
             💾 Save Deal
           </button>
-          <button type="button" className={styles.detailsBtn}>
-            🔍 View Details
-          </button>
+          <button className={styles.detailsBtn}>🔍 View Details</button>
         </div>
       </div>
     </Link>
