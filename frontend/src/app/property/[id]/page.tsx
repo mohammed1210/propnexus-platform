@@ -57,9 +57,12 @@ type Property = {
 };
 
 export default function PropertyDetailsPage() {
-  // Typed params
+  // Typed params → normalize to a single, clean string
   const params = useParams<{ id: string }>();
-  const id = params?.id;
+  const rawParam = (Array.isArray(params?.id) ? params?.id?.[0] : params?.id) as
+    | string
+    | undefined;
+  const id = rawParam ? decodeURIComponent(rawParam).trim() : undefined;
 
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,33 +77,50 @@ export default function PropertyDetailsPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   // Fetch property (memoized so we can safely put it in deps)
-const fetchProperty = useCallback(async (propId: string) => {
-  setLoading(true);
+  const fetchProperty = useCallback(async (propId: string) => {
+    setLoading(true);
 
-  const { data, error, status } = await supabase
-    .from("properties")
-    .select("*")
-    .eq("id", propId.trim())
-    .maybeSingle();              // ← avoids 406 when no rows
+    // Diagnostics block (visible in DevTools)
+    console.groupCollapsed("[PropertyDetails] fetchProperty");
+    console.debug("param id ->", propId);
 
-  if (error && status !== 406) {
-    console.error("Error fetching property:", error);
-    setProperty(null);
-  } else if (!data) {
-    // 0 rows -> show "Property not found"
-    setProperty(null);
-  } else {
-    const p = data as Property;
-    setProperty(p);
-    computeAIScore(p);
-  }
+    try {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("*")
+        .eq("id", propId.toString())
+        .maybeSingle(); // avoid 406 when 0 rows
 
-  setLoading(false);
-}, []);
+      if (error) {
+        console.error("Supabase error:", error);
+        setProperty(null);
+      } else if (!data) {
+        console.warn("No property found for id:", propId);
+        setProperty(null);
+      } else {
+        const p = data as Property;
+        console.debug("Loaded property title:", p.title);
+        setProperty(p);
+        computeAIScore(p);
+      }
+    } catch (err) {
+      console.error("Unexpected fetch error:", err);
+      setProperty(null);
+    } finally {
+      setLoading(false);
+      console.groupEnd();
+    }
+  }, []);
 
   // Trigger fetch
   useEffect(() => {
-    if (id) fetchProperty(id);
+    if (!id) {
+      console.warn("[PropertyDetails] Missing id param in URL");
+      setLoading(false);
+      setProperty(null);
+      return;
+    }
+    fetchProperty(id);
   }, [id, fetchProperty]); // <-- include fetchProperty
 
   function computeAIScore(p: Property) {
@@ -150,7 +170,15 @@ const fetchProperty = useCallback(async (propId: string) => {
 
   // ----- early returns BELOW all hooks
   if (loading) return <p className="p-6">Loading…</p>;
-  if (!property) return <p className="p-6">Property not found.</p>;
+  if (!property)
+    return (
+      <div className="p-6">
+        <p>Property not found.</p>
+        <p className="text-xs text-slate-500 mt-2">
+          Debug: URL id = <code>{id ?? "—"}</code>
+        </p>
+      </div>
+    );
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
