@@ -4,10 +4,10 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import styles from './PropertyCard.module.css';
-import supabase from '../lib/supabaseClient';
+import { getSupabase } from '@/lib/supabaseClient';
 
 interface Property {
-  id: string | null;             // use id only
+  id: string | null;
   title: string;
   location: string;
   price: number | null;
@@ -30,14 +30,20 @@ export default function PropertyCard({ property }: Props) {
       : fallbackImage;
 
   const [imgSrc, setImgSrc] = useState(initial);
-  const pid = property.id ?? ''; // route & save with id
+  const pid = property.id ?? '';
 
   const handleSave = async (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent navigation
-    const userId = 'demo-user'; // TODO: replace with real session.user.id
+    e.preventDefault();
+    let sb;
+    try {
+      sb = getSupabase();
+    } catch {
+      alert('❌ Cannot save deal during prerender.');
+      return;
+    }
 
-    const { error } = await supabase.from('saved_deals').insert({
-      user_id: userId,
+    const { error } = await sb.from('saved_deals').insert({
+      user_id: 'demo-user', // TODO: replace with real user ID
       property_id: pid,
     });
 
@@ -59,7 +65,6 @@ export default function PropertyCard({ property }: Props) {
           sizes="(max-width: 768px) 100vw, 50vw"
           className={styles.image}
           onError={() => setImgSrc(fallbackImage)}
-          priority={false}
         />
       </div>
 
