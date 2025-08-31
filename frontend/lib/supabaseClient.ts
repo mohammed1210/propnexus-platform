@@ -1,7 +1,18 @@
 // lib/supabaseClient.ts
-import { createPagesBrowserClient } from '@supabase/auth-helpers-nextjs';
-import { type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-const supabase = createPagesBrowserClient();
+let client: SupabaseClient | null = null;
 
-export default supabase as SupabaseClient;
+/** Get a singleton Supabase client (browser only). */
+export function getSupabase(): SupabaseClient {
+  if (typeof window === 'undefined') {
+    // Guard against being called during SSR/prerender.
+    throw new Error('getSupabase() called on the server');
+  }
+  if (!client) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    client = createClient(url, key);
+  }
+  return client;
+}

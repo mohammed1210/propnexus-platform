@@ -1,8 +1,9 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 
 // Types-only shim so Codespaces/TS won't complain if @types/node isn't installed.
 declare const process: { env?: Record<string, string | undefined> };
@@ -24,7 +25,7 @@ import AIScoreInfo from '@/components/property_details/AIScoreInfo';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
 import AIChatbot from '@/components/property_details/AIChatbot';
 
-const MapSingle = dynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
+const MapSingle = nextDynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
 
 type Property = {
   id: string; // id only
@@ -58,7 +59,8 @@ function getBackendBase(): string {
 
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
-  const id = params?.id as string | undefined;
+  // normalize id just in case
+  const id = (params?.id ?? '') as string;
 
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,11 +111,12 @@ export default function PropertyDetailsPage() {
     try {
       const base = getBackendBase();
       // Adjust endpoint when your backend route is ready
-      await fetch(`${base}/api/saved-deals`, {
+      const resp = await fetch(`${base}/api/saved-deals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ property_id: property.id, user_id: 'demo-user' }),
       });
+      if (!resp.ok) throw new Error(`Save failed: ${resp.status}`);
       alert('Deal saved!');
     } catch (e) {
       console.error(e);
