@@ -1,27 +1,39 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-// UI
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import Badge from '@/components/ui/Badge';
 
-// Charts
 import { Line } from 'react-chartjs-2';
 import {
-  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend,
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
 } from 'chart.js';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
-// supabase
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+/** ── Supabase (lazy, browser-only singleton) ───────────────────── */
+let _sb: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
+  if (!_sb) {
+    _sb = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+  }
+  return _sb;
+}
 
+/** Types */
 type SavedDeal = {
   id: string;
   property_id: string;
@@ -38,11 +50,14 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const sb = getSupabase();
     (async () => {
       setLoading(true);
-      const { data } = await supabase
+      const { data } = await sb
         .from('saved_deals')
-        .select('id, property_id, title, location, price, yield_percent, roi_percent, created_at')
+        .select(
+          'id, property_id, title, location, price, yield_percent, roi_percent, created_at'
+        )
         .order('created_at', { ascending: true });
       setDeals((data as SavedDeal[]) ?? []);
       setLoading(false);
@@ -51,8 +66,8 @@ export default function AnalyticsPage() {
 
   const kpis = useMemo(() => {
     const count = deals.length;
-    const avgYield = safeAvg(deals.map(d => Number(d.yield_percent ?? 0)));
-    const avgROI = safeAvg(deals.map(d => Number(d.roi_percent ?? 0)));
+    const avgYield = safeAvg(deals.map((d) => Number(d.yield_percent ?? 0)));
+    const avgROI = safeAvg(deals.map((d) => Number(d.roi_percent ?? 0)));
     const totalValue = deals.reduce((s, d) => s + Number(d.price ?? 0), 0);
     return { count, avgYield, avgROI, totalValue };
   }, [deals]);
@@ -60,29 +75,32 @@ export default function AnalyticsPage() {
   const monthly = useMemo(() => {
     // group by YYYY-MM
     const map = new Map<string, { count: number; avgYield: number }>();
-    deals.forEach(d => {
+    deals.forEach((d) => {
       const key = (d.created_at ?? '').slice(0, 7) || 'Unknown';
       const init = map.get(key) || { count: 0, avgYield: 0 };
       map.set(key, {
         count: init.count + 1,
-        avgYield: // rolling avg calc
-          ((init.avgYield * init.count) + Number(d.yield_percent ?? 0)) / (init.count + 1),
+        avgYield:
+          ((init.avgYield * init.count) + Number(d.yield_percent ?? 0)) /
+          (init.count + 1),
       });
     });
     const labels = Array.from(map.keys()).sort();
     return {
       labels,
-      countSeries: labels.map(l => map.get(l)!.count),
-      yieldSeries: labels.map(l => Number(map.get(l)!.avgYield.toFixed(2))),
+      countSeries: labels.map((l) => map.get(l)!.count),
+      yieldSeries: labels.map((l) => Number(map.get(l)!.avgYield.toFixed(2))),
     };
   }, [deals]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Sidebar (only on analytics) */}
+      {/* Sidebar */}
       <aside className="md:col-span-1 bg-slate-900 text-white rounded-xl p-4 h-fit">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 bg-blue-500 rounded-md grid place-items-center font-bold">PN</div>
+          <div className="w-8 h-8 bg-blue-500 rounded-md grid place-items-center font-bold">
+            PN
+          </div>
           <div className="font-bold">PropNexus</div>
         </div>
 
@@ -161,32 +179,48 @@ export default function AnalyticsPage() {
           </div>
         </Section>
 
-        {/* Recent saved deals (light table) */}
+        {/* Recent saved deals */}
         <Section>
           <SectionTitle icon={<span>⭐</span>}>Recent Saved Deals</SectionTitle>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  <Th>Title</Th><Th>Location</Th><Th>Price</Th><Th>Yield</Th><Th>ROI</Th><Th>Date</Th>
+                  <Th>Title</Th>
+                  <Th>Location</Th>
+                  <Th>Price</Th>
+                  <Th>Yield</Th>
+                  <Th>ROI</Th>
+                  <Th>Date</Th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td className="p-3 text-slate-500" colSpan={6}>Loading…</td></tr>
+                  <tr>
+                    <td className="p-3 text-slate-500" colSpan={6}>
+                      Loading…
+                    </td>
+                  </tr>
                 ) : deals.length === 0 ? (
-                  <tr><td className="p-3 text-slate-500" colSpan={6}>No saved deals yet.</td></tr>
+                  <tr>
+                    <td className="p-3 text-slate-500" colSpan={6}>
+                      No saved deals yet.
+                    </td>
+                  </tr>
                 ) : (
-                  deals.slice(-8).reverse().map(d => (
-                    <tr key={d.id} className="border-t">
-                      <Td>{d.title ?? '—'}</Td>
-                      <Td>{d.location ?? '—'}</Td>
-                      <Td>£{formatGBP(Number(d.price ?? 0))}</Td>
-                      <Td>{d.yield_percent ?? '—'}%</Td>
-                      <Td>{d.roi_percent ?? '—'}%</Td>
-                      <Td>{formatDate(d.created_at)}</Td>
-                    </tr>
-                  ))
+                  deals
+                    .slice(-8)
+                    .reverse()
+                    .map((d) => (
+                      <tr key={d.id} className="border-t">
+                        <Td>{d.title ?? '—'}</Td>
+                        <Td>{d.location ?? '—'}</Td>
+                        <Td>£{formatGBP(Number(d.price ?? 0))}</Td>
+                        <Td>{d.yield_percent ?? '—'}%</Td>
+                        <Td>{d.roi_percent ?? '—'}%</Td>
+                        <Td>{formatDate(d.created_at)}</Td>
+                      </tr>
+                    ))
                 )}
               </tbody>
             </table>
@@ -197,16 +231,25 @@ export default function AnalyticsPage() {
   );
 }
 
-/* ─── Little helpers (inline to keep file portable) ─────────────── */
-function NavItem({ href, label, emoji, active = false }:{
-  href: string; label: string; emoji: string; active?: boolean;
+/* ─── Little helpers ────────────────────────────────────────────── */
+function NavItem({
+  href,
+  label,
+  emoji,
+  active = false,
+}: {
+  href: string;
+  label: string;
+  emoji: string;
+  active?: boolean;
 }) {
   return (
     <Link
       href={href}
       className={`block px-3 py-2 rounded-md text-sm ${active ? 'bg-white/10' : 'hover:bg-white/10'}`}
     >
-      <span className="mr-2">{emoji}</span>{label}
+      <span className="mr-2">{emoji}</span>
+      {label}
     </Link>
   );
 }
@@ -228,9 +271,9 @@ function Td({ children }: { children: React.ReactNode }) {
 }
 
 function safeAvg(nums: number[]) {
-  const arr = nums.filter(n => Number.isFinite(n));
+  const arr = nums.filter((n) => Number.isFinite(n));
   if (!arr.length) return 0;
-  const v = arr.reduce((a,b) => a+b, 0) / arr.length;
+  const v = arr.reduce((a, b) => a + b, 0) / arr.length;
   return Number(v.toFixed(2));
 }
 function formatGBP(n: number) {
@@ -239,5 +282,9 @@ function formatGBP(n: number) {
 }
 function formatDate(s?: string | null) {
   if (!s) return '—';
-  try { return new Date(s).toLocaleDateString(); } catch { return '—'; }
+  try {
+    return new Date(s).toLocaleDateString();
+  } catch {
+    return '—';
+  }
 }
