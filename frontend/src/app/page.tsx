@@ -1,288 +1,279 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import dynamic from 'next/dynamic';
-import PropertyCard from '../../components/PropertyCard';
-import { Property } from '../types';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { getSupabase } from '@/lib/supabaseClient';   // ✅ use singleton client
 
-const MapView = dynamic(() => import('./MapView'), { ssr: false });
+import Section from '@/components/ui/Section';
+import SectionTitle from '@/components/ui/SectionTitle';
+import Badge from '@/components/ui/Badge';
 
-function Toast({ message, type }: { message: string; type: 'success' | 'error' }) {
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: '20px',
-        right: '20px',
-        backgroundColor: type === 'success' ? '#16a34a' : '#dc2626',
-        color: 'white',
-        padding: '10px 16px',
-        borderRadius: '6px',
-        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-        zIndex: 1000,
-      }}
-    >
-      {message}
-    </div>
-  );
-}
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
-// Helper to normalize any incoming object to the Property shape your UI expects
-function normalize(p: any): Property {
-  return {
-    id: p.id ?? p.property_id ?? p.uuid ?? p._id ?? null,
-    title: p.title ?? p.address ?? 'Untitled',
-    location: p.location ?? p.postcode ?? '',
-    price: p.price ?? null,
-    bedrooms: p.bedrooms ?? null,
-    bathrooms: p.bathrooms ?? null,
-    yield_percent: p.yield_percent ?? null,
-    roi_percent: p.roi_percent ?? null,
-    imageurl: p.imageurl ?? p.image ?? null,
-    // propertyType / investmentType may exist in your global type
-    propertyType: (p as any).propertyType ?? (p as any).property_type ?? undefined,
-    investmentType: (p as any).investmentType ?? (p as any).investment_type ?? undefined,
-  } as any;
-}
+/** Types */
+type SavedDeal = {
+  id: string;
+  property_id: string;
+  title?: string | null;
+  location?: string | null;
+  price?: number | null;
+  yield_percent?: number | null;
+  roi_percent?: number | null;
+  created_at?: string | null;
+};
 
-export default function PropertiesPage() {
-  const [properties, setProperties] = useState<Property[]>([]);
+export default function AnalyticsPage() {
+  const [deals, setDeals] = useState<SavedDeal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [searchLocation, setSearchLocation] = useState('');
-  const [minPrice, setMinPrice] = useState(0);
-  const [maxPrice, setMaxPrice] = useState(2_000_000);
-  const [bedrooms, setBedrooms] = useState<'Any' | string>('Any');
-  const [propertyType, setPropertyType] = useState<'All' | string>('All');
-  const [investmentType, setInvestmentType] = useState<'All' | string>('All');
-  const [minYield, setMinYield] = useState(0);
-  const [minROI, setMinROI] = useState(0);
-
-  const [showMap, setShowMap] = useState(true);
-  const [showMoreFilters, setShowMoreFilters] = useState(false);
-
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const BACKEND_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://propnexus-backend-production.up.railway.app').replace(/\/+$/, '');
 
   useEffect(() => {
-    const apply = () => {
-      if (typeof window !== 'undefined') setShowMap(window.innerWidth >= 1024);
+    let ignore = false;
+    let sb;
+    try {
+      sb = getSupabase();   // ✅ safe browser-only
+    } catch {
+      return;               // SSR/prerender: skip
+    }
+
+    (async () => {
+      setLoading(true);
+      const { data, error } = await sb
+        .from('saved_deals')
+        .select(
+          'id, property_id, title, location, price, yield_percent, roi_percent, created_at'
+        )
+        .order('created_at', { ascending: true });
+
+      if (!ignore) {
+        if (error) console.error('Error fetching deals:', error);
+        setDeals((data as SavedDeal[]) ?? []);
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      ignore = true;
     };
-    apply();
-    window.addEventListener('resize', apply);
-    return () => window.removeEventListener('resize', apply);
   }, []);
 
-  const fetchProperties = useCallback(async () => {
-    try {
-      setError(null);
-      const res = await fetch(`${BACKEND_BASE}/properties`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const normalized = (Array.isArray(data) ? data : []).map(normalize);
-      setProperties(normalized);
-    } catch (e: any) {
-      console.error('Error fetching properties:', e);
-      setError('Could not load properties. Please try again.');
-      setProperties([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [BACKEND_BASE]);
+  const kpis = useMemo(() => {
+    const count = deals.length;
+    const avgYield = safeAvg(deals.map((d) => Number(d.yield_percent ?? 0)));
+    const avgROI = safeAvg(deals.map((d) => Number(d.roi_percent ?? 0)));
+    const totalValue = deals.reduce((s, d) => s + Number(d.price ?? 0), 0);
+    return { count, avgYield, avgROI, totalValue };
+  }, [deals]);
 
-  useEffect(() => { fetchProperties(); }, [fetchProperties]);
-  useEffect(() => {
-    const i = setInterval(fetchProperties, 60000);
-    return () => clearInterval(i);
-  }, [fetchProperties]);
-
-  async function handleSearch() {
-    if (!searchLocation.trim()) {
-      showToast('⚠️ Enter a location first', 'error');
-      return;
-    }
-    try {
-      showToast(`🔍 Scraping ${searchLocation}…`, 'success');
-      const res = await fetch(`${BACKEND_BASE}/scrape`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location: searchLocation }),
+  const monthly = useMemo(() => {
+    const map = new Map<string, { count: number; avgYield: number }>();
+    deals.forEach((d) => {
+      const key = (d.created_at ?? '').slice(0, 7) || 'Unknown';
+      const init = map.get(key) || { count: 0, avgYield: 0 };
+      map.set(key, {
+        count: init.count + 1,
+        avgYield:
+          ((init.avgYield * init.count) + Number(d.yield_percent ?? 0)) /
+          (init.count + 1),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const normalized = (Array.isArray(data.properties) ? data.properties : []).map(normalize);
-      setProperties(normalized);
-      showToast(`✅ Found ${normalized.length} properties in ${searchLocation}`, 'success');
-    } catch (e) {
-      console.error('Error scraping/searching:', e);
-      showToast('❌ Error searching properties. Please try again.', 'error');
-    }
-  }
-
-  const filteredProperties = useMemo(() => {
-    const q = searchLocation.trim().toLowerCase();
-
-    return properties.filter((p) => {
-      const price = Number(p.price ?? 0);
-      const matchesPrice = price >= minPrice && price <= maxPrice;
-
-      const matchesLocation = q ? (p.location ?? '').toLowerCase().includes(q) : true;
-      const matchesBedrooms = bedrooms === 'Any' ? true : Number(p.bedrooms) === Number(bedrooms);
-      const matchesPropertyType =
-        propertyType === 'All' ? true : (p as any).propertyType?.toLowerCase() === propertyType.toLowerCase();
-      const matchesInvestmentType =
-        investmentType === 'All' ? true : (p as any).investmentType?.toLowerCase() === investmentType.toLowerCase();
-      const matchesYield = Number(p.yield_percent ?? 0) >= minYield;
-      const matchesROI = Number(p.roi_percent ?? 0) >= minROI;
-
-      return (
-        matchesPrice &&
-        matchesLocation &&
-        matchesBedrooms &&
-        matchesPropertyType &&
-        matchesInvestmentType &&
-        matchesYield &&
-        matchesROI
-      );
     });
-  }, [properties, searchLocation, minPrice, maxPrice, bedrooms, propertyType, investmentType, minYield, minROI]);
+    const labels = Array.from(map.keys()).sort();
+    return {
+      labels,
+      countSeries: labels.map((l) => map.get(l)!.count),
+      yieldSeries: labels.map((l) => Number(map.get(l)!.avgYield.toFixed(2))),
+    };
+  }, [deals]);
 
   return (
-    <div className="main-wrapper">
-      {/* Filters */}
-      <div className="sticky-primary" role="region" aria-label="Filters">
-        <input
-          className="filter-input large"
-          style={{ flex: '0 1 40%' }}
-          type="text"
-          placeholder="🔎 Search location"
-          value={searchLocation}
-          onChange={(e) => setSearchLocation(e.target.value)}
-          aria-label="Search location"
-        />
-
-        <button onClick={handleSearch} className="small-button" title="Search properties">
-          🔍 Search
-        </button>
-
-        <select
-          className="filter-select small"
-          value={investmentType}
-          onChange={(e) => setInvestmentType(e.target.value)}
-          aria-label="Investment type"
-        >
-          <option value="All">All Investment Types</option>
-          <option value="HMO">HMO</option>
-          <option value="Flips">Flips</option>
-          <option value="Buy to Let">Buy to Let</option>
-          <option value="Joint venture">Joint venture</option>
-        </select>
-
-        <button
-          onClick={() => setShowMoreFilters((v) => !v)}
-          className="small-button"
-          title="Show more filters"
-          aria-expanded={showMoreFilters}
-        >
-          ⚙️ Filters
-        </button>
-
-        <button
-          onClick={() => setShowMap((v) => !v)}
-          className="small-button"
-          style={{ backgroundColor: showMap ? '#334155' : '#3b82f6', color: '#fff' }}
-          aria-pressed={showMap}
-        >
-          {showMap ? 'Hide Map 🗺️' : 'Show Map 🗺️'}
-        </button>
-
-        <button
-          className="small-button"
-          style={{ marginLeft: 'auto' }}
-          onClick={() => document.body.classList.toggle('dark-mode')}
-          aria-label="Toggle dark mode"
-        >
-          🌙 Dark Mode
-        </button>
-      </div>
-
-      {/* Advanced filters */}
-      {showMoreFilters && (
-        <div className="filters-row" role="region" aria-label="Advanced filters">
-          <div>
-            <label htmlFor="minPrice">Min Price</label>
-            <input id="minPrice" type="number" value={minPrice} onChange={(e) => setMinPrice(Number(e.target.value))} />
+    <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Sidebar */}
+      <aside className="md:col-span-1 bg-slate-900 text-white rounded-xl p-4 h-fit">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 bg-blue-500 rounded-md grid place-items-center font-bold">
+            PN
           </div>
-          <div>
-            <label htmlFor="maxPrice">Max Price</label>
-            <input id="maxPrice" type="number" value={maxPrice} onChange={(e) => setMaxPrice(Number(e.target.value))} />
-          </div>
-          <div>
-            <label htmlFor="beds">Bedrooms</label>
-            <select id="beds" value={bedrooms} onChange={(e) => setBedrooms(e.target.value)}>
-              <option value="Any">Any Beds</option>
-              <option value="1">1 Bed</option>
-              <option value="2">2 Beds</option>
-              <option value="3">3 Beds</option>
-              <option value="4">4+ Beds</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="ptype">Property Type</label>
-            <select id="ptype" value={propertyType} onChange={(e) => setPropertyType(e.target.value)}>
-              <option value="All">All Types</option>
-              <option value="Flat">Flat</option>
-              <option value="House">House</option>
-              <option value="Studio">Studio</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="minYield">Min Yield (%)</label>
-            <input id="minYield" type="number" value={minYield} onChange={(e) => setMinYield(Number(e.target.value))} />
-          </div>
-          <div>
-            <label htmlFor="minRoi">Min ROI (%)</label>
-            <input id="minRoi" type="number" value={minROI} onChange={(e) => setMinROI(Number(e.target.value))} />
-          </div>
+          <div className="font-bold">PropNexus</div>
         </div>
-      )}
+
+        <nav className="space-y-1">
+          <NavItem href="/" label="Listings" emoji="🏠" />
+          <NavItem href="/analytics" label="Analytics" emoji="📈" active />
+          <NavItem href="/deals" label="Saved Deals" emoji="⭐" />
+        </nav>
+
+        <div className="mt-6 text-xs text-slate-300">
+          Track portfolio metrics, AI scores and market signals here.
+        </div>
+      </aside>
 
       {/* Content */}
-      <div className={`content-layout ${showMap ? '' : 'hide-map'}`}>
-        <div className="property-list" aria-live="polite">
-          {loading && <p style={{ color: '#64748b' }}>Loading properties…</p>}
-          {!loading && error && <p style={{ color: '#b91c1c' }}>{error}</p>}
-          {!loading && !error && filteredProperties.length === 0 && (
-            <p style={{ color: '#64748b' }}>No matching properties found.</p>
-          )}
-          {!loading && !error &&
-            filteredProperties.map((p) => <PropertyCard key={String(p.id)} property={p as any} />)}
+      <main className="md:col-span-2 space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold">Analytics & Portfolio</h1>
+          <p className="text-slate-600">Aggregated view of your saved deals and signals.</p>
+        </header>
+
+        {/* KPI row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard label="Saved Deals" value={kpis.count} />
+          <KpiCard label="Avg Yield" value={`${kpis.avgYield}%`} />
+          <KpiCard label="Avg ROI" value={`${kpis.avgROI}%`} />
+          <KpiCard label="Total Value" value={`£${formatGBP(kpis.totalValue)}`} />
         </div>
 
-        {showMap && filteredProperties.length > 0 && (
-          <aside className="map-view">
-            <div className="map-panel">
-              <MapView properties={filteredProperties as any[]} />
-            </div>
-          </aside>
-        )}
-      </div>
+        {/* Charts */}
+        <Section>
+          <SectionTitle icon={<span>📈</span>}>Saved Deals Over Time</SectionTitle>
+          <div className="rounded-xl border border-slate-200 p-4">
+            <Line
+              data={{
+                labels: monthly.labels,
+                datasets: [
+                  {
+                    label: 'Saved deals',
+                    data: monthly.countSeries,
+                    borderWidth: 2,
+                    tension: 0.3,
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } },
+              }}
+            />
+          </div>
+        </Section>
 
-      <button
-        className="back-to-top"
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        aria-label="Back to top"
-      >
-        ⬆ Back to Top
-      </button>
+        <Section>
+          <SectionTitle icon={<span>📊</span>}>Average Yield by Month</SectionTitle>
+          <div className="rounded-xl border border-slate-200 p-4">
+            <Line
+              data={{
+                labels: monthly.labels,
+                datasets: [
+                  {
+                    label: 'Avg yield %',
+                    data: monthly.yieldSeries,
+                    borderWidth: 2,
+                    tension: 0.3,
+                  },
+                ],
+              }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, suggestedMax: 12 } },
+              }}
+            />
+          </div>
+        </Section>
 
-      {toast && <Toast message={toast.message} type={toast.type} />}
+        {/* Recent saved deals */}
+        <Section>
+          <SectionTitle icon={<span>⭐</span>}>Recent Saved Deals</SectionTitle>
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <Th>Title</Th>
+                  <Th>Location</Th>
+                  <Th>Price</Th>
+                  <Th>Yield</Th>
+                  <Th>ROI</Th>
+                  <Th>Date</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td className="p-3 text-slate-500" colSpan={6}>
+                      Loading…
+                    </td>
+                  </tr>
+                ) : deals.length === 0 ? (
+                  <tr>
+                    <td className="p-3 text-slate-500" colSpan={6}>
+                      No saved deals yet.
+                    </td>
+                  </tr>
+                ) : (
+                  deals
+                    .slice(-8)
+                    .reverse()
+                    .map((d) => (
+                      <tr key={d.id} className="border-t">
+                        <Td>{d.title ?? '—'}</Td>
+                        <Td>{d.location ?? '—'}</Td>
+                        <Td>£{formatGBP(Number(d.price ?? 0))}</Td>
+                        <Td>{d.yield_percent ?? '—'}%</Td>
+                        <Td>{d.roi_percent ?? '—'}%</Td>
+                        <Td>{formatDate(d.created_at)}</Td>
+                      </tr>
+                    ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Section>
+      </main>
     </div>
   );
+}
+
+/* ─── Little helpers ────────────────────────────────────────────── */
+function NavItem({ href, label, emoji, active = false }:{
+  href: string; label: string; emoji: string; active?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`block px-3 py-2 rounded-md text-sm ${active ? 'bg-white/10' : 'hover:bg-white/10'}`}
+    >
+      <span className="mr-2">{emoji}</span>{label}
+    </Link>
+  );
+}
+
+function KpiCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="text-xl font-semibold mt-1">{value}</div>
+    </div>
+  );
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return <th className="text-left font-medium px-3 py-2 text-slate-600">{children}</th>;
+}
+function Td({ children }: { children: React.ReactNode }) {
+  return <td className="px-3 py-2">{children}</td>;
+}
+
+function safeAvg(nums: number[]) {
+  const arr = nums.filter((n) => Number.isFinite(n));
+  if (!arr.length) return 0;
+  const v = arr.reduce((a, b) => a + b, 0) / arr.length;
+  return Number(v.toFixed(2));
+}
+function formatGBP(n: number) {
+  if (!Number.isFinite(n)) return '0';
+  return n.toLocaleString();
+}
+function formatDate(s?: string | null) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleDateString(); } catch { return '—'; }
 }
