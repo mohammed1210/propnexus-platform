@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
 import PropertyCard from '@/components/PropertyCard';
@@ -65,4 +66,26 @@ export default function ListingsPage() {
       </Section>
     </div>
   );
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return <th className="text-left font-medium px-3 py-2 text-slate-600">{children}</th>;
+}
+function Td({ children }: { children: React.ReactNode }) {
+  return <td className="px-3 py-2">{children}</td>;
+}
+
+function safeAvg(nums: number[]) {
+  const arr = nums.filter((n) => Number.isFinite(n));
+  if (!arr.length) return 0;
+  const v = arr.reduce((a, b) => a + b, 0) / arr.length;
+  return Number(v.toFixed(2));
+}
+function formatGBP(n: number) {
+  if (!Number.isFinite(n)) return '0';
+  return n.toLocaleString();
+}
+function formatDate(s?: string | null) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleDateString(); } catch { return '—'; }
 }

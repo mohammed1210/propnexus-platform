@@ -66,15 +66,15 @@ export default function AnalyticsPage() {
 
   const kpis = useMemo(() => {
     const count = deals.length;
-    const avgYield = safeAvg(deals.map(d => Number(d.yield_percent ?? 0)));
-    const avgROI = safeAvg(deals.map(d => Number(d.roi_percent ?? 0)));
+    const avgYield = safeAvg(deals.map((d) => Number(d.yield_percent ?? 0)));
+    const avgROI = safeAvg(deals.map((d) => Number(d.roi_percent ?? 0)));
     const totalValue = deals.reduce((s, d) => s + Number(d.price ?? 0), 0);
     return { count, avgYield, avgROI, totalValue };
   }, [deals]);
 
   const monthly = useMemo(() => {
     const map = new Map<string, { count: number; avgYield: number }>();
-    deals.forEach(d => {
+    deals.forEach((d) => {
       const key = (d.created_at ?? '').slice(0, 7) || 'Unknown';
       const init = map.get(key) || { count: 0, avgYield: 0 };
       map.set(key, {
@@ -85,8 +85,8 @@ export default function AnalyticsPage() {
     const labels = Array.from(map.keys()).sort();
     return {
       labels,
-      countSeries: labels.map(l => map.get(l)!.count),
-      yieldSeries: labels.map(l => Number(map.get(l)!.avgYield.toFixed(2))),
+      countSeries: labels.map((l) => map.get(l)!.count),
+      yieldSeries: labels.map((l) => Number(map.get(l)!.avgYield.toFixed(2))),
     };
   }, [deals]);
 
@@ -95,7 +95,9 @@ export default function AnalyticsPage() {
       {/* Sidebar */}
       <aside className="md:col-span-1 bg-slate-900 text-white rounded-xl p-4 h-fit">
         <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 bg-blue-500 rounded-md grid place-items-center font-bold">PN</div>
+          <div className="w-8 h-8 bg-blue-500 rounded-md grid place-items-center font-bold">
+            PN
+          </div>
           <div className="font-bold">PropNexus</div>
         </div>
 
@@ -163,25 +165,41 @@ export default function AnalyticsPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  <Th>Title</Th><Th>Location</Th><Th>Price</Th><Th>Yield</Th><Th>ROI</Th><Th>Date</Th>
+                  <Th>Title</Th>
+                  <Th>Location</Th>
+                  <Th>Price</Th>
+                  <Th>Yield</Th>
+                  <Th>ROI</Th>
+                  <Th>Date</Th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td className="p-3 text-slate-500" colSpan={6}>Loading…</td></tr>
+                  <tr>
+                    <td className="p-3 text-slate-500" colSpan={6}>
+                      Loading…
+                    </td>
+                  </tr>
                 ) : deals.length === 0 ? (
-                  <tr><td className="p-3 text-slate-500" colSpan={6}>No saved deals yet.</td></tr>
+                  <tr>
+                    <td className="p-3 text-slate-500" colSpan={6}>
+                      No saved deals yet.
+                    </td>
+                  </tr>
                 ) : (
-                  deals.slice(-8).reverse().map(d => (
-                    <tr key={d.id} className="border-t">
-                      <Td>{d.title ?? '—'}</Td>
-                      <Td>{d.location ?? '—'}</Td>
-                      <Td>£{formatGBP(Number(d.price ?? 0))}</Td>
-                      <Td>{d.yield_percent ?? '—'}%</Td>
-                      <Td>{d.roi_percent ?? '—'}%</Td>
-                      <Td>{formatDate(d.created_at)}</Td>
-                    </tr>
-                  ))
+                  deals
+                    .slice(-8)
+                    .reverse()
+                    .map((d) => (
+                      <tr key={d.id} className="border-t">
+                        <Td>{d.title ?? '—'}</Td>
+                        <Td>{d.location ?? '—'}</Td>
+                        <Td>£{formatGBP(Number(d.price ?? 0))}</Td>
+                        <Td>{d.yield_percent ?? '—'}%</Td>
+                        <Td>{d.roi_percent ?? '—'}%</Td>
+                        <Td>{formatDate(d.created_at)}</Td>
+                      </tr>
+                    ))
                 )}
               </tbody>
             </table>
@@ -201,7 +219,8 @@ function NavItem({ href, label, emoji, active = false }:{
       href={href}
       className={`block px-3 py-2 rounded-md text-sm ${active ? 'bg-white/10' : 'hover:bg-white/10'}`}
     >
-      <span className="mr-2">{emoji}</span>{label}
+      <span className="mr-2">{emoji}</span>
+      {label}
     </Link>
   );
 }
@@ -220,9 +239,9 @@ function Td({ children }: { children: React.ReactNode }) {
   return <td className="px-3 py-2">{children}</td>;
 }
 function safeAvg(nums: number[]) {
-  const arr = nums.filter(n => Number.isFinite(n));
+  const arr = nums.filter((n) => Number.isFinite(n));
   if (!arr.length) return 0;
-  const v = arr.reduce((a,b) => a+b, 0) / arr.length;
+  const v = arr.reduce((a, b) => a + b, 0) / arr.length;
   return Number(v.toFixed(2));
 }
 function formatGBP(n: number) {
@@ -231,5 +250,9 @@ function formatGBP(n: number) {
 }
 function formatDate(s?: string | null) {
   if (!s) return '—';
-  try { return new Date(s).toLocaleDateString(); } catch { return '—'; }
+  try {
+    return new Date(s).toLocaleDateString();
+  } catch {
+    return '—';
+  }
 }
