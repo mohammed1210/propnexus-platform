@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import nextDynamic from 'next/dynamic';
+import Image from 'next/image';
 
 // Types-only shim so Codespaces/TS won't complain if @types/node isn't installed.
 declare const process: { env?: Record<string, string | undefined> };
@@ -170,14 +171,19 @@ export default function PropertyDetailsPage() {
         </header>
 
         {/* Hero Image */}
-        {property.imageurl && (
-          // Replace with next/image to silence Next's <img> warning if desired
-          <img
-            src={property.imageurl}
-            alt={property.title}
-            className="w-full h-72 md:h-96 object-cover rounded-xl shadow-sm"
-          />
-        )}
+        
+{property.imageurl && (
+  <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden shadow-sm">
+    <Image
+      src={property.imageurl}
+      alt={property.title}
+      fill
+      sizes="(max-width: 768px) 100vw, 80vw"
+      style={{ objectFit: 'cover' }}
+      priority
+    />
+  </div>
+)}
 
         {/* Overview */}
         {property.description && (

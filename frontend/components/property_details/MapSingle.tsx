@@ -4,7 +4,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L, { LatLngExpression } from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 
 type MinimalProperty = {
   latitude?: number | null;
