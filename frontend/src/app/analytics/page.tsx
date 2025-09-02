@@ -3,11 +3,10 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getSupabase } from '@/lib/supabaseClient'; // ✅ use shared client
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
-import Badge from '@/components/ui/Badge';
 
 import { Line } from 'react-chartjs-2';
 import {
@@ -20,18 +19,6 @@ import {
   Legend,
 } from 'chart.js';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
-
-/** ── Supabase (lazy, browser-only singleton) ───────────────────── */
-let _sb: SupabaseClient | null = null;
-function getSupabase(): SupabaseClient {
-  if (!_sb) {
-    _sb = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-  }
-  return _sb;
-}
 
 /** Types */
 type SavedDeal = {
@@ -50,18 +37,33 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const sb = getSupabase();
+    let ignore = false;
+    let sb;
+    try {
+      sb = getSupabase(); // ✅ safe on client; SSR will skip
+    } catch {
+      return;
+    }
+
     (async () => {
       setLoading(true);
-      const { data } = await sb
+      const { data, error } = await sb
         .from('saved_deals')
         .select(
           'id, property_id, title, location, price, yield_percent, roi_percent, created_at'
         )
         .order('created_at', { ascending: true });
-      setDeals((data as SavedDeal[]) ?? []);
-      setLoading(false);
+
+      if (!ignore) {
+        if (error) console.error('Error fetching deals:', error);
+        setDeals((data as SavedDeal[]) ?? []);
+        setLoading(false);
+      }
     })();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const kpis = useMemo(() => {
@@ -79,7 +81,9 @@ export default function AnalyticsPage() {
       const init = map.get(key) || { count: 0, avgYield: 0 };
       map.set(key, {
         count: init.count + 1,
-        avgYield: ((init.avgYield * init.count) + Number(d.yield_percent ?? 0)) / (init.count + 1),
+        avgYield:
+          ((init.avgYield * init.count) + Number(d.yield_percent ?? 0)) /
+          (init.count + 1),
       });
     });
     const labels = Array.from(map.keys()).sort();
@@ -250,9 +254,5 @@ function formatGBP(n: number) {
 }
 function formatDate(s?: string | null) {
   if (!s) return '—';
-  try {
-    return new Date(s).toLocaleDateString();
-  } catch {
-    return '—';
-  }
+  try { return new Date(s).toLocaleDateString(); } catch { return '—'; }
 }

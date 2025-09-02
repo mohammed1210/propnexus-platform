@@ -6,16 +6,14 @@ import { useEffect, useState } from 'react';
 export default function HeaderClient() {
   const [isDark, setIsDark] = useState(false);
 
-  // Init theme and (optionally) Leaflet marker icons
+  // Theme restore + Leaflet marker icon setup
   useEffect(() => {
-    // Theme init (idempotent)
-    try {
-      const dark = localStorage.getItem('theme') === 'dark';
-      setIsDark(dark);
-      document.body.classList.toggle('dark-mode', dark);
-    } catch {}
+    // theme
+    const dark = localStorage.getItem('theme') === 'dark';
+    setIsDark(dark);
+    document.body.classList.toggle('dark-mode', dark);
 
-    // Leaflet default marker icons (only loads on pages that use Leaflet)
+    // leaflet markers (safe to ignore if Leaflet isn’t on the page)
     (async () => {
       try {
         const L = (await import('leaflet')).default;
@@ -27,7 +25,7 @@ export default function HeaderClient() {
           iconRetinaUrl: retina,
           shadowUrl: shadow,
         });
-      } catch { /* ignore if Leaflet unused on this page */ }
+      } catch {}
     })();
   }, []);
 
@@ -35,7 +33,7 @@ export default function HeaderClient() {
     const next = !isDark;
     setIsDark(next);
     document.body.classList.toggle('dark-mode', next);
-    try { localStorage.setItem('theme', next ? 'dark' : 'light'); } catch {}
+    localStorage.setItem('theme', next ? 'dark' : 'light');
   };
 
   return (
@@ -50,7 +48,7 @@ export default function HeaderClient() {
         <Link href="/deals">Saved Deals</Link>
       </nav>
 
-      <button onClick={toggleTheme} className="mode-toggle" style={{ marginLeft: 12 }}>
+      <button onClick={toggleTheme} className="mode-toggle">
         {isDark ? '☀️ Light Mode' : '🌙 Dark Mode'}
       </button>
     </header>
