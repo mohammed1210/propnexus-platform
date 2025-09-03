@@ -29,7 +29,7 @@ import AIChatbot from '@/components/property_details/AIChatbot';
 const MapSingle = nextDynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
 
 type Property = {
-  id: string; // id only
+  id: string;
   title: string;
   location: string;
   price: number;
@@ -55,12 +55,10 @@ function getBackendBase(): string {
   if (!raw) {
     throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
   }
-  return raw.replace(/\/+$/, ''); // strip trailing slash(es)
+  return raw.replace(/\/+$/, '');
 }
-
 export default function PropertyDetailsPage() {
   const params = useParams<{ id: string }>();
-  // normalize id just in case
   const id = (params?.id ?? '') as string;
 
   const [property, setProperty] = useState<Property | null>(null);
@@ -111,7 +109,6 @@ export default function PropertyDetailsPage() {
     if (!property) return;
     try {
       const base = getBackendBase();
-      // Adjust endpoint when your backend route is ready
       const resp = await fetch(`${base}/api/saved-deals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -150,17 +147,15 @@ export default function PropertyDetailsPage() {
     );
   }
 
-  return (
+    return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
       {/* LEFT */}
       <div className="md:col-span-2 space-y-6">
-        {/* Header */}
         <header className="mb-4 md:mb-6">
-          <h1 className="text-[clamp(1.5rem,4vw,2.25rem)] font-extrabold leading-tight text-balance">
+          <h1 className="text-[clamp(1.5rem,4vw,2.25rem)] font-extrabold leading-tight">
             {property.title}
           </h1>
           <p className="text-slate-600 mt-1">{property.location}</p>
-
           <div className="mt-3">
             <CardActions
               onSave={handleSaveDeal}
@@ -170,20 +165,18 @@ export default function PropertyDetailsPage() {
           </div>
         </header>
 
-        {/* Hero Image */}
-        
-{property.imageurl && (
-  <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden shadow-sm">
-    <Image
-      src={property.imageurl}
-      alt={property.title}
-      fill
-      sizes="(max-width: 768px) 100vw, 80vw"
-      style={{ objectFit: 'cover' }}
-      priority
-    />
-  </div>
-)}
+        {property.imageurl && (
+          <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden shadow-sm">
+            <Image
+              src={property.imageurl}
+              alt={property.title}
+              fill
+              sizes="(max-width: 768px) 100vw, 80vw"
+              style={{ objectFit: 'cover' }}
+              priority
+            />
+          </div>
+        )}
 
         {/* Overview */}
         {property.description && (

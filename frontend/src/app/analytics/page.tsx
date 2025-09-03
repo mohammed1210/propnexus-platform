@@ -1,15 +1,12 @@
+// frontend/src/app/analytics/page.tsx
 'use client';
-export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-
-// ✅ use the shared browser client
-import { getSupabase } from '@/lib/supabaseClient';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
-import Badge from '@/components/ui/Badge';
 
 import { Line } from 'react-chartjs-2';
 import {
@@ -21,7 +18,26 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+
+// Chart.js setup (must be called once on the client)
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
+
+/** ── Supabase (lazy, browser-only singleton) ───────────────────── */
+let _sb: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) {
+    // Keep the page rendering even if env is missing
+    if (typeof window !== 'undefined') {
+      // eslint-disable-next-line no-console
+      console.warn('Analytics: Supabase env vars missing');
+    }
+    return null;
+  }
+  if (!_sb) _sb = createClient(url, key);
+  return _sb;
+}
 
 /** Types */
 type SavedDeal = {
@@ -40,50 +56,56 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const sb = getSupabase();
+    if (!sb) {
+      setDeals([]);
+      setLoading(false);
+      return;
+    }
     let ignore = false;
-
     (async () => {
-      const sb = getSupabase();
       setLoading(true);
       const { data, error } = await sb
         .from('saved_deals')
-        .select('id, property_id, title, location, price, yield_percent, roi_percent, created_at')
+        .select(
+          'id, property_id, title, location, price, yield_percent, roi_percent, created_at'
+        )
         .order('created_at', { ascending: true });
 
       if (!ignore) {
-        if (error) console.error('Error fetching deals:', error);
+        if (error) console.error('analytics fetch error', error);
         setDeals((data as SavedDeal[]) ?? []);
         setLoading(false);
       }
     })();
-
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, []);
 
+  // KPIs
   const kpis = useMemo(() => {
     const count = deals.length;
-    const avgYield = safeAvg(deals.map(d => Number(d.yield_percent ?? 0)));
-    const avgROI = safeAvg(deals.map(d => Number(d.roi_percent ?? 0)));
-    const totalValue = deals.reduce((s, d) => s + Number(d.price ?? 0), 0);
+    const avgYield = avg(deals.map((d) => num(d.yield_percent)));
+    const avgROI = avg(deals.map((d) => num(d.roi_percent)));
+    const totalValue = deals.reduce((s, d) => s + num(d.price), 0);
     return { count, avgYield, avgROI, totalValue };
   }, [deals]);
 
+  // Monthly series
   const monthly = useMemo(() => {
-    const map = new Map<string, { count: number; avgYield: number }>();
-    deals.forEach(d => {
+    const map = new Map<string, { count: number; sumYield: number }>();
+    for (const d of deals) {
       const key = (d.created_at ?? '').slice(0, 7) || 'Unknown';
-      const init = map.get(key) || { count: 0, avgYield: 0 };
-      map.set(key, {
-        count: init.count + 1,
-        avgYield: ((init.avgYield * init.count) + Number(d.yield_percent ?? 0)) / (init.count + 1),
-      });
-    });
+      const m = map.get(key) ?? { count: 0, sumYield: 0 };
+      m.count += 1;
+      m.sumYield += num(d.yield_percent);
+      map.set(key, m);
+    }
     const labels = Array.from(map.keys()).sort();
-    return {
-      labels,
-      countSeries: labels.map(l => map.get(l)!.count),
-      yieldSeries: labels.map(l => Number(map.get(l)!.avgYield.toFixed(2))),
-    };
+    const countSeries = labels.map((l) => map.get(l)!.count);
+    const yieldSeries = labels.map((l) => round((map.get(l)!.sumYield / Math.max(map.get(l)!.count, 1)) || 0));
+    return { labels, countSeries, yieldSeries };
   }, [deals]);
 
   return (
@@ -106,10 +128,10 @@ export default function AnalyticsPage() {
         </div>
       </aside>
 
-      {/* Content */}
+      {/* Main */}
       <main className="md:col-span-2 space-y-6">
         <header>
-          <h1 className="text-2xl font-bold">Analytics & Portfolio</h1>
+          <h1 className="text-2xl font-bold">Analytics &amp; Portfolio</h1>
           <p className="text-slate-600">Aggregated view of your saved deals and signals.</p>
         </header>
 
@@ -123,39 +145,56 @@ export default function AnalyticsPage() {
 
         {/* Charts */}
         <Section>
-          <SectionTitle icon={<span>📈</span>}>Saved Deals Over Time</SectionTitle>
+          <SectionTitle>Saved Deals Over Time</SectionTitle>
           <div className="rounded-xl border border-slate-200 p-4">
             <Line
               data={{
                 labels: monthly.labels,
-                datasets: [{ label: 'Saved deals', data: monthly.countSeries, borderWidth: 2, tension: 0.3 }],
+                datasets: [
+                  { label: 'Saved deals', data: monthly.countSeries, borderWidth: 2, tension: 0.3 },
+                ],
               }}
-              options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } },
+              }}
             />
           </div>
         </Section>
 
         <Section>
-          <SectionTitle icon={<span>📊</span>}>Average Yield by Month</SectionTitle>
+          <SectionTitle>Average Yield by Month</SectionTitle>
           <div className="rounded-xl border border-slate-200 p-4">
             <Line
               data={{
                 labels: monthly.labels,
-                datasets: [{ label: 'Avg yield %', data: monthly.yieldSeries, borderWidth: 2, tension: 0.3 }],
+                datasets: [
+                  { label: 'Avg yield %', data: monthly.yieldSeries, borderWidth: 2, tension: 0.3 },
+                ],
               }}
-              options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, suggestedMax: 12 } } }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, suggestedMax: 12 } },
+              }}
             />
           </div>
         </Section>
 
-        {/* Recent saved deals */}
+        {/* Recent saved deals table */}
         <Section>
-          <SectionTitle icon={<span>⭐</span>}>Recent Saved Deals</SectionTitle>
+          <SectionTitle>Recent Saved Deals</SectionTitle>
           <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  <Th>Title</Th><Th>Location</Th><Th>Price</Th><Th>Yield</Th><Th>ROI</Th><Th>Date</Th>
+                  <Th>Title</Th>
+                  <Th>Location</Th>
+                  <Th>Price</Th>
+                  <Th>Yield</Th>
+                  <Th>ROI</Th>
+                  <Th>Date</Th>
                 </tr>
               </thead>
               <tbody>
@@ -164,13 +203,13 @@ export default function AnalyticsPage() {
                 ) : deals.length === 0 ? (
                   <tr><td className="p-3 text-slate-500" colSpan={6}>No saved deals yet.</td></tr>
                 ) : (
-                  deals.slice(-8).reverse().map(d => (
+                  deals.slice(-8).reverse().map((d) => (
                     <tr key={d.id} className="border-t">
                       <Td>{d.title ?? '—'}</Td>
                       <Td>{d.location ?? '—'}</Td>
-                      <Td>£{formatGBP(Number(d.price ?? 0))}</Td>
-                      <Td>{d.yield_percent ?? '—'}%</Td>
-                      <Td>{d.roi_percent ?? '—'}%</Td>
+                      <Td>£{formatGBP(num(d.price))}</Td>
+                      <Td>{valOrDash(d.yield_percent)}%</Td>
+                      <Td>{valOrDash(d.roi_percent)}%</Td>
                       <Td>{formatDate(d.created_at)}</Td>
                     </tr>
                   ))
@@ -184,8 +223,8 @@ export default function AnalyticsPage() {
   );
 }
 
-/* ─── Little helpers ────────────────────────────────────────────── */
-function NavItem({ href, label, emoji, active = false }:{
+/* ─── Small presentational helpers ─────────────────────────────── */
+function NavItem({ href, label, emoji, active = false }: {
   href: string; label: string; emoji: string; active?: boolean;
 }) {
   return (
@@ -211,16 +250,19 @@ function Th({ children }: { children: React.ReactNode }) {
 function Td({ children }: { children: React.ReactNode }) {
   return <td className="px-3 py-2">{children}</td>;
 }
-function safeAvg(nums: number[]) {
-  const arr = nums.filter(n => Number.isFinite(n));
-  if (!arr.length) return 0;
-  const v = arr.reduce((a, b) => a + b, 0) / arr.length;
-  return Number(v.toFixed(2));
+
+/* ─── Data helpers ─────────────────────────────────────────────── */
+function num(n: unknown) { return Number(n ?? 0) || 0; }
+function round(n: number) { return Number(n.toFixed(2)); }
+function avg(list: number[]) {
+  const arr = list.filter((x) => Number.isFinite(x));
+  return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
 }
-function formatGBP(n: number) {
-  if (!Number.isFinite(n)) return '0';
-  return n.toLocaleString();
+function valOrDash(n?: number | null): string | number {
+  if (n === null || n === undefined) return '–';
+  return n;
 }
+function formatGBP(n: number) { return n.toLocaleString(); }
 function formatDate(s?: string | null) {
   if (!s) return '—';
   try { return new Date(s).toLocaleDateString(); } catch { return '—'; }

@@ -19,7 +19,7 @@ const nextConfig = {
       '@components': path.resolve(__dirname, 'components'),
       '@details': path.resolve(__dirname, 'components/property_details'),
       '@map': path.resolve(__dirname, 'src/app'),
-      '@lib': path.resolve(__dirname, 'lib'),
+      '@lib': path.resolve(__dirname, 'src/lib'),
     };
     return config;
   },
