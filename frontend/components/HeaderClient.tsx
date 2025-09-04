@@ -44,7 +44,7 @@ export default function HeaderClient() {
 
       {/* Primary nav */}
       <nav style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
-        <Link href="/listings" className="hover:underline">Listings</Link>
+        <Link href="/listings" className="hover:underline">listings</Link>
         <Link href="/analytics" className="hover:underline">Analytics</Link>
         <Link href="/deals" className="hover:underline">Saved Deals</Link>
       </nav>

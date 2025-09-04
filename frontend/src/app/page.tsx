@@ -73,11 +73,20 @@ export default function HomePage() {
                 </button>
               </div>
               <p className="mt-2 text-sm text-slate-300">
-                e.g. <button type="button" className="underline" onClick={() => router.push('/listings?q=SW1A')}>
+                e.g.{' '}
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => router.push('/listings?q=SW1A')}
+                >
                   SW1A
                 </button>{' '}
                 or{' '}
-                <button type="button" className="underline" onClick={() => router.push('/listings?q=Manchester')}>
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => router.push('/listings?q=Manchester')}
+                >
                   Manchester
                 </button>
               </p>
@@ -137,9 +146,18 @@ export default function HomePage() {
                 <div className="rounded-lg bg-white/90 p-4 shadow">
                   <p className="text-xs font-medium text-slate-500">Realtime Signals</p>
                   <div className="mt-1 grid grid-cols-3 gap-3 text-sm">
-                    <div><p className="text-slate-500">Avg Yield</p><p className="font-semibold">6.1%</p></div>
-                    <div><p className="text-slate-500">Avg ROI</p><p className="font-semibold">14.8%</p></div>
-                    <div><p className="text-slate-500">Deals Today</p><p className="font-semibold">28</p></div>
+                    <div>
+                      <p className="text-slate-500">Avg Yield</p>
+                      <p className="font-semibold">6.1%</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Avg ROI</p>
+                      <p className="font-semibold">14.8%</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Deals Today</p>
+                      <p className="font-semibold">28</p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -150,9 +168,7 @@ export default function HomePage() {
         {/* Bottom CTA strip */}
         <div className="mx-auto max-w-7xl px-4 pb-16">
           <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4 text-slate-200 flex items-center justify-between">
-            <p className="text-sm">
-              New here? Jump straight to the live feed of properties.
-            </p>
+            <p className="text-sm">New here? Jump straight to the live feed of properties.</p>
             <Link
               href="/listings"
               className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
