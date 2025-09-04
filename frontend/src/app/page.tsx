@@ -44,21 +44,19 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 py-16 md:py-24 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
           {/* Left: Headline + Search */}
           <section>
-            <p className="text-sm font-semibold tracking-widest text-indigo-300">
-              PROP NEXUS
-            </p>
-            <h1 className="mt-2 text-4xl md:text-5xl font-extrabold leading-tight text-white">
+            <p className="text-xs md:text-sm font-semibold tracking-[.2em] text-indigo-300">PROP NEXUS</p>
+            <h1 className="mt-2 text-[clamp(2rem,6vw,3.25rem)] font-extrabold leading-tight text-white">
               AI-Powered Property
               <span className="block text-indigo-300">Sourcing Platform</span>
             </h1>
 
             <p className="mt-4 text-slate-200/90 max-w-prose">
-              Discover investment opportunities, score deals with AI, and analyse
-              yield & ROI in seconds. Start by searching a location or postcode.
+              Discover investment opportunities, score deals with AI, and analyse yield & ROI in seconds.
+              Start by searching a location or postcode.
             </p>
 
             {/* Search */}
-            <form onSubmit={onSubmit} className="mt-8">
+            <form onSubmit={onSubmit} className="mt-7">
               <div className="flex w-full max-w-xl overflow-hidden rounded-xl border border-white/10 bg-white/95 shadow-xl focus-within:ring-2 focus-within:ring-indigo-400 md:bg-white">
                 <input
                   value={q}
@@ -74,63 +72,33 @@ export default function HomePage() {
                   Search
                 </button>
               </div>
-              <p className="mt-2 text-sm text-slate-300">
-                e.g.{' '}
-                <button
-                  type="button"
-                  className="underline"
-                  onClick={() => router.push('/listings?q=SW1A')}
-                >
-                  SW1A
-                </button>{' '}
-                or{' '}
-                <button
-                  type="button"
-                  className="underline"
-                  onClick={() => router.push('/listings?q=Manchester')}
-                >
-                  Manchester
-                </button>
-              </p>
 
               {/* bullets */}
-              <ul className="mt-6 space-y-2 text-slate-200/90 text-sm">
-                <li className="flex items-start gap-2">
-                  <span aria-hidden>🤖</span>
-                  <span>AI deal scoring to prioritise the best opportunities.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span aria-hidden>📊</span>
-                  <span>Instant yield & ROI metrics with configurable inputs.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span aria-hidden>🗺️</span>
-                  <span>Map view of fresh listings — filtered by budget & beds.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span aria-hidden>🔗</span>
-                  <span>One-click export to CRM (coming soon).</span>
-                </li>
+              <ul className="mt-6 space-y-2.5 text-slate-200/90 text-sm">
+                <li className="flex items-start gap-2"><span aria-hidden>🤖</span><span>AI deal scoring to prioritise the best opportunities.</span></li>
+                <li className="flex items-start gap-2"><span aria-hidden>📊</span><span>Instant yield & ROI metrics with configurable inputs.</span></li>
+                <li className="flex items-start gap-2"><span aria-hidden>🗺️</span><span>Map view of fresh listings — filtered by budget & beds.</span></li>
+                <li className="flex items-start gap-2"><span aria-hidden>🔗</span><span>One-click export to CRM (coming soon).</span></li>
               </ul>
+
+              {/* quick examples */}
+              <p className="mt-3 text-xs text-slate-300">
+                e.g. <button type="button" className="underline" onClick={() => router.push('/listings?q=SW1A')}>SW1A</button> or{' '}
+                <button type="button" className="underline" onClick={() => router.push('/listings?q=Manchester')}>Manchester</button>
+              </p>
             </form>
 
             {/* Quick links */}
             <div className="mt-8 flex items-center gap-4 text-sm">
-              <Link href="/listings" className="text-indigo-300 hover:text-indigo-200 underline">
-                Browse listings
-              </Link>
+              <Link href="/listings" className="text-indigo-300 hover:text-indigo-200 underline">Browse listings</Link>
               <span className="text-slate-400">•</span>
-              <Link href="/analytics" className="text-indigo-300 hover:text-indigo-200 underline">
-                Portfolio analytics
-              </Link>
+              <Link href="/analytics" className="text-indigo-300 hover:text-indigo-200 underline">Portfolio analytics</Link>
               <span className="text-slate-400">•</span>
-              <Link href="/deals" className="text-indigo-300 hover:text-indigo-200 underline">
-                Saved deals
-              </Link>
+              <Link href="/deals" className="text-indigo-300 hover:text-indigo-200 underline">Saved deals</Link>
             </div>
           </section>
 
-          {/* Right: Decorative tile (unchanged) */}
+          {/* Right: Decorative tile */}
           <section className="hidden md:block">
             <div className="relative mx-auto w-full max-w-xl aspect-[16/10] rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-md shadow-2xl overflow-hidden">
               <svg viewBox="0 0 600 380" className="absolute inset-0 h-full w-full">
@@ -146,17 +114,7 @@ export default function HomePage() {
                     const y1 = Math.random() * 380;
                     const x2 = Math.random() * 600;
                     const y2 = Math.random() * 380;
-                    return (
-                      <line
-                        key={i}
-                        x1={x1}
-                        y1={y1}
-                        x2={x2}
-                        y2={y2}
-                        stroke="rgba(148,163,184,0.35)"
-                        strokeWidth="1"
-                      />
-                    );
+                    return <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(148,163,184,0.35)" strokeWidth="1" />;
                   })}
                 </g>
                 <circle cx="460" cy="200" r="140" fill="url(#g1)" />
@@ -180,10 +138,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 pb-16">
           <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4 text-slate-200 flex items-center justify-between">
             <p className="text-sm">New here? Jump straight to the live feed of properties.</p>
-            <Link
-              href="/listings"
-              className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
-            >
+            <Link href="/listings" className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">
               View Listings →
             </Link>
           </div>

@@ -29,7 +29,6 @@ type Property = {
   longitude?: number | null;
 };
 
-/** Page export wrapped in Suspense so we can use useSearchParams safely */
 export default function ListingsPage() {
   return (
     <Suspense fallback={<div className="p-6">Loading…</div>}>
@@ -47,9 +46,9 @@ function ListingsInner() {
 
   // UI filters
   const [q, setQ] = useState('');
-  const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
-  const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
-  const [minBeds,  setMinBeds]  = useState<number | undefined>(undefined);
+  const [minPrice, setMinPrice] = useState<number | undefined>();
+  const [maxPrice, setMaxPrice] = useState<number | undefined>();
+  const [minBeds,  setMinBeds]  = useState<number | undefined>();
 
   // 1) seed filters from URL once
   useEffect(() => {
@@ -74,8 +73,7 @@ function ListingsInner() {
       if (minPrice != null) p.set('min', String(minPrice));
       if (maxPrice != null) p.set('max', String(maxPrice));
       if (minBeds  != null) p.set('beds', String(minBeds));
-      const qs = p.toString();
-      router.replace(`/listings${qs ? `?${qs}` : ''}`);
+      router.replace(`/listings${p.toString() ? `?${p.toString()}` : ''}`);
     }, 250);
     return () => { if (timerRef.current) window.clearTimeout(timerRef.current); };
   }, [q, minPrice, maxPrice, minBeds, router]);
@@ -128,7 +126,7 @@ function ListingsInner() {
 
   const center: [number, number] = points.length
     ? [points[0].lat, points[0].lng]
-    : [51.5072, -0.1276]; // London
+    : [53.8, -1.6]; // UK-ish centre
 
   const clearAll = () => {
     setQ('');
@@ -140,16 +138,15 @@ function ListingsInner() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-extrabold tracking-tight">Listings</h1>
+        <h1 className="text-[clamp(1.5rem,3.5vw,2rem)] font-extrabold tracking-tight">Listings</h1>
         <p className="text-slate-600">Fresh opportunities from the feed.</p>
       </header>
 
       {/* 🔎 Sticky filters */}
       <div
         className="sticky top-0 z-30 -mx-4 px-4 py-3
-                   bg-white dark:bg-slate-900
-                   supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:backdrop-blur
-                   border-b border-slate-200 dark:border-slate-800 shadow-sm"
+                   bg-white/85 dark:bg-slate-900/85 backdrop-blur supports-[backdrop-filter]:backdrop-blur
+                   border-b border-slate-200 dark:border-slate-800"
       >
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
           <input
@@ -157,6 +154,7 @@ function ListingsInner() {
             onChange={e => setQ(e.target.value)}
             placeholder="Search title or location…"
             className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
+            aria-label="Search title or location"
           />
           <input
             type="number"
@@ -165,6 +163,7 @@ function ListingsInner() {
             value={minPrice ?? ''}
             onChange={e => setMinPrice(e.target.value ? Number(e.target.value) : undefined)}
             className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
+            aria-label="Minimum price"
           />
           <input
             type="number"
@@ -173,11 +172,13 @@ function ListingsInner() {
             value={maxPrice ?? ''}
             onChange={e => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)}
             className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
+            aria-label="Maximum price"
           />
           <select
             value={minBeds ?? ''}
             onChange={e => setMinBeds(e.target.value ? Number(e.target.value) : undefined)}
             className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
+            aria-label="Minimum bedrooms"
           >
             <option value="">Min beds</option>
             <option value="1">1+ bed</option>
@@ -193,6 +194,11 @@ function ListingsInner() {
           >
             Clear
           </button>
+        </div>
+
+        {/* tiny status row */}
+        <div className="mt-2 text-xs text-slate-500">
+          {loading ? 'Loading…' : `${filtered.length} result${filtered.length === 1 ? '' : 's'}`}
         </div>
       </div>
 
