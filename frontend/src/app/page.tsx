@@ -1,156 +1,167 @@
 // src/app/page.tsx
 'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useMemo, useState } from 'react';
-import Section from '@/components/ui/Section';
-import SectionTitle from '@/components/ui/SectionTitle';
-import PropertyCard from '@/components/PropertyCard';
-import { getSupabase } from '@/lib/supabaseClient';
-
-// Avoid clashing with export const dynamic
-import NextDynamic from 'next/dynamic';
-const MapContainer = NextDynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
-const TileLayer    = NextDynamic(() => import('react-leaflet').then(m => m.TileLayer),    { ssr: false });
-const Marker       = NextDynamic(() => import('react-leaflet').then(m => m.Marker),       { ssr: false });
-
-type Property = {
-  id: string | null;
-  title: string;
-  location: string;
-  price: number | null;
-  bedrooms?: number | null;
-  bathrooms?: number | null;
-  yield_percent?: number | null;
-  roi_percent?: number | null;
-  imageurl?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-};
-
-export default function ListingsPage() {
-  const [items, setItems] = useState<Property[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // simple UI filters
+export default function HomePage() {
+  const router = useRouter();
   const [q, setQ] = useState('');
-  const [minPrice, setMinPrice] = useState<number | undefined>();
-  const [maxPrice, setMaxPrice] = useState<number | undefined>();
-  const [minBeds, setMinBeds]   = useState<number | undefined>();
 
-  useEffect(() => {
-    let ignore = false;
-    const sb = getSupabase();
-    (async () => {
-      setLoading(true);
-      const { data, error } = await sb
-        .from('properties')
-        .select('id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, latitude, longitude')
-        .limit(60);
-
-      if (!ignore) {
-        if (error) console.error('fetch properties error', error);
-        setItems((data as Property[]) ?? []);
-        setLoading(false);
-      }
-    })();
-    return () => { ignore = true; };
-  }, []);
-
-  const filtered = useMemo(() => {
-    return items.filter(p => {
-      const titleMatch = q ? (p.title?.toLowerCase().includes(q.toLowerCase()) || p.location?.toLowerCase().includes(q.toLowerCase())) : true;
-      const priceOK = (minPrice == null || (p.price ?? 0) >= minPrice) && (maxPrice == null || (p.price ?? 0) <= maxPrice);
-      const bedsOK  = (minBeds == null || (p.bedrooms ?? 0) >= minBeds);
-      return titleMatch && priceOK && bedsOK;
-    });
-  }, [items, q, minPrice, maxPrice, minBeds]);
-
-  const points = useMemo(
-    () =>
-      filtered
-        .filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
-        .map(p => ({ id: p.id ?? '', title: p.title, lat: Number(p.latitude), lng: Number(p.longitude) })),
-    [filtered]
-  );
-
-  const center: [number, number] = points.length ? [points[0].lat, points[0].lng] : [51.5072, -0.1276];
+  function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const query = new URLSearchParams();
+    if (q.trim()) query.set('q', q.trim());
+    router.push(`/listings?${query.toString()}`);
+  }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-extrabold tracking-tight">Listings</h1>
-        <p className="text-slate-600">Fresh opportunities from the feed.</p>
-      </header>
+    <div className="relative min-h-[88vh] overflow-hidden">
+      {/* Background: subtle techy gradient + dots */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(80rem 40rem at 10% -10%, rgba(99,102,241,.25), transparent 60%), radial-gradient(80rem 40rem at 110% 10%, rgba(56,189,248,.25), transparent 60%), linear-gradient(180deg, rgba(15,23,42,.65), rgba(15,23,42,.65))',
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-[0.15]"
+        style={{
+          backgroundImage:
+            'radial-gradient(#ffffff 1px, transparent 1px), radial-gradient(#ffffff 1px, transparent 1px)',
+          backgroundSize: '24px 24px, 24px 24px',
+          backgroundPosition: '0 0, 12px 12px',
+        }}
+      />
 
-      {/* 🔎 Sticky filters bar */}
-      <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-          <input
-            value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="Search title or location…"
-            className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
-          />
-          <input
-            type="number"
-            inputMode="numeric"
-            placeholder="Min £"
-            value={minPrice ?? ''}
-            onChange={e => setMinPrice(e.target.value ? Number(e.target.value) : undefined)}
-            className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
-          />
-          <input
-            type="number"
-            inputMode="numeric"
-            placeholder="Max £"
-            value={maxPrice ?? ''}
-            onChange={e => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)}
-            className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
-          />
-          <select
-            value={minBeds ?? ''}
-            onChange={e => setMinBeds(e.target.value ? Number(e.target.value) : undefined)}
-            className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
-          >
-            <option value="">Min beds</option>
-            <option value="1">1+ bed</option>
-            <option value="2">2+ beds</option>
-            <option value="3">3+ beds</option>
-            <option value="4">4+ beds</option>
-          </select>
+      <main className="relative z-10">
+        <div className="mx-auto max-w-7xl px-4 py-16 md:py-24 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+          {/* Left: Headline + Search */}
+          <section>
+            <p className="text-sm font-semibold tracking-widest text-indigo-300">PROP NEXUS</p>
+            <h1 className="mt-2 text-4xl md:text-5xl font-extrabold leading-tight text-white">
+              AI-Powered Property
+              <span className="block text-indigo-300">Sourcing Platform</span>
+            </h1>
+
+            <p className="mt-4 text-slate-200/90 max-w-prose">
+              Discover investment opportunities, score deals with AI, and analyse yield & ROI in seconds.
+              Start by searching a location or postcode.
+            </p>
+
+            {/* Search */}
+            <form onSubmit={onSubmit} className="mt-8">
+              <div className="flex w-full max-w-xl overflow-hidden rounded-xl border border-white/10 bg-white/95 shadow-xl focus-within:ring-2 focus-within:ring-indigo-400 md:bg-white">
+                <input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Search by area, city, or postcode…"
+                  className="flex-1 h-12 px-4 text-slate-900 placeholder-slate-500 outline-none"
+                  aria-label="Search by location or postcode"
+                />
+                <button
+                  type="submit"
+                  className="h-12 px-5 font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
+                >
+                  Search
+                </button>
+              </div>
+              <p className="mt-2 text-sm text-slate-300">
+                e.g. <button type="button" className="underline" onClick={() => router.push('/listings?q=SW1A')}>
+                  SW1A
+                </button>{' '}
+                or{' '}
+                <button type="button" className="underline" onClick={() => router.push('/listings?q=Manchester')}>
+                  Manchester
+                </button>
+              </p>
+            </form>
+
+            {/* Quick links */}
+            <div className="mt-8 flex items-center gap-4 text-sm">
+              <Link href="/listings" className="text-indigo-300 hover:text-indigo-200 underline">
+                Browse listings
+              </Link>
+              <span className="text-slate-400">•</span>
+              <Link href="/analytics" className="text-indigo-300 hover:text-indigo-200 underline">
+                Portfolio analytics
+              </Link>
+              <span className="text-slate-400">•</span>
+              <Link href="/deals" className="text-indigo-300 hover:text-indigo-200 underline">
+                Saved deals
+              </Link>
+            </div>
+          </section>
+
+          {/* Right: Decorative “AI / data” tile */}
+          <section className="hidden md:block">
+            <div className="relative mx-auto w-full max-w-xl aspect-[16/10] rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-md shadow-2xl overflow-hidden">
+              {/* glowing node web */}
+              <svg viewBox="0 0 600 380" className="absolute inset-0 h-full w-full">
+                <defs>
+                  <radialGradient id="g1" cx="50%" cy="50%" r="60%">
+                    <stop offset="0%" stopColor="rgba(99,102,241,0.9)" />
+                    <stop offset="100%" stopColor="rgba(99,102,241,0)" />
+                  </radialGradient>
+                </defs>
+                <g opacity="0.7">
+                  {[...Array(26)].map((_, i) => {
+                    const x1 = Math.random() * 600;
+                    const y1 = Math.random() * 380;
+                    const x2 = Math.random() * 600;
+                    const y2 = Math.random() * 380;
+                    return (
+                      <line
+                        key={i}
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
+                        stroke="rgba(148,163,184,0.35)"
+                        strokeWidth="1"
+                      />
+                    );
+                  })}
+                </g>
+                <circle cx="460" cy="200" r="140" fill="url(#g1)" />
+              </svg>
+
+              {/* Card copy */}
+              <div className="relative z-10 h-full w-full p-6 flex flex-col justify-end">
+                <div className="rounded-lg bg-white/90 p-4 shadow">
+                  <p className="text-xs font-medium text-slate-500">Realtime Signals</p>
+                  <div className="mt-1 grid grid-cols-3 gap-3 text-sm">
+                    <div><p className="text-slate-500">Avg Yield</p><p className="font-semibold">6.1%</p></div>
+                    <div><p className="text-slate-500">Avg ROI</p><p className="font-semibold">14.8%</p></div>
+                    <div><p className="text-slate-500">Deals Today</p><p className="font-semibold">28</p></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
-      </div>
 
-      {/* 🗺️ Map (only when we have coordinates) */}
-      {points.length > 0 && (
-        <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
-          <MapContainer style={{ height: 360, width: '100%' }} center={center} zoom={11} scrollWheelZoom={false}>
-            <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            {points.map(p => <Marker key={p.id} position={[p.lat, p.lng]} />)}
-          </MapContainer>
+        {/* Bottom CTA strip */}
+        <div className="mx-auto max-w-7xl px-4 pb-16">
+          <div className="rounded-xl border border-white/10 bg-slate-900/60 p-4 text-slate-200 flex items-center justify-between">
+            <p className="text-sm">
+              New here? Jump straight to the live feed of properties.
+            </p>
+            <Link
+              href="/listings"
+              className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+            >
+              View Listings →
+            </Link>
+          </div>
         </div>
-      )}
-
-      <Section>
-        <SectionTitle>Latest Properties</SectionTitle>
-
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="animate-pulse rounded-xl border border-slate-200 dark:border-slate-800 p-4 h-48 bg-slate-50 dark:bg-slate-800/40" />
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <p className="p-3 text-slate-500">No properties match the current filters.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map(p => (
-              <PropertyCard key={p.id ?? `${p.title}-${Math.random()}`} property={p} />
-            ))}
-          </div>
-        )}
-      </Section>
+      </main>
     </div>
   );
 }
