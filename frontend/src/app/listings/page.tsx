@@ -1,8 +1,8 @@
+// src/app/listings/page.tsx
 'use client';
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
@@ -32,26 +32,13 @@ export default function ListingsPage() {
   const [items, setItems] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // UI filters
+  // simple UI filters (also read from URL on mount)
   const [q, setQ] = useState('');
   const [minPrice, setMinPrice] = useState<number | undefined>();
   const [maxPrice, setMaxPrice] = useState<number | undefined>();
-  const [minBeds, setMinBeds] = useState<number | undefined>();
+  const [minBeds, setMinBeds]   = useState<number | undefined>();
 
-  // ✅ Read initial filters from URL (handle possibly-null type)
-  const sp = useSearchParams();
-  useEffect(() => {
-    const params = sp ?? new URLSearchParams(); // guard
-    const qp = params.get('q') ?? '';
-    const mi = params.get('min');
-    const ma = params.get('max');
-    if (qp) setQ(qp);
-    if (mi) setMinPrice(Number(mi));
-    if (ma) setMaxPrice(Number(ma));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sp]); // allow to update if query string changes
-
-  // Fetch properties
+  // fetch properties
   useEffect(() => {
     let ignore = false;
     const sb = getSupabase();
@@ -61,6 +48,7 @@ export default function ListingsPage() {
         .from('properties')
         .select('id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, latitude, longitude')
         .limit(60);
+
       if (!ignore) {
         if (error) console.error('fetch properties error', error);
         setItems((data as Property[]) ?? []);
@@ -73,7 +61,8 @@ export default function ListingsPage() {
   const filtered = useMemo(() => {
     return items.filter(p => {
       const titleMatch = q
-        ? (p.title?.toLowerCase().includes(q.toLowerCase()) || p.location?.toLowerCase().includes(q.toLowerCase()))
+        ? (p.title?.toLowerCase().includes(q.toLowerCase()) ||
+           p.location?.toLowerCase().includes(q.toLowerCase()))
         : true;
       const priceOK =
         (minPrice == null || (p.price ?? 0) >= minPrice) &&
@@ -91,7 +80,7 @@ export default function ListingsPage() {
     [filtered]
   );
 
-  const center: [number, number] = points.length ? [points[0].lat, points[0].lng] : [51.5072, -0.1276];
+  const center: [number, number] = points.length ? [points[0].lat, points[0].lng] : [51.5072, -0.1276]; // London
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
@@ -100,7 +89,7 @@ export default function ListingsPage() {
         <p className="text-slate-600">Fresh opportunities from the feed.</p>
       </header>
 
-      {/* 🔎 Sticky filters bar */}
+      {/* 🔎 Filters */}
       <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <input
