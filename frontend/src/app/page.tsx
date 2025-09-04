@@ -1,4 +1,3 @@
-// src/app/page.tsx
 'use client';
 
 import { useState } from 'react';
@@ -20,7 +19,7 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-[88vh] overflow-hidden">
-      {/* Background: subtle techy gradient + dots */}
+      {/* Background */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
@@ -44,15 +43,17 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 py-16 md:py-24 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
           {/* Left: Headline + Search */}
           <section>
-            <p className="text-sm font-semibold tracking-widest text-indigo-300">PROP NEXUS</p>
+            <p className="text-sm font-semibold tracking-widest text-indigo-300">
+              PROP NEXUS
+            </p>
             <h1 className="mt-2 text-4xl md:text-5xl font-extrabold leading-tight text-white">
               AI-Powered Property
               <span className="block text-indigo-300">Sourcing Platform</span>
             </h1>
 
             <p className="mt-4 text-slate-200/90 max-w-prose">
-              Discover investment opportunities, score deals with AI, and analyse yield & ROI in seconds.
-              Start by searching a location or postcode.
+              Discover investment opportunities, score deals with AI, and analyse
+              yield & ROI in seconds. Start by searching a location or postcode.
             </p>
 
             {/* Search */}
@@ -90,6 +91,26 @@ export default function HomePage() {
                   Manchester
                 </button>
               </p>
+
+              {/* bullets */}
+              <ul className="mt-6 space-y-2 text-slate-200/90 text-sm">
+                <li className="flex items-start gap-2">
+                  <span aria-hidden>🤖</span>
+                  <span>AI deal scoring to prioritise the best opportunities.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span aria-hidden>📊</span>
+                  <span>Instant yield & ROI metrics with configurable inputs.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span aria-hidden>🗺️</span>
+                  <span>Map view of fresh listings — filtered by budget & beds.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span aria-hidden>🔗</span>
+                  <span>One-click export to CRM (coming soon).</span>
+                </li>
+              </ul>
             </form>
 
             {/* Quick links */}
@@ -108,10 +129,9 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* Right: Decorative “AI / data” tile */}
+          {/* Right: Decorative tile (unchanged) */}
           <section className="hidden md:block">
             <div className="relative mx-auto w-full max-w-xl aspect-[16/10] rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-md shadow-2xl overflow-hidden">
-              {/* glowing node web */}
               <svg viewBox="0 0 600 380" className="absolute inset-0 h-full w-full">
                 <defs>
                   <radialGradient id="g1" cx="50%" cy="50%" r="60%">
@@ -141,23 +161,13 @@ export default function HomePage() {
                 <circle cx="460" cy="200" r="140" fill="url(#g1)" />
               </svg>
 
-              {/* Card copy */}
               <div className="relative z-10 h-full w-full p-6 flex flex-col justify-end">
                 <div className="rounded-lg bg-white/90 p-4 shadow">
                   <p className="text-xs font-medium text-slate-500">Realtime Signals</p>
                   <div className="mt-1 grid grid-cols-3 gap-3 text-sm">
-                    <div>
-                      <p className="text-slate-500">Avg Yield</p>
-                      <p className="font-semibold">6.1%</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">Avg ROI</p>
-                      <p className="font-semibold">14.8%</p>
-                    </div>
-                    <div>
-                      <p className="text-slate-500">Deals Today</p>
-                      <p className="font-semibold">28</p>
-                    </div>
+                    <div><p className="text-slate-500">Avg Yield</p><p className="font-semibold">6.1%</p></div>
+                    <div><p className="text-slate-500">Avg ROI</p><p className="font-semibold">14.8%</p></div>
+                    <div><p className="text-slate-500">Deals Today</p><p className="font-semibold">28</p></div>
                   </div>
                 </div>
               </div>

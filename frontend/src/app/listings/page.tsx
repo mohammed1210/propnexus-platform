@@ -1,3 +1,4 @@
+// src/app/listings/page.tsx
 'use client';
 export const dynamic = 'force-dynamic';
 
@@ -9,36 +10,10 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
 
-// leaflet/react-leaflet
-import type { LatLngBoundsExpression } from 'leaflet';
-import { useMap } from 'react-leaflet';
-
-// Avoid clashing with `export const dynamic`
 import NextDynamic from 'next/dynamic';
-
-const MapContainer = NextDynamic(
-  () => import('react-leaflet').then(m => m.MapContainer),
-  { ssr: false }
-);
-const TileLayer = NextDynamic(
-  () => import('react-leaflet').then(m => m.TileLayer),
-  { ssr: false }
-);
-const Marker = NextDynamic(
-  () => import('react-leaflet').then(m => m.Marker),
-  { ssr: false }
-);
-
-// Inline helper: fit the map to all markers when there are 2+
-function FitBoundsInline({ points }: { points: { lat: number; lng: number }[] }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!map || points.length < 2) return;
-    const bounds: LatLngBoundsExpression = points.map(p => [p.lat, p.lng]) as any;
-    map.fitBounds(bounds, { padding: [24, 24] });
-  }, [map, points]);
-  return null;
-}
+const MapContainer = NextDynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
+const TileLayer    = NextDynamic(() => import('react-leaflet').then(m => m.TileLayer),    { ssr: false });
+const Marker       = NextDynamic(() => import('react-leaflet').then(m => m.Marker),       { ssr: false });
 
 type Property = {
   id: string | null;
@@ -54,7 +29,7 @@ type Property = {
   longitude?: number | null;
 };
 
-/* ---------- Outer page: provides Suspense boundary ---------- */
+/** Page export wrapped in Suspense so we can use useSearchParams safely */
 export default function ListingsPage() {
   return (
     <Suspense fallback={<div className="p-6">Loading…</div>}>
@@ -63,7 +38,6 @@ export default function ListingsPage() {
   );
 }
 
-/* ---------- Actual page content that uses useSearchParams ---------- */
 function ListingsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -171,7 +145,12 @@ function ListingsInner() {
       </header>
 
       {/* 🔎 Sticky filters */}
-      <div className="sticky top-0 z-10 -mx-4 px-4 py-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-b border-slate-200 dark:border-slate-800">
+      <div
+        className="sticky top-0 z-30 -mx-4 px-4 py-3
+                   bg-white dark:bg-slate-900
+                   supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:backdrop-blur
+                   border-b border-slate-200 dark:border-slate-800 shadow-sm"
+      >
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
           <input
             value={q}
@@ -223,12 +202,16 @@ function ListingsInner() {
           <MapContainer
             style={{ height: 360, width: '100%' }}
             center={center}
-            zoom={11}
+            zoom={6}
             scrollWheelZoom={false}
           >
-            <TileLayer attribution="&copy; OpenStreetMap" url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            {points.map(p => <Marker key={p.id} position={[p.lat, p.lng]} />)}
-            {points.length >= 2 && <FitBoundsInline points={points} />}
+            <TileLayer
+              attribution="&copy; OpenStreetMap"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {points.map(p => (
+              <Marker key={p.id} position={[p.lat, p.lng]} />
+            ))}
           </MapContainer>
         </div>
       )}
