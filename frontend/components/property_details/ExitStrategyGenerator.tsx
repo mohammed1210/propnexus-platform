@@ -42,7 +42,7 @@ type StrategyInput =
 
 /* --- Helpers ------------------------------------------------------------- */
 
-const API = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').trim();
 
 function stripMarkdown(s: string): string {
   return s
@@ -84,9 +84,6 @@ function splitBlobToList(blob: string): string[] {
 /* --- Component ----------------------------------------------------------- */
 
 export default function ExitStrategyGenerator(props: Props) {
-  // Support both calling styles:
-  // 1) <ExitStrategyGenerator property={property} />
-  // 2) <ExitStrategyGenerator title="..." location="..." ... />
   const merged: LooseProperty = 'property' in props ? props.property ?? {} : props;
 
   const title = merged.title ?? '';
@@ -102,6 +99,7 @@ export default function ExitStrategyGenerator(props: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [generatedAt, setGeneratedAt] = useState<Date | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const timeLabel = useMemo(
     () =>
@@ -117,9 +115,9 @@ export default function ExitStrategyGenerator(props: Props) {
     setItems([]);
 
     try {
-      if (!API) throw new Error('Missing NEXT_PUBLIC_API_URL');
+      if (!API_BASE) throw new Error('Missing NEXT_PUBLIC_API_URL');
 
-      const res = await fetch(`${API}/generate-strategies`, {
+      const res = await fetch(`${API_BASE}/generate-strategies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -165,6 +163,8 @@ export default function ExitStrategyGenerator(props: Props) {
     const text = items.map((s, i) => `${i + 1}. ${s}`).join('\n\n');
     try {
       await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
     } catch {
       /* ignore */
     }
@@ -186,8 +186,9 @@ export default function ExitStrategyGenerator(props: Props) {
             onClick={handleCopy}
             disabled={!items.length || loading}
             aria-label="Copy strategies to clipboard"
+            title={items.length ? 'Copy to clipboard' : 'No strategies to copy yet'}
           >
-            Copy
+            {copied ? 'Copied ✓' : 'Copy'}
           </button>
           <button
             className={`${styles.btn} ${styles.btnPrimary}`}

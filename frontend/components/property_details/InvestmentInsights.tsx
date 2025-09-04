@@ -1,4 +1,3 @@
-// frontend/components/property_details/InvestmentInsights.tsx
 'use client';
 
 /* ──────────────────────────────────────────────────────────────────
@@ -7,13 +6,12 @@
    - Fetches nearby comps by postcode (debounce + abort-safe)
    - Optional compact AI Score breakdown (aiOverall + aiItems)
    - Uses shared <Button> for refresh
-   - NEW: hideTitle prop to suppress the internal heading
+   - hideTitle prop to suppress the internal heading
    ────────────────────────────────────────────────────────────────── */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Button from '@/components/ui/Button';
 
-/* ── Types ──────────────────────────────────────────────────────── */
 type RentComp = { monthly_rent?: number | string };
 type SalesComp = Record<string, unknown>;
 
@@ -27,7 +25,6 @@ type CompsPayload = {
 
 type AIItem = { key?: string; label: string; value: number; hint?: string };
 
-/* ── Component ──────────────────────────────────────────────────── */
 export default function InvestmentInsights({
   className = '',
   price,
@@ -47,10 +44,8 @@ export default function InvestmentInsights({
   compsHref?: string;
   aiOverall?: number;
   aiItems?: AIItem[];
-  /** If true, do not render the internal “Investment Insights” heading */
   hideTitle?: boolean;
 }) {
-  /* ── State ───────────────────────────────────────────────────── */
   const [comps, setComps] = useState<CompsPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -60,7 +55,6 @@ export default function InvestmentInsights({
   const abortRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<number | null>(null);
 
-  /* ── Fetcher ──────────────────────────────────────────────────── */
   const fetchComps = async (pc: string, opts?: { signal?: AbortSignal }) => {
     setLoading(true);
     setFetchError(null);
@@ -116,7 +110,6 @@ export default function InvestmentInsights({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postcode]);
 
-  /* ── Derived ─────────────────────────────────────────────────── */
   const avgRent = useMemo(() => {
     const rs =
       comps?.rents
@@ -129,7 +122,7 @@ export default function InvestmentInsights({
   const salesCount = comps?.sales?.length ?? 0;
   const rentsCount = comps?.rents?.length ?? 0;
 
-  /* ── Heuristics ───────────────────────────────────────────────── */
+  // Heuristics
   const upsides: string[] = [];
   const risks: string[] = [];
   const nextSteps: string[] = [
@@ -150,14 +143,12 @@ export default function InvestmentInsights({
   if (!upsides.length) upsides.push('No obvious positives from current inputs.');
   if (!risks.length) risks.push('No obvious red flags from current inputs.');
 
-  /* ── View ────────────────────────────────────────────────────── */
   return (
     <section
       className={`rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 ${className}`}
     >
       {!hideTitle && <h3 className="text-lg font-semibold mb-2">💡 Investment Insights</h3>}
 
-      {/* Compact AI Score Breakdown (optional) */}
       {typeof aiOverall === 'number' && Array.isArray(aiItems) && (
         <details className="mb-3 group">
           <summary className="cursor-pointer select-none text-sm font-medium list-none flex items-center gap-2">
@@ -173,6 +164,7 @@ export default function InvestmentInsights({
                 <li key={it.key ?? idx}>
                   {it.label}
                   <span className="ml-1 font-semibold">{it.value}%</span>
+                  {it.hint ? <span className="ml-1 text-neutral-500">— {it.hint}</span> : null}
                 </li>
               ))}
             </ul>
@@ -240,11 +232,10 @@ export default function InvestmentInsights({
           </Button>
         </div>
 
-        {/* States */}
         {!postcode && <div className="text-sm text-neutral-500 mt-2">Add postcode to load sales & rents.</div>}
 
         {postcode && loading && (
-          <div className="text-sm text-neutral-500 mt-2">
+          <div className="text-sm text-neutral-500 mt-2" aria-live="polite">
             <span className="inline-block h-3 w-24 bg-neutral-200 dark:bg-neutral-800 rounded animate-pulse mr-2" />
             Loading {postcode}…
           </div>

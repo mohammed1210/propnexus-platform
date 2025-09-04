@@ -14,7 +14,7 @@
 }
 
 .heading {
-  font-size: 1.05rem; /* a touch smaller so it fits the page rhythm */
+  font-size: 1.05rem;
   font-weight: 600;
   line-height: 1.2;
   margin: 0;
@@ -77,23 +77,15 @@
 
 .list {
   margin: 0;
-  padding-left: 1.25rem;         /* keep standard <ol> indent tidy */
+  padding-left: 1.25rem;
   display: grid;
   gap: .75rem;
 }
 
-.list > li {
-  line-height: 1.5;
-}
+.list > li { line-height: 1.5; }
 
-.titleLine {
-  font-weight: 600;
-  margin-bottom: .15rem;
-}
-
-.descLine {
-  color: var(--text-muted);
-}
+.titleLine { font-weight: 600; margin-bottom: .15rem; }
+.descLine  { color: var(--text-muted); }
 
 /* timestamp */
 .timestamp {
@@ -104,12 +96,9 @@
 }
 
 /* errors */
-.error {
-  color: #dc2626;                /* red-600 */
-  margin-top: .5rem;
-}
+.error { color: #dc2626; } /* red-600 */
 
-/* respect reduced motion */
+/* reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .btn { transition: none; }
   .result { animation: none; }
