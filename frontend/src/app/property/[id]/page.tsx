@@ -7,14 +7,16 @@ import { useParams } from 'next/navigation';
 import nextDynamic from 'next/dynamic';
 import Image from 'next/image';
 
-// Types-only shim for env
+// Types-only shim for env (keeps TS happy without @types/node)
 declare const process: { env?: Record<string, string | undefined> };
 
+// UI
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import CardActions from '@/components/ui/CardActions';
 import Badge from '@/components/ui/Badge';
 
+// Property detail components
 import MortgageCalculator from '@/components/property_details/MortgageCalculator';
 import StampDutyCalculator from '@/components/property_details/StampDutyCalculator';
 import AreaIntel from '@/components/property_details/AreaIntel';
@@ -56,6 +58,7 @@ function getBackendBase(): string {
 
 export default function PropertyDetailsPage() {
   const { id = '' } = useParams<{ id: string }>() ?? {};
+
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -83,13 +86,15 @@ export default function PropertyDetailsPage() {
     }
   }, []);
 
-  useEffect(() => { if (id) fetchProperty(id); }, [id, fetchProperty]);
+  useEffect(() => {
+    if (id) fetchProperty(id);
+  }, [id, fetchProperty]);
 
   function computeAIScore(p: Property) {
     const items = [
-      { label: 'Yield',     value: Math.min(100, Number(p.yield_percent ?? 0) * 10) },
-      { label: 'ROI',       value: Math.min(100, Number(p.roi_percent ?? 0) * 10) },
-      { label: 'Bedrooms',  value: Math.min(100, Number(p.bedrooms ?? 0) * 20) },
+      { label: 'Yield', value: Math.min(100, Number(p.yield_percent ?? 0) * 10) },
+      { label: 'ROI', value: Math.min(100, Number(p.roi_percent ?? 0) * 10) },
+      { label: 'Bedrooms', value: Math.min(100, Number(p.bedrooms ?? 0) * 20) },
       { label: 'Bathrooms', value: Math.min(100, Number(p.bathrooms ?? 0) * 25) },
     ];
     setAiItems(items);
@@ -113,19 +118,26 @@ export default function PropertyDetailsPage() {
     }
   }
 
-  const hasCoords = useMemo(() =>
-    property?.latitude != null && property?.longitude != null &&
-    Number.isFinite(property.latitude) && Number.isFinite(property.longitude)
-  , [property]);
+  const hasCoords = useMemo(
+    () =>
+      property?.latitude != null &&
+      property?.longitude != null &&
+      Number.isFinite(property.latitude) &&
+      Number.isFinite(property.longitude),
+    [property]
+  );
 
   const postcode = useMemo(() => property?.location?.trim().split(/\s+/).pop(), [property]);
 
   if (loading) return <p className="p-6">Loading…</p>;
+
   if (!property) {
     return (
       <div className="p-6">
         <p>Property not found.</p>
-        <a href="/" className="text-blue-600 underline">← Back to listings</a>
+        <a href="/" className="text-blue-600 underline">
+          ← Back to listings
+        </a>
       </div>
     );
   }
@@ -134,12 +146,13 @@ export default function PropertyDetailsPage() {
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
       {/* LEFT */}
       <div className="md:col-span-2 space-y-6">
-        {/* Header (ensure it’s always clickable above any overlays) */}
+        {/* Header — keep above hero image via z-index so header links remain clickable */}
         <header className="mb-4 md:mb-6 relative z-[60]">
           <h1 className="text-[clamp(1.5rem,4vw,2.25rem)] font-extrabold leading-tight text-balance">
             {property.title}
           </h1>
           <p className="text-slate-600 mt-1">{property.location}</p>
+
           <div className="mt-3">
             <CardActions
               onSave={handleSaveDeal}
@@ -149,7 +162,7 @@ export default function PropertyDetailsPage() {
           </div>
         </header>
 
-        {/* Hero Image (relative so it never overlays header) */}
+        {/* Hero Image */}
         {property.imageurl && (
           <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden shadow-sm">
             <Image
@@ -163,14 +176,18 @@ export default function PropertyDetailsPage() {
           </div>
         )}
 
+        {/* AI Deal Score */}
         <Section id="ai-score-section">
           <SectionTitle icon={<span>🧠</span>}>
             AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
           <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-3" />
-          <div className="mt-3"><AIScoreInfo /></div>
+          <div className="mt-3">
+            <AIScoreInfo />
+          </div>
         </Section>
 
+        {/* Exit Strategies (AI) */}
         <Section>
           <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
           <ExitStrategyGenerator
@@ -185,16 +202,19 @@ export default function PropertyDetailsPage() {
           />
         </Section>
 
+        {/* Mortgage */}
         <Section>
           <SectionTitle icon={<span>🏦</span>}>Mortgage</SectionTitle>
           <MortgageCalculator price={Number(property.price)} />
         </Section>
 
+        {/* Stamp Duty */}
         <Section>
           <SectionTitle icon={<span>🧾</span>}>Stamp Duty</SectionTitle>
           <StampDutyCalculator price={Number(property.price)} />
         </Section>
 
+        {/* Area Intelligence */}
         <Section>
           <SectionTitle icon={<span>🗺️</span>}>Area Intelligence</SectionTitle>
           <AreaIntel
@@ -210,6 +230,7 @@ export default function PropertyDetailsPage() {
           />
         </Section>
 
+        {/* Investment Insights */}
         <Section>
           <InvestmentInsights
             price={Number(property.price)}
@@ -222,6 +243,7 @@ export default function PropertyDetailsPage() {
           />
         </Section>
 
+        {/* Notes */}
         <Section>
           <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
           <NotesFields propertyId={property.id} />
@@ -233,13 +255,31 @@ export default function PropertyDetailsPage() {
         <Section>
           <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
           <ul className="space-y-2 text-sm">
-            <li><Badge>Price</Badge> £{Number(property.price).toLocaleString()}</li>
-            <li><Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}</li>
-            <li><Badge>ROI</Badge> {property.roi_percent != null ? `${property.roi_percent}%` : '—'}</li>
-            <li><Badge>Beds</Badge> {property.bedrooms ?? '—'}</li>
-            <li><Badge>Baths</Badge> {property.bathrooms ?? '—'}</li>
-            {property.propertyType && (<li><Badge>Type</Badge> {property.propertyType}</li>)}
-            {property.investmentType && (<li><Badge>Investment</Badge> {property.investmentType}</li>)}
+            <li>
+              <Badge>Price</Badge> £{Number(property.price).toLocaleString()}
+            </li>
+            <li>
+              <Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}
+            </li>
+            <li>
+              <Badge>ROI</Badge> {property.roi_percent != null ? `${property.roi_percent}%` : '—'}
+            </li>
+            <li>
+              <Badge>Beds</Badge> {property.bedrooms ?? '—'}
+            </li>
+            <li>
+              <Badge>Baths</Badge> {property.bathrooms ?? '—'}
+            </li>
+            {property.propertyType && (
+              <li>
+                <Badge>Type</Badge> {property.propertyType}
+              </li>
+            )}
+            {property.investmentType && (
+              <li>
+                <Badge>Investment</Badge> {property.investmentType}
+              </li>
+            )}
           </ul>
         </Section>
 
