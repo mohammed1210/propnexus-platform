@@ -19,7 +19,6 @@ import {
   Legend,
 } from 'chart.js';
 
-// Chart.js setup (must be called once on the client)
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
 /** ── Supabase (lazy, browser-only singleton) ───────────────────── */
@@ -28,9 +27,7 @@ function getSupabase(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
-    // Keep the page rendering even if env is missing
     if (typeof window !== 'undefined') {
-      // eslint-disable-next-line no-console
       console.warn('Analytics: Supabase env vars missing');
     }
     return null;
@@ -104,7 +101,9 @@ export default function AnalyticsPage() {
     }
     const labels = Array.from(map.keys()).sort();
     const countSeries = labels.map((l) => map.get(l)!.count);
-    const yieldSeries = labels.map((l) => round((map.get(l)!.sumYield / Math.max(map.get(l)!.count, 1)) || 0));
+    const yieldSeries = labels.map((l) =>
+      round((map.get(l)!.sumYield / Math.max(map.get(l)!.count, 1)) || 0)
+    );
     return { labels, countSeries, yieldSeries };
   }, [deals]);
 
@@ -185,9 +184,11 @@ export default function AnalyticsPage() {
         {/* Recent saved deals table */}
         <Section>
           <SectionTitle>Recent Saved Deals</SectionTitle>
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
+
+          {/* Sticky header needs a vertically scrollable container */}
+          <div className="overflow-x-auto overflow-y-auto max-h-[420px] rounded-xl border border-slate-200">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50">
+              <thead>
                 <tr>
                   <Th>Title</Th>
                   <Th>Location</Th>
@@ -199,12 +200,27 @@ export default function AnalyticsPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td className="p-3 text-slate-500" colSpan={6}>Loading…</td></tr>
+                  <tr>
+                    <Td className="p-3 text-neutral-500" colSpan={6}>
+                      Loading…
+                    </Td>
+                  </tr>
                 ) : deals.length === 0 ? (
-                  <tr><td className="p-3 text-slate-500" colSpan={6}>No saved deals yet.</td></tr>
+                  <tr>
+                    <Td className="p-3 text-neutral-500" colSpan={6}>
+                      No saved deals yet.
+                    </Td>
+                  </tr>
                 ) : (
                   deals.slice(-8).reverse().map((d) => (
-                    <tr key={d.id} className="border-t">
+                    <tr
+                      key={d.id}
+                      className={[
+                        'border-t border-neutral-200 dark:border-neutral-800',
+                        'odd:bg-white even:bg-slate-50/40 dark:odd:bg-neutral-900 dark:even:bg-neutral-900/60',
+                        'hover:bg-slate-50 dark:hover:bg-neutral-800/40 transition-colors',
+                      ].join(' ')}
+                    >
                       <Td>{d.title ?? '—'}</Td>
                       <Td>{d.location ?? '—'}</Td>
                       <Td>£{formatGBP(num(d.price))}</Td>
@@ -244,11 +260,34 @@ function KpiCard({ label, value }: { label: string; value: string | number }) {
     </div>
   );
 }
+
+/** Sticky table header cell */
 function Th({ children }: { children: React.ReactNode }) {
-  return <th className="text-left font-medium px-3 py-2 text-slate-600">{children}</th>;
+  return (
+    <th
+      className={[
+        'text-left font-medium px-3 py-2 text-slate-600',
+        // sticky header + backgrounds for both themes
+        'sticky top-0 z-10 bg-slate-50 dark:bg-neutral-900',
+        // subtle bottom border so it separates from rows
+        'border-b border-neutral-200 dark:border-neutral-800',
+      ].join(' ')}
+    >
+      {children}
+    </th>
+  );
 }
-function Td({ children }: { children: React.ReactNode }) {
-  return <td className="px-3 py-2">{children}</td>;
+
+function Td({
+  children,
+  className = '',
+  ...rest
+}: React.TdHTMLAttributes<HTMLTableCellElement>) {
+  return (
+    <td className={`px-3 py-2 ${className}`} {...rest}>
+      {children}
+    </td>
+  );
 }
 
 /* ─── Data helpers ─────────────────────────────────────────────── */

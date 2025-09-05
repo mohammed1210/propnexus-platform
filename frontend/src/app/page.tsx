@@ -41,13 +41,13 @@ export default function HomePage() {
       />
 
       <main className="relative z-10">
-        <div className="mx-auto max-w-7xl px-4 py-16 md:py-24 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+        <div className="mx-auto max-w-7xl px-4 py-14 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
           {/* Left: Headline + Search */}
           <section>
-            <p className="text-sm font-semibold tracking-widest text-indigo-300">
+            <p className="text-xs md:text-sm font-semibold tracking-[0.2em] text-indigo-300">
               PROP NEXUS
             </p>
-            <h1 className="mt-2 text-4xl md:text-5xl font-extrabold leading-tight text-white">
+            <h1 className="mt-2 text-[2rem] md:text-5xl font-extrabold leading-tight text-white">
               AI-Powered Property
               <span className="block text-indigo-300">Sourcing Platform</span>
             </h1>
@@ -58,7 +58,7 @@ export default function HomePage() {
             </p>
 
             {/* Search */}
-            <form onSubmit={onSubmit} className="mt-8">
+            <form onSubmit={onSubmit} className="mt-7">
               <div className="flex w-full max-w-xl overflow-hidden rounded-xl border border-white/10 bg-white/95 shadow-xl focus-within:ring-2 focus-within:ring-indigo-400 md:bg-white">
                 <input
                   value={q}
@@ -74,6 +74,8 @@ export default function HomePage() {
                   Search
                 </button>
               </div>
+
+              {/* examples */}
               <p className="mt-2 text-sm text-slate-300">
                 e.g.{' '}
                 <button
@@ -93,44 +95,24 @@ export default function HomePage() {
                 </button>
               </p>
 
-              {/* bullets */}
-              <ul className="mt-6 space-y-2 text-slate-200/90 text-sm">
-                <li className="flex items-start gap-2">
-                  <span aria-hidden>🤖</span>
-                  <span>AI deal scoring to prioritise the best opportunities.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span aria-hidden>📊</span>
-                  <span>Instant yield & ROI metrics with configurable inputs.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span aria-hidden>🗺️</span>
-                  <span>Map view of fresh listings — filtered by budget & beds.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span aria-hidden>🔗</span>
-                  <span>One-click export to CRM (coming soon).</span>
-                </li>
+              {/* bullets – more spacing + readable size */}
+              <ul className="mt-6 space-y-2 text-slate-200/95 text-[15px] md:text-base">
+                <li className="flex items-start gap-2"><span aria-hidden>🤖</span><span>AI deal scoring to prioritise the best opportunities.</span></li>
+                <li className="flex items-start gap-2"><span aria-hidden>📊</span><span>Instant yield & ROI metrics with configurable inputs.</span></li>
+                <li className="flex items-start gap-2"><span aria-hidden>🗺️</span><span>Map view of fresh listings — filtered by budget & beds.</span></li>
+                <li className="flex items-start gap-2"><span aria-hidden>🔗</span><span>One-click export to CRM (coming soon).</span></li>
               </ul>
             </form>
 
-            {/* Quick links */}
-            <div className="mt-8 flex items-center gap-4 text-sm">
-              <Link href="/listings" className="text-indigo-300 hover:text-indigo-200 underline">
-                Browse listings
-              </Link>
-              <span className="text-slate-400">•</span>
-              <Link href="/analytics" className="text-indigo-300 hover:text-indigo-200 underline">
-                Portfolio analytics
-              </Link>
-              <span className="text-slate-400">•</span>
-              <Link href="/deals" className="text-indigo-300 hover:text-indigo-200 underline">
-                Saved deals
-              </Link>
+            {/* Quick links → styled as chips for clearer taps on mobile */}
+            <div className="mt-8 flex flex-wrap items-center gap-3 text-sm">
+              <Link href="/listings" className="px-3 py-1.5 rounded-full bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30">Browse listings</Link>
+              <Link href="/analytics" className="px-3 py-1.5 rounded-full bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30">Portfolio analytics</Link>
+              <Link href="/deals" className="px-3 py-1.5 rounded-full bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30">Saved deals</Link>
             </div>
           </section>
 
-          {/* Right: Decorative tile (unchanged) */}
+          {/* Right: Decorative tile */}
           <section className="hidden md:block">
             <div className="relative mx-auto w-full max-w-xl aspect-[16/10] rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-md shadow-2xl overflow-hidden">
               <svg viewBox="0 0 600 380" className="absolute inset-0 h-full w-full">
@@ -147,15 +129,7 @@ export default function HomePage() {
                     const x2 = Math.random() * 600;
                     const y2 = Math.random() * 380;
                     return (
-                      <line
-                        key={i}
-                        x1={x1}
-                        y1={y1}
-                        x2={x2}
-                        y2={y2}
-                        stroke="rgba(148,163,184,0.35)"
-                        strokeWidth="1"
-                      />
+                      <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(148,163,184,0.35)" strokeWidth="1" />
                     );
                   })}
                 </g>

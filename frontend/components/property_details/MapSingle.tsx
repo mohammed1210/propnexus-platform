@@ -1,4 +1,3 @@
-// /frontend/components/property_details/MapSingle.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -16,23 +15,17 @@ type MapSingleProps = {
   latitude?: number;
   longitude?: number;
   title?: string;
-
   /** Container height in px (default 320) */
   height?: number;
-
   /** Initial zoom (default 13) */
   zoom?: number;
-
   /** Enable/disable wheel zoom (default false) */
   scrollWheelZoom?: boolean;
-
   /** Extra class names for the outer container */
   className?: string;
 };
 
-// ---- Component ----
 export default function MapSingle(props: MapSingleProps) {
-  // Pull coords/title from either shape
   const lat = props.property?.latitude ?? props.latitude;
   const lng = props.property?.longitude ?? props.longitude;
   const title = props.property?.title ?? props.title ?? 'Property';
@@ -45,12 +38,11 @@ export default function MapSingle(props: MapSingleProps) {
     typeof lat === 'number' && !Number.isNaN(lat) &&
     typeof lng === 'number' && !Number.isNaN(lng);
 
-  const position: LatLngExpression = useMemo<LatLngExpression>(
-    () => (hasCoords ? [lat as number, lng as number] : [52.5, -1.5]), // UK-ish fallback
+  const position: LatLngExpression = useMemo(
+    () => (hasCoords ? [lat as number, lng as number] : [52.5, -1.5]),
     [hasCoords, lat, lng]
   );
 
-  // SSR safety + Leaflet icon fix
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -58,17 +50,13 @@ export default function MapSingle(props: MapSingleProps) {
       // @ts-ignore
       delete L.Icon.Default.prototype._getIconUrl;
       L.Icon.Default.mergeOptions({
-        iconRetinaUrl:
-          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-        iconUrl:
-          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-        shadowUrl:
-          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
       });
-    } catch { /* no-op */ }
+    } catch {}
   }, []);
 
-  // Dark-mode tile switching (reacts to your body class toggle)
   const [darkMode, setDarkMode] = useState(false);
   useEffect(() => {
     const isDark = () => document.body.classList.contains('dark-mode');
@@ -88,28 +76,20 @@ export default function MapSingle(props: MapSingleProps) {
     );
   }
 
-  // Basemap URLs + attribution
   const lightUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
   const lightAttr = '&copy; OpenStreetMap contributors';
   const darkUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-  const darkAttr =
-    '&copy; OpenStreetMap contributors, &copy; CARTO';
+  const darkAttr = '&copy; OpenStreetMap contributors, &copy; CARTO';
 
   return (
-    <div
-      className={`rounded-lg overflow-hidden ${props.className ?? ''}`}
-      style={{ height, width: '100%' }}
-    >
+    <div className={`rounded-lg overflow-hidden ${props.className ?? ''}`} style={{ height, width: '100%' }}>
       <MapContainer
         center={position}
         zoom={zoom}
         scrollWheelZoom={scrollWheelZoom}
         style={{ height: '100%', width: '100%' }}
       >
-        <TileLayer
-          attribution={darkMode ? darkAttr : lightAttr}
-          url={darkMode ? darkUrl : lightUrl}
-        />
+        <TileLayer attribution={darkMode ? darkAttr : lightAttr} url={darkMode ? darkUrl : lightUrl} />
         <Marker position={position}>
           <Popup>{title}</Popup>
         </Marker>
