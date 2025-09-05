@@ -7,9 +7,13 @@ export default function HeaderClient() {
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
+
+    // restore theme
     const dark = localStorage.getItem('theme') === 'dark';
     setIsDark(dark);
     document.body.classList.toggle('dark-mode', dark);
+
+    // set Leaflet default marker icons (safe if Leaflet not used)
 
     (async () => {
       try {

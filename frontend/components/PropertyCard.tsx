@@ -113,6 +113,7 @@ export default function PropertyCard({ property }: Props) {
     </>
   );
 
+  // Keep the whole card clickable when we have an id; otherwise render a plain div
   return href ? (
     <Link href={href} className={styles.card} prefetch aria-label={property.title}>
       {CardInner}

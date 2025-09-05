@@ -231,7 +231,7 @@ function ListingsInner() {
             style={{ height: 360, width: '100%' }}
             center={center}
             zoom={6}
-            scrollWheelZoom={false}
+
             whenReady={handleMapReady}    // () => void ✔️
           >
             <TileLayer
