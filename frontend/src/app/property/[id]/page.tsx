@@ -1,4 +1,3 @@
-// src/app/property/[id]/page.tsx
 'use client';
 export const dynamic = 'force-dynamic';
 
@@ -92,9 +91,9 @@ export default function PropertyDetailsPage() {
 
   function computeAIScore(p: Property) {
     const items = [
-      { label: 'Yield', value: Math.min(100, Number(p.yield_percent ?? 0) * 10) },
-      { label: 'ROI', value: Math.min(100, Number(p.roi_percent ?? 0) * 10) },
-      { label: 'Bedrooms', value: Math.min(100, Number(p.bedrooms ?? 0) * 20) },
+      { label: 'Yield',     value: Math.min(100, Number(p.yield_percent ?? 0) * 10) },
+      { label: 'ROI',       value: Math.min(100, Number(p.roi_percent ?? 0) * 10) },
+      { label: 'Bedrooms',  value: Math.min(100, Number(p.bedrooms ?? 0) * 20) },
       { label: 'Bathrooms', value: Math.min(100, Number(p.bathrooms ?? 0) * 25) },
     ];
     setAiItems(items);
@@ -135,9 +134,7 @@ export default function PropertyDetailsPage() {
     return (
       <div className="p-6">
         <p>Property not found.</p>
-        <a href="/" className="text-blue-600 underline">
-          ← Back to listings
-        </a>
+        <a href="/" className="text-blue-600 underline">← Back to listings</a>
       </div>
     );
   }
@@ -146,7 +143,7 @@ export default function PropertyDetailsPage() {
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
       {/* LEFT */}
       <div className="md:col-span-2 space-y-6">
-        {/* Header — keep above hero image via z-index so header links remain clickable */}
+        {/* Header — above hero image so header links remain clickable */}
         <header className="mb-4 md:mb-6 relative z-[60]">
           <h1 className="text-[clamp(1.5rem,4vw,2.25rem)] font-extrabold leading-tight text-balance">
             {property.title}
@@ -182,9 +179,7 @@ export default function PropertyDetailsPage() {
             AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
           </SectionTitle>
           <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-3" />
-          <div className="mt-3">
-            <AIScoreInfo />
-          </div>
+          <div className="mt-3"><AIScoreInfo /></div>
         </Section>
 
         {/* Exit Strategies (AI) */}
@@ -255,31 +250,13 @@ export default function PropertyDetailsPage() {
         <Section>
           <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
           <ul className="space-y-2 text-sm">
-            <li>
-              <Badge>Price</Badge> £{Number(property.price).toLocaleString()}
-            </li>
-            <li>
-              <Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}
-            </li>
-            <li>
-              <Badge>ROI</Badge> {property.roi_percent != null ? `${property.roi_percent}%` : '—'}
-            </li>
-            <li>
-              <Badge>Beds</Badge> {property.bedrooms ?? '—'}
-            </li>
-            <li>
-              <Badge>Baths</Badge> {property.bathrooms ?? '—'}
-            </li>
-            {property.propertyType && (
-              <li>
-                <Badge>Type</Badge> {property.propertyType}
-              </li>
-            )}
-            {property.investmentType && (
-              <li>
-                <Badge>Investment</Badge> {property.investmentType}
-              </li>
-            )}
+            <li><Badge>Price</Badge> £{Number(property.price).toLocaleString()}</li>
+            <li><Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}</li>
+            <li><Badge>ROI</Badge> {property.roi_percent != null ? `${property.roi_percent}%` : '—'}</li>
+            <li><Badge>Beds</Badge> {property.bedrooms ?? '—'}</li>
+            <li><Badge>Baths</Badge> {property.bathrooms ?? '—'}</li>
+            {property.propertyType && (<li><Badge>Type</Badge> {property.propertyType}</li>)}
+            {property.investmentType && (<li><Badge>Investment</Badge> {property.investmentType}</li>)}
           </ul>
         </Section>
 

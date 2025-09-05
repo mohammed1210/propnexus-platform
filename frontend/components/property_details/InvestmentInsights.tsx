@@ -2,7 +2,7 @@
 
 /* ──────────────────────────────────────────────────────────────────
    InvestmentInsights
-   - Generates Upsides / Risks / Next Steps from inputs
+   - Upsides / Risks / Next Steps from inputs
    - Fetches nearby comps by postcode (debounce + abort-safe)
    - Optional compact AI Score breakdown (aiOverall + aiItems)
    - Uses shared <Button> for refresh

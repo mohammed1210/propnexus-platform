@@ -42,7 +42,8 @@ type StrategyInput =
 
 /* --- Helpers ------------------------------------------------------------- */
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').trim();
+// Support either env var name
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
 
 function stripMarkdown(s: string): string {
   return s
@@ -166,7 +167,7 @@ export default function ExitStrategyGenerator(props: Props) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch {
-      /* ignore */
+      /* ignore clipboard failures */
     }
   }
 
