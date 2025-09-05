@@ -11,9 +11,12 @@ import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
 
 import NextDynamic from 'next/dynamic';
+import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
+
 const MapContainer = NextDynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
 const TileLayer    = NextDynamic(() => import('react-leaflet').then(m => m.TileLayer),    { ssr: false });
 const Marker       = NextDynamic(() => import('react-leaflet').then(m => m.Marker),       { ssr: false });
+const Popup        = NextDynamic(() => import('react-leaflet').then(m => m.Popup),        { ssr: false });
 
 type Property = {
   id: string | null;
@@ -122,13 +125,37 @@ function ListingsInner() {
     () =>
       filtered
         .filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
-        .map(p => ({ id: p.id ?? '', title: p.title, lat: Number(p.latitude), lng: Number(p.longitude) })),
+        .map(p => ({ id: p.id ?? '', title: p.title, lat: Number(p.latitude), lng: Number(p.longitude), price: p.price })),
     [filtered]
   );
 
   const center: [number, number] = points.length
     ? [points[0].lat, points[0].lng]
     : [51.5072, -0.1276]; // London
+
+  // Fit-to-bounds logic via ref (works with whenReady: () => void)
+  const mapRef = useRef<LeafletMap | null>(null);
+
+  const fitToPoints = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
+    if (!pts.length) return;
+    const bounds: LatLngBoundsExpression = pts.map(p => [p.lat, p.lng]) as LatLngBoundsExpression;
+    m.fitBounds(bounds, { padding: [24, 24] });
+  };
+
+  const handleMapReady = () => {
+    const map = mapRef.current;
+    if (map) fitToPoints(map, points);
+  };
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (points.length) {
+      fitToPoints(map, points);
+    } else {
+      map.setView(center, 6);
+    }
+  }, [points, center]);
 
   const clearAll = () => {
     setQ('');
@@ -140,23 +167,23 @@ function ListingsInner() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-extrabold tracking-tight">Listings</h1>
+        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">Listings</h1>
         <p className="text-slate-600">Fresh opportunities from the feed.</p>
       </header>
 
-      {/* 🔎 Sticky filters */}
+      {/* 🔎 Sticky filters (compact on mobile) */}
       <div
-        className="sticky top-0 z-30 -mx-4 px-4 py-3
+        className="sticky top-12 md:top-16 z-40 -mx-4 px-4 py-2 md:py-3
                    bg-white dark:bg-slate-900
                    supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:backdrop-blur
                    border-b border-slate-200 dark:border-slate-800 shadow-sm"
       >
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-3 items-center">
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
             placeholder="Search title or location…"
-            className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
+            className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm"
           />
           <input
             type="number"
@@ -164,7 +191,7 @@ function ListingsInner() {
             placeholder="Min £"
             value={minPrice ?? ''}
             onChange={e => setMinPrice(e.target.value ? Number(e.target.value) : undefined)}
-            className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
+            className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm"
           />
           <input
             type="number"
@@ -172,12 +199,12 @@ function ListingsInner() {
             placeholder="Max £"
             value={maxPrice ?? ''}
             onChange={e => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)}
-            className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
+            className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm"
           />
           <select
             value={minBeds ?? ''}
             onChange={e => setMinBeds(e.target.value ? Number(e.target.value) : undefined)}
-            className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3"
+            className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm"
           >
             <option value="">Min beds</option>
             <option value="1">1+ bed</option>
@@ -188,7 +215,7 @@ function ListingsInner() {
 
           <button
             onClick={clearAll}
-            className="h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 px-3"
+            className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 px-2.5 md:px-3 text-[13px] md:text-sm"
             title="Clear filters"
           >
             Clear
@@ -200,17 +227,34 @@ function ListingsInner() {
       {points.length > 0 && (
         <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
           <MapContainer
+            ref={mapRef as any}           // react-leaflet forwards ref to Leaflet Map
             style={{ height: 360, width: '100%' }}
             center={center}
             zoom={6}
-            scrollWheelZoom={false}
+
+            whenReady={handleMapReady}    // () => void ✔️
           >
             <TileLayer
               attribution="&copy; OpenStreetMap"
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             {points.map(p => (
-              <Marker key={p.id} position={[p.lat, p.lng]} />
+              <Marker key={p.id} position={[p.lat, p.lng]}>
+                <Popup>
+                  <div className="text-sm">
+                    <div className="font-semibold">{p.title}</div>
+                    {p.price != null && (
+                      <div className="text-slate-600">£{p.price.toLocaleString()}</div>
+                    )}
+                    <a
+                      href={`/property/${p.id}`}
+                      className="inline-block mt-1 underline text-blue-600 hover:text-blue-700"
+                    >
+                      View details →
+                    </a>
+                  </div>
+                </Popup>
+              </Marker>
             ))}
           </MapContainer>
         </div>

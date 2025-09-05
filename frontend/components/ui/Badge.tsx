@@ -7,9 +7,6 @@ type Props = React.HTMLAttributes<HTMLSpanElement> & {
   variant?: Variant;
 };
 
-/**
- * Tiny, rounded pill for small labels (e.g., "beta", "AI Score", "New").
- */
 export default function Badge({ variant = 'neutral', className = '', children, ...rest }: Props) {
   const styles: Record<Variant, string> = {
     neutral: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',

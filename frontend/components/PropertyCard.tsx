@@ -48,7 +48,7 @@ export default function PropertyCard({ property }: Props) {
     }
 
     const { error } = await sb.from('saved_deals').insert({
-      user_id: 'demo-user', // TODO: replace with real user ID when auth is wired
+      user_id: 'demo-user',
       property_id: pid,
     });
 
@@ -62,10 +62,7 @@ export default function PropertyCard({ property }: Props) {
 
   const CardInner = (
     <>
-      <div
-        className={styles.imageWrapper}
-        style={{ position: 'relative', overflow: 'hidden', borderRadius: 12 }}
-      >
+      <div className={styles.imageWrapper} style={{ position: 'relative', overflow: 'hidden', borderRadius: 12 }}>
         <Image
           src={imgSrc || fallbackImage}
           alt={property.title || 'Property'}
@@ -80,16 +77,12 @@ export default function PropertyCard({ property }: Props) {
       <div className={styles.info}>
         <div className="flex items-start justify-between gap-3">
           <h2 className={styles.title}>{property.title}</h2>
-          <Badge variant="info" aria-label="AI score beta">
-            AI score • beta
-          </Badge>
+          <Badge variant="info" aria-label="AI score beta">AI score • beta</Badge>
         </div>
 
         <p className={styles.location}>{property.location}</p>
 
-        <p className={styles.price}>
-          £{Number(property.price ?? 0).toLocaleString()}
-        </p>
+        <p className={styles.price}>£{Number(property.price ?? 0).toLocaleString()}</p>
 
         {(property.bedrooms != null || property.bathrooms != null) && (
           <p className={styles.details} aria-label="Bedrooms and bathrooms">
@@ -99,33 +92,21 @@ export default function PropertyCard({ property }: Props) {
         )}
 
         <div className={styles.metrics}>
-          <Badge variant="success" className="mr-2">
-            Yield: {property.yield_percent ?? 0}%
-          </Badge>
+          <Badge variant="success" className="mr-2">Yield: {property.yield_percent ?? 0}%</Badge>
           <Badge variant="neutral">ROI: {property.roi_percent ?? 0}%</Badge>
         </div>
 
         <div className={styles.buttons}>
-          <Button
-            onClick={handleSave}
-            variant="secondary"
-            size="sm"
-            leadingIcon={<span>💾</span>}
-            aria-label="Save deal"
-          >
+          <Button onClick={handleSave} variant="secondary" size="sm" leadingIcon={<span>💾</span>} aria-label="Save deal">
             Save Deal
           </Button>
 
           {href ? (
             <Link href={href} prefetch>
-              <Button variant="primary" size="sm" leadingIcon={<span>🔍</span>}>
-                View Details
-              </Button>
+              <Button variant="primary" size="sm" leadingIcon={<span>🔍</span>}>View Details</Button>
             </Link>
           ) : (
-            <Button variant="ghost" size="sm" disabled>
-              View Details
-            </Button>
+            <Button variant="ghost" size="sm" disabled>View Details</Button>
           )}
         </div>
       </div>
@@ -138,8 +119,6 @@ export default function PropertyCard({ property }: Props) {
       {CardInner}
     </Link>
   ) : (
-    <div className={styles.card} aria-label={property.title}>
-      {CardInner}
-    </div>
+    <div className={styles.card} aria-label={property.title}>{CardInner}</div>
   );
 }
