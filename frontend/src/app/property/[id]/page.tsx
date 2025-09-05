@@ -1,3 +1,4 @@
+// src/app/property/[id]/page.tsx
 'use client';
 export const dynamic = 'force-dynamic';
 
@@ -6,16 +7,14 @@ import { useParams } from 'next/navigation';
 import nextDynamic from 'next/dynamic';
 import Image from 'next/image';
 
-// Types-only shim for env (keeps TS happy without @types/node)
+// Types-only shim for env
 declare const process: { env?: Record<string, string | undefined> };
 
-// UI
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import CardActions from '@/components/ui/CardActions';
 import Badge from '@/components/ui/Badge';
 
-// Property detail components
 import MortgageCalculator from '@/components/property_details/MortgageCalculator';
 import StampDutyCalculator from '@/components/property_details/StampDutyCalculator';
 import AreaIntel from '@/components/property_details/AreaIntel';
@@ -57,7 +56,6 @@ function getBackendBase(): string {
 
 export default function PropertyDetailsPage() {
   const { id = '' } = useParams<{ id: string }>() ?? {};
-
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -85,9 +83,7 @@ export default function PropertyDetailsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (id) fetchProperty(id);
-  }, [id, fetchProperty]);
+  useEffect(() => { if (id) fetchProperty(id); }, [id, fetchProperty]);
 
   function computeAIScore(p: Property) {
     const items = [
@@ -118,18 +114,14 @@ export default function PropertyDetailsPage() {
   }
 
   const hasCoords = useMemo(
-    () =>
-      property?.latitude != null &&
-      property?.longitude != null &&
-      Number.isFinite(property.latitude) &&
-      Number.isFinite(property.longitude),
+    () => property?.latitude != null && property?.longitude != null &&
+          Number.isFinite(property.latitude) && Number.isFinite(property.longitude),
     [property]
   );
 
   const postcode = useMemo(() => property?.location?.trim().split(/\s+/).pop(), [property]);
 
   if (loading) return <p className="p-6">Loading…</p>;
-
   if (!property) {
     return (
       <div className="p-6">
@@ -143,13 +135,12 @@ export default function PropertyDetailsPage() {
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
       {/* LEFT */}
       <div className="md:col-span-2 space-y-6">
-        {/* Header — above hero image so header links remain clickable */}
-        <header className="mb-4 md:mb-6 relative z-[60]">
-          <h1 className="text-[clamp(1.5rem,4vw,2.25rem)] font-extrabold leading-tight text-balance">
+        {/* Header */}
+        <header className="mb-4 md:mb-6">
+          <h1 className="text-[clamp(1.5rem,4vw,2.25rem)] font-extrabold leading-tight tracking-tight">
             {property.title}
           </h1>
-          <p className="text-slate-600 mt-1">{property.location}</p>
-
+          <p className="text-neutral-600 mt-1">{property.location}</p>
           <div className="mt-3">
             <CardActions
               onSave={handleSaveDeal}
@@ -161,7 +152,7 @@ export default function PropertyDetailsPage() {
 
         {/* Hero Image */}
         {property.imageurl && (
-          <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden shadow-sm">
+          <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-sm">
             <Image
               src={property.imageurl}
               alt={property.title}
@@ -174,17 +165,17 @@ export default function PropertyDetailsPage() {
         )}
 
         {/* AI Deal Score */}
-        <Section id="ai-score-section">
-          <SectionTitle icon={<span>🧠</span>}>
-            AI Deal Score <span className="ml-2 text-xs font-medium text-slate-500">beta</span>
+        <Section aria-labelledby="ai-deal-score">
+          <SectionTitle id="ai-deal-score" icon={<span>🧠</span>}>
+            AI Deal Score <span className="ml-2 text-xs font-medium text-neutral-500">beta</span>
           </SectionTitle>
           <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-3" />
           <div className="mt-3"><AIScoreInfo /></div>
         </Section>
 
-        {/* Exit Strategies (AI) */}
-        <Section>
-          <SectionTitle icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
+        {/* Exit Strategies */}
+        <Section aria-labelledby="exit-strategies">
+          <SectionTitle id="exit-strategies" icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
           <ExitStrategyGenerator
             title={property.title}
             location={property.location}
@@ -198,20 +189,20 @@ export default function PropertyDetailsPage() {
         </Section>
 
         {/* Mortgage */}
-        <Section>
-          <SectionTitle icon={<span>🏦</span>}>Mortgage</SectionTitle>
+        <Section aria-labelledby="mortgage">
+          <SectionTitle id="mortgage" icon={<span>🏦</span>}>Mortgage</SectionTitle>
           <MortgageCalculator price={Number(property.price)} />
         </Section>
 
         {/* Stamp Duty */}
-        <Section>
-          <SectionTitle icon={<span>🧾</span>}>Stamp Duty</SectionTitle>
+        <Section aria-labelledby="stamp-duty">
+          <SectionTitle id="stamp-duty" icon={<span>🧾</span>}>Stamp Duty</SectionTitle>
           <StampDutyCalculator price={Number(property.price)} />
         </Section>
 
         {/* Area Intelligence */}
-        <Section>
-          <SectionTitle icon={<span>🗺️</span>}>Area Intelligence</SectionTitle>
+        <Section aria-labelledby="area-intel">
+          <SectionTitle id="area-intel" icon={<span>🗺️</span>}>Area Intelligence</SectionTitle>
           <AreaIntel
             locationLabel={property.location}
             postcode={postcode}
@@ -226,7 +217,8 @@ export default function PropertyDetailsPage() {
         </Section>
 
         {/* Investment Insights */}
-        <Section>
+        <Section aria-labelledby="investment-insights">
+          <SectionTitle id="investment-insights">Investment Insights</SectionTitle>
           <InvestmentInsights
             price={Number(property.price)}
             yield_percent={property.yield_percent ?? undefined}
@@ -239,16 +231,16 @@ export default function PropertyDetailsPage() {
         </Section>
 
         {/* Notes */}
-        <Section>
-          <SectionTitle icon={<span>📝</span>}>Notes</SectionTitle>
+        <Section aria-labelledby="notes">
+          <SectionTitle id="notes" icon={<span>📝</span>}>Notes</SectionTitle>
           <NotesFields propertyId={property.id} />
         </Section>
       </div>
 
       {/* RIGHT — Sidebar */}
       <aside className="md:col-span-1 space-y-6">
-        <Section>
-          <SectionTitle icon={<span>📊</span>}>Deal Summary</SectionTitle>
+        <Section aria-labelledby="deal-summary">
+          <SectionTitle id="deal-summary" icon={<span>📊</span>}>Deal Summary</SectionTitle>
           <ul className="space-y-2 text-sm">
             <li><Badge>Price</Badge> £{Number(property.price).toLocaleString()}</li>
             <li><Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}</li>
@@ -260,17 +252,16 @@ export default function PropertyDetailsPage() {
           </ul>
         </Section>
 
-        <Section>
-          <SectionTitle icon={<span>🗺️</span>}>Location</SectionTitle>
+        <Section aria-labelledby="location">
+          <SectionTitle id="location" icon={<span>🗺️</span>}>Location</SectionTitle>
           {hasCoords ? (
             <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
           ) : (
-            <p className="text-gray-500">Map unavailable — no coordinates provided.</p>
+            <p className="text-neutral-500">Map unavailable — no coordinates provided.</p>
           )}
         </Section>
       </aside>
 
-      {/* Floating Chatbot */}
       <AIChatbot property={property as any} />
     </div>
   );
