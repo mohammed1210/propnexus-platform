@@ -1,7 +1,6 @@
-// src/app/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -10,6 +9,10 @@ export const dynamic = 'force-dynamic';
 export default function HomePage() {
   const router = useRouter();
   const [q, setQ] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  // Avoid hydration mismatch for random SVG lines
+  useEffect(() => setMounted(true), []);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,20 +98,47 @@ export default function HomePage() {
                 </button>
               </p>
 
-              {/* bullets – more spacing + readable size */}
+              {/* bullets */}
               <ul className="mt-6 space-y-2 text-slate-200/95 text-[15px] md:text-base">
-                <li className="flex items-start gap-2"><span aria-hidden>🤖</span><span>AI deal scoring to prioritise the best opportunities.</span></li>
-                <li className="flex items-start gap-2"><span aria-hidden>📊</span><span>Instant yield & ROI metrics with configurable inputs.</span></li>
-                <li className="flex items-start gap-2"><span aria-hidden>🗺️</span><span>Map view of fresh listings — filtered by budget & beds.</span></li>
-                <li className="flex items-start gap-2"><span aria-hidden>🔗</span><span>One-click export to CRM (coming soon).</span></li>
+                <li className="flex items-start gap-2">
+                  <span aria-hidden>🤖</span>
+                  <span>AI deal scoring to prioritise the best opportunities.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span aria-hidden>📊</span>
+                  <span>Instant yield & ROI metrics with configurable inputs.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span aria-hidden>🗺️</span>
+                  <span>Map view of fresh listings — filtered by budget & beds.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span aria-hidden>🔗</span>
+                  <span>One-click export to CRM (coming soon).</span>
+                </li>
               </ul>
             </form>
 
-            {/* Quick links → styled as chips for clearer taps on mobile */}
+            {/* Quick links */}
             <div className="mt-8 flex flex-wrap items-center gap-3 text-sm">
-              <Link href="/listings" className="px-3 py-1.5 rounded-full bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30">Browse listings</Link>
-              <Link href="/analytics" className="px-3 py-1.5 rounded-full bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30">Portfolio analytics</Link>
-              <Link href="/deals" className="px-3 py-1.5 rounded-full bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30">Saved deals</Link>
+              <Link
+                href="/listings"
+                className="px-3 py-1.5 rounded-full bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30"
+              >
+                Browse listings
+              </Link>
+              <Link
+                href="/analytics"
+                className="px-3 py-1.5 rounded-full bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30"
+              >
+                Portfolio analytics
+              </Link>
+              <Link
+                href="/deals"
+                className="px-3 py-1.5 rounded-full bg-indigo-600/20 text-indigo-200 hover:bg-indigo-600/30"
+              >
+                Saved deals
+              </Link>
             </div>
           </section>
 
@@ -122,17 +152,29 @@ export default function HomePage() {
                     <stop offset="100%" stopColor="rgba(99,102,241,0)" />
                   </radialGradient>
                 </defs>
-                <g opacity="0.7">
-                  {[...Array(26)].map((_, i) => {
-                    const x1 = Math.random() * 600;
-                    const y1 = Math.random() * 380;
-                    const x2 = Math.random() * 600;
-                    const y2 = Math.random() * 380;
-                    return (
-                      <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(148,163,184,0.35)" strokeWidth="1" />
-                    );
-                  })}
-                </g>
+
+                {/* Render random lines only on client to avoid hydration mismatch */}
+                {mounted && (
+                  <g opacity="0.7">
+                    {Array.from({ length: 26 }).map((_, i) => {
+                      const x1 = Math.random() * 600;
+                      const y1 = Math.random() * 380;
+                      const x2 = Math.random() * 600;
+                      const y2 = Math.random() * 380;
+                      return (
+                        <line
+                          key={i}
+                          x1={x1}
+                          y1={y1}
+                          x2={x2}
+                          y2={y2}
+                          stroke="rgba(148,163,184,0.35)"
+                          strokeWidth="1"
+                        />
+                      );
+                    })}
+                  </g>
+                )}
                 <circle cx="460" cy="200" r="140" fill="url(#g1)" />
               </svg>
 
@@ -140,9 +182,18 @@ export default function HomePage() {
                 <div className="rounded-lg bg-white/90 p-4 shadow">
                   <p className="text-xs font-medium text-slate-500">Realtime Signals</p>
                   <div className="mt-1 grid grid-cols-3 gap-3 text-sm">
-                    <div><p className="text-slate-500">Avg Yield</p><p className="font-semibold">6.1%</p></div>
-                    <div><p className="text-slate-500">Avg ROI</p><p className="font-semibold">14.8%</p></div>
-                    <div><p className="text-slate-500">Deals Today</p><p className="font-semibold">28</p></div>
+                    <div>
+                      <p className="text-slate-500">Avg Yield</p>
+                      <p className="font-semibold">6.1%</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Avg ROI</p>
+                      <p className="font-semibold">14.8%</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500">Deals Today</p>
+                      <p className="font-semibold">28</p>
+                    </div>
                   </div>
                 </div>
               </div>

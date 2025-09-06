@@ -4,9 +4,10 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 export default function HeaderClient() {
-  const [isDark, setIsDark] = useState(false);
+  const [dark, setDark] = useState(false);
 
   useEffect(() => {
+<<<<<<< HEAD
 
     // restore theme
     const dark = localStorage.getItem('theme') === 'dark';
@@ -32,34 +33,40 @@ export default function HeaderClient() {
     document.body.classList.toggle('dark-mode', next);
     localStorage.setItem('theme', next ? 'dark' : 'light');
   };
+=======
+    const root = document.documentElement;
+    if (dark) {
+      root.classList.add('dark');
+      root.dataset.theme = 'dark';
+    } else {
+      root.classList.remove('dark');
+      delete (root as any).dataset?.theme;
+    }
+  }, [dark]);
+>>>>>>> e766067 (fix: stable map + ts-ignore)
 
   return (
-    <header
-      className="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-white/75 dark:supports-[backdrop-filter]:bg-black/40 bg-white dark:bg-neutral-900 border-b border-neutral-200/70 dark:border-neutral-800/70"
-    >
-      <div className="mx-auto max-w-7xl px-4 h-14 flex items-center gap-3">
-        <Link href="/" className="font-extrabold tracking-tight hover:opacity-80" aria-label="Go to homepage">
-          PropNexus
-        </Link>
+    <header className="sticky top-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur header-shadow">
+      <div className="mx-auto max-w-7xl px-4 h-12 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-7 h-7 rounded-md bg-indigo-600 text-white grid place-items-center text-xs font-bold">
+            PN
+          </div>
+          <Link href="/" className="font-semibold">PropNexus</Link>
+        </div>
 
-        <nav className="ml-auto flex items-center gap-1" aria-label="Primary">
-          {[
-            { href: '/listings', label: 'Listings' },
-            { href: '/analytics', label: 'Analytics' },
-            { href: '/deals', label: 'Saved Deals' },
-          ].map(i => (
-            <Link
-              key={i.href}
-              href={i.href}
-              className="px-3 py-1.5 rounded-full text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800"
-            >
-              {i.label}
-            </Link>
-          ))}
+        <nav className="hidden sm:flex items-center gap-4 text-sm">
+          <Link href="/listings" className="hover:underline">Listings</Link>
+          <Link href="/analytics" className="hover:underline">Analytics</Link>
+          <Link href="/deals" className="hover:underline">Saved Deals</Link>
         </nav>
 
-        <button onClick={toggleTheme} className="ml-2 rounded-full px-3 py-1.5 text-sm hover:bg-neutral-100 dark:hover:bg-neutral-800">
-          {isDark ? '☀️ Light' : '🌙 Dark'}
+        <button
+          className="text-xs px-2.5 py-1 rounded-md border border-slate-300 dark:border-slate-700"
+          onClick={() => setDark((v) => !v)}
+          aria-pressed={dark}
+        >
+          {dark ? 'Light' : 'Dark'}
         </button>
       </div>
     </header>

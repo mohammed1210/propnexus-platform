@@ -3,40 +3,16 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
-
 import { Line } from 'react-chartjs-2';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Tooltip,
-  Legend,
+  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend,
 } from 'chart.js';
+import { getSupabase } from '@/lib/supabaseClient';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
-/** ── Supabase (lazy, browser-only singleton) ───────────────────── */
-let _sb: SupabaseClient | null = null;
-function getSupabase(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
-    if (typeof window !== 'undefined') {
-      console.warn('Analytics: Supabase env vars missing');
-    }
-    return null;
-  }
-  if (!_sb) _sb = createClient(url, key);
-  return _sb;
-}
-
-/** Types */
 type SavedDeal = {
   id: string;
   property_id: string;
@@ -53,34 +29,23 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const sb = getSupabase();
-    if (!sb) {
-      setDeals([]);
-      setLoading(false);
-      return;
-    }
     let ignore = false;
+    const sb = getSupabase();
+
     (async () => {
       setLoading(true);
-      const { data, error } = await sb
-        .from('saved_deals')
-        .select(
-          'id, property_id, title, location, price, yield_percent, roi_percent, created_at'
-        )
-        .order('created_at', { ascending: true });
+      const { data, error } = await sb.from('saved_deals').select('*').order('created_at', { ascending: false });
 
       if (!ignore) {
-        if (error) console.error('analytics fetch error', error);
+        if (error) console.warn('load saved_deals', error); // ⬅️ was console.error
         setDeals((data as SavedDeal[]) ?? []);
         setLoading(false);
       }
     })();
-    return () => {
-      ignore = true;
-    };
+
+    return () => { ignore = true; };
   }, []);
 
-  // KPIs
   const kpis = useMemo(() => {
     const count = deals.length;
     const avgYield = avg(deals.map((d) => num(d.yield_percent)));
@@ -89,7 +54,6 @@ export default function AnalyticsPage() {
     return { count, avgYield, avgROI, totalValue };
   }, [deals]);
 
-  // Monthly series
   const monthly = useMemo(() => {
     const map = new Map<string, { count: number; sumYield: number }>();
     for (const d of deals) {
@@ -109,32 +73,27 @@ export default function AnalyticsPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Sidebar */}
       <aside className="md:col-span-1 bg-slate-900 text-white rounded-xl p-4 h-fit">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 bg-blue-500 rounded-md grid place-items-center font-bold">PN</div>
           <div className="font-bold">PropNexus</div>
         </div>
-
         <nav className="space-y-1">
-          <NavItem href="/" label="Listings" emoji="🏠" />
+          <NavItem href="/listings" label="Listings" emoji="🏠" />
           <NavItem href="/analytics" label="Analytics" emoji="📈" active />
           <NavItem href="/deals" label="Saved Deals" emoji="⭐" />
         </nav>
-
         <div className="mt-6 text-xs text-slate-300">
           Track portfolio metrics, AI scores and market signals here.
         </div>
       </aside>
 
-      {/* Main */}
       <main className="md:col-span-2 space-y-6">
         <header>
           <h1 className="text-2xl font-bold">Analytics &amp; Portfolio</h1>
           <p className="text-slate-600">Aggregated view of your saved deals and signals.</p>
         </header>
 
-        {/* KPI row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label="Saved Deals" value={kpis.count} />
           <KpiCard label="Avg Yield" value={`${kpis.avgYield}%`} />
@@ -142,22 +101,15 @@ export default function AnalyticsPage() {
           <KpiCard label="Total Value" value={`£${formatGBP(kpis.totalValue)}`} />
         </div>
 
-        {/* Charts */}
         <Section>
           <SectionTitle>Saved Deals Over Time</SectionTitle>
           <div className="rounded-xl border border-slate-200 p-4">
             <Line
               data={{
                 labels: monthly.labels,
-                datasets: [
-                  { label: 'Saved deals', data: monthly.countSeries, borderWidth: 2, tension: 0.3 },
-                ],
+                datasets: [{ label: 'Saved deals', data: monthly.countSeries, borderWidth: 2, tension: 0.3 }],
               }}
-              options={{
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true } },
-              }}
+              options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }}
             />
           </div>
         </Section>
@@ -168,59 +120,30 @@ export default function AnalyticsPage() {
             <Line
               data={{
                 labels: monthly.labels,
-                datasets: [
-                  { label: 'Avg yield %', data: monthly.yieldSeries, borderWidth: 2, tension: 0.3 },
-                ],
+                datasets: [{ label: 'Avg yield %', data: monthly.yieldSeries, borderWidth: 2, tension: 0.3 }],
               }}
-              options={{
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, suggestedMax: 12 } },
-              }}
+              options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, suggestedMax: 12 } } }}
             />
           </div>
         </Section>
 
-        {/* Recent saved deals table */}
         <Section>
           <SectionTitle>Recent Saved Deals</SectionTitle>
-
-          {/* Sticky header needs a vertically scrollable container */}
-          <div className="overflow-x-auto overflow-y-auto max-h-[420px] rounded-xl border border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="bg-slate-50 sticky top-0">
                 <tr>
-                  <Th>Title</Th>
-                  <Th>Location</Th>
-                  <Th>Price</Th>
-                  <Th>Yield</Th>
-                  <Th>ROI</Th>
-                  <Th>Date</Th>
+                  <Th>Title</Th><Th>Location</Th><Th>Price</Th><Th>Yield</Th><Th>ROI</Th><Th>Date</Th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr>
-                    <Td className="p-3 text-neutral-500" colSpan={6}>
-                      Loading…
-                    </Td>
-                  </tr>
+                  <tr><td className="p-3 text-slate-500" colSpan={6}>Loading…</td></tr>
                 ) : deals.length === 0 ? (
-                  <tr>
-                    <Td className="p-3 text-neutral-500" colSpan={6}>
-                      No saved deals yet.
-                    </Td>
-                  </tr>
+                  <tr><td className="p-3 text-slate-500" colSpan={6}>No saved deals yet.</td></tr>
                 ) : (
                   deals.slice(-8).reverse().map((d) => (
-                    <tr
-                      key={d.id}
-                      className={[
-                        'border-t border-neutral-200 dark:border-neutral-800',
-                        'odd:bg-white even:bg-slate-50/40 dark:odd:bg-neutral-900 dark:even:bg-neutral-900/60',
-                        'hover:bg-slate-50 dark:hover:bg-neutral-800/40 transition-colors',
-                      ].join(' ')}
-                    >
+                    <tr key={d.id} className="border-t">
                       <Td>{d.title ?? '—'}</Td>
                       <Td>{d.location ?? '—'}</Td>
                       <Td>£{formatGBP(num(d.price))}</Td>
@@ -239,70 +162,22 @@ export default function AnalyticsPage() {
   );
 }
 
-/* ─── Small presentational helpers ─────────────────────────────── */
-function NavItem({ href, label, emoji, active = false }: {
-  href: string; label: string; emoji: string; active?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`block px-3 py-2 rounded-md text-sm ${active ? 'bg-white/10' : 'hover:bg-white/10'}`}
-    >
-      <span className="mr-2">{emoji}</span>{label}
-    </Link>
-  );
+function NavItem({ href, label, emoji, active = false }:{href:string;label:string;emoji:string;active?:boolean}) {
+  return <Link href={href} className={`block px-3 py-2 rounded-md text-sm ${active ? 'bg-white/10' : 'hover:bg-white/10'}`}>
+    <span className="mr-2">{emoji}</span>{label}
+  </Link>;
 }
-function KpiCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="text-xl font-semibold mt-1">{value}</div>
-    </div>
-  );
+function KpiCard({ label, value }:{label:string;value:string|number}) {
+  return <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="text-xs text-slate-500">{label}</div>
+    <div className="text-xl font-semibold mt-1">{value}</div>
+  </div>;
 }
-
-/** Sticky table header cell */
-function Th({ children }: { children: React.ReactNode }) {
-  return (
-    <th
-      className={[
-        'text-left font-medium px-3 py-2 text-slate-600',
-        // sticky header + backgrounds for both themes
-        'sticky top-0 z-10 bg-slate-50 dark:bg-neutral-900',
-        // subtle bottom border so it separates from rows
-        'border-b border-neutral-200 dark:border-neutral-800',
-      ].join(' ')}
-    >
-      {children}
-    </th>
-  );
-}
-
-function Td({
-  children,
-  className = '',
-  ...rest
-}: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return (
-    <td className={`px-3 py-2 ${className}`} {...rest}>
-      {children}
-    </td>
-  );
-}
-
-/* ─── Data helpers ─────────────────────────────────────────────── */
-function num(n: unknown) { return Number(n ?? 0) || 0; }
-function round(n: number) { return Number(n.toFixed(2)); }
-function avg(list: number[]) {
-  const arr = list.filter((x) => Number.isFinite(x));
-  return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
-}
-function valOrDash(n?: number | null): string | number {
-  if (n === null || n === undefined) return '–';
-  return n;
-}
-function formatGBP(n: number) { return n.toLocaleString(); }
-function formatDate(s?: string | null) {
-  if (!s) return '—';
-  try { return new Date(s).toLocaleDateString(); } catch { return '—'; }
-}
+function Th({ children }:{children: React.ReactNode}) { return <th className="text-left font-medium px-3 py-2 text-slate-600">{children}</th>; }
+function Td({ children }:{children: React.ReactNode}) { return <td className="px-3 py-2">{children}</td>; }
+function num(n: unknown){ return Number(n ?? 0) || 0; }
+function round(n:number){ return Number(n.toFixed(2)); }
+function avg(list:number[]){ const arr = list.filter((x)=>Number.isFinite(x)); return arr.length ? round(arr.reduce((a,b)=>a+b,0)/arr.length) : 0; }
+function valOrDash(n?: number | null){ return n==null ? '–' : n; }
+function formatGBP(n:number){ return n.toLocaleString(); }
+function formatDate(s?:string|null){ if(!s) return '—'; try{ return new Date(s).toLocaleDateString(); } catch { return '—'; } }
