@@ -2,23 +2,22 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useMemo, useRef, useState, Suspense } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import nextDynamic from 'next/dynamic';
+import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
 
-import NextDynamic from 'next/dynamic';
-import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
+// react-leaflet (client-only) — use an alias to avoid clashing with route `dynamic`
+const MapContainer = nextDynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
+const TileLayer    = nextDynamic(() => import('react-leaflet').then(m => m.TileLayer),    { ssr: false });
+const Marker       = nextDynamic(() => import('react-leaflet').then(m => m.Marker),       { ssr: false });
+const Popup        = nextDynamic(() => import('react-leaflet').then(m => m.Popup),        { ssr: false });
 
-const MapContainer = NextDynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
-const TileLayer    = NextDynamic(() => import('react-leaflet').then(m => m.TileLayer),    { ssr: false });
-const Marker       = NextDynamic(() => import('react-leaflet').then(m => m.Marker),       { ssr: false });
-const Popup        = NextDynamic(() => import('react-leaflet').then(m => m.Popup),        { ssr: false });
-
-// ---------- Types ----------
 type RawProperty = {
   id: string | null;
   title: string | null;
@@ -33,7 +32,17 @@ type RawProperty = {
   longitude?: number | null;
 };
 
-// ---------- ClientMap (stable single instance) ----------
+export default function ListingsPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading…</div>}>
+      <ListingsInner />
+    </Suspense>
+  );
+}
+
+/* -------------------------
+   Map rendered ONCE
+   ------------------------- */
 function ClientMap({
   points,
   defaultCenter,
@@ -46,31 +55,37 @@ function ClientMap({
 
   useEffect(() => setMounted(true), []);
 
-  const fitToPoints = (m: LeafletMap, pts: typeof points) => {
+  const fitToPoints = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return;
     const bounds: LatLngBoundsExpression = pts.map(p => [p.lat, p.lng]) as LatLngBoundsExpression;
     m.fitBounds(bounds, { padding: [24, 24] });
   };
 
-  const handleReady = (m: LeafletMap) => {
-    mapRef.current = m;
-    if (points.length) fitToPoints(m, points);
-    else m.setView(defaultCenter, 6);
+  // react-leaflet forwards Leaflet Map instance to this callback ref
+  const setMap = (instance: LeafletMap | null) => {
+    mapRef.current = instance;
+    if (!instance) return;
+    if (points.length) fitToPoints(instance, points);
+    else instance.setView(defaultCenter, 6);
   };
 
+  // update view when points change (keep one MapContainer)
   useEffect(() => {
     const m = mapRef.current;
     if (!m) return;
     if (points.length) fitToPoints(m, points);
     else m.setView(defaultCenter, 6);
-  }, [points, defaultCenter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [points.map(p => `${p.lat},${p.lng}`).join('|')]);
 
+  // create MapContainer exactly once after mount
   const mapOnce = useMemo(() => {
     if (!mounted) return null;
     return (
       <MapContainer
-        // @ts-ignore – react-leaflet forwards the Leaflet Map instance here at runtime
-        ref={handleReady}
+        /* keep a single container; never change key */
+        /* @ts-ignore — react-leaflet forwards Leaflet Map instance to this callback ref */
+        ref={setMap}
         center={defaultCenter}
         zoom={6}
         scrollWheelZoom={false}
@@ -100,21 +115,14 @@ function ClientMap({
         ))}
       </MapContainer>
     );
-  }, [mounted, points, defaultCenter]);
+    // only build once after mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted]);
 
   return (
     <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
       {mapOnce}
     </div>
-  );
-}
-
-// ---------- Page ----------
-export default function ListingsPage() {
-  return (
-    <Suspense fallback={<div className="p-6">Loading…</div>}>
-      <ListingsInner />
-    </Suspense>
   );
 }
 
@@ -125,12 +133,13 @@ function ListingsInner() {
   const [items, setItems] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // filters
   const [q, setQ] = useState('');
   const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
   const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
   const [minBeds,  setMinBeds]  = useState<number | undefined>(undefined);
 
-  // Seed filters from URL
+  // seed filters from URL once
   useEffect(() => {
     const qp  = searchParams?.get('q')   ?? '';
     const mi  = searchParams?.get('min');
@@ -140,9 +149,10 @@ function ListingsInner() {
     if (mi) setMinPrice(Number(mi));
     if (ma) setMaxPrice(Number(ma));
     if (bed) setMinBeds(Number(bed));
-  }, [searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Push filter changes
+  // push filters back to URL (debounced)
   const timerRef = useRef<number | null>(null);
   useEffect(() => {
     if (timerRef.current) window.clearTimeout(timerRef.current);
@@ -152,12 +162,13 @@ function ListingsInner() {
       if (minPrice != null) p.set('min', String(minPrice));
       if (maxPrice != null) p.set('max', String(maxPrice));
       if (minBeds  != null) p.set('beds', String(minBeds));
-      router.replace(`/listings${p.toString() ? `?${p.toString()}` : ''}`);
+      const qs = p.toString();
+      router.replace(`/listings${qs ? `?${qs}` : ''}`);
     }, 250);
     return () => { if (timerRef.current) window.clearTimeout(timerRef.current); };
   }, [q, minPrice, maxPrice, minBeds, router]);
 
-  // Fetch properties
+  // fetch properties
   useEffect(() => {
     let ignore = false;
     const sb = getSupabase();
@@ -169,7 +180,7 @@ function ListingsInner() {
         .limit(60);
 
       if (!ignore) {
-        if (error) console.warn('load properties', error);
+        if (error) console.warn('fetch properties', error);
         setItems((data as RawProperty[]) ?? []);
         setLoading(false);
       }
@@ -177,7 +188,7 @@ function ListingsInner() {
     return () => { ignore = true; };
   }, []);
 
-  // Apply filters
+  // apply filters
   const filtered = useMemo(() => {
     return items.filter(p => {
       const title = p.title ?? '';
@@ -197,7 +208,7 @@ function ListingsInner() {
     });
   }, [items, q, minPrice, maxPrice, minBeds]);
 
-  // Map points
+  // map points + default center
   const points = useMemo(
     () =>
       filtered
@@ -214,7 +225,7 @@ function ListingsInner() {
 
   const defaultCenter: [number, number] = points.length
     ? [points[0].lat, points[0].lng]
-    : [51.5072, -0.1276];
+    : [51.5072, -0.1276]; // London
 
   const clearAll = () => {
     setQ('');
@@ -231,80 +242,82 @@ function ListingsInner() {
       </header>
 
       {/* Filters */}
-      <div className="sticky top-12 md:top-16 z-40 -mx-4 px-4 py-2 md:py-3
+      <div
+        className="sticky top-12 md:top-16 z-40 -mx-4 px-4 py-2 md:py-3
                    bg-white dark:bg-slate-900
                    supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:backdrop-blur
-                   border-b border-slate-200 dark:border-slate-800 shadow-sm">
+                   border-b border-slate-200 dark:border-slate-800 shadow-sm"
+      >
         <div className="grid grid-cols-1 md:grid-cols-5 gap-2 md:gap-3 items-center">
-          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search title or location…" className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm" />
-          <input type="number" inputMode="numeric" placeholder="Min £" value={minPrice ?? ''} onChange={e => setMinPrice(e.target.value ? Number(e.target.value) : undefined)} className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm" />
-          <input type="number" inputMode="numeric" placeholder="Max £" value={maxPrice ?? ''} onChange={e => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)} className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm" />
-          <select value={minBeds ?? ''} onChange={e => setMinBeds(e.target.value ? Number(e.target.value) : undefined)} className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm">
+          <input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="Search title or location…"
+            className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm"
+          />
+          <input
+            type="number"
+            inputMode="numeric"
+            placeholder="Min £"
+            value={minPrice ?? ''}
+            onChange={e => setMinPrice(e.target.value ? Number(e.target.value) : undefined)}
+            className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm"
+          />
+          <input
+            type="number"
+            inputMode="numeric"
+            placeholder="Max £"
+            value={maxPrice ?? ''}
+            onChange={e => setMaxPrice(e.target.value ? Number(e.target.value) : undefined)}
+            className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm"
+          />
+          <select
+            value={minBeds ?? ''}
+            onChange={e => setMinBeds(e.target.value ? Number(e.target.value) : undefined)}
+            className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-2.5 md:px-3 text-[13px] md:text-sm"
+          >
             <option value="">Min beds</option>
             <option value="1">1+ bed</option>
             <option value="2">2+ beds</option>
             <option value="3">3+ beds</option>
             <option value="4">4+ beds</option>
           </select>
-          <button onClick={clearAll} className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 px-2.5 md:px-3 text-[13px] md:text-sm" title="Clear filters">Clear</button>
+
+          <button
+            onClick={clearAll}
+            className="h-9 md:h-10 rounded-md border border-slate-300 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 px-2.5 md:px-3 text-[13px] md:text-sm"
+            title="Clear filters"
+          >
+            Clear
+          </button>
         </div>
       </div>
 
-<<<<<<< HEAD
-      {/* 🗺️ Map */}
-      {points.length > 0 && (
-        <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
-          <MapContainer
-            ref={mapRef as any}           // react-leaflet forwards ref to Leaflet Map
-            style={{ height: 360, width: '100%' }}
-            center={center}
-            zoom={6}
-
-            whenReady={handleMapReady}    // () => void ✔️
-          >
-            <TileLayer
-              attribution="&copy; OpenStreetMap"
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            {points.map(p => (
-              <Marker key={p.id} position={[p.lat, p.lng]}>
-                <Popup>
-                  <div className="text-sm">
-                    <div className="font-semibold">{p.title}</div>
-                    {p.price != null && (
-                      <div className="text-slate-600">£{p.price.toLocaleString()}</div>
-                    )}
-                    <a
-                      href={`/property/${p.id}`}
-                      className="inline-block mt-1 underline text-blue-600 hover:text-blue-700"
-                    >
-                      View details →
-                    </a>
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
-          </MapContainer>
-        </div>
-      )}
-=======
-      {/* Map */}
+      {/* Map (single instance) */}
       <ClientMap points={points} defaultCenter={defaultCenter} />
->>>>>>> e766067 (fix: stable map + ts-ignore)
 
       {/* Cards */}
       <Section>
         <SectionTitle>Latest Properties</SectionTitle>
+
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="animate-pulse rounded-xl border border-slate-200 dark:border-slate-800 p-4 h-48 bg-slate-50 dark:bg-slate-800/40" />
+              <div
+                key={i}
+                className="animate-pulse rounded-xl border border-slate-200 dark:border-slate-800 p-4 h-48 bg-slate-50 dark:bg-slate-800/40"
+              />
             ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-4 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
             <p className="text-slate-600 dark:text-slate-300 mb-2">No properties match the current filters.</p>
-            <button onClick={clearAll} className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500">Clear filters</button>
+            <button
+              onClick={clearAll}
+              className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
+            >
+              Clear filters
+            </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

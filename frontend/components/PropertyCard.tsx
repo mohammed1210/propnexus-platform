@@ -10,7 +10,7 @@ export type PropertyCardProps = {
     id: string;
     title: string;
     location: string;
-    price: number;                 // <- guaranteed number (we coerce upstream)
+    price: number;
     bedrooms?: number | null;
     bathrooms?: number | null;
     yield_percent?: number | null;
@@ -21,16 +21,7 @@ export type PropertyCardProps = {
 };
 
 export default function PropertyCard({ href, property, onSave }: PropertyCardProps) {
-  const {
-    title,
-    location,
-    price,
-    bedrooms,
-    bathrooms,
-    yield_percent,
-    roi_percent,
-    imageurl,
-  } = property;
+  const { title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl } = property;
 
   return (
     <article className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
@@ -45,9 +36,7 @@ export default function PropertyCard({ href, property, onSave }: PropertyCardPro
             style={{ objectFit: 'cover' }}
           />
         ) : (
-          <div className="absolute inset-0 grid place-items-center text-slate-400 text-sm">
-            No image
-          </div>
+          <div className="absolute inset-0 grid place-items-center text-slate-400 text-sm">No image</div>
         )}
       </div>
 
@@ -64,8 +53,7 @@ export default function PropertyCard({ href, property, onSave }: PropertyCardPro
         </div>
 
         <div className="text-sm text-slate-600 dark:text-slate-300">
-          Yield: {yield_percent != null ? `${yield_percent}%` : '—'} · ROI:{' '}
-          {roi_percent != null ? `${roi_percent}%` : '—'}
+          Yield: {yield_percent != null ? `${yield_percent}%` : '—'} · ROI: {roi_percent != null ? `${roi_percent}%` : '—'}
         </div>
 
         {/* Actions */}
@@ -87,19 +75,6 @@ export default function PropertyCard({ href, property, onSave }: PropertyCardPro
           ) : null}
         </div>
       </div>
-<<<<<<< HEAD
-    </>
-  );
-
-  // Keep the whole card clickable when we have an id; otherwise render a plain div
-  return href ? (
-    <Link href={href} className={styles.card} prefetch aria-label={property.title}>
-      {CardInner}
-    </Link>
-  ) : (
-    <div className={styles.card} aria-label={property.title}>{CardInner}</div>
-=======
     </article>
->>>>>>> e766067 (fix: stable map + ts-ignore)
   );
 }

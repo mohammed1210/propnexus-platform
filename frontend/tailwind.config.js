@@ -1,9 +1,20 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [],
+  content: [
+    "./src/**/*.{js,ts,jsx,tsx}",
+    "./components/**/*.{js,ts,jsx,tsx}",
+    "./app/**/*.{js,ts,jsx,tsx}"
+  ],
+  darkMode: ["class", '[data-theme="dark"]'],
   theme: {
-    extend: {},
+    extend: {
+      container: { center: true, padding: "1rem" },
+      fontFamily: {
+        sans: [
+          'ui-sans-serif','system-ui','Segoe UI','Tahoma','Geneva','Verdana','sans-serif'
+        ],
+      },
+    },
   },
   plugins: [],
-}
-
+};
