@@ -227,6 +227,30 @@ function ListingsInner() {
     ? [points[0].lat, points[0].lng]
     : [51.5072, -0.1276]; // London
 
+  // Fit-to-bounds logic via ref (works with whenReady: () => void)
+  const mapRef = useRef<LeafletMap | null>(null);
+
+  const fitToPoints = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
+    if (!pts.length) return;
+    const bounds: LatLngBoundsExpression = pts.map(p => [p.lat, p.lng]) as LatLngBoundsExpression;
+    m.fitBounds(bounds, { padding: [24, 24] });
+  };
+
+  const handleMapReady = () => {
+    const map = mapRef.current;
+    if (map) fitToPoints(map, points);
+  };
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (points.length) {
+      fitToPoints(map, points);
+    } else {
+      map.setView(center, 6);
+    }
+  }, [points, center]);
+
   const clearAll = () => {
     setQ('');
     setMinPrice(undefined);

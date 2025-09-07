@@ -129,7 +129,9 @@ export default function AnalyticsPage() {
 
         <Section>
           <SectionTitle>Recent Saved Deals</SectionTitle>
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
+
+          {/* Sticky header needs a vertically scrollable container */}
+          <div className="overflow-x-auto overflow-y-auto max-h-[420px] rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 sticky top-0">
                 <tr>
@@ -138,12 +140,27 @@ export default function AnalyticsPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td className="p-3 text-slate-500" colSpan={6}>Loading…</td></tr>
+                  <tr>
+                    <Td className="p-3 text-neutral-500" colSpan={6}>
+                      Loading…
+                    </Td>
+                  </tr>
                 ) : deals.length === 0 ? (
-                  <tr><td className="p-3 text-slate-500" colSpan={6}>No saved deals yet.</td></tr>
+                  <tr>
+                    <Td className="p-3 text-neutral-500" colSpan={6}>
+                      No saved deals yet.
+                    </Td>
+                  </tr>
                 ) : (
                   deals.slice(-8).reverse().map((d) => (
-                    <tr key={d.id} className="border-t">
+                    <tr
+                      key={d.id}
+                      className={[
+                        'border-t border-neutral-200 dark:border-neutral-800',
+                        'odd:bg-white even:bg-slate-50/40 dark:odd:bg-neutral-900 dark:even:bg-neutral-900/60',
+                        'hover:bg-slate-50 dark:hover:bg-neutral-800/40 transition-colors',
+                      ].join(' ')}
+                    >
                       <Td>{d.title ?? '—'}</Td>
                       <Td>{d.location ?? '—'}</Td>
                       <Td>£{formatGBP(num(d.price))}</Td>
