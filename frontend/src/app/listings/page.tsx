@@ -12,12 +12,25 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
 
-// react-leaflet (client-only) — use an alias to avoid clashing with route `dynamic`
-const MapContainer = nextDynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
-const TileLayer    = nextDynamic(() => import('react-leaflet').then(m => m.TileLayer),    { ssr: false });
-const Marker       = nextDynamic(() => import('react-leaflet').then(m => m.Marker),       { ssr: false });
-const Popup        = nextDynamic(() => import('react-leaflet').then(m => m.Popup),        { ssr: false });
+// --- react-leaflet (client-only) --------------------------------------------
+const MapContainer = nextDynamic(
+  () => import('react-leaflet').then(m => m.MapContainer),
+  { ssr: false }
+);
+const TileLayer = nextDynamic(
+  () => import('react-leaflet').then(m => m.TileLayer),
+  { ssr: false }
+);
+const Marker = nextDynamic(
+  () => import('react-leaflet').then(m => m.Marker),
+  { ssr: false }
+);
+const Popup = nextDynamic(
+  () => import('react-leaflet').then(m => m.Popup),
+  { ssr: false }
+);
 
+// --- Types from DB -----------------------------------------------------------
 type RawProperty = {
   id: string | null;
   title: string | null;
@@ -32,6 +45,7 @@ type RawProperty = {
   longitude?: number | null;
 };
 
+// --- Page (wrapped so we can use useSearchParams) ----------------------------
 export default function ListingsPage() {
   return (
     <Suspense fallback={<div className="p-6">Loading…</div>}>
@@ -40,9 +54,9 @@ export default function ListingsPage() {
   );
 }
 
-/* -------------------------
-   Map rendered ONCE
-   ------------------------- */
+/* =============================================================================
+   Leaflet Map — single container, never double-initializes
+   ========================================================================== */
 function ClientMap({
   points,
   defaultCenter,
@@ -50,10 +64,7 @@ function ClientMap({
   points: { id: string; title: string; lat: number; lng: number; price?: number }[];
   defaultCenter: [number, number];
 }) {
-  const [mounted, setMounted] = useState(false);
   const mapRef = useRef<LeafletMap | null>(null);
-
-  useEffect(() => setMounted(true), []);
 
   const fitToPoints = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return;
@@ -61,15 +72,26 @@ function ClientMap({
     m.fitBounds(bounds, { padding: [24, 24] });
   };
 
-  // react-leaflet forwards Leaflet Map instance to this callback ref
+  // react-leaflet forwards the Leaflet Map instance into this callback ref
   const setMap = (instance: LeafletMap | null) => {
-    mapRef.current = instance;
     if (!instance) return;
+
+    // If React ever hands us a different instance, tear down the old one first
+    if (mapRef.current && mapRef.current !== instance) {
+      try {
+        mapRef.current.remove();
+      } catch {
+        /* ignore */
+      }
+    }
+
+    mapRef.current = instance;
+
     if (points.length) fitToPoints(instance, points);
     else instance.setView(defaultCenter, 6);
   };
 
-  // update view when points change (keep one MapContainer)
+  // Update view when points change (without remounting the container)
   useEffect(() => {
     const m = mapRef.current;
     if (!m) return;
@@ -78,13 +100,11 @@ function ClientMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points.map(p => `${p.lat},${p.lng}`).join('|')]);
 
-  // create MapContainer exactly once after mount
-  const mapOnce = useMemo(() => {
-    if (!mounted) return null;
-    return (
+  return (
+    <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
       <MapContainer
-        /* keep a single container; never change key */
-        /* @ts-ignore — react-leaflet forwards Leaflet Map instance to this callback ref */
+        key="main-map" // stable key → one container only
+        /* @ts-ignore react-leaflet sets this with the Leaflet Map instance */
         ref={setMap}
         center={defaultCenter}
         zoom={6}
@@ -95,6 +115,7 @@ function ClientMap({
           attribution="&copy; OpenStreetMap"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+
         {points.map(p => (
           <Marker key={p.id} position={[p.lat, p.lng]}>
             <Popup>
@@ -114,18 +135,13 @@ function ClientMap({
           </Marker>
         ))}
       </MapContainer>
-    );
-    // only build once after mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted]);
-
-  return (
-    <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
-      {mapOnce}
     </div>
   );
 }
 
+/* =============================================================================
+   Listings page content
+   ========================================================================== */
 function ListingsInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -137,13 +153,13 @@ function ListingsInner() {
   const [q, setQ] = useState('');
   const [minPrice, setMinPrice] = useState<number | undefined>(undefined);
   const [maxPrice, setMaxPrice] = useState<number | undefined>(undefined);
-  const [minBeds,  setMinBeds]  = useState<number | undefined>(undefined);
+  const [minBeds, setMinBeds] = useState<number | undefined>(undefined);
 
   // seed filters from URL once
   useEffect(() => {
-    const qp  = searchParams?.get('q')   ?? '';
-    const mi  = searchParams?.get('min');
-    const ma  = searchParams?.get('max');
+    const qp = searchParams?.get('q') ?? '';
+    const mi = searchParams?.get('min');
+    const ma = searchParams?.get('max');
     const bed = searchParams?.get('beds');
     if (qp) setQ(qp);
     if (mi) setMinPrice(Number(mi));
@@ -161,11 +177,13 @@ function ListingsInner() {
       if (q.trim()) p.set('q', q.trim());
       if (minPrice != null) p.set('min', String(minPrice));
       if (maxPrice != null) p.set('max', String(maxPrice));
-      if (minBeds  != null) p.set('beds', String(minBeds));
+      if (minBeds != null) p.set('beds', String(minBeds));
       const qs = p.toString();
       router.replace(`/listings${qs ? `?${qs}` : ''}`);
     }, 250);
-    return () => { if (timerRef.current) window.clearTimeout(timerRef.current); };
+    return () => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+    };
   }, [q, minPrice, maxPrice, minBeds, router]);
 
   // fetch properties
@@ -176,7 +194,9 @@ function ListingsInner() {
       setLoading(true);
       const { data, error } = await sb
         .from('properties')
-        .select('id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, latitude, longitude')
+        .select(
+          'id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, latitude, longitude'
+        )
         .limit(60);
 
       if (!ignore) {
@@ -185,17 +205,19 @@ function ListingsInner() {
         setLoading(false);
       }
     })();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   // apply filters
   const filtered = useMemo(() => {
     return items.filter(p => {
       const title = p.title ?? '';
-      const loc   = p.location ?? '';
+      const loc = p.location ?? '';
       const titleMatch = q
-        ? (title.toLowerCase().includes(q.toLowerCase()) ||
-           loc.toLowerCase().includes(q.toLowerCase()))
+        ? title.toLowerCase().includes(q.toLowerCase()) ||
+          loc.toLowerCase().includes(q.toLowerCase())
         : true;
 
       const price = Number(p.price ?? 0);
@@ -203,7 +225,8 @@ function ListingsInner() {
         (minPrice == null || price >= minPrice) &&
         (maxPrice == null || price <= maxPrice);
 
-      const bedsOK = (minBeds == null || (p.bedrooms ?? 0) >= minBeds);
+      const bedsOK = minBeds == null || (p.bedrooms ?? 0) >= minBeds;
+
       return titleMatch && priceOK && bedsOK;
     });
   }, [items, q, minPrice, maxPrice, minBeds]);
@@ -265,9 +288,9 @@ function ListingsInner() {
         <p className="text-slate-600">Fresh opportunities from the feed.</p>
       </header>
 
-      {/* Filters */}
+      {/* Sticky filters (ensures content doesn't bleed underneath) */}
       <div
-        className="sticky top-12 md:top-16 z-40 -mx-4 px-4 py-2 md:py-3
+        className="sticky top-12 md:top-16 z-50 -mx-4 px-4 py-2 md:py-3
                    bg-white dark:bg-slate-900
                    supports-[backdrop-filter]:bg-white/80 supports-[backdrop-filter]:backdrop-blur
                    border-b border-slate-200 dark:border-slate-800 shadow-sm"
@@ -335,7 +358,9 @@ function ListingsInner() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-4 rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40">
-            <p className="text-slate-600 dark:text-slate-300 mb-2">No properties match the current filters.</p>
+            <p className="text-slate-600 dark:text-slate-300 mb-2">
+              No properties match the current filters.
+            </p>
             <button
               onClick={clearAll}
               className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-500"
