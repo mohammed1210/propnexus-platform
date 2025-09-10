@@ -2,7 +2,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import nextDynamic from 'next/dynamic';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
@@ -13,22 +13,10 @@ import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
 
 // --- react-leaflet (client-only) --------------------------------------------
-const MapContainer = nextDynamic(
-  () => import('react-leaflet').then(m => m.MapContainer),
-  { ssr: false }
-);
-const TileLayer = nextDynamic(
-  () => import('react-leaflet').then(m => m.TileLayer),
-  { ssr: false }
-);
-const Marker = nextDynamic(
-  () => import('react-leaflet').then(m => m.Marker),
-  { ssr: false }
-);
-const Popup = nextDynamic(
-  () => import('react-leaflet').then(m => m.Popup),
-  { ssr: false }
-);
+const MapContainer = nextDynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
+const TileLayer    = nextDynamic(() => import('react-leaflet').then(m => m.TileLayer),    { ssr: false });
+const Marker       = nextDynamic(() => import('react-leaflet').then(m => m.Marker),       { ssr: false });
+const Popup        = nextDynamic(() => import('react-leaflet').then(m => m.Popup),        { ssr: false });
 
 // --- Types from DB -----------------------------------------------------------
 type RawProperty = {
@@ -45,7 +33,7 @@ type RawProperty = {
   longitude?: number | null;
 };
 
-// --- Page (wrapped so we can use useSearchParams) ----------------------------
+// --- Page (Suspense wrapper so we can use useSearchParams safely) ------------
 export default function ListingsPage() {
   return (
     <Suspense fallback={<div className="p-6">Loading…</div>}>
@@ -55,7 +43,7 @@ export default function ListingsPage() {
 }
 
 /* =============================================================================
-   Leaflet Map — single container, never double-initializes
+   Leaflet Map — create ONE container after mount; drive via instance updates
    ========================================================================== */
 function ClientMap({
   points,
@@ -64,7 +52,10 @@ function ClientMap({
   points: { id: string; title: string; lat: number; lng: number; price?: number }[];
   defaultCenter: [number, number];
 }) {
+  const [mounted, setMounted] = useState(false);
   const mapRef = useRef<LeafletMap | null>(null);
+
+  useEffect(() => setMounted(true), []);
 
   const fitToPoints = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return;
@@ -72,26 +63,15 @@ function ClientMap({
     m.fitBounds(bounds, { padding: [24, 24] });
   };
 
-  // react-leaflet forwards the Leaflet Map instance into this callback ref
+  // react-leaflet forwards the Leaflet Map instance to this callback ref
   const setMap = (instance: LeafletMap | null) => {
     if (!instance) return;
-
-    // If React ever hands us a different instance, tear down the old one first
-    if (mapRef.current && mapRef.current !== instance) {
-      try {
-        mapRef.current.remove();
-      } catch {
-        /* ignore */
-      }
-    }
-
     mapRef.current = instance;
-
     if (points.length) fitToPoints(instance, points);
     else instance.setView(defaultCenter, 6);
   };
 
-  // Update view when points change (without remounting the container)
+  // Drive the map when data changes (do NOT recreate MapContainer)
   useEffect(() => {
     const m = mapRef.current;
     if (!m) return;
@@ -100,11 +80,13 @@ function ClientMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points.map(p => `${p.lat},${p.lng}`).join('|')]);
 
-  return (
-    <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+  // Create MapContainer exactly once after mount
+  const mapOnce = useMemo(() => {
+    if (!mounted) return null;
+    return (
       <MapContainer
-        key="main-map" // stable key → one container only
-        /* @ts-ignore react-leaflet sets this with the Leaflet Map instance */
+        /* keep a single container; never change key */
+        /* @ts-ignore — react-leaflet forwards the Leaflet Map instance to this callback ref */
         ref={setMap}
         center={defaultCenter}
         zoom={6}
@@ -115,7 +97,6 @@ function ClientMap({
           attribution="&copy; OpenStreetMap"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-
         {points.map(p => (
           <Marker key={p.id} position={[p.lat, p.lng]}>
             <Popup>
@@ -135,6 +116,14 @@ function ClientMap({
           </Marker>
         ))}
       </MapContainer>
+    );
+    // only build once after mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted]);
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+      {mapOnce}
     </div>
   );
 }
@@ -157,9 +146,9 @@ function ListingsInner() {
 
   // seed filters from URL once
   useEffect(() => {
-    const qp = searchParams?.get('q') ?? '';
-    const mi = searchParams?.get('min');
-    const ma = searchParams?.get('max');
+    const qp  = searchParams?.get('q') ?? '';
+    const mi  = searchParams?.get('min');
+    const ma  = searchParams?.get('max');
     const bed = searchParams?.get('beds');
     if (qp) setQ(qp);
     if (mi) setMinPrice(Number(mi));
@@ -177,13 +166,11 @@ function ListingsInner() {
       if (q.trim()) p.set('q', q.trim());
       if (minPrice != null) p.set('min', String(minPrice));
       if (maxPrice != null) p.set('max', String(maxPrice));
-      if (minBeds != null) p.set('beds', String(minBeds));
+      if (minBeds  != null) p.set('beds', String(minBeds));
       const qs = p.toString();
       router.replace(`/listings${qs ? `?${qs}` : ''}`);
     }, 250);
-    return () => {
-      if (timerRef.current) window.clearTimeout(timerRef.current);
-    };
+    return () => { if (timerRef.current) window.clearTimeout(timerRef.current); };
   }, [q, minPrice, maxPrice, minBeds, router]);
 
   // fetch properties
@@ -194,9 +181,7 @@ function ListingsInner() {
       setLoading(true);
       const { data, error } = await sb
         .from('properties')
-        .select(
-          'id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, latitude, longitude'
-        )
+        .select('id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, latitude, longitude')
         .limit(60);
 
       if (!ignore) {
@@ -205,19 +190,17 @@ function ListingsInner() {
         setLoading(false);
       }
     })();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, []);
 
   // apply filters
   const filtered = useMemo(() => {
     return items.filter(p => {
       const title = p.title ?? '';
-      const loc = p.location ?? '';
+      const loc   = p.location ?? '';
       const titleMatch = q
-        ? title.toLowerCase().includes(q.toLowerCase()) ||
-          loc.toLowerCase().includes(q.toLowerCase())
+        ? (title.toLowerCase().includes(q.toLowerCase()) ||
+           loc.toLowerCase().includes(q.toLowerCase()))
         : true;
 
       const price = Number(p.price ?? 0);
@@ -225,7 +208,7 @@ function ListingsInner() {
         (minPrice == null || price >= minPrice) &&
         (maxPrice == null || price <= maxPrice);
 
-      const bedsOK = minBeds == null || (p.bedrooms ?? 0) >= minBeds;
+      const bedsOK = (minBeds == null || (p.bedrooms ?? 0) >= minBeds);
 
       return titleMatch && priceOK && bedsOK;
     });
@@ -250,36 +233,34 @@ function ListingsInner() {
     ? [points[0].lat, points[0].lng]
     : [51.5072, -0.1276]; // London
 
-  // Fit-to-bounds logic via ref (works with whenReady: () => void)
-  const mapRef = useRef<LeafletMap | null>(null);
-
-  const fitToPoints = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
-    if (!pts.length) return;
-    const bounds: LatLngBoundsExpression = pts.map(p => [p.lat, p.lng]) as LatLngBoundsExpression;
-    m.fitBounds(bounds, { padding: [24, 24] });
-  };
-
-  const handleMapReady = () => {
-    const map = mapRef.current;
-    if (map) fitToPoints(map, points);
-  };
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    if (points.length) {
-      fitToPoints(map, points);
-    } else {
-      map.setView(center, 6);
-    }
-  }, [points, center]);
-
   const clearAll = () => {
     setQ('');
     setMinPrice(undefined);
     setMaxPrice(undefined);
     setMinBeds(undefined);
   };
+
+  // Save handler (enables "Save Deal" in PropertyCard)
+  const onSave = useCallback(async (prop: {
+    id: string; title?: string | null; location?: string | null;
+    price?: number | null; yield_percent?: number | null; roi_percent?: number | null;
+  }) => {
+    try {
+      const sb = getSupabase();
+      await sb.from('saved_deals').insert({
+        property_id: prop.id,
+        title: prop.title ?? null,
+        location: prop.location ?? null,
+        price: prop.price ?? null,
+        yield_percent: prop.yield_percent ?? null,
+        roi_percent: prop.roi_percent ?? null,
+      });
+      // (Optional) You could add local feedback here
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('save deal failed', e);
+    }
+  }, []);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
@@ -288,7 +269,7 @@ function ListingsInner() {
         <p className="text-slate-600">Fresh opportunities from the feed.</p>
       </header>
 
-      {/* Sticky filters (ensures content doesn't bleed underneath) */}
+      {/* Sticky filters */}
       <div
         className="sticky top-12 md:top-16 z-50 -mx-4 px-4 py-2 md:py-3
                    bg-white dark:bg-slate-900
@@ -370,22 +351,36 @@ function ListingsInner() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((p, i) => (
-              <PropertyCard
-                key={p.id ?? `card-${i}`}
-                property={{
-                  id: String(p.id ?? `card-${i}`),
-                  title: p.title ?? '',
-                  location: p.location ?? '',
-                  price: Number(p.price ?? 0),
-                  bedrooms: p.bedrooms ?? null,
-                  bathrooms: p.bathrooms ?? null,
-                  yield_percent: p.yield_percent ?? null,
-                  roi_percent: p.roi_percent ?? null,
-                  imageurl: p.imageurl ?? null,
-                }}
-              />
-            ))}
+            {filtered.map((p, i) => {
+              const id = String(p.id ?? `card-${i}`);
+              return (
+                <PropertyCard
+                  key={id}
+                  property={{
+                    id,
+                    title: p.title ?? '',
+                    location: p.location ?? '',
+                    price: Number(p.price ?? 0),
+                    bedrooms: p.bedrooms ?? null,
+                    bathrooms: p.bathrooms ?? null,
+                    yield_percent: p.yield_percent ?? null,
+                    roi_percent: p.roi_percent ?? null,
+                    imageurl: p.imageurl ?? null,
+                  }}
+                  href={`/property/${id}`}          // ✅ enables "View Details" button
+                  onSave={() =>
+                    onSave({
+                      id,
+                      title: p.title,
+                      location: p.location,
+                      price: p.price ?? null,
+                      yield_percent: p.yield_percent ?? null,
+                      roi_percent: p.roi_percent ?? null,
+                    })
+                  }                                  // ✅ enables "Save Deal" button
+                />
+              );
+            })}
           </div>
         )}
       </Section>

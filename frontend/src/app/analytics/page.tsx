@@ -1,13 +1,19 @@
-// frontend/src/app/analytics/page.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import type React from 'react';
 import Link from 'next/link';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import { Line } from 'react-chartjs-2';
 import {
-  Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend,
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
 } from 'chart.js';
 import { getSupabase } from '@/lib/supabaseClient';
 
@@ -31,19 +37,22 @@ export default function AnalyticsPage() {
   useEffect(() => {
     let ignore = false;
     const sb = getSupabase();
-
     (async () => {
       setLoading(true);
-      const { data, error } = await sb.from('saved_deals').select('*').order('created_at', { ascending: false });
+      const { data, error } = await sb
+        .from('saved_deals')
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (!ignore) {
-        if (error) console.warn('load saved_deals', error); // ⬅️ was console.error
+        if (error) console.warn('load saved_deals', error);
         setDeals((data as SavedDeal[]) ?? []);
         setLoading(false);
       }
     })();
-
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const kpis = useMemo(() => {
@@ -107,9 +116,20 @@ export default function AnalyticsPage() {
             <Line
               data={{
                 labels: monthly.labels,
-                datasets: [{ label: 'Saved deals', data: monthly.countSeries, borderWidth: 2, tension: 0.3 }],
+                datasets: [
+                  {
+                    label: 'Saved deals',
+                    data: monthly.countSeries,
+                    borderWidth: 2,
+                    tension: 0.3,
+                  },
+                ],
               }}
-              options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } },
+              }}
             />
           </div>
         </Section>
@@ -120,9 +140,15 @@ export default function AnalyticsPage() {
             <Line
               data={{
                 labels: monthly.labels,
-                datasets: [{ label: 'Avg yield %', data: monthly.yieldSeries, borderWidth: 2, tension: 0.3 }],
+                datasets: [
+                  { label: 'Avg yield %', data: monthly.yieldSeries, borderWidth: 2, tension: 0.3 },
+                ],
               }}
-              options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, suggestedMax: 12 } } }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, suggestedMax: 12 } },
+              }}
             />
           </div>
         </Section>
@@ -130,12 +156,16 @@ export default function AnalyticsPage() {
         <Section>
           <SectionTitle>Recent Saved Deals</SectionTitle>
 
-          {/* Sticky header needs a vertically scrollable container */}
           <div className="overflow-x-auto overflow-y-auto max-h-[420px] rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 sticky top-0">
                 <tr>
-                  <Th>Title</Th><Th>Location</Th><Th>Price</Th><Th>Yield</Th><Th>ROI</Th><Th>Date</Th>
+                  <Th>Title</Th>
+                  <Th>Location</Th>
+                  <Th>Price</Th>
+                  <Th>Yield</Th>
+                  <Th>ROI</Th>
+                  <Th>Date</Th>
                 </tr>
               </thead>
               <tbody>
@@ -152,23 +182,26 @@ export default function AnalyticsPage() {
                     </Td>
                   </tr>
                 ) : (
-                  deals.slice(-8).reverse().map((d) => (
-                    <tr
-                      key={d.id}
-                      className={[
-                        'border-t border-neutral-200 dark:border-neutral-800',
-                        'odd:bg-white even:bg-slate-50/40 dark:odd:bg-neutral-900 dark:even:bg-neutral-900/60',
-                        'hover:bg-slate-50 dark:hover:bg-neutral-800/40 transition-colors',
-                      ].join(' ')}
-                    >
-                      <Td>{d.title ?? '—'}</Td>
-                      <Td>{d.location ?? '—'}</Td>
-                      <Td>£{formatGBP(num(d.price))}</Td>
-                      <Td>{valOrDash(d.yield_percent)}%</Td>
-                      <Td>{valOrDash(d.roi_percent)}%</Td>
-                      <Td>{formatDate(d.created_at)}</Td>
-                    </tr>
-                  ))
+                  deals
+                    .slice(-8)
+                    .reverse()
+                    .map((d) => (
+                      <tr
+                        key={d.id}
+                        className={[
+                          'border-t border-neutral-200 dark:border-neutral-800',
+                          'odd:bg-white even:bg-slate-50/40 dark:odd:bg-neutral-900 dark:even:bg-neutral-900/60',
+                          'hover:bg-slate-50 dark:hover:bg-neutral-800/40 transition-colors',
+                        ].join(' ')}
+                      >
+                        <Td>{d.title ?? '—'}</Td>
+                        <Td>{d.location ?? '—'}</Td>
+                        <Td>£{formatGBP(num(d.price))}</Td>
+                        <Td>{valOrDash(d.yield_percent)}%</Td>
+                        <Td>{valOrDash(d.roi_percent)}%</Td>
+                        <Td>{formatDate(d.created_at)}</Td>
+                      </tr>
+                    ))
                 )}
               </tbody>
             </table>
@@ -179,22 +212,72 @@ export default function AnalyticsPage() {
   );
 }
 
-function NavItem({ href, label, emoji, active = false }:{href:string;label:string;emoji:string;active?:boolean}) {
-  return <Link href={href} className={`block px-3 py-2 rounded-md text-sm ${active ? 'bg-white/10' : 'hover:bg-white/10'}`}>
-    <span className="mr-2">{emoji}</span>{label}
-  </Link>;
+function NavItem({
+  href,
+  label,
+  emoji,
+  active = false,
+}: {
+  href: string;
+  label: string;
+  emoji: string;
+  active?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`block px-3 py-2 rounded-md text-sm ${
+        active ? 'bg-white/10' : 'hover:bg-white/10'
+      }`}
+    >
+      <span className="mr-2">{emoji}</span>
+      {label}
+    </Link>
+  );
 }
-function KpiCard({ label, value }:{label:string;value:string|number}) {
-  return <div className="rounded-xl border border-slate-200 bg-white p-4">
-    <div className="text-xs text-slate-500">{label}</div>
-    <div className="text-xl font-semibold mt-1">{value}</div>
-  </div>;
+
+function KpiCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="text-xs text-slate-500">{label}</div>
+      <div className="text-xl font-semibold mt-1">{value}</div>
+    </div>
+  );
 }
-function Th({ children }:{children: React.ReactNode}) { return <th className="text-left font-medium px-3 py-2 text-slate-600">{children}</th>; }
-function Td({ children }:{children: React.ReactNode}) { return <td className="px-3 py-2">{children}</td>; }
-function num(n: unknown){ return Number(n ?? 0) || 0; }
-function round(n:number){ return Number(n.toFixed(2)); }
-function avg(list:number[]){ const arr = list.filter((x)=>Number.isFinite(x)); return arr.length ? round(arr.reduce((a,b)=>a+b,0)/arr.length) : 0; }
-function valOrDash(n?: number | null){ return n==null ? '–' : n; }
-function formatGBP(n:number){ return n.toLocaleString(); }
-function formatDate(s?:string|null){ if(!s) return '—'; try{ return new Date(s).toLocaleDateString(); } catch { return '—'; } }
+
+/** ---------- Typed table cells (allow className/colSpan, etc.) ---------- */
+type ThProps = React.ThHTMLAttributes<HTMLTableCellElement>;
+const Th = ({ className, ...rest }: ThProps) => (
+  <th className={`text-left font-medium px-3 py-2 text-slate-600 ${className ?? ''}`} {...rest} />
+);
+
+type TdProps = React.TdHTMLAttributes<HTMLTableCellElement>;
+const Td = ({ className, ...rest }: TdProps) => (
+  <td className={`px-3 py-2 ${className ?? ''}`} {...rest} />
+);
+
+/** ---------- Small helpers ---------- */
+function num(n: unknown) {
+  return Number(n ?? 0) || 0;
+}
+function round(n: number) {
+  return Number(n.toFixed(2));
+}
+function avg(list: number[]) {
+  const arr = list.filter((x) => Number.isFinite(x));
+  return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+}
+function valOrDash(n?: number | null) {
+  return n == null ? '–' : n;
+}
+function formatGBP(n: number) {
+  return n.toLocaleString();
+}
+function formatDate(s?: string | null) {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleDateString();
+  } catch {
+    return '—';
+  }
+}
