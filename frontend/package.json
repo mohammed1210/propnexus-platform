@@ -11,7 +11,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "ingest:csv": "ts-node scripts/ingest-csv.ts data/listings.sample.csv"
   },
   "dependencies": {
     "@pdf-lib/standard-fonts": "^1.0.0",
