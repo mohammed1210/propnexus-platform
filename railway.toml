@@ -1,7 +1,21 @@
-[services.ingest-worker]
-root = "/"
-build = "npm ci --omit=dev"
-start = "bash -lc \"./scripts/cron-ingest.sh\""
+# railway.toml
 
-[services.ingest-worker.cron]
-schedule = "0 6 * * *"
+[build]
+# We don’t need a Dockerfile — force Railway to use Nixpacks with Node
+builder = "NIXPACKS"
+
+[deploy]
+# Don’t run a webserver — just our cron ingestion worker
+startCommand = "bash -lc './cron-ingest.sh'"
+
+[cron]
+# Run ingestion every day at 3am UTC
+# You can adjust timing (e.g. every 6 hours: "0 */6 * * *")
+schedule = "0 3 * * *"
+
+# Which script to run
+command = "npx tsx --env-file .env.ingest scripts/ingest-csv.ts data/listings.sample.csv --source=rightmove"
+
+[env]
+# Railway will inject these automatically if you’ve set them in project settings
+NODE_ENV = "production"
