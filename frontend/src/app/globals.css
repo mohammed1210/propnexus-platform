@@ -1,8 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Your custom variables + overrides below */
 :root {
-  /* Theme tokens */
   --page-bg: #f8fafc;
   --text: #1e293b;
-
   --card-bg: #ffffff;
   --text-muted: #6b7280;
   --border: #e5e7eb;

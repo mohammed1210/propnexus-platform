@@ -21,6 +21,7 @@ class SummaryRequest(BaseModel):
     investmentType: str | None = None
     propertyType: str | None = None
 
+
 @router.post("/generate-summary")
 async def generate_summary(req: SummaryRequest):
     try:
@@ -50,6 +51,7 @@ async def generate_summary(req: SummaryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ✅ Strategy schema
 class StrategyRequest(BaseModel):
     price: float
@@ -58,6 +60,7 @@ class StrategyRequest(BaseModel):
     location: str
     property_type: str | None = None
     description: str | None = None
+
 
 @router.post("/generate-strategies")
 async def generate_strategies(req: StrategyRequest):
@@ -92,9 +95,11 @@ async def generate_strategies(req: StrategyRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # ✅ Investment summary freeform prompt
 class InvestmentPrompt(BaseModel):
     prompt: str
+
 
 @router.post("/investment-summary")
 async def investment_summary(req: InvestmentPrompt):

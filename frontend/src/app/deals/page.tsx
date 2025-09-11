@@ -1,4 +1,3 @@
-// src/app/deals/page.tsx
 'use client';
 export const dynamic = 'force-dynamic';
 
@@ -29,19 +28,22 @@ export default function SavedDealsPage() {
   useEffect(() => {
     let ignore = false;
     let sb: ReturnType<typeof getSupabase>;
-    try { sb = getSupabase(); } catch { return; }
+    try {
+      sb = getSupabase();
+    } catch {
+      return;
+    }
 
     (async () => {
       setLoading(true);
       const { data, error } = await sb
         .from('saved_deals')
-        .select(
-          'id, property_id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, created_at'
-        )
+        .select('id, property_id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, created_at')
         .order('created_at', { ascending: false });
 
+      // …inside the useEffect where we load saved_deals…
       if (!ignore) {
-        if (error) console.error('load saved_deals', error);
+        if (error) console.warn('load saved_deals', error); // ⬅️ was console.error
         setDeals((data as SavedDeal[]) ?? []);
         setLoading(false);
       }
@@ -70,10 +72,10 @@ export default function SavedDealsPage() {
               <PropertyCard
                 key={d.id}
                 property={{
-                  id: d.property_id ?? d.id,
+                  id: String(d.property_id ?? d.id),
                   title: d.title ?? '',
                   location: d.location ?? '',
-                  price: d.price ?? null,
+                  price: Number(d.price ?? 0),
                   bedrooms: d.bedrooms ?? null,
                   bathrooms: d.bathrooms ?? null,
                   yield_percent: d.yield_percent ?? null,

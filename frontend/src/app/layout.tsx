@@ -7,11 +7,9 @@ import HeaderClient from '@/components/HeaderClient';
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        <div className="main-wrapper">
-          <HeaderClient />
-          {children}
-        </div>
+      <body className="min-h-screen">
+        <HeaderClient />
+        <div className="main-wrapper">{children}</div>
       </body>
     </html>
   );

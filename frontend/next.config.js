@@ -4,11 +4,17 @@ const path = require('path');
 const nextConfig = {
   reactStrictMode: true,
 
-  // ✅ Allow remote images (prevents 400s from Next/Image optimizer)
+  // ✅ Remote image handling (fixes Next/Image 400 errors)
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '**' },
-      { protocol: 'http', hostname: '**' },
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: '**',
+      },
     ],
   },
 
@@ -16,10 +22,10 @@ const nextConfig = {
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
       '@': path.resolve(__dirname, 'src'),
-      '@components': path.resolve(__dirname, 'components'),
-      '@details': path.resolve(__dirname, 'components/property_details'),
-      '@map': path.resolve(__dirname, 'src/app'),
-      '@lib': path.resolve(__dirname, 'src/lib'),
+      '@components': path.resolve(__dirname, 'frontend/components'),
+      '@details': path.resolve(__dirname, 'frontend/components/property-details'),
+      '@map': path.resolve(__dirname, 'frontend/src/app'),
+      '@lib': path.resolve(__dirname, 'frontend/src/lib'),
     };
     return config;
   },
