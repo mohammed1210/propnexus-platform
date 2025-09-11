@@ -1,0 +1,7 @@
+[services.ingest-worker]
+root = "/"
+build = "npm ci --omit=dev"
+start = "bash -lc \"./scripts/cron-ingest.sh\""
+
+[services.ingest-worker.cron]
+schedule = "0 6 * * *"
