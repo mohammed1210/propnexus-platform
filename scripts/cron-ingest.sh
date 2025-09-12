@@ -4,11 +4,13 @@ set -euo pipefail
 echo "[Cron] Starting ingestion…"
 node -v && npm -v
 
-# Ensure Railway env vars are present (these are set on your service)
+# Ensure Railway envs are present
 : "${SUPABASE_URL:?missing SUPABASE_URL}"
 : "${SUPABASE_SERVICE_ROLE_KEY:?missing SUPABASE_SERVICE_ROLE_KEY}"
 
-# Run the ingest (CSV path is inside the repo)
-npm run ingest:csv --silent
+# Run the ingest (prints command + output)
+set -x
+npm run ingest:csv
+set +x
 
 echo "[Cron] Done ✅"
