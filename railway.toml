@@ -1,7 +1,7 @@
 # railway.toml
 
 [build]
-# Force Railway to use Nixpacks (no Dockerfile needed)
+# We don’t need a Dockerfile – force Railway to use Nixpacks
 builder = "NIXPACKS"
 
 [deploy]
@@ -9,10 +9,12 @@ builder = "NIXPACKS"
 startCommand = "bash -lc './scripts/cron-ingest.sh'"
 
 [cron]
-# Run ingestion every day at 03:00 UTC (adjust as you like)
+# Run ingestion every day at 3am UTC
+# You can adjust timing (e.g. every 6 hours: "0 */6 * * *")
 schedule = "0 3 * * *"
-# Call the root package’s script (no .env file in Railway; it uses service vars)
-command = "npm --prefix . run ingest:csv --silent"
+
+# Run the ingest script from the repo root, even if cron executes in /scripts
+command = "npm --prefix .. run ingest:csv"
 
 [env]
 NODE_ENV = "production"
