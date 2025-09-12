@@ -16,6 +16,6 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
-    "ingest:csv": "tsx --env-file .env.ingest scripts/ingest-csv.ts"
+    "ingest:csv": "tsx scripts/ingest-csv.ts data/listings.sample.csv"
   }
 }
