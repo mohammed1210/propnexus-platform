@@ -5,7 +5,7 @@
 builder = "NIXPACKS"
 
 [deploy]
-# Boot the worker by running our cron shell script from repo root
+# Don’t run a webserver – just our cron ingestion worker
 startCommand = "bash -lc './scripts/cron-ingest.sh'"
 
 [cron]
