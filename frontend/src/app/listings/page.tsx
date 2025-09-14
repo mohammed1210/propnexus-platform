@@ -182,7 +182,7 @@ function ListingsInner() {
       const { data, error } = await sb
         .from('properties')
         .select('id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, latitude, longitude')
-        .limit(60);
+        .range(0, 59);
 
       if (!ignore) {
         if (error) console.warn('fetch properties', error);

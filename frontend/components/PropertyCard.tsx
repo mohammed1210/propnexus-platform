@@ -16,8 +16,11 @@ export type Property = {
 };
 
 export default function PropertyCard({ p }: { p: Property }) {
+  if (!p) return null;
+
   return (
     <article className={styles.card}>
+      {/* Image block with zoom-on-hover */}
       <Link href={`/property/${p.id}`} aria-label={`Open ${p.title}`}>
         <div className={styles.imageWrapper}>
           <FallbackImage
@@ -31,6 +34,7 @@ export default function PropertyCard({ p }: { p: Property }) {
         </div>
       </Link>
 
+      {/* Info block (always visible, not zoomed) */}
       <div className={styles.info}>
         <Link href={`/property/${p.id}`} className={styles.title}>
           {p.title}
@@ -46,12 +50,15 @@ export default function PropertyCard({ p }: { p: Property }) {
         <div className={styles.price}>{fmtGBP(p.price ?? 0)}</div>
 
         <div className={styles.metrics}>
-          <span className={styles.badge}>Yield {fmtPct(p.yield_percent)}</span>{' '}
+          <span className={styles.badge}>Yield {fmtPct(p.yield_percent)}</span>
           <span className={styles.badge}>ROI {fmtPct(p.roi_percent)}</span>
         </div>
 
+        {/* Buttons fixed in their own row */}
         <div className={styles.buttons}>
-          <button className={styles.save} type="button">Save Deal</button>
+          <button className={styles.save} type="button">
+            Save Deal
+          </button>
           <Link className={styles.detailsBtn} href={`/property/${p.id}`}>
             View Details
           </Link>
