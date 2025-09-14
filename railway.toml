@@ -13,7 +13,7 @@ startCommand = "bash -lc './scripts/cron-ingest.sh'"
 # schedule is fine; adjust if you want
 schedule = "0 6 * * *"
 # call the root package script explicitly
-command = "npm --prefix . run ingest:csv"
+command = "npm --prefix . run ingest:live"
 
 [env]
 NODE_ENV = "production"
