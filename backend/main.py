@@ -1,4 +1,20 @@
 # backend/main.py
+
+"""
+Entry point for the PropNexus FastAPI backend.
+
+This module initialises the FastAPI application, configures CORS,
+loads environment variables, sets up the Supabase client and
+registers all route modules. Additional routers for metrics and
+email notifications are included as part of the Sprint‑4
+operationalisation efforts.
+
+The `/` root endpoint returns a simple message. Core property
+endpoints (`/properties` and `/properties/{id}`) expose the
+Supabase‐backed data store. See individual route modules under
+`backend/routes/` for more functionality.
+"""
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -12,7 +28,11 @@ from routes import gpt_routes
 from routes.ai_routes import router as ai_routes
 from routes import area_routes
 from routes import comps_routes
-from routes import scrape_routes   # ✅ unified scraper routes
+from routes import scrape_routes
+
+# New operational routes
+from routes.metrics_routes import router as metrics_router
+from routes.email_routes import router as email_router
 
 # ===============================
 # Env & Supabase client
@@ -31,7 +51,7 @@ if SUPABASE_URL and SUPABASE_KEY:
 # ===============================
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
-# CORS
+# CORS configuration: allow Vercel previews/prod and localhost during dev
 origins = [
     "https://propnexus-platform.vercel.app",
     "https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app",
@@ -55,50 +75,71 @@ app.include_router(gpt_routes.router)
 app.include_router(ai_routes)
 app.include_router(area_routes.router)
 app.include_router(comps_routes.router)
-app.include_router(scrape_routes.router)  # ✅ NEW unified scrape
+app.include_router(scrape_routes.router)  # unified scrape
+
+# Include new operational routers
+app.include_router(metrics_router)
+app.include_router(email_router)
 
 # ===============================
-# Health
+# Root endpoint
 # ===============================
 @app.get("/")
-async def root():
+async def root() -> dict[str, str]:
+    """Simple root endpoint to confirm the API is running."""
     return {"message": "PropNexus backend is running."}
+
 
 # ===============================
 # Properties (Supabase)
 # ===============================
 @app.get("/properties")
 async def get_properties():
+    """Fetch all properties from Supabase."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase env vars not configured")
     response = supabase.table("properties").select("*").execute()
     return response.data
 
+
 @app.get("/properties/{property_id}")
 async def get_property_by_id(property_id: str):
+    """Fetch a single property by its ID."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase env vars not configured")
     try:
-        response = supabase.table("properties").select("*").eq("id", property_id).execute()
+        response = (
+            supabase.table("properties")
+            .select("*")
+            .eq("id", property_id)
+            .execute()
+        )
         if not response.data:
             raise HTTPException(status_code=404, detail="Property not found")
         return response.data[0]
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
 
 # Alias for Next.js fetches (/api/…)
 @app.get("/api/properties/{property_id}")
 async def get_property_by_id_alias(property_id: str):
+    """Alias route for compatibility with Next.js API calls."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase env vars not configured")
     try:
-        response = supabase.table("properties").select("*").eq("id", property_id).execute()
+        response = (
+            supabase.table("properties")
+            .select("*")
+            .eq("id", property_id)
+            .execute()
+        )
         if not response.data:
             raise HTTPException(status_code=404, detail="Property not found")
         return response.data[0]
     except HTTPException:
         raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
