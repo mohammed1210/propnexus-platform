@@ -29,6 +29,8 @@ from routes.ai_routes import router as ai_routes
 from routes import area_routes
 from routes import comps_routes
 from routes import scrape_routes
+from routes import stripe_routes  # billing/paywall
+from routes import digests_routes  # digest emails
 
 # New operational routes
 from routes.metrics_routes import router as metrics_router
