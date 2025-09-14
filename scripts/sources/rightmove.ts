@@ -23,10 +23,10 @@ const MAX_PAGES = Number(process.env.RM_MAX_PAGES ?? '1');
 const DELAY_MS  = Number(process.env.RM_DELAY_MS  ?? '1200');
 
 // ---- Gateway(s) ------------------------------------------------------------
-const ZENROWS = process.env.ZENROWS_API_KEY ? {
-  url: (target: string) =>
-    `https://api.zenrows.com/v1/?apikey=${process.env.ZENROWS_API_KEY}&url=${encodeURIComponent(target)}&premium_proxy=true&js_render=true`,
-} : null;
+// const ZENROWS = process.env.ZENROWS_API_KEY ? {
+//   url: (target: string) =>
+//     `https://api.zenrows.com/v1/?apikey=${process.env.ZENROWS_API_KEY}&url=${encodeURIComponent(target)}&premium_proxy=true&js_render=true`,
+// } : null;
 
 const SCRAPERAPI = process.env.SCRAPERAPI_KEY ? {
   url: (target: string) =>
@@ -38,7 +38,7 @@ const SCRAPINGBEE = process.env.SCRAPINGBEE_KEY ? {
     `https://app.scrapingbee.com/api/v1/?api_key=${process.env.SCRAPINGBEE_KEY}&render_js=true&country_code=gb&url=${encodeURIComponent(target)}`,
 } : null;
 
-const GATEWAY = ZENROWS ?? SCRAPERAPI ?? SCRAPINGBEE ?? null;
+const GATEWAY = SCRAPERAPI ?? SCRAPINGBEE ?? null;
 
 // ---- Fallback headers (no gateway) ----------------------------------------
 const UA =
