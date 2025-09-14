@@ -14,7 +14,6 @@ type PropertyRow = {
   imageurl?: string | null;
   latitude?: number | null;
   longitude?: number | null;
-  // computed/optional fields frontend already understands:
   yield_percent?: number | null;
   roi_percent?: number | null;
 };
@@ -25,32 +24,24 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('❌ Missing Supabase env. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
   process.exit(1);
 }
-const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-});
+const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
-// Collect all RM_SEARCH_* envs dynamically so you can add/remove cities in .env/Railway
-const SEARCHES: { name: string; url: string }[] = Object.entries(process.env)
-  .filter(([k, v]) => k.startsWith('RM_SEARCH_') && typeof v === 'string' && v.length > 0)
-  .map(([k, url]) => ({ name: k, url: url as string }));
+// Which searches to run (discover all RM_SEARCH_* in env)
+const SEARCHES = Object.entries(process.env)
+  .filter(([k, v]) => k.startsWith('RM_SEARCH_') && v && String(v).startsWith('http'))
+  .map(([k, v]) => ({ name: k, url: String(v) }));
+
+function computeDerived(row: PropertyRow): PropertyRow {
+  const estRent = Math.round(row.price * 0.005); // placeholder
+  const yieldPct = row.price ? (estRent * 12) / row.price * 100 : null;
+  return { ...row, yield_percent: yieldPct ? Number(yieldPct.toFixed(1)) : null, roi_percent: null };
+}
 
 async function upsert(rows: PropertyRow[]) {
   if (!rows.length) return { count: 0 };
   const { error } = await sb.from('properties').upsert(rows, { onConflict: 'source,source_id' });
   if (error) throw error;
   return { count: rows.length };
-}
-
-function computeDerived(row: PropertyRow): PropertyRow {
-  // Placeholder: very rough rent proxy; replace with your model later.
-  const estRent = Math.round(row.price * 0.005); // ~0.5% rule
-  const yieldPct = row.price ? (estRent * 12) / row.price * 100 : null;
-
-  return {
-    ...row,
-    yield_percent: yieldPct ? Number(yieldPct.toFixed(1)) : null,
-    roi_percent: null,
-  };
 }
 
 async function run() {
@@ -66,11 +57,9 @@ async function run() {
   for (const s of SEARCHES) {
     console.log(`• Scraping: ${s.name}`);
     try {
-     // inside for (const s of SEARCHES) { ... }
-const items = await scrapeRightmove(s.url);
-// 👇 helpful during bring-up
-console.log(`  scraped ${items.length} cards from ${s.name}`);
-      const rows = items.map<PropertyRow>((i) =>
+      const items = await scrapeRightmove(s.url);
+      console.log(`  scraped ${items.length} cards from ${s.name}`);
+      const rows = items.map<PropertyRow>(i =>
         computeDerived({
           source: i.source,
           source_id: i.source_id,
@@ -84,7 +73,6 @@ console.log(`  scraped ${items.length} cards from ${s.name}`);
           longitude: i.longitude ?? null,
         })
       );
-
       const { count } = await upsert(rows);
       total += count;
       console.log(`  → upserted ${count} rows`);
@@ -96,7 +84,7 @@ console.log(`  scraped ${items.length} cards from ${s.name}`);
   console.log(`[Ingest] Done. Upserted ${total} rows.`);
 }
 
-run().catch((e) => {
+run().catch(e => {
   console.error('Fatal:', e);
   process.exit(1);
 });
