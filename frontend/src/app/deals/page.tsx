@@ -71,7 +71,7 @@ export default function SavedDealsPage() {
             {deals.map((d) => (
               <PropertyCard
                 key={d.id}
-                property={{
+                p={{
                   id: String(d.property_id ?? d.id),
                   title: d.title ?? '',
                   location: d.location ?? '',

@@ -2,7 +2,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import nextDynamic from 'next/dynamic';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
@@ -81,45 +81,44 @@ function ClientMap({
   }, [points.map(p => `${p.lat},${p.lng}`).join('|')]);
 
   // Create MapContainer exactly once after mount
-  const mapOnce = useMemo(() => {
-    if (!mounted) return null;
-    return (
-      <MapContainer
-        /* keep a single container; never change key */
-        /* @ts-ignore — react-leaflet forwards the Leaflet Map instance to this callback ref */
-        ref={setMap}
-        center={defaultCenter}
-        zoom={6}
-        scrollWheelZoom={false}
-        style={{ height: 360, width: '100%' }}
-      >
-        <TileLayer
-          attribution="&copy; OpenStreetMap"
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        {points.map(p => (
-          <Marker key={p.id} position={[p.lat, p.lng]}>
-            <Popup>
-              <div className="text-sm">
-                <div className="font-semibold">{p.title}</div>
-                {p.price != null && (
-                  <div className="text-slate-600">£{p.price.toLocaleString()}</div>
-                )}
-                <a
-                  href={`/property/${p.id}`}
-                  className="inline-block mt-1 underline text-blue-600 hover:text-blue-700"
-                >
-                  View details →
-                </a>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-    );
-    // only build once after mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted]);
+ const mapOnce = useMemo(() => {
+  if (!mounted) return null;
+  return (
+    <MapContainer
+      key="leaflet-map-once"          // 👈 force a fresh container on dev remounts
+      /* @ts-ignore – react-leaflet forwards the instance via ref callback */
+      ref={setMap}
+      center={defaultCenter}
+      zoom={6}
+      scrollWheelZoom={false}
+      style={{ height: 360, width: '100%' }}
+    >
+      <TileLayer
+        attribution="&copy; OpenStreetMap"
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      {points.map(p => (
+        <Marker key={p.id} position={[p.lat, p.lng]}>
+          <Popup>
+            <div className="text-sm">
+              <div className="font-semibold">{p.title}</div>
+              {p.price != null && (
+                <div className="text-slate-600">£{p.price.toLocaleString()}</div>
+              )}
+              <a
+                href={`/property/${p.id}`}
+                className="inline-block mt-1 underline text-blue-600 hover:text-blue-700"
+              >
+                View details →
+              </a>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </MapContainer>
+  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [mounted]); // ← still build only once after mount
 
   return (
     <div className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
@@ -174,24 +173,38 @@ function ListingsInner() {
   }, [q, minPrice, maxPrice, minBeds, router]);
 
   // fetch properties
-  useEffect(() => {
-    let ignore = false;
-    const sb = getSupabase();
-    (async () => {
-      setLoading(true);
-      const { data, error } = await sb
-        .from('properties')
-        .select('id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, latitude, longitude')
-        .limit(60);
+useEffect(() => {
+  let ignore = false;
+  const sb = getSupabase();
 
-      if (!ignore) {
-        if (error) console.warn('fetch properties', error);
-        setItems((data as RawProperty[]) ?? []);
-        setLoading(false);
-      }
-    })();
-    return () => { ignore = true; };
-  }, []);
+  (async () => {
+    setLoading(true);
+
+    const baseQuery = sb
+      .from('properties')
+      .select(
+        'id, title, location, price, bedrooms, bathrooms, yield_percent, roi_percent, imageurl, latitude, longitude'
+      );
+
+    // Prefer range; gracefully fall back to limit if range is absent
+    const query =
+      typeof (baseQuery as any).range === 'function'
+        ? (baseQuery as any).range(0, 59)
+        : baseQuery.limit(60);
+
+    const { data, error } = await query;
+
+    if (!ignore) {
+      if (error) console.warn('fetch properties', error);
+      setItems((data as RawProperty[]) ?? []);
+      setLoading(false);
+    }
+  })();
+
+  return () => {
+    ignore = true;
+  };
+}, []);
 
   // apply filters
   const filtered = useMemo(() => {
@@ -239,28 +252,6 @@ function ListingsInner() {
     setMaxPrice(undefined);
     setMinBeds(undefined);
   };
-
-  // Save handler (enables "Save Deal" in PropertyCard)
-  const onSave = useCallback(async (prop: {
-    id: string; title?: string | null; location?: string | null;
-    price?: number | null; yield_percent?: number | null; roi_percent?: number | null;
-  }) => {
-    try {
-      const sb = getSupabase();
-      await sb.from('saved_deals').insert({
-        property_id: prop.id,
-        title: prop.title ?? null,
-        location: prop.location ?? null,
-        price: prop.price ?? null,
-        yield_percent: prop.yield_percent ?? null,
-        roi_percent: prop.roi_percent ?? null,
-      });
-      // (Optional) You could add local feedback here
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn('save deal failed', e);
-    }
-  }, []);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
@@ -351,36 +342,22 @@ function ListingsInner() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((p, i) => {
-              const id = String(p.id ?? `card-${i}`);
-              return (
-                <PropertyCard
-                  key={id}
-                  property={{
-                    id,
-                    title: p.title ?? '',
-                    location: p.location ?? '',
-                    price: Number(p.price ?? 0),
-                    bedrooms: p.bedrooms ?? null,
-                    bathrooms: p.bathrooms ?? null,
-                    yield_percent: p.yield_percent ?? null,
-                    roi_percent: p.roi_percent ?? null,
-                    imageurl: p.imageurl ?? null,
-                  }}
-                  href={`/property/${id}`}          // ✅ enables "View Details" button
-                  onSave={() =>
-                    onSave({
-                      id,
-                      title: p.title,
-                      location: p.location,
-                      price: p.price ?? null,
-                      yield_percent: p.yield_percent ?? null,
-                      roi_percent: p.roi_percent ?? null,
-                    })
-                  }                                  // ✅ enables "Save Deal" button
-                />
-              );
-            })}
+            {filtered.map((p, i) => (
+              <PropertyCard
+                key={p.id ?? `card-${i}`}
+                p={{
+                  id: String(p.id ?? `card-${i}`),
+                  title: p.title ?? '',
+                  location: p.location ?? '',
+                  price: Number(p.price ?? 0),
+                  bedrooms: p.bedrooms ?? null,
+                  bathrooms: p.bathrooms ?? null,
+                  yield_percent: p.yield_percent ?? null,
+                  roi_percent: p.roi_percent ?? null,
+                  imageurl: p.imageurl ?? null,
+                }}
+              />
+            ))}
           </div>
         )}
       </Section>
