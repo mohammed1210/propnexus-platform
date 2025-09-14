@@ -46,9 +46,9 @@ export async function scrapezoopla(searchUrl: string): Promise<ScrapedItem[]> {
     const baths = /(\d+)\s*bath/i.exec(summary)?.[1];
 
     items.push({
-      source: 'Zoopla',
+      source: 'zoopla',
       source_id: id,
-      title: title || `Zoopla listing ${id}`,
+      title: title || `zoopla listing ${id}`,
       location,
       price,
       bedrooms: beds ? Number(beds) : null,

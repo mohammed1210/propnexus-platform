@@ -66,7 +66,10 @@ async function run() {
   for (const s of SEARCHES) {
     console.log(`• Scraping: ${s.name}`);
     try {
-      const items = await scrapeRightmove(s.url);
+     // inside for (const s of SEARCHES) { ... }
+const items = await scrapeRightmove(s.url);
+// 👇 helpful during bring-up
+console.log(`  scraped ${items.length} cards from ${s.name}`);
       const rows = items.map<PropertyRow>((i) =>
         computeDerived({
           source: i.source,

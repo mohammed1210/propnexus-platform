@@ -1,10 +1,11 @@
 // scripts/sources/rightmove.ts
-import * as cheerio from 'cheerio';
-import { request } from 'undici';
+// Robust Rightmove scraper: tries HTML cards first, then embedded JSON blobs.
 
-export type ScrapedItem = {
+import { load } from 'cheerio';
+
+export type RMItem = {
   source: 'rightmove';
-  source_id: string;          // stable id from the site
+  source_id: string;
   title: string;
   location: string;
   price: number;
@@ -15,49 +16,244 @@ export type ScrapedItem = {
   longitude?: number | null;
 };
 
-export async function scrapeRightmove(searchUrl: string): Promise<ScrapedItem[]> {
-  const { body } = await request(searchUrl, { method: 'GET' });
-  const html = await body.text();
+const PAGE_SIZE = 24;
+const MAX_PAGES = 5;
+const REQUEST_DELAY_MS = 650;
 
-  const $ = cheerio.load(html);
-  const items: ScrapedItem[] = [];
+const UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36';
 
-  // NOTE: selectors are intentionally defensive; Rightmove markup can change.
-  $('.l-searchResult').each((_, el) => {
-    const root = $(el);
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-    const id = root.attr('id')?.replace(/\D+/g, '') || '';
-    if (!id) return;
+function parsePrice(raw: string): number {
+  const m = raw.replace(/[, ]/g, '').match(/£?(\d+(?:\.\d+)?)/i);
+  return m ? Number(m[1]) : 0;
+}
 
-    const title = root.find('.propertyCard-title').text().trim() ||
-                  root.find('[data-testid="title"]').text().trim();
+function firstTruthy(...vals: Array<string | null | undefined>): string {
+  for (const v of vals) if (v && v.trim()) return v.trim();
+  return '';
+}
 
-    const location = root.find('.propertyCard-address').text().trim() ||
-                     root.find('[data-testid="address"]').text().trim();
+function extractIdFromHref(href: string): string | null {
+  const m1 = href.match(/\/properties\/(\d+)/i);
+  if (m1) return m1[1];
+  const m2 = href.match(/property-(\d+)/i);
+  if (m2) return m2[1];
+  return null;
+}
 
-    const priceText = root.find('.propertyCard-priceValue').text().replace(/[^\d]/g, '');
-    const price = priceText ? Number(priceText) : 0;
+function extractBeds(text: string): number | null {
+  const m = text.toLowerCase().match(/(\d+)\s*bed/);
+  return m ? Number(m[1]) : null;
+}
+function extractBaths(text: string): number | null {
+  const m = text.toLowerCase().match(/(\d+)\s*bath/);
+  return m ? Number(m[1]) : null;
+}
 
-    const img = root.find('img').attr('src') || root.find('img').attr('data-src') || null;
+async function fetchHtml(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': UA,
+      'Accept-Language': 'en-GB,en;q=0.9',
+      Referer: 'https://www.rightmove.co.uk/',
+    },
+    redirect: 'follow',
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return await res.text();
+}
 
-    // beds/baths are often embedded in the summary list; keep it best-effort
-    const summary = root.find('.propertyCard-branchSummary, .property-information').text();
-    const beds = /(\d+)\s*bed/i.exec(summary)?.[1];
-    const baths = /(\d+)\s*bath/i.exec(summary)?.[1];
+/* -------------------- Parser A: scrape HTML cards -------------------- */
+function parseHtmlCards(html: string): RMItem[] {
+const $ = load(html);
 
-    items.push({
+  const cards =
+    $('[data-testid="propertyCard"]').toArray().length
+      ? $('[data-testid="propertyCard"]').toArray()
+      : $('.l-searchResult').toArray();
+
+  const out: RMItem[] = [];
+
+  for (const card of cards) {
+    const href =
+      $(card).find('a[href*="/properties/"]').attr('href') ||
+      $(card).find('a.propertyCard-link').attr('href') ||
+      $(card).find('a').attr('href') ||
+      '';
+
+    const id = extractIdFromHref(href);
+    if (!id) continue;
+
+    const title =
+      $(card).find('[data-testid="propertyCard-title"]').text().trim() ||
+      $(card).find('h2').first().text().trim() ||
+      $(card).find('.propertyCard-title').text().trim() ||
+      `Property ${id}`;
+
+    const location =
+      $(card).find('[data-testid="propertyCard-address"]').text().trim() ||
+      $(card).find('.propertyCard-address').text().trim() ||
+      $(card).find('.propertyCard-subtitle').text().trim() ||
+      '';
+
+    const priceRaw =
+      $(card).find('[data-testid="price"]').text().trim() ||
+      $(card).find('.propertyCard-priceValue').text().trim() ||
+      $(card).find('.propertyCard-price').text().trim() ||
+      '';
+    const price = parsePrice(priceRaw);
+
+    const features =
+      $(card).find('[data-testid="property-features"]').text().trim() ||
+      $(card).find('.propertyCard-tags').text().trim() ||
+      $(card).find('.propertyCard-branchSummary').text().trim() ||
+      title;
+
+    const bedrooms = extractBeds(features) ?? extractBeds(title);
+    const bathrooms = extractBaths(features);
+
+    const img =
+      $(card).find('img').attr('src') ||
+      $(card).find('img').attr('data-src') ||
+      $(card).find('img').attr('data-lazy-src') ||
+      null;
+
+    out.push({
       source: 'rightmove',
       source_id: id,
-      title: title || `Rightmove listing ${id}`,
+      title,
       location,
       price,
-      bedrooms: beds ? Number(beds) : null,
-      bathrooms: baths ? Number(baths) : null,
+      bedrooms: bedrooms ?? null,
+      bathrooms: bathrooms ?? null,
       imageurl: img,
-      latitude: null,   // keep null unless you have a reliable selector
+      latitude: null,
       longitude: null,
     });
-  });
+  }
+
+  return out;
+}
+
+/* -------------------- Parser B: embedded JSON fallbacks -------------------- */
+function tryParseEmbeddedJson(html: string): RMItem[] {
+  // Rightmove often ships JSON in window.jsonModel or __NEXT_DATA__ / __PRELOADED_STATE__
+  const blobs: string[] = [];
+
+  const jsonModel = html.match(/window\.jsonModel\s*=\s*({.*?});\s*<\/script>/s);
+  if (jsonModel) blobs.push(jsonModel[1]);
+
+  const nextData = html.match(/<script[^>]*id="__NEXT_DATA__"[^>]*>\s*({[\s\S]*?})\s*<\/script>/s);
+  if (nextData) blobs.push(nextData[1]);
+
+  const preloaded = html.match(/window\.__PRELOADED_STATE__\s*=\s*({.*?});\s*<\/script>/s);
+  if (preloaded) blobs.push(preloaded[1]);
+
+  const items: RMItem[] = [];
+
+  for (const blob of blobs) {
+    try {
+      const data = JSON.parse(blob);
+
+      // A few shapes we’ve met in the wild:
+      const listings =
+        // jsonModel: { properties: [...] }
+        (data && Array.isArray(data.properties) && data.properties) ||
+        // next data: { props: { pageProps: { searchResults: { properties: [...] }}}}
+        data?.props?.pageProps?.searchResults?.properties ||
+        // preloaded: { results: { properties: [...] } }
+        data?.results?.properties;
+
+      if (!Array.isArray(listings)) continue;
+
+      for (const p of listings) {
+        const id =
+          String(p.id || p.propertyId || p.propertyIdFormatted || '').replace(/\D/g, '') ||
+          null;
+        if (!id) continue;
+
+        const title =
+          p.title ||
+          p.propertyTypeFull ||
+          p.propertySubType ||
+          `Property ${id}`;
+
+        const address =
+          p.displayAddress || p.address || p.location || p.shortAddress || '';
+
+        const price =
+          parsePrice(String(p.price?.amount || p.price?.display || p.price || ''));
+
+        const bedrooms =
+          (typeof p.bedrooms === 'number' ? p.bedrooms : null) ??
+          extractBeds(String(p.summary || p.title || ''));
+
+        const bathrooms =
+          (typeof p.bathrooms === 'number' ? p.bathrooms : null) ??
+          extractBaths(String(p.summary || ''));
+
+        const img =
+          p.primaryImageUrl ||
+          p.imageUrl ||
+          p.image?.src ||
+          null;
+
+        items.push({
+          source: 'rightmove',
+          source_id: id,
+          title: String(title),
+          location: String(address),
+          price: Number(price || 0),
+          bedrooms: bedrooms ?? null,
+          bathrooms: bathrooms ?? null,
+          imageurl: img ?? null,
+          latitude: p.location?.latitude ?? null,
+          longitude: p.location?.longitude ?? null,
+        });
+      }
+    } catch {
+      // ignore this blob and try the next
+    }
+  }
 
   return items;
+}
+
+/* -------------------- Public: scrape with pagination -------------------- */
+export async function scrapeRightmove(baseUrl: string, maxPages = MAX_PAGES): Promise<RMItem[]> {
+  const u = new URL(baseUrl);
+  const all: RMItem[] = [];
+
+  for (let page = 0; page < maxPages; page++) {
+    u.searchParams.set('index', String(page * PAGE_SIZE));
+
+    const html = await fetchHtml(u.toString());
+
+    // Strategy A
+    let items = parseHtmlCards(html);
+
+    // Strategy B (fallback) if Strategy A found nothing
+    if (items.length === 0) {
+      items = tryParseEmbeddedJson(html);
+    }
+
+    if (items.length === 0) {
+      // nothing on this page — bail out early
+      break;
+    }
+
+    all.push(...items);
+
+    if (items.length < PAGE_SIZE) break; // likely the last page
+    await sleep(REQUEST_DELAY_MS);
+  }
+
+  // Deduplicate by source_id
+  const map = new Map<string, RMItem>();
+  for (const it of all) map.set(it.source_id, it);
+  return [...map.values()];
 }
