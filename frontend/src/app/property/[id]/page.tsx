@@ -23,6 +23,7 @@ import AIScoreBars from '@/components/property_details/AIScoreBars';
 import AIScoreInfo from '@/components/property_details/AIScoreInfo';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
 import AIChatbot from '@/components/property_details/AIChatbot';
+import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 
 const MapSingle = nextDynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
 
@@ -173,6 +174,12 @@ export default function PropertyDetailsPage() {
         </Section>
 
         {/* Exit Strategies */}
+   {/* Investment Summary */}
+    <Section aria-labelledby="investment-summary">
+      <SectionTitle id="investment-summary" icon={<icon={<span>📊</span>}uDCCA</span>}>Investment Summary</SectionTitle>
+      <InvestmentSummary property={property} />
+    </Section>
+
         <Section aria-labelledby="exit-strategies">
           <SectionTitle id="exit-strategies" icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
           <ExitStrategyGenerator
