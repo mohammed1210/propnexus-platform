@@ -2,7 +2,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import nextDynamic from 'next/dynamic';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
@@ -240,28 +240,6 @@ function ListingsInner() {
     setMinBeds(undefined);
   };
 
-  // Save handler (enables "Save Deal" in PropertyCard)
-  const onSave = useCallback(async (prop: {
-    id: string; title?: string | null; location?: string | null;
-    price?: number | null; yield_percent?: number | null; roi_percent?: number | null;
-  }) => {
-    try {
-      const sb = getSupabase();
-      await sb.from('saved_deals').insert({
-        property_id: prop.id,
-        title: prop.title ?? null,
-        location: prop.location ?? null,
-        price: prop.price ?? null,
-        yield_percent: prop.yield_percent ?? null,
-        roi_percent: prop.roi_percent ?? null,
-      });
-      // (Optional) You could add local feedback here
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn('save deal failed', e);
-    }
-  }, []);
-
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 space-y-6">
       <header className="space-y-1">
@@ -351,36 +329,22 @@ function ListingsInner() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((p, i) => {
-              const id = String(p.id ?? `card-${i}`);
-              return (
-                <PropertyCard
-                  key={id}
-                  property={{
-                    id,
-                    title: p.title ?? '',
-                    location: p.location ?? '',
-                    price: Number(p.price ?? 0),
-                    bedrooms: p.bedrooms ?? null,
-                    bathrooms: p.bathrooms ?? null,
-                    yield_percent: p.yield_percent ?? null,
-                    roi_percent: p.roi_percent ?? null,
-                    imageurl: p.imageurl ?? null,
-                  }}
-                  href={`/property/${id}`}          // ✅ enables "View Details" button
-                  onSave={() =>
-                    onSave({
-                      id,
-                      title: p.title,
-                      location: p.location,
-                      price: p.price ?? null,
-                      yield_percent: p.yield_percent ?? null,
-                      roi_percent: p.roi_percent ?? null,
-                    })
-                  }                                  // ✅ enables "Save Deal" button
-                />
-              );
-            })}
+            {filtered.map((p, i) => (
+              <PropertyCard
+                key={p.id ?? `card-${i}`}
+                p={{
+                  id: String(p.id ?? `card-${i}`),
+                  title: p.title ?? '',
+                  location: p.location ?? '',
+                  price: Number(p.price ?? 0),
+                  bedrooms: p.bedrooms ?? null,
+                  bathrooms: p.bathrooms ?? null,
+                  yield_percent: p.yield_percent ?? null,
+                  roi_percent: p.roi_percent ?? null,
+                  imageurl: p.imageurl ?? null,
+                }}
+              />
+            ))}
           </div>
         )}
       </Section>
