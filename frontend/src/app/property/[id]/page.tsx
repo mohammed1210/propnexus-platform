@@ -21,9 +21,9 @@ import NotesFields from '@/components/property_details/NotesFields';
 import InvestmentInsights from '@/components/property_details/InvestmentInsights';
 import AIScoreBars from '@/components/property_details/AIScoreBars';
 import AIScoreInfo from '@/components/property_details/AIScoreInfo';
+import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
 import AIChatbot from '@/components/property_details/AIChatbot';
-import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 
 const MapSingle = nextDynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
 
@@ -46,6 +46,10 @@ type Property = {
   transport_summary?: string | null;
   propertyType?: string | null;
   investmentType?: string | null;
+
+  // Added to satisfy InvestmentSummary's prop type expectations:
+  source?: string | null;
+  created_at?: string | null;
 };
 
 function getBackendBase(): string {
@@ -173,13 +177,15 @@ export default function PropertyDetailsPage() {
           <div className="mt-3"><AIScoreInfo /></div>
         </Section>
 
-        {/* Exit Strategies */}
-   {/* Investment Summary */}
-    <Section aria-labelledby="investment-summary">
-      <SectionTitle id="investment-summary" icon={<icon={<span>📊</span>}uDCCA</span>}>Investment Summary</SectionTitle>
-      <InvestmentSummary property={property} />
-    </Section>
+        {/* Investment Summary */}
+        <Section aria-labelledby="investment-summary">
+          <SectionTitle id="investment-summary" icon={<span>📈</span>}>
+            Investment Summary
+          </SectionTitle>
+          <InvestmentSummary property={property} />
+        </Section>
 
+        {/* Exit Strategies */}
         <Section aria-labelledby="exit-strategies">
           <SectionTitle id="exit-strategies" icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
           <ExitStrategyGenerator
