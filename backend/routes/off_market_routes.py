@@ -37,7 +37,7 @@ async def generate_off_market(payload: OffMarketRequest):
         content = response.choices[0].message.content.strip()
         return {"deals": content}
 
-    except Exception as e:  # ✅ properly aligned with try
+    except Exception:  # ✅ properly aligned with try
         logger.exception("Failed to generate off-market deals")
         raise HTTPException(
             status_code=500, detail="Failed to generate off-market deals"
