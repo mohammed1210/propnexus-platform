@@ -9,6 +9,8 @@ from routes import area_routes, comps_routes, gpt_routes
 from routes.ai_routes import router as ai_routes
 from routes.notes import router as notes_router
 from routes.off_market_routes import router as off_market_router
+from routes.stripe_routes import router as stripe_router
+app.include_router(stripe_router)
 
 # -----------------------------
 # Route modules
