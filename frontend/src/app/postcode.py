@@ -1,5 +1,6 @@
 import requests
 
+
 def get_lat_lng_from_postcode(postcode: str):
     try:
         url = f"https://api.postcodes.io/postcodes/{postcode}"
@@ -8,7 +9,7 @@ def get_lat_lng_from_postcode(postcode: str):
         if res.status_code == 200 and data["status"] == 200:
             return {
                 "latitude": data["result"]["latitude"],
-                "longitude": data["result"]["longitude"]
+                "longitude": data["result"]["longitude"],
             }
         else:
             return None

@@ -411,9 +411,11 @@ class Request:
                 files=files,
                 json=json,
                 boundary=get_multipart_boundary_from_content_type(
-                    content_type=content_type.encode(self.headers.encoding)
-                    if content_type
-                    else None
+                    content_type=(
+                        content_type.encode(self.headers.encoding)
+                        if content_type
+                        else None
+                    )
                 ),
             )
             self._prepare(headers)

@@ -1,22 +1,21 @@
 # backend/main.py
+import os
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from supabase import create_client, Client
-import os
+from routes import scrape_routes  # ✅ unified scraper routes
+from routes import area_routes, comps_routes, gpt_routes
+from routes.ai_routes import router as ai_routes
+from routes.notes import router as notes_router
+from routes.off_market_routes import router as off_market_router
 
 # -----------------------------
 # Route modules
 # -----------------------------
 from routes.save_deal import router as save_deal_router
-from routes.notes import router as notes_router
-from routes import gpt_routes
-from routes.ai_routes import router as ai_routes
-from routes import area_routes
-from routes import comps_routes
-from routes import scrape_routes   # ✅ unified scraper routes
-from routes.off_market_routes import router as off_market_router
 from routes.stripe_routes import router as stripe_router
+from supabase import Client, create_client
 
 # ===============================
 # Env & Supabase client
@@ -48,12 +47,13 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,                         # explicit allow-list
+    allow_origins=origins,  # explicit allow-list
     allow_origin_regex=r"^https://.*\.vercel\.app$",  # any Vercel preview/prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ===============================
 # Health
@@ -62,13 +62,16 @@ app.add_middleware(
 async def root():
     return {"message": "PropNexus backend is running."}
 
+
 @app.get("/health")
 async def health():
     return {"ok": True}
 
+
 @app.get("/api/health")
 async def api_health():
     return {"ok": True}
+
 
 # ===============================
 # Register routers
@@ -85,6 +88,7 @@ app.include_router(scrape_routes.router)  # ✅ unified scrape
 app.include_router(off_market_router)
 app.include_router(stripe_router)
 
+
 # ===============================
 # Properties (Supabase)
 # ===============================
@@ -95,16 +99,14 @@ async def get_properties():
     response = supabase.table("properties").select("*").execute()
     return response.data
 
+
 @app.get("/properties/{property_id}")
 async def get_property_by_id(property_id: str):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase env vars not configured")
     try:
         response = (
-            supabase.table("properties")
-            .select("*")
-            .eq("id", property_id)
-            .execute()
+            supabase.table("properties").select("*").eq("id", property_id).execute()
         )
         if not response.data:
             raise HTTPException(status_code=404, detail="Property not found")
@@ -114,6 +116,7 @@ async def get_property_by_id(property_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 # Alias for Next.js fetches (/api/…)
 @app.get("/api/properties/{property_id}")
 async def get_property_by_id_alias(property_id: str):
@@ -121,10 +124,7 @@ async def get_property_by_id_alias(property_id: str):
         raise HTTPException(status_code=500, detail="Supabase env vars not configured")
     try:
         response = (
-            supabase.table("properties")
-            .select("*")
-            .eq("id", property_id)
-            .execute()
+            supabase.table("properties").select("*").eq("id", property_id).execute()
         )
         if not response.data:
             raise HTTPException(status_code=404, detail="Property not found")
