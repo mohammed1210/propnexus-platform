@@ -2,8 +2,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from openai import OpenAI
 import os
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Initialize OpenAI client using API key from environment
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -33,7 +35,7 @@ async def generate_off_market(payload: OffMarketRequest):
         )
         content = response.choices[0].message.content.strip()
         return {"deals": content}
-      
-      except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-      
+
+    except Exception as e:
+        logger.exception("Failed to generate off-market deals")
+        raise HTTPException(status_code=500, detail="Failed to generate off-market deals")
