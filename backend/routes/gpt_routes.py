@@ -1,15 +1,17 @@
 # /backend/routes/gpt_routes.py
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 import os
-from openai import OpenAI
+
 from dotenv import load_dotenv
+from fastapi import APIRouter, HTTPException
+from openai import OpenAI
+from pydantic import BaseModel
 
 load_dotenv()
 
 router = APIRouter()
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 # ✅ Summary schema
 class SummaryRequest(BaseModel):
@@ -39,7 +41,10 @@ async def generate_summary(req: SummaryRequest):
         chat = openai.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are an investment analyst summarizing UK property deals."},
+                {
+                    "role": "system",
+                    "content": "You are an investment analyst summarizing UK property deals.",
+                },
                 {"role": "user", "content": prompt},
             ],
             temperature=0.7,
@@ -110,7 +115,10 @@ async def investment_summary(req: InvestmentPrompt):
         chat = openai.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "You are an expert UK property investment analyst."},
+                {
+                    "role": "system",
+                    "content": "You are an expert UK property investment analyst.",
+                },
                 {"role": "user", "content": req.prompt},
             ],
             temperature=0.7,

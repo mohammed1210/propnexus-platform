@@ -695,16 +695,18 @@ class Client(BaseClient):
             transport=transport,
         )
         self._mounts: dict[URLPattern, BaseTransport | None] = {
-            URLPattern(key): None
-            if proxy is None
-            else self._init_proxy_transport(
-                proxy,
-                verify=verify,
-                cert=cert,
-                trust_env=trust_env,
-                http1=http1,
-                http2=http2,
-                limits=limits,
+            URLPattern(key): (
+                None
+                if proxy is None
+                else self._init_proxy_transport(
+                    proxy,
+                    verify=verify,
+                    cert=cert,
+                    trust_env=trust_env,
+                    http1=http1,
+                    http2=http2,
+                    limits=limits,
+                )
             )
             for key, proxy in proxy_map.items()
         }
@@ -1410,16 +1412,18 @@ class AsyncClient(BaseClient):
         )
 
         self._mounts: dict[URLPattern, AsyncBaseTransport | None] = {
-            URLPattern(key): None
-            if proxy is None
-            else self._init_proxy_transport(
-                proxy,
-                verify=verify,
-                cert=cert,
-                trust_env=trust_env,
-                http1=http1,
-                http2=http2,
-                limits=limits,
+            URLPattern(key): (
+                None
+                if proxy is None
+                else self._init_proxy_transport(
+                    proxy,
+                    verify=verify,
+                    cert=cert,
+                    trust_env=trust_env,
+                    http1=http1,
+                    http2=http2,
+                    limits=limits,
+                )
             )
             for key, proxy in proxy_map.items()
         }
