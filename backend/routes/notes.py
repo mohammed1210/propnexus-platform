@@ -1,10 +1,11 @@
 # backend/routes/notes.py
+import os
+from datetime import datetime
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
-from supabase import create_client, Client
-import os
+from supabase import Client, create_client
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -16,11 +17,13 @@ if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE:
 
 sb: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE)
 
+
 class NotesPayload(BaseModel):
     property_id: str
-    user_id: Optional[str] = None   # keep None for now if you don't have auth
+    user_id: Optional[str] = None  # keep None for now if you don't have auth
     custom_field: Optional[str] = ""
     notes: Optional[str] = ""
+
 
 @router.get("/{property_id}")
 def get_notes(property_id: str, user_id: Optional[str] = None):
@@ -34,14 +37,19 @@ def get_notes(property_id: str, user_id: Optional[str] = None):
         .limit(1)
         .execute()
     )
-    data = resp.data[0] if resp.data else {
-        "property_id": property_id,
-        "user_id": uid,
-        "custom_field": "",
-        "notes": "",
-        "updated_at": None,
-    }
+    data = (
+        resp.data[0]
+        if resp.data
+        else {
+            "property_id": property_id,
+            "user_id": uid,
+            "custom_field": "",
+            "notes": "",
+            "updated_at": None,
+        }
+    )
     return data
+
 
 @router.post("")
 def upsert_notes(payload: NotesPayload):
@@ -51,7 +59,7 @@ def upsert_notes(payload: NotesPayload):
         "user_id": payload.user_id or "",
         "custom_field": payload.custom_field or "",
         "notes": payload.notes or "",
-        "updated_at": datetime.utcnow().isoformat()
+        "updated_at": datetime.utcnow().isoformat(),
     }
     # upsert on the composite key
     resp = sb.table("notes").upsert(row, on_conflict="user_id,property_id").execute()

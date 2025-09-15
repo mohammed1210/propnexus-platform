@@ -1,7 +1,9 @@
+from typing import Any, Dict
+
 from fastapi import APIRouter
-from typing import Dict, Any
 
 router = APIRouter()
+
 
 @router.get("/comps/{postcode}")
 async def get_comps(postcode: str) -> Dict[str, Any]:
@@ -13,8 +15,18 @@ async def get_comps(postcode: str) -> Dict[str, Any]:
     return {
         "postcode": postcode,
         "sales": [
-            {"price": 245000, "date": "2024-11-15", "bedrooms": 3, "distance_miles": 0.4},
-            {"price": 260000, "date": "2024-12-01", "bedrooms": 2, "distance_miles": 0.7},
+            {
+                "price": 245000,
+                "date": "2024-11-15",
+                "bedrooms": 3,
+                "distance_miles": 0.4,
+            },
+            {
+                "price": 260000,
+                "date": "2024-12-01",
+                "bedrooms": 2,
+                "distance_miles": 0.7,
+            },
         ],
         "rents": [
             {"monthly_rent": 1200, "bedrooms": 2, "date": "2025-01-20"},
