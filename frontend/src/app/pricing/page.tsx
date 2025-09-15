@@ -2,9 +2,11 @@
 import { useState } from "react";
 
 const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL!;
+
+// TODO: replace with your real test price IDs from Stripe
 const PLANS = [
-  { name: "Starter", priceId: "price_xxx_monthly", price: "£19/mo" },
-  { name: "Pro",     priceId: "price_yyy_monthly", price: "£49/mo" },
+  { name: "Starter", priceId: "price_test_STARTER", price: "£19/mo" },
+  { name: "Pro",     priceId: "price_test_PRO",     price: "£49/mo" },
 ];
 
 export default function Pricing() {
@@ -13,7 +15,7 @@ export default function Pricing() {
   async function startCheckout(priceId: string) {
     try {
       setLoading(priceId);
-      // TODO: replace with real user email from your auth (Supabase)
+      // TODO: swap this with the signed-in user's email
       const customer_email = "test@example.com";
 
       const res = await fetch(`${BACKEND}/stripe/create-checkout-session`, {
@@ -25,8 +27,8 @@ export default function Pricing() {
       const { url } = await res.json();
       window.location.href = url;
     } catch (e) {
-      alert("Checkout failed");
       console.error(e);
+      alert("Checkout failed");
     } finally {
       setLoading(null);
     }
