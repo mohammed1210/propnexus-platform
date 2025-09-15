@@ -1,6 +1,6 @@
 import os
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from openai import OpenAI
 from pydantic import BaseModel
 
