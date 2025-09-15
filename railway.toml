@@ -16,28 +16,3 @@ command  = "npm --prefix . run ingest:csv"
 
 [env]
 NODE_ENV = "production"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SEPARATE WORKER SERVICE: "ingest-worker"
-# Runs the live Rightmove scraper with its own cron schedule.
-# To activate: create a new Service in Railway from the same repo and
-# set its name to "ingest-worker" so this block applies to it.
-# ─────────────────────────────────────────────────────────────────────────────
-[[services]]
-name = "ingest-worker"
-
-  [services.build]
-  builder = "NIXPACKS"
-  command = "echo skip-next-build"
-
-  [services.deploy]
-  # one-off run command if you deploy without cron (e.g., for manual tests)
-  startCommand = "bash -lc 'npx tsx scripts/ingest-live.ts'"
-
-  [services.cron]
-  # Scrape every 6 hours; tweak as you like (e.g. "0 * * * *" for hourly)
-  schedule = "0 */6 * * *"
-  command  = "bash -lc 'npx tsx scripts/ingest-live.ts'"
-
-  [services.env]
-  NODE_ENV = "production"

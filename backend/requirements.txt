@@ -11,3 +11,5 @@ playwright
 python-dotenv
 requests
 openai>=1.14.0
+
+stripe

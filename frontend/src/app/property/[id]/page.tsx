@@ -21,11 +21,13 @@ import NotesFields from '@/components/property_details/NotesFields';
 import InvestmentInsights from '@/components/property_details/InvestmentInsights';
 import AIScoreBars from '@/components/property_details/AIScoreBars';
 import AIScoreInfo from '@/components/property_details/AIScoreInfo';
+import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
 import AIChatbot from '@/components/property_details/AIChatbot';
 
 const MapSingle = nextDynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
 
+/** Page-local shape coming from the API (nullable numeric fields allowed) */
 type Property = {
   id: string;
   title: string;
@@ -45,6 +47,9 @@ type Property = {
   transport_summary?: string | null;
   propertyType?: string | null;
   investmentType?: string | null;
+  /** Some components expect these to exist */
+  source?: string | null;
+  created_at?: string | null;
 };
 
 function getBackendBase(): string {
@@ -120,6 +125,20 @@ export default function PropertyDetailsPage() {
 
   const postcode = useMemo(() => property?.location?.trim().split(/\s+/).pop(), [property]);
 
+  /** Normalize nullable numerics to the strict numeric shape that InvestmentSummary expects */
+  const normalizedForSummary = useMemo(() => {
+    if (!property) return null;
+    return {
+      ...property,
+      // ensure numbers:
+      price: Number(property.price ?? 0),
+      bedrooms: Number(property.bedrooms ?? 0),
+      bathrooms: Number(property.bathrooms ?? 0),
+      yield_percent: Number(property.yield_percent ?? 0),
+      roi_percent: Number(property.roi_percent ?? 0),
+    };
+  }, [property]);
+
   if (loading) return <p className="p-6">Loading…</p>;
   if (!property) {
     return (
@@ -170,6 +189,17 @@ export default function PropertyDetailsPage() {
           </SectionTitle>
           <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-3" />
           <div className="mt-3"><AIScoreInfo /></div>
+        </Section>
+
+        {/* Investment Summary */}
+        <Section aria-labelledby="investment-summary">
+          <SectionTitle id="investment-summary" icon={<span>📈</span>}>
+            Investment Summary
+          </SectionTitle>
+          {/* Cast after normalization so TS is satisfied even if the component's type is stricter */}
+          {normalizedForSummary && (
+            <InvestmentSummary property={normalizedForSummary as any} />
+          )}
         </Section>
 
         {/* Exit Strategies */}

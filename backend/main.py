@@ -1,40 +1,21 @@
 # backend/main.py
-
-"""
-Entry point for the PropNexus FastAPI backend.
-
-This module initialises the FastAPI application, configures CORS,
-loads environment variables, sets up the Supabase client and
-registers all route modules. Additional routers for metrics and
-email notifications are included as part of the Sprint‑4
-operationalisation efforts.
-
-The `/` root endpoint returns a simple message. Core property
-endpoints (`/properties` and `/properties/{id}`) expose the
-Supabase‐backed data store. See individual route modules under
-`backend/routes/` for more functionality.
-"""
-
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from supabase import create_client, Client
 import os
 
-# Route modules
-from routes.save_deal import router as save_deal_router
-from routes.notes import router as notes_router
-from routes import gpt_routes
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from routes import scrape_routes  # ✅ unified scraper routes
+from routes import area_routes, comps_routes, gpt_routes
 from routes.ai_routes import router as ai_routes
-from routes import area_routes
-from routes import comps_routes
-from routes import scrape_routes
-from routes import stripe_routes  # billing/paywall
-from routes import digests_routes  # digest emails
+from routes.notes import router as notes_router
+from routes.off_market_routes import router as off_market_router
 
-# New operational routes
-from routes.metrics_routes import router as metrics_router
-from routes.email_routes import router as email_router
+# -----------------------------
+# Route modules
+# -----------------------------
+from routes.save_deal import router as save_deal_router
+from routes.stripe_routes import router as stripe_router
+from supabase import Client, create_client
 
 # ===============================
 # Env & Supabase client
@@ -53,35 +34,26 @@ if SUPABASE_URL and SUPABASE_KEY:
 # ===============================
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
-# CORS configuration: allow Vercel previews/prod and localhost during dev
+# ===============================
+# CORS (allow Vercel previews/prod + localhost)
+# ===============================
+# Explicit origins you know you’ll use:
 origins = [
     "https://propnexus-platform.vercel.app",
     "https://propnexus-platform-git-2872bb-mohammed-abbas-projects-8ab7e126.vercel.app",
     "http://localhost:3000",
     "http://localhost:3001",
 ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https://.*vercel\.app$",  # any Vercel preview/prod
+    allow_origins=origins,  # explicit allow-list
+    allow_origin_regex=r"^https://.*\.vercel\.app$",  # any Vercel preview/prod
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ===============================
-# Register routers
-# ===============================
-app.include_router(save_deal_router)
-app.include_router(notes_router)
-app.include_router(gpt_routes.router)
-app.include_router(ai_routes)
-app.include_router(area_routes.router)
-app.include_router(comps_routes.router)
-app.include_router(scrape_routes.router)  # unified scrape
-
-# Include new operational routers
-app.include_router(metrics_router)
-app.include_router(email_router)
 
 # ===============================
 # Root endpoint
@@ -90,6 +62,32 @@ app.include_router(email_router)
 async def root() -> dict[str, str]:
     """Simple root endpoint to confirm the API is running."""
     return {"message": "PropNexus backend is running."}
+
+
+@app.get("/health")
+async def health():
+    return {"ok": True}
+
+
+@app.get("/api/health")
+async def api_health():
+    return {"ok": True}
+
+
+# ===============================
+# Register routers
+# (Routers that already define their own /api prefix will keep it;
+#  others are mounted as-is)
+# ===============================
+app.include_router(save_deal_router)
+app.include_router(notes_router)
+app.include_router(gpt_routes.router)
+app.include_router(ai_routes)
+app.include_router(area_routes.router)
+app.include_router(comps_routes.router)
+app.include_router(scrape_routes.router)  # ✅ unified scrape
+app.include_router(off_market_router)
+app.include_router(stripe_router)
 
 
 # ===============================
@@ -111,10 +109,7 @@ async def get_property_by_id(property_id: str):
         raise HTTPException(status_code=500, detail="Supabase env vars not configured")
     try:
         response = (
-            supabase.table("properties")
-            .select("*")
-            .eq("id", property_id)
-            .execute()
+            supabase.table("properties").select("*").eq("id", property_id).execute()
         )
         if not response.data:
             raise HTTPException(status_code=404, detail="Property not found")
@@ -125,6 +120,7 @@ async def get_property_by_id(property_id: str):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+
 # Alias for Next.js fetches (/api/…)
 @app.get("/api/properties/{property_id}")
 async def get_property_by_id_alias(property_id: str):
@@ -133,10 +129,7 @@ async def get_property_by_id_alias(property_id: str):
         raise HTTPException(status_code=500, detail="Supabase env vars not configured")
     try:
         response = (
-            supabase.table("properties")
-            .select("*")
-            .eq("id", property_id)
-            .execute()
+            supabase.table("properties").select("*").eq("id", property_id).execute()
         )
         if not response.data:
             raise HTTPException(status_code=404, detail="Property not found")

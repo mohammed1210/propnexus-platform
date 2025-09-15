@@ -1,42 +1,30 @@
-# backend/routes/stripe_routes.py
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 import os
 
-try:
-    import stripe  # type: ignore
-except Exception:
-    stripe = None
+import stripe
+from fastapi import APIRouter, HTTPException
 
-router = APIRouter(prefix="/billing", tags=["billing"])
+router = APIRouter()
 
-class CheckoutReq(BaseModel):
-    plan: str = "premium"
+# Initialize Stripe with API key from environment
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
 
 @router.post("/create-checkout-session")
-def create_checkout_session(body: CheckoutReq):
-    if stripe is None:
-        raise HTTPException(status_code=501, detail="Stripe SDK not installed on server")
-
-    secret = os.getenv("STRIPE_API_KEY")
-    price_premium = os.getenv("STRIPE_PRICE_PREMIUM")
-    frontend = os.getenv("FRONTEND_URL", "http://localhost:3000")
-
-    if not secret or not price_premium:
-        raise HTTPException(status_code=500, detail="Missing STRIPE_API_KEY or STRIPE_PRICE_PREMIUM")
-
-    stripe.api_key = secret
-    price_id = price_premium if body.plan == "premium" else price_premium
-
+async def create_checkout_session():
+    """
+    Create a Stripe Checkout session for a subscription.
+    Returns the session ID for client to redirect to Stripe checkout.
+    """
     try:
         session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            line_items=[{"price": os.getenv("STRIPE_PRICE_ID"), "quantity": 1}],
             mode="subscription",
-            line_items=[{"price": price_id, "quantity": 1}],
-            success_url=f"{frontend}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{frontend}/billing/cancelled",
-            allow_promotion_codes=True,
-            metadata={"plan": body.plan},
+            success_url=os.getenv(
+                "STRIPE_SUCCESS_URL", "http://localhost:3000/success"
+            ),
+            cancel_url=os.getenv("STRIPE_CANCEL_URL", "http://localhost:3000/cancel"),
         )
-        return {"url": session.url}
+        return {"sessionId": session.id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
