@@ -13,6 +13,9 @@ from routes.ai_routes import router as ai_routes
 from routes import area_routes
 from routes import comps_routes
 from routes import scrape_routes   # ✅ unified scraper routes
+from routes.off_market_routes import router as off_market_router
+from routes.stripe_routes import router as stripe_router
+
 
 # ===============================
 # Env & Supabase client
@@ -58,6 +61,9 @@ app.include_router(comps_routes.router)
 app.include_router(scrape_routes.router)  # ✅ NEW unified scrape
 
 # ===============================
+app.include_router(off_market_router)
+app.include_router(stripe_router)
+
 # Health
 # ===============================
 @app.get("/")
