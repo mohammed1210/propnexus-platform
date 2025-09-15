@@ -1,9 +1,10 @@
 # 📄 /backend/routes/save_deal.py
 
+import os
+
+from dotenv import load_dotenv
 from fastapi import APIRouter, Request
 from supabase import create_client
-import os
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -13,6 +14,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+
 @router.post("/save-deal")
 async def save_deal(request: Request):
     try:
@@ -21,8 +23,8 @@ async def save_deal(request: Request):
 
         if response.error:
             return {"error": str(response.error)}
-        
+
         return {"message": "Deal saved successfully", "data": response.data}
-    
+
     except Exception as e:
         return {"error": f"Server error: {str(e)}"}

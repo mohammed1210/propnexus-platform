@@ -1,9 +1,10 @@
 # /backend/routes/area_routes.py
-from fastapi import APIRouter, HTTPException
+
 import httpx
-import os
+from fastapi import APIRouter
 
 router = APIRouter()
+
 
 @router.get("/area-intel/{postcode}")
 async def get_area_intel(postcode: str):
@@ -19,7 +20,7 @@ async def get_area_intel(postcode: str):
         "avgRent": 1350,
         "crimeRateIndex": 42,
         "ofstedSummary": "Ofsted Good nearby",
-        "transportSummary": "Excellent · ~18 mins to centre"
+        "transportSummary": "Excellent · ~18 mins to centre",
     }
 
     async with httpx.AsyncClient(timeout=10) as client:
@@ -50,6 +51,7 @@ async def get_area_intel(postcode: str):
             # You can replace with your real ONS/Valuation Office source later
             # For now, use illustrative randomised numbers near fallback
             import random
+
             result["avgYieldPct"] = round(random.uniform(4.5, 6.5), 1)
             result["avgRent"] = random.randint(1200, 1600)
 
