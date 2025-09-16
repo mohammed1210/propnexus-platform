@@ -1,5 +1,5 @@
 'use client';
 
-import SuccessPage from '../../../success_page';
+import SuccessPage from '../success_page';
 
 export default SuccessPage;
