@@ -1,4 +1,5 @@
-// Re-export the Off-Market page from src.
-// This file lives in `frontend/app/off-market/page.tsx`
+'use client';
 
-export { default } from '../../src/app/off-market/page';
+import OffMarketPage from '../../../off_market_page';
+
+export default OffMarketPage;
