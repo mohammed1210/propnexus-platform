@@ -1,4 +1,5 @@
-// Re-export the Success page from src.
-// This file lives in `frontend/app/success/page.tsx`
+'use client';
 
-export { default } from '../../src/app/success/page';
+import SuccessPage from '../../../success_page';
+
+export default SuccessPage;
