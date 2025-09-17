@@ -1,5 +1,12 @@
 'use client';
+
+// === Dynamic rendering flags ===
 export const dynamic = 'force-dynamic';
+export const dynamicParams = true;
+export async function generateStaticParams() {
+  // rely on dynamic fallback for now
+  return [];
+}
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -70,7 +77,8 @@ export default function PropertyDetailsPage() {
     setLoading(true);
     try {
       const base = getBackendBase();
-      const resp = await fetch(`${base}/api/properties/${encodeURIComponent(propId)}`, { cache: 'no-store' });
+      // CHANGED: /api/properties/... -> /properties/...
+      const resp = await fetch(`${base}/properties/${encodeURIComponent(propId)}`, { cache: 'no-store' });
       if (!resp.ok) {
         console.error('Property fetch failed', resp.status, await resp.text());
         setProperty(null);
