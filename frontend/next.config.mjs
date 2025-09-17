@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 
 const nextConfig = {
-  reactStrictMode: false,
+  reactStrictMode: true,
 
   // Tell Next where the real workspace root is (one level up).
   // This silences the multiple lockfiles warning.
