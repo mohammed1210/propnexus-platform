@@ -37,17 +37,20 @@ export default function HeaderClient() {
         </Link>
 
         {/* Navigation */}
-        <nav className="flex items-center gap-6">
-          <Link href="/listings" className="hover:text-indigo-600 dark:hover:text-indigo-400">
-            Listings
-          </Link>
-          <Link href="/analytics" className="hover:text-indigo-600 dark:hover:text-indigo-400">
-            Analytics
-          </Link>
-          <Link href="/deals" className="hover:text-indigo-600 dark:hover:text-indigo-400">
-            Saved Deals
-          </Link>
-        </nav>
+<nav className="hidden md:flex items-center gap-6">
+  <Link href="/" className="hover:text-indigo-600 dark:hover:text-indigo-400">
+    Listings
+  </Link>
+  <Link href="/saved" className="hover:text-indigo-600 dark:hover:text-indigo-400">
+    Saved Deals
+  </Link>
+  <Link href="/off-market" className="hover:text-indigo-600 dark:hover:text-indigo-400">
+    Off-Market
+  </Link>
+  <Link href="/pricing" className="hover:text-indigo-600 dark:hover:text-indigo-400">
+    Pricing
+  </Link>
+</nav>
 
         {/* Dark mode toggle */}
         <button
