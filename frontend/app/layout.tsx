@@ -1,4 +1,4 @@
-import '@/app/globals.css'
+import '@./globals.css'
 import type { Metadata } from 'next'
 import HeaderClient from '@/components/HeaderClient'
 
