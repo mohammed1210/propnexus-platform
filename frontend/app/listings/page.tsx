@@ -84,8 +84,8 @@ function ClientMap({
 
 function ListingsInner() {
   const router = useRouter()
-  const params = useSearchParams()
-  const q = params.get('q')?.trim() ?? ''
+  const searchParams = useSearchParams()
+  const q = searchParams.get('q') ?? '' // safe query param (used in effect deps)
 
   const [rows, setRows] = useState<RawProperty[]>([])
   const [loading, setLoading] = useState(true)
@@ -95,7 +95,16 @@ function ListingsInner() {
     ;(async () => {
       setLoading(true)
       const supabase = getSupabase()
-      const { data, error } = await supabase.from('properties').select('*').limit(50)
+
+      // Optional: apply a simple filter if q exists (title or location ilike)
+      // Adjust to your schema/indexes as needed.
+      const base = supabase.from('properties').select('*').limit(50)
+      const query = q
+        ? base.or(`title.ilike.%${q}%,location.ilike.%${q}%`)
+        : base
+
+      const { data, error } = await query
+
       if (!cancelled) {
         if (error) console.error(error)
         setRows(data || [])
