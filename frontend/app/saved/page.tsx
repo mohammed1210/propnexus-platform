@@ -1,41 +1,67 @@
-'use client'
-export const dynamic = 'force-dynamic'
+'use client';
+import { useEffect, useState } from 'react';
+import { getSupabase } from '@/lib/supabaseClient';
+import Section from '@/components/ui/Section';
+import SectionTitle from '@/components/ui/SectionTitle';
 
-import { useEffect, useState } from 'react'
-
-type SavedDeal = {
-  id: string
-  title?: string | null
-  location?: string | null
-  created_at?: string | null
-}
+type Deal = {
+  id: string;
+  title?: string | null;
+  location?: string | null;
+  price?: number | null;
+  yield_percent?: number | null;
+  roi_percent?: number | null;
+  imageurl?: string | null;
+  saved_at?: string | null;
+};
 
 export default function SavedDealsPage() {
-  const [deals, setDeals] = useState<SavedDeal[]>([])
-  const [loading, setLoading] = useState(true)
+  const [rows, setRows] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TODO: wire to Supabase or API if/when ready
-    setLoading(false)
-  }, [])
+    let ignore = false;
+    (async () => {
+      setLoading(true);
+      const sb = getSupabase();
+      const { data, error } = await sb
+        .from('saved_deals')
+        .select('*')
+        .order('saved_at', { ascending: false }); // ✅ correct timestamp
 
-  if (loading) return <div className="p-6">Loading your saved deals…</div>
+      if (!ignore) {
+        if (error) console.error('load saved_deals', error);
+        setRows((data as Deal[]) ?? []);
+        setLoading(false);
+      }
+    })();
+    return () => { ignore = true; };
+  }, []);
 
   return (
-    <main className="max-w-6xl mx-auto p-6">
-      <h1 className="text-2xl font-semibold mb-4">Saved Deals</h1>
-      {deals.length === 0 ? (
-        <p>No saved deals yet.</p>
+    <Section>
+      <SectionTitle>Saved Deals</SectionTitle>
+      {loading ? (
+        <div className="p-4">Loading…</div>
+      ) : rows.length === 0 ? (
+        <div className="p-4">No saved deals yet.</div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {deals.map((d) => (
-            <div key={d.id} className="border rounded p-4">
-              <div className="font-medium">{d.title ?? 'Deal'}</div>
-              <div className="opacity-70 text-sm">{d.location ?? '—'}</div>
-            </div>
+        <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {rows.map((d) => (
+            <li key={d.id} className="rounded border border-zinc-200 p-4">
+              <div className="font-medium">{d.title ?? '—'}</div>
+              <div className="text-sm opacity-70">{d.location ?? '—'}</div>
+              <div className="mt-1">£{(d.price ?? 0).toLocaleString()}</div>
+              <div className="text-sm mt-1">
+                Yield {d.yield_percent ?? '—'}% · ROI {d.roi_percent ?? '—'}%
+              </div>
+              <div className="text-xs opacity-70 mt-1">
+                Saved {d.saved_at ? new Date(d.saved_at).toLocaleDateString() : '—'}
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </main>
-  )
+    </Section>
+  );
 }

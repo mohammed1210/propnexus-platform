@@ -24,9 +24,11 @@ type SavedDeal = {
   title?: string | null;
   location?: string | null;
   price?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
-  created_at?: string | null;
+  saved_at?: string | null; // ✅ was created_at
 };
 
 export default function AnalyticsPage() {
@@ -41,7 +43,7 @@ export default function AnalyticsPage() {
       const { data, error } = await sb
         .from('saved_deals')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('saved_at', { ascending: false }); // ✅ was created_at
 
       if (!ignore) {
         if (error) console.warn('load saved_deals', error);
@@ -49,9 +51,7 @@ export default function AnalyticsPage() {
         setLoading(false);
       }
     })();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, []);
 
   const kpis = useMemo(() => {
@@ -65,7 +65,7 @@ export default function AnalyticsPage() {
   const monthly = useMemo(() => {
     const map = new Map<string, { count: number; sumYield: number }>();
     for (const d of deals) {
-      const key = (d.created_at ?? '').slice(0, 7) || 'Unknown';
+      const key = (d.saved_at ?? '').slice(0, 7) || 'Unknown'; // ✅ was created_at
       const m = map.get(key) ?? { count: 0, sumYield: 0 };
       m.count += 1;
       m.sumYield += num(d.yield_percent);
@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
         <nav className="space-y-1">
           <NavItem href="/listings" label="Listings" emoji="🏠" />
           <NavItem href="/analytics" label="Analytics" emoji="📈" active />
-          <NavItem href="/deals" label="Saved Deals" emoji="⭐" />
+          <NavItem href="/saved" label="Saved Deals" emoji="⭐" />
         </nav>
         <div className="mt-6 text-xs text-slate-300">
           Track portfolio metrics, AI scores and market signals here.
@@ -115,20 +115,9 @@ export default function AnalyticsPage() {
             <Line
               data={{
                 labels: monthly.labels,
-                datasets: [
-                  {
-                    label: 'Saved deals',
-                    data: monthly.countSeries,
-                    borderWidth: 2,
-                    tension: 0.3,
-                  },
-                ],
+                datasets: [{ label: 'Saved deals', data: monthly.countSeries, borderWidth: 2, tension: 0.3 }],
               }}
-              options={{
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true } },
-              }}
+              options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }}
             />
           </div>
         </Section>
@@ -139,22 +128,15 @@ export default function AnalyticsPage() {
             <Line
               data={{
                 labels: monthly.labels,
-                datasets: [
-                  { label: 'Avg yield %', data: monthly.yieldSeries, borderWidth: 2, tension: 0.3 },
-                ],
+                datasets: [{ label: 'Avg yield %', data: monthly.yieldSeries, borderWidth: 2, tension: 0.3 }],
               }}
-              options={{
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, suggestedMax: 12 } },
-              }}
+              options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, suggestedMax: 12 } } }}
             />
           </div>
         </Section>
 
         <Section>
           <SectionTitle>Recent Saved Deals</SectionTitle>
-
           <div className="overflow-x-auto overflow-y-auto max-h-[420px] rounded-xl border border-slate-200">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 sticky top-0">
@@ -169,38 +151,20 @@ export default function AnalyticsPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr>
-                    <Td className="p-3 text-neutral-500" colSpan={6}>
-                      Loading…
-                    </Td>
-                  </tr>
+                  <tr><Td className="p-3 text-neutral-500" colSpan={6}>Loading…</Td></tr>
                 ) : deals.length === 0 ? (
-                  <tr>
-                    <Td className="p-3 text-neutral-500" colSpan={6}>
-                      No saved deals yet.
-                    </Td>
-                  </tr>
+                  <tr><Td className="p-3 text-neutral-500" colSpan={6}>No saved deals yet.</Td></tr>
                 ) : (
-                  deals
-                    .slice(-8)
-                    .reverse()
-                    .map((d) => (
-                      <tr
-                        key={d.id}
-                        className={[
-                          'border-t border-neutral-200 dark:border-neutral-800',
-                          'odd:bg-white even:bg-slate-50/40 dark:odd:bg-neutral-900 dark:even:bg-neutral-900/60',
-                          'hover:bg-slate-50 dark:hover:bg-neutral-800/40 transition-colors',
-                        ].join(' ')}
-                      >
-                        <Td>{d.title ?? '—'}</Td>
-                        <Td>{d.location ?? '—'}</Td>
-                        <Td>£{formatGBP(num(d.price))}</Td>
-                        <Td>{valOrDash(d.yield_percent)}%</Td>
-                        <Td>{valOrDash(d.roi_percent)}%</Td>
-                        <Td>{formatDate(d.created_at)}</Td>
-                      </tr>
-                    ))
+                  deals.slice(-8).reverse().map((d) => (
+                    <tr key={d.id} className="border-t border-neutral-200 dark:border-neutral-800">
+                      <Td>{d.title ?? '—'}</Td>
+                      <Td>{d.location ?? '—'}</Td>
+                      <Td>£{formatGBP(num(d.price))}</Td>
+                      <Td>{valOrDash(d.yield_percent)}%</Td>
+                      <Td>{valOrDash(d.roi_percent)}%</Td>
+                      <Td>{formatDate(d.saved_at)}</Td> {/* ✅ was created_at */}
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
@@ -211,26 +175,10 @@ export default function AnalyticsPage() {
   );
 }
 
-function NavItem({
-  href,
-  label,
-  emoji,
-  active = false,
-}: {
-  href: string;
-  label: string;
-  emoji: string;
-  active?: boolean;
-}) {
+function NavItem({ href, label, emoji, active = false }: { href: string; label: string; emoji: string; active?: boolean; }) {
   return (
-    <Link
-      href={href}
-      className={`block px-3 py-2 rounded-md text-sm ${
-        active ? 'bg-white/10' : 'hover:bg-white/10'
-      }`}
-    >
-      <span className="mr-2">{emoji}</span>
-      {label}
+    <Link href={href} className={`block px-3 py-2 rounded-md text-sm ${active ? 'bg-white/10' : 'hover:bg-white/10'}`}>
+      <span className="mr-2">{emoji}</span>{label}
     </Link>
   );
 }
@@ -244,7 +192,6 @@ function KpiCard({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-/** ---------- Typed table cells (allow className/colSpan, etc.) ---------- */
 type ThProps = React.ThHTMLAttributes<HTMLTableCellElement>;
 const Th = ({ className, ...rest }: ThProps) => (
   <th className={`text-left font-medium px-3 py-2 text-slate-600 ${className ?? ''}`} {...rest} />
@@ -255,28 +202,10 @@ const Td = ({ className, ...rest }: TdProps) => (
   <td className={`px-3 py-2 ${className ?? ''}`} {...rest} />
 );
 
-/** ---------- Small helpers ---------- */
-function num(n: unknown) {
-  return Number(n ?? 0) || 0;
-}
-function round(n: number) {
-  return Number(n.toFixed(2));
-}
-function avg(list: number[]) {
-  const arr = list.filter((x) => Number.isFinite(x));
-  return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
-}
-function valOrDash(n?: number | null) {
-  return n == null ? '–' : n;
-}
-function formatGBP(n: number) {
-  return n.toLocaleString();
-}
-function formatDate(s?: string | null) {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleDateString();
-  } catch {
-    return '—';
-  }
-}
+/** Helpers */
+function num(n: unknown) { return Number(n ?? 0) || 0; }
+function round(n: number) { return Number(n.toFixed(2)); }
+function avg(list: number[]) { const arr = list.filter((x) => Number.isFinite(x)); return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0; }
+function valOrDash(n?: number | null) { return n == null ? '–' : n; }
+function formatGBP(n: number) { return n.toLocaleString(); }
+function formatDate(s?: string | null) { if (!s) return '—'; try { return new Date(s).toLocaleDateString(); } catch { return '—'; } }
