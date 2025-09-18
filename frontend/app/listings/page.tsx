@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import nextDynamic from 'next/dynamic'
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet'
 
@@ -68,7 +68,13 @@ function ClientMap({
   }, [points, defaultCenter])
 
   return (
-    <MapContainer ref={setMap as any} center={defaultCenter} zoom={6} style={{ height: 400, width: '100%' }}>
+    <MapContainer
+      ref={setMap as any}
+      center={defaultCenter}
+      zoom={6}
+      // Fill the sticky container
+      style={{ height: '100%', width: '100%' }}
+    >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       {points.map(p => (
         <Marker key={p.id} position={{ lat: p.lat, lng: p.lng }}>
@@ -82,9 +88,77 @@ function ClientMap({
   )
 }
 
+function FiltersBar() {
+  const sp = useSearchParams()
+  const router = useRouter()
+
+  // ✅ narrow sp before using
+  const qInit    = sp ? sp.get('q')    ?? '' : ''
+  const minInit  = sp ? sp.get('min')  ?? '' : ''
+  const maxInit  = sp ? sp.get('max')  ?? '' : ''
+  const bedsInit = sp ? sp.get('beds') ?? '' : ''
+
+  const [q, setQ] = useState(qInit)
+  const [min, setMin] = useState(minInit)
+  const [max, setMax] = useState(maxInit)
+  const [beds, setBeds] = useState(bedsInit)
+
+  const apply = () => {
+    const p = new URLSearchParams()
+    if (q) p.set('q', q)
+    if (min) p.set('min', min)
+    if (max) p.set('max', max)
+    if (beds) p.set('beds', beds)
+    router.push(`/listings?${p.toString()}`)
+  }
+
+  return (
+    <div className="mb-4 grid grid-cols-2 md:grid-cols-5 gap-2">
+      <input
+        value={q}
+        onChange={e => setQ(e.target.value)}
+        placeholder="Search area, title or postcode"
+        className="border rounded px-3 py-2"
+      />
+      <input
+        value={min}
+        onChange={e => setMin(e.target.value)}
+        placeholder="Min £"
+        inputMode="numeric"
+        className="border rounded px-3 py-2"
+      />
+      <input
+        value={max}
+        onChange={e => setMax(e.target.value)}
+        placeholder="Max £"
+        inputMode="numeric"
+        className="border rounded px-3 py-2"
+      />
+      <input
+        value={beds}
+        onChange={e => setBeds(e.target.value)}
+        placeholder="Beds"
+        inputMode="numeric"
+        className="border rounded px-3 py-2"
+      />
+      <button
+        onClick={apply}
+        className="rounded bg-zinc-900 text-white px-3 py-2 hover:bg-zinc-800"
+      >
+        Apply
+      </button>
+    </div>
+  )
+}
+
+/** ----------------------- Listings (data) ----------------------- */
 function ListingsInner() {
   const searchParams = useSearchParams()
-  const q = searchParams?.get('q') ?? '' // ✅ safe: no “possibly null” error
+
+  const q    = searchParams?.get('q')    ?? ''
+  const minP = Number(searchParams?.get('min')  ?? '') || 0
+  const maxP = Number(searchParams?.get('max')  ?? '') || 0
+  const beds = Number(searchParams?.get('beds') ?? '') || 0
 
   const [rows, setRows] = useState<RawProperty[]>([])
   const [loading, setLoading] = useState(true)
@@ -95,9 +169,13 @@ function ListingsInner() {
       setLoading(true)
       const supabase = getSupabase()
 
-      // Optional simple filter on ?q=
-      const base = supabase.from('properties').select('*').limit(50)
-      const query = q ? base.or(`title.ilike.%${q}%,location.ilike.%${q}%`) : base
+      let query = supabase.from('properties').select('*').limit(200)
+
+      if (q)   query = query.or(`title.ilike.%${q}%,location.ilike.%${q}%`)
+      if (minP) query = query.gte('price', minP)
+      if (maxP) query = query.lte('price', maxP)
+      if (beds) query = query.gte('bedrooms', beds)
+
       const { data, error } = await query
 
       if (!cancelled) {
@@ -106,10 +184,8 @@ function ListingsInner() {
         setLoading(false)
       }
     })()
-    return () => {
-      cancelled = true
-    }
-  }, [q])
+    return () => { cancelled = true }
+  }, [q, minP, maxP, beds])
 
   const points = useMemo(() => {
     return rows
@@ -127,7 +203,10 @@ function ListingsInner() {
     <Section>
       <SectionTitle>Listings</SectionTitle>
 
-      <div className="grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-6">
+      <FiltersBar />
+
+      <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6">
+        {/* left: list */}
         <div className="space-y-3">
           {loading ? (
             <div className="p-4">Loading…</div>
@@ -138,7 +217,8 @@ function ListingsInner() {
           )}
         </div>
 
-        <div>
+        {/* right: sticky full-height map */}
+        <div className="md:sticky md:top-20 h-[calc(100vh-6rem)]">
           <ClientMap points={points} defaultCenter={[53.5, -2]} />
         </div>
       </div>
