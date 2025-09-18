@@ -15,6 +15,8 @@ type Deal = {
   saved_at?: string | null;
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function SavedDealsPage() {
   const [rows, setRows] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
