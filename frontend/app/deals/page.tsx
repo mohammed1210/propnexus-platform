@@ -1,1 +1,1 @@
-export { default } from '../../src/app/deals/page';
+export { default, dynamic } from '../saved/page'
