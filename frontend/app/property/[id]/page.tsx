@@ -53,9 +53,9 @@ type Property = {
 };
 
 function getBackendBase(): string {
-  const raw = (process?.env?.NEXT_PUBLIC_BACKEND_URL ?? '') as string;
-  if (!raw) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
-  return raw.replace(/\/+$/, '');
+  const raw = (process?.env?.NEXT_PUBLIC_API_URL ?? '') as string
+  if (!raw) throw new Error('NEXT_PUBLIC_API_URL is not set')
+  return raw.replace(/\/+$/, '')
 }
 
 export default function PropertyDetailsPage() {
@@ -70,7 +70,7 @@ export default function PropertyDetailsPage() {
     setLoading(true);
     try {
       const base = getBackendBase();
-      const resp = await fetch(`${base}/api/properties/${encodeURIComponent(propId)}`, { cache: 'no-store' });
+      const resp = await fetch(`${base}/properties/${encodeURIComponent(propId)}`, { cache: 'no-store' })
       if (!resp.ok) {
         console.error('Property fetch failed', resp.status, await resp.text());
         setProperty(null);

@@ -3,6 +3,5 @@
 .env.local
 node_modules
 /frontend/.env.local
-# keep sample env files
 !.env.example
 !frontend/.env.example
