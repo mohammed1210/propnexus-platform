@@ -17,6 +17,7 @@ type Deal = {
   roi_percent?: number | null;
   imageurl?: string | null;
   saved_at?: string | null;
+  investment_type?: string | null;
 };
 
 export const dynamic = 'force-dynamic';
@@ -41,7 +42,9 @@ export default function SavedDealsPage() {
         setLoading(false);
       }
     })();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   return (
@@ -72,18 +75,24 @@ export default function SavedDealsPage() {
 
               {/* body */}
               <div className="p-4 space-y-2">
-                <Link
-                  href={d.property_id ? `/property/${d.property_id}` : '#'}
-                  className="block font-medium hover:underline"
-                >
-                  {d.title ?? '—'}
-                </Link>
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    href={d.property_id ? `/property/${d.property_id}` : '#'}
+                    className="block font-medium hover:underline"
+                  >
+                    {d.title ?? '—'}
+                  </Link>
+                  {d.investment_type ? (
+                    <span className="shrink-0 text-xs px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
+                      {d.investment_type.toUpperCase()}
+                    </span>
+                  ) : null}
+                </div>
+
                 <div className="text-sm opacity-70">{d.location ?? '—'}</div>
 
                 <div className="flex items-center justify-between pt-1">
-                  <div className="font-semibold">
-                    £{(d.price ?? 0).toLocaleString()}
-                  </div>
+                  <div className="font-semibold">£{(d.price ?? 0).toLocaleString()}</div>
                   <div className="flex gap-2 text-xs">
                     <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
                       Yield {d.yield_percent ?? '—'}%
