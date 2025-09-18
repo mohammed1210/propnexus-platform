@@ -130,7 +130,7 @@ function ListingsInner() {
           ) : rows.length === 0 ? (
             <div className="p-4">No results.</div>
           ) : (
-            rows.map((r, i) => <PropertyCard key={`${r.id}-${i}`} property={r as any} />)
+            rows.map((r, i) => <PropertyCard key={`${r.id}-${i}`} p={r as any} />)
           )}
         </div>
 
