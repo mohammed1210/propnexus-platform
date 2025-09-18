@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import nextDynamic from 'next/dynamic'
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet'
 
@@ -83,9 +83,8 @@ function ClientMap({
 }
 
 function ListingsInner() {
-  const router = useRouter()
   const searchParams = useSearchParams()
-  const q = searchParams.get('q') ?? '' // safe query param (used in effect deps)
+  const q = searchParams?.get('q') ?? '' // ✅ safe: no “possibly null” error
 
   const [rows, setRows] = useState<RawProperty[]>([])
   const [loading, setLoading] = useState(true)
@@ -96,13 +95,9 @@ function ListingsInner() {
       setLoading(true)
       const supabase = getSupabase()
 
-      // Optional: apply a simple filter if q exists (title or location ilike)
-      // Adjust to your schema/indexes as needed.
+      // Optional simple filter on ?q=
       const base = supabase.from('properties').select('*').limit(50)
-      const query = q
-        ? base.or(`title.ilike.%${q}%,location.ilike.%${q}%`)
-        : base
-
+      const query = q ? base.or(`title.ilike.%${q}%,location.ilike.%${q}%`) : base
       const { data, error } = await query
 
       if (!cancelled) {
