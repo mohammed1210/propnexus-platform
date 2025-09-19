@@ -21,11 +21,12 @@ const nextConfig = {
     config.resolve.alias = {
       ...(config.resolve.alias ?? {}),
       // All paths relative to the FRONTEND folder
-      '@components': resolve(__dirname, 'src/components'),
-      '@details':    resolve(__dirname, 'src/components/property_details'),
-      '@map':        resolve(__dirname, 'src/components/map'),
-      '@lib':        resolve(__dirname, 'src/lib'),
-      '@app':        resolve(__dirname, 'src/app'),
+      '@components': resolve(__dirname, 'components'),
+      '@details':    resolve(__dirname, 'components/property_details'),
+      '@map':        resolve(__dirname, 'components/map'),
+      '@lib':        resolve(__dirname, 'lib'),
+      // REMOVE this alias entirely unless you truly need it
+      // '@app':     resolve(__dirname, 'app'),
     };
     return config;
   },
