@@ -31,6 +31,40 @@ type RawProperty = {
   investment_type?: string | null
 }
 
+/* ---------- filter options ---------- */
+const PRICE_MIN = [
+  { v: '', label: 'Min £' },
+  { v: '75000',  label: '£75k+' },
+  { v: '100000', label: '£100k+' },
+  { v: '150000', label: '£150k+' },
+  { v: '200000', label: '£200k+' },
+  { v: '300000', label: '£300k+' },
+  { v: '500000', label: '£500k+' },
+]
+const PRICE_MAX = [
+  { v: '', label: 'Max £' },
+  { v: '100000', label: '£100k' },
+  { v: '150000', label: '£150k' },
+  { v: '200000', label: '£200k' },
+  { v: '300000', label: '£300k' },
+  { v: '500000', label: '£500k' },
+  { v: '750000', label: '£750k' },
+]
+const BEDS = [
+  { v: '', label: 'Any beds' },
+  { v: '1', label: '1+ bed' },
+  { v: '2', label: '2+ beds' },
+  { v: '3', label: '3+ beds' },
+  { v: '4', label: '4+ beds' },
+]
+const TYPES = [
+  { v: '',     label: 'All types' },
+  { v: 'btl',  label: 'Buy-to-Let' },
+  { v: 'hmo',  label: 'HMO' },
+  { v: 'flip', label: 'Flip' },
+  { v: 'sa',   label: 'Serviced Accom' },
+]
+
 export default function ListingsPage() {
   return (
     <Suspense fallback={<div className="p-6">Loading…</div>}>
@@ -88,12 +122,11 @@ function ClientMap({
   )
 }
 
-/* --------------------------- Filters bar --------------------------- */
+/* --------------------- Filters bar (polished) --------------------- */
 function FiltersBar() {
   const sp = useSearchParams()
   const router = useRouter()
 
-  // Narrow sp before using
   const qInit    = sp ? sp.get('q')    ?? '' : ''
   const minInit  = sp ? sp.get('min')  ?? '' : ''
   const maxInit  = sp ? sp.get('max')  ?? '' : ''
@@ -119,62 +152,52 @@ function FiltersBar() {
   const reset = () => router.push('/listings')
 
   return (
-    <div className="mb-6 grid grid-cols-1 md:grid-cols-[2fr_repeat(4,1fr)_auto] gap-3 items-center">
-      {/* Big, prominent search */}
+    // (no outer margins here; wrapper handles sticky + padding)
+    <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-3 items-center">
+      {/* prominent search */}
       <input
         value={q}
         onChange={e => setQ(e.target.value)}
         placeholder="Search by area, title, or postcode"
-        className="border rounded-lg px-4 py-3 text-lg w-full shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        className="border rounded-lg px-4 py-3 text-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
       />
 
-      {/* Min/Max */}
-      <input
+      <select
         value={min}
         onChange={e => setMin(e.target.value)}
-        placeholder="Min £"
-        inputMode="numeric"
-        className="border rounded-lg px-3 py-2 w-full shadow-sm focus:ring-indigo-500"
-      />
-      <input
+        className="border rounded-lg px-3 py-2 w-full focus:ring-indigo-500 bg-white"
+      >
+        {PRICE_MIN.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
+      </select>
+
+      <select
         value={max}
         onChange={e => setMax(e.target.value)}
-        placeholder="Max £"
-        inputMode="numeric"
-        className="border rounded-lg px-3 py-2 w-full shadow-sm focus:ring-indigo-500"
-      />
+        className="border rounded-lg px-3 py-2 w-full focus:ring-indigo-500 bg-white"
+      >
+        {PRICE_MAX.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
+      </select>
 
-      {/* Beds dropdown */}
       <select
         value={beds}
         onChange={e => setBeds(e.target.value)}
-        className="border rounded-lg px-3 py-2 w-full shadow-sm focus:ring-indigo-500"
+        className="border rounded-lg px-3 py-2 w-full focus:ring-indigo-500 bg-white"
       >
-        <option value="">Any beds</option>
-        <option value="1">1+ bed</option>
-        <option value="2">2+ beds</option>
-        <option value="3">3+ beds</option>
-        <option value="4">4+ beds</option>
+        {BEDS.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
       </select>
 
-      {/* Investment type */}
       <select
         value={type}
         onChange={e => setType(e.target.value)}
-        className="border rounded-lg px-3 py-2 w-full shadow-sm focus:ring-indigo-500"
+        className="border rounded-lg px-3 py-2 w-full focus:ring-indigo-500 bg-white"
       >
-        <option value="">All types</option>
-        <option value="btl">Buy-to-Let</option>
-        <option value="hmo">HMO</option>
-        <option value="flip">Flip</option>
-        <option value="sa">Serviced Accom</option>
+        {TYPES.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
       </select>
 
-      {/* Actions */}
       <div className="flex gap-2">
         <button
           onClick={apply}
-          className="rounded-lg bg-indigo-600 text-white px-4 py-2.5 shadow-sm hover:bg-indigo-500 transition"
+          className="rounded-lg bg-indigo-600 text-white px-4 py-2.5 shadow-sm hover:bg-indigo-500"
         >
           Apply
         </button>
@@ -190,15 +213,15 @@ function FiltersBar() {
   )
 }
 
-/* ------------------------ Listings (data) ------------------------- */
+/* ----------------------- Listings (data) ----------------------- */
 function ListingsInner() {
   const searchParams = useSearchParams()
 
-  const q    = searchParams?.get('q')    ?? ''
-  const minP = Number(searchParams?.get('min')  ?? '') || 0
-  const maxP = Number(searchParams?.get('max')  ?? '') || 0
-  const beds = Number(searchParams?.get('beds') ?? '') || 0
-  const type = searchParams?.get('type') ?? '' // ✅ new
+  const q     = searchParams?.get('q')    ?? ''
+  const minP  = Number(searchParams?.get('min')  ?? '') || 0
+  const maxP  = Number(searchParams?.get('max')  ?? '') || 0
+  const beds  = Number(searchParams?.get('beds') ?? '') || 0
+  const type  = searchParams?.get('type') ?? ''
 
   const [rows, setRows] = useState<RawProperty[]>([])
   const [loading, setLoading] = useState(true)
@@ -215,7 +238,7 @@ function ListingsInner() {
       if (minP) query = query.gte('price', minP)
       if (maxP) query = query.lte('price', maxP)
       if (beds) query = query.gte('bedrooms', beds)
-      if (type) query = query.eq('investment_type', type) // ✅ filter by type if present
+      if (type) query = query.eq('investment_type', type)
 
       const { data, error } = await query
 
@@ -244,7 +267,16 @@ function ListingsInner() {
     <Section>
       <SectionTitle>Listings</SectionTitle>
 
-      <FiltersBar />
+      {/* Sticky wrapper for the filter bar */}
+      <div className="
+        sticky top-16 md:top-20 z-30
+        bg-white/80 dark:bg-zinc-950/80 backdrop-blur
+        supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-950/60
+        border border-zinc-200 dark:border-zinc-800
+        rounded-xl p-3 mb-6
+      ">
+        <FiltersBar />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6">
         {/* left: list */}
