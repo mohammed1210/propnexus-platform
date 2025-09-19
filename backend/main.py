@@ -4,6 +4,14 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
+# Routers (imports must be at top to satisfy Ruff E402)
+from routes import area_routes, comps_routes, gpt_routes, scrape_routes
+from routes.ai_routes import router as ai_routes
+from routes.notes import router as notes_router
+from routes.off_market_routes import router as off_market_router
+from routes.save_deal import router as save_deal_router
+from routes.stripe_routes import router as stripe_router
 from supabase import Client, create_client
 
 # -----------------------------
@@ -60,15 +68,8 @@ async def api_health():
 
 
 # -----------------------------
-# Routers
+# Routers wiring
 # -----------------------------
-from routes import area_routes, comps_routes, gpt_routes, scrape_routes
-from routes.ai_routes import router as ai_routes
-from routes.notes import router as notes_router
-from routes.off_market_routes import router as off_market_router
-from routes.save_deal import router as save_deal_router
-from routes.stripe_routes import router as stripe_router
-
 app.include_router(save_deal_router)
 app.include_router(notes_router)
 app.include_router(gpt_routes.router)
