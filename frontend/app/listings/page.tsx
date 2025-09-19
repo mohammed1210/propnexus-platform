@@ -28,42 +28,7 @@ type RawProperty = {
   imageurl?: string | null
   latitude?: number | null
   longitude?: number | null
-  investment_type?: string | null
 }
-
-/* ---------- filter options ---------- */
-const PRICE_MIN = [
-  { v: '', label: 'Min £' },
-  { v: '75000',  label: '£75k+' },
-  { v: '100000', label: '£100k+' },
-  { v: '150000', label: '£150k+' },
-  { v: '200000', label: '£200k+' },
-  { v: '300000', label: '£300k+' },
-  { v: '500000', label: '£500k+' },
-]
-const PRICE_MAX = [
-  { v: '', label: 'Max £' },
-  { v: '100000', label: '£100k' },
-  { v: '150000', label: '£150k' },
-  { v: '200000', label: '£200k' },
-  { v: '300000', label: '£300k' },
-  { v: '500000', label: '£500k' },
-  { v: '750000', label: '£750k' },
-]
-const BEDS = [
-  { v: '', label: 'Any beds' },
-  { v: '1', label: '1+ bed' },
-  { v: '2', label: '2+ beds' },
-  { v: '3', label: '3+ beds' },
-  { v: '4', label: '4+ beds' },
-]
-const TYPES = [
-  { v: '',     label: 'All types' },
-  { v: 'btl',  label: 'Buy-to-Let' },
-  { v: 'hmo',  label: 'HMO' },
-  { v: 'flip', label: 'Flip' },
-  { v: 'sa',   label: 'Serviced Accom' },
-]
 
 export default function ListingsPage() {
   return (
@@ -122,22 +87,21 @@ function ClientMap({
   )
 }
 
-/* --------------------- Filters bar (polished) --------------------- */
+/** ----------------------- Sticky filters bar ----------------------- */
 function FiltersBar() {
   const sp = useSearchParams()
   const router = useRouter()
 
+  // Narrow before use
   const qInit    = sp ? sp.get('q')    ?? '' : ''
   const minInit  = sp ? sp.get('min')  ?? '' : ''
   const maxInit  = sp ? sp.get('max')  ?? '' : ''
   const bedsInit = sp ? sp.get('beds') ?? '' : ''
-  const typeInit = sp ? sp.get('type') ?? '' : ''
 
   const [q, setQ]       = useState(qInit)
   const [min, setMin]   = useState(minInit)
   const [max, setMax]   = useState(maxInit)
   const [beds, setBeds] = useState(bedsInit)
-  const [type, setType] = useState(typeInit)
 
   const apply = () => {
     const p = new URLSearchParams()
@@ -145,66 +109,51 @@ function FiltersBar() {
     if (min)  p.set('min', min)
     if (max)  p.set('max', max)
     if (beds) p.set('beds', beds)
-    if (type) p.set('type', type)
     router.push(`/listings?${p.toString()}`)
   }
 
-  const reset = () => router.push('/listings')
-
   return (
-    // (no outer margins here; wrapper handles sticky + padding)
-    <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] gap-3 items-center">
-      {/* prominent search */}
+    <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
       <input
         value={q}
         onChange={e => setQ(e.target.value)}
-        placeholder="Search by area, title, or postcode"
-        className="border rounded-lg px-4 py-3 text-lg w-full focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+        placeholder="Search area, title, or postcode"
+        className="md:col-span-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90"
       />
-
-      <select
+      <input
         value={min}
         onChange={e => setMin(e.target.value)}
-        className="border rounded-lg px-3 py-2 w-full focus:ring-indigo-500 bg-white"
-      >
-        {PRICE_MIN.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
-      </select>
-
-      <select
+        placeholder="Min £"
+        inputMode="numeric"
+        className="border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90"
+      />
+      <input
         value={max}
         onChange={e => setMax(e.target.value)}
-        className="border rounded-lg px-3 py-2 w-full focus:ring-indigo-500 bg-white"
-      >
-        {PRICE_MAX.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
-      </select>
-
-      <select
+        placeholder="Max £"
+        inputMode="numeric"
+        className="border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90"
+      />
+      <input
         value={beds}
         onChange={e => setBeds(e.target.value)}
-        className="border rounded-lg px-3 py-2 w-full focus:ring-indigo-500 bg-white"
-      >
-        {BEDS.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
-      </select>
-
-      <select
-        value={type}
-        onChange={e => setType(e.target.value)}
-        className="border rounded-lg px-3 py-2 w-full focus:ring-indigo-500 bg-white"
-      >
-        {TYPES.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
-      </select>
-
+        placeholder="Any beds"
+        inputMode="numeric"
+        className="border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90"
+      />
       <div className="flex gap-2">
         <button
           onClick={apply}
-          className="rounded-lg bg-indigo-600 text-white px-4 py-2.5 shadow-sm hover:bg-indigo-500"
+          className="flex-1 rounded-xl bg-indigo-600 text-white px-3 py-2 hover:bg-indigo-500"
         >
           Apply
         </button>
         <button
-          onClick={reset}
-          className="rounded-lg border px-4 py-2.5 hover:bg-zinc-50"
-          title="Clear filters"
+          onClick={() => {
+            setQ(''); setMin(''); setMax(''); setBeds('');
+            router.push('/listings')
+          }}
+          className="rounded-xl border px-3 py-2"
         >
           Reset
         </button>
@@ -213,15 +162,14 @@ function FiltersBar() {
   )
 }
 
-/* ----------------------- Listings (data) ----------------------- */
+/** ----------------------- Listings (data) ----------------------- */
 function ListingsInner() {
   const searchParams = useSearchParams()
 
-  const q     = searchParams?.get('q')    ?? ''
-  const minP  = Number(searchParams?.get('min')  ?? '') || 0
-  const maxP  = Number(searchParams?.get('max')  ?? '') || 0
-  const beds  = Number(searchParams?.get('beds') ?? '') || 0
-  const type  = searchParams?.get('type') ?? ''
+  const q    = searchParams?.get('q')    ?? ''
+  const minP = Number(searchParams?.get('min')  ?? '') || 0
+  const maxP = Number(searchParams?.get('max')  ?? '') || 0
+  const beds = Number(searchParams?.get('beds') ?? '') || 0
 
   const [rows, setRows] = useState<RawProperty[]>([])
   const [loading, setLoading] = useState(true)
@@ -238,7 +186,6 @@ function ListingsInner() {
       if (minP) query = query.gte('price', minP)
       if (maxP) query = query.lte('price', maxP)
       if (beds) query = query.gte('bedrooms', beds)
-      if (type) query = query.eq('investment_type', type)
 
       const { data, error } = await query
 
@@ -249,7 +196,7 @@ function ListingsInner() {
       }
     })()
     return () => { cancelled = true }
-  }, [q, minP, maxP, beds, type])
+  }, [q, minP, maxP, beds])
 
   const points = useMemo(() => {
     return rows
@@ -267,18 +214,14 @@ function ListingsInner() {
     <Section>
       <SectionTitle>Listings</SectionTitle>
 
-      {/* Sticky wrapper for the filter bar */}
-      <div className="
-        sticky top-16 md:top-20 z-30
-        bg-white/80 dark:bg-zinc-950/80 backdrop-blur
-        supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-950/60
-        border border-zinc-200 dark:border-zinc-800
-        rounded-xl p-3 mb-6
-      ">
-        <FiltersBar />
+      {/* Sticky shell directly under site header (assumes header ~56px tall) */}
+      <div className="sticky top-[56px] z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-zinc-200/70 dark:border-zinc-800/70">
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          <FiltersBar />
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6 pt-4">
         {/* left: list */}
         <div className="space-y-3">
           {loading ? (
