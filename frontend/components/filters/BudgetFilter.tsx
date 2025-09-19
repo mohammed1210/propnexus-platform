@@ -29,7 +29,7 @@ function parseIntSafe(v: string | null) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Serialise as price=MIN-MAX (nulls omitted), e.g., "price=150000-300000", "price=-300000", "price=500000-"
+// Serialise as price=MIN-MAX (nulls omitted)
 function encodePriceParam(min: number | null, max: number | null) {
   const left = min != null ? String(min) : '';
   const right = max != null ? String(max) : '';
@@ -42,7 +42,10 @@ function decodePriceParam(raw: string | null): { min: number | null; max: number
   const [a, b] = raw.split('-');
   const min = a ? parseInt(a, 10) : null;
   const max = b ? parseInt(b, 10) : null;
-  return { min: Number.isFinite(min as number) ? (min as number) : null, max: Number.isFinite(max as number) ? (max as number) : null };
+  return {
+    min: Number.isFinite(min as number) ? (min as number) : null,
+    max: Number.isFinite(max as number) ? (max as number) : null,
+  };
 }
 
 export default function BudgetFilter({
@@ -58,11 +61,15 @@ export default function BudgetFilter({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const sp = useSearchParams();
+
+  // --- helpers that safely read the URL params (no “possibly null”) ---
+  const spGet = (key: string) => (sp ? sp.get(key) : null);
+  const spToString = () => (sp ? sp.toString() : '');
 
   // read initial state from URL or localStorage
   const initial = useMemo(() => {
-    const fromUrl = decodePriceParam(searchParams.get('price'));
+    const fromUrl = decodePriceParam(spGet('price'));
     if (fromUrl.min != null || fromUrl.max != null) return fromUrl;
 
     try {
@@ -70,7 +77,8 @@ export default function BudgetFilter({
       if (raw) return JSON.parse(raw) as { min: number | null; max: number | null };
     } catch {}
     return { min: null, max: null };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally not depending on URL/localStorage for initial load
 
   const [min, setMin] = useState<number | null>(initial.min);
   const [max, setMax] = useState<number | null>(initial.max);
@@ -78,7 +86,7 @@ export default function BudgetFilter({
   // keep URL in sync (debounced-ish)
   useEffect(() => {
     const t = setTimeout(() => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(spToString()); // ✅ safe
       const encoded = encodePriceParam(min, max);
       if (encoded) {
         params.set('price', encoded);
@@ -93,7 +101,9 @@ export default function BudgetFilter({
       } catch {}
     }, 200);
     return () => clearTimeout(t);
-  }, [min, max]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [min, max, pathname, router]); // (params source comes from spToString())
+  // --------------------------------------------------------------------
 
   // handle input changes
   const onMinChange = (v: string) => {
@@ -128,7 +138,7 @@ export default function BudgetFilter({
     return PRESETS.find(p => (p.min ?? null) === (min ?? null) && (p.max ?? null) === (max ?? null))?.label ?? null;
   }, [min, max]);
 
-  // (Optional) dual slider only on wide screens for progressive enhancement
+  // (Optional) dual slider only on wide screens
   const showSlider = typeof window !== 'undefined' && window.innerWidth >= 1024;
 
   return (
