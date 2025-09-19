@@ -214,12 +214,12 @@ function ListingsInner() {
     <Section>
       <SectionTitle>Listings</SectionTitle>
 
-      {/* Sticky shell directly under site header (assumes header ~56px tall) */}
-      <div className="sticky top-[56px] z-30 bg-white/80 dark:bg-zinc-950/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-zinc-200/70 dark:border-zinc-800/70">
-        <div className="max-w-6xl mx-auto px-4 py-3">
-          <FiltersBar />
-        </div>
-      </div>
+      {/* Sticky shell directly under site header */}
+<div className="sticky [top:var(--header-h,56px)] z-30 bg-white dark:bg-zinc-950 border-b border-zinc-200/80 dark:border-zinc-800/80 shadow-sm">
+  <div className="max-w-6xl mx-auto px-4 py-3">
+    <FiltersBar />
+  </div>
+</div>
 
       <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6 pt-4">
         {/* left: list */}
