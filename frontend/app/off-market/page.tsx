@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import { getSupabase } from '@/lib/supabaseClient';
+import { apiPost } from '@/lib/api';
 
 type OffMarket = {
   id: string;
@@ -14,7 +15,7 @@ type OffMarket = {
   bathrooms?: number | null;
   investment_type?: string | null;
   contact?: string | null;
-  source?: string | null;       // could be domain or label
+  source?: string | null;
   notes?: string | null;
   created_at?: string | null;
 };
@@ -25,18 +26,26 @@ export default function OffMarketPage() {
   const [rows, setRows] = useState<OffMarket[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // form state for generator
+  const [loc, setLoc] = useState('Liverpool');
+  const [budget, setBudget] = useState<string>('250000');
+  const [count, setCount] = useState<string>('3');
+  const [generating, setGenerating] = useState(false);
+
+  const sb = useMemo(() => getSupabase(), []);
+
+  // load from Supabase
   useEffect(() => {
     let ignore = false;
     (async () => {
       setLoading(true);
-      const sb = getSupabase();
       const { data, error } = await sb
         .from('off_market_deals')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (!ignore) {
-        if (error) console.error('off_market_deals load', error);
+        if (error) console.error('off_market_deals', error);
         setRows((data as OffMarket[]) ?? []);
         setLoading(false);
       }
@@ -44,52 +53,142 @@ export default function OffMarketPage() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [sb]);
 
-  const count = rows.length;
-  const avgPrice = useMemo(() => {
-    if (!rows.length) return 0;
-    const sum = rows.reduce((s, r) => s + Number(r.price ?? 0), 0);
-    return Math.round(sum / rows.length);
-  }, [rows]);
+  // call backend → parse JSON string → upsert → refresh UI
+  const generateDeals = async () => {
+    const numBudget = Number(budget || 0);
+    const numCount = Math.max(1, Math.min(10, Number(count || 3)));
+    if (!loc || !Number.isFinite(numBudget)) {
+      alert('Please enter a location and a valid budget.');
+      return;
+    }
+
+    setGenerating(true);
+    try {
+      // Backend route from routes/off_market_routes.py (no prefix):
+      // @router.post("/generate-off-market")
+      const res: { deals: string } = await apiPost('/generate-off-market', {
+  location: loc,
+  budget: numBudget,
+  count: numCount,
+});
+
+      // The model returns a string that should be a JSON array
+      let parsed: any[] = [];
+      try {
+        parsed = JSON.parse(res.deals);
+      } catch {
+        // Sometimes models wrap in code fences or add text. Try a loose extraction.
+        const match = res.deals.match(/\[([\s\S]*)\]/);
+        if (match) parsed = JSON.parse(match[0]);
+      }
+
+      if (!Array.isArray(parsed) || parsed.length === 0) {
+        throw new Error('Unexpected response format from generator.');
+      }
+
+      // Map to our table shape
+      const nowIso = new Date().toISOString();
+      const payload = parsed.map((p, i) => ({
+        // Rely on db default UUID; we don’t set id here
+        title: p.title || p.address || `Off-market deal ${i + 1}`,
+        location: p.location || loc,
+        price: Number(p.price ?? p.asking_price ?? 0) || null,
+        bedrooms: Number(p.bedrooms ?? null),
+        bathrooms: Number(p.bathrooms ?? null),
+        investment_type: p.investment_type || 'HMO',
+        contact: p.contact || null,
+        source: 'AI generated',
+        notes: p.description || p.notes || null,
+        created_at: nowIso,
+      }));
+
+      // Optional simple de-dupe (same title+price)
+      const existingKey = new Set(
+        rows.map(r => `${(r.title || '').trim().toLowerCase()}|${r.price ?? ''}`)
+      );
+      const toInsert = payload.filter(
+        d => !existingKey.has(`${(d.title || '').trim().toLowerCase()}|${d.price ?? ''}`)
+      );
+
+      if (toInsert.length === 0) {
+        alert('No new unique deals to insert.');
+        return;
+      }
+
+      const { data, error } = await sb.from('off_market_deals').insert(toInsert).select('*');
+      if (error) throw error;
+
+      // Optimistically prepend new rows to the UI
+      setRows(prev => [...(data as OffMarket[]), ...prev]);
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'Failed to generate / save deals.');
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   return (
     <Section>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between gap-4 mb-4">
         <SectionTitle>Off-Market Deals</SectionTitle>
-        {count > 0 && (
-          <div className="hidden sm:flex gap-2 text-sm">
-            <Kpi label="Deals" value={count} />
-            <Kpi label="Avg Price" value={`£${avgPrice.toLocaleString()}`} />
-          </div>
-        )}
+
+        {/* generator controls (compact on mobile) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            className="border rounded-lg px-3 py-2 w-[160px]"
+            placeholder="Location"
+            value={loc}
+            onChange={e => setLoc(e.target.value)}
+          />
+          <input
+            className="border rounded-lg px-3 py-2 w-[120px]"
+            placeholder="Budget £"
+            inputMode="numeric"
+            value={budget}
+            onChange={e => setBudget(e.target.value)}
+          />
+          <input
+            className="border rounded-lg px-3 py-2 w-[90px]"
+            placeholder="Count"
+            inputMode="numeric"
+            value={count}
+            onChange={e => setCount(e.target.value)}
+          />
+          <button
+            onClick={generateDeals}
+            disabled={generating}
+            className="rounded-lg bg-indigo-600 text-white px-3 py-2 hover:bg-indigo-500 disabled:opacity-60"
+          >
+            {generating ? 'Generating…' : 'Generate Deals'}
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <div className="p-4">Loading…</div>
       ) : rows.length === 0 ? (
-        <div className="p-4 rounded-xl border bg-amber-50/60 text-amber-900">
-          No off-market deals yet.
-        </div>
+        <div className="p-4">No off-market deals yet.</div>
       ) : (
         <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {rows.map((d) => (
+          {rows.map(d => (
             <li
               key={d.id}
-              className="rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-sm hover:shadow-md transition"
+              className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 shadow-sm"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="font-semibold leading-snug">{d.title ?? '—'}</div>
-                <span className="text-[11px] px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300 tracking-wide">
+              <div className="flex items-start justify-between">
+                <div className="font-medium">{d.title ?? '—'}</div>
+                <span className="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
                   {d.investment_type ?? '—'}
                 </span>
               </div>
-
               <div className="text-sm opacity-70">{d.location ?? '—'}</div>
 
               <div className="mt-2 flex items-center justify-between">
                 <div className="font-semibold">
-                  £{Number(d.price ?? 0).toLocaleString('en-GB')}
+                  £{Number(d.price ?? 0).toLocaleString()}
                 </div>
                 <div className="text-xs opacity-70">
                   {d.bedrooms ?? 0} beds • {d.bathrooms ?? 0} baths
@@ -101,16 +200,14 @@ export default function OffMarketPage() {
               <div className="mt-3 flex items-center justify-between text-sm">
                 <span className="opacity-70">{d.source ?? '—'}</span>
                 {d.contact ? (
-                  <a className="underline" href={`mailto:${d.contact}`}>
-                    Contact
-                  </a>
+                  <a className="underline" href={`mailto:${d.contact}`}>Contact</a>
                 ) : (
                   <span className="opacity-50">No contact</span>
                 )}
               </div>
 
               <div className="mt-2 text-xs opacity-60">
-                Added {formatDate(d.created_at)}
+                Added {d.created_at ? new Date(d.created_at).toLocaleDateString() : '—'}
               </div>
             </li>
           ))}
@@ -118,22 +215,4 @@ export default function OffMarketPage() {
       )}
     </Section>
   );
-}
-
-function Kpi({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2">
-      <div className="text-[11px] uppercase tracking-wide opacity-60">{label}</div>
-      <div className="text-sm font-semibold">{value}</div>
-    </div>
-  );
-}
-
-function formatDate(s?: string | null) {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleDateString('en-GB');
-  } catch {
-    return '—';
-  }
 }
