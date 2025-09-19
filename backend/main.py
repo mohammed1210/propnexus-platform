@@ -1,6 +1,6 @@
 # backend/main.py
 import os
-import logging
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,6 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # -----------------------------
 # Root + health
 # -----------------------------
@@ -47,18 +48,21 @@ app.add_middleware(
 async def root():
     return {"message": "PropNexus backend is running."}
 
+
 @app.get("/health")
 async def health():
     return {"ok": True}
+
 
 @app.get("/api/health")
 async def api_health():
     return {"ok": True}
 
+
 # -----------------------------
 # Routers
 # -----------------------------
-from routes import scrape_routes, area_routes, comps_routes, gpt_routes
+from routes import area_routes, comps_routes, gpt_routes, scrape_routes
 from routes.ai_routes import router as ai_routes
 from routes.notes import router as notes_router
 from routes.off_market_routes import router as off_market_router
@@ -75,6 +79,7 @@ app.include_router(scrape_routes.router)
 app.include_router(off_market_router)
 app.include_router(stripe_router)
 
+
 # -----------------------------
 # Supabase property endpoints
 # -----------------------------
@@ -84,6 +89,7 @@ async def get_properties():
         raise HTTPException(status_code=500, detail="Supabase not configured")
     return supabase.table("properties").select("*").execute().data
 
+
 @app.get("/properties/{property_id}")
 async def get_property_by_id(property_id: str):
     if not supabase:
@@ -92,6 +98,7 @@ async def get_property_by_id(property_id: str):
     if not res.data:
         raise HTTPException(status_code=404, detail="Property not found")
     return res.data[0]
+
 
 @app.get("/api/properties/{property_id}")
 async def get_property_by_id_alias(property_id: str):

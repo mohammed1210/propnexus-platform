@@ -15,6 +15,7 @@ may wish to adapt them accordingly.
 """
 
 import os
+
 from supabase import create_client
 
 # Import scrapers lazily inside functions to avoid heavy imports when
@@ -36,8 +37,8 @@ def daily_scrape() -> None:
     to meet your requirements.
     """
     # Avoid circular imports by importing inside the function
-    from scraper.zoopla_scraper import scrape_zoopla_properties
     from scraper.rightmove_scraper import scrape_rightmove_properties
+    from scraper.zoopla_scraper import scrape_zoopla_properties
 
     # Define the locations you want to scrape daily. You may replace
     # these with user-defined favourites or the most active markets.

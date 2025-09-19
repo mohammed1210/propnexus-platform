@@ -18,9 +18,10 @@ SUPABASE_URL and the appropriate key are not set, the `/metrics`
 endpoint will raise a 500 error to signal misconfiguration.
 """
 
+import os
+
 from fastapi import APIRouter, HTTPException
 from supabase import create_client
-import os
 
 router = APIRouter()
 
@@ -61,8 +62,12 @@ async def metrics() -> dict[str, int]:
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     try:
-        props_count = len(supabase.table("properties").select("id").execute().data or [])
-        saved_count = len(supabase.table("saved_deals").select("id").execute().data or [])
+        props_count = len(
+            supabase.table("properties").select("id").execute().data or []
+        )
+        saved_count = len(
+            supabase.table("saved_deals").select("id").execute().data or []
+        )
         notes_count = len(supabase.table("notes").select("id").execute().data or [])
         return {
             "properties": props_count,

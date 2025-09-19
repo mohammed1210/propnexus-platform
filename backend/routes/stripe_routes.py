@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Request, Query
-from pydantic import BaseModel
-import stripe
-import os
 import json
 import logging
-from utils.billing import upsert_subscription, get_entitlement_by_email
+import os
+
+import stripe
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel
+from utils.billing import get_entitlement_by_email, upsert_subscription
 
 router = APIRouter()
 log = logging.getLogger(__name__)
@@ -12,14 +13,17 @@ log = logging.getLogger(__name__)
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
+
 class CheckoutPayload(BaseModel):
     price_id: str
     customer_email: str
     mode: str = "subscription"
     metadata: dict | None = None
 
+
 class PortalPayload(BaseModel):
     customer_id: str
+
 
 @router.post("/stripe/create-checkout-session")
 def create_checkout_session(payload: CheckoutPayload):
@@ -38,6 +42,7 @@ def create_checkout_session(payload: CheckoutPayload):
         log.exception("create_checkout_session failed")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.post("/stripe/create-portal-session")
 def create_portal_session(payload: PortalPayload):
     try:
@@ -50,9 +55,11 @@ def create_portal_session(payload: PortalPayload):
         log.exception("create_portal_session failed")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/me/entitlement")
 def get_entitlement(email: str = Query(...)):
     return get_entitlement_by_email(email)
+
 
 @router.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
@@ -79,7 +86,9 @@ async def stripe_webhook(request: Request):
             subscription_id = data.get("subscription")
             if subscription_id and customer_id and email:
                 sub = stripe.Subscription.retrieve(subscription_id)
-                upsert_subscription(email=email, stripe_customer_id=customer_id, subscription=sub)
+                upsert_subscription(
+                    email=email, stripe_customer_id=customer_id, subscription=sub
+                )
 
         elif t in ("customer.subscription.created", "customer.subscription.updated"):
             sub = data
@@ -87,7 +96,9 @@ async def stripe_webhook(request: Request):
             customer = stripe.Customer.retrieve(customer_id) if customer_id else None
             email = customer.email if customer else None
             if email and customer_id:
-                upsert_subscription(email=email, stripe_customer_id=customer_id, subscription=sub)
+                upsert_subscription(
+                    email=email, stripe_customer_id=customer_id, subscription=sub
+                )
 
         elif t == "customer.subscription.deleted":
             sub = data
@@ -95,7 +106,9 @@ async def stripe_webhook(request: Request):
             customer = stripe.Customer.retrieve(customer_id) if customer_id else None
             email = customer.email if customer else None
             if email and customer_id:
-                upsert_subscription(email=email, stripe_customer_id=customer_id, subscription=sub)
+                upsert_subscription(
+                    email=email, stripe_customer_id=customer_id, subscription=sub
+                )
 
     except Exception:
         log.exception("Failed to upsert subscription from webhook")

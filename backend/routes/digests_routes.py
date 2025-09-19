@@ -1,12 +1,16 @@
 # backend/routes/digests_routes.py
+import os
+
+import requests
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-import os, requests
 
 router = APIRouter(prefix="/digests", tags=["digests"])
 
+
 class TestDigestReq(BaseModel):
     to: str
+
 
 @router.post("/test")
 def send_test_digest(body: TestDigestReq):
@@ -31,4 +35,3 @@ def send_test_digest(body: TestDigestReq):
     if resp.status_code >= 400:
         raise HTTPException(status_code=500, detail=f"Mailgun error: {resp.text}")
     return {"ok": True}
-    

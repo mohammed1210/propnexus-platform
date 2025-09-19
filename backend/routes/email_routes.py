@@ -18,10 +18,11 @@ You can call this endpoint from the frontend or from scheduled
 tasks. It expects a JSON body with `to`, `subject` and `text` fields.
 """
 
+import os
+
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-import os
-import httpx
 
 router = APIRouter()
 
@@ -33,6 +34,7 @@ FROM_EMAIL = os.getenv("FROM_EMAIL") or "PropNexus <no-reply@example.com>"
 
 class EmailRequest(BaseModel):
     """Schema for email send requests."""
+
     to: str
     subject: str
     text: str

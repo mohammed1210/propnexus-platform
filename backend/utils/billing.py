@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timezone
-from supabase import create_client, Client
+
+from supabase import Client, create_client
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -9,10 +10,12 @@ supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+
 def _dt_from_ts(ts: int | None):
     if not ts:
         return None
     return datetime.fromtimestamp(int(ts), tz=timezone.utc)
+
 
 def get_or_create_customer(email: str, stripe_customer_id: str | None):
     if supabase is None:
@@ -23,8 +26,14 @@ def get_or_create_customer(email: str, stripe_customer_id: str | None):
     if stripe_customer_id:
         data["stripe_customer_id"] = stripe_customer_id
 
-    resp = supabase.table("customers").upsert(data, on_conflict="email").select("*").execute()
+    resp = (
+        supabase.table("customers")
+        .upsert(data, on_conflict="email")
+        .select("*")
+        .execute()
+    )
     return resp.data[0] if resp.data else None
+
 
 def upsert_subscription(email: str, stripe_customer_id: str, subscription):
     """
@@ -37,7 +46,9 @@ def upsert_subscription(email: str, stripe_customer_id: str, subscription):
         return None
 
     # ensure customer exists
-    customer = get_or_create_customer(email=email, stripe_customer_id=stripe_customer_id)
+    customer = get_or_create_customer(
+        email=email, stripe_customer_id=stripe_customer_id
+    )
     if not customer:
         return None
 
@@ -49,10 +60,14 @@ def upsert_subscription(email: str, stripe_customer_id: str, subscription):
         "raw": subscription,  # store full for debugging
     }
 
-    resp = supabase.table("subscriptions").upsert(
-        sub_data, on_conflict="stripe_subscription_id"
-    ).select("*").execute()
+    resp = (
+        supabase.table("subscriptions")
+        .upsert(sub_data, on_conflict="stripe_subscription_id")
+        .select("*")
+        .execute()
+    )
     return resp.data[0] if resp.data else None
+
 
 def get_entitlement_by_email(email: str) -> dict:
     if supabase is None:
