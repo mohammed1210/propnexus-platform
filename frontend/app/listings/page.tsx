@@ -49,7 +49,7 @@ function ClientMap({
 
   const fitToPoints = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return
-    const bounds: LatLngBoundsExpression = pts.map(p => [p.lat, p.lng]) as LatLngBoundsExpression
+    const bounds: LatLngBoundsExpression = pts.map(p => [p.lat, p.lng]) as unknown as LatLngBoundsExpression
     m.fitBounds(bounds, { padding: [24, 24] })
   }
 
@@ -150,7 +150,7 @@ function FiltersBar() {
         </button>
         <button
           onClick={() => {
-            setQ(''); setMin(''); setMax(''); setBeds('');
+            setQ(''); setMin(''); setMax(''); setBeds('')
             router.push('/listings')
           }}
           className="rounded-xl border px-3 py-2"
@@ -215,11 +215,11 @@ function ListingsInner() {
       <SectionTitle>Listings</SectionTitle>
 
       {/* Sticky shell directly under site header */}
-<div className="sticky [top:var(--header-h,56px)] z-30 bg-white dark:bg-zinc-950 border-b border-zinc-200/80 dark:border-zinc-800/80 shadow-sm">
-  <div className="max-w-6xl mx-auto px-4 py-3">
-    <FiltersBar />
-  </div>
-</div>
+      <div className="sticky [top:var(--header-h,56px)] z-30 bg-white dark:bg-zinc-950 border-b border-zinc-200/80 dark:border-zinc-800/80 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-3">
+          <FiltersBar />
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-[3fr_2fr] gap-6 pt-4">
         {/* left: list */}
