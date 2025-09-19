@@ -1,16 +1,14 @@
 // frontend/next.config.mjs
 import { fileURLToPath } from 'url';
-import path, { dirname, resolve } from 'path';
+import { dirname, resolve } from 'path';
 
-// ESM-safe __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = dirname(__filename);
 
 const nextConfig = {
-  reactStrictMode: false,
+  reactStrictMode: true,
 
-  // Tell Next where the real workspace root is (one level up).
-  // This silences the multiple lockfiles warning.
+  // Silence multiple-lockfiles warning in monorepos
   outputFileTracingRoot: resolve(__dirname, '..'),
 
   images: {
@@ -21,11 +19,11 @@ const nextConfig = {
     config.resolve.alias = {
       ...(config.resolve.alias ?? {}),
       // All paths relative to the FRONTEND folder
-      '@components': resolve(__dirname, 'src/components'),
-      '@details':    resolve(__dirname, 'src/components/property_details'),
-      '@map':        resolve(__dirname, 'src/components/map'),
-      '@lib':        resolve(__dirname, 'src/lib'),
-      '@app':        resolve(__dirname, 'src/app'),
+      '@components': resolve(__dirname, 'components'),
+      '@details':    resolve(__dirname, 'components/property_details'),
+      '@map':        resolve(__dirname, 'components/map'),
+      '@lib':        resolve(__dirname, 'lib'),
+      '@':           resolve(__dirname, '.'), // allow imports like "@/lib/supabaseClient"
     };
     return config;
   },

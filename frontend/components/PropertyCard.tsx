@@ -2,6 +2,7 @@ import Link from 'next/link';
 import styles from './PropertyCard.module.css';
 import FallbackImage from './FallbackImage';
 import { fmtGBP, fmtPct, plural } from '../lib/format';
+import { getSupabase } from '@/lib/supabaseClient';
 
 export type Property = {
   id: string;
@@ -17,6 +18,31 @@ export type Property = {
 
 export default function PropertyCard({ p }: { p: Property }) {
   if (!p) return null;
+
+  async function handleSaveDeal() {
+    const sb = getSupabase();
+    const { error } = await sb.from('saved_deals').insert([
+      {
+        property_id: p.id,
+        title: p.title,
+        location: p.location,
+        price: p.price,
+        bedrooms: p.bedrooms,
+        bathrooms: p.bathrooms,
+        yield_percent: p.yield_percent,
+        roi_percent: p.roi_percent,
+        imageurl: p.imageurl,
+        saved_at: new Date().toISOString(),
+      },
+    ]);
+
+    if (error) {
+      console.error('Error saving deal:', error);
+      alert('❌ Failed to save deal');
+    } else {
+      alert('✅ Deal saved successfully');
+    }
+  }
 
   return (
     <article className={styles.card}>
@@ -56,7 +82,7 @@ export default function PropertyCard({ p }: { p: Property }) {
 
         {/* Buttons fixed in their own row */}
         <div className={styles.buttons}>
-          <button className={styles.save} type="button">
+          <button className={styles.save} type="button" onClick={handleSaveDeal}>
             Save Deal
           </button>
           <Link className={styles.detailsBtn} href={`/property/${p.id}`}>
