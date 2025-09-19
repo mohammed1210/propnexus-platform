@@ -46,6 +46,11 @@ h1, h2, h3, p { margin: 0; padding: 0; }
   box-shadow: var(--shadow);
 }
 
+/* your global resets */
+:root { color-scheme: light dark; }
+html, body, :root { height: 100%; }
+* { box-sizing: border-box; }
+
 /* ========================================
 2️⃣ CONTAINER LAYOUTS
 ======================================== */
