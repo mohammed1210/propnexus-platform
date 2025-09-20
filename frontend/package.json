@@ -21,6 +21,7 @@
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.39.4",
     "chart.js": "^4.5.0",
+    "clsx": "^2.1.1",
     "html2pdf.js": "^0.10.1",
     "leaflet": "^1.9.4",
     "next": "^15.4.4",
