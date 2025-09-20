@@ -129,41 +129,41 @@ export default function OffMarketPage() {
   };
 
   return (
-    <Section>
-      <div className="flex items-center justify-between gap-4 mb-4">
-        <SectionTitle>Off-Market Deals</SectionTitle>
+  <Section>
+    <SectionTitle>Off-Market Deals</SectionTitle>
 
-        {/* generator controls (compact on mobile) */}
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            className="border rounded-lg px-3 py-2 w-[160px]"
-            placeholder="Location"
-            value={loc}
-            onChange={e => setLoc(e.target.value)}
-          />
-          <input
-            className="border rounded-lg px-3 py-2 w-[120px]"
-            placeholder="Budget £"
-            inputMode="numeric"
-            value={budget}
-            onChange={e => setBudget(e.target.value)}
-          />
-          <input
-            className="border rounded-lg px-3 py-2 w-[90px]"
-            placeholder="Count"
-            inputMode="numeric"
-            value={count}
-            onChange={e => setCount(e.target.value)}
-          />
-          <button
-            onClick={generateDeals}
-            disabled={generating}
-            className="rounded-lg bg-indigo-600 text-white px-3 py-2 hover:bg-indigo-500 disabled:opacity-60"
-          >
-            {generating ? 'Generating…' : 'Generate Deals'}
-          </button>
-        </div>
+    {/* Sticky filter-like shell for generator */}
+    <div className="sticky-filter">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-2 justify-end">
+        <input
+          className="border rounded-lg px-3 py-2 w-[160px]"
+          placeholder="Location"
+          value={loc}
+          onChange={e => setLoc(e.target.value)}
+        />
+        <input
+          className="border rounded-lg px-3 py-2 w-[120px]"
+          placeholder="Budget £"
+          inputMode="numeric"
+          value={budget}
+          onChange={e => setBudget(e.target.value)}
+        />
+        <input
+          className="border rounded-lg px-3 py-2 w-[90px]"
+          placeholder="Count"
+          inputMode="numeric"
+          value={count}
+          onChange={e => setCount(e.target.value)}
+        />
+        <button
+          onClick={generateDeals}
+          disabled={generating}
+          className="rounded-lg bg-indigo-600 text-white px-3 py-2 hover:bg-indigo-500 disabled:opacity-60"
+        >
+          {generating ? 'Generating…' : 'Generate Deals'}
+        </button>
       </div>
+    </div>
 
       {/* Manual add panel */}
       <details className="mb-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
