@@ -5,6 +5,7 @@ import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import { getSupabase } from '@/lib/supabaseClient';
 import { apiPost } from '@/lib/api';
+import AddDealForm from '@/components/offMarket/AddDealForm';
 
 type OffMarket = {
   id: string;
@@ -54,6 +55,14 @@ export default function OffMarketPage() {
       ignore = true;
     };
   }, [sb]);
+
+  const refreshRows = async () => {
+    const { data } = await sb
+      .from('off_market_deals')
+      .select('*')
+      .order('created_at', { ascending: false });
+    setRows((data as OffMarket[]) ?? []);
+  };
 
   // call backend → upsert → refresh UI
   const generateDeals = async () => {
@@ -155,6 +164,16 @@ export default function OffMarketPage() {
           </button>
         </div>
       </div>
+
+      {/* Manual add panel */}
+      <details className="mb-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+        <summary className="cursor-pointer select-none font-medium">
+          + Add Off-Market Deal
+        </summary>
+        <div className="mt-3">
+          <AddDealForm onCreated={refreshRows} />
+        </div>
+      </details>
 
       {loading ? (
         <div className="p-4">Loading…</div>
