@@ -1,10 +1,20 @@
 // frontend/lib/api.ts
-const BASE = process.env.NEXT_PUBLIC_API_URL;
+function getBase(): string {
+  const base =
+    process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
+  if (!base) {
+    throw new Error(
+      "API base URL is not set. Define NEXT_PUBLIC_BACKEND_URL or NEXT_PUBLIC_API_URL."
+    );
+  }
+  // strip trailing slash
+  return base.replace(/\/$/, "");
+}
 
 export async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
-  if (!BASE) throw new Error("NEXT_PUBLIC_API_URL is not set");
-  const res = await fetch(`${BASE}${path}`, { cache: "no-store", ...init });
-  if (!res.ok) throw new Error(`GET ${path} failed: ${res.status}`);
+  const url = `${getBase()}${path}`;
+  const res = await fetch(url, { cache: "no-store", ...init });
+  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
   return res.json() as Promise<T>;
 }
 
@@ -13,16 +23,13 @@ export async function apiPost<T>(
   body?: unknown,
   init?: RequestInit
 ): Promise<T> {
-  if (!BASE) throw new Error("NEXT_PUBLIC_API_URL is not set");
-  const res = await fetch(`${BASE}${path}`, {
+  const url = `${getBase()}${path}`;
+  const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
+    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
     body: body ? JSON.stringify(body) : undefined,
     ...init,
   });
-  if (!res.ok) throw new Error(`POST ${path} failed: ${res.status}`);
+  if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
   return res.json() as Promise<T>;
 }

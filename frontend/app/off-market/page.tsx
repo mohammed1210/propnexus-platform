@@ -26,7 +26,7 @@ export default function OffMarketPage() {
   const [rows, setRows] = useState<OffMarket[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // form state for generator
+  // generator form state
   const [loc, setLoc] = useState('Liverpool');
   const [budget, setBudget] = useState<string>('250000');
   const [count, setCount] = useState<string>('3');
@@ -34,7 +34,7 @@ export default function OffMarketPage() {
 
   const sb = useMemo(() => getSupabase(), []);
 
-  // load from Supabase
+  // load existing deals from Supabase
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -55,7 +55,7 @@ export default function OffMarketPage() {
     };
   }, [sb]);
 
-  // call backend → parse JSON string → upsert → refresh UI
+  // call backend → upsert → refresh UI
   const generateDeals = async () => {
     const numBudget = Number(budget || 0);
     const numCount = Math.max(1, Math.min(10, Number(count || 3)));
@@ -66,37 +66,26 @@ export default function OffMarketPage() {
 
     setGenerating(true);
     try {
-      // Backend route from routes/off_market_routes.py (no prefix):
-      // @router.post("/generate-off-market")
-      const res: { deals: string } = await apiPost('/generate-off-market', {
-  location: loc,
-  budget: numBudget,
-  count: numCount,
-});
+      // Backend route (router has prefix "/off-market")
+      const res: { deals: any[] } = await apiPost('/off-market/generate-off-market', {
+        location: loc,
+        budget: numBudget,
+        count: numCount,
+      });
 
-      // The model returns a string that should be a JSON array
-      let parsed: any[] = [];
-      try {
-        parsed = JSON.parse(res.deals);
-      } catch {
-        // Sometimes models wrap in code fences or add text. Try a loose extraction.
-        const match = res.deals.match(/\[([\s\S]*)\]/);
-        if (match) parsed = JSON.parse(match[0]);
-      }
-
-      if (!Array.isArray(parsed) || parsed.length === 0) {
-        throw new Error('Unexpected response format from generator.');
+      const parsed = Array.isArray(res.deals) ? res.deals : [];
+      if (parsed.length === 0) {
+        throw new Error('Generator returned no deals.');
       }
 
       // Map to our table shape
       const nowIso = new Date().toISOString();
-      const payload = parsed.map((p, i) => ({
-        // Rely on db default UUID; we don’t set id here
+      const payload = parsed.map((p: any, i: number) => ({
         title: p.title || p.address || `Off-market deal ${i + 1}`,
         location: p.location || loc,
         price: Number(p.price ?? p.asking_price ?? 0) || null,
-        bedrooms: Number(p.bedrooms ?? null),
-        bathrooms: Number(p.bathrooms ?? null),
+        bedrooms: p.bedrooms != null ? Number(p.bedrooms) : null,
+        bathrooms: p.bathrooms != null ? Number(p.bathrooms) : null,
         investment_type: p.investment_type || 'HMO',
         contact: p.contact || null,
         source: 'AI generated',
@@ -104,7 +93,7 @@ export default function OffMarketPage() {
         created_at: nowIso,
       }));
 
-      // Optional simple de-dupe (same title+price)
+      // simple de-dupe (same title+price)
       const existingKey = new Set(
         rows.map(r => `${(r.title || '').trim().toLowerCase()}|${r.price ?? ''}`)
       );
@@ -120,8 +109,8 @@ export default function OffMarketPage() {
       const { data, error } = await sb.from('off_market_deals').insert(toInsert).select('*');
       if (error) throw error;
 
-      // Optimistically prepend new rows to the UI
-      setRows(prev => [...(data as OffMarket[]), ...prev]);
+      // Prepend new rows
+      setRows(prev => [ ...(data as OffMarket[]), ...prev ]);
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'Failed to generate / save deals.');
@@ -187,9 +176,7 @@ export default function OffMarketPage() {
               <div className="text-sm opacity-70">{d.location ?? '—'}</div>
 
               <div className="mt-2 flex items-center justify-between">
-                <div className="font-semibold">
-                  £{Number(d.price ?? 0).toLocaleString()}
-                </div>
+                <div className="font-semibold">£{Number(d.price ?? 0).toLocaleString()}</div>
                 <div className="text-xs opacity-70">
                   {d.bedrooms ?? 0} beds • {d.bathrooms ?? 0} baths
                 </div>
