@@ -5,7 +5,8 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import nextDynamic from "next/dynamic";
 import type { Map as LeafletMap, LatLngBoundsExpression } from "leaflet";
-import { FiSearch, FiPoundSign } from "react-icons/fi";
+import { FiSearch } from "react-icons/fi";
+import { LuPoundSterling } from "react-icons/lu";
 import { LuBedDouble } from "react-icons/lu";
 
 import Section from "@/components/ui/Section";
@@ -142,7 +143,7 @@ function FiltersBar() {
       </div>
 
       <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <FiPoundSign className="opacity-60" />
+        <LuPoundSterling className="opacity-60" />
         <input
           value={min}
           onChange={(e) => setMin(e.target.value)}
@@ -153,7 +154,7 @@ function FiltersBar() {
       </div>
 
       <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <FiPoundSign className="opacity-60" />
+        <LuPoundSterling className="opacity-60" />
         <input
           value={max}
           onChange={(e) => setMax(e.target.value)}
