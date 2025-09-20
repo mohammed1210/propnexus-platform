@@ -7,8 +7,8 @@
 ======================================== */
 :root {
   /* layout helpers */
-  --header-h: 56px;            /* used by sticky bars */
-  --sticky-offset: 96px;       /* header + (optional) filter space */
+  --header-h: 56px;          /* site header height */
+  --sticky-offset: 96px;     /* header + filter bar */
 
   /* color tokens */
   --page-bg: #f8fafc;
@@ -17,203 +17,120 @@
   --text-muted: #6b7280;
   --border: #e5e7eb;
   --shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.1);
-
-  color-scheme: light dark;
 }
 
-@media (min-width: 1024px) {
-  :root { --header-h: 64px; }
-}
-
-/* Support both .dark and .dark-mode toggles */
-.dark, .dark-mode {
-  --page-bg: #0b1220;          /* slightly richer than #111827 */
+/* Dark theme (class-based: <html class="dark"> … ) */
+.dark {
+  --page-bg: #0b0f19;
   --text: #e5e7eb;
   --card-bg: #0f172a;
   --text-muted: #94a3b8;
-  --border: #223;
+  --border: #1f2a44;
   --shadow: 0 2px 8px rgba(0,0,0,.45);
 }
 
 /* ========================================
-1) GLOBAL RESET & BASE
+1) BASE / RESET
 ======================================== */
 html, body, :root { height: 100%; }
+:root { color-scheme: light dark; }
 * { box-sizing: border-box; }
-
-html { scroll-behavior: smooth; }
 
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica,
-               Arial, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji;
   background: var(--page-bg);
   color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  scroll-behavior: smooth;
 }
 
 h1, h2, h3, p { margin: 0; padding: 0; }
 
-/* Generic “cardy” sections used across pages */
+/* Generic “card” look shared by lots of surfaces */
+.card,
 .section-box {
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 24px;
-  background: var(--card-bg);
   box-shadow: var(--shadow);
 }
+
+/* Subtle header shadow helper */
+.header-shadow { box-shadow: 0 2px 4px rgba(0,0,0,.08); }
 
 /* ========================================
-2) LAYOUT HELPERS
+2) PAGE LAYOUT HELPERS
 ======================================== */
-.main-wrapper {
-  padding: 1rem;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
 .content-layout {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start; /* prevents map column stretching if empty */
-}
-
-/* list & map columns */
-.property-list {
-  flex: 1 1 48%;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
 
-.map-view {
-  flex: 0 0 46%;
+/* Desktop: list + map */
+@media (min-width: 1024px) {
+  .content-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+    align-items: start;
+  }
+}
+
+/* Map column sizing + stickiness */
+.map-sticky {
   position: sticky;
-  top: var(--sticky-offset);
-  align-self: flex-start;
-  background: transparent;
-  border: 0;
-  height: calc(100vh - var(--sticky-offset) - 24px);
+  top: calc(var(--header-h) + 56px); /* header + filter bar */
+  height: calc(100vh - (var(--header-h) + 56px) - 16px);
 }
-
-.map-panel {
-  height: clamp(420px, 58vh, 600px);
-  background: transparent;
-  border: 0;
+.leaflet-panel {
+  height: 100%;
   overflow: hidden;
 }
-
-.map-panel .leaflet-container,
-.map-view .leaflet-container {
-  height: 100% !important;
+.leaflet-panel .leaflet-container {
   width: 100% !important;
+  height: 100% !important;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: var(--shadow);
 }
 
-/* When map is hidden, remove the empty column */
-.hide-map .map-view { display: none; }
-.hide-map .property-list { flex: 1 1 100%; }
+/* Mobile map becomes a simple block */
+@media (max-width: 768px) {
+  .map-sticky { position: relative; top: 0; height: 320px; }
+}
 
 /* ========================================
 3) STICKY FILTER BAR
 ======================================== */
-.sticky-primary {
+.sticky-filter {
   position: sticky;
-  top: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  padding: .55rem .75rem;
-  margin-bottom: 12px;
-
+  top: var(--header-h);
+  z-index: 30;
   background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-
-  /* subtle “frosted” feel when stuck */
-  backdrop-filter: saturate(140%) blur(2px);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0,0,0,.04);
 }
-
-.filter-bar {
-  background: var(--filter-bar-bg, #f8f9fa);
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-}
-.dark .filter-bar, .dark-mode .filter-bar {
-  background: rgba(255,255,255,0.05);
-}
-
-/* Inputs / selects used in filters */
-.filter-input.large,
-.filter-select.small {
-  padding: .55rem .65rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text);
-}
-
-.filter-input.large {
-  flex: 1 1 48%;
-  min-width: 320px;
-  max-width: 680px;
-}
-
-/* Buttons */
-.small-button {
-  padding: .55rem .8rem;
-  border-radius: 8px;
-  background: #3b82f6;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  line-height: 1;
-}
-.small-button:hover { background: #2563eb; }
 
 /* ========================================
-4) ADVANCED FILTER ROW
+4) INPUTS / BUTTONS (tiny utility classes)
 ======================================== */
-.filters-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  padding: 1rem 0;
-}
-.filters-row > div { display: flex; flex-direction: column; }
-.filters-row label {
-  font-size: .8rem;
-  margin-bottom: .25rem;
-  color: var(--text-muted);
-}
-.filters-row input,
-.filters-row select {
-  padding: .5rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text);
+input.input,
+select.input {
+  @apply border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800;
 }
 
+button.btn        { @apply rounded-xl px-3 py-2 font-medium; }
+button.btn-primary{ @apply bg-indigo-600 text-white hover:bg-indigo-500; }
+button.btn-outline{ @apply border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50/70 dark:hover:bg-zinc-800/50; }
+
 /* ========================================
-5) BACK TO TOP
+5) MISC
 ======================================== */
 .back-to-top {
   position: fixed;
   bottom: 20px;
   right: 20px;
   z-index: 1000;
-  background: #334155;
+  background-color: #334155;
   color: #fff;
   font-size: 14px;
   padding: .5rem .75rem;
@@ -224,51 +141,3 @@ h1, h2, h3, p { margin: 0; padding: 0; }
   transition: opacity .3s;
 }
 .back-to-top:hover { opacity: 1; }
-
-/* ========================================
-6) HEADER & SHADOWS
-======================================== */
-.header-shadow { box-shadow: 0 2px 4px rgba(0,0,0,.1); }
-
-/* ========================================
-7) RESPONSIVE
-======================================== */
-@media (max-width: 768px) {
-  .content-layout { flex-direction: column; }
-
-  .map-view {
-    width: 100% !important;
-    height: 300px !important;
-    position: relative !important;
-    top: unset;
-    border-left: none;
-    flex: 1 1 auto;
-  }
-
-  .sticky-primary {
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: .5rem;
-  }
-
-  .filter-input.large {
-    flex: 1 1 100%;
-    min-width: 0;
-    max-width: none;
-  }
-
-  .filters-row { flex-direction: column; }
-
-  .back-to-top { bottom: 80px; right: 16px; }
-}
-
-/* Desktop: narrower map, flexible list */
-@media (min-width: 1024px) {
-  .content-layout { align-items: flex-start; }
-  .map-view {
-    flex: 0 0 34%;
-    max-width: 520px;
-    min-width: 360px;
-  }
-  .property-list { flex: 1 1 auto; }
-}
