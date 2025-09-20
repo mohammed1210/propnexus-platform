@@ -19,7 +19,7 @@ type OffMarket = {
   source?: string | null;
   notes?: string | null;
   created_at?: string | null;
-  image_url?: string | null; // ⬅️ show this at the top of the card if present
+  image_url?: string | null; // display if present
 };
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +36,7 @@ export default function OffMarketPage() {
 
   const sb = useMemo(() => getSupabase(), []);
 
-  // load existing deals from Supabase
+  // load existing
   useEffect(() => {
     let ignore = false;
     (async () => {
@@ -52,9 +52,7 @@ export default function OffMarketPage() {
         setLoading(false);
       }
     })();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [sb]);
 
   const refreshRows = async () => {
@@ -65,7 +63,7 @@ export default function OffMarketPage() {
     setRows((data as OffMarket[]) ?? []);
   };
 
-  // call backend → upsert → refresh UI
+  // generate via backend
   const generateDeals = async () => {
     const numBudget = Number(budget || 0);
     const numCount = Math.max(1, Math.min(10, Number(count || 3)));
@@ -76,7 +74,6 @@ export default function OffMarketPage() {
 
     setGenerating(true);
     try {
-      // Backend route (router has prefix "/off-market")
       const res: { deals: any[] } = await apiPost('/off-market/generate-off-market', {
         location: loc,
         budget: numBudget,
@@ -84,11 +81,8 @@ export default function OffMarketPage() {
       });
 
       const parsed = Array.isArray(res.deals) ? res.deals : [];
-      if (parsed.length === 0) {
-        throw new Error('Generator returned no deals.');
-      }
+      if (parsed.length === 0) throw new Error('Generator returned no deals.');
 
-      // Map to our table shape
       const nowIso = new Date().toISOString();
       const payload = parsed.map((p: any, i: number) => ({
         title: p.title || p.address || `Off-market deal ${i + 1}`,
@@ -101,26 +95,26 @@ export default function OffMarketPage() {
         source: 'AI generated',
         notes: p.description || p.notes || null,
         created_at: nowIso,
-        image_url: null, // generator won’t provide this
+        image_url: null,
       }));
 
-      // simple de-dupe (same title+price)
       const existingKey = new Set(
         rows.map(r => `${(r.title || '').trim().toLowerCase()}|${r.price ?? ''}`)
       );
       const toInsert = payload.filter(
         d => !existingKey.has(`${(d.title || '').trim().toLowerCase()}|${d.price ?? ''}`)
       );
-
       if (toInsert.length === 0) {
         alert('No new unique deals to insert.');
         return;
       }
 
-      const { data, error } = await sb.from('off_market_deals').insert(toInsert).select('*');
+      const { data, error } = await sb
+        .from('off_market_deals')
+        .insert(toInsert)
+        .select('*');
       if (error) throw error;
 
-      // Prepend new rows
       setRows(prev => [ ...(data as OffMarket[]), ...prev ]);
     } catch (err: any) {
       console.error(err);
@@ -134,7 +128,7 @@ export default function OffMarketPage() {
     <Section>
       <SectionTitle>Off-Market Deals</SectionTitle>
 
-      {/* Sticky filter-like shell for generator */}
+      {/* Sticky generator bar */}
       <div className="sticky-filter">
         <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-2 justify-end">
           <input
@@ -167,7 +161,7 @@ export default function OffMarketPage() {
         </div>
       </div>
 
-      {/* Manual add panel */}
+      {/* Manual add form */}
       <details className="mb-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
         <summary className="cursor-pointer select-none font-medium">
           + Add Off-Market Deal
@@ -191,7 +185,6 @@ export default function OffMarketPage() {
               {/* Photo */}
               {d.image_url ? (
                 <div className="aspect-[16/10] w-full bg-zinc-100 dark:bg-zinc-800">
-                  {/* Using <img> avoids remotePatterns config for next/image */}
                   <img
                     src={d.image_url}
                     alt={d.title || 'Off-market property image'}
