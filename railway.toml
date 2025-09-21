@@ -1,19 +1,18 @@
 # railway.toml
-
+# ─────────────────────────────────────────────────────────────────────────────
+# DEFAULT SERVICE (what you already had): runs ./scripts/cron-ingest.sh
+# Uses a no-op build (we're not building Next.js here), and a daily CSV ingest.
+# ─────────────────────────────────────────────────────────────────────────────
 [build]
 builder = "NIXPACKS"
-# make the build step a no-op for the worker
 buildCommand = "echo skip-next-build"
 
 [deploy]
-# run our cron wrapper from the repo root
 startCommand = "bash -lc './scripts/cron-ingest.sh'"
 
 [cron]
-# schedule is fine; adjust if you want
-schedule = "0 6 * * *"
-# call the root package script explicitly
-command = "npm --prefix . run ingest:csv"
+schedule = "0 6 * * *"                  # every day at 06:00 UTC
+command  = "npm --prefix . run ingest:csv"
 
 [env]
 NODE_ENV = "production"
