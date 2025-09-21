@@ -1,60 +1,77 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import clsx from 'clsx';
 
 export default function HeaderClient() {
-  const [dark, setDark] = useState(false);
+  const pathname = usePathname();
+  const [scrolled, setScrolled] = useState(false);
 
-  // Restore theme preference from localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('theme');
-    if (stored === 'dark') {
-      setDark(true);
-    }
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Apply dark mode to <html> element + persist
-  useEffect(() => {
-    const root = document.documentElement;
-    if (dark) {
-      root.classList.add('dark');
-      root.dataset.theme = 'dark';
-      localStorage.setItem('theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      delete (root as any).dataset?.theme;
-      localStorage.setItem('theme', 'light');
-    }
-  }, [dark]);
+  const nav = [
+    { href: '/listings', label: 'Listings' },
+    { href: '/saved', label: 'Saved Deals' },
+    { href: '/off-market', label: 'Off-Market' },
+    { href: '/pricing', label: 'Pricing' },
+    { href: '/analytics', label: 'Analytics' },
+  ];
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
-        {/* Logo */}
-        <Link href="/" className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
-          PropNexus
+    <header
+      className={clsx(
+        'sticky top-0 z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur supports-[backdrop-filter]:bg-white/70',
+        scrolled && 'shadow-sm border-b border-zinc-200/70 dark:border-zinc-800/60'
+      )}
+      style={{ ['--header-h' as any]: '56px' }}
+    >
+      <div className="max-w-6xl mx-auto h-14 px-4 flex items-center gap-3">
+        {/* brand */}
+        <Link href="/" className="font-semibold tracking-tight">
+          <span className="text-zinc-900 dark:text-zinc-100">PropNexus</span>
+          <span className="opacity-60">Listings</span>
         </Link>
 
-        {/* Navigation */}
-        <nav className="flex items-center gap-6">
-          <Link href="/listings" className="hover:text-indigo-600 dark:hover:text-indigo-400">
-            Listings
-          </Link>
-          <Link href="/analytics" className="hover:text-indigo-600 dark:hover:text-indigo-400">
-            Analytics
-          </Link>
-          <Link href="/deals" className="hover:text-indigo-600 dark:hover:text-indigo-400">
-            Saved Deals
-          </Link>
+        {/* spacer pushes tabs to the right */}
+        <div className="flex-1" />
+
+        {/* right-aligned tabs */}
+        <nav className="hidden md:flex items-center gap-1">
+          {nav.map(({ href, label }) => {
+            const active = pathname === href || pathname?.startsWith(href + '/');
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={clsx(
+                  'px-3 py-2 rounded-md text-sm',
+                  active
+                    ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-100/70 dark:bg-zinc-800'
+                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/70 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-zinc-800'
+                )}
+              >
+                {label}
+              </Link>
+            );
+          })}
         </nav>
 
-        {/* Dark mode toggle */}
+        {/* theme toggle placeholder (kept as simple text for now) */}
         <button
-          onClick={() => setDark(!dark)}
-          className="ml-4 rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-sm"
+          className="ml-2 rounded-md border px-2 py-1 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          onClick={() => {
+            // You can wire your theme toggle here
+            document.documentElement.classList.toggle('dark');
+          }}
         >
-          {dark ? 'Light' : 'Dark'}
+          Dark
         </button>
       </div>
     </header>

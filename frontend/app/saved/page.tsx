@@ -1,0 +1,226 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import Section from '@/components/ui/Section';
+import SectionTitle from '@/components/ui/SectionTitle';
+import { getSupabase } from '@/lib/supabaseClient';
+
+type Deal = {
+  id: string;
+  property_id: string | null;
+  title?: string | null;
+  location?: string | null;
+  price?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  yield_percent?: number | null;
+  roi_percent?: number | null;
+  imageurl?: string | null;
+  saved_at?: string | null;
+  investment_type?: string | null;
+};
+
+export const dynamic = 'force-dynamic';
+
+export default function SavedDealsPage() {
+  const [rows, setRows] = useState<Deal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null); // disable buttons while removing
+
+  useEffect(() => {
+    let ignore = false;
+    (async () => {
+      setLoading(true);
+      const sb = getSupabase();
+      const { data, error } = await sb
+        .from('saved_deals')
+        .select('*')
+        .order('saved_at', { ascending: false });
+
+      if (!ignore) {
+        if (error) console.error('load saved_deals', error);
+        setRows((data as Deal[]) ?? []);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const removeDeal = async (id: string) => {
+    // confirm
+    if (!window.confirm('Remove this saved deal?')) return;
+
+    // optimistic: remove locally first
+    const prev = rows;
+    setBusyId(id);
+    setRows((r) => r.filter((x) => x.id !== id));
+
+    const sb = getSupabase();
+    const { error } = await sb.from('saved_deals').delete().eq('id', id);
+
+    setBusyId(null);
+
+    if (error) {
+      // rollback on error
+      console.error('delete saved_deal', error);
+      setRows(prev);
+      window.alert('Sorry — failed to remove. Please try again.');
+    }
+  };
+
+  const kpis = useMemo(() => {
+    const count = rows.length;
+    const avgYield = avg(rows.map((d) => num(d.yield_percent)));
+    const avgRoi = avg(rows.map((d) => num(d.roi_percent)));
+    const totalValue = rows.reduce((s, d) => s + num(d.price), 0);
+    return { count, avgYield, avgRoi, totalValue };
+  }, [rows]);
+
+  return (
+    <Section>
+      <div className="flex items-center justify-between gap-4 mb-3">
+        <SectionTitle>Saved Deals</SectionTitle>
+        {rows.length > 0 && (
+          <div className="hidden sm:flex gap-2">
+            <Kpi label="Saved" value={kpis.count} />
+            <Kpi label="Avg Yield" value={`${kpis.avgYield}%`} />
+            <Kpi label="Avg ROI" value={`${kpis.avgRoi}%`} />
+            <Kpi label="Total" value={`£${formatGBP(kpis.totalValue)}`} />
+          </div>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="p-4">Loading…</div>
+      ) : rows.length === 0 ? (
+        <div className="p-4">No saved deals yet.</div>
+      ) : (
+        <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          {rows.map((d) => {
+            const removing = busyId === d.id;
+            return (
+              <li
+                key={d.id}
+                className="rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition"
+              >
+                {/* image */}
+                <div className="aspect-[16/9] bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={d.imageurl ?? 'https://placehold.co/640x360?text=PropNexus'}
+                    alt={d.title ?? 'Property'}
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+
+                {/* body */}
+                <div className="p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <Link
+                      href={d.property_id ? `/property/${d.property_id}` : '#'}
+                      className="block font-semibold hover:underline leading-snug"
+                    >
+                      {d.title ?? '—'}
+                    </Link>
+
+                    {d.investment_type ? (
+                      <span className="shrink-0 text-[11px] px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300 tracking-wide">
+                        {String(d.investment_type).toUpperCase()}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="text-sm opacity-70">{d.location ?? '—'}</div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="font-semibold">£{formatGBP(num(d.price))}</div>
+                    <div className="flex gap-2 text-xs">
+                      <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                        Yield {valOrDash(d.yield_percent)}%
+                      </span>
+                      <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
+                        ROI {valOrDash(d.roi_percent)}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-xs opacity-70">
+                    {d.bedrooms ?? 0} beds • {d.bathrooms ?? 0} baths
+                  </div>
+
+                  <div className="text-xs opacity-60">
+                    Saved {formatDate(d.saved_at)}
+                  </div>
+
+                  <div className="pt-2 grid grid-cols-3 gap-2">
+                    <Link
+                      href={d.property_id ? `/property/${d.property_id}` : '#'}
+                      className="col-span-1 text-center rounded-xl border px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                    >
+                      View
+                    </Link>
+                    <button
+                      className="col-span-1 rounded-xl bg-zinc-900 text-white px-3 py-2 hover:bg-zinc-800 disabled:opacity-60 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                      onClick={() => window.open('mailto:sales@propnexus.ai')}
+                      disabled={removing}
+                    >
+                      Enquire
+                    </button>
+                    <button
+                      className="col-span-1 rounded-xl border border-red-300 text-red-700 px-3 py-2 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-900/20 disabled:opacity-60"
+                      onClick={() => removeDeal(d.id)}
+                      disabled={removing}
+                      aria-busy={removing}
+                    >
+                      {removing ? 'Removing…' : 'Remove'}
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Section>
+  );
+}
+
+/* ---------- tiny presentational bits ---------- */
+function Kpi({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-3 py-2">
+      <div className="text-[11px] uppercase tracking-wide opacity-60">{label}</div>
+      <div className="text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+/* ---------- helpers ---------- */
+function num(n: unknown) {
+  return Number(n ?? 0) || 0;
+}
+function round(n: number) {
+  return Number(n.toFixed(2));
+}
+function avg(list: number[]) {
+  const arr = list.filter((x) => Number.isFinite(x));
+  return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+}
+function valOrDash(n?: number | null) {
+  return n == null ? '–' : round(Number(n));
+}
+function formatGBP(n: number) {
+  return n.toLocaleString('en-GB', { maximumFractionDigits: 0 });
+}
+function formatDate(s?: string | null) {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleDateString('en-GB');
+  } catch {
+    return '—';
+  }
+}

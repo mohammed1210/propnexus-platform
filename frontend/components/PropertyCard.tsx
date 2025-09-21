@@ -1,11 +1,10 @@
-import Link from 'next/link';
-import styles from './PropertyCard.module.css';
-import FallbackImage from './FallbackImage';
-import { fmtGBP, fmtPct, plural } from '../lib/format';
+import Link from "next/link";
+import Badge from "@/components/ui/Badge";
+import ImageWithFallback from "@/components/ImageWithFallback";
 
-export type Property = {
-  id: string;
-  title: string;
+type Prop = {
+  id?: string | number | null;
+  title?: string | null;
   location?: string | null;
   price?: number | null;
   bedrooms?: number | null;
@@ -15,55 +14,66 @@ export type Property = {
   imageurl?: string | null;
 };
 
-export default function PropertyCard({ p }: { p: Property }) {
-  if (!p) return null;
+export default function PropertyCard({ p }: { p: Prop }) {
+  const id = String(p.id ?? "");
+  const priceFmt =
+    p.price != null ? `£${Number(p.price).toLocaleString()}` : "—";
 
   return (
-    <article className={styles.card}>
-      {/* Image block with zoom-on-hover */}
-      <Link href={`/property/${p.id}`} aria-label={`Open ${p.title}`}>
-        <div className={styles.imageWrapper}>
-          <FallbackImage
-            src={p.imageurl || null}
-            alt={p.title}
-            fill
-            sizes="(max-width: 768px) 100vw, 33vw"
-            style={{ objectFit: 'cover' }}
-            className={styles.image}
-          />
-        </div>
-      </Link>
+    <article className="card p-3 md:p-4">
+      {/* cover */}
+      <div className="mb-3">
+        <ImageWithFallback
+          src={p.imageurl || "/placeholder.png"}
+          alt={p.title || "Property"}
+          width={1200}
+          height={630}
+          className="w-full h-48 md:h-52 object-cover rounded-lg"
+        />
+      </div>
 
-      {/* Info block (always visible, not zoomed) */}
-      <div className={styles.info}>
-        <Link href={`/property/${p.id}`} className={styles.title}>
-          {p.title}
-        </Link>
-        {p.location && <div className={styles.location}>{p.location}</div>}
-
-        <div className={styles.details}>
-          <span>{plural(p.bedrooms ?? 0, 'bed')}</span>
-          <span>•</span>
-          <span>{plural(p.bathrooms ?? 0, 'bath')}</span>
-        </div>
-
-        <div className={styles.price}>{fmtGBP(p.price ?? 0)}</div>
-
-        <div className={styles.metrics}>
-          <span className={styles.badge}>Yield {fmtPct(p.yield_percent)}</span>
-          <span className={styles.badge}>ROI {fmtPct(p.roi_percent)}</span>
-        </div>
-
-        {/* Buttons fixed in their own row */}
-        <div className={styles.buttons}>
-          <button className={styles.save} type="button">
-            Save Deal
-          </button>
-          <Link className={styles.detailsBtn} href={`/property/${p.id}`}>
-            View Details
-          </Link>
+      {/* title + meta */}
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-base md:text-lg font-semibold">
+          {p.title || "Untitled property"}
+        </h3>
+        <div className="flex gap-2">
+          {p.yield_percent != null && (
+            <Badge color="green">
+              Yield {Number(p.yield_percent).toFixed(1)}%
+            </Badge>
+          )}
+          {p.roi_percent != null && (
+            <Badge color="indigo">
+              ROI {Number(p.roi_percent).toFixed(1)}%
+            </Badge>
+          )}
         </div>
       </div>
+
+      <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+        {p.location || "—"}
+      </div>
+
+      <div className="mt-2 flex items-center justify-between">
+        <div className="text-lg font-semibold">{priceFmt}</div>
+        <div className="text-xs text-zinc-500 dark:text-zinc-400">
+          {(p.bedrooms ?? 0)} beds • {(p.bathrooms ?? 0)} baths
+        </div>
+      </div>
+
+      {/* actions */}
+      {id && (
+        <div className="mt-3 flex gap-2">
+          <Link
+            className="btn btn-outline"
+            href={`/property/${encodeURIComponent(id)}`}
+          >
+            View Details
+          </Link>
+          <button className="btn btn-primary">Save Deal</button>
+        </div>
+      )}
     </article>
   );
 }

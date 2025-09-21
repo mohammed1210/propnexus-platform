@@ -26,3 +26,10 @@ venv/
 .vscode/
 .idea/
 .vercel
+
+# Python envs
+.venv/
+backend/.venv/
+# keep sample env files
+!.env.example
+!frontend/.env.example

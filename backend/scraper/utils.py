@@ -1,9 +1,11 @@
-from supabase import create_client, Client
 import os
+
+from supabase import Client, create_client
 
 supabase_url = os.getenv("SUPABASE_URL")
 supabase_key = os.getenv("SUPABASE_ANON_KEY")
 supabase: Client = create_client(supabase_url, supabase_key)
+
 
 async def insert_property_to_supabase(property_data):
     data = {
@@ -15,6 +17,6 @@ async def insert_property_to_supabase(property_data):
         "bmv": property_data["bmv"],
         "imageurl": property_data["image_url"],
         "description": property_data["description"],
-        "source": property_data["source"]
+        "source": property_data["source"],
     }
     supabase.table("properties").insert(data).execute()

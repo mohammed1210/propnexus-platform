@@ -1,9 +1,10 @@
+import os
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from scraper.zoopla_scraper import scrape_zoopla_properties
 from scraper.rightmove_scraper import scrape_rightmove_properties
-from supabase import create_client, Client
-import os
+from scraper.zoopla_scraper import scrape_zoopla_properties
+from supabase import Client, create_client
 
 # ✅ Load Supabase client
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -12,8 +13,10 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 router = APIRouter()
 
+
 class ScrapeRequest(BaseModel):
     location: str
+
 
 @router.post("/scrape")
 async def scrape_all_sources(req: ScrapeRequest):

@@ -2,6 +2,7 @@ import requests
 from bs4 import BeautifulSoup
 from utils.postcode import get_lat_lng_from_postcode
 
+
 async def scrape_rightmove_properties():
     print("🔍 Scraping Rightmove...")
 
@@ -20,7 +21,9 @@ async def scrape_rightmove_properties():
     for card in cards[:5]:  # Limit to 5 for now
         try:
             title = card.select_one(".propertyCard-title").get_text(strip=True)
-            price_text = card.select_one(".propertyCard-priceValue").get_text(strip=True)
+            price_text = card.select_one(".propertyCard-priceValue").get_text(
+                strip=True
+            )
             location = card.select_one(".propertyCard-address").get_text(strip=True)
             price = int(price_text.replace("£", "").replace(",", "").strip())
 
@@ -28,13 +31,15 @@ async def scrape_rightmove_properties():
             lat = coords.get("latitude", 0)
             lng = coords.get("longitude", 0)
 
-            results.append({
-                "title": title,
-                "price": price,
-                "location": location,
-                "latitude": lat,
-                "longitude": lng,
-            })
+            results.append(
+                {
+                    "title": title,
+                    "price": price,
+                    "location": location,
+                    "latitude": lat,
+                    "longitude": lng,
+                }
+            )
         except Exception as e:
             print("❌ Error parsing property:", e)
 
