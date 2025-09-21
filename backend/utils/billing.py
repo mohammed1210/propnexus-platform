@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+
 from supabase import Client, create_client
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -9,10 +10,12 @@ supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+
 def _dt_from_ts(ts: int | None):
     if not ts:
         return None
     return datetime.fromtimestamp(int(ts), tz=timezone.utc)
+
 
 def get_or_create_customer(email: str, stripe_customer_id: str | None):
     if supabase is None:
@@ -28,10 +31,13 @@ def get_or_create_customer(email: str, stripe_customer_id: str | None):
     )
     return resp.data[0] if resp.data else None
 
+
 def upsert_subscription(email: str, stripe_customer_id: str, subscription):
     if supabase is None:
         return None
-    customer = get_or_create_customer(email=email, stripe_customer_id=stripe_customer_id)
+    customer = get_or_create_customer(
+        email=email, stripe_customer_id=stripe_customer_id
+    )
     if not customer:
         return None
 
@@ -57,6 +63,7 @@ def upsert_subscription(email: str, stripe_customer_id: str, subscription):
     )
     return resp.data[0] if resp.data else None
 
+
 def get_entitlement_by_email(email: str) -> dict:
     if supabase is None:
         return {"active": False}
@@ -68,4 +75,3 @@ def get_entitlement_by_email(email: str) -> dict:
     ).data
     active = any(s["status"] in ("active", "trialing") for s in subs or [])
     return {"active": active, "subscriptions": subs or []}
-    

@@ -36,14 +36,14 @@ window._vwo_code || (function() {
     hide_element_style = &#x27;opacity:0 !important;filter:alpha(opacity=0) !important;background:none !important;transition:none !important;&#x27;,
     /* DO NOT EDIT BELOW THIS LINE */
     f=false,w=window,d=document,v=d.querySelector(&#x27;#vwoCode&#x27;),cK=&#x27;_vwo_&#x27;+account_id+&#x27;_settings&#x27;,cc={};
-    
+
     try{
         var c=JSON.parse(localStorage.getItem(&#x27;_vwo_&#x27;+account_id+&#x27;_config&#x27;));
         cc=c&amp;&amp;typeof c===&#x27;object&#x27;?c:{};
     }catch(e){}
-    
+
     var stT=cc.stT===&#x27;session&#x27;?w.sessionStorage:w.localStorage;
-    
+
     code={
         nonce:v&amp;&amp;v.nonce,
         library_tolerance:function(){return typeof library_tolerance!==&#x27;undefined&#x27;?library_tolerance:undefined},
@@ -58,7 +58,7 @@ window._vwo_code || (function() {
         getSettings:function(){try{var e=stT.getItem(cK);if(!e){return}e=JSON.parse(e);if(Date.now()&gt;e.e){stT.removeItem(cK);return}return e.s}catch(e){return}},
         init:function(){if(d.URL.indexOf(&#x27;__vwo_disable__&#x27;)&gt;-1)return;var e=this.settings_tolerance();w._vwo_settings_timer=setTimeout(function(){_vwo_code.finish();stT.removeItem(cK)},e);var t;if(this.hide_element()!==&#x27;body&#x27;){t=d.createElement(&#x27;style&#x27;);var n=this.hide_element(),i=n?n+this.hide_element_style():&#x27;&#x27;,r=d.getElementsByTagName(&#x27;head&#x27;)[0];t.setAttribute(&#x27;id&#x27;,&#x27;_vis_opt_path_hides&#x27;);v&amp;&amp;t.setAttribute(&#x27;nonce&#x27;,v.nonce);t.setAttribute(&#x27;type&#x27;,&#x27;text/css&#x27;);if(t.styleSheet)t.styleSheet.cssText=i;else t.appendChild(d.createTextNode(i));r.appendChild(t)}else{t=d.getElementsByTagName(&#x27;head&#x27;)[0];var i=d.createElement(&#x27;div&#x27;);i.style.cssText=&#x27;z-index: 2147483647 !important;position: fixed !important;left: 0 !important;top: 0 !important;width: 100% !important;height: 100% !important;background: white !important;display: block !important;&#x27;;i.setAttribute(&#x27;id&#x27;,&#x27;_vis_opt_path_hides&#x27;);i.classList.add(&#x27;_vis_hide_layer&#x27;);t.parentNode.insertBefore(i,t.nextSibling)}var o=window._vis_opt_url||d.URL,s=&#x27;https://dev.visualwebsiteoptimizer.com/j.php?a=&#x27;+account_id+&#x27;&amp;u=&#x27;+encodeURIComponent(o)+&#x27;&amp;vn=&#x27;+version;if(w.location.search.indexOf(&#x27;_vwo_xhr&#x27;)!==-1){this.addScript({src:s})}else{this.load(s+&#x27;&amp;x=true&#x27;)}}
     };
-    
+
     w._vwo_code=code;
     code.init();
 })();
@@ -1198,7 +1198,7 @@ window._vwo_code || (function() {
                                         valuation</a></li>
                                 <li><a class="seo-nav-subNav-link" href="/guides/landlord/investor-newsletter/"
                                         data-parent-nav="buy">Investors</a></li>
-                                
+
                                 <li><a class="seo-nav-subNav-link" href="/mortgages"
                                         data-parent-nav="buy">Mortgages</a></li>
                             </div>
@@ -1445,7 +1445,7 @@ window._vwo_code || (function() {
                 valuation</a>
             <a class="seo-mob-nav-link seo-link" href="/guides/landlord/investor-newsletter/" tabindex="-1"
                 data-parent-nav="buy">Investors</a>
-            
+
             <a class="seo-mob-nav-link seo-link" href="/mortgages" tabindex="-1"
                 data-parent-nav="buy">Mortgages</a>
         </div>

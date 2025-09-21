@@ -1,6 +1,7 @@
-import os
 import logging
+import os
 from typing import Optional
+
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from supabase import Client, create_client
@@ -12,15 +13,17 @@ logger = logging.getLogger(__name__)
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 supabase: Optional[Client] = (
-    create_client(SUPABASE_URL, SUPABASE_KEY)
-    if SUPABASE_URL and SUPABASE_KEY else None
+    create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 )
 
 ADMIN_TOKEN = os.getenv("OFF_MARKET_ADMIN_TOKEN", "").strip()
 
+
 def require_admin(x_api_key: Optional[str] = Header(default=None)):
     if ADMIN_TOKEN and (x_api_key or "").strip() != ADMIN_TOKEN:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
+        )
     return True
 
 
@@ -41,6 +44,7 @@ class CreateDealRequest(BaseModel):
     def strip_text(cls, v: str) -> str:
         return v.strip()
 
+
 class CreateDealResponse(BaseModel):
     id: str
     title: str
@@ -56,7 +60,9 @@ class CreateDealResponse(BaseModel):
 
 
 # ---------- Routes ----------
-@router.post("/create", response_model=CreateDealResponse, dependencies=[Depends(require_admin)])
+@router.post(
+    "/create", response_model=CreateDealResponse, dependencies=[Depends(require_admin)]
+)
 def create_off_market_deal(payload: CreateDealRequest):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -78,14 +84,17 @@ class GenerateRequest(BaseModel):
     budget: float
     count: int = 5
 
+
 @router.post("/generate-off-market")
 async def generate_off_market(payload: GenerateRequest):
     # For now just echo; hook up GPT later
     return {
         "deals": [
-            {"address": f"Demo address {i+1}, {payload.location}",
-             "price": payload.budget / payload.count,
-             "description": "Generated placeholder deal"}
+            {
+                "address": f"Demo address {i+1}, {payload.location}",
+                "price": payload.budget / payload.count,
+                "description": "Generated placeholder deal",
+            }
             for i in range(payload.count)
         ]
     }
