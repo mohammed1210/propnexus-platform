@@ -1,7 +1,6 @@
 import os
 import logging
 from typing import Optional
-
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from supabase import Client, create_client
@@ -9,24 +8,17 @@ from supabase import Client, create_client
 router = APIRouter(prefix="/off-market", tags=["off-market"])
 logger = logging.getLogger(__name__)
 
-# --- Supabase client (service role preferred for server-side writes) ---
+# --- Supabase client ---
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-if not SUPABASE_URL or not SUPABASE_KEY:
-    logger.warning("Supabase credentials missing; /off-market/create will fail without them.")
 supabase: Optional[Client] = (
-    create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+    create_client(SUPABASE_URL, SUPABASE_KEY)
+    if SUPABASE_URL and SUPABASE_KEY else None
 )
 
-# --- Optional lightweight auth (swap later for real auth/JWT) ---
 ADMIN_TOKEN = os.getenv("OFF_MARKET_ADMIN_TOKEN", "").strip()
 
-
 def require_admin(x_api_key: Optional[str] = Header(default=None)):
-    """
-    Minimal gate: if OFF_MARKET_ADMIN_TOKEN is set, require it via X-API-Key header.
-    Replace with proper auth (JWT/session) when login is live.
-    """
     if ADMIN_TOKEN and (x_api_key or "").strip() != ADMIN_TOKEN:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
     return True
@@ -49,7 +41,6 @@ class CreateDealRequest(BaseModel):
     def strip_text(cls, v: str) -> str:
         return v.strip()
 
-
 class CreateDealResponse(BaseModel):
     id: str
     title: str
@@ -67,34 +58,34 @@ class CreateDealResponse(BaseModel):
 # ---------- Routes ----------
 @router.post("/create", response_model=CreateDealResponse, dependencies=[Depends(require_admin)])
 def create_off_market_deal(payload: CreateDealRequest):
-    """
-    Insert a new off-market deal into Supabase with server-side validation.
-    Requires X-API-Key header if OFF_MARKET_ADMIN_TOKEN is set.
-    """
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
+    data = payload.dict()
     try:
-        data = {
-            "title": payload.title,
-            "location": payload.location,
-            "price": payload.price,
-            "bedrooms": payload.bedrooms,
-            "bathrooms": payload.bathrooms,
-            "investment_type": payload.investment_type,
-            "contact": payload.contact,
-            "source": payload.source or "Manual",
-            "notes": payload.notes,
-        }
         res = supabase.table("off_market_deals").insert(data).select("*").execute()
         if not res.data:
             raise HTTPException(status_code=502, detail="Insert failed")
-
-        row = res.data[0]
-        return CreateDealResponse(**row)
-
-    except HTTPException:
-        raise
+        return CreateDealResponse(**res.data[0])
     except Exception as e:
         logger.exception("Failed to create off-market deal")
         raise HTTPException(status_code=500, detail="Failed to create deal") from e
+
+
+# ✅ add this route so frontend /off-market/generate-off-market works
+class GenerateRequest(BaseModel):
+    location: str
+    budget: float
+    count: int = 5
+
+@router.post("/generate-off-market")
+async def generate_off_market(payload: GenerateRequest):
+    # For now just echo; hook up GPT later
+    return {
+        "deals": [
+            {"address": f"Demo address {i+1}, {payload.location}",
+             "price": payload.budget / payload.count,
+             "description": "Generated placeholder deal"}
+            for i in range(payload.count)
+        ]
+    }

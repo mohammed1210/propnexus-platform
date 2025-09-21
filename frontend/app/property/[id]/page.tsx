@@ -6,9 +6,6 @@ import { useParams } from 'next/navigation';
 import nextDynamic from 'next/dynamic';
 import Image from 'next/image';
 
-// Types-only shim for env
-declare const process: { env?: Record<string, string | undefined> };
-
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import CardActions from '@/components/ui/CardActions';
@@ -27,7 +24,7 @@ import AIChatbot from '@/components/property_details/AIChatbot';
 
 const MapSingle = nextDynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
 
-/** Page-local shape coming from the API (nullable numeric fields allowed) */
+/** Shape coming from the API (nullable numeric fields allowed) */
 type Property = {
   id: string;
   title: string;
@@ -47,19 +44,23 @@ type Property = {
   transport_summary?: string | null;
   propertyType?: string | null;
   investmentType?: string | null;
-  /** Some components expect these to exist */
   source?: string | null;
   created_at?: string | null;
 };
 
 function getBackendBase(): string {
-  const raw = (process?.env?.NEXT_PUBLIC_API_URL ?? '') as string
-  if (!raw) throw new Error('NEXT_PUBLIC_API_URL is not set')
-  return raw.replace(/\/+$/, '')
+  const raw =
+    process.env.NEXT_PUBLIC_BACKEND_URL ??
+    process.env.NEXT_PUBLIC_API_URL ??
+    '';
+  if (!raw) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
+  return raw.replace(/\/+$/, '');
 }
 
 export default function PropertyDetailsPage() {
-  const { id = '' } = useParams<{ id: string }>() ?? {};
+  const params = useParams<{ id: string }>() as { id?: string };
+  const id = params?.id ?? '';
+
   const [property, setProperty] = useState<Property | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -70,7 +71,7 @@ export default function PropertyDetailsPage() {
     setLoading(true);
     try {
       const base = getBackendBase();
-      const resp = await fetch(`${base}/properties/${encodeURIComponent(propId)}`, { cache: 'no-store' })
+      const resp = await fetch(`${base}/properties/${encodeURIComponent(propId)}`, { cache: 'no-store' });
       if (!resp.ok) {
         console.error('Property fetch failed', resp.status, await resp.text());
         setProperty(null);
@@ -87,7 +88,9 @@ export default function PropertyDetailsPage() {
     }
   }, []);
 
-  useEffect(() => { if (id) fetchProperty(id); }, [id, fetchProperty]);
+  useEffect(() => {
+    if (id) fetchProperty(id);
+  }, [id, fetchProperty]);
 
   function computeAIScore(p: Property) {
     const items = [
@@ -104,10 +107,11 @@ export default function PropertyDetailsPage() {
     if (!property) return;
     try {
       const base = getBackendBase();
-      const resp = await fetch(`${base}/api/saved-deals`, {
+      // ✅ backend route is /save-deal
+      const resp = await fetch(`${base}/save-deal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ property_id: property.id, user_id: 'demo-user' }),
+        body: JSON.stringify({ property_id: property.id }),
       });
       if (!resp.ok) throw new Error(`Save failed: ${resp.status}`);
       alert('Deal saved!');
@@ -118,8 +122,11 @@ export default function PropertyDetailsPage() {
   }
 
   const hasCoords = useMemo(
-    () => property?.latitude != null && property?.longitude != null &&
-          Number.isFinite(property.latitude) && Number.isFinite(property.longitude),
+    () =>
+      property?.latitude != null &&
+      property?.longitude != null &&
+      Number.isFinite(property.latitude) &&
+      Number.isFinite(property.longitude),
     [property]
   );
 
@@ -130,7 +137,6 @@ export default function PropertyDetailsPage() {
     if (!property) return null;
     return {
       ...property,
-      // ensure numbers:
       price: Number(property.price ?? 0),
       bedrooms: Number(property.bedrooms ?? 0),
       bathrooms: Number(property.bathrooms ?? 0),
@@ -196,7 +202,6 @@ export default function PropertyDetailsPage() {
           <SectionTitle id="investment-summary" icon={<span>📈</span>}>
             Investment Summary
           </SectionTitle>
-          {/* Cast after normalization so TS is satisfied even if the component's type is stricter */}
           {normalizedForSummary && (
             <InvestmentSummary property={normalizedForSummary as any} />
           )}
