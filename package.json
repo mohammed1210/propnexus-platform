@@ -3,7 +3,8 @@
     "@supabase/supabase-js": "^2.57.4",
     "clsx": "^2.1.1",
     "csv-parse": "^6.1.0",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "undici": "^6.21.3"
   },
   "devDependencies": {
     "@types/node": "^24.3.1",
@@ -21,6 +22,7 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
-    "ingest:csv": "tsx scripts/ingest-csv.ts data/listings.sample.csv --source=rightmove"
+    "ingest:csv": "tsx scripts/ingest-csv.ts data/listings.sample.csv --source=rightmove",
+    "ingest:live": "tsx scripts/ingest-live.ts"
   }
 }

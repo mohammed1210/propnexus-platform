@@ -249,7 +249,7 @@ function ListingsInner() {
 
   return (
     <Section>
-      
+
 
       {/* Sticky shell directly under site header */}
       <div className="sticky-filter">
