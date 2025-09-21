@@ -1,44 +1,100 @@
-import logging
 import os
+import logging
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
-from openai import OpenAI
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from pydantic import BaseModel, Field, field_validator
+from supabase import Client, create_client
 
-router = APIRouter()
+router = APIRouter(prefix="/off-market", tags=["off-market"])
 logger = logging.getLogger(__name__)
 
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# --- Supabase client (service role preferred for server-side writes) ---
+SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+if not SUPABASE_URL or not SUPABASE_KEY:
+    logger.warning("Supabase credentials missing; /off-market/create will fail without them.")
+supabase: Optional[Client] = (
+    create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+)
+
+# --- Optional lightweight auth (swap later for real auth/JWT) ---
+ADMIN_TOKEN = os.getenv("OFF_MARKET_ADMIN_TOKEN", "").strip()
 
 
-class OffMarketRequest(BaseModel):
-    location: str
-    budget: float
-    count: int = 5
-
-
-@router.post("/generate-off-market")
-async def generate_off_market(payload: OffMarketRequest):
+def require_admin(x_api_key: Optional[str] = Header(default=None)):
     """
-    Generate off-market property deals using OpenAI.
+    Minimal gate: if OFF_MARKET_ADMIN_TOKEN is set, require it via X-API-Key header.
+    Replace with proper auth (JWT/session) when login is live.
     """
-    prompt = (
-        f"Generate {payload.count} unique off-market property investment opportunities "
-        f"in {payload.location} under a budget of £{payload.budget:.2f}. "
-        "Provide each opportunity as a JSON object with keys: address, price, description. "
-        "Return a JSON array of these objects."
-    )
+    if ADMIN_TOKEN and (x_api_key or "").strip() != ADMIN_TOKEN:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+    return True
+
+
+# ---------- Schemas ----------
+class CreateDealRequest(BaseModel):
+    title: str = Field(..., min_length=2)
+    location: str = Field(..., min_length=2)
+    price: Optional[float] = Field(None, ge=0)
+    bedrooms: Optional[int] = Field(None, ge=0, le=20)
+    bathrooms: Optional[int] = Field(None, ge=0, le=20)
+    investment_type: Optional[str] = Field(None, max_length=50)
+    contact: Optional[str] = Field(None, max_length=120)
+    source: Optional[str] = Field("Manual", max_length=80)
+    notes: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator("title", "location")
+    @classmethod
+    def strip_text(cls, v: str) -> str:
+        return v.strip()
+
+
+class CreateDealResponse(BaseModel):
+    id: str
+    title: str
+    location: Optional[str] = None
+    price: Optional[float] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    investment_type: Optional[str] = None
+    contact: Optional[str] = None
+    source: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+# ---------- Routes ----------
+@router.post("/create", response_model=CreateDealResponse, dependencies=[Depends(require_admin)])
+def create_off_market_deal(payload: CreateDealRequest):
+    """
+    Insert a new off-market deal into Supabase with server-side validation.
+    Requires X-API-Key header if OFF_MARKET_ADMIN_TOKEN is set.
+    """
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
     try:
-        response = openai_client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-        )
-        content = response.choices[0].message.content.strip()
-        return {"deals": content}
+        data = {
+            "title": payload.title,
+            "location": payload.location,
+            "price": payload.price,
+            "bedrooms": payload.bedrooms,
+            "bathrooms": payload.bathrooms,
+            "investment_type": payload.investment_type,
+            "contact": payload.contact,
+            "source": payload.source or "Manual",
+            "notes": payload.notes,
+        }
+        res = supabase.table("off_market_deals").insert(data).select("*").execute()
+        if not res.data:
+            raise HTTPException(status_code=502, detail="Insert failed")
 
-    except Exception:  # ✅ properly aligned with try
-        logger.exception("Failed to generate off-market deals")
-        raise HTTPException(
-            status_code=500, detail="Failed to generate off-market deals"
-        )
+        row = res.data[0]
+        return CreateDealResponse(**row)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to create off-market deal")
+        raise HTTPException(status_code=500, detail="Failed to create deal") from e
