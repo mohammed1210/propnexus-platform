@@ -2,92 +2,77 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-
-const NAV = [
-  { label: 'Listings',    href: '/listings' },
-  { label: 'Saved Deals', href: '/saved' },
-  { label: 'Off-Market',  href: '/off-market' },
-  { label: 'Pricing',     href: '/pricing' },
-  { label: 'Analytics',   href: '/analytics' },
-];
+import { useState, useEffect } from 'react';
+import clsx from 'clsx';
 
 export default function HeaderClient() {
   const pathname = usePathname();
-  const [dark, setDark] = useState(false);
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLElement | null>(null);
+  const [scrolled, setScrolled] = useState(false);
 
-  // Expose header height as a CSS var so other sticky bars can align perfectly.
   useEffect(() => {
-    if (!ref.current) return;
-    const el = ref.current;
-    const setVar = () => {
-      const h = `${el.getBoundingClientRect().height}px`;
-      document.documentElement.style.setProperty('--header-h', h);
-    };
-    setVar();
-    const ro = new ResizeObserver(setVar);
-    ro.observe(el);
-    return () => ro.disconnect();
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  const nav = [
+    { href: '/listings', label: 'Listings' },
+    { href: '/saved', label: 'Saved Deals' },
+    { href: '/off-market', label: 'Off-Market' },
+    { href: '/pricing', label: 'Pricing' },
+    { href: '/analytics', label: 'Analytics' },
+  ];
 
   return (
     <header
-      ref={ref}
-      className="sticky top-0 z-40 bg-white dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800"
+      className={clsx(
+        'sticky top-0 z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur supports-[backdrop-filter]:bg-white/70',
+        scrolled && 'shadow-sm border-b border-zinc-200/70 dark:border-zinc-800/60'
+      )}
+      style={{ ['--header-h' as any]: '56px' }}
     >
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link href="/" className="font-semibold text-xl">PropNexus</Link>
+      <div className="max-w-6xl mx-auto h-14 px-4 flex items-center gap-3">
+        {/* brand */}
+        <Link href="/" className="font-semibold tracking-tight">
+          <span className="text-zinc-900 dark:text-zinc-100">PropNexus</span>
+          <span className="opacity-60">Listings</span>
+        </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-6">
-          {NAV.map(item => {
-            const active = pathname === item.href;
+        {/* spacer pushes tabs to the right */}
+        <div className="flex-1" />
+
+        {/* right-aligned tabs */}
+        <nav className="hidden md:flex items-center gap-1">
+          {nav.map(({ href, label }) => {
+            const active = pathname === href || pathname?.startsWith(href + '/');
             return (
               <Link
-                key={item.href}
-                href={item.href}
-                className={`text-sm ${active ? 'font-semibold' : 'opacity-80 hover:opacity-100'}`}
+                key={href}
+                href={href}
+                className={clsx(
+                  'px-3 py-2 rounded-md text-sm',
+                  active
+                    ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-100/70 dark:bg-zinc-800'
+                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/70 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-zinc-800'
+                )}
               >
-                {item.label}
+                {label}
               </Link>
             );
           })}
-          <button
-            onClick={() => {
-              setDark(d => !d);
-              document.documentElement.classList.toggle('dark');
-            }}
-            className="text-sm px-2 py-1 border rounded"
-            aria-label="Toggle dark mode"
-          >
-            {dark ? 'Light' : 'Dark'}
-          </button>
         </nav>
 
-        {/* Mobile: menu + theme toggle */}
-        <div className="md:hidden flex items-center gap-2">
-          <button
-            onClick={() => {
-              setDark(d => !d);
-              document.documentElement.classList.toggle('dark');
-            }}
-            className="text-sm px-2 py-1 border rounded"
-            aria-label="Toggle dark mode"
-          >
-            {dark ? '☀︎' : '🌙'}
-          </button>
-          <button
-            onClick={() => setOpen(o => !o)}
-            className="px-3 py-2 rounded border"
-            aria-expanded={open}
-            aria-controls="mobile-nav"
-            aria-label="Toggle navigation"
-          >
-            ☰
-          </button>
-        </div>
+        {/* theme toggle placeholder (kept as simple text for now) */}
+        <button
+          className="ml-2 rounded-md border px-2 py-1 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
+          onClick={() => {
+            // You can wire your theme toggle here
+            document.documentElement.classList.toggle('dark');
+          }}
+        >
+          Dark
+        </button>
       </div>
 
       {/* Mobile dropdown */}

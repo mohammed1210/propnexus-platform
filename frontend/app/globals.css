@@ -2,8 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Your custom variables + overrides below */
+/* ========================================
+0) THEME TOKENS & GLOBAL VARS
+======================================== */
 :root {
+  /* layout helpers */
+  --header-h: 56px;          /* site header height */
+  --sticky-offset: 96px;     /* header + filter bar */
+
+  /* color tokens */
   --page-bg: #f8fafc;
   --text: #1e293b;
   --card-bg: #ffffff;
@@ -12,190 +19,111 @@
   --shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.1);
 }
 
-/* Dark theme overrides */
-.dark-mode {
-  --page-bg: #111827;
+/* Dark theme (class-based: <html class="dark"> … ) */
+.dark {
+  --page-bg: #0b0f19;
   --text: #e5e7eb;
-
-  --card-bg: #1f2937;
+  --card-bg: #0f172a;
   --text-muted: #94a3b8;
-  --border: #374151;
+  --border: #1f2a44;
   --shadow: 0 2px 8px rgba(0,0,0,.45);
 }
 
 /* ========================================
-1️⃣ GLOBAL RESET & BASE STYLES
+1) BASE / RESET
 ======================================== */
+html, body, :root { height: 100%; }
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+
 body {
   margin: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: var(--page-bg);
+  background: var(--page-bg);
   color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   scroll-behavior: smooth;
 }
 
 h1, h2, h3, p { margin: 0; padding: 0; }
 
-/* Cardy sections used on details page */
+/* Generic “card” look shared by lots of surfaces */
+.card,
 .section-box {
+  background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 24px;
-  background-color: var(--card-bg);
+  border-radius: 12px;
   box-shadow: var(--shadow);
 }
 
-/* your global resets */
-:root { color-scheme: light dark; }
-html, body, :root { height: 100%; }
-* { box-sizing: border-box; }
+/* Subtle header shadow helper */
+.header-shadow { box-shadow: 0 2px 4px rgba(0,0,0,.08); }
 
 /* ========================================
-2️⃣ CONTAINER LAYOUTS
+2) PAGE LAYOUT HELPERS
 ======================================== */
-.main-wrapper {
-  padding: 1rem;
-  max-width: 1200px;
-  margin: 0 auto;
-}
-
 .content-layout {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start; /* prevents map column stretching if empty */
-}
-
-/* Make list slightly wider, map slightly narrower */
-.property-list {
-  flex: 1 1 48%;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
 
-/* right column container */
-.map-view {
-  flex: 0 0 46%;
+/* Desktop: list + map */
+@media (min-width: 1024px) {
+  .content-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+    align-items: start;
+  }
+}
+
+/* Map column sizing + stickiness */
+.map-sticky {
   position: sticky;
-  top: 72px;                 /* ↓ was 86px — brings it closer to the filters */
-  align-self: flex-start;
-  background: transparent;
-  border: 0;
+  top: calc(var(--header-h) + 56px); /* header + filter bar */
+  height: calc(100vh - (var(--header-h) + 56px) - 16px);
 }
-
-/* the wrapper that holds the Leaflet map */
-.map-panel {
-  height: clamp(420px, 58vh, 600px);  /* pick a height you like */
-  background: transparent;            /* no white card behind it */
-  border: 0;
+.leaflet-panel {
+  height: 100%;
   overflow: hidden;
 }
-
-/* style the actual Leaflet map inside */
-.map-panel .leaflet-container {
-  height: 100% !important;
+.leaflet-panel .leaflet-container {
   width: 100% !important;
+  height: 100% !important;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 12px;
   box-shadow: var(--shadow);
 }
 
-/* When map is hidden, remove the empty column */
-.hide-map .map-view { display: none; }
-.hide-map .property-list { flex: 1 1 100%; }
+/* Mobile map becomes a simple block */
+@media (max-width: 768px) {
+  .map-sticky { position: relative; top: 0; height: 320px; }
+}
 
 /* ========================================
-3️⃣ FILTER BAR (sticky, highlighted)
+3) STICKY FILTER BAR
 ======================================== */
-.sticky-primary {
+.sticky-filter {
   position: sticky;
-  top: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-
-  padding: .55rem .75rem;         /* tighter vertical space */
-  background-color: var(--card-bg);
+  top: var(--header-h);
+  z-index: 30;
+  background: var(--card-bg);
   border-bottom: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow);      /* subtle pop while scrolling */
-}
-
-.filter-bar {
-  background-color: var(--filter-bar-bg, #f8f9fa); /* light grey in light mode */
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  position: sticky;
-  top: 0;
-  z-index: 50;
-}
-
-.dark .filter-bar {
-  background-color: rgba(255, 255, 255, 0.05); /* subtle dark highlight */
+  box-shadow: 0 2px 6px rgba(0,0,0,.04);
 }
 
 /* ========================================
-4️⃣ SEARCH + SELECT FILTERS
+4) INPUTS / BUTTONS (tiny utility classes)
 ======================================== */
-.filter-input.large,
-.filter-select.small {
-  padding: .55rem .65rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text);
+input.input,
+select.input {
+  @apply border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800;
 }
 
-/* Make search prominent (~half width on desktop) */
-.filter-input.large {
-  flex: 1 1 48%;
-  min-width: 320px;
-  max-width: 680px;
-}
-
-/* Buttons */
-.small-button {
-  padding: .55rem .8rem;
-  border-radius: 6px;
-  background-color: #3b82f6;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  line-height: 1;
-}
-.small-button:hover { background-color: #2563eb; }
+button.btn        { @apply rounded-xl px-3 py-2 font-medium; }
+button.btn-primary{ @apply bg-indigo-600 text-white hover:bg-indigo-500; }
+button.btn-outline{ @apply border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50/70 dark:hover:bg-zinc-800/50; }
 
 /* ========================================
-5️⃣ ADVANCED FILTER ROW
-======================================== */
-.filters-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  padding: 1rem 0;
-}
-.filters-row > div { display: flex; flex-direction: column; }
-.filters-row label {
-  font-size: .8rem;
-  margin-bottom: .25rem;
-  color: var(--text-muted);
-}
-.filters-row input,
-.filters-row select {
-  padding: .5rem;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--text);
-}
-
-/* ========================================
-6️⃣ BACK TO TOP BUTTON
+5) MISC
 ======================================== */
 .back-to-top {
   position: fixed;
@@ -206,96 +134,10 @@ html, body, :root { height: 100%; }
   color: #fff;
   font-size: 14px;
   padding: .5rem .75rem;
-  border-radius: 4px;
+  border-radius: 8px;
   border: none;
   cursor: pointer;
   opacity: .85;
   transition: opacity .3s;
 }
 .back-to-top:hover { opacity: 1; }
-
-/* ========================================
-8️⃣ HEADER & SCROLL BEHAVIOUR
-======================================== */
-.header-shadow { box-shadow: 0 2px 4px rgba(0,0,0,.1); }
-html { scroll-behavior: smooth; }
-
-/* ========================================
-9️⃣ MOBILE
-======================================== */
-@media (max-width: 768px) {
-  .content-layout { flex-direction: column; }
-
-  .map-view {
-    width: 100% !important;
-    height: 300px !important;
-    position: relative !important;
-    top: unset;
-    border-left: none;
-    flex: 1 1 auto;
-  }
-
-  .sticky-primary {
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: .5rem;
-  }
-
-  /* Search goes full-width on small screens for usability */
-  .filter-input.large {
-    flex: 1 1 100%;
-    min-width: 0;
-    max-width: none;
-  }
-
-  .filters-row { flex-direction: column; }
-
-  .back-to-top { bottom: 80px; right: 16px; }
-}
-
-/* ===== Filter bar highlight ===== */
-.sticky-primary {
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  margin-bottom: 12px;           /* keeps it off the content */
-}
-
-/* Subtle “frosted” when it sticks (optional but nice) */
-.sticky-primary {
-  backdrop-filter: saturate(140%) blur(2px);
-}
-
-/* ===== Desktop layout: make map narrower ===== */
-@media (min-width: 1024px) {
-  .content-layout {
-    /* keep your flex behavior, but constrain the map column */
-    align-items: flex-start;
-  }
-
-  .map-view {
-    flex: 0 0 34%;               /* ~one‑third width */
-    max-width: 520px;            /* don’t let it get huge on wide screens */
-    min-width: 360px;            /* still readable */
-  }
-
-  .property-list {
-    flex: 1 1 auto;              /* take the rest */
-  }
-}
-
-/* ===== Kill the sticky jiggle ===== */
-/* Use a fixed offset so the map’s sticky height doesn’t keep recalculating */
-:root { --sticky-offset: 96px; } /* matches your header+bar height */
-.map-view {
-  position: sticky;
-  top: var(--sticky-offset);
-  height: calc(100vh - var(--sticky-offset) - 24px); /* minus a tiny gap */
-}
-
-/* Leaflet sanity: make the canvas always fill the box */
-.map-view .leaflet-container {
-  width: 100%;
-  height: 100%;
-}
