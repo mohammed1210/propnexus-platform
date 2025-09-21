@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
-import { getSupabase } from '@/lib/supabaseClient';
 
 type Deal = {
   id: string;
@@ -23,58 +22,75 @@ type Deal = {
 
 export const dynamic = 'force-dynamic';
 
+/** Resolve the FastAPI base URL from public env */
+function getBackendBase(): string {
+  const raw =
+    (process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      '') as string;
+  if (!raw) throw new Error('NEXT_PUBLIC_API_URL (or NEXT_PUBLIC_BACKEND_URL) is not set');
+  return raw.replace(/\/+$/, '');
+}
+
 export default function SavedDealsPage() {
   const [rows, setRows] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null); // disable buttons while removing
+  const [busyId, setBusyId] = useState<string | null>(null);
 
+  // Load saved deals from backend
   useEffect(() => {
-    let ignore = false;
+    let cancelled = false;
     (async () => {
       setLoading(true);
-      const sb = getSupabase();
-      const { data, error } = await sb
-        .from('saved_deals')
-        .select('*')
-        .order('saved_at', { ascending: false });
+      try {
+        const base = getBackendBase();
+        const resp = await fetch(`${base}/saved-deals`, { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`Load failed: ${resp.status}`);
+        const data = (await resp.json()) as Deal[] | { data: Deal[] };
 
-      if (!ignore) {
-        if (error) console.error('load saved_deals', error);
-        setRows((data as Deal[]) ?? []);
-        setLoading(false);
+        // handle either plain array or { data: [...] }
+        const items = Array.isArray(data) ? data : (data as any)?.data ?? [];
+        if (!cancelled) setRows(items);
+      } catch (err) {
+        console.error('load saved_deals', err);
+        if (!cancelled) setRows([]);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     })();
     return () => {
-      ignore = true;
+      cancelled = true;
     };
   }, []);
 
   const removeDeal = async (id: string) => {
-    // confirm
     if (!window.confirm('Remove this saved deal?')) return;
 
-    // optimistic: remove locally first
+    // optimistic update
     const prev = rows;
     setBusyId(id);
-    setRows((r) => r.filter((x) => x.id !== id));
+    setRows(r => r.filter(x => x.id !== id));
 
-    const sb = getSupabase();
-    const { error } = await sb.from('saved_deals').delete().eq('id', id);
-
-    setBusyId(null);
-
-    if (error) {
+    try {
+      const base = getBackendBase();
+      const resp = await fetch(`${base}/saved-deals/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (!resp.ok) throw new Error(`Delete failed: ${resp.status}`);
+    } catch (err) {
+      console.error('delete saved_deal', err);
       // rollback on error
-      console.error('delete saved_deal', error);
       setRows(prev);
       window.alert('Sorry — failed to remove. Please try again.');
+    } finally {
+      setBusyId(null);
     }
   };
 
   const kpis = useMemo(() => {
     const count = rows.length;
-    const avgYield = avg(rows.map((d) => num(d.yield_percent)));
-    const avgRoi = avg(rows.map((d) => num(d.roi_percent)));
+    const avgYield = avg(rows.map(d => num(d.yield_percent)));
+    const avgRoi = avg(rows.map(d => num(d.roi_percent)));
     const totalValue = rows.reduce((s, d) => s + num(d.price), 0);
     return { count, avgYield, avgRoi, totalValue };
   }, [rows]);
@@ -99,7 +115,7 @@ export default function SavedDealsPage() {
         <div className="p-4">No saved deals yet.</div>
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          {rows.map((d) => {
+          {rows.map(d => {
             const removing = busyId === d.id;
             return (
               <li
@@ -152,9 +168,7 @@ export default function SavedDealsPage() {
                     {d.bedrooms ?? 0} beds • {d.bathrooms ?? 0} baths
                   </div>
 
-                  <div className="text-xs opacity-60">
-                    Saved {formatDate(d.saved_at)}
-                  </div>
+                  <div className="text-xs opacity-60">Saved {formatDate(d.saved_at)}</div>
 
                   <div className="pt-2 grid grid-cols-3 gap-2">
                     <Link
@@ -207,7 +221,7 @@ function round(n: number) {
   return Number(n.toFixed(2));
 }
 function avg(list: number[]) {
-  const arr = list.filter((x) => Number.isFinite(x));
+  const arr = list.filter(x => Number.isFinite(x));
   return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
 }
 function valOrDash(n?: number | null) {
