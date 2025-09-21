@@ -1,1 +1,2 @@
-export { default } from '../../src/app/deals/page';
+export const dynamic = 'force-dynamic';
+export { default } from '../saved/page';

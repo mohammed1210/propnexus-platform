@@ -17,11 +17,11 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],                 // ← point generic alias to src/*
+      "@/*": ["./*"],
       "@/components/*": ["components/*"],
       "@components/*": ["components/*"],
-      "@/lib/*": ["src/lib/*"],
-      "@/types": ["src/types.ts"]       // ← key fix
+      "@/lib/*": ["lib/*"],
+      "@/types/*": ["types/*"]
     },
 
     "plugins": [{ "name": "next" }],
