@@ -67,7 +67,7 @@ def create_off_market_deal(payload: CreateDealRequest):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
-    data = payload.dict()
+    data = payload.model_dump()  # pydantic v2
     try:
         res = supabase.table("off_market_deals").insert(data).select("*").execute()
         if not res.data:
@@ -80,21 +80,30 @@ def create_off_market_deal(payload: CreateDealRequest):
 
 # ✅ add this route so frontend /off-market/generate-off-market works
 class GenerateRequest(BaseModel):
-    location: str
-    budget: float
-    count: int = 5
+    location: str = Field(..., min_length=2)
+    budget: float = Field(..., ge=0)
+    count: int = Field(5, ge=1, le=10)  # must be ≥1 (cap at 10 for sanity)
 
 
 @router.post("/generate-off-market")
 async def generate_off_market(payload: GenerateRequest):
-    # For now just echo; hook up GPT later
-    return {
-        "deals": [
-            {
-                "address": f"Demo address {i+1}, {payload.location}",
-                "price": payload.budget / payload.count,
-                "description": "Generated placeholder deal",
-            }
-            for i in range(payload.count)
-        ]
-    }
+    """
+    Temporary generator that synthesizes off-market deals.
+    Guards against bad inputs (e.g., zero/negative count) to prevent 500s.
+    """
+    # Extra runtime hardening (belt & braces)
+    location = (payload.location or "").strip()
+    budget = max(0.0, float(payload.budget or 0))
+    count = max(1, min(10, int(payload.count or 1)))
+
+    unit_price = budget / max(1, count)
+
+    deals = [
+        {
+            "address": f"Demo address {i+1}, {location}",
+            "price": unit_price,
+            "description": "Generated placeholder deal",
+        }
+        for i in range(count)
+    ]
+    return {"deals": deals}
