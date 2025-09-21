@@ -1,0 +1,14 @@
+{
+  "name": "ingest-worker",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
+    "csv-parse": "^6.1.0",
+    "dotenv": "^17.2.2",
+    "tsx": "^4.20.5"
+  },
+  "scripts": {
+    "start": "bash -lc ./cron-ingest.sh"
+  }
+}

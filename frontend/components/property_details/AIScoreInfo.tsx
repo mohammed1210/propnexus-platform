@@ -1,17 +1,19 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from 'react';
 
 // Allow other components to open this modal programmatically
 export function triggerAIScoreInfo() {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("open-aiscore-info"));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('open-aiscore-info'));
   }
 }
 
 export default function AIScoreInfo({
-  triggerClassName = "mt-2 inline-flex items-center gap-1 text-sm underline text-gray-600",
-}: { triggerClassName?: string }) {
+  triggerClassName = 'mt-2 inline-flex items-center gap-1 text-sm underline text-gray-600',
+}: {
+  triggerClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const btnRef = useRef<HTMLButtonElement | null>(null);
@@ -19,16 +21,16 @@ export default function AIScoreInfo({
   // Open on global event
   useEffect(() => {
     const handler = () => setOpen(true);
-    window.addEventListener("open-aiscore-info", handler);
-    return () => window.removeEventListener("open-aiscore-info", handler);
+    window.addEventListener('open-aiscore-info', handler);
+    return () => window.removeEventListener('open-aiscore-info', handler);
   }, []);
 
   // Esc to close
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
   // Focus management
@@ -43,7 +45,7 @@ export default function AIScoreInfo({
 
   return (
     <>
-      {/* Optional inline trigger (you can render or ignore this) */}
+      {/* Inline trigger */}
       <button
         ref={btnRef}
         className={triggerClassName}
@@ -74,14 +76,22 @@ export default function AIScoreInfo({
 
             <div className="space-y-2 text-sm text-neutral-700 dark:text-neutral-200">
               <p>
-                The overall score blends four signals: <strong>Yield</strong>, <strong>ROI</strong>, <strong>Area
-                Demand</strong>, and <strong>Risk</strong>.
+                The overall score blends four signals: <strong>Yield</strong>, <strong>ROI</strong>,{' '}
+                <strong>Area Demand</strong>, and <strong>Risk</strong>.
               </p>
               <ul className="list-disc pl-5">
-                <li><strong>Yield</strong>: gross yield vs. typical local ranges.</li>
-                <li><strong>ROI</strong>: projected return given refurb &amp; exit assumptions.</li>
-                <li><strong>Area Demand</strong>: local rental demand/comps (illustrative for now).</li>
-                <li><strong>Risk</strong>: down‑valuation, cost overrun, void risk (illustrative for now).</li>
+                <li>
+                  <strong>Yield</strong>: gross yield vs. typical local ranges.
+                </li>
+                <li>
+                  <strong>ROI</strong>: projected return given refurb &amp; exit assumptions.
+                </li>
+                <li>
+                  <strong>Area Demand</strong>: local rental demand/comps (illustrative for now).
+                </li>
+                <li>
+                  <strong>Risk</strong>: down-valuation, cost overrun, void risk (illustrative for now).
+                </li>
               </ul>
               <p className="text-xs text-neutral-500">
                 Scores are indicative only. Always validate with your own numbers and due diligence.

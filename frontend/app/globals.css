@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ========================================
+0) THEME TOKENS & GLOBAL VARS
+======================================== */
+:root {
+  /* layout helpers */
+  --header-h: 56px;          /* site header height */
+  --sticky-offset: 96px;     /* header + filter bar */
+
+  /* color tokens */
+  --page-bg: #f8fafc;
+  --text: #1e293b;
+  --card-bg: #ffffff;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --shadow: 0 1px 2px rgba(0,0,0,.06), 0 1px 3px rgba(0,0,0,.1);
+}
+
+/* Dark theme (class-based: <html class="dark"> … ) */
+.dark {
+  --page-bg: #0b0f19;
+  --text: #e5e7eb;
+  --card-bg: #0f172a;
+  --text-muted: #94a3b8;
+  --border: #1f2a44;
+  --shadow: 0 2px 8px rgba(0,0,0,.45);
+}
+
+/* ========================================
+1) BASE / RESET
+======================================== */
+html, body, :root { height: 100%; }
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  scroll-behavior: smooth;
+}
+
+h1, h2, h3, p { margin: 0; padding: 0; }
+
+/* Generic “card” look shared by lots of surfaces */
+.card,
+.section-box {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+/* Subtle header shadow helper */
+.header-shadow { box-shadow: 0 2px 4px rgba(0,0,0,.08); }
+
+/* ========================================
+2) PAGE LAYOUT HELPERS
+======================================== */
+.content-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+/* Desktop: list + map */
+@media (min-width: 1024px) {
+  .content-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+    align-items: start;
+  }
+}
+
+/* Map column sizing + stickiness */
+.map-sticky {
+  position: sticky;
+  top: calc(var(--header-h) + 56px); /* header + filter bar */
+  height: calc(100vh - (var(--header-h) + 56px) - 16px);
+}
+.leaflet-panel {
+  height: 100%;
+  overflow: hidden;
+}
+.leaflet-panel .leaflet-container {
+  width: 100% !important;
+  height: 100% !important;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+/* Mobile map becomes a simple block */
+@media (max-width: 768px) {
+  .map-sticky { position: relative; top: 0; height: 320px; }
+}
+
+/* ========================================
+3) STICKY FILTER BAR
+======================================== */
+.sticky-filter {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 30;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 2px 6px rgba(0,0,0,.04);
+}
+
+/* ========================================
+4) INPUTS / BUTTONS (tiny utility classes)
+======================================== */
+input.input,
+select.input {
+  @apply border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800;
+}
+
+button.btn        { @apply rounded-xl px-3 py-2 font-medium; }
+button.btn-primary{ @apply bg-indigo-600 text-white hover:bg-indigo-500; }
+button.btn-outline{ @apply border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50/70 dark:hover:bg-zinc-800/50; }
+
+/* ========================================
+5) MISC
+======================================== */
+.back-to-top {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+  background-color: #334155;
+  color: #fff;
+  font-size: 14px;
+  padding: .5rem .75rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  opacity: .85;
+  transition: opacity .3s;
+}
+.back-to-top:hover { opacity: 1; }

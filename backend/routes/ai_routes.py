@@ -1,13 +1,16 @@
-from fastapi import APIRouter, Request
-from pydantic import BaseModel
-from openai import OpenAI
 import os
+
+from fastapi import APIRouter
+from openai import OpenAI
+from pydantic import BaseModel
 
 router = APIRouter()
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+
 class PropertySummaryRequest(BaseModel):
     property: dict
+
 
 class StrategyRequest(BaseModel):
     price: float
@@ -16,6 +19,7 @@ class StrategyRequest(BaseModel):
     location: str
     property_type: str = ""
     description: str = ""
+
 
 @router.post("/generate-summary")
 async def generate_summary(payload: PropertySummaryRequest):
@@ -54,6 +58,7 @@ Summarise this UK property investment in 2–3 sentences:
         print("❌ GPT summary error:", str(e))
         return {"summary": "Unable to generate summary."}
 
+
 @router.post("/generate-strategies")
 async def generate_strategies(payload: StrategyRequest):
     try:
@@ -81,7 +86,9 @@ Use bullet points and short, clear wording.
         strategies = [
             line.strip()
             for line in content.split("\n")
-            if line.strip().startswith("-") or line.strip().startswith("•") or line.strip().startswith("1.")
+            if line.strip().startswith("-")
+            or line.strip().startswith("•")
+            or line.strip().startswith("1.")
         ]
 
         return {"strategies": strategies}

@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
 type AreaIntelData = {
   avgYieldPct?: number;
@@ -12,7 +12,7 @@ type AreaIntelData = {
 
 interface AreaIntelProps {
   locationLabel?: string;
-  postcode?: string; // postcode for live lookup
+  postcode?: string;
   data?: AreaIntelData;
   className?: string;
 }
@@ -21,20 +21,17 @@ export default function AreaIntel({
   locationLabel,
   postcode,
   data,
-  className = "",
+  className = '',
 }: AreaIntelProps) {
   const [liveData, setLiveData] = useState<AreaIntelData | null>(null);
-  const [loading, setLoading] = useState(false); // only true when we actually fetch
+  const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  // Fetch from backend only if postcode & backend URL are provided
   useEffect(() => {
-    const backend = (process.env.NEXT_PUBLIC_BACKEND_URL || "").trim();
-    // Normalise postcode (trim, uppercase); allow spaces
-    const pc = (postcode ?? "").trim().toUpperCase();
-    const validPostcode = pc.length >= 3; // cheap guard, avoids empty/undefined
+    const backend = (process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
+    const pc = (postcode ?? '').trim().toUpperCase();
+    const validPostcode = pc.length >= 3;
 
-    // If no postcode or no backend URL → no fetch, no loader, no error
     if (!backend || !validPostcode) {
       setLoading(false);
       setErr(null);
@@ -47,25 +44,21 @@ export default function AreaIntel({
     setLoading(true);
     setErr(null);
 
-    // Simple session cache to avoid repeated fetches during navigation
     const cacheKey = `area-intel:${pc}`;
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached) {
-      try {
+
+    try {
+      const cached = typeof window !== 'undefined' ? sessionStorage.getItem(cacheKey) : null;
+      if (cached) {
         const parsed = JSON.parse(cached);
         setLiveData(parsed);
         setLoading(false);
-        return () => {
-          ctrl.abort();
-        };
-      } catch {
-        // ignore parse errors and continue to fetch fresh
+        return () => ctrl.abort();
       }
+    } catch {
+      /* ignore cache parse */
     }
 
-    fetch(`${backend}/area-intel/${encodeURIComponent(pc)}`, {
-      signal: ctrl.signal,
-    })
+    fetch(`${backend}/area-intel/${encodeURIComponent(pc)}`, { signal: ctrl.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -73,17 +66,13 @@ export default function AreaIntel({
       .then((json) => {
         if (cancelled) return;
         setLiveData(json);
-        try {
-          sessionStorage.setItem(cacheKey, JSON.stringify(json));
-        } catch {
-          // ignore storage errors
-        }
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(json)); } catch {}
       })
       .catch((e) => {
         if (cancelled) return;
-        console.error("AreaIntel fetch error:", e);
+        console.error('AreaIntel fetch error:', e);
         setLiveData(null);
-        setErr("Couldn’t load live area data.");
+        setErr('Couldn’t load live area data.');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -95,13 +84,14 @@ export default function AreaIntel({
     };
   }, [postcode]);
 
-  // Merge live data, passed data, and fallback demo values
+  // Merge: live → provided → sensible demo defaults
   const d = {
     avgYieldPct: liveData?.avgYieldPct ?? data?.avgYieldPct ?? 5.8,
     avgRent: liveData?.avgRent ?? data?.avgRent ?? 1350,
     crimeRateIndex: liveData?.crimeRateIndex ?? data?.crimeRateIndex ?? 42,
-    ofstedSummary: liveData?.ofstedSummary ?? data?.ofstedSummary ?? "Ofsted Good nearby",
-    transportSummary: liveData?.transportSummary ?? data?.transportSummary ?? "Excellent · ~18 mins to centre",
+    ofstedSummary: liveData?.ofstedSummary ?? data?.ofstedSummary ?? 'Ofsted Good nearby',
+    transportSummary:
+      liveData?.transportSummary ?? data?.transportSummary ?? 'Excellent · ~18 mins to centre',
   };
 
   return (
@@ -110,23 +100,19 @@ export default function AreaIntel({
       aria-labelledby="area-intelligence"
     >
       <div className="mb-2 flex items-center justify-between">
-        <h3 id="area-intelligence" className="text-lg font-semibold">
-          📍 Area Intelligence
-        </h3>
-        {locationLabel && (
-          <span className="text-xs text-neutral-500">{locationLabel}</span>
-        )}
+        <h3 id="area-intelligence" className="text-lg font-semibold">📍 Area Intelligence</h3>
+        {locationLabel && <span className="text-xs text-neutral-500">{locationLabel}</span>}
       </div>
 
       {loading ? (
-        <div className="p-4 text-sm text-neutral-500">Loading live data…</div>
+        <div className="p-4">
+          <div className="h-4 w-1/3 bg-neutral-200 dark:bg-neutral-800 rounded mb-2 animate-pulse" />
+          <div className="h-4 w-1/2 bg-neutral-200 dark:bg-neutral-800 rounded mb-2 animate-pulse" />
+          <div className="h-4 w-2/3 bg-neutral-200 dark:bg-neutral-800 rounded animate-pulse" />
+        </div>
       ) : (
         <>
-          {err && (
-            <div className="mb-3 text-xs text-amber-600">
-              {err} Showing illustrative figures instead.
-            </div>
-          )}
+          {err && <div className="mb-3 text-xs text-amber-600">{err} Showing illustrative figures instead.</div>}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <InfoCard label="Average Yield" value={`${Number(d.avgYieldPct).toFixed(1)}%`} hint="Local average gross yield" />

@@ -1,83 +1,67 @@
-import React from "react";
+'use client';
 
-interface ScoreItem {
+import React from 'react';
+
+type Item = {
   label: string;
-  value: number;
-  color?: string;
-  tooltip?: string;
-}
+  value: number; // 0–100
+};
 
 export default function AIScoreBars({
-  overall = 0,
-  items = [],
-  className = "",
-  showHeader = true, // NEW: lets you hide the header
+  overall,
+  items,
+  showHeader = true,
+  className = '',
 }: {
-  overall?: number;
-  items?: ScoreItem[];
-  className?: string;
+  overall: number;        // 0–100
+  items: Item[];
   showHeader?: boolean;
+  className?: string;
 }) {
+  const safe = (n: number) => Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0));
+
   return (
-    <section
-      className={`rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 ${className}`}
-      aria-labelledby="ai-score-breakdown"
-    >
+    <section className={className}>
       {showHeader && (
-        <div className="mb-3 flex items-center justify-between">
-          <h3
-            id="ai-score-breakdown"
-            className="text-lg font-semibold"
-          >
-            🤖 AI Deal Score — Breakdown
-          </h3>
-          <div className="rounded-md border px-2 py-1 text-sm">
-            Overall: <span className="font-semibold">{overall}</span>
-          </div>
+        <div className="mb-2 flex items-center gap-2">
+          <div className="text-lg font-semibold">AI Deal Score</div>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+            beta
+          </span>
         </div>
       )}
 
-      <div className="space-y-2 sm:space-y-3">
-        {items.map((it, idx) => {
-          const width = Math.min(100, Math.max(0, it.value));
-          const color = it.color || "bg-blue-500";
-          return (
-            <div key={idx}>
-              <div className="mb-1 flex items-center justify-between">
-                <span className="text-sm font-medium">
-                  {it.label}
-                  {it.tooltip && (
-                    <span
-                      className="ml-1 cursor-help text-xs text-gray-400"
-                      title={it.tooltip}
-                    >
-                      ⓘ
-                    </span>
-                  )}
-                </span>
-                <span className="text-sm">{width}%</span>
-              </div>
-
-              {/* Updated bar track & fill */}
-              <div className="h-3 w-full overflow-hidden rounded-full border border-neutral-300 dark:border-neutral-700 bg-neutral-200 dark:bg-neutral-800">
-                <div
-                  className={`h-full ${color} transition-all duration-700 ease-out`}
-                  style={{ width: `${width}%` }}
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={it.value}
-                />
-              </div>
-            </div>
-          );
-        })}
+      {/* Overall pill */}
+      <div className="mb-3">
+        <div className="text-sm text-neutral-600 dark:text-neutral-300 mb-1">Overall</div>
+        <div className="h-2 w-full rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-[width] duration-500"
+            style={{ width: `${safe(overall)}%` }}
+            aria-label={`Overall score ${safe(overall)} out of 100`}
+          />
+        </div>
+        <div className="text-xs text-neutral-500 mt-1">{safe(overall)} / 100</div>
       </div>
 
-      {/* Shortened disclaimer */}
-      <p className="mt-2 text-sm text-slate-600">
-        Indicative only — based on yield, ROI, area demand and risk.
-      </p>
+      {/* Breakdown */}
+      <ul className="space-y-2">
+        {items.map((it, idx) => (
+          <li key={idx}>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-neutral-700 dark:text-neutral-200">{it.label}</span>
+              <span className="text-neutral-500">{safe(it.value)}%</span>
+            </div>
+            <div className="h-2 w-full rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+              <div
+                className="h-full bg-neutral-600 dark:bg-neutral-400 transition-[width] duration-500"
+                style={{ width: `${safe(it.value)}%` }}
+                aria-hidden
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

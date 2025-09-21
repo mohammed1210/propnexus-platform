@@ -2,12 +2,17 @@
   "name": "propnexus-platform",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "npm@10.8.2",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "ingest:csv": "ts-node scripts/ingest-csv.ts data/listings.sample.csv"
   },
   "dependencies": {
     "@pdf-lib/standard-fonts": "^1.0.0",
@@ -16,11 +21,13 @@
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.39.4",
     "chart.js": "^4.5.0",
+    "clsx": "^2.1.1",
     "html2pdf.js": "^0.10.1",
     "leaflet": "^1.9.4",
     "next": "^15.4.4",
     "openai": "^5.16.0",
     "pako": "^2.1.0",
+    "papaparse": "^5.5.3",
     "pdf-lib": "^1.17.1",
     "react": "^18.2.0",
     "react-chartjs-2": "^5.3.0",
@@ -31,16 +38,18 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@types/geojson": "^7946.0.16",
     "@types/leaflet": "^1.9.20",
-    "@types/next": "^8.0.7",
     "@types/node": "^24.3.0",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^18.3.23",
-    "@types/react-dom": "19.1.9",
-    "autoprefixer": "^10.4.14",
+    "@types/react-dom": "18.2.7",
+    "@types/trusted-types": "^2.0.7",
+    "autoprefixer": "^10.4.21",
     "eslint": "8.45.0",
     "eslint-config-next": "13.5.6",
-    "postcss": "^8.4.27",
-    "tailwindcss": "^3.3.3",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.17",
     "typescript": "^5.9.2"
   }
 }
