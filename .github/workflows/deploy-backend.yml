@@ -27,4 +27,4 @@ jobs:
       - name: Deploy with Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service "propnexus-backend" --path backend --ci
+        run: railway up --service "propnexus-backend" --path-as-root backend --ci
