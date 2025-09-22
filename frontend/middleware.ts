@@ -1,11 +1,11 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (pathname === "/saved-deals') {
-    return NextResponse.redirect(new URL("/saved-deals', req.url));
+  // Old → new aliases
+  if (pathname === '/saved' || pathname === '/saved-deals-deals') {
+    return NextResponse.redirect(new URL('/saved-deals', req.url));
   }
   if (pathname === '/off-market-deals') {
     return NextResponse.redirect(new URL('/off-market', req.url));
@@ -13,3 +13,8 @@ export function middleware(req: NextRequest) {
 
   return NextResponse.next();
 }
+
+// (optional) limit middleware to top-level paths we might alias
+export const config = {
+  matcher: ['/', '/saved', '/saved-deals-deals', '/off-market-deals'],
+};
