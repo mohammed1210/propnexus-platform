@@ -1,24 +1,25 @@
 # backend/main.py
+from __future__ import annotations
+
 import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
-# Routers (imports must be at top to satisfy Ruff E402)
-from routes import area_routes, comps_routes, gpt_routes, scrape_routes
-from routes.ai_routes import router as ai_routes
-from routes.notes import router as notes_router
-from routes.off_market_routes import router as off_market_router
-from routes.save_deal import router as save_deal_router
-from routes.stripe_routes import router as stripe_router
 from supabase import Client, create_client
 
-# -----------------------------
-# Load env
-# -----------------------------
+# --- Load environment early ---------------------------------------------------
 load_dotenv()
 
+# --- Routers (keep imports at top to satisfy linters like Ruff E402) ----------
+from routes import area_routes, comps_routes, gpt_routes, scrape_routes  # noqa: E402
+from routes.ai_routes import router as ai_routes  # noqa: E402
+from routes.notes import router as notes_router  # noqa: E402
+from routes.off_market_routes import router as off_market_router  # noqa: E402
+from routes.save_deal import router as save_deal_router  # noqa: E402
+from routes.stripe_routes import router as stripe_router  # noqa: E402
+
+# --- Supabase client (prefer service role on server) --------------------------
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
@@ -26,18 +27,15 @@ supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# -----------------------------
-# FastAPI app
-# -----------------------------
+# --- FastAPI app --------------------------------------------------------------
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
-# -----------------------------
-# CORS (explicit + vercel previews)
-# -----------------------------
+# --- CORS ---------------------------------------------------------------------
+# Allow local dev + production domain + any vercel preview (subdomain) deploys
 origins = [
-    "https://propnexus-platform.vercel.app",
     "http://localhost:3000",
     "http://localhost:3001",
+    "https://propnexus-platform.vercel.app",
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -49,9 +47,7 @@ app.add_middleware(
 )
 
 
-# -----------------------------
-# Root + health
-# -----------------------------
+# --- Root/health --------------------------------------------------------------
 @app.get("/")
 async def root():
     return {"message": "PropNexus backend is running."}
@@ -67,10 +63,11 @@ async def api_health():
     return {"ok": True}
 
 
-# -----------------------------
-# Routers wiring
-# -----------------------------
-app.include_router(save_deal_router)
+# --- Routers ------------------------------------------------------------------
+# Order doesn’t matter here; include all feature routers.
+app.include_router(
+    save_deal_router
+)  # /save-deal, /saved-deals, DELETE /saved-deals/{id}
 app.include_router(notes_router)
 app.include_router(gpt_routes.router)
 app.include_router(ai_routes)
@@ -81,9 +78,7 @@ app.include_router(off_market_router)
 app.include_router(stripe_router)
 
 
-# -----------------------------
-# Supabase property endpoints
-# -----------------------------
+# --- Supabase-backed property endpoints --------------------------------------
 @app.get("/properties")
 async def get_properties():
     if not supabase:
@@ -101,6 +96,7 @@ async def get_property_by_id(property_id: str):
     return res.data[0]
 
 
+# Back-compat alias for older clients
 @app.get("/api/properties/{property_id}")
 async def get_property_by_id_alias(property_id: str):
     return await get_property_by_id(property_id)
