@@ -14,7 +14,10 @@
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
     "ts-node": "^10.9.2",
-    "tsx": "^4.20.5"
+    "tsx": "^4.20.5",
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0"
   },
   "scripts": {
     "dev": "next dev",

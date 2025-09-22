@@ -28,7 +28,7 @@ type SavedDeal = {
   bathrooms?: number | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
-  saved_at?: string | null; // ✅ was created_at
+  saved_at?: string | null;
 };
 
 export default function AnalyticsPage() {
@@ -37,13 +37,13 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     let ignore = false;
-    const sb = getSupabase();
     (async () => {
       setLoading(true);
+      const sb = getSupabase();
       const { data, error } = await sb
         .from('saved_deals')
         .select('*')
-        .order('saved_at', { ascending: false }); // ✅ was created_at
+        .order('saved_at', { ascending: false });
 
       if (!ignore) {
         if (error) console.warn('load saved_deals', error);
@@ -51,7 +51,9 @@ export default function AnalyticsPage() {
         setLoading(false);
       }
     })();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const kpis = useMemo(() => {
@@ -65,7 +67,7 @@ export default function AnalyticsPage() {
   const monthly = useMemo(() => {
     const map = new Map<string, { count: number; sumYield: number }>();
     for (const d of deals) {
-      const key = (d.saved_at ?? '').slice(0, 7) || 'Unknown'; // ✅ was created_at
+      const key = (d.saved_at ?? '').slice(0, 7) || 'Unknown';
       const m = map.get(key) ?? { count: 0, sumYield: 0 };
       m.count += 1;
       m.sumYield += num(d.yield_percent);
@@ -74,7 +76,7 @@ export default function AnalyticsPage() {
     const labels = Array.from(map.keys()).sort();
     const countSeries = labels.map((l) => map.get(l)!.count);
     const yieldSeries = labels.map((l) =>
-      round((map.get(l)!.sumYield / Math.max(map.get(l)!.count, 1)) || 0)
+      round((map.get(l)!.sumYield / Math.max(map.get(l)!.count, 1)) || 0),
     );
     return { labels, countSeries, yieldSeries };
   }, [deals]);
@@ -89,7 +91,7 @@ export default function AnalyticsPage() {
         <nav className="space-y-1">
           <NavItem href="/listings" label="Listings" emoji="🏠" />
           <NavItem href="/analytics" label="Analytics" emoji="📈" active />
-          <NavItem href="/saved" label="Saved Deals" emoji="⭐" />
+          <NavItem href="/saved-deals" label="Saved Deals" emoji="⭐" />
         </nav>
         <div className="mt-6 text-xs text-slate-300">
           Track portfolio metrics, AI scores and market signals here.
@@ -115,9 +117,20 @@ export default function AnalyticsPage() {
             <Line
               data={{
                 labels: monthly.labels,
-                datasets: [{ label: 'Saved deals', data: monthly.countSeries, borderWidth: 2, tension: 0.3 }],
+                datasets: [
+                  {
+                    label: 'Saved deals',
+                    data: monthly.countSeries,
+                    borderWidth: 2,
+                    tension: 0.3,
+                  },
+                ],
               }}
-              options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } },
+              }}
             />
           </div>
         </Section>
@@ -128,9 +141,20 @@ export default function AnalyticsPage() {
             <Line
               data={{
                 labels: monthly.labels,
-                datasets: [{ label: 'Avg yield %', data: monthly.yieldSeries, borderWidth: 2, tension: 0.3 }],
+                datasets: [
+                  {
+                    label: 'Avg yield %',
+                    data: monthly.yieldSeries,
+                    borderWidth: 2,
+                    tension: 0.3,
+                  },
+                ],
               }}
-              options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, suggestedMax: 12 } } }}
+              options={{
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, suggestedMax: 12 } },
+              }}
             />
           </div>
         </Section>
@@ -151,20 +175,34 @@ export default function AnalyticsPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><Td className="p-3 text-neutral-500" colSpan={6}>Loading…</Td></tr>
+                  <tr>
+                    <Td className="p-3 text-neutral-500" colSpan={6}>
+                      Loading…
+                    </Td>
+                  </tr>
                 ) : deals.length === 0 ? (
-                  <tr><Td className="p-3 text-neutral-500" colSpan={6}>No saved deals yet.</Td></tr>
+                  <tr>
+                    <Td className="p-3 text-neutral-500" colSpan={6}>
+                      No saved deals yet.
+                    </Td>
+                  </tr>
                 ) : (
-                  deals.slice(-8).reverse().map((d) => (
-                    <tr key={d.id} className="border-t border-neutral-200 dark:border-neutral-800">
-                      <Td>{d.title ?? '—'}</Td>
-                      <Td>{d.location ?? '—'}</Td>
-                      <Td>£{formatGBP(num(d.price))}</Td>
-                      <Td>{valOrDash(d.yield_percent)}%</Td>
-                      <Td>{valOrDash(d.roi_percent)}%</Td>
-                      <Td>{formatDate(d.saved_at)}</Td> {/* ✅ was created_at */}
-                    </tr>
-                  ))
+                  deals
+                    .slice(-8)
+                    .reverse()
+                    .map((d) => (
+                      <tr
+                        key={d.id}
+                        className="border-t border-neutral-200 dark:border-neutral-800"
+                      >
+                        <Td>{d.title ?? '—'}</Td>
+                        <Td>{d.location ?? '—'}</Td>
+                        <Td>£{formatGBP(num(d.price))}</Td>
+                        <Td>{valOrDash(d.yield_percent)}%</Td>
+                        <Td>{valOrDash(d.roi_percent)}%</Td>
+                        <Td>{formatDate(d.saved_at)}</Td>
+                      </tr>
+                    ))
                 )}
               </tbody>
             </table>
@@ -175,10 +213,26 @@ export default function AnalyticsPage() {
   );
 }
 
-function NavItem({ href, label, emoji, active = false }: { href: string; label: string; emoji: string; active?: boolean; }) {
+function NavItem({
+  href,
+  label,
+  emoji,
+  active = false,
+}: {
+  href: string;
+  label: string;
+  emoji: string;
+  active?: boolean;
+}) {
   return (
-    <Link href={href} className={`block px-3 py-2 rounded-md text-sm ${active ? 'bg-white/10' : 'hover:bg-white/10'}`}>
-      <span className="mr-2">{emoji}</span>{label}
+    <Link
+      href={href}
+      className={`block px-3 py-2 rounded-md text-sm ${
+        active ? 'bg-white/10' : 'hover:bg-white/10'
+      }`}
+    >
+      <span className="mr-2">{emoji}</span>
+      {label}
     </Link>
   );
 }
@@ -202,10 +256,28 @@ const Td = ({ className, ...rest }: TdProps) => (
   <td className={`px-3 py-2 ${className ?? ''}`} {...rest} />
 );
 
-/** Helpers */
-function num(n: unknown) { return Number(n ?? 0) || 0; }
-function round(n: number) { return Number(n.toFixed(2)); }
-function avg(list: number[]) { const arr = list.filter((x) => Number.isFinite(x)); return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0; }
-function valOrDash(n?: number | null) { return n == null ? '–' : n; }
-function formatGBP(n: number) { return n.toLocaleString(); }
-function formatDate(s?: string | null) { if (!s) return '—'; try { return new Date(s).toLocaleDateString(); } catch { return '—'; } }
+/* ---------- helpers ---------- */
+function num(n: unknown) {
+  return Number(n ?? 0) || 0;
+}
+function round(n: number) {
+  return Number(n.toFixed(2));
+}
+function avg(list: number[]) {
+  const arr = list.filter((x) => Number.isFinite(x));
+  return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+}
+function valOrDash(n?: number | null) {
+  return n == null ? '–' : n;
+}
+function formatGBP(n: number) {
+  return n.toLocaleString('en-GB', { maximumFractionDigits: 0 });
+}
+function formatDate(s?: string | null) {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleDateString('en-GB');
+  } catch {
+    return '—';
+  }
+}

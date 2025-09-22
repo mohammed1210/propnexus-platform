@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 
 export default function HeaderClient() {
@@ -17,11 +17,11 @@ export default function HeaderClient() {
   }, []);
 
   const nav = [
-    { href: '/listings', label: 'Listings' },
-    { href: '/saved', label: 'Saved Deals' },
-    { href: '/off-market', label: 'Off-Market' },
-    { href: '/pricing', label: 'Pricing' },
-    { href: '/analytics', label: 'Analytics' },
+    { href: '/listings',     label: 'Listings' },
+    { href: '/off-market',   label: 'Off-Market' },
+    { href: '/saved-deals',  label: 'Saved Deals' },
+    { href: '/analytics',    label: 'Analytics' },
+    { href: '/pricing',      label: 'Pricing' },
   ];
 
   return (
@@ -35,11 +35,10 @@ export default function HeaderClient() {
       <div className="max-w-6xl mx-auto h-14 px-4 flex items-center gap-3">
         {/* brand */}
         <Link href="/" className="font-semibold tracking-tight">
-          <span className="text-zinc-900 dark:text-zinc-100">PropNexus</span>
+          <span className="text-zinc-900 dark:text-zinc-100">PropNexus</span>{' '}
           <span className="opacity-60">Listings</span>
         </Link>
 
-        {/* spacer pushes tabs to the right */}
         <div className="flex-1" />
 
         {/* right-aligned tabs */}
@@ -63,13 +62,9 @@ export default function HeaderClient() {
           })}
         </nav>
 
-        {/* theme toggle placeholder (kept as simple text for now) */}
         <button
           className="ml-2 rounded-md border px-2 py-1 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          onClick={() => {
-            // You can wire your theme toggle here
-            document.documentElement.classList.toggle('dark');
-          }}
+          onClick={() => document.documentElement.classList.toggle('dark')}
         >
           Dark
         </button>
