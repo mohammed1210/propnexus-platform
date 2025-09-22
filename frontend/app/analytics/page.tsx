@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
         <nav className="space-y-1">
           <NavItem href="/listings" label="Listings" emoji="🏠" />
           <NavItem href="/analytics" label="Analytics" emoji="📈" active />
-          <NavItem href="/saved" label="Saved Deals" emoji="⭐" />
+          <NavItem href="/saved-deals" label="Saved Deals" emoji="⭐" />
         </nav>
         <div className="mt-6 text-xs text-slate-300">
           Track portfolio metrics, AI scores and market signals here.
