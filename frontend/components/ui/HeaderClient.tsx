@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation';
 
 const links = [
   { href: '/listings',  label: 'Listings' },
-  { href: "/saved-deals',     label: 'Saved Deals' },
   { href: '/off-market',label: 'Off-Market' },
-  { href: '/pricing',   label: 'Pricing' },
+  { href: "/saved-deals',     label: 'Saved Deals' },
   { href: '/analytics', label: 'Analytics' },
+  { href: '/pricing',   label: 'Pricing' },
 ];
 
 export default function HeaderClient() {
