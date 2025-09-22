@@ -20,6 +20,10 @@ ADMIN_TOKEN = os.getenv("OFF_MARKET_ADMIN_TOKEN", "").strip()
 
 
 def require_admin(x_api_key: Optional[str] = Header(default=None)):
+    """
+    Require a matching admin token when OFF_MARKET_ADMIN_TOKEN is set.
+    If the env var is empty, the check is skipped (useful for local dev).
+    """
     if ADMIN_TOKEN and (x_api_key or "").strip() != ADMIN_TOKEN:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
@@ -64,13 +68,17 @@ class CreateDealResponse(BaseModel):
     "/create", response_model=CreateDealResponse, dependencies=[Depends(require_admin)]
 )
 def create_off_market_deal(payload: CreateDealRequest):
+    """
+    Insert a new row into off_market_deals (Supabase-py v2).
+    NOTE: In v2, .insert() returns a response directly; there is no .select("*") chain.
+    """
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
-    data = payload.model_dump()  # pydantic v2
+    data = payload.dict()
     try:
-        res = supabase.table("off_market_deals").insert(data).select("*").execute()
-        if not res.data:
+        res = supabase.table("off_market_deals").insert(data).execute()
+        if not getattr(res, "data", None):
             raise HTTPException(status_code=502, detail="Insert failed")
         return CreateDealResponse(**res.data[0])
     except Exception as e:
@@ -78,32 +86,23 @@ def create_off_market_deal(payload: CreateDealRequest):
         raise HTTPException(status_code=500, detail="Failed to create deal") from e
 
 
-# ✅ add this route so frontend /off-market/generate-off-market works
+# ✅ simple generator endpoint (guard against zero/negative count)
 class GenerateRequest(BaseModel):
-    location: str = Field(..., min_length=2)
-    budget: float = Field(..., ge=0)
-    count: int = Field(5, ge=1, le=10)  # must be ≥1 (cap at 10 for sanity)
+    location: str
+    budget: float
+    count: int = 5
 
 
 @router.post("/generate-off-market")
 async def generate_off_market(payload: GenerateRequest):
-    """
-    Temporary generator that synthesizes off-market deals.
-    Guards against bad inputs (e.g., zero/negative count) to prevent 500s.
-    """
-    # Extra runtime hardening (belt & braces)
-    location = (payload.location or "").strip()
-    budget = max(0.0, float(payload.budget or 0))
-    count = max(1, min(10, int(payload.count or 1)))
-
-    unit_price = budget / max(1, count)
-
-    deals = [
-        {
-            "address": f"Demo address {i+1}, {location}",
-            "price": unit_price,
-            "description": "Generated placeholder deal",
-        }
-        for i in range(count)
-    ]
-    return {"deals": deals}
+    # For now just echo; hook up GPT later
+    return {
+        "deals": [
+            {
+                "address": f"Demo address {i+1}, {payload.location}",
+                "price": payload.budget / payload.count,
+                "description": "Generated placeholder deal",
+            }
+            for i in range(payload.count)
+        ]
+    }
