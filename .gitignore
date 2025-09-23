@@ -1,44 +1,29 @@
-# macOS system files
-.DS_Store
-
-# Node dependencies and build output
+# Node / Next / monorepo
 node_modules/
 .next/
-out/
+.turbo/
 .vercel/
+dist/
+build/
+coverage/
 
-# Python-related
-__pycache__/
-*.pyc
-venv/
-
-# Logs and local configs
-*.log
-.env
-.env.local
-.env.*
-
-# GitHub/Vercel junk
-*.swp
-.vercel/
-
-# IDE/editor
-.vscode/
-.idea/
-.vercel
-
-# Python envs
+# Python
 .venv/
-backend/.venv/
-# keep sample env files
-!.env.example
-!frontend/.env.example
+__pycache__/
+.pytest_cache/
 
-# Ignore real env files
+# OS / editor
+.DS_Store
+*.log
+
+# Env files (never commit real envs)
 .env
 **/.env
-
-# Ignore real env files
-.env
-**/.env
+.env.local
+.env.production
+.env.development
 backend/.env
+frontend/.env
+
+# Lock-in for repo hygiene
+*.sqlite
