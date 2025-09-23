@@ -37,3 +37,8 @@ backend/.venv/
 # Ignore real env files
 .env
 **/.env
+
+# Ignore real env files
+.env
+**/.env
+backend/.env
