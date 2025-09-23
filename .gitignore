@@ -33,3 +33,7 @@ backend/.venv/
 # keep sample env files
 !.env.example
 !frontend/.env.example
+
+# Ignore real env files
+.env
+**/.env
