@@ -1,7 +1,7 @@
 # backend/main.py
 from __future__ import annotations
-
 import os
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,18 +10,13 @@ from supabase import Client, create_client
 # Load env early
 load_dotenv()
 
-# Routers (package-relative imports; keep at top so linters are happy)
-from backend.routes import (  # noqa: E402
-    area_routes,
-    comps_routes,
-    gpt_routes,
-    scrape_routes,
-)
-from backend.routes.ai import router as ai_router  # noqa: E402
-from backend.routes.notes import router as notes_router  # noqa: E402
-from backend.routes.off_market_routes import router as off_market_router  # noqa: E402
-from backend.routes.save_deal import router as save_deal_router  # noqa: E402
-from backend.routes.stripe_routes import router as stripe_router  # noqa: E402
+# Routers (relative imports; keep at top for linter)
+from .routes import area_routes, comps_routes, gpt_routes, scrape_routes  # noqa: E402
+from .routes.ai import router as ai_router  # noqa: E402
+from .routes.notes import router as notes_router  # noqa: E402
+from .routes.off_market_routes import router as off_market_router  # noqa: E402
+from .routes.save_deal import router as save_deal_router  # noqa: E402
+from .routes.stripe_routes import router as stripe_router  # noqa: E402
 
 # Supabase client (prefer service role on server)
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
@@ -33,10 +28,14 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
-# CORS (allow local & vercel previews; tighten later if you want)
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "https://propnexus-platform.vercel.app"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://propnexus-platform.vercel.app",
+    ],
     allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
@@ -52,11 +51,11 @@ async def root():
 async def health():
     return {"ok": True}
 
-# Include routers (additive)
+# Routers
 app.include_router(save_deal_router)
 app.include_router(notes_router)
 app.include_router(gpt_routes.router)
-app.include_router(ai_router)                # <- new AI endpoints
+app.include_router(ai_router)                 # <- PO2 additive include
 app.include_router(area_routes.router)
 app.include_router(comps_routes.router)
 app.include_router(scrape_routes.router)

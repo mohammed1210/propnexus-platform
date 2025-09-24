@@ -1,38 +1,60 @@
-import {
-  SummaryRequest,
-  SummaryResponse,
-  StrategiesRequest,
-  StrategiesResponse,
-} from "../types/ai";
+// frontend/lib/api.ts
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "";
+const BASE =
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, '') || 'http://127.0.0.1:8000';
 
-async function postAiSummary(payload: SummaryRequest): Promise<SummaryResponse> {
-  const res = await fetch(`${API_BASE}/ai/summary`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || "Failed to fetch AI summary");
+    const text = await res.text().catch(() => '');
+    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
   }
-  return (await res.json()) as SummaryResponse;
+  return (await res.json()) as T;
 }
 
-async function postAiStrategies(
-  payload: StrategiesRequest,
+/** Generic POST used around the app (kept for back-compat). */
+export async function apiPost<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
+  const url = path.startsWith('http') ? path : `${BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
+  });
+  return handle<TRes>(res);
+}
+
+/** --- PO2 AI routes (typed) --- */
+export interface SummaryRequest {
+  title: string;
+  price?: number;
+  location: string;
+  yield_?: number;
+  roi?: number;
+  description?: string;
+}
+export interface SummaryResponse {
+  summary: string;
+  bullets: string[];
+}
+export interface StrategiesRequest {
+  property: Record<string, unknown>;
+  constraints?: Record<string, unknown>;
+}
+export interface Strategy {
+  title: string;
+  rationale: string;
+  steps: string[];
+  risk: string;
+}
+export interface StrategiesResponse {
+  strategies: Strategy[];
+}
+
+export async function postAiSummary(payload: SummaryRequest): Promise<SummaryResponse> {
+  return apiPost<SummaryRequest, SummaryResponse>('/ai/summary', payload);
+}
+
+export async function postAiStrategies(
+  payload: StrategiesRequest
 ): Promise<StrategiesResponse> {
-  const res = await fetch(`${API_BASE}/ai/strategies`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || "Failed to fetch AI strategies");
-  }
-  return (await res.json()) as StrategiesResponse;
+  return apiPost<StrategiesRequest, StrategiesResponse>('/ai/strategies', payload);
 }
-
-export { postAiSummary, postAiStrategies };

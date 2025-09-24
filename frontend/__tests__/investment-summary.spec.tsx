@@ -1,15 +1,36 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import InvestmentSummary from "../components/property_details/InvestmentSummary";
-import * as api from "../lib/api";
+// frontend/__tests__/investment-summary.spec.tsx
+import { render, screen, waitFor } from '@testing-library/react'
+import InvestmentSummary from '@/components/property_details/InvestmentSummary'
 
-describe("InvestmentSummary", () => {
-  it("renders text summary without charts", async () => {
-    jest
-      .spyOn(api, "postAiSummary")
-      .mockResolvedValue({ summary: "Test summary", bullets: ["One", "Two"] });
-    render(<InvestmentSummary title="Title" location="UB8" />);
-    await waitFor(() => screen.getByTestId("investment-summary-text"));
-    expect(screen.getByText("Test summary")).toBeInTheDocument();
-    expect(screen.queryByRole("img")).toBeNull();
-  });
-});
+// Mock the whole api module with a writable function
+jest.mock('@/lib/api', () => ({
+  postAiSummary: jest.fn(),
+}))
+
+import { postAiSummary } from '@/lib/api'
+
+describe('InvestmentSummary', () => {
+  it('renders text summary without charts', async () => {
+    (postAiSummary as jest.Mock).mockResolvedValue({
+      summary: 'Test summary',
+      bullets: ['One', 'Two'],
+    })
+
+    // Pass the minimal props your component expects
+    render(
+      <InvestmentSummary
+        property={{
+          title: 'Title',
+          location: 'UB8',
+          price: 300000,
+        }}
+      />
+    )
+
+    await waitFor(() => screen.getByTestId('investment-summary-text'))
+    expect(screen.getByTestId('investment-summary-text').textContent).toMatch(/Test summary/)
+    // sanity check: no charts
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(document.querySelector('.chart')).toBeNull()
+  })
+})

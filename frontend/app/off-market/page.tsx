@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
