@@ -13,6 +13,7 @@
     "lint": "next lint",
     "test": "jest",
     "format": "prettier --write .",
+    "type-check": "tsc --noEmit",
     "ingest:csv": "ts-node scripts/ingest-csv.ts data/listings.sample.csv"
   },
   "dependencies": {

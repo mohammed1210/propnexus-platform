@@ -3,6 +3,7 @@
 import os
 
 from fastapi import APIRouter, HTTPException
+
 from supabase import create_client
 
 router = APIRouter()

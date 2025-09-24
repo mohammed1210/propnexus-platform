@@ -1,10 +1,12 @@
 # backend/main.py
 from __future__ import annotations
+
 import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
 from supabase import Client, create_client
 
 # Load env early
@@ -42,25 +44,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 async def root():
     return {"message": "PropNexus backend is running."}
+
 
 @app.get("/health")
 @app.get("/api/health")
 async def health():
     return {"ok": True}
 
+
 # Routers
 app.include_router(save_deal_router)
 app.include_router(notes_router)
 app.include_router(gpt_routes.router)
-app.include_router(ai_router)                 # <- PO2 additive include
+app.include_router(ai_router)  # <- PO2 additive include
 app.include_router(area_routes.router)
 app.include_router(comps_routes.router)
 app.include_router(scrape_routes.router)
 app.include_router(off_market_router)
 app.include_router(stripe_router)
+
 
 # Supabase-backed property endpoints (unchanged)
 @app.get("/properties")
@@ -68,6 +74,7 @@ async def get_properties():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     return supabase.table("properties").select("*").execute().data
+
 
 @app.get("/properties/{property_id}")
 async def get_property_by_id(property_id: str):

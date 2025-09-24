@@ -1,7 +1,9 @@
 # backend/routes/scrape_routes.py
 import os
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 from supabase import Client, create_client
 
 # Import scrapers relative to backend package
@@ -17,8 +19,10 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 router = APIRouter()
 
+
 class ScrapeRequest(BaseModel):
     location: str
+
 
 @router.post("/scrape")
 async def scrape_all_sources(req: ScrapeRequest):
@@ -51,4 +55,3 @@ async def scrape_all_sources(req: ScrapeRequest):
     except Exception as e:  # pragma: no cover
         print("❌ Scrape failed:", type(e).__name__)
         raise HTTPException(status_code=500, detail="Scraping failed")
-    
