@@ -1,35 +1,38 @@
-// frontend/lib/api.ts
-function getBase(): string {
-  const base =
-    process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
-  if (!base) {
-    throw new Error(
-      "API base URL is not set. Define NEXT_PUBLIC_BACKEND_URL or NEXT_PUBLIC_API_URL."
-    );
-  }
-  // strip trailing slash
-  return base.replace(/\/$/, "");
-}
+import {
+  SummaryRequest,
+  SummaryResponse,
+  StrategiesRequest,
+  StrategiesResponse,
+} from "../types/ai";
 
-export async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
-  const url = `${getBase()}${path}`;
-  const res = await fetch(url, { cache: "no-store", ...init });
-  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`);
-  return res.json() as Promise<T>;
-}
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "";
 
-export async function apiPost<T>(
-  path: string,
-  body?: unknown,
-  init?: RequestInit
-): Promise<T> {
-  const url = `${getBase()}${path}`;
-  const res = await fetch(url, {
+async function postAiSummary(payload: SummaryRequest): Promise<SummaryResponse> {
+  const res = await fetch(`${API_BASE}/ai/summary`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-    body: body ? JSON.stringify(body) : undefined,
-    ...init,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`POST ${url} failed: ${res.status}`);
-  return res.json() as Promise<T>;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Failed to fetch AI summary");
+  }
+  return (await res.json()) as SummaryResponse;
 }
+
+async function postAiStrategies(
+  payload: StrategiesRequest,
+): Promise<StrategiesResponse> {
+  const res = await fetch(`${API_BASE}/ai/strategies`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || "Failed to fetch AI strategies");
+  }
+  return (await res.json()) as StrategiesResponse;
+}
+
+export { postAiSummary, postAiStrategies };
