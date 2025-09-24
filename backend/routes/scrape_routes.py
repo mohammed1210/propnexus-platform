@@ -6,9 +6,15 @@ from pydantic import BaseModel
 
 from supabase import Client, create_client
 
-# Import scrapers relative to backend package
-from ..scraper.rightmove_scraper import scrape_rightmove_properties
-from ..scraper.zoopla_scraper import scrape_zoopla_properties
+# Dual-import for local/package vs Railway/flat
+try:
+    from scraper.rightmove_scraper import scrape_rightmove_properties  # type: ignore
+    from scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
+except ModuleNotFoundError:
+    from backend.scraper.rightmove_scraper import (
+        scrape_rightmove_properties,  # type: ignore
+    )
+    from backend.scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")

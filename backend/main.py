@@ -12,13 +12,35 @@ from supabase import Client, create_client
 # Load env early
 load_dotenv()
 
-# Routers (relative imports; keep at top for linter)
-from .routes import area_routes, comps_routes, gpt_routes, scrape_routes  # noqa: E402
-from .routes.ai import router as ai_router  # noqa: E402
-from .routes.notes import router as notes_router  # noqa: E402
-from .routes.off_market_routes import router as off_market_router  # noqa: E402
-from .routes.save_deal import router as save_deal_router  # noqa: E402
-from .routes.stripe_routes import router as stripe_router  # noqa: E402
+# --- Dual-import: flat (/app) OR package (backend.*) -------------------------
+try:
+    # Railway (flat) / local if you run `uvicorn main:app` from /backend
+    from routes import (  # type: ignore
+        area_routes,
+        comps_routes,
+        gpt_routes,
+        scrape_routes,
+    )
+    from routes.ai import router as ai_router  # type: ignore
+    from routes.notes import router as notes_router  # type: ignore
+    from routes.off_market_routes import router as off_market_router  # type: ignore
+    from routes.save_deal import router as save_deal_router  # type: ignore
+    from routes.stripe_routes import router as stripe_router  # type: ignore
+except ModuleNotFoundError:
+    # Codespaces/local when you run `uvicorn backend.main:app`
+    from backend.routes import (  # type: ignore
+        area_routes,
+        comps_routes,
+        gpt_routes,
+        scrape_routes,
+    )
+    from backend.routes.ai import router as ai_router  # type: ignore
+    from backend.routes.notes import router as notes_router  # type: ignore
+    from backend.routes.off_market_routes import (
+        router as off_market_router,  # type: ignore
+    )
+    from backend.routes.save_deal import router as save_deal_router  # type: ignore
+    from backend.routes.stripe_routes import router as stripe_router  # type: ignore
 
 # Supabase client (prefer service role on server)
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
