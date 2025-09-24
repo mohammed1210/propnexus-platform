@@ -1,9 +1,9 @@
-from typing import List, Optional
-
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 
 
 class SummaryRequest(BaseModel):
+    """Request payload for generating an investment summary."""
     title: str
     price: Optional[float] = None
     location: str
@@ -13,16 +13,19 @@ class SummaryRequest(BaseModel):
 
 
 class SummaryResponse(BaseModel):
+    """Response payload containing a summary and bullet points."""
     summary: str
     bullets: List[str]
 
 
 class StrategiesRequest(BaseModel):
-    property: dict
-    constraints: Optional[dict] = None
+    """Request payload for generating exit strategies."""
+    property: Dict[str, Any]
+    constraints: Optional[Dict[str, Any]] = None
 
 
 class Strategy(BaseModel):
+    """A single exit strategy with rationale, steps, and optional risk."""
     title: str
     rationale: str
     steps: List[str]
@@ -30,4 +33,6 @@ class Strategy(BaseModel):
 
 
 class StrategiesResponse(BaseModel):
+    """Response payload containing a list of strategies."""
     strategies: List[Strategy]
+    

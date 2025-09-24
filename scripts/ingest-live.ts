@@ -1,90 +1,48 @@
-// scripts/ingest-live.ts
-import 'dotenv/config';
-import { createClient } from '@supabase/supabase-js';
-import { scrapeRightmove } from './sources/rightmove';
+#!/usr/bin/env node
+// CLI script for scraping search pages with fallback and structured logs.
+import { fetchSearchPage, Mode } from "./providers/scraper-provider";
 
-type PropertyRow = {
-  source: string;
-  source_id: string;
-  title: string;
-  location: string;
-  price: number;
-  bedrooms?: number | null;
-  bathrooms?: number | null;
-  imageurl?: string | null;
-  latitude?: number | null;
-  longitude?: number | null;
-  yield_percent?: number | null;
-  roi_percent?: number | null;
-};
-
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error('❌ Missing Supabase env. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
-  process.exit(1);
-}
-const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
-
-// Which searches to run (discover all RM_SEARCH_* in env)
-const SEARCHES = Object.entries(process.env)
-  .filter(([k, v]) => k.startsWith('RM_SEARCH_') && v && String(v).startsWith('http'))
-  .map(([k, v]) => ({ name: k, url: String(v) }));
-
-function computeDerived(row: PropertyRow): PropertyRow {
-  const estRent = Math.round(row.price * 0.005); // placeholder
-  const yieldPct = row.price ? (estRent * 12) / row.price * 100 : null;
-  return { ...row, yield_percent: yieldPct ? Number(yieldPct.toFixed(1)) : null, roi_percent: null };
-}
-
-async function upsert(rows: PropertyRow[]) {
-  if (!rows.length) return { count: 0 };
-  const { error } = await sb.from('properties').upsert(rows, { onConflict: 'source,source_id' });
-  if (error) throw error;
-  return { count: rows.length };
-}
-
-async function run() {
-  console.log(`[Ingest] Starting live scrape… (${new Date().toISOString()})`);
-
-  if (!SEARCHES.length) {
-    console.warn('No RM_SEARCH_* envs found. Add some to .env or Railway Variables.');
-    return;
-  }
-
-  let total = 0;
-
-  for (const s of SEARCHES) {
-    console.log(`• Scraping: ${s.name}`);
-    try {
-      const items = await scrapeRightmove(s.url);
-      console.log(`  scraped ${items.length} cards from ${s.name}`);
-      const rows = items.map<PropertyRow>(i =>
-        computeDerived({
-          source: i.source,
-          source_id: i.source_id,
-          title: i.title,
-          location: i.location,
-          price: i.price,
-          bedrooms: i.bedrooms ?? null,
-          bathrooms: i.bathrooms ?? null,
-          imageurl: i.imageurl ?? null,
-          latitude: i.latitude ?? null,
-          longitude: i.longitude ?? null,
-        })
-      );
-      const { count } = await upsert(rows);
-      total += count;
-      console.log(`  → upserted ${count} rows`);
-    } catch (e: any) {
-      console.error(`  ✖ ${s.name} failed:`, e?.message || e);
+function parseArgs(): { url: string; mode: Mode } {
+  const args = process.argv.slice(2);
+  let url = "";
+  let mode: Mode = (process.env.SCRAPER_MODE as Mode) || "direct";
+  for (let i = 0; i < args.length; i++) {
+    if (!args[i].startsWith("--") && !url) {
+      url = args[i];
+    } else if (args[i] === "--mode" && args[i + 1]) {
+      mode = args[i + 1] as Mode;
+      i++;
     }
   }
-
-  console.log(`[Ingest] Done. Upserted ${total} rows.`);
+  if (!url) {
+    console.error("Usage: ingest-live.ts <url> [--mode direct|scraperapi|nojs]");
+    process.exit(1);
+  }
+  return { url, mode };
 }
 
-run().catch(e => {
-  console.error('Fatal:', e);
-  process.exit(1);
-});
+(async () => {
+  const { url, mode } = parseArgs();
+  try {
+    const result = await fetchSearchPage(url, mode);
+    console.log(
+      JSON.stringify({
+        level: "info",
+        url,
+        attempt: 1,
+        mode,
+        status: result.status,
+        html: result.html.slice(0, 200),
+      }),
+    );
+  } catch (err: any) {
+    console.error(
+      JSON.stringify({
+        level: "error",
+        url,
+        message: err.message || String(err),
+      }),
+    );
+    process.exit(1);
+  }
+})();

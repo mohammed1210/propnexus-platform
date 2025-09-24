@@ -5,7 +5,7 @@ import os
 import stripe
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
-from utils.billing import get_entitlement_by_email, upsert_subscription
+from ..utils.billing import get_entitlement_by_email, upsert_subscription
 
 router = APIRouter()
 log = logging.getLogger(__name__)

@@ -1,66 +1,64 @@
-'use client';
-import { useEffect, useMemo, useState } from 'react';
-import { Property } from '@/types';
+import { useEffect, useState } from "react";
+import { SummaryResponse, SummaryRequest } from "../../types/ai";
+import { postAiSummary } from "../../lib/api";
+import Toast from "../ui/Toast";
 
-export default function InvestmentSummary({ property }: { property: Property }) {
-  const [summary, setSummary] = useState('');
-  const [loading, setLoading] = useState(true);
-  const BACKEND_BASE = process.env.NEXT_PUBLIC_API_URL;
+interface Props {
+  title: string;
+  price?: number;
+  location: string;
+  yield?: number;
+  roi?: number;
+  description?: string;
+}
+
+export default function InvestmentSummary(props: Props) {
+  const [summary, setSummary] = useState<SummaryResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!property) return;
-    if (!BACKEND_BASE) {
-      setSummary(`£${property.price?.toLocaleString()} • Yield ${property.yield_percent ?? 'N/A'}% • ROI ${property.roi_percent ?? 'N/A'}%`);
-      setLoading(false);
-      return;
-    }
-    (async () => {
+    const fetchSummary = async () => {
+      setLoading(true);
+      setError("");
       try {
-        setLoading(true);
-        const res = await fetch(`${BACKEND_BASE}/generate-summary`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(property),
-        });
-        const data = await res.json();
-        setSummary(data.summary ?? 'No summary available');
-      } catch {
-        setSummary(`£${property.price?.toLocaleString()} • Yield ${property.yield_percent ?? 'N/A'}% • ROI ${property.roi_percent ?? 'N/A'}%`);
+        const req: SummaryRequest = {
+          title: props.title,
+          price: props.price,
+          location: props.location,
+          yield: props.yield,
+          roi: props.roi,
+          description: props.description,
+        };
+        const res = await postAiSummary(req);
+        setSummary(res);
+      } catch (e: any) {
+        setError(e.message || "Failed to load summary");
       } finally {
         setLoading(false);
       }
-    })();
-  }, [property, BACKEND_BASE]);
-
-  const { yieldScore, roiScore } = useMemo(() => {
-    const y = property.yield_percent ?? 0;
-    const r = property.roi_percent ?? 0;
-    return {
-      yieldScore: Math.min(100, (y / 12) * 100),
-      roiScore: Math.min(100, (r / 25) * 100),
     };
-  }, [property]);
+    fetchSummary();
+  }, [props.title, props.price, props.location, props.yield, props.roi, props.description]);
 
   return (
     <div>
-      <h3 className="text-lg font-semibold mb-2">📈 Investment Summary</h3>
-      {loading ? <p className="animate-pulse">Loading…</p> : <p>{summary}</p>}
-      <Progress label="Yield" score={yieldScore} />
-      <Progress label="ROI" score={roiScore} />
-    </div>
-  );
-}
-
-function Progress({ label, score }: { label: string; score: number }) {
-  return (
-    <div className="mb-2">
-      <div className="flex justify-between text-xs mb-1">
-        <span>{label}</span>
-        <span>{Math.round(score)} / 100</span>
-      </div>
-      <div className="h-2 bg-slate-200 rounded">
-        <div style={{ width: `${score}%` }} className="h-2 bg-gradient-to-r from-blue-500 to-green-500 rounded" />
-      </div>
+      <h2>Investment Summary</h2>
+      {loading && <p>Loading...</p>}
+      {!loading && summary && (
+        <>
+          <p data-testid="investment-summary-text">{summary.summary}</p>
+          {summary.bullets && summary.bullets.length > 0 && (
+            <ul>
+              {summary.bullets.slice(0, 5).map((b, i) => (
+                <li key={i}>{b}</li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      {!loading && !summary && !error && <p>No summary available.</p>}
+      {error && <Toast message={error} onClose={() => setError("")} />}
     </div>
   );
 }
