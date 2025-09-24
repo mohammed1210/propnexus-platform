@@ -1,8 +1,12 @@
+!/backend/**
 .git
-.gitignore
+.github
+.vscode
 node_modules
 venv
 **/__pycache__/
-**/*.pyc
-.env
-.env.*
+*.log
+.gitignore
+.pre-commit-config.yaml
+.scrape_debug
+supabase/.branches

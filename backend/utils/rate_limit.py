@@ -1,50 +1,33 @@
-"""Simple in-memory rate limiter for AI endpoints.
-
-Each unique key (e.g., IP address or API key) is allowed a maximum number of
-calls within a time window. Configured via environment variables:
-- AI_RPS_WINDOW: window size in seconds (default 60)
-- AI_RPS_MAX: max number of calls in the window (default 10)
-
-This limiter is not persistent and should not be used for production-grade
-rate limiting in distributed environments.
-"""
+"""Simple in-memory rate limiter."""
 
 import os
-import time
 from collections import defaultdict, deque
-from typing import Deque, DefaultDict
-
-# Configuration from environment variables with fallbacks
-AI_RPS_WINDOW: int = int(os.getenv("AI_RPS_WINDOW", "60"))
-AI_RPS_MAX: int = int(os.getenv("AI_RPS_MAX", "10"))
+from datetime import datetime, timedelta
+from typing import Deque, Dict
 
 
 class RateLimiter:
-    """In-memory rate limiter using a deque of timestamps per key."""
+    def __init__(self, max_requests: int | None = None, window_seconds: int | None = None) -> None:
+        # Use environment variables with defaults
+        self.max_requests = max_requests or int(os.getenv("AI_RPS_MAX", "10"))
+        self.window_seconds = window_seconds or int(os.getenv("AI_RPS_WINDOW", "60"))
+        self._timestamps: Dict[str, Deque[datetime]] = defaultdict(deque)
 
-    def __init__(self) -> None:
-        # Mapping of key -> deque of call timestamps
-        self.calls: DefaultDict[str, Deque[float]] = defaultdict(deque)
+    def allow(self, key: str) -> bool:
+        """Return True if a request is allowed; otherwise False."""
+        now = datetime.utcnow()
+        window_start = now - timedelta(seconds=self.window_seconds)
+        timestamps = self._timestamps[key]
 
-    def is_allowed(self, key: str, max_calls: int = AI_RPS_MAX, window: int = AI_RPS_WINDOW) -> bool:
-        """Check if a call is allowed for the given key.
+        # Remove expired timestamps
+        while timestamps and timestamps[0] < window_start:
+            timestamps.popleft()
 
-        Args:
-            key: A unique identifier for the caller (e.g., IP or API token).
-            max_calls: Maximum number of calls allowed within the window.
-            window: Time window in seconds.
-
-        Returns:
-            True if the call is allowed, False if the rate limit has been exceeded.
-        """
-        now = time.time()
-        calls = self.calls[key]
-        # Purge timestamps outside the current window
-        while calls and calls[0] <= now - window:
-            calls.popleft()
-
-        if len(calls) >= max_calls:
+        if len(timestamps) >= self.max_requests:
             return False
 
-        calls.append(now)
+        timestamps.append(now)
         return True
+
+
+rate_limiter = RateLimiter()

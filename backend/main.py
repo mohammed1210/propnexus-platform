@@ -1,29 +1,29 @@
+# backend/main.py
 from __future__ import annotations
-import os, pathlib, sys, logging
-logging.basicConfig(level=logging.INFO)
-logging.info("CWD=%s", os.getcwd())
-logging.info("PYTHONPATH=%s", os.environ.get("PYTHONPATH"))
-logging.info("Exists backend/main.py? %s",
-             pathlib.Path(__file__).resolve().is_file())
+
+import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
 from supabase import Client, create_client
 
 # Load env early
 load_dotenv()
 
-# --- Routers ---
-# Import routers using package-relative paths (module is backend.main)
-from backend.routes import area_routes, comps_routes, gpt_routes, scrape_routes  # type: ignore
-from backend.routes.ai import router as ai_router  # type: ignore
-from backend.routes.notes import router as notes_router  # type: ignore
-from backend.routes.off_market_routes import router as off_market_router  # type: ignore
-from backend.routes.save_deal import router as save_deal_router  # type: ignore
-from backend.routes.stripe_routes import router as stripe_router  # type: ignore
+# Routers (package-relative imports; keep at top so linters are happy)
+from backend.routes import (  # noqa: E402
+    area_routes,
+    comps_routes,
+    gpt_routes,
+    scrape_routes,
+)
+from backend.routes.ai import router as ai_router  # noqa: E402
+from backend.routes.notes import router as notes_router  # noqa: E402
+from backend.routes.off_market_routes import router as off_market_router  # noqa: E402
+from backend.routes.save_deal import router as save_deal_router  # noqa: E402
+from backend.routes.stripe_routes import router as stripe_router  # noqa: E402
 
-# --- Supabase client ---
+# Supabase client (prefer service role on server)
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
@@ -31,23 +31,18 @@ supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-app = FastAPI(title="PropNexus Backend", version="0.3.0")
+app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
-# --- CORS ---
+# CORS (allow local & vercel previews; tighten later if you want)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://propnexus-platform.vercel.app",
-    ],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000", "https://propnexus-platform.vercel.app"],
     allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- Health ---
 @app.get("/")
 async def root():
     return {"message": "PropNexus backend is running."}
@@ -57,18 +52,18 @@ async def root():
 async def health():
     return {"ok": True}
 
-# --- Routers ---
+# Include routers (additive)
 app.include_router(save_deal_router)
 app.include_router(notes_router)
 app.include_router(gpt_routes.router)
-app.include_router(ai_router)
+app.include_router(ai_router)                # <- new AI endpoints
 app.include_router(area_routes.router)
 app.include_router(comps_routes.router)
 app.include_router(scrape_routes.router)
 app.include_router(off_market_router)
 app.include_router(stripe_router)
 
-# --- Supabase-backed property endpoints ---
+# Supabase-backed property endpoints (unchanged)
 @app.get("/properties")
 async def get_properties():
     if not supabase:

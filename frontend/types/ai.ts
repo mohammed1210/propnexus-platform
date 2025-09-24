@@ -1,33 +1,29 @@
-// /frontend/types/ai.ts
 export interface SummaryRequest {
   title: string;
-  location: string;
   price?: number;
-  bedrooms?: number;
-  bathrooms?: number;
-  yield_percent?: number;
-  roi_percent?: number;
-  propertyType?: string;
-  investmentType?: string;
+  location: string;
+  yield?: number;
+  roi?: number;
   description?: string;
 }
 
 export interface SummaryResponse {
   summary: string;
-  bullets?: string[];
+  bullets: string[];
 }
 
 export interface StrategiesRequest {
+  property: Record<string, any>;
+  constraints?: Record<string, any>;
+}
+
+export interface Strategy {
   title: string;
-  location: string;
-  price?: number;
-  yield_percent?: number;
-  roi_percent?: number;
-  propertyType?: string;
-  investmentType?: string;
-  description?: string;
+  rationale: string;
+  steps: string[];
+  risk?: string;
 }
 
 export interface StrategiesResponse {
-  strategies: string[];
+  strategies: Strategy[];
 }

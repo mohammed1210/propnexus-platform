@@ -23,3 +23,4 @@ for update
 create policy "Saved deals: delete own" on public.saved_deals
 for delete
   using (auth.uid() = user_id);
+  

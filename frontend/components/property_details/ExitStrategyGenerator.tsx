@@ -1,66 +1,64 @@
-'use client';
+import { useState } from "react";
+import { StrategiesRequest, Strategy } from "../../types/ai";
+import { postAiStrategies } from "../../lib/api";
+import Toast from "../ui/Toast";
 
-import React, { useState } from 'react';
-import { postAiStrategies } from '@/lib/api';
-import type { StrategiesRequest, StrategiesResponse } from '@/types/ai';
+interface Props {
+  property: Record<string, any>;
+  constraints?: Record<string, any>;
+}
 
-type Props = {
-  title?: string;
-  location?: string;
-  price?: number;
-  yield_percent?: number;
-  roi_percent?: number;
-  propertyType?: string;
-  investmentType?: string;
-  description?: string;
-};
-
-export default function ExitStrategyGenerator(props: Props) {
+export default function ExitStrategyGenerator({ property, constraints }: Props) {
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [strategies, setStrategies] = useState<string[] | null>(null);
+  const [error, setError] = useState("");
 
-  async function handleGenerate() {
+  const generateStrategies = async () => {
     setLoading(true);
-    setError(null);
+    setError("");
     try {
-      // Matches flat StrategiesRequest in '@/types/ai'
-      const payload: StrategiesRequest = {
-        title: props.title ?? '',
-        location: props.location ?? '',
-        price: props.price,
-        yield_percent: props.yield_percent,
-        roi_percent: props.roi_percent,
-        propertyType: props.propertyType,
-        investmentType: props.investmentType,
-        description: props.description,
-      };
-
-      const res: StrategiesResponse = await postAiStrategies(payload);
-      setStrategies(res?.strategies ?? []);
+      const req: StrategiesRequest = { property, constraints };
+      const res = await postAiStrategies(req);
+      setStrategies(res.strategies);
     } catch (e: any) {
-      console.error('✖ Exit strategy generation failed:', e);
-      setError(e?.message ?? 'Failed to generate strategies');
+      setError(e.message || "Failed to generate strategies");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="space-y-4">
-      <button onClick={handleGenerate} disabled={loading} className="btn btn-outline">
-        {loading ? 'Generating…' : 'Generate exit strategies'}
-      </button>
-
-      {error ? <p className="text-red-600 text-sm">{error}</p> : null}
-
-      {Array.isArray(strategies) && strategies.length > 0 && (
-        <ul className="list-disc pl-5 space-y-1">
-          {strategies.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ul>
-      )}
+    <div>
+      <button onClick={generateStrategies}>Generate exit strategies</button>
+      {loading && <p>Generating...</p>}
+      {strategies.map((s, idx) => (
+        <div key={idx} className="strategy-card">
+          <h3>{s.title}</h3>
+          <p>{s.rationale}</p>
+          {s.steps?.length > 0 && (
+            <ol>
+              {s.steps.map((step, i) => (
+                <li key={i}>{step}</li>
+              ))}
+            </ol>
+          )}
+          {s.risk && (
+            <p>
+              <strong>Risk:</strong> {s.risk}
+            </p>
+          )}
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(
+                `${s.title}\n${s.rationale}\n${s.steps.join("\n")}`,
+              );
+            }}
+          >
+            Copy to clipboard
+          </button>
+        </div>
+      ))}
+      {error && <Toast message={error} onClose={() => setError("")} />}
     </div>
   );
 }
