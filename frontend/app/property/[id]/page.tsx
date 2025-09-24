@@ -47,7 +47,26 @@ export default function PropertyDetailsPage() {
           .eq('id', id)
           .single();
 
+<<<<<<< HEAD
         if (error) throw error;
+=======
+  async function handleSaveDeal() {
+    if (!property) return;
+    try {
+      const base = getBackendBase();
+      const resp = await fetch(`${base}/save-deal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_id: property.id }),
+      });
+      if (!resp.ok) throw new Error(`Save failed: ${resp.status}`);
+      alert('Deal saved!');
+    } catch (e) {
+      console.error(e);
+      alert('Could not save this deal.');
+    }
+  }
+>>>>>>> bd565100 (feat(ai): add strategy + summary fixes, scraper updates, and TS type cleanup)
 
         // Normalize a few fields the UI expects
         const p: LooseProperty | null = data
@@ -73,8 +92,21 @@ export default function PropertyDetailsPage() {
       }
     })();
 
+<<<<<<< HEAD
     return () => {
       cancelled = true;
+=======
+  // Normalize nullable numerics for components that expect numbers
+  const normalizedForSummary = useMemo(() => {
+    if (!property) return null;
+    return {
+      ...property,
+      price: Number(property.price ?? 0),
+      bedrooms: Number(property.bedrooms ?? 0),
+      bathrooms: Number(property.bathrooms ?? 0),
+      yield_percent: Number(property.yield_percent ?? 0),
+      roi_percent: Number(property.roi_percent ?? 0),
+>>>>>>> bd565100 (feat(ai): add strategy + summary fixes, scraper updates, and TS type cleanup)
     };
   }, [id, sb]);
 
@@ -189,7 +221,35 @@ export default function PropertyDetailsPage() {
         </div>
       </div>
 
+<<<<<<< HEAD
       {/* Floating local chatbot */}
+=======
+      {/* RIGHT — Sidebar */}
+      <aside className="md:col-span-1 space-y-6">
+        <Section aria-labelledby="deal-summary">
+          <SectionTitle id="deal-summary" icon={<span>📊</span>}>Deal Summary</SectionTitle>
+          <ul className="space-y-2 text-sm">
+            <li><Badge>Price</Badge> £{Number(property.price).toLocaleString()}</li>
+            <li><Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}</li>
+            <li><Badge>ROI</Badge> {property.roi_percent != null ? `${property.roi_percent}%` : '—'}</li>
+            <li><Badge>Beds</Badge> {property.bedrooms ?? '—'}</li>
+            <li><Badge>Baths</Badge> {property.bathrooms ?? '—'}</li>
+            {property.propertyType && (<li><Badge>Type</Badge> {property.propertyType}</li>)}
+            {property.investmentType && (<li><Badge>Investment</Badge> {property.investmentType}</li>)}
+          </ul>
+        </Section>
+
+        <Section aria-labelledby="location">
+          <SectionTitle id="location" icon={<span>🗺️</span>}>Location</SectionTitle>
+          {hasCoords ? (
+            <MapSingle property={property as any} height={260} zoom={14} scrollWheelZoom={false} />
+          ) : (
+            <p className="text-neutral-500">Map unavailable — no coordinates provided.</p>
+          )}
+        </Section>
+      </aside>
+
+>>>>>>> bd565100 (feat(ai): add strategy + summary fixes, scraper updates, and TS type cleanup)
       <AIChatbot property={property as any} />
     </Section>
   );
