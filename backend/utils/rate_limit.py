@@ -7,7 +7,9 @@ from typing import Deque, Dict
 
 
 class RateLimiter:
-    def __init__(self, max_requests: int | None = None, window_seconds: int | None = None) -> None:
+    def __init__(
+        self, max_requests: int | None = None, window_seconds: int | None = None
+    ) -> None:
         # Use environment variables with defaults
         self.max_requests = max_requests or int(os.getenv("AI_RPS_MAX", "10"))
         self.window_seconds = window_seconds or int(os.getenv("AI_RPS_WINDOW", "60"))

@@ -10,8 +10,4 @@ const customJestConfig = {
   },
 }
 
-<<<<<<< HEAD
 module.exports = createJestConfig(customJestConfig)
-=======
-module.exports = createJestConfig(customJestConfig)
->>>>>>> bd565100 (feat(ai): add strategy + summary fixes, scraper updates, and TS type cleanup)

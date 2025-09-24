@@ -1,22 +1,22 @@
 """AI routes for summary and exit strategy generation."""
+
 from __future__ import annotations
 
 import logging
 import os
-from typing import List, Dict
+from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import JSONResponse
 
 from ..schemas.ai import (
-    SummaryRequest,
-    SummaryResponse,
     StrategiesRequest,
     StrategiesResponse,
     Strategy,
+    SummaryRequest,
+    SummaryResponse,
 )
-from ..utils.rate_limit import rate_limiter
 from ..utils.openai_client import openai_client
+from ..utils.rate_limit import rate_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -79,7 +79,9 @@ def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
     prop_lines = "\n".join(f"{k}: {v}" for k, v in req.property.items())
     constraints = req.constraints or {}
     constraint_lines = (
-        "\n" + "\n".join(f"{k}: {v}" for k, v in constraints.items()) if constraints else ""
+        "\n" + "\n".join(f"{k}: {v}" for k, v in constraints.items())
+        if constraints
+        else ""
     )
     user_prompt = (
         f"Property details:\n{prop_lines}{constraint_lines}\n\n"
@@ -95,7 +97,12 @@ def parse_strategies_response(text: str) -> StrategiesResponse:
     """Parse OpenAI output into structured strategies."""
     lines = [line.strip() for line in text.splitlines()]
     strategies: List[Strategy] = []
-    current: Dict[str, List[str] | str] = {"title": "", "rationale": "", "steps": [], "risk": ""}
+    current: Dict[str, List[str] | str] = {
+        "title": "",
+        "rationale": "",
+        "steps": [],
+        "risk": "",
+    }
     for line in lines:
         if not line:
             continue
@@ -147,17 +154,23 @@ async def ai_summary(
     # Rate limit by client IP
     ip = request.client.host or "unknown"
     if not rate_limiter.allow(ip):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded"
+        )
 
     try:
         messages = format_summary_prompt(req)
         raw = await openai_client.chat_completion(messages, temperature=0.3)
         return parse_summary_response(raw)
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        )
     except Exception as exc:
         logger.exception("Summary generation failed: %s", exc)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI summary error")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="AI summary error"
+        )
 
 
 @router.post("/strategies", response_model=StrategiesResponse)
@@ -168,15 +181,20 @@ async def ai_strategies(
 ) -> StrategiesResponse:
     ip = request.client.host or "unknown"
     if not rate_limiter.allow(ip):
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded"
+        )
 
     try:
         messages = format_strategies_prompt(req)
         raw = await openai_client.chat_completion(messages, temperature=0.5)
         return parse_strategies_response(raw)
     except RuntimeError as exc:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        )
     except Exception as exc:
         logger.exception("Strategy generation failed: %s", exc)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI strategies error")
-        
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="AI strategies error"
+        )
