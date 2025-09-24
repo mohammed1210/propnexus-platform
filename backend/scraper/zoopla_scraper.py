@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from bs4 import (  # noqa: F401  (kept for when you replace the stub with real parsing)
+    BeautifulSoup,
+)
 from fastapi import BackgroundTasks
-from bs4 import BeautifulSoup  # noqa: F401  (kept for when you replace the stub with real parsing)
+
 from ..utils.postcode import get_lat_lng_from_postcode
 
 

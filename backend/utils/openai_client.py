@@ -1,8 +1,9 @@
 """Async wrapper for OpenAI chat completions using httpx."""
+
 from __future__ import annotations
 
 import os
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 import httpx
 
@@ -35,7 +36,9 @@ class OpenAIClient:
             "max_tokens": max_tokens,
         }
         async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.post(f"{self.base_url}/chat/completions", headers=headers, json=payload)
+            resp = await client.post(
+                f"{self.base_url}/chat/completions", headers=headers, json=payload
+            )
             resp.raise_for_status()
             data = resp.json()
             return data["choices"][0]["message"]["content"].strip()
