@@ -7,6 +7,7 @@ from typing import Any, Dict
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, Request, status
+
 from supabase import Client, create_client
 
 load_dotenv()

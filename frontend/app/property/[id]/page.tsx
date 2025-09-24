@@ -107,7 +107,6 @@ export default function PropertyDetailsPage() {
     if (!property) return;
     try {
       const base = getBackendBase();
-      // ✅ backend route is /save-deal
       const resp = await fetch(`${base}/save-deal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,7 +131,7 @@ export default function PropertyDetailsPage() {
 
   const postcode = useMemo(() => property?.location?.trim().split(/\s+/).pop(), [property]);
 
-  /** Normalize nullable numerics to the strict numeric shape that InvestmentSummary expects */
+  // Normalize nullable numerics for components that expect numbers
   const normalizedForSummary = useMemo(() => {
     if (!property) return null;
     return {
@@ -289,7 +288,7 @@ export default function PropertyDetailsPage() {
         <Section aria-labelledby="location">
           <SectionTitle id="location" icon={<span>🗺️</span>}>Location</SectionTitle>
           {hasCoords ? (
-            <MapSingle property={property} height={260} zoom={14} scrollWheelZoom={false} />
+            <MapSingle property={property as any} height={260} zoom={14} scrollWheelZoom={false} />
           ) : (
             <p className="text-neutral-500">Map unavailable — no coordinates provided.</p>
           )}

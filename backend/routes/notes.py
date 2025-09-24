@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 from supabase import Client, create_client
 
 router = APIRouter(prefix="/notes", tags=["notes"])

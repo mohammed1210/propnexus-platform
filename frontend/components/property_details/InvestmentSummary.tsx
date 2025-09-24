@@ -1,66 +1,88 @@
+// frontend/components/property_details/InvestmentSummary.tsx
 'use client';
-import { useEffect, useMemo, useState } from 'react';
-import { Property } from '@/types';
+import React, { useEffect, useState } from 'react';
+import { postAiSummary } from '@/lib/api';
+import type { SummaryRequest, SummaryResponse } from '@/types/ai';
 
-export default function InvestmentSummary({ property }: { property: Property }) {
-  const [summary, setSummary] = useState('');
+type Props = {
+  property: {
+    title: string;
+    location: string;
+    price?: number | null;
+    bedrooms?: number | null;
+    bathrooms?: number | null;
+    yield_percent?: number | null;
+    roi_percent?: number | null;
+    description?: string | null;
+    propertyType?: string | null;
+    investmentType?: string | null;
+  };
+};
+
+const numOrUndef = (v: unknown): number | undefined =>
+  v === null || v === undefined || v === '' ? undefined : Number(v as number);
+
+export default function InvestmentSummary({ property }: Props) {
   const [loading, setLoading] = useState(true);
-  const BACKEND_BASE = process.env.NEXT_PUBLIC_API_URL;
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<SummaryResponse | null>(null);
 
   useEffect(() => {
-    if (!property) return;
-    if (!BACKEND_BASE) {
-      setSummary(`£${property.price?.toLocaleString()} • Yield ${property.yield_percent ?? 'N/A'}% • ROI ${property.roi_percent ?? 'N/A'}%`);
-      setLoading(false);
-      return;
-    }
-    (async () => {
+    let cancelled = false;
+
+    async function run() {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        const res = await fetch(`${BACKEND_BASE}/generate-summary`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(property),
-        });
-        const data = await res.json();
-        setSummary(data.summary ?? 'No summary available');
-      } catch {
-        setSummary(`£${property.price?.toLocaleString()} • Yield ${property.yield_percent ?? 'N/A'}% • ROI ${property.roi_percent ?? 'N/A'}%`);
+        const payload: SummaryRequest = {
+          title: property.title,
+          location: String(property.location ?? ''),
+          price: numOrUndef(property.price),         // ✅ narrowed
+          bedrooms: numOrUndef(property.bedrooms),   // ✅ narrowed
+          bathrooms: numOrUndef(property.bathrooms), // ✅ narrowed
+          yield_percent: numOrUndef(property.yield_percent),
+          roi_percent: numOrUndef(property.roi_percent),
+          propertyType: property.propertyType ?? undefined,
+          investmentType: property.investmentType ?? undefined,
+          description: property.description ?? undefined,
+        };
+
+        const res = await postAiSummary(payload);
+        if (!cancelled) setData(res);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message ?? 'Failed to load summary');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    })();
-  }, [property, BACKEND_BASE]);
+    }
 
-  const { yieldScore, roiScore } = useMemo(() => {
-    const y = property.yield_percent ?? 0;
-    const r = property.roi_percent ?? 0;
-    return {
-      yieldScore: Math.min(100, (y / 12) * 100),
-      roiScore: Math.min(100, (r / 25) * 100),
-    };
-  }, [property]);
+    run();
+    return () => { cancelled = true; };
+  }, [
+    property.title,
+    property.location,
+    property.price,
+    property.bedrooms,
+    property.bathrooms,
+    property.yield_percent,
+    property.roi_percent,
+    property.propertyType,
+    property.investmentType,
+    property.description,
+  ]);
+
+  if (loading) return <p data-testid="investment-summary-loading">Loading summary…</p>;
+  if (error) return <p role="alert" className="text-red-600">Error: {error}</p>;
+  if (!data) return null;
 
   return (
-    <div>
-      <h3 className="text-lg font-semibold mb-2">📈 Investment Summary</h3>
-      {loading ? <p className="animate-pulse">Loading…</p> : <p>{summary}</p>}
-      <Progress label="Yield" score={yieldScore} />
-      <Progress label="ROI" score={roiScore} />
-    </div>
-  );
-}
-
-function Progress({ label, score }: { label: string; score: number }) {
-  return (
-    <div className="mb-2">
-      <div className="flex justify-between text-xs mb-1">
-        <span>{label}</span>
-        <span>{Math.round(score)} / 100</span>
-      </div>
-      <div className="h-2 bg-slate-200 rounded">
-        <div style={{ width: `${score}%` }} className="h-2 bg-gradient-to-r from-blue-500 to-green-500 rounded" />
-      </div>
+    <div data-testid="investment-summary-text" className="space-y-2">
+      {data.summary && <p>{data.summary}</p>}
+      {Array.isArray(data.bullets) && data.bullets.length > 0 && (
+        <ul className="list-disc pl-5">
+          {data.bullets.map((b, i) => <li key={i}>{b}</li>)}
+        </ul>
+      )}
     </div>
   );
 }
