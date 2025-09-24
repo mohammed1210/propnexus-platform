@@ -1,29 +1,38 @@
-export interface SummaryRequest {
+// frontend/types/ai.ts
+export type SummaryRequest = {
   title: string;
-  price?: number;
   location: string;
-  yield?: number;
-  roi?: number;
+  price?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  yield_percent?: number;
+  roi_percent?: number;
+  propertyType?: string;
+  investmentType?: string;
   description?: string;
-}
+};
 
-export interface SummaryResponse {
-  summary: string;
-  bullets: string[];
-}
+export type SummaryResponse = {
+  summary?: string;
+  bullets?: string[];
+};
 
-export interface StrategiesRequest {
-  property: Record<string, any>;
-  constraints?: Record<string, any>;
-}
-
-export interface Strategy {
+export type Strategy = {
   title: string;
   rationale: string;
   steps: string[];
   risk?: string;
-}
+};
 
-export interface StrategiesResponse {
+export type StrategiesResponse = {
   strategies: Strategy[];
-}
+};
+
+export type StrategiesRequest = {
+  property: Omit<SummaryRequest, 'bedrooms' | 'bathrooms'> & {
+    // bedrooms/bathrooms optional here too if you’ll use them for strategies
+    bedrooms?: number;
+    bathrooms?: number;
+  };
+  constraints?: Record<string, unknown>;
+};

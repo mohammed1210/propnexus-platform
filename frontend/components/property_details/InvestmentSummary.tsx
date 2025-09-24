@@ -1,64 +1,88 @@
-import { useEffect, useState } from "react";
-import { SummaryResponse, SummaryRequest } from "../../types/ai";
-import { postAiSummary } from "../../lib/api";
-import Toast from "../ui/Toast";
+// frontend/components/property_details/InvestmentSummary.tsx
+'use client';
+import React, { useEffect, useState } from 'react';
+import { postAiSummary } from '@/lib/api';
+import type { SummaryRequest, SummaryResponse } from '@/types/ai';
 
-interface Props {
-  title: string;
-  price?: number;
-  location: string;
-  yield?: number;
-  roi?: number;
-  description?: string;
-}
+type Props = {
+  property: {
+    title: string;
+    location: string;
+    price?: number | null;
+    bedrooms?: number | null;
+    bathrooms?: number | null;
+    yield_percent?: number | null;
+    roi_percent?: number | null;
+    description?: string | null;
+    propertyType?: string | null;
+    investmentType?: string | null;
+  };
+};
 
-export default function InvestmentSummary(props: Props) {
-  const [summary, setSummary] = useState<SummaryResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+const numOrUndef = (v: unknown): number | undefined =>
+  v === null || v === undefined || v === '' ? undefined : Number(v as number);
+
+export default function InvestmentSummary({ property }: Props) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<SummaryResponse | null>(null);
 
   useEffect(() => {
-    const fetchSummary = async () => {
+    let cancelled = false;
+
+    async function run() {
       setLoading(true);
-      setError("");
+      setError(null);
       try {
-        const req: SummaryRequest = {
-          title: props.title,
-          price: props.price,
-          location: props.location,
-          yield: props.yield,
-          roi: props.roi,
-          description: props.description,
+        const payload: SummaryRequest = {
+          title: property.title,
+          location: String(property.location ?? ''),
+          price: numOrUndef(property.price),         // ✅ narrowed
+          bedrooms: numOrUndef(property.bedrooms),   // ✅ narrowed
+          bathrooms: numOrUndef(property.bathrooms), // ✅ narrowed
+          yield_percent: numOrUndef(property.yield_percent),
+          roi_percent: numOrUndef(property.roi_percent),
+          propertyType: property.propertyType ?? undefined,
+          investmentType: property.investmentType ?? undefined,
+          description: property.description ?? undefined,
         };
-        const res = await postAiSummary(req);
-        setSummary(res);
+
+        const res = await postAiSummary(payload);
+        if (!cancelled) setData(res);
       } catch (e: any) {
-        setError(e.message || "Failed to load summary");
+        if (!cancelled) setError(e?.message ?? 'Failed to load summary');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    };
-    fetchSummary();
-  }, [props.title, props.price, props.location, props.yield, props.roi, props.description]);
+    }
+
+    run();
+    return () => { cancelled = true; };
+  }, [
+    property.title,
+    property.location,
+    property.price,
+    property.bedrooms,
+    property.bathrooms,
+    property.yield_percent,
+    property.roi_percent,
+    property.propertyType,
+    property.investmentType,
+    property.description,
+  ]);
+
+  if (loading) return <p data-testid="investment-summary-loading">Loading summary…</p>;
+  if (error) return <p role="alert" className="text-red-600">Error: {error}</p>;
+  if (!data) return null;
 
   return (
-    <div>
-      <h2>Investment Summary</h2>
-      {loading && <p>Loading...</p>}
-      {!loading && summary && (
-        <>
-          <p data-testid="investment-summary-text">{summary.summary}</p>
-          {summary.bullets && summary.bullets.length > 0 && (
-            <ul>
-              {summary.bullets.slice(0, 5).map((b, i) => (
-                <li key={i}>{b}</li>
-              ))}
-            </ul>
-          )}
-        </>
+    <div data-testid="investment-summary-text" className="space-y-2">
+      {data.summary && <p>{data.summary}</p>}
+      {Array.isArray(data.bullets) && data.bullets.length > 0 && (
+        <ul className="list-disc pl-5">
+          {data.bullets.map((b, i) => <li key={i}>{b}</li>)}
+        </ul>
       )}
-      {!loading && !summary && !error && <p>No summary available.</p>}
-      {error && <Toast message={error} onClose={() => setError("")} />}
     </div>
   );
 }
