@@ -1,7 +1,13 @@
 import requests
 from bs4 import BeautifulSoup
 
-from ..utils.postcode import get_lat_lng_from_postcode
+# Dual-import utils
+try:
+    from utils.postcode import get_lat_lng_from_postcode  # type: ignore
+except ModuleNotFoundError:
+    from backend.utils.postcode import get_lat_lng_from_postcode  # type: ignore
+
+# ...rest of file unchanged...
 
 
 async def scrape_rightmove_properties():
