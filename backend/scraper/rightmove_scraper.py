@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
-from utils.postcode import get_lat_lng_from_postcode
+
+from ..utils.postcode import get_lat_lng_from_postcode
 
 
 async def scrape_rightmove_properties():

@@ -4,6 +4,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
+
 from supabase import Client, create_client
 
 router = APIRouter(prefix="/off-market", tags=["off-market"])
