@@ -1,16 +1,19 @@
 # backend/main.py
 from __future__ import annotations
 
+import logging
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from supabase import Client, create_client
 
 # Load env early (Railway + local)
 load_dotenv()
+
+log = logging.getLogger("uvicorn.error")
 
 # --- Dual-import: flat (/backend as CWD) OR package (backend.*) --------------
 try:
@@ -56,6 +59,13 @@ supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+
+def _sb() -> Client:
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    return supabase
+
+
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
 # CORS (list explicit Vercel URLs; regex allows preview branches too)
@@ -98,19 +108,38 @@ app.include_router(properties_router)  # keep properties after helpers
 app.include_router(stripe_router)
 
 
-# Supabase-backed property endpoints (simple pass-throughs)
+# ---------- Supabase-backed property endpoints (with error handling) ----------
+
+
 @app.get("/properties")
 async def get_properties():
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    return supabase.table("properties").select("*").execute().data
+    sb = _sb()
+    try:
+        res = sb.table("properties").select("*").execute()
+    except Exception as e:
+        log.exception("Supabase exception on /properties")
+        raise HTTPException(status_code=502, detail="Database upstream error") from e
+    if getattr(res, "error", None):
+        log.error("Supabase error on /properties: %s", res.error)
+        raise HTTPException(status_code=502, detail=str(res.error))
+    return res.data or []
 
 
 @app.get("/properties/{property_id}")
 async def get_property_by_id(property_id: str):
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    res = supabase.table("properties").select("*").eq("id", property_id).execute()
+    sb = _sb()
+    try:
+        res = (
+            sb.table("properties").select("*").eq("id", property_id).limit(1).execute()
+        )
+    except Exception as e:
+        log.exception("Supabase exception on /properties/%s", property_id)
+        raise HTTPException(status_code=502, detail="Database upstream error") from e
+    if getattr(res, "error", None):
+        log.error("Supabase error on /properties/%s: %s", property_id, res.error)
+        raise HTTPException(status_code=502, detail=str(res.error))
     if not res.data:
-        raise HTTPException(status_code=404, detail="Property not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Property not found"
+        )
     return res.data[0]
