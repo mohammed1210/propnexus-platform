@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 
-// Types for callers
 export type MapMarker = {
   id: string;
   lat: number;
@@ -15,15 +14,20 @@ type Props = {
   zoom?: number;
   markers?: MapMarker[];
   onMarkerClick?: (id: string) => void;
-  height?: number | string; // default 100%
+  height?: number | string; // px or CSS size
 };
 
-// NOTE: This component is intended to be imported dynamically with { ssr: false }
-// Example usage in a page:
-//   const MapView = dynamic(() => import('@/components/MapView'), { ssr: false });
-
+/**
+ * Lightweight Leaflet map that:
+ * - Loads Leaflet only on the client
+ * - Injects Leaflet CSS from CDN (avoids TS/webpack CSS issues)
+ * - Uses CDN icon URLs to avoid importing images
+ *
+ * Import dynamically where used:
+ *   const MapView = dynamic(() => import('@components/MapView'), { ssr: false });
+ */
 export default function MapView({
-  center = { lat: 51.4545, lng: -0.9781 }, // Reading as a sensible default
+  center = { lat: 51.4545, lng: -0.9781 }, // Reading default
   zoom = 12,
   markers = [],
   onMarkerClick,
@@ -34,26 +38,37 @@ export default function MapView({
 
   useEffect(() => {
     let L: any;
-    let map: any;
+
+    const ensureLeafletCss = () => {
+      if (typeof document === 'undefined') return;
+      if (document.getElementById('leaflet-css')) return;
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.crossOrigin = '';
+      document.head.appendChild(link);
+    };
 
     const init = async () => {
-      // Dynamically import Leaflet only on client
+      ensureLeafletCss();
+
       const leaflet = await import('leaflet');
-      await import('leaflet/dist/leaflet.css');
       L = leaflet.default ?? leaflet;
 
-      // Fix default icon paths under Next.js
-      // @ts-ignore
-      delete (L.Icon.Default as any).prototype._getIconUrl;
+      // Fix default marker icons via CDN assets
       L.Icon.Default.mergeOptions({
-        iconRetinaUrl: (await import('leaflet/dist/images/marker-icon-2x.png')).default,
-        iconUrl: (await import('leaflet/dist/images/marker-icon.png')).default,
-        shadowUrl: (await import('leaflet/dist/images/marker-shadow.png')).default,
+        iconRetinaUrl:
+          'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl:
+          'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl:
+          'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
       });
 
       if (!mapEl.current) return;
 
-      map = L.map(mapEl.current).setView([center.lat, center.lng], zoom);
+      const map = L.map(mapEl.current).setView([center.lat, center.lng], zoom);
       mapRef.current = map;
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -64,12 +79,8 @@ export default function MapView({
       // Add markers
       markers.forEach((m) => {
         const marker = L.marker([m.lat, m.lng], { title: m.title ?? '' }).addTo(map);
-        if (onMarkerClick) {
-          marker.on('click', () => onMarkerClick(m.id));
-        }
-        if (m.title) {
-          marker.bindTooltip(m.title);
-        }
+        if (m.title) marker.bindTooltip(m.title);
+        if (onMarkerClick) marker.on('click', () => onMarkerClick(m.id));
       });
     };
 
@@ -83,9 +94,6 @@ export default function MapView({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // If markers change at runtime, you could add an effect to re-render them.
-  // For now the map initializes once (typical for our dashboard).
 
   return (
     <div

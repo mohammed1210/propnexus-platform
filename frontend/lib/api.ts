@@ -1,9 +1,13 @@
 // frontend/lib/api.ts
 
-// Base URL for the FastAPI backend. Trim any trailing slashes.
+// Base URL for the FastAPI backend. Trim trailing slashes.
+// Back-compat: accept several env names.
 export const BASE =
-  (process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, '') as string | undefined) ||
-  'http://127.0.0.1:8000';
+  (
+    process.env.NEXT_PUBLIC_API_BASE ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_URL
+  )?.replace(/\/+$/, '') || 'http://127.0.0.1:8000';
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -11,6 +15,15 @@ async function handle<T>(res: Response): Promise<T> {
     throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
   }
   return (await res.json()) as T;
+}
+
+// Simple GET helper
+export async function apiGet<TRes>(path: string): Promise<TRes> {
+  const url = path.startsWith('http')
+    ? path
+    : `${BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+  const res = await fetch(url, { method: 'GET' });
+  return handle<TRes>(res);
 }
 
 /** Generic POST used around the app (kept for back-compat). */
