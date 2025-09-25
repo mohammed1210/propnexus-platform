@@ -90,16 +90,22 @@ def _sb() -> Client:
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
 
-# Robust request logging (no BaseHTTPMiddleware)
+# Robust request logging; short-circuit /health to prove traffic reaches app
 @app.middleware("http")
 async def _request_logger(request: Request, call_next):
     t0 = time.time()
+    path = request.url.path
+
+    # ❶ Fail-safe health check: bypass everything and return OK immediately.
+    if path == "/health" or path == "/api/health":
+        return JSONResponse(status_code=200, content={"ok": True, "via": "middleware"})
+
     try:
         response = await call_next(request)
         return response
     except Exception as exc:
         # Full traceback to Deploy Logs
-        log.exception("Unhandled error for %s %s", request.method, request.url.path)
+        log.exception("Unhandled error for %s %s", request.method, path)
         # Return a safe JSON instead of opaque 502
         return JSONResponse(
             status_code=500,
@@ -112,7 +118,7 @@ async def _request_logger(request: Request, call_next):
     finally:
         dt = (time.time() - t0) * 1000
         logging.getLogger("uvicorn.access").info(
-            "%s %s -> %.1fms", request.method, request.url.path, dt
+            "%s %s -> %.1fms", request.method, path, dt
         )
 
 
@@ -133,17 +139,11 @@ app.add_middleware(
 
 
 # ------------------------------------------------------------------------------
-# Health
+# Basic root
 # ------------------------------------------------------------------------------
 @app.get("/")
 async def root():
     return {"message": "PropNexus backend is running."}
-
-
-@app.get("/health")
-@app.get("/api/health")
-async def health():
-    return {"ok": True}
 
 
 # ------------------------------------------------------------------------------
