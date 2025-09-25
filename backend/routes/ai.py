@@ -7,16 +7,15 @@ import os
 from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-
-from ..schemas.ai import (
+from schemas.ai import (
     StrategiesRequest,
     StrategiesResponse,
     Strategy,
     SummaryRequest,
     SummaryResponse,
 )
-from ..utils.openai_client import openai_client
-from ..utils.rate_limit import rate_limiter
+from utils.openai_client import openai_client
+from utils.rate_limit import rate_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
