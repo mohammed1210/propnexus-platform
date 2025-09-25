@@ -1,113 +1,91 @@
-from __future__ import annotations
-
+# backend/main.py
+import importlib
 import logging
-import os
-from typing import Optional
+import time
 
-# Shared Supabase client (HTTP/1.1)
-from db import make_supabase
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from httpx import RemoteProtocolError
 
-# Routers
-from routes.off_market_routes import router as off_market_router
-
-from supabase import Client
-
-logger = logging.getLogger("uvicorn")
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
-
-# ---------------- App & middleware ----------------
+# -----------------------------------------------------------------------------
+# App
+# -----------------------------------------------------------------------------
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
-
-# Short-circuit /health at the very edge so we can see traffic even when upstreams fail
-@app.middleware("http")
-async def _tiny_health_bypass(request, call_next):
-    if request.url.path in ("/health", "/api/health"):
-        return JSONResponse({"ok": True})
-    return await call_next(request)
-
-
-# CORS
-allowed_origins = [
+# -----------------------------------------------------------------------------
+# CORS (Vercel preview + production + local)
+# -----------------------------------------------------------------------------
+ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "https://propnexus-platform.vercel.app",
+    # preview deployments on vercel (git branches)
     "https://propnexus-platform-git-po2-mohammed1210.vercel.app",
 ]
-allow_origin_regex = r"^https://.*\.vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_origin_regex=allow_origin_regex,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https://.*\.vercel\.app$",  # any vercel preview
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ---------------- Supabase ----------------
-supabase: Optional[Client] = make_supabase()
-if supabase:
-    logger.info("Supabase client created (http2 disabled)")
-else:
-    logger.warning("Supabase env not configured; DB endpoints will 500")
-
-# ---------------- Routers ----------------
-app.include_router(off_market_router)
+log = logging.getLogger("uvicorn.error")
 
 
-# ---------------- Simple endpoints ----------------
-@app.get("/")
-def root():
-    return {"ok": True, "service": "propnexus-backend"}
+# -----------------------------------------------------------------------------
+# Lightweight request logging + guaranteed /health
+# -----------------------------------------------------------------------------
+@app.middleware("http")
+async def _shim(request: Request, call_next):
+    # Always respond to health quickly to prove the app is reachable
+    if request.url.path in ("/health", "/api/health"):
+        return JSONResponse({"ok": True})
+
+    t0 = time.time()
+    try:
+        resp = await call_next(request)
+        return resp
+    finally:
+        dt_ms = (time.time() - t0) * 1000.0
+        log.info("REQ %s %s -> %.1fms", request.method, request.url.path, dt_ms)
 
 
 @app.get("/health")
 def health():
-    # Will be intercepted by middleware above, but keep handler for completeness
     return {"ok": True}
 
 
-@app.get("/saved-deals")
-def list_saved_deals():
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+# -----------------------------------------------------------------------------
+# Routers
+# We include everything that's present, but don't crash if a module is missing.
+# -----------------------------------------------------------------------------
+def include_router_if_available(module_path: str, attr: str = "router"):
     try:
-        res = (
-            supabase.table("saved_deals")
-            .select("*")
-            .order("saved_at", desc=True)
-            .execute()
-        )
-        return {"data": res.data or []}
-    except Exception as e:
-        logger.exception("Saved deals query failed")
-        raise HTTPException(status_code=502, detail=f"Database upstream error: {e}")
+        module = importlib.import_module(module_path)
+        router = getattr(module, attr)
+        app.include_router(router)
+        log.info("Router mounted: %s.%s", module_path, attr)
+    except Exception as e:  # noqa: BLE001 - we want a soft failure + log
+        log.warning("Router NOT mounted (%s): %s", module_path, e)
 
 
-@app.get("/properties/{property_id}")
-def get_property_by_id(property_id: str):
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    try:
-        res = (
-            supabase.table("properties")
-            .select("*")
-            .eq("id", property_id)
-            .limit(1)
-            .execute()
-        )
-        data = res.data or []
-        if not data:
-            raise HTTPException(status_code=404, detail="Property not found")
-        return data[0]
-    except RemoteProtocolError:
-        # What was causing intermittent 502s before forcing HTTP/1.1
-        raise HTTPException(status_code=502, detail="Database upstream error")
-    except Exception as e:
-        logger.exception("Property fetch failed")
-        raise HTTPException(status_code=502, detail=f"Database upstream error: {e}")
+# Core routes used today
+include_router_if_available("routes.off_market_routes")  # /off-market/...
+include_router_if_available("routes.properties_routes")  # /properties/...
+include_router_if_available("routes.saved_deals_routes")  # /saved-deals
+
+# Other feature routers (mounted if present in the repo)
+include_router_if_available("routes.save_deal")  # legacy save-deal
+include_router_if_available("routes.notes")
+include_router_if_available("routes.ai")
+include_router_if_available("routes.area")
+include_router_if_available("routes.comps")
+include_router_if_available("routes.scrape")
+include_router_if_available("routes.stripe")
+
+# -----------------------------------------------------------------------------
+# End
+# -----------------------------------------------------------------------------

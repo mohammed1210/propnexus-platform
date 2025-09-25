@@ -1,108 +1,84 @@
-import logging
+# backend/routes/off_market_routes.py
 import os
 from typing import Optional
 
-# ---> Use the shared HTTP/1.1 Supabase client
-from db import make_supabase
-from fastapi import APIRouter, Depends, Header, HTTPException, status
-from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, Header, HTTPException
+from pydantic import BaseModel
 
-from supabase import Client
+from supabase import Client, create_client
 
+# -----------------------------------------------------------------------------
+# Supabase client (lazy init)
+# -----------------------------------------------------------------------------
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+supabase: Optional[Client] = None
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+
+# -----------------------------------------------------------------------------
+# Router
+# -----------------------------------------------------------------------------
 router = APIRouter(prefix="/off-market", tags=["off-market"])
-logger = logging.getLogger(__name__)
-
-# --- Supabase client (shared) ---
-supabase: Optional[Client] = make_supabase()
-
-ADMIN_TOKEN = os.getenv("OFF_MARKET_ADMIN_TOKEN", "").strip()
 
 
-def require_admin(x_api_key: Optional[str] = Header(default=None)):
-    """
-    Require a matching admin token when OFF_MARKET_ADMIN_TOKEN is set.
-    If the env var is empty, the check is skipped (useful for local dev).
-    """
-    if ADMIN_TOKEN and (x_api_key or "").strip() != ADMIN_TOKEN:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
-        )
-    return True
-
-
-# ---------- Schemas ----------
-class CreateDealRequest(BaseModel):
-    title: str = Field(..., min_length=2)
-    location: str = Field(..., min_length=2)
-    price: Optional[float] = Field(None, ge=0)
-    bedrooms: Optional[int] = Field(None, ge=0, le=20)
-    bathrooms: Optional[int] = Field(None, ge=0, le=20)
-    investment_type: Optional[str] = Field(None, max_length=50)
-    contact: Optional[str] = Field(None, max_length=120)
-    source: Optional[str] = Field("Manual", max_length=80)
-    notes: Optional[str] = Field(None, max_length=2000)
-
-    @field_validator("title", "location")
-    @classmethod
-    def strip_text(cls, v: str) -> str:
-        return v.strip()
-
-
-class CreateDealResponse(BaseModel):
-    id: str
+# -----------------------------------------------------------------------------
+# Schemas
+# -----------------------------------------------------------------------------
+class DealIn(BaseModel):
     title: str
-    location: Optional[str] = None
-    price: Optional[float] = None
+    location: str
+    price: float
     bedrooms: Optional[int] = None
     bathrooms: Optional[int] = None
     investment_type: Optional[str] = None
     contact: Optional[str] = None
-    source: Optional[str] = None
     notes: Optional[str] = None
-    created_at: Optional[str] = None
 
 
-# ---------- Routes ----------
-@router.post(
-    "/create", response_model=CreateDealResponse, dependencies=[Depends(require_admin)]
-)
-def create_off_market_deal(payload: CreateDealRequest):
-    """
-    Insert a new row into off_market_deals (Supabase-py v2).
-    NOTE: In v2, .insert() returns a response directly; there is no .select("*") chain.
-    """
+class DealOut(BaseModel):
+    address: str
+    price: float
+    description: str
+
+
+# -----------------------------------------------------------------------------
+# Endpoints
+# -----------------------------------------------------------------------------
+@router.post("/generate-off-market")
+def generate_off_market(location: str, budget: float, count: int = 3) -> dict:
+    """Return placeholder generated deals (no DB)."""
+    deals = [
+        DealOut(
+            address=f"Demo address {i+1}, {location}",
+            price=100000.0,
+            description="Generated placeholder deal",
+        ).dict()
+        for i in range(count)
+    ]
+    return {"deals": deals}
+
+
+@router.post("/create")
+def create_off_market(
+    deal: DealIn,
+    x_api_key: Optional[str] = Header(None, convert_underscores=False),
+):
+    """Admin-gated endpoint to insert a deal into Supabase."""
+    admin_token = os.getenv("OFF_MARKET_ADMIN_TOKEN")
+    if not admin_token:
+        raise HTTPException(status_code=500, detail="Admin token not set in backend")
+    if x_api_key != admin_token:
+        raise HTTPException(status_code=403, detail="Forbidden: invalid API key")
+
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
-    data = payload.model_dump()
     try:
-        res = supabase.table("off_market_deals").insert(data).execute()
-        if not getattr(res, "data", None):
-            raise HTTPException(status_code=502, detail="Insert failed")
-        return CreateDealResponse(**res.data[0])
-    except Exception:
-        logger.exception("Failed to create off-market deal")
-        raise HTTPException(status_code=500, detail="Failed to create deal")
-
-
-# ✅ simple generator endpoint (guard against zero/negative count)
-class GenerateRequest(BaseModel):
-    location: str
-    budget: float
-    count: int = 5
-
-
-@router.post("/generate-off-market")
-async def generate_off_market(payload: GenerateRequest):
-    # For now just echo; hook up GPT later
-    count = max(0, int(payload.count))
-    return {
-        "deals": [
-            {
-                "address": f"Demo address {i+1}, {payload.location}",
-                "price": float(payload.budget) / count if count else 0.0,
-                "description": "Generated placeholder deal",
-            }
-            for i in range(count)
-        ]
-    }
+        data = deal.dict()
+        resp = supabase.table("off_market_deals").insert(data).execute()
+        return {"ok": True, "data": resp.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Supabase insert failed: {e}")
