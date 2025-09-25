@@ -6,16 +6,22 @@ import os
 import time
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
 
 from supabase import Client, create_client
 
+# ------------------------------------------------------------------------------
+# Logging config (respect LOG_LEVEL if set)
+# ------------------------------------------------------------------------------
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(level=getattr(logging, LOG_LEVEL, logging.INFO))
+log = logging.getLogger("uvicorn.error")
+
 # Load env early (Railway + local)
 load_dotenv()
-
-log = logging.getLogger("uvicorn.error")
 
 # --- Dual-import: flat (/backend as CWD) OR package (backend.*) --------------
 try:
@@ -49,7 +55,9 @@ except ModuleNotFoundError:
     from backend.routes.save_deal import router as save_deal_router  # type: ignore
     from backend.routes.stripe_routes import router as stripe_router  # type: ignore
 
+# ------------------------------------------------------------------------------
 # Supabase client (prefer service role on server)
+# ------------------------------------------------------------------------------
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = (
     os.getenv("SUPABASE_SERVICE_ROLE")
@@ -59,7 +67,17 @@ SUPABASE_KEY = (
 
 supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        log.info("Supabase client created")
+    except Exception:
+        log.exception("Failed to create Supabase client")
+else:
+    log.warning(
+        "Supabase env missing: url_present=%s, service_key_present=%s",
+        bool(SUPABASE_URL),
+        bool(SUPABASE_KEY),
+    )
 
 
 def _sb() -> Client:
@@ -68,28 +86,33 @@ def _sb() -> Client:
     return supabase
 
 
+# ------------------------------------------------------------------------------
+# App + middleware
+# ------------------------------------------------------------------------------
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
 
-# --- request logging & crash visibility ---------------------------------------
-async def _request_logger(request, call_next):
+# Request logging & crash visibility
+async def _request_logger(request: Request, call_next):
     t0 = time.time()
+    path = request.url.path
+    method = request.method
     try:
         resp = await call_next(request)
         return resp
     except Exception:
-        log.exception("Unhandled error for %s %s", request.method, request.url.path)
+        # Full traceback goes to Railway "Deploy Logs"
+        log.exception("Unhandled error for %s %s", method, path)
+        # Re-raise so the global exception handler (below) formats JSON
         raise
     finally:
         dt = (time.time() - t0) * 1000
-        logging.getLogger("uvicorn.access").info(
-            "%s %s -> %.1fms", request.method, request.url.path, dt
-        )
+        logging.getLogger("uvicorn.access").info("%s %s -> %.1fms", method, path, dt)
 
 
 app.add_middleware(BaseHTTPMiddleware, dispatch=_request_logger)
 
-# CORS (list explicit Vercel URLs; regex allows preview branches too)
+# CORS (explicit + regex for previews)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -105,6 +128,44 @@ app.add_middleware(
 )
 
 
+# Global exception handler -> always JSON (instead of opaque 502)
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(_: Request, exc: Exception):
+    # Already logged by _request_logger
+    return JSONResponse(
+        status_code=500,
+        content={
+            "ok": False,
+            "error": "Internal Server Error",
+            "detail": str(exc.__class__.__name__),
+        },
+    )
+
+
+# ------------------------------------------------------------------------------
+# Lifespan hooks (extra diagnostics at startup)
+# ------------------------------------------------------------------------------
+@app.on_event("startup")
+async def _on_startup():
+    log.info(
+        "Startup: urls_ready=%s, routers=[save_deal, notes, ai, area, comps, scrape, off_market, properties, stripe]",
+        True,
+    )
+    log.info(
+        "CORS allow_origin_regex=%s allow_origins=%s",
+        r"^https://.*\.vercel\.app$",
+        [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "https://propnexus-platform.vercel.app",
+            "https://propnexus-platform-git-po2-mohammed1210.vercel.app",
+        ],
+    )
+
+
+# ------------------------------------------------------------------------------
+# Health
+# ------------------------------------------------------------------------------
 @app.get("/")
 async def root():
     return {"message": "PropNexus backend is running."}
@@ -116,7 +177,9 @@ async def health():
     return {"ok": True}
 
 
+# ------------------------------------------------------------------------------
 # Routers
+# ------------------------------------------------------------------------------
 app.include_router(save_deal_router)
 app.include_router(notes_router)
 app.include_router(gpt_routes.router)
@@ -129,7 +192,9 @@ app.include_router(properties_router)
 app.include_router(stripe_router)
 
 
-# ---------- Supabase-backed property endpoints (with error handling) ----------
+# ------------------------------------------------------------------------------
+# Supabase-backed property endpoints (with error handling)
+# ------------------------------------------------------------------------------
 @app.get("/properties")
 async def get_properties():
     sb = _sb()
