@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from supabase import Client, create_client
 
@@ -68,6 +70,25 @@ def _sb() -> Client:
 
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
+
+# --- request logging & crash visibility ---------------------------------------
+async def _request_logger(request, call_next):
+    t0 = time.time()
+    try:
+        resp = await call_next(request)
+        return resp
+    except Exception:
+        log.exception("Unhandled error for %s %s", request.method, request.url.path)
+        raise
+    finally:
+        dt = (time.time() - t0) * 1000
+        logging.getLogger("uvicorn.access").info(
+            "%s %s -> %.1fms", request.method, request.url.path, dt
+        )
+
+
+app.add_middleware(BaseHTTPMiddleware, dispatch=_request_logger)
+
 # CORS (list explicit Vercel URLs; regex allows preview branches too)
 app.add_middleware(
     CORSMiddleware,
@@ -104,13 +125,11 @@ app.include_router(area_routes.router)
 app.include_router(comps_routes.router)
 app.include_router(scrape_routes.router)
 app.include_router(off_market_router)
-app.include_router(properties_router)  # keep properties after helpers
+app.include_router(properties_router)
 app.include_router(stripe_router)
 
 
 # ---------- Supabase-backed property endpoints (with error handling) ----------
-
-
 @app.get("/properties")
 async def get_properties():
     sb = _sb()
