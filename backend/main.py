@@ -5,9 +5,9 @@ import os
 import time
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 
 from supabase import Client, create_client
 
@@ -92,7 +92,11 @@ app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
 # Robust request logging; short-circuit /health to prove traffic reaches app
 @app.middleware("http")
-async def _request_logger(request: Request, call_next):
+async def _tiny_health_bypass(request, call_next):
+    # Short-circuit /health no matter what, so we always get 200 if the app is alive
+    if request.url.path in ("/health", "/api/health"):
+        return JSONResponse({"ok": True})
+    return await call_next(request)
     t0 = time.time()
     path = request.url.path
 
