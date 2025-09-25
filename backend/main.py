@@ -1,4 +1,3 @@
-# backend/main.py
 from __future__ import annotations
 
 import logging
@@ -8,7 +7,6 @@ import time
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from supabase import Client, create_client
@@ -92,25 +90,31 @@ def _sb() -> Client:
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
 
-# Request logging & crash visibility
+# Robust request logging (no BaseHTTPMiddleware)
+@app.middleware("http")
 async def _request_logger(request: Request, call_next):
     t0 = time.time()
-    path = request.url.path
-    method = request.method
     try:
-        resp = await call_next(request)
-        return resp
-    except Exception:
-        # Full traceback goes to Railway "Deploy Logs"
-        log.exception("Unhandled error for %s %s", method, path)
-        # Re-raise so the global exception handler (below) formats JSON
-        raise
+        response = await call_next(request)
+        return response
+    except Exception as exc:
+        # Full traceback to Deploy Logs
+        log.exception("Unhandled error for %s %s", request.method, request.url.path)
+        # Return a safe JSON instead of opaque 502
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "error": "Internal Server Error",
+                "detail": str(exc.__class__.__name__),
+            },
+        )
     finally:
         dt = (time.time() - t0) * 1000
-        logging.getLogger("uvicorn.access").info("%s %s -> %.1fms", method, path, dt)
+        logging.getLogger("uvicorn.access").info(
+            "%s %s -> %.1fms", request.method, request.url.path, dt
+        )
 
-
-app.add_middleware(BaseHTTPMiddleware, dispatch=_request_logger)
 
 # CORS (explicit + regex for previews)
 app.add_middleware(
@@ -126,41 +130,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-# Global exception handler -> always JSON (instead of opaque 502)
-@app.exception_handler(Exception)
-async def _unhandled_exception_handler(_: Request, exc: Exception):
-    # Already logged by _request_logger
-    return JSONResponse(
-        status_code=500,
-        content={
-            "ok": False,
-            "error": "Internal Server Error",
-            "detail": str(exc.__class__.__name__),
-        },
-    )
-
-
-# ------------------------------------------------------------------------------
-# Lifespan hooks (extra diagnostics at startup)
-# ------------------------------------------------------------------------------
-@app.on_event("startup")
-async def _on_startup():
-    log.info(
-        "Startup: urls_ready=%s, routers=[save_deal, notes, ai, area, comps, scrape, off_market, properties, stripe]",
-        True,
-    )
-    log.info(
-        "CORS allow_origin_regex=%s allow_origins=%s",
-        r"^https://.*\.vercel\.app$",
-        [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "https://propnexus-platform.vercel.app",
-            "https://propnexus-platform-git-po2-mohammed1210.vercel.app",
-        ],
-    )
 
 
 # ------------------------------------------------------------------------------
