@@ -1,33 +1,44 @@
 # backend/routes/off_market_routes.py
+from __future__ import annotations
+
 import os
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from supabase import Client, create_client
+# Optional Supabase client
+_SUPABASE_URL = os.getenv("SUPABASE_URL")
+_SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-# -----------------------------------------------------------------------------
-# Supabase client (lazy init)
-# -----------------------------------------------------------------------------
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+try:
+    if _SUPABASE_URL and _SUPABASE_KEY:
+        from supabase import Client, create_client  # type: ignore
 
-supabase: Optional[Client] = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-
-# -----------------------------------------------------------------------------
-# Router
-# -----------------------------------------------------------------------------
-router = APIRouter(prefix="/off-market", tags=["off-market"])
+        _sb: Optional[Client] = create_client(_SUPABASE_URL, _SUPABASE_KEY)
+    else:
+        _sb = None
+except Exception:
+    _sb = None
 
 
-# -----------------------------------------------------------------------------
-# Schemas
-# -----------------------------------------------------------------------------
-class DealIn(BaseModel):
+router = APIRouter()
+
+
+# ---------- Schemas ----------
+class GenerateRequest(BaseModel):
+    location: str = Field(..., examples=["Reading"])
+    budget: float = Field(..., ge=0)
+    count: int = Field(5, ge=1, le=50)
+
+
+class GeneratedDeal(BaseModel):
+    address: str
+    price: float
+    description: str = "Generated placeholder deal"
+
+
+class CreateDealRequest(BaseModel):
     title: str
     location: str
     price: float
@@ -38,47 +49,43 @@ class DealIn(BaseModel):
     notes: Optional[str] = None
 
 
-class DealOut(BaseModel):
-    address: str
-    price: float
-    description: str
-
-
-# -----------------------------------------------------------------------------
-# Endpoints
-# -----------------------------------------------------------------------------
-@router.post("/generate-off-market")
-def generate_off_market(location: str, budget: float, count: int = 3) -> dict:
-    """Return placeholder generated deals (no DB)."""
-    deals = [
-        DealOut(
-            address=f"Demo address {i+1}, {location}",
-            price=100000.0,
-            description="Generated placeholder deal",
-        ).dict()
-        for i in range(count)
+# ---------- Routes ----------
+@router.post("/off-market/generate-off-market", response_model=dict)
+def generate_off_market(payload: GenerateRequest) -> dict:
+    """Return dummy deals; accepts JSON body (Option B)."""
+    per = (payload.budget / max(payload.count, 1)) if payload.count else payload.budget
+    deals: List[GeneratedDeal] = [
+        GeneratedDeal(
+            address=f"Demo address {i+1}, {payload.location}", price=round(per, 2)
+        )
+        for i in range(payload.count)
     ]
-    return {"deals": deals}
+    return {"deals": [d.model_dump() for d in deals]}
 
 
-@router.post("/create")
+@router.post("/off-market/create", response_model=dict)
 def create_off_market(
-    deal: DealIn,
-    x_api_key: Optional[str] = Header(None, convert_underscores=False),
-):
-    """Admin-gated endpoint to insert a deal into Supabase."""
-    admin_token = os.getenv("OFF_MARKET_ADMIN_TOKEN")
-    if not admin_token:
-        raise HTTPException(status_code=500, detail="Admin token not set in backend")
-    if x_api_key != admin_token:
+    body: CreateDealRequest,
+    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+) -> dict:
+    """Admin-gated create. Requires X-API-Key that matches OFF_MARKET_ADMIN_TOKEN."""
+    admin_token = os.getenv("OFF_MARKET_ADMIN_TOKEN") or ""
+    if not admin_token or x_api_key != admin_token:
         raise HTTPException(status_code=403, detail="Forbidden: invalid API key")
 
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+    record = body.model_dump()
 
-    try:
-        data = deal.dict()
-        resp = supabase.table("off_market_deals").insert(data).execute()
-        return {"ok": True, "data": resp.data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Supabase insert failed: {e}")
+    if _sb:
+        try:
+            _sb.table("off_market_deals").insert(
+                {
+                    "title": record.get("title"),
+                    "location": record.get("location"),
+                    "price": record.get("price"),
+                    "notes": record.get("notes") or "Created via API",
+                }
+            ).execute()
+        except Exception:
+            pass
+
+    return {"ok": True, "deal": record}

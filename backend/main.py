@@ -1,4 +1,6 @@
 # backend/main.py
+from __future__ import annotations
+
 import importlib
 import logging
 import time
@@ -60,7 +62,6 @@ def health():
 
 # -----------------------------------------------------------------------------
 # Routers
-# We include everything that's present, but don't crash if a module is missing.
 # -----------------------------------------------------------------------------
 def include_router_if_available(module_path: str, attr: str = "router"):
     try:
@@ -68,17 +69,16 @@ def include_router_if_available(module_path: str, attr: str = "router"):
         router = getattr(module, attr)
         app.include_router(router)
         log.info("Router mounted: %s.%s", module_path, attr)
-    except Exception as e:  # noqa: BLE001 - we want a soft failure + log
+    except Exception as e:  # soft fail
         log.warning("Router NOT mounted (%s): %s", module_path, e)
 
 
-# Core routes used today
+# Core routes
 include_router_if_available("routes.off_market_routes")  # /off-market/...
-include_router_if_available("routes.properties_routes")  # /properties/...
-include_router_if_available("routes.saved_deals_routes")  # /saved-deals
+include_router_if_available("routes.properties")  # /properties/...
+include_router_if_available("routes.save_deal")  # /saved-deals (legacy)
 
-# Other feature routers (mounted if present in the repo)
-include_router_if_available("routes.save_deal")  # legacy save-deal
+# Optional feature routes
 include_router_if_available("routes.notes")
 include_router_if_available("routes.ai")
 include_router_if_available("routes.area")
