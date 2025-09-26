@@ -1,1 +1,102 @@
-<paste the YAML above>
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main, po2 ]
+  pull_request:
+
+jobs:
+  frontend:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Enable Corepack (pnpm / yarn)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm --version
+            pnpm install --frozen-lockfile
+          elif [ -f yarn.lock ]; then
+            yarn --version
+            yarn install --frozen-lockfile
+          elif [ -f package-lock.json ]; then
+            npm ci
+          else
+            echo "No lockfile found at repo root" && exit 1
+          fi
+
+      - name: Type check (best-effort)
+        run: |
+          if jq -e '.scripts["typecheck"]' package.json > /dev/null; then
+            pnpm run typecheck || yarn run typecheck || npm run typecheck || true
+          else
+            npx -y tsc -v || echo "tsc not found"
+          fi
+
+      - name: Lint (if present)
+        run: |
+          if jq -e '.scripts["lint"]' package.json > /dev/null; then
+            pnpm run lint || yarn run lint || npm run lint
+          else
+            echo "No lint script, skipping"
+          fi
+
+      - name: Build (if present)
+        run: |
+          if jq -e '.scripts["build"]' package.json > /dev/null; then
+            pnpm run build || yarn run build || npm run build
+          else
+            echo "No build script, skipping"
+          fi
+
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies (project + linters)
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          pip install "ruff==0.6.8" "black==24.8.0" pytest
+
+      - name: Lint (ruff + black --check)
+        run: |
+          ruff check . --output-format=github
+          black --check .
+
+      - name: Run tests (if any)
+        run: |
+          if ls -1 *_test.py tests 2>/dev/null | grep -q '.'; then
+            pytest -q
+          else
+            echo "No tests found, skipping"
+          fi

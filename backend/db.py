@@ -1,38 +1,42 @@
 # backend/db.py
-import logging
+from __future__ import annotations
+
 import os
 from typing import Optional
 
-from supabase import Client, ClientOptions, create_client
+from dotenv import load_dotenv
 
-logger = logging.getLogger(__name__)
+from supabase import Client, create_client
 
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+load_dotenv()
+
+# Lazily created singleton
+_SUPABASE: Optional[Client] = None
 
 
 def make_supabase() -> Optional[Client]:
     """
-    Create a Supabase client (SDK v2).
-    Note: supabase-py doesn't expose a way to inject a custom httpx client.
-    We keep conservative timeouts to avoid hanging requests.
+    Create a Supabase client if env vars are present.
+    We avoid passing custom ClientOptions to stay compatible with the
+    supabase-py version installed in Railway.
     """
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        logger.warning("Supabase not configured: missing SUPABASE_URL or SUPABASE_KEY")
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+
+    if not url or not key:
+        # Missing credentials — callers should handle None
         return None
+
     try:
-        options = ClientOptions(
-            postgrest_client_timeout=10,
-            storage_client_timeout=10,
-            realtime_client_timeout=10,
-        )
-        client = create_client(SUPABASE_URL, SUPABASE_KEY, options=options)
-        logger.info("Supabase client created")
-        return client
+        return create_client(url, key)
     except Exception:
-        logger.exception("Failed to create Supabase client")
+        # If the library version or env are off, don't crash the app;
+        # routers can choose to 404/503 gracefully.
         return None
 
 
-# Singleton used by routes
-sb: Optional[Client] = make_supabase()
+def get_supabase() -> Optional[Client]:
+    global _SUPABASE
+    if _SUPABASE is None:
+        _SUPABASE = make_supabase()
+    return _SUPABASE
