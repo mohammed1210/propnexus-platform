@@ -7,39 +7,39 @@ on:
 
 jobs:
   backend:
+    name: Backend CI
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     env:
-      # Make 'import main' from tests work
       PYTHONPATH: backend
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
 
-      - name: Install deps
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          # tools for CI
+          if [ -f backend/requirements.txt ]; then
+            pip install -r backend/requirements.txt
+          fi
+          # Tools needed for lint + tests
           pip install ruff black pytest
 
       - name: Lint (ruff + black --check)
+        working-directory: backend
         run: |
           ruff check .
           black --check .
 
       - name: Run tests (if any)
         run: |
-          if ls -1 *_test.py tests 2>/dev/null | grep -q '.'; then
+          if ls -1 backend/tests 2>/dev/null | grep -q '\.py$'; then
             pytest -q
           else
-            echo "no tests found; skipping"
+            echo "No backend tests; skipping"
           fi

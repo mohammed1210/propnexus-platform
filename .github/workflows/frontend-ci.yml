@@ -7,46 +7,57 @@ on:
 
 jobs:
   frontend:
+    name: Frontend CI
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
+
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: yarn
 
-      - name: Enable Corepack (pnpm/yarn shim)
+      - name: Enable Corepack (pnpm/yarn shims)
         run: corepack enable
 
-      - name: Install deps (yarn)
-        run: yarn install --frozen-lockfile
+      - name: Install dependencies (auto-detect)
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            echo "Using pnpm"
+            pnpm install --frozen-lockfile
+          elif [ -f yarn.lock ]; then
+            echo "Using yarn"
+            yarn install --frozen-lockfile
+          elif [ -f package-lock.json ]; then
+            echo "Using npm ci"
+            npm ci
+          else
+            echo "No lockfile found; using npm install"
+            npm install
+          fi
 
       - name: Type check (if script exists)
         run: |
           if jq -e '.scripts.typecheck' package.json >/dev/null; then
-            yarn run typecheck
+            pnpm run typecheck 2>/dev/null || yarn run typecheck 2>/dev/null || npm run typecheck
           else
-            echo "no typecheck script"
+            echo "No typecheck script; skipping"
           fi
 
       - name: Lint (if script exists)
         run: |
           if jq -e '.scripts.lint' package.json >/dev/null; then
-            yarn run lint
+            pnpm run lint 2>/dev/null || yarn run lint 2>/dev/null || npm run lint
           else
-            echo "no lint script"
+            echo "No lint script; skipping"
           fi
 
       - name: Build (if script exists)
         run: |
           if jq -e '.scripts.build' package.json >/dev/null; then
-            yarn run build
+            pnpm run build 2>/dev/null || yarn run build 2>/dev/null || npm run build
           else
-            echo "no build script"
+            echo "No build script; skipping"
           fi
