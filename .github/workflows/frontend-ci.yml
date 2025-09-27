@@ -10,6 +10,11 @@ jobs:
     name: Frontend CI
     runs-on: ubuntu-latest
 
+    # 👇 all `run:` steps execute inside the frontend folder
+    defaults:
+      run:
+        working-directory: frontend
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,6 +26,10 @@ jobs:
 
       - name: Enable Corepack (pnpm/yarn shims)
         run: corepack enable
+
+      # jq is used below to check for scripts in package.json
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
 
       - name: Install dependencies (auto-detect)
         run: |
