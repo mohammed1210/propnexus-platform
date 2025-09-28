@@ -2,146 +2,135 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, Literal
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException, Request, status
+from pydantic import BaseModel
 
-router = APIRouter(prefix="/stripe", tags=["stripe"])
+# Try to import billing helpers without crashing the app if they don't exist
+try:
+    from ..utils.billing import (  # type: ignore
+        get_entitlement_by_email,
+        upsert_subscription,
+    )
+except Exception:
+    # Safe fallbacks so the app can boot even if billing utils are absent
+    def get_entitlement_by_email(email: str) -> dict:
+        return {"email": email, "plan": "free", "active": False}
 
-# --- Configuration -------------------------------------------------------------
+    def upsert_subscription(*_args, **_kwargs) -> None:
+        return None
 
-# Accept a few common env var names; use whatever you already set in Railway
-STRIPE_SECRET = (
-    os.getenv("STRIPE_SECRET_KEY")
-    or os.getenv("STRIPE_API_KEY")
-    or os.getenv("STRIPE_SECRET")
-)
 
-# Try to import Stripe only if a secret is present
-stripe = None  # type: ignore
-if STRIPE_SECRET:
+router = APIRouter()
+
+# Stripe client is optional
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+stripe = None
+if STRIPE_SECRET_KEY:
     try:
         import stripe as _stripe  # type: ignore
 
-        _stripe.api_key = STRIPE_SECRET
+        _stripe.api_key = STRIPE_SECRET_KEY
         stripe = _stripe
     except Exception:
-        # If the library isn’t installed, treat as not configured
-        stripe = None
-
-# Import billing helpers with package-relative path; if missing, we’ll gate at runtime
-_get_entitlement = None
-_upsert_subscription = None
-try:
-    from ..utils.billing import (
-        get_entitlement_by_email as _get_entitlement,  # type: ignore; returns customer's entitlement
-    )
-    from ..utils.billing import (
-        upsert_subscription as _upsert_subscription,  # persists sub state to DB
-    )
-except Exception:
-    _get_entitlement = None
-    _upsert_subscription = None
+        stripe = None  # keep booting; routes will 503 if called
 
 
-# --- Models --------------------------------------------------------------------
+class CheckoutRequest(BaseModel):
+    price_id: str
+    customer_email: Optional[str] = None
+    mode: str = "subscription"  # or 'payment'
+    success_url: str
+    cancel_url: str
 
 
-class CheckoutPayload(BaseModel):
-    email: str = Field(..., description="Customer email")
-    price_id: str = Field(..., description="Stripe Price ID")
-    success_url: str = Field(..., description="URL to send user after success")
-    cancel_url: str = Field(..., description="URL to send user after cancel")
+class PortalRequest(BaseModel):
+    customer_id: str
+    return_url: str
 
 
-class PortalPayload(BaseModel):
-    customer_id: str = Field(..., description="Stripe Customer ID")
-    return_url: str = Field(..., description="Return URL after portal exit")
+@router.get("/me/entitlement")
+def me_entitlement(email: str):
+    """
+    Lightweight helper so the frontend can know what features to show.
+    Always returns a JSON object; never crashes the app.
+    """
+    try:
+        return get_entitlement_by_email(email)
+    except Exception as exc:
+        # Keep this resilient — entitlement is non-critical
+        return {"email": email, "plan": "free", "active": False, "error": str(exc)}
 
 
-class OkResponse(BaseModel):
-    ok: Literal[True] = True
-
-
-# --- Guards --------------------------------------------------------------------
-
-
-def require_stripe() -> None:
-    if not STRIPE_SECRET or stripe is None:
+@router.post("/stripe/create-checkout-session")
+def create_checkout_session(body: CheckoutRequest):
+    if not stripe:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Stripe not configured on server (missing STRIPE_SECRET_KEY or library).",
+            detail="Stripe not configured on server",
         )
-
-
-def require_billing_helpers() -> None:
-    if _get_entitlement is None or _upsert_subscription is None:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Billing helpers not available (..utils.billing).",
-        )
-
-
-# --- Endpoints -----------------------------------------------------------------
-
-
-@router.post("/create-checkout-session")
-def create_checkout_session(body: CheckoutPayload) -> Dict[str, str]:
-    """
-    Create a subscription Checkout Session. Returns the hosted session URL.
-    """
-    require_stripe()
-
-    # Optional: ensure the email is allowed / not already fully entitled
-    if _get_entitlement:
-        try:
-            _ = _get_entitlement(body.email)  # you can use this to gate/annotate
-        except Exception:
-            # If your helper raises, you can still allow checkout; do not hard fail.
-            pass
 
     try:
-        session = stripe.checkout.Session.create(  # type: ignore[attr-defined]
-            mode="subscription",
+        session = stripe.checkout.Session.create(
+            mode=body.mode,
             line_items=[{"price": body.price_id, "quantity": 1}],
-            customer_email=body.email,
-            success_url=body.success_url + "?session_id={CHECKOUT_SESSION_ID}",
+            customer_email=body.customer_email,
+            success_url=body.success_url,
             cancel_url=body.cancel_url,
             allow_promotion_codes=True,
-            billing_address_collection="auto",
-            payment_method_types=["card"],
         )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Stripe error: {e}")
+        return {"id": session["id"], "url": session["url"]}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Stripe error: {exc}") from exc
 
-    return {"id": session.get("id", ""), "url": session.get("url", "")}
 
+@router.post("/stripe/create-portal-session")
+def create_portal_session(body: PortalRequest):
+    if not stripe:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Stripe not configured on server",
+        )
 
-@router.post("/create-portal-session")
-def create_portal_session(body: PortalPayload) -> Dict[str, str]:
-    """
-    Create a Billing Portal Session so the customer can manage their subscription.
-    """
-    require_stripe()
     try:
-        portal = stripe.billing_portal.Session.create(  # type: ignore[attr-defined]
-            customer=body.customer_id,
-            return_url=body.return_url,
+        session = stripe.billing_portal.Session.create(
+            customer=body.customer_id, return_url=body.return_url
         )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Stripe error: {e}")
+        return {"url": session["url"]}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Stripe error: {exc}") from exc
 
-    return {"url": portal.get("url", "")}
 
-
-@router.post("/webhook", response_model=OkResponse)
-def webhook() -> OkResponse:
+@router.post("/stripe/webhook")
+async def stripe_webhook(request: Request):
     """
-    Minimal webhook handler placeholder. Add signature verification if you enable this.
-    We don't fail app startup when Stripe is missing; this route just acknowledges.
+    Optional: If no Stripe, accept and no-op to keep the app healthy.
+    If Stripe is configured, validate signature and handle events.
     """
-    # If you later verify signatures:
-    #   endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
-    #   require_stripe(); verify request body + signature here...
-    return OkResponse()
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature")
+
+    if not stripe or not STRIPE_WEBHOOK_SECRET:
+        # Accept to avoid retries hammering the service in non-Stripe envs
+        return {"ok": True, "skipped": True}
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig, STRIPE_WEBHOOK_SECRET)  # type: ignore
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Webhook error: {exc}") from exc
+
+    # Handle events you care about; keep minimal and resilient by default
+    if event["type"] == "checkout.session.completed":
+        # Example: upsert/activate subscription here if you want
+        obj = event["data"]["object"]
+        email = (obj.get("customer_details") or {}).get("email")
+        if email:
+            try:
+                upsert_subscription(email=email, active=True)
+            except Exception:
+                pass
+
+    return {"ok": True}
