@@ -1,3 +1,4 @@
+# .github/workflows/frontend-ci.yml
 name: Frontend CI
 
 on:
@@ -9,11 +10,6 @@ jobs:
   frontend:
     name: Frontend CI
     runs-on: ubuntu-latest
-
-    # 👇 all `run:` steps execute inside the frontend folder
-    defaults:
-      run:
-        working-directory: frontend
 
     steps:
       - name: Checkout repository
@@ -27,11 +23,8 @@ jobs:
       - name: Enable Corepack (pnpm/yarn shims)
         run: corepack enable
 
-      # jq is used below to check for scripts in package.json
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
       - name: Install dependencies (auto-detect)
+        working-directory: frontend
         run: |
           if [ -f pnpm-lock.yaml ]; then
             echo "Using pnpm"
@@ -48,6 +41,7 @@ jobs:
           fi
 
       - name: Type check (if script exists)
+        working-directory: frontend
         run: |
           if jq -e '.scripts.typecheck' package.json >/dev/null; then
             pnpm run typecheck 2>/dev/null || yarn run typecheck 2>/dev/null || npm run typecheck
@@ -56,6 +50,7 @@ jobs:
           fi
 
       - name: Lint (if script exists)
+        working-directory: frontend
         run: |
           if jq -e '.scripts.lint' package.json >/dev/null; then
             pnpm run lint 2>/dev/null || yarn run lint 2>/dev/null || npm run lint
@@ -64,6 +59,7 @@ jobs:
           fi
 
       - name: Build (if script exists)
+        working-directory: frontend
         run: |
           if jq -e '.scripts.build' package.json >/dev/null; then
             pnpm run build 2>/dev/null || yarn run build 2>/dev/null || npm run build
