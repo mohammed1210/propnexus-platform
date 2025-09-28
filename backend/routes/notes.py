@@ -148,7 +148,6 @@ def patch_notes(
 
     updates["updated_at"] = _now_iso()
 
-    # Ensure .select("*") so resp.data contains updated rows (rowcount proxy)
     resp = (
         sb.table("notes")
         .update(updates)
@@ -162,7 +161,6 @@ def patch_notes(
     if resp.data and len(resp.data) > 0:
         return {"ok": True}
 
-    # If update matched nothing, create it (patch upsert behavior)
     base = {
         "property_id": property_id,
         "user_id": uid,

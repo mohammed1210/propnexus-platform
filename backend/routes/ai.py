@@ -1,4 +1,5 @@
-"""AI routes for summary and exit strategy generation."""
+# backend/routes/ai.py
+"""AI routes for summary and exit strategy generation (PO2)."""
 
 from __future__ import annotations
 
@@ -7,15 +8,17 @@ import os
 from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from schemas.ai import (
+
+# 👇 FIXED: package-relative imports so it works both locally and on Railway
+from ..schemas.ai import (
     StrategiesRequest,
     StrategiesResponse,
     Strategy,
     SummaryRequest,
     SummaryResponse,
 )
-from utils.openai_client import openai_client
-from utils.rate_limit import rate_limiter
+from ..utils.openai_client import openai_client
+from ..utils.rate_limit import rate_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -42,6 +45,8 @@ def format_summary_prompt(req: SummaryRequest) -> List[Dict[str, str]]:
         f"Title: {req.title}\n"
         f"Location: {req.location}\n"
         f"Price: {req.price or 'N/A'}\n"
+        f"Bedrooms: {getattr(req, 'bedrooms', None) or 'N/A'}\n"
+        f"Bathrooms: {getattr(req, 'bathrooms', None) or 'N/A'}\n"
         f"Yield: {req.yield_ or 'N/A'}\n"
         f"ROI: {req.roi or 'N/A'}\n"
         f"Description: {req.description or 'N/A'}\n\n"
@@ -60,9 +65,8 @@ def parse_summary_response(text: str) -> SummaryResponse:
         return SummaryResponse(summary="No summary available.", bullets=[])
 
     summary = lines[0]
-    bullets = []
+    bullets: List[str] = []
     for line in lines[1:]:
-        # Accept leading symbols like "-", "•", "1.", etc.
         clean = line.lstrip("-•0123456789. ").strip()
         if clean:
             bullets.append(clean)
@@ -84,7 +88,8 @@ def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
     )
     user_prompt = (
         f"Property details:\n{prop_lines}{constraint_lines}\n\n"
-        "Suggest up to 3 exit strategies. For each strategy, provide a title, rationale, a numbered list of steps, and risk."
+        "Suggest up to 3 exit strategies. For each, provide a title, a one-paragraph rationale, "
+        "a numbered list of actionable steps, and risk."
     )
     return [
         {"role": "system", "content": sys_prompt},
@@ -102,42 +107,40 @@ def parse_strategies_response(text: str) -> StrategiesResponse:
         "steps": [],
         "risk": "",
     }
+
+    def flush():
+        if current["title"]:
+            strategies.append(
+                Strategy(
+                    title=current["title"],
+                    rationale=current["rationale"],
+                    steps=list(current["steps"]),  # type: ignore[arg-type]
+                    risk=current["risk"] or None,  # type: ignore[return-value]
+                )
+            )
+
     for line in lines:
         if not line:
             continue
-        # New strategy starts when line looks like "1. <Title>"
-        if line[0].isdigit() and "." in line:
-            if current["title"]:
-                strategies.append(
-                    Strategy(
-                        title=current["title"],
-                        rationale=current["rationale"],
-                        steps=list(current["steps"]),
-                        risk=current["risk"] or None,
-                    )
-                )
-                current = {"title": "", "rationale": "", "steps": [], "risk": ""}
+        if line[0].isdigit() and "." in line:  # "1. Title"
+            flush()
+            current = {"title": "", "rationale": "", "steps": [], "risk": ""}  # type: ignore[assignment]
             current["title"] = line.split(".", 1)[1].strip()
         elif line.lower().startswith(("rationale:", "reason:")):
             current["rationale"] = line.split(":", 1)[1].strip()
         elif line.lower().startswith("risk:"):
             current["risk"] = line.split(":", 1)[1].strip()
-        elif line[0] in ("-", "•") or line[:2].isdigit() and line[2] in (".", ")"):
-            # Step lines starting with bullet or number
+        elif line[0] in ("-", "•") or (
+            len(line) > 2 and line[:2].isdigit() and line[2] in (".", ")")
+        ):
             step = line.lstrip("-•0123456789. )").strip()
-            current["steps"].append(step)
-    # Append the last strategy
-    if current["title"]:
-        strategies.append(
-            Strategy(
-                title=current["title"],
-                rationale=current["rationale"],
-                steps=list(current["steps"]),
-                risk=current["risk"] or None,
-            )
-        )
+            if step:
+                # type: ignore[index]
+                current["steps"].append(step)  # noqa: E701
+
+    flush()
+
     if not strategies:
-        # Fallback: put entire response as one strategy
         strategies.append(
             Strategy(title="General Exit Strategy", rationale=text, steps=[], risk=None)
         )
@@ -150,13 +153,11 @@ async def ai_summary(
     request: Request,
     _api_key: str = Depends(ensure_api_key),
 ) -> SummaryResponse:
-    # Rate limit by client IP
     ip = request.client.host or "unknown"
     if not rate_limiter.allow(ip):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded"
         )
-
     try:
         messages = format_summary_prompt(req)
         raw = await openai_client.chat_completion(messages, temperature=0.3)
@@ -165,7 +166,7 @@ async def ai_summary(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         )
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover
         logger.exception("Summary generation failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="AI summary error"
@@ -183,7 +184,6 @@ async def ai_strategies(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded"
         )
-
     try:
         messages = format_strategies_prompt(req)
         raw = await openai_client.chat_completion(messages, temperature=0.5)
@@ -192,7 +192,7 @@ async def ai_strategies(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         )
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover
         logger.exception("Strategy generation failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="AI strategies error"

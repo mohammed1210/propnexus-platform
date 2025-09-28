@@ -1,91 +1,93 @@
 # backend/main.py
 from __future__ import annotations
 
-import importlib
-import logging
-import time
+import os
 
-from fastapi import FastAPI, Request
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
-# -----------------------------------------------------------------------------
-# App
-# -----------------------------------------------------------------------------
+from supabase import Client, create_client
+
+# Load env early (works locally & on Railway)
+load_dotenv()
+
+# --- Router imports (package paths so prod + local both work) -----------------
+from backend.routes import (  # noqa: E402
+    area_routes,
+    comps_routes,
+    gpt_routes,
+    scrape_routes,
+)
+from backend.routes.ai import router as ai_router  # noqa: E402
+from backend.routes.notes import router as notes_router  # noqa: E402
+from backend.routes.off_market_routes import router as off_market_router  # noqa: E402
+from backend.routes.save_deal import router as save_deal_router  # noqa: E402
+from backend.routes.stripe_routes import router as stripe_router  # noqa: E402
+
+# --- Supabase (prefer service role on server) --------------------------------
+SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+
+supabase: Client | None = None
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# --- FastAPI -----------------------------------------------------------------
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
-# -----------------------------------------------------------------------------
-# CORS (Vercel preview + production + local)
-# -----------------------------------------------------------------------------
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "https://propnexus-platform.vercel.app",
-    # preview deployments on vercel (git branches)
-    "https://propnexus-platform-git-po2-mohammed1210.vercel.app",
-]
-
+# --- CORS --------------------------------------------------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"^https://.*\.vercel\.app$",  # any vercel preview
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://propnexus-platform.vercel.app",
+    ],
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-log = logging.getLogger("uvicorn.error")
 
-
-# -----------------------------------------------------------------------------
-# Lightweight request logging + guaranteed /health
-# -----------------------------------------------------------------------------
-@app.middleware("http")
-async def _shim(request: Request, call_next):
-    # Always respond to health quickly to prove the app is reachable
-    if request.url.path in ("/health", "/api/health"):
-        return JSONResponse({"ok": True})
-
-    t0 = time.time()
-    try:
-        resp = await call_next(request)
-        return resp
-    finally:
-        dt_ms = (time.time() - t0) * 1000.0
-        log.info("REQ %s %s -> %.1fms", request.method, request.url.path, dt_ms)
+# --- Health ------------------------------------------------------------------
+@app.get("/")
+async def root():
+    return {"message": "PropNexus backend is running."}
 
 
 @app.get("/health")
-def health():
+@app.get("/api/health")
+async def health():
     return {"ok": True}
 
 
-# -----------------------------------------------------------------------------
-# Routers
-# -----------------------------------------------------------------------------
-def include_router_if_available(module_path: str, attr: str = "router"):
-    try:
-        module = importlib.import_module(module_path)
-        router = getattr(module, attr)
-        app.include_router(router)
-        log.info("Router mounted: %s.%s", module_path, attr)
-    except Exception as e:  # soft fail
-        log.warning("Router NOT mounted (%s): %s", module_path, e)
+# --- Routers (include each ONCE) ---------------------------------------------
+app.include_router(save_deal_router)
+app.include_router(notes_router)
+app.include_router(gpt_routes.router)  # legacy summary routes
+app.include_router(ai_router)  # PO2 AI routes (/ai/summary, /ai/strategies)
+app.include_router(area_routes.router)
+app.include_router(comps_routes.router)
+app.include_router(scrape_routes.router)
+app.include_router(off_market_router)
+app.include_router(stripe_router)
 
 
-# Core routes
-include_router_if_available("routes.off_market_routes")  # /off-market/...
-include_router_if_available("routes.properties")  # /properties/...
-include_router_if_available("routes.save_deal")  # /saved-deals (legacy)
+# --- Supabase-backed property endpoints --------------------------------------
+@app.get("/properties")
+async def get_properties():
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    return supabase.table("properties").select("*").execute().data
 
-# Optional feature routes
-include_router_if_available("routes.notes")
-include_router_if_available("routes.ai")
-include_router_if_available("routes.area")
-include_router_if_available("routes.comps")
-include_router_if_available("routes.scrape")
-include_router_if_available("routes.stripe")
 
-# -----------------------------------------------------------------------------
-# End
-# -----------------------------------------------------------------------------
+@app.get("/properties/{property_id}")
+async def get_property_by_id(property_id: str):
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    res = supabase.table("properties").select("*").eq("id", property_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Property not found")
+    return res.data[0]

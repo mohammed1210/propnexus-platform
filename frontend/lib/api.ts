@@ -1,81 +1,73 @@
 // frontend/lib/api.ts
+const BASE =
+  process.env.NEXT_PUBLIC_API_BASE?.replace(/\/+$/, '') ||
+  'http://127.0.0.1:8000';
 
-// Base URL for the FastAPI backend. Trim trailing slashes.
-// Back-compat: accept several env names.
-export const BASE =
-  (
-    process.env.NEXT_PUBLIC_API_BASE ||
-    process.env.NEXT_PUBLIC_BACKEND_URL ||
-    process.env.NEXT_PUBLIC_API_URL
-  )?.replace(/\/+$/, '') || 'http://127.0.0.1:8000';
-
-async function handle<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
-  }
-  return (await res.json()) as T;
-}
-
-// Simple GET helper
-export async function apiGet<TRes>(path: string): Promise<TRes> {
-  const url = path.startsWith('http')
-    ? path
-    : `${BASE}${path.startsWith('/') ? '' : '/'}${path}`;
-  const res = await fetch(url, { method: 'GET' });
-  return handle<TRes>(res);
-}
-
-/** Generic POST used around the app (kept for back-compat). */
-export async function apiPost<TReq, TRes>(path: string, body: TReq): Promise<TRes> {
-  const url = path.startsWith('http')
-    ? path
-    : `${BASE}${path.startsWith('/') ? '' : '/'}${path}`;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify((body ?? {}) as unknown),
+async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const resp = await fetch(`${BASE}${path}`, {
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options,
   });
-
-  return handle<TRes>(res);
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => '');
+    throw new Error(`API ${resp.status}: ${txt || resp.statusText}`);
+  }
+  return (await resp.json()) as T;
 }
 
-/** --- PO2 AI routes (typed) --- */
-export interface SummaryRequest {
+export async function apiPost<Req, Res>(path: string, body: Req): Promise<Res> {
+  return apiFetch<Res>(path, { method: 'POST', body: JSON.stringify(body) });
+}
+
+/** ---- AI endpoints ---- */
+export type SummaryRequest = {
   title: string;
-  price?: number;
   location: string;
-  yield_?: number;
-  roi?: number;
+  price?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  yield_percent?: number;
+  roi_percent?: number;
   description?: string;
-}
+};
 
-export interface SummaryResponse {
+export type SummaryResponse = {
   summary: string;
   bullets: string[];
-}
+};
 
-export interface StrategiesRequest {
-  property: Record<string, unknown>;
-  constraints?: Record<string, unknown>;
-}
-
-export interface Strategy {
+export type Strategy = {
   title: string;
   rationale: string;
-  steps: string[];
-  risk: string;
-}
+  steps?: string[];
+  risk?: string | null;
+};
 
-export interface StrategiesResponse {
-  strategies: Strategy[];
-}
+export type StrategiesRequest = {
+  property: {
+    title: string;
+    location: string;
+    price?: number;
+    yield_percent?: number;
+    roi_percent?: number;
+    propertyType?: string;
+    investmentType?: string;
+    description?: string;
+    bedrooms?: number;
+    bathrooms?: number;
+  };
+  constraints?: Record<string, string | number | boolean>;
+};
 
-export function postAiSummary(payload: SummaryRequest): Promise<SummaryResponse> {
+export type StrategiesResponse = { strategies: Strategy[] };
+
+export function postAiSummary(payload: SummaryRequest) {
   return apiPost<SummaryRequest, SummaryResponse>('/ai/summary', payload);
 }
 
-export function postAiStrategies(payload: StrategiesRequest): Promise<StrategiesResponse> {
+export function postAiStrategies(payload: StrategiesRequest) {
   return apiPost<StrategiesRequest, StrategiesResponse>('/ai/strategies', payload);
 }

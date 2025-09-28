@@ -1,2 +1,2 @@
-# backend/scraper/__init__.py
+# backend/routes/__init__.py
 # (intentionally empty; marks package)
