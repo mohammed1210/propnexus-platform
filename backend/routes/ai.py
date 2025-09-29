@@ -9,16 +9,20 @@ from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-# ✅ Package-relative imports so it works locally and on Railway
-from ..schemas.ai import (
+# NOTE:
+# main.py adds BACKEND_DIR to sys.path and imports routes as "routes.*".
+# That means our sibling packages are visible as top-level modules:
+#   routes, schemas, utils
+# So we must import from "schemas" and "utils" (NOT relative "..schemas").
+from schemas.ai import (
     StrategiesRequest,
     StrategiesResponse,
     Strategy,
     SummaryRequest,
     SummaryResponse,
 )
-from ..utils.openai_client import openai_client
-from ..utils.rate_limit import rate_limiter
+from utils.openai_client import openai_client
+from utils.rate_limit import rate_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
