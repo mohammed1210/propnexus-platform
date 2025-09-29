@@ -1,36 +1,39 @@
-# backend/main.py
-import importlib
 import logging
-import time
-from typing import Iterable, Optional
+import sys
+from pathlib import Path
+from time import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-log = logging.getLogger("uvicorn.error")
+# -----------------------------------------------------------------------------
+# Ensure imports like "from routes.x import router" work on Railway/Docker
+# -----------------------------------------------------------------------------
+BACKEND_DIR = Path(__file__).resolve().parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 # -----------------------------------------------------------------------------
 # App
 # -----------------------------------------------------------------------------
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
+log = logging.getLogger("uvicorn.error")
 
 # -----------------------------------------------------------------------------
-# CORS (local + production + any vercel preview)
+# CORS (Vercel preview + production + local)
 # -----------------------------------------------------------------------------
 ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:3001",
     "https://propnexus-platform.vercel.app",
-    # keep a known preview you use often; regex below will allow all others
-    "https://propnexus-platform-git-po2-mohammed-abbas-projects-8ab7e126.vercel.app",
 ]
-
+# allow any Vercel preview: https://*-mohammed-abbas-projects-*.vercel.app
+# We’ll accept via a custom check in middleware instead of regex, since
+# FastAPI CORSMiddleware only accepts exact strings or "*".
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -38,69 +41,61 @@ app.add_middleware(
 
 
 # -----------------------------------------------------------------------------
-# Lightweight request timing + /health
+# Simple health check
 # -----------------------------------------------------------------------------
-@app.middleware("http")
-async def _shim(request: Request, call_next):
-    # very fast health
-    if request.url.path in ("/health", "/api/health"):
-        return JSONResponse({"ok": True})
-
-    t0 = time.time()
-    try:
-        resp = await call_next(request)
-        return resp
-    finally:
-        dt_ms = (time.time() - t0) * 1000.0
-        log.info("REQ %s %s -> %.1fms", request.method, request.url.path, dt_ms)
-
-
 @app.get("/health")
 def health():
     return {"ok": True}
 
 
 # -----------------------------------------------------------------------------
-# Router mounting (tolerant to either 'backend.routes.X' or 'routes.X')
+# Basic request timing (helps on Railway edge 502 debugging)
 # -----------------------------------------------------------------------------
-def _first_import(module_candidates: Iterable[str]) -> Optional[object]:
-    last_exc: Optional[Exception] = None
-    for mod in module_candidates:
-        try:
-            return importlib.import_module(mod)
-        except Exception as e:  # noqa: BLE001
-            last_exc = e
-    if last_exc:
-        raise last_exc
-    return None
-
-
-def mount_router(name: str, attr: str = "router"):
-    """
-    Try to import a router module from both package layouts and include it if present.
-    """
-    candidates = (f"backend.routes.{name}", f"routes.{name}")
+@app.middleware("http")
+async def timing_middleware(request: Request, call_next):
+    t0 = time()
     try:
-        module = _first_import(candidates)
-        router = getattr(module, attr)
+        response = await call_next(request)
+        return response
+    finally:
+        dt = (time() - t0) * 1000.0
+        log.info("REQ %s %s -> %.1fms", request.method, request.url.path, dt)
+
+
+# -----------------------------------------------------------------------------
+# Mount routers (import safely + log clear reason if missing)
+# -----------------------------------------------------------------------------
+def try_mount(module: str, attr: str = "router", name: str | None = None):
+    """Import routes.<module>:<attr> and include it if present."""
+    import importlib
+
+    disp = name or module
+    try:
+        mod = importlib.import_module(f"routes.{module}")
+        router = getattr(mod, attr)
         app.include_router(router)
-        log.info("Router mounted: %s", name)
-    except Exception as e:  # noqa: BLE001
-        log.warning(
-            "Router NOT mounted (%s): import failed or module missing", f"routes.{name}"
-        )
-        log.debug("Mount failure for %s: %r", name, e)
+        log.info("Router mounted: %s", disp)
+    except Exception as exc:
+        log.warning("Router NOT mounted (%s): %s", f"routes.{module}", exc)
 
 
-# Core/active routers
-mount_router("off_market_routes")  # /off-market/...
-mount_router("properties")  # /properties/...
-mount_router("save_deal")  # /save-deal
-mount_router("notes")  # /notes
-mount_router("ai")  # /ai
-mount_router("stripe_routes")  # /stripe (if present)
+# Core routes (these should exist)
+try_mount("off_market_routes")
+try_mount("properties")  # <-- this is the one we need running
+try_mount("save_deal")
+try_mount("notes")
+try_mount("ai")
+# Optional routes (ok if missing)
+try_mount("area")
+try_mount("comps")
+try_mount("scrape")
+try_mount("stripe_routes")
 
-# Optional/experimental (silently skipped if not present)
-mount_router("area")
-mount_router("comps")
-mount_router("scrape")
+
+# -----------------------------------------------------------------------------
+# Error handler example for uniform JSON (optional)
+# -----------------------------------------------------------------------------
+@app.exception_handler(Exception)
+async def unhandled(request: Request, exc: Exception):
+    log.exception("Unhandled error: %s", exc)
+    return JSONResponse(status_code=502, content={"detail": "Server error"})
