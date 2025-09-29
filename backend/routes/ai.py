@@ -9,7 +9,7 @@ from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-# 👇 FIXED: package-relative imports so it works both locally and on Railway
+# ✅ Package-relative imports so it works locally and on Railway
 from ..schemas.ai import (
     StrategiesRequest,
     StrategiesResponse,
@@ -35,22 +35,25 @@ def ensure_api_key() -> str:
     return key
 
 
+# --------------------------- Prompt builders --------------------------------- #
 def format_summary_prompt(req: SummaryRequest) -> List[Dict[str, str]]:
-    """Build messages for summary generation."""
     sys_prompt = (
         "You are an investment analyst for UK buy-to-let properties. "
-        "Be concise and factual. Currency GBP. Use UK property terms."
+        "Be concise and factual. Use GBP and UK property terminology."
     )
     user_prompt = (
         f"Title: {req.title}\n"
         f"Location: {req.location}\n"
         f"Price: {req.price or 'N/A'}\n"
-        f"Bedrooms: {getattr(req, 'bedrooms', None) or 'N/A'}\n"
-        f"Bathrooms: {getattr(req, 'bathrooms', None) or 'N/A'}\n"
-        f"Yield: {req.yield_ or 'N/A'}\n"
-        f"ROI: {req.roi or 'N/A'}\n"
+        f"Bedrooms: {req.bedrooms or 'N/A'}\n"
+        f"Bathrooms: {req.bathrooms or 'N/A'}\n"
+        f"Yield %: {req.yield_percent or 'N/A'}\n"
+        f"ROI %: {req.roi_percent or 'N/A'}\n"
+        f"Property type: {req.propertyType or 'N/A'}\n"
+        f"Investment type: {req.investmentType or 'N/A'}\n"
         f"Description: {req.description or 'N/A'}\n\n"
-        "Provide a short summary followed by bullet points highlighting the key investment factors."
+        "Provide a short 1–2 sentence summary.\n"
+        "Then list 4–6 bullet points of key investment factors."
     )
     return [
         {"role": "system", "content": sys_prompt},
@@ -58,26 +61,10 @@ def format_summary_prompt(req: SummaryRequest) -> List[Dict[str, str]]:
     ]
 
 
-def parse_summary_response(text: str) -> SummaryResponse:
-    """Split the OpenAI response into summary and bullet list."""
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if not lines:
-        return SummaryResponse(summary="No summary available.", bullets=[])
-
-    summary = lines[0]
-    bullets: List[str] = []
-    for line in lines[1:]:
-        clean = line.lstrip("-•0123456789. ").strip()
-        if clean:
-            bullets.append(clean)
-    return SummaryResponse(summary=summary, bullets=bullets)
-
-
 def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
-    """Build messages for strategy generation."""
     sys_prompt = (
         "You are an investment analyst for UK buy-to-let properties. "
-        "Provide exit strategies with rationale, steps and risk. Currency GBP. Use UK property terms."
+        "Return exit strategies with rationale, steps and risk. Use GBP."
     )
     prop_lines = "\n".join(f"{k}: {v}" for k, v in req.property.items())
     constraints = req.constraints or {}
@@ -88,8 +75,8 @@ def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
     )
     user_prompt = (
         f"Property details:\n{prop_lines}{constraint_lines}\n\n"
-        "Suggest up to 3 exit strategies. For each, provide a title, a one-paragraph rationale, "
-        "a numbered list of actionable steps, and risk."
+        "Suggest up to 3 exit strategies. For each strategy, provide a title, "
+        "a 'Rationale:' sentence, a numbered list of steps (3–6), and 'Risk:'."
     )
     return [
         {"role": "system", "content": sys_prompt},
@@ -97,16 +84,24 @@ def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
     ]
 
 
+# --------------------------- Parsers ----------------------------------------- #
+def parse_summary_response(text: str) -> SummaryResponse:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not lines:
+        return SummaryResponse(summary="No summary available.", bullets=[])
+    summary = lines[0]
+    bullets: List[str] = []
+    for line in lines[1:]:
+        clean = line.lstrip("-•0123456789.) ").strip()
+        if clean:
+            bullets.append(clean)
+    return SummaryResponse(summary=summary, bullets=bullets)
+
+
 def parse_strategies_response(text: str) -> StrategiesResponse:
-    """Parse OpenAI output into structured strategies."""
-    lines = [line.strip() for line in text.splitlines()]
+    lines = [line.rstrip() for line in text.splitlines()]
     strategies: List[Strategy] = []
-    current: Dict[str, List[str] | str] = {
-        "title": "",
-        "rationale": "",
-        "steps": [],
-        "risk": "",
-    }
+    current = {"title": "", "rationale": "", "steps": [], "risk": ""}
 
     def flush():
         if current["title"]:
@@ -114,39 +109,53 @@ def parse_strategies_response(text: str) -> StrategiesResponse:
                 Strategy(
                     title=current["title"],
                     rationale=current["rationale"],
-                    steps=list(current["steps"]),  # type: ignore[arg-type]
-                    risk=current["risk"] or None,  # type: ignore[return-value]
+                    steps=list(current["steps"]),
+                    risk=current["risk"] or None,
                 )
             )
 
     for line in lines:
-        if not line:
+        if not line.strip():
             continue
-        if line[0].isdigit() and "." in line:  # "1. Title"
+        if line[0].isdigit() and "." in line[:4]:  # "1. Title"
             flush()
-            current = {"title": "", "rationale": "", "steps": [], "risk": ""}  # type: ignore[assignment]
-            current["title"] = line.split(".", 1)[1].strip()
-        elif line.lower().startswith(("rationale:", "reason:")):
+            current = {
+                "title": line.split(".", 1)[1].strip(),
+                "rationale": "",
+                "steps": [],
+                "risk": "",
+            }
+            continue
+        low = line.lower()
+        if low.startswith("rationale:"):
             current["rationale"] = line.split(":", 1)[1].strip()
-        elif line.lower().startswith("risk:"):
+            continue
+        if low.startswith("risk:"):
             current["risk"] = line.split(":", 1)[1].strip()
-        elif line[0] in ("-", "•") or (
-            len(line) > 2 and line[:2].isdigit() and line[2] in (".", ")")
+            continue
+        # steps (bullets or numbered)
+        if low.lstrip().startswith(("-", "•")) or (
+            line[:2].isdigit() and line[2] in (".", ")")
         ):
-            step = line.lstrip("-•0123456789. )").strip()
+            step = line.lstrip("-•0123456789.) ").strip()
             if step:
-                # type: ignore[index]
-                current["steps"].append(step)  # noqa: E701
+                current["steps"].append(step)
 
     flush()
 
     if not strategies:
         strategies.append(
-            Strategy(title="General Exit Strategy", rationale=text, steps=[], risk=None)
+            Strategy(
+                title="General Exit Strategy",
+                rationale=text.strip() or "N/A",
+                steps=[],
+                risk=None,
+            )
         )
     return StrategiesResponse(strategies=strategies)
 
 
+# --------------------------- Routes ------------------------------------------ #
 @router.post("/summary", response_model=SummaryResponse)
 async def ai_summary(
     req: SummaryRequest,
@@ -166,7 +175,7 @@ async def ai_summary(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         )
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         logger.exception("Summary generation failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="AI summary error"
@@ -192,7 +201,7 @@ async def ai_strategies(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
         )
-    except Exception as exc:  # pragma: no cover
+    except Exception as exc:
         logger.exception("Strategy generation failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="AI strategies error"

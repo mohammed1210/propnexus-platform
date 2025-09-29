@@ -9,10 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from supabase import Client, create_client
 
-# Load env early (works locally & on Railway)
+# Load env early
 load_dotenv()
 
-# --- Router imports (package paths so prod + local both work) -----------------
+# Routers (package-relative)
 from backend.routes import (  # noqa: E402
     area_routes,
     comps_routes,
@@ -25,7 +25,7 @@ from backend.routes.off_market_routes import router as off_market_router  # noqa
 from backend.routes.save_deal import router as save_deal_router  # noqa: E402
 from backend.routes.stripe_routes import router as stripe_router  # noqa: E402
 
-# --- Supabase (prefer service role on server) --------------------------------
+# Supabase (prefer server role in backend)
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
@@ -33,10 +33,9 @@ supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- FastAPI -----------------------------------------------------------------
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
-# --- CORS --------------------------------------------------------------------
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -51,7 +50,6 @@ app.add_middleware(
 )
 
 
-# --- Health ------------------------------------------------------------------
 @app.get("/")
 async def root():
     return {"message": "PropNexus backend is running."}
@@ -63,11 +61,11 @@ async def health():
     return {"ok": True}
 
 
-# --- Routers (include each ONCE) ---------------------------------------------
+# Routers (once each)
 app.include_router(save_deal_router)
 app.include_router(notes_router)
-app.include_router(gpt_routes.router)  # legacy summary routes
-app.include_router(ai_router)  # PO2 AI routes (/ai/summary, /ai/strategies)
+app.include_router(gpt_routes.router)  # legacy summary
+app.include_router(ai_router)  # PO2 summary & strategies
 app.include_router(area_routes.router)
 app.include_router(comps_routes.router)
 app.include_router(scrape_routes.router)
@@ -75,7 +73,7 @@ app.include_router(off_market_router)
 app.include_router(stripe_router)
 
 
-# --- Supabase-backed property endpoints --------------------------------------
+# Supabase-backed property endpoints
 @app.get("/properties")
 async def get_properties():
     if not supabase:
