@@ -1,29 +1,20 @@
-# railway.toml — single Python service for the backend
+# Railway config for the PropNexus backend (FastAPI / Python)
 
+# Use Nixpacks (Python) to build
 [build]
-# Use Railway's (still supported) Nixpacks to detect Python from requirements.txt
 builder = "NIXPACKS"
 
-# Optional: pin Python version used by Nixpacks
-[build.env]
-NIXPACKS_PYTHON_VERSION = "3.12"
+# Deploy/start configuration
+[deploy]
+# Start FastAPI with Uvicorn; Railway injects $PORT
+startCommand = "python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
 
-# ------------------------------------------------------------------------------
-# Backend service
-# ------------------------------------------------------------------------------
-[[services]]
-name = "propnexus-backend"
-root = "./backend"
+# Build from the /backend directory
+[service]
+rootDirectory = "backend"
 
-# Make sure dependencies install during build
-buildCommand = "pip install -r requirements.txt"
-
-# Start the FastAPI app with uvicorn
-start = "python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
-
-# Optional healthcheck (FastAPI exposes /health)
-[services.healthcheck]
-path = "/health"
-interval = 10
-timeout = 5
-retries = 6
+# Handy defaults
+[variables]
+PYTHONUNBUFFERED = "1"
