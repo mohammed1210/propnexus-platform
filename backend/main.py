@@ -1,4 +1,6 @@
 # backend/main.py
+from __future__ import annotations
+
 import logging
 import sys
 from pathlib import Path
@@ -9,42 +11,42 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 # -----------------------------------------------------------------------------
-# Ensure imports like "from routes.x import router" work on Railway/Docker
+# Make "from routes.* import router" work both locally and on Railway
 # -----------------------------------------------------------------------------
 BACKEND_DIR = Path(__file__).resolve().parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 # -----------------------------------------------------------------------------
-# App
+# App + logger
 # -----------------------------------------------------------------------------
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 log = logging.getLogger("uvicorn.error")
 
 # -----------------------------------------------------------------------------
-# CORS (Vercel preview + production + local)
+# CORS
+#   - Explicit allowlist for localhost + production
+#   - Regex for ANY Vercel preview under *.vercel.app (e.g. your git-po2 URL)
 # -----------------------------------------------------------------------------
-ALLOWED_ORIGINS_EXACT = [
+ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://propnexus-platform.vercel.app",  # prod app (keep if/when you set it)
+    "http://propnexus-platform-git-po2-mohammed-abbas-projects-8ab7e126.vercel.app"
+    "https://propnexus-platform.vercel.app",  # production app domain (adjust if different)
 ]
-
-# Allow ANY Vercel preview, e.g. https://propnexus-platform-git-*.vercel.app
-VERCEL_REGEX = r"^https?://([a-z0-9-]+\.)*vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS_EXACT,
-    allow_origin_regex=VERCEL_REGEX,  # 🔓 all Vercel previews
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"^https://.+\.vercel\.app$",  # matches all Vercel preview URLs
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"],  # includes automatic handling of OPTIONS preflight
     allow_headers=["*"],
 )
 
 
 # -----------------------------------------------------------------------------
-# Simple health check
+# Health
 # -----------------------------------------------------------------------------
 @app.get("/health")
 def health():
@@ -52,44 +54,42 @@ def health():
 
 
 # -----------------------------------------------------------------------------
-# Basic request timing (helps on Railway edge 502 debugging)
+# Simple timing log for each request (helps diagnose Railway 502s)
 # -----------------------------------------------------------------------------
 @app.middleware("http")
 async def timing_middleware(request: Request, call_next):
     t0 = time()
     try:
-        response = await call_next(request)
-        return response
+        return await call_next(request)
     finally:
-        dt = (time() - t0) * 1000.0
-        log.info("REQ %s %s -> %.1fms", request.method, request.url.path, dt)
+        ms = (time() - t0) * 1000.0
+        log.info("REQ %s %s -> %.1fms", request.method, request.url.path, ms)
 
 
 # -----------------------------------------------------------------------------
-# Mount routers (import safely + log clear reason if missing)
+# Router mounting (import robustly; log if missing but keep server up)
 # -----------------------------------------------------------------------------
 def try_mount(module: str, attr: str = "router", name: str | None = None):
-    """Import routes.<module>:<attr> and include it if present."""
     import importlib
 
-    disp = name or module
+    label = name or module
     try:
         mod = importlib.import_module(f"routes.{module}")
         router = getattr(mod, attr)
         app.include_router(router)
-        log.info("Router mounted: %s", disp)
+        log.info("Router mounted: %s", label)
     except Exception as exc:
         log.warning("Router NOT mounted (%s): %s", f"routes.{module}", exc)
 
 
-# Core routes (these should exist)
+# Core routes
 try_mount("off_market_routes")
-try_mount("properties")  # <-- critical
+try_mount("properties")
 try_mount("save_deal")
 try_mount("notes")
 try_mount("ai")
 
-# Optional routes (ok if missing)
+# Optional routes (fine if absent)
 try_mount("area")
 try_mount("comps")
 try_mount("scrape")
@@ -97,7 +97,7 @@ try_mount("stripe_routes")
 
 
 # -----------------------------------------------------------------------------
-# Uniform error handler
+# Fallback error handler
 # -----------------------------------------------------------------------------
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception):
