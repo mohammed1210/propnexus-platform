@@ -5,71 +5,58 @@ import logging
 import sys
 from pathlib import Path
 from time import time
+from typing import Optional
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# -----------------------------------------------------------------------------
-# Make "from routes.* import router" work both locally and on Railway
-# -----------------------------------------------------------------------------
+# ---- Make "from routes.x import router" work on Railway/Docker
 BACKEND_DIR = Path(__file__).resolve().parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-# -----------------------------------------------------------------------------
-# App + logger
-# -----------------------------------------------------------------------------
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 log = logging.getLogger("uvicorn.error")
 
-# -----------------------------------------------------------------------------
-# CORS
-#   - Explicit allowlist for localhost + production
-#   - Regex for ANY Vercel preview under *.vercel.app (e.g. your git-po2 URL)
-# -----------------------------------------------------------------------------
-ALLOWED_ORIGINS = [
+# ---- CORS: localhost + production + any Vercel preview for this project
+ALLOWED_ORIGINS = {
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://propnexus-platform-git-po2-mohammed-abbas-projects-8ab7e126.vercel.app"
-    "https://propnexus-platform.vercel.app",  # production app domain (adjust if different)
-]
+    "https://propnexus-platform.vercel.app",
+}
+# Accept previews like:
+# https://propnexus-platform-git-<branch>-mohammed-abbas-projects-<hash>.vercel.app
+ALLOWED_ORIGIN_REGEX = r"^https:\/\/propnexus-platform-git-[A-Za-z0-9._-]+-mohammed-abbas-projects-[A-Za-z0-9._-]+\.vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"^https://.+\.vercel\.app$",  # matches all Vercel preview URLs
+    allow_origins=["*"],  # <— TEMP ONLY
     allow_credentials=True,
-    allow_methods=["*"],  # includes automatic handling of OPTIONS preflight
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# -----------------------------------------------------------------------------
-# Health
-# -----------------------------------------------------------------------------
+# ---- Health
 @app.get("/health")
 def health():
     return {"ok": True}
 
 
-# -----------------------------------------------------------------------------
-# Simple timing log for each request (helps diagnose Railway 502s)
-# -----------------------------------------------------------------------------
+# ---- Lightweight request timing (helps diagnose 502s)
 @app.middleware("http")
-async def timing_middleware(request: Request, call_next):
+async def timing_mw(request: Request, call_next):
     t0 = time()
     try:
         return await call_next(request)
     finally:
-        ms = (time() - t0) * 1000.0
-        log.info("REQ %s %s -> %.1fms", request.method, request.url.path, ms)
+        dt = (time() - t0) * 1000.0
+        log.info("REQ %s %s -> %.1fms", request.method, request.url.path, dt)
 
 
-# -----------------------------------------------------------------------------
-# Router mounting (import robustly; log if missing but keep server up)
-# -----------------------------------------------------------------------------
-def try_mount(module: str, attr: str = "router", name: str | None = None):
+# ---- Safe router mount helper
+def try_mount(module: str, attr: str = "router", name: Optional[str] = None):
     import importlib
 
     label = name or module
@@ -89,16 +76,14 @@ try_mount("save_deal")
 try_mount("notes")
 try_mount("ai")
 
-# Optional routes (fine if absent)
+# Optional routes
 try_mount("area")
 try_mount("comps")
 try_mount("scrape")
 try_mount("stripe_routes")
 
 
-# -----------------------------------------------------------------------------
-# Fallback error handler
-# -----------------------------------------------------------------------------
+# ---- Uniform error handler (keeps Railway edge from showing internals)
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception):
     log.exception("Unhandled error: %s", exc)
