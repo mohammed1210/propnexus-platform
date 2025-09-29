@@ -1,3 +1,4 @@
+# backend/main.py
 import logging
 import sys
 from pathlib import Path
@@ -23,17 +24,19 @@ log = logging.getLogger("uvicorn.error")
 # -----------------------------------------------------------------------------
 # CORS (Vercel preview + production + local)
 # -----------------------------------------------------------------------------
-ALLOWED_ORIGINS = [
+ALLOWED_ORIGINS_EXACT = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "https://propnexus-platform.vercel.app",
+    "https://propnexus-platform.vercel.app",  # prod app (keep if/when you set it)
 ]
-# allow any Vercel preview: https://*-mohammed-abbas-projects-*.vercel.app
-# We’ll accept via a custom check in middleware instead of regex, since
-# FastAPI CORSMiddleware only accepts exact strings or "*".
+
+# Allow ANY Vercel preview, e.g. https://propnexus-platform-git-*.vercel.app
+VERCEL_REGEX = r"^https?://([a-z0-9-]+\.)*vercel\.app$"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=ALLOWED_ORIGINS_EXACT,
+    allow_origin_regex=VERCEL_REGEX,  # 🔓 all Vercel previews
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,10 +84,11 @@ def try_mount(module: str, attr: str = "router", name: str | None = None):
 
 # Core routes (these should exist)
 try_mount("off_market_routes")
-try_mount("properties")  # <-- this is the one we need running
+try_mount("properties")  # <-- critical
 try_mount("save_deal")
 try_mount("notes")
 try_mount("ai")
+
 # Optional routes (ok if missing)
 try_mount("area")
 try_mount("comps")
@@ -93,7 +97,7 @@ try_mount("stripe_routes")
 
 
 # -----------------------------------------------------------------------------
-# Error handler example for uniform JSON (optional)
+# Uniform error handler
 # -----------------------------------------------------------------------------
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception):
