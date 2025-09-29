@@ -1,11 +1,7 @@
 # railway.toml
-[build]
-builder = "NIXPACKS"
 
 [deploy]
+# Explicitly tell Railway how to start
 startCommand = "python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+# Healthcheck so Railway knows when app is ready
 healthcheckPath = "/health"
-healthcheckTimeout = 100
-
-[variables]
-PYTHONUNBUFFERED = "1"
