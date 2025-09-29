@@ -20,8 +20,10 @@ export type SummaryResponse = {
 export type Strategy = {
   title: string;
   rationale: string;
-  steps: string[];
-  risk?: string;
+  /** Steps are optional because the model may omit them sometimes */
+  steps?: string[];
+  /** Risk can be null/undefined depending on model output */
+  risk?: string | null;
 };
 
 export type StrategiesResponse = {
@@ -29,10 +31,18 @@ export type StrategiesResponse = {
 };
 
 export type StrategiesRequest = {
-  property: Omit<SummaryRequest, 'bedrooms' | 'bathrooms'> & {
-    // bedrooms/bathrooms optional here too if you’ll use them for strategies
+  property: {
+    title: string;
+    location: string;
+    price?: number;
+    yield_percent?: number;
+    roi_percent?: number;
+    propertyType?: string;
+    investmentType?: string;
+    description?: string;
     bedrooms?: number;
     bathrooms?: number;
   };
-  constraints?: Record<string, unknown>;
+  /** Optional constraints; when omitted, backend uses defaults */
+  constraints?: Record<string, string | number | boolean>;
 };

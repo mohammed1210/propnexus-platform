@@ -1,4 +1,3 @@
-// frontend/components/property_details/ExitStrategyGenerator.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -25,6 +24,7 @@ export default function ExitStrategyGenerator(props: Props) {
     setLoading(true);
     setError(null);
     try {
+      // NOTE: constraints is optional — omit when empty to satisfy the type
       const payload: StrategiesRequest = {
         property: {
           title: props.title,
@@ -36,7 +36,6 @@ export default function ExitStrategyGenerator(props: Props) {
           investmentType: props.investmentType,
           description: props.description,
         },
-        constraints: {},
       };
 
       const res: StrategiesResponse = await postAiStrategies(payload);
