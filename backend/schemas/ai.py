@@ -21,7 +21,7 @@ class SummaryRequest(BaseModel):
 
 class SummaryResponse(BaseModel):
     summary: Optional[str] = None
-    bullets: List[str] = []
+    bullets: list[str] | None = None
 
 
 class Strategy(BaseModel):

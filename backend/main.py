@@ -1,48 +1,52 @@
 # backend/main.py
 from __future__ import annotations
 
-import os
+import logging
+import time
+from typing import Optional
 
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from supabase import Client, create_client
 
-# Load env early
-load_dotenv()
+# -----------------------------------------------------------------------------
+# Helper: lazy/optional router import that won't crash if a module is missing
+# -----------------------------------------------------------------------------
+def _try_import(module_path: str, attr: str = "router") -> Optional[object]:
+    try:
+        module = __import__(module_path, fromlist=[attr])
+        return getattr(module, attr)
+    except Exception:
+        return None
 
-# Routers (package-relative)
-from backend.routes import (  # noqa: E402
-    area_routes,
-    comps_routes,
-    gpt_routes,
-    scrape_routes,
-)
-from backend.routes.ai import router as ai_router  # noqa: E402
-from backend.routes.notes import router as notes_router  # noqa: E402
-from backend.routes.off_market_routes import router as off_market_router  # noqa: E402
-from backend.routes.save_deal import router as save_deal_router  # noqa: E402
-from backend.routes.stripe_routes import router as stripe_router  # noqa: E402
 
-# Supabase (prefer server role in backend)
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+# Pre-resolve routers (all imports are still at top of file → Ruff happy)
+off_market_router = _try_import("backend.routes.off_market_routes")
+properties_router = _try_import("backend.routes.properties")
+save_deal_router = _try_import("backend.routes.save_deal")
+notes_router = _try_import("backend.routes.notes")
+ai_router = _try_import("backend.routes.ai")
+stripe_router = _try_import("backend.routes.stripe_routes")  # optional
 
-supabase: Client | None = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+# -----------------------------------------------------------------------------
+# App
+# -----------------------------------------------------------------------------
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
+log = logging.getLogger("uvicorn.error")
 
-# CORS
+# -----------------------------------------------------------------------------
+# CORS (Vercel preview + production + local)
+# -----------------------------------------------------------------------------
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://propnexus-platform.vercel.app",
+    # preview branches on Vercel also allowed via regex below
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://propnexus-platform.vercel.app",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
@@ -50,42 +54,42 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-async def root():
-    return {"message": "PropNexus backend is running."}
+# -----------------------------------------------------------------------------
+# Lightweight request logging + guaranteed /health
+# -----------------------------------------------------------------------------
+@app.middleware("http")
+async def _shim(request: Request, call_next):
+    if request.url.path in ("/health", "/api/health"):
+        return JSONResponse({"ok": True})
+
+    t0 = time.time()
+    try:
+        resp = await call_next(request)
+        return resp
+    finally:
+        dt_ms = (time.time() - t0) * 1000.0
+        log.info("REQ %s %s -> %.1fms", request.method, request.url.path, dt_ms)
 
 
 @app.get("/health")
-@app.get("/api/health")
-async def health():
+def health():
     return {"ok": True}
 
 
-# Routers (once each)
-app.include_router(save_deal_router)
-app.include_router(notes_router)
-app.include_router(gpt_routes.router)  # legacy summary
-app.include_router(ai_router)  # PO2 summary & strategies
-app.include_router(area_routes.router)
-app.include_router(comps_routes.router)
-app.include_router(scrape_routes.router)
-app.include_router(off_market_router)
-app.include_router(stripe_router)
+# -----------------------------------------------------------------------------
+# Router mounting (only if successfully imported)
+# -----------------------------------------------------------------------------
+def _mount(name: str, router: Optional[object]):
+    if router is None:
+        log.warning("Router NOT mounted (%s): import failed or module missing", name)
+        return
+    app.include_router(router)
+    log.info("Router mounted: %s", name)
 
 
-# Supabase-backed property endpoints
-@app.get("/properties")
-async def get_properties():
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    return supabase.table("properties").select("*").execute().data
-
-
-@app.get("/properties/{property_id}")
-async def get_property_by_id(property_id: str):
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    res = supabase.table("properties").select("*").eq("id", property_id).execute()
-    if not res.data:
-        raise HTTPException(status_code=404, detail="Property not found")
-    return res.data[0]
+_mount("routes.off_market_routes", off_market_router)
+_mount("routes.properties", properties_router)
+_mount("routes.save_deal", save_deal_router)
+_mount("routes.notes", notes_router)
+_mount("routes.ai", ai_router)
+_mount("routes.stripe_routes", stripe_router)

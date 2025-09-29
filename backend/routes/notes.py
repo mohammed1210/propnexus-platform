@@ -1,4 +1,6 @@
 # backend/routes/notes.py
+from __future__ import annotations
+
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Literal, Optional
@@ -10,6 +12,7 @@ from supabase import Client, create_client
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
+# --- Supabase (server-side credentials only) ----------------------------------
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_SERVICE_ROLE = (
     os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -17,12 +20,12 @@ SUPABASE_SERVICE_ROLE = (
     or os.getenv("SUPABASE_SERVICE_ROLE")
 )
 
-if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE:
-    raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE")
+_sb: Client | None = None
+if SUPABASE_URL and SUPABASE_SERVICE_ROLE:
+    _sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE)
 
-sb: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE)
 
-
+# --- Models -------------------------------------------------------------------
 class NotesRecord(BaseModel):
     id: Optional[str] = None
     property_id: str
@@ -44,6 +47,7 @@ class NotesPatchPayload(BaseModel):
     notes: Optional[str] = None
 
 
+# --- Helpers ------------------------------------------------------------------
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -62,13 +66,28 @@ def _default_record(property_id: str, user_id: str) -> NotesRecord:
     )
 
 
+def _require_sb() -> Client:
+    """
+    Ensure Supabase client exists. If server vars are missing, respond with 503
+    (don't crash the whole app at import time).
+    """
+    if _sb is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Supabase not configured on server",
+        )
+    return _sb
+
+
 def _raise_if_error(resp) -> None:
     if getattr(resp, "error", None):
         raise HTTPException(status_code=500, detail=str(resp.error))
 
 
+# --- Routes -------------------------------------------------------------------
 @router.get("/{property_id}", response_model=NotesRecord)
 def get_notes(property_id: str, user_id: Optional[str] = Query(default=None)):
+    sb = _require_sb()
     uid = _norm_user(user_id)
     resp = (
         sb.table("notes")
@@ -86,6 +105,7 @@ def get_notes(property_id: str, user_id: Optional[str] = Query(default=None)):
 
 @router.get("", response_model=List[NotesRecord])
 def list_notes(user_id: Optional[str] = Query(default=None)):
+    sb = _require_sb()
     uid = _norm_user(user_id)
     resp = sb.table("notes").select("*").eq("user_id", uid).execute()
     _raise_if_error(resp)
@@ -96,6 +116,7 @@ def list_notes(user_id: Optional[str] = Query(default=None)):
     "", status_code=status.HTTP_201_CREATED, response_model=Dict[str, Literal[True]]
 )
 def upsert_notes(payload: NotesPayload):
+    sb = _require_sb()
     row = {
         "property_id": payload.property_id,
         "user_id": _norm_user(payload.user_id),
@@ -114,14 +135,18 @@ def patch_notes(
     body: NotesPatchPayload,
     user_id: Optional[str] = Query(default=None),
 ):
+    sb = _require_sb()
     uid = _norm_user(user_id)
+
     updates: Dict[str, Any] = {}
     if body.custom_field is not None:
         updates["custom_field"] = body.custom_field
     if body.notes is not None:
         updates["notes"] = body.notes
+
     if not updates:
         return {"ok": True}
+
     updates["updated_at"] = _now_iso()
     resp = (
         sb.table("notes")
@@ -132,8 +157,11 @@ def patch_notes(
         .execute()
     )
     _raise_if_error(resp)
+
     if resp.data:
         return {"ok": True}
+
+    # If no existing row, upsert a new one
     base = {"property_id": property_id, "user_id": uid, **updates}
     resp2 = sb.table("notes").upsert(base, on_conflict="user_id,property_id").execute()
     _raise_if_error(resp2)
@@ -142,6 +170,7 @@ def patch_notes(
 
 @router.delete("/{property_id}", response_model=Dict[str, Literal[True]])
 def delete_notes(property_id: str, user_id: Optional[str] = Query(default=None)):
+    sb = _require_sb()
     uid = _norm_user(user_id)
     resp = (
         sb.table("notes")
