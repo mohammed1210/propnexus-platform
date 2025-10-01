@@ -1,18 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { postAiStrategies } from '@/lib/api';
 import type { StrategiesRequest, StrategiesResponse, Strategy } from '@/types/ai';
 
 type Props = {
-  title: string;
-  location: string;
-  price?: number;
-  yield_percent?: number;
-  roi_percent?: number;
-  propertyType?: string;
-  investmentType?: string;
-  description?: string;
+  title?: string;
+  location?: string;
+  price?: number | null;
+  yield_percent?: number | null;
+  roi_percent?: number | null;
+  propertyType?: string | null;
+  investmentType?: string | null;
+  description?: string | null;
 };
 
 export default function ExitStrategyGenerator(props: Props) {
@@ -20,22 +20,31 @@ export default function ExitStrategyGenerator(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [strategies, setStrategies] = useState<Strategy[] | null>(null);
 
+  // Guard a non-empty title so backend validation never 422s
+  const safeTitle = useMemo(
+    () =>
+      (props.title ?? '').toString().trim() ||
+      `${props.propertyType ?? 'Property'} in ${props.location ?? 'UK'}`,
+    [props.title, props.propertyType, props.location],
+  );
+
   async function handleGenerate() {
     setLoading(true);
     setError(null);
     try {
-      // NOTE: constraints is optional — omit when empty to satisfy the type
       const payload: StrategiesRequest = {
         property: {
-          title: props.title,
-          location: props.location,
-          price: props.price,
-          yield_percent: props.yield_percent,
-          roi_percent: props.roi_percent,
-          propertyType: props.propertyType,
-          investmentType: props.investmentType,
-          description: props.description,
+          title: safeTitle,
+          location: props.location ?? '',
+          price: typeof props.price === 'number' ? props.price : undefined,
+          yield_percent: typeof props.yield_percent === 'number' ? props.yield_percent : undefined,
+          roi_percent: typeof props.roi_percent === 'number' ? props.roi_percent : undefined,
+          propertyType: props.propertyType ?? undefined,
+          investmentType: props.investmentType ?? undefined,
+          description: props.description ?? undefined,
         },
+        // Add constraints here if you have UI for them. Keep optional.
+        // constraints: { budget: 200000, risk_tolerance: 'medium' },
       };
 
       const res: StrategiesResponse = await postAiStrategies(payload);

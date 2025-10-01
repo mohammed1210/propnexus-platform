@@ -1,73 +1,65 @@
 // frontend/lib/api.ts
-function computeBase(): string {
-  // Highest → lowest precedence (compatible with your existing configs)
-  const raw =
-    process.env.NEXT_PUBLIC_API_BASE ||
+
+// --- Base URL for the FastAPI backend (trim trailing slashes) -------------
+export const BASE =
+  (process.env.NEXT_PUBLIC_API_BASE ||
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
-    '';
+    ''
+  ).replace(/\/+$/, '') || 'http://127.0.0.1:8000';
 
-  // In development only, allow localhost fallback
-  if (!raw) {
-    if (process.env.NODE_ENV !== 'production') {
-      return 'http://127.0.0.1:8000';
-    }
-    // In production, never use localhost. Force a hard error so we notice.
-    throw new Error('API base URL is not configured (set NEXT_PUBLIC_API_BASE or NEXT_PUBLIC_BACKEND_URL)');
-  }
+// Small helper: JSON fetch with good error messages
+async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const url = `${BASE}${path}`;
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  });
 
-  return raw.replace(/\/+$/, '');
-}
-
-const API_BASE = computeBase();
-
-export type SummaryRequest = {
-  title: string;
-  location: string;
-  price?: number;
-  bedrooms?: number;
-  bathrooms?: number;
-  yield_percent?: number;
-  roi_percent?: number;
-  propertyType?: string;
-  investmentType?: string;
-  description?: string;
-};
-
-export type SummaryResponse = { summary: string; bullets: string[] };
-
-export type StrategiesRequest = {
-  property: Record<string, unknown>;
-  constraints?: Record<string, unknown>;
-};
-
-export type Strategy = { title: string; rationale?: string; steps?: string[]; risk?: string | null };
-export type StrategiesResponse = { strategies: Strategy[] };
-
-async function j<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`HTTP ${res.status}: ${text || res.statusText}`);
+    // Try to surface FastAPI/Pydantic error details
+    let detail: any;
+    try {
+      detail = await res.json();
+    } catch {
+      detail = await res.text();
+    }
+    throw new Error(
+      `HTTP ${res.status} ${res.statusText} at ${path} — ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
+    );
   }
-  return res.json() as Promise<T>;
+
+  // If there is no body (204), return undefined as any
+  if (res.status === 204) return undefined as unknown as T;
+  return (await res.json()) as T;
 }
 
-export async function postAiSummary(body: SummaryRequest) {
-  const res = await fetch(`${API_BASE}/ai/summary`, {
+// ----------------------------- AI endpoints --------------------------------
+import type {
+  SummaryRequest,
+  SummaryResponse,
+  StrategiesRequest,
+  StrategiesResponse,
+} from '@/types/ai';
+
+export async function postAiSummary(body: SummaryRequest): Promise<SummaryResponse> {
+  return fetchJson<SummaryResponse>('/ai/summary', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-  return j<SummaryResponse>(res);
 }
 
-export async function postAiStrategies(body: StrategiesRequest) {
-  const res = await fetch(`${API_BASE}/ai/strategies`, {
+export async function postAiStrategies(body: StrategiesRequest): Promise<StrategiesResponse> {
+  return fetchJson<StrategiesResponse>('/ai/strategies', {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-  return j<StrategiesResponse>(res);
 }
 
-export { API_BASE };
+// (Optional) generic GET helper you might reuse elsewhere
+export async function getJson<T>(path: string): Promise<T> {
+  return fetchJson<T>(path, { method: 'GET' });
+}

@@ -43,7 +43,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
         ? `🤖 Quick take: ${hints.join(' · ')}. Sense-check product fees, refi assumptions and local demand.`
         : '🤖 Share price, yield, ROI or postcode and I can give a sharper take.';
 
-    // Very tiny heuristics
+    // Tiny heuristics to keep this offline widget useful
     const lower = prompt.toLowerCase();
     if (lower.includes('risk')) {
       return `${base} Key risks: down-valuation, refurb overrun, and void periods. Add contingency and model DSCR ≥ 1.25×.`;
@@ -71,7 +71,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
         prev.concat({
           role: 'assistant',
           content: reply,
-        })
+        }),
       );
     }, 500);
   };

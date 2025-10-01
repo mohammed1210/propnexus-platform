@@ -1,13 +1,13 @@
-// frontend/components/property_details/InvestmentSummary.tsx
 'use client';
+
 import React, { useEffect, useState } from 'react';
 import { postAiSummary } from '@/lib/api';
 import type { SummaryRequest, SummaryResponse } from '@/types/ai';
 
 type Props = {
   property: {
-    title: string;
-    location: string;
+    title?: string | null;
+    location?: string | null;
     price?: number | null;
     bedrooms?: number | null;
     bathrooms?: number | null;
@@ -33,9 +33,15 @@ export default function InvestmentSummary({ property }: Props) {
     async function run() {
       setLoading(true);
       setError(null);
+
       try {
+        // Backend requires a non-empty title. Guard it.
+        const safeTitle =
+          (property.title ?? '').toString().trim() ||
+          `${property.propertyType ?? 'Property'} in ${property.location ?? 'UK'}`;
+
         const payload: SummaryRequest = {
-          title: property.title,
+          title: safeTitle,
           location: String(property.location ?? ''),
           price: numOrUndef(property.price),
           bedrooms: numOrUndef(property.bedrooms),
