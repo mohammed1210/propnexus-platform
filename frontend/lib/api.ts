@@ -1,43 +1,49 @@
 // frontend/lib/api.ts
 
-// --- Base URL for the FastAPI backend (trim trailing slashes) -------------
+// -------- Base URL for the FastAPI backend --------
+// Priority:
+// 1) NEXT_PUBLIC_API_BASE (new, preferred)
+// 2) NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL (legacy fallbacks)
+// 3) http://127.0.0.1:8000 (local dev)
 export const BASE =
-  (process.env.NEXT_PUBLIC_API_BASE ||
-    process.env.NEXT_PUBLIC_BACKEND_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    ''
-  ).replace(/\/+$/, '') || 'http://127.0.0.1:8000';
+  (process.env.NEXT_PUBLIC_API_BASE || '').replace(/\/+$/, '') ||
+  (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000');
 
-// Small helper: JSON fetch with good error messages
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const url = `${BASE}${path}`;
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      'content-type': 'application/json',
-      ...(init?.headers || {}),
-    },
-  });
-
+// Generic helpers
+export async function apiGet<T>(path: string, headers: Record<string, string> = {}): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { headers });
   if (!res.ok) {
-    // Try to surface FastAPI/Pydantic error details
-    let detail: any;
-    try {
-      detail = await res.json();
-    } catch {
-      detail = await res.text();
-    }
-    throw new Error(
-      `HTTP ${res.status} ${res.statusText} at ${path} — ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`
-    );
+    const text = await res.text().catch(() => '');
+    throw new Error(`GET ${path} failed: ${res.status} ${text}`);
   }
-
-  // If there is no body (204), return undefined as any
-  if (res.status === 204) return undefined as unknown as T;
-  return (await res.json()) as T;
+  return res.json() as Promise<T>;
 }
 
-// ----------------------------- AI endpoints --------------------------------
+export async function apiPost<T>(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {}
+): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    // Try to surface FastAPI error details nicely
+    let detail = '';
+    try {
+      const j = await res.json();
+      detail = j?.detail ? ` ${JSON.stringify(j.detail)}` : '';
+    } catch {
+      detail = ` ${(await res.text().catch(() => '')).slice(0, 500)}`;
+    }
+    throw new Error(`POST ${path} failed: ${res.status}${detail}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+// ---------- AI endpoints ----------
 import type {
   SummaryRequest,
   SummaryResponse,
@@ -45,21 +51,10 @@ import type {
   StrategiesResponse,
 } from '@/types/ai';
 
-export async function postAiSummary(body: SummaryRequest): Promise<SummaryResponse> {
-  return fetchJson<SummaryResponse>('/ai/summary', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+export function postAiSummary(body: SummaryRequest) {
+  return apiPost<SummaryResponse>('/ai/summary', body);
 }
 
-export async function postAiStrategies(body: StrategiesRequest): Promise<StrategiesResponse> {
-  return fetchJson<StrategiesResponse>('/ai/strategies', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-}
-
-// (Optional) generic GET helper you might reuse elsewhere
-export async function getJson<T>(path: string): Promise<T> {
-  return fetchJson<T>(path, { method: 'GET' });
+export function postAiStrategies(body: StrategiesRequest) {
+  return apiPost<StrategiesResponse>('/ai/strategies', body);
 }
