@@ -1,7 +1,0 @@
-# railway.toml
-
-[deploy]
-# Explicitly tell Railway how to start
-startCommand = "python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
-# Healthcheck so Railway knows when app is ready
-healthcheckPath = "/health"
