@@ -1,54 +1,67 @@
 # backend/main.py
-from __future__ import annotations
-
 import logging
 import os
-import socket
 import sys
 from pathlib import Path
 from time import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 # -----------------------------------------------------------------------------
-# Make "routes.*" imports work on Railway/Docker
+# Ensure imports like "from routes.x import router" work on Railway/Docker
 # -----------------------------------------------------------------------------
 BACKEND_DIR = Path(__file__).resolve().parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-# -----------------------------------------------------------------------------
-# App & logger
-# -----------------------------------------------------------------------------
-app = FastAPI(title="PropNexus Backend", version="0.1.0")
+app = FastAPI(title="PropNexus Backend", version="0.2.0")
 log = logging.getLogger("uvicorn.error")
 
 # -----------------------------------------------------------------------------
-# CORS
-# NOTE: allow_origins="*" cannot be combined with allow_credentials=True.
-# Keep it permissive for now so preflights succeed; we can lock it down later.
+# CORS: localhost + vercel + previews (relaxed enough for PO2)
 # -----------------------------------------------------------------------------
+ALLOWED_ORIGINS = {
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    # main prod
+    "https://propnexus-platform.vercel.app",
+}
+# Accept previews like:
+# https://propnexus-platform-git-<branch>-mohammed-abbas-projects-<hash>.vercel.app
+ALLOWED_ORIGIN_REGEX = r"^https:\/\/propnexus-platform-git-[A-Za-z0-9._-]+-mohammed-abbas-projects-[A-Za-z0-9._-]+\.vercel\.app$"
+
+# For PO2 we allow "*" (keeps preflight simple) but still log Origin for visibility.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TEMP: allow all (works with allow_credentials=False)
-    allow_credentials=False,  # must be False when allow_origins=["*"]
+    allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    max_age=600,
 )
 
 
 # -----------------------------------------------------------------------------
-# Health
+# Health & tiny debug
 # -----------------------------------------------------------------------------
-@app.get("/health")
-def health():
-    return {"ok": True}
+@app.get("/health", response_class=PlainTextResponse)
+def health() -> str:
+    return "OK"
+
+
+@app.get("/_debug/echo")
+def echo(origin: str | None = None):
+    return {
+        "ok": True,
+        "origin_param": origin,
+        "env": {"PORT": os.getenv("PORT"), "HOSTNAME": os.getenv("HOSTNAME")},
+    }
 
 
 # -----------------------------------------------------------------------------
-# Simple timing (helps debugging Railway edge retries)
+# Basic request timing (helps on Railway edge 5xx debugging)
 # -----------------------------------------------------------------------------
 @app.middleware("http")
 async def timing_middleware(request: Request, call_next):
@@ -62,7 +75,7 @@ async def timing_middleware(request: Request, call_next):
 
 
 # -----------------------------------------------------------------------------
-# Mount routers (import safely + log reason if missing)
+# Mount routers (import safely + log clear reason if missing)
 # -----------------------------------------------------------------------------
 def try_mount(module: str, attr: str = "router", name: str | None = None):
     import importlib
@@ -83,28 +96,11 @@ try_mount("properties")
 try_mount("save_deal")
 try_mount("notes")
 try_mount("ai")
-# Optional routes
+# Optional
 try_mount("area")
 try_mount("comps")
 try_mount("scrape")
 try_mount("stripe_routes")
-
-
-# -----------------------------------------------------------------------------
-# Debug helpers
-# -----------------------------------------------------------------------------
-@app.get("/_debug/env")
-def debug_env():
-    return {
-        "ok": True,
-        "port_env": os.getenv("PORT"),
-        "hostname": socket.gethostname(),
-    }
-
-
-@app.on_event("startup")
-def _startup_log():
-    log.info("[startup] PORT=%r, HOSTNAME=%s", os.getenv("PORT"), socket.gethostname())
 
 
 # -----------------------------------------------------------------------------
@@ -114,3 +110,9 @@ def _startup_log():
 async def unhandled(request: Request, exc: Exception):
     log.exception("Unhandled error: %s", exc)
     return JSONResponse(status_code=502, content={"detail": "Server error"})
+
+
+# Log binding info at startup (helps confirm Railway port)
+@app.on_event("startup")
+def _startup_log():
+    log.info("[startup] PORT=%r, HOSTNAME=%s", os.getenv("PORT"), os.getenv("HOSTNAME"))
