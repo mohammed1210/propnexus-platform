@@ -1,4 +1,3 @@
-// frontend/components/property_details/InvestmentSummary.tsx
 'use client';
 import React, { useEffect, useState } from 'react';
 import { postAiSummary } from '@/lib/api';
@@ -28,6 +27,12 @@ export default function InvestmentSummary({ property }: Props) {
   const [data, setData] = useState<SummaryResponse | null>(null);
 
   useEffect(() => {
+    // Don’t fire until we at least have a title to satisfy backend schema
+    if (!property?.title) {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function run() {
@@ -73,6 +78,7 @@ export default function InvestmentSummary({ property }: Props) {
     property.description,
   ]);
 
+  if (!property?.title) return <p data-testid="investment-summary-loading">Loading property details…</p>;
   if (loading) return <p data-testid="investment-summary-loading">Loading summary…</p>;
   if (error) return <p role="alert" className="text-red-600">Error: {error}</p>;
   if (!data) return null;

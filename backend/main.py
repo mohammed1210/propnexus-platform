@@ -1,4 +1,3 @@
-# backend/main.py
 import logging
 import os
 import sys
@@ -7,7 +6,7 @@ from time import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse
 
 # -----------------------------------------------------------------------------
 # Ensure imports like "from routes.x import router" work on Railway/Docker
@@ -16,7 +15,7 @@ BACKEND_DIR = Path(__file__).resolve().parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-app = FastAPI(title="PropNexus Backend", version="0.2.0")
+app = FastAPI(title="PropNexus Backend", version="0.2.1")
 log = logging.getLogger("uvicorn.error")
 
 # -----------------------------------------------------------------------------
@@ -25,8 +24,7 @@ log = logging.getLogger("uvicorn.error")
 ALLOWED_ORIGINS = {
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    # main prod
-    "https://propnexus-platform.vercel.app",
+    "https://propnexus-platform.vercel.app",  # main prod
 }
 # Accept previews like:
 # https://propnexus-platform-git-<branch>-mohammed-abbas-projects-<hash>.vercel.app
@@ -46,9 +44,11 @@ app.add_middleware(
 # -----------------------------------------------------------------------------
 # Health & tiny debug
 # -----------------------------------------------------------------------------
-@app.get("/health", response_class=PlainTextResponse)
-def health() -> str:
-    return "OK"
+@app.get("/health")
+@app.head("/health")
+def health() -> JSONResponse:
+    """Always return JSON so tests never fail decoding."""
+    return JSONResponse({"ok": True})
 
 
 @app.get("/_debug/echo")
