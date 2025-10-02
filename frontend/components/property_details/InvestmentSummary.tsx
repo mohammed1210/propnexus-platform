@@ -5,8 +5,8 @@ import type { SummaryRequest, SummaryResponse } from '@/types/ai';
 
 type Props = {
   property: {
-    title: string;
-    location: string;
+    title?: string | null;
+    location?: string | null;
     price?: number | null;
     bedrooms?: number | null;
     bathrooms?: number | null;
@@ -27,8 +27,8 @@ export default function InvestmentSummary({ property }: Props) {
   const [data, setData] = useState<SummaryResponse | null>(null);
 
   useEffect(() => {
-    // Don’t fire until we at least have a title to satisfy backend schema
-    if (!property?.title) {
+    // Require at least a title OR location, otherwise bail
+    if (!property?.title && !property?.location) {
       setLoading(false);
       return;
     }
@@ -40,8 +40,8 @@ export default function InvestmentSummary({ property }: Props) {
       setError(null);
       try {
         const payload: SummaryRequest = {
-          title: property.title,
-          location: String(property.location ?? ''),
+          title: property.title ?? '',
+          location: property.location ?? '',
           price: numOrUndef(property.price),
           bedrooms: numOrUndef(property.bedrooms),
           bathrooms: numOrUndef(property.bathrooms),
@@ -66,19 +66,21 @@ export default function InvestmentSummary({ property }: Props) {
       cancelled = true;
     };
   }, [
-    property.title,
-    property.location,
-    property.price,
-    property.bedrooms,
-    property.bathrooms,
-    property.yield_percent,
-    property.roi_percent,
-    property.propertyType,
-    property.investmentType,
-    property.description,
+    property?.title,
+    property?.location,
+    property?.price,
+    property?.bedrooms,
+    property?.bathrooms,
+    property?.yield_percent,
+    property?.roi_percent,
+    property?.propertyType,
+    property?.investmentType,
+    property?.description,
   ]);
 
-  if (!property?.title) return <p data-testid="investment-summary-loading">Loading property details…</p>;
+  if (!property?.title && !property?.location) {
+    return <p data-testid="investment-summary-loading">Loading property details…</p>;
+  }
   if (loading) return <p data-testid="investment-summary-loading">Loading summary…</p>;
   if (error) return <p role="alert" className="text-red-600">Error: {error}</p>;
   if (!data) return null;
