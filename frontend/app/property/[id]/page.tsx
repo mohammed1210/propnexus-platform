@@ -34,8 +34,8 @@ export default function PropertyDetailsPage() {
 
     (async () => {
       try {
-        const url = `${API_BASE.replace(/\/+$/, '')}/properties/${id}`;
-        const res = await fetch(url, { cache: 'no-store' });
+        const base = API_BASE.replace(/\/+$/, '');
+        const res = await fetch(`${base}/properties/${id}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`Failed to fetch property (${res.status})`);
         const data = await res.json();
         setProperty(data ?? null);
@@ -100,7 +100,7 @@ export default function PropertyDetailsPage() {
             <InvestmentSummary property={property as any} />
           </div>
 
-          {/* Exit Strategies (expects individual fields) */}
+          {/* Exit Strategies */}
           <div className="border p-4 rounded-md">
             <h2 className="font-semibold text-lg mb-2">Exit Strategies</h2>
             <ExitStrategyGenerator
@@ -119,7 +119,7 @@ export default function PropertyDetailsPage() {
             />
           </div>
 
-          {/* Notes (needs propertyId) */}
+          {/* Notes */}
           <div className="border p-4 rounded-md">
             <h2 className="font-semibold text-lg mb-2">Investor Notes</h2>
             {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
@@ -128,22 +128,22 @@ export default function PropertyDetailsPage() {
 
         {/* Right column */}
         <div className="space-y-6">
-          {/* Mortgage calculator (requires price) */}
-<div className="border p-4 rounded-md">
-  <h2 className="font-semibold text-lg mb-2">Mortgage & BRRR Calculator</h2>
-  <MortgageCalculator price={price ?? 0} />
-</div>
+          {/* Mortgage calculator */}
+          <div className="border p-4 rounded-md">
+            <h2 className="font-semibold text-lg mb-2">Mortgage & BRRR Calculator</h2>
+            <MortgageCalculator price={price ?? 0} />
+          </div>
 
-          {/* Stamp Duty (requires price) */}
+          {/* Stamp Duty */}
           <div className="border p-4 rounded-md">
             <h2 className="font-semibold text-lg mb-2">Stamp Duty Calculator</h2>
             <StampDutyCalculator price={price ?? 0} />
           </div>
 
           {/* Location */}
-          <div className="border p-4 rounded-md">
-            <h2 className="font-semibold text-lg mb-2">Location</h2>
-            {typeof property.latitude === 'number' && typeof property.longitude === 'number' ? (
+          {typeof property.latitude === 'number' && typeof property.longitude === 'number' ? (
+            <div className="border p-4 rounded-md">
+              <h2 className="font-semibold text-lg mb-2">Location</h2>
               <iframe
                 title="Map"
                 width="100%"
@@ -152,10 +152,8 @@ export default function PropertyDetailsPage() {
                 style={{ border: 0 }}
                 src={`https://www.google.com/maps?q=${property.latitude},${property.longitude}&z=14&output=embed`}
               />
-            ) : (
-              <p>Map unavailable — no coordinates provided.</p>
-            )}
-          </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

@@ -8,29 +8,15 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-# -----------------------------------------------------------------------------
 # Ensure imports like "from routes.x import router" work on Railway/Docker
-# -----------------------------------------------------------------------------
 BACKEND_DIR = Path(__file__).resolve().parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-app = FastAPI(title="PropNexus Backend", version="0.2.1")
+app = FastAPI(title="PropNexus Backend", version="0.2.0")
 log = logging.getLogger("uvicorn.error")
 
-# -----------------------------------------------------------------------------
-# CORS: localhost + vercel + previews (relaxed enough for PO2)
-# -----------------------------------------------------------------------------
-ALLOWED_ORIGINS = {
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://propnexus-platform.vercel.app",  # main prod
-}
-# Accept previews like:
-# https://propnexus-platform-git-<branch>-mohammed-abbas-projects-<hash>.vercel.app
-ALLOWED_ORIGIN_REGEX = r"^https:\/\/propnexus-platform-git-[A-Za-z0-9._-]+-mohammed-abbas-projects-[A-Za-z0-9._-]+\.vercel\.app$"
-
-# For PO2 we allow "*" (keeps preflight simple) but still log Origin for visibility.
+# CORS (relaxed for PO2; log origins for visibility)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,9 +27,7 @@ app.add_middleware(
 )
 
 
-# -----------------------------------------------------------------------------
 # Health & tiny debug
-# -----------------------------------------------------------------------------
 @app.get("/health")
 @app.head("/health")
 def health() -> JSONResponse:
@@ -60,23 +44,18 @@ def echo(origin: str | None = None):
     }
 
 
-# -----------------------------------------------------------------------------
-# Basic request timing (helps on Railway edge 5xx debugging)
-# -----------------------------------------------------------------------------
+# Basic request timing
 @app.middleware("http")
 async def timing_middleware(request: Request, call_next):
     t0 = time()
     try:
-        resp = await call_next(request)
-        return resp
+        return await call_next(request)
     finally:
         dt = (time() - t0) * 1000.0
         log.info("REQ %s %s -> %.1fms", request.method, request.url.path, dt)
 
 
-# -----------------------------------------------------------------------------
-# Mount routers (import safely + log clear reason if missing)
-# -----------------------------------------------------------------------------
+# Mount routers with safe import
 def try_mount(module: str, attr: str = "router", name: str | None = None):
     import importlib
 
@@ -103,16 +82,14 @@ try_mount("scrape")
 try_mount("stripe_routes")
 
 
-# -----------------------------------------------------------------------------
 # Uniform error handler
-# -----------------------------------------------------------------------------
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception):
     log.exception("Unhandled error: %s", exc)
     return JSONResponse(status_code=502, content={"detail": "Server error"})
 
 
-# Log binding info at startup (helps confirm Railway port)
+# Startup log (confirms Railway port)
 @app.on_event("startup")
 def _startup_log():
     log.info("[startup] PORT=%r, HOSTNAME=%s", os.getenv("PORT"), os.getenv("HOSTNAME"))
