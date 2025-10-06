@@ -23,9 +23,17 @@ origins = [
     "http://localhost:3000",
 ]
 
+app = FastAPI(title="PropNexus Backend", version="0.1.0")
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://propnexus-platform.vercel.app",
+    ],
+    allow_origin_regex=r"^https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

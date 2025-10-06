@@ -1,3 +1,4 @@
+// frontend/components/property_details/InvestmentSummary.tsx
 'use client';
 import React, { useEffect, useState } from 'react';
 import { postAiSummary } from '@/lib/api';
