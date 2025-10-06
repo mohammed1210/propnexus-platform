@@ -124,13 +124,15 @@ async def stripe_webhook(request: Request):
 
     # Handle events you care about; keep minimal and resilient by default
     if event["type"] == "checkout.session.completed":
-        # Example: upsert/activate subscription here if you want
         obj = event["data"]["object"]
-        email = (obj.get("customer_details") or {}).get("email")
-        if email:
-            try:
-                upsert_subscription(email=email, active=True)
-            except Exception:
-                pass
+    email = obj.get("customer_details", {}).get("email")
+    stripe_customer_id = obj.get("customer")
+    subscription = obj
+
+    if email and stripe_customer_id:
+        try:
+            upsert_subscription(email, stripe_customer_id, subscription)
+        except Exception as e:
+            print(f"⚠️ Failed to upsert subscription: {e}")
 
     return {"ok": True}

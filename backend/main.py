@@ -88,10 +88,10 @@ try_mount("properties")
 try_mount("save_deal")
 try_mount("notes")
 try_mount("ai")
-# Optional
-try_mount("area")
-try_mount("comps")
-try_mount("scrape")
+# Optional routes
+try_mount("area_routes")
+try_mount("comps_routes")
+try_mount("scrape_routes")
 try_mount("stripe_routes")
 
 
