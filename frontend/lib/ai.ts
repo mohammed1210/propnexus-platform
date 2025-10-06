@@ -81,7 +81,7 @@ async function requestJSON<T>(
       let detail: unknown;
       try {
         detail = await res.json();
-      } catch {/* ignore */}
+      } catch { /* ignore */ }
       const suffix = detail ? ` — ${JSON.stringify(detail)}` : ` — ${res.statusText}`;
       throw new Error(`${rest.method ?? "GET"} ${url} failed (${res.status})${suffix}`);
     }
@@ -96,11 +96,11 @@ async function requestJSON<T>(
   }
 }
 
-/** Call POST /ai/summary with a normalized payload. */
+/** Call POST /ai/generate-summary with a normalized payload. */
 export async function getAISummary(p: PropertyForAI): Promise<SummaryResponse> {
   const body = buildSummaryBody(p);
   const base = (BASE || "").replace(/\/+$/, "");
-  return requestJSON<SummaryResponse>(`${base}/ai/summary`, {
+  return requestJSON<SummaryResponse>(`${base}/ai/generate-summary`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -108,14 +108,14 @@ export async function getAISummary(p: PropertyForAI): Promise<SummaryResponse> {
   });
 }
 
-/** Call POST /ai/strategies with a normalized payload (and optional constraints). */
+/** Call POST /ai/generate-strategies with a normalized payload (and optional constraints). */
 export async function getAIStrategies(
   p: PropertyForAI,
   constraints?: Record<string, unknown>
 ): Promise<StrategiesResponse> {
   const property = buildSummaryBody(p);
   const base = (BASE || "").replace(/\/+$/, "");
-  return requestJSON<StrategiesResponse>(`${base}/ai/strategies`, {
+  return requestJSON<StrategiesResponse>(`${base}/ai/generate-strategies`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ property, constraints }),
