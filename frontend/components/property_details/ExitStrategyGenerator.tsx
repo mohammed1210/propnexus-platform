@@ -1,4 +1,3 @@
-// frontend/components/property_details/ExitStrategyGenerator.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -6,8 +5,8 @@ import { postAiStrategies } from '@/lib/api';
 import type { StrategiesRequest, StrategiesResponse, Strategy } from '@/types/ai';
 
 type Props = {
-  title: string;
-  location: string;
+  title?: string;
+  location?: string;
   price?: number;
   yield_percent?: number;
   roi_percent?: number;
@@ -25,10 +24,11 @@ export default function ExitStrategyGenerator(props: Props) {
     setLoading(true);
     setError(null);
     try {
+      // Our API expects a property object inside the request
       const payload: StrategiesRequest = {
         property: {
-          title: props.title,
-          location: props.location,
+          title: props.title ?? '',
+          location: props.location ?? '',
           price: props.price,
           yield_percent: props.yield_percent,
           roi_percent: props.roi_percent,
@@ -37,6 +37,7 @@ export default function ExitStrategyGenerator(props: Props) {
           description: props.description,
         },
       };
+
       const res: StrategiesResponse = await postAiStrategies(payload);
       setStrategies(res?.strategies ?? []);
     } catch (e: any) {
@@ -51,54 +52,20 @@ export default function ExitStrategyGenerator(props: Props) {
       <button
         onClick={handleGenerate}
         disabled={loading}
-        className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
+        className="btn btn-outline"
       >
         {loading ? 'Generating…' : 'Generate exit strategies'}
       </button>
 
-      {error && (
-        <p role="alert" className="text-red-600 text-sm">
-          Error: {error}
-        </p>
+      {error ? <p className="text-red-600 text-sm">{error}</p> : null}
+
+      {Array.isArray(strategies) && strategies.length > 0 && (
+        <ul className="list-disc pl-5 space-y-1">
+          {strategies.map((s, i) => (
+            <li key={i}>{typeof s === 'string' ? s : s.text}</li>
+          ))}
+        </ul>
       )}
-
-      {strategies?.slice(0, 4).map((s, i) => (
-        <article key={i} aria-label={`strategy-${i + 1}`} className="rounded-lg border p-4">
-          <h4 className="font-semibold">{s.title}</h4>
-          {s.rationale && <p className="mt-1 text-sm text-neutral-700">{s.rationale}</p>}
-
-          {Array.isArray(s.steps) && s.steps.length > 0 && (
-            <ol className="mt-2 list-decimal pl-5 text-sm space-y-1">
-              {s.steps.map((st: string, idx: number) => (
-                <li key={idx}>{st}</li>
-              ))}
-            </ol>
-          )}
-
-          {s.risk && (
-            <p className="mt-2 text-sm">
-              <strong>Risk:</strong> {s.risk}
-            </p>
-          )}
-
-          <div className="mt-3">
-            <button
-              className="rounded-md border px-2 py-1 text-xs hover:bg-neutral-50"
-              onClick={() => {
-                const text =
-                  `${s.title}\n\n${s.rationale ?? ''}\n\n` +
-                  (s.steps?.length
-                    ? `Steps:\n${s.steps.map((x, n) => `${n + 1}. ${x}`).join('\n')}\n\n`
-                    : '') +
-                  `Risk: ${s.risk ?? ''}`;
-                if (navigator?.clipboard) navigator.clipboard.writeText(text);
-              }}
-            >
-              Copy
-            </button>
-          </div>
-        </article>
-      ))}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
+
 import React, { useEffect, useState } from 'react';
-import { apiPost } from '@/lib/api';
+import { postAiSummary } from '@/lib/api';
 import type { SummaryRequest, SummaryResponse } from '@/types/ai';
 
 type Props = {
@@ -21,16 +22,6 @@ type Props = {
 const numOrUndef = (v: unknown): number | undefined =>
   v === null || v === undefined || v === '' ? undefined : Number(v as number);
 
-/** Calls backend AI endpoint; adapts to either `{summary}` or `{summary, bullets}` responses */
-async function postAiSummary(payload: SummaryRequest): Promise<SummaryResponse> {
-  // Backend route expects `{ property: <flattened fields> }` at /ai/generate-summary
-  const res = await apiPost('/ai/generate-summary', { property: payload });
-  return {
-    summary: typeof res?.summary === 'string' ? res.summary : '',
-    bullets: Array.isArray(res?.bullets) ? res.bullets : [],
-  };
-}
-
 export default function InvestmentSummary({ property }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +36,7 @@ export default function InvestmentSummary({ property }: Props) {
 
     let cancelled = false;
 
-    async function run() {
+    (async () => {
       setLoading(true);
       setError(null);
       try {
@@ -69,9 +60,8 @@ export default function InvestmentSummary({ property }: Props) {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }
+    })();
 
-    run();
     return () => {
       cancelled = true;
     };
