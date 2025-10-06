@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { postAiSummary } from '@/lib/api';
+import { apiPost } from '@/lib/api';
 import type { SummaryRequest, SummaryResponse } from '@/types/ai';
 
 type Props = {
@@ -20,6 +20,16 @@ type Props = {
 
 const numOrUndef = (v: unknown): number | undefined =>
   v === null || v === undefined || v === '' ? undefined : Number(v as number);
+
+/** Calls backend AI endpoint; adapts to either `{summary}` or `{summary, bullets}` responses */
+async function postAiSummary(payload: SummaryRequest): Promise<SummaryResponse> {
+  // Backend route expects `{ property: <flattened fields> }` at /ai/generate-summary
+  const res = await apiPost('/ai/generate-summary', { property: payload });
+  return {
+    summary: typeof res?.summary === 'string' ? res.summary : '',
+    bullets: Array.isArray(res?.bullets) ? res.bullets : [],
+  };
+}
 
 export default function InvestmentSummary({ property }: Props) {
   const [loading, setLoading] = useState(true);
