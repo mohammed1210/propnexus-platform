@@ -1,68 +1,90 @@
-// frontend/lib/api.ts
+// /lib/api.ts
 /**
- * Central API client used by Listings, Property pages, Off-Market, and AI helpers.
- * - Reads NEXT_PUBLIC_API_BASE (set in .env.production.local for Vercel).
- * - Falls back to legacy env names to remain compatible.
- * - Exposes getJson/postJson, plus AI helpers.
- * - Keeps a backwards-compat export `apiPost` used in older pages.
+ * Centralized API helpers for PropNexus frontend.
+ * Handles GPT endpoints (summary + strategies) and any REST calls to backend.
  */
 
-const envBase =
-  (process.env.NEXT_PUBLIC_API_BASE ||
-    process.env.NEXT_PUBLIC_BACKEND_URL ||
-    process.env.NEXT_PUBLIC_API_URL ||
-    "").replace(/\/+$/, "");
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE ||
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "";
 
-export const BASE: string = envBase || "http://127.0.0.1:8000";
+// --------------- Utilities ---------------
 
-type Json = Record<string, unknown> | unknown[];
-
-/** Low-level fetch with sane defaults */
-async function request<T>(
-  path: string,
-  init: RequestInit = {}
-): Promise<T> {
-  const url = `${BASE}${path.startsWith("/") ? path : `/${path}`}`;
-  const headers = new Headers(init.headers || {});
-  if (!headers.has("content-type")) headers.set("content-type", "application/json");
-
-  const res = await fetch(url, { ...init, headers, credentials: "omit" });
-  const ct = res.headers.get("content-type") || "";
-  const body = ct.includes("application/json") ? await res.json() : await res.text();
-
-  if (!res.ok) {
-    const err = (body as any)?.detail || (body as any)?.error || body;
-    throw new Error(typeof err === "string" ? err : JSON.stringify(err));
+async function safeFetch(path: string, options?: RequestInit) {
+  const url = `${API_BASE.replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+  try {
+    const res = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+      ...options,
+    });
+    if (!res.ok) {
+      console.error(`[API] ${res.status} ${res.statusText} for ${url}`);
+      throw new Error(`Request failed (${res.status})`);
+    }
+    return await res.json();
+  } catch (err) {
+    console.error("[API fetch error]", err);
+    throw err;
   }
-  return body as T;
 }
 
-export const getJson = <T>(path: string, init?: RequestInit) =>
-  request<T>(path, { ...init, method: "GET" });
+// --------------- AI Summary ---------------
 
-export const postJson = <T>(path: string, data?: Json, init?: RequestInit) =>
-  request<T>(path, {
-    ...init,
-    method: "POST",
-    body: data != null ? JSON.stringify(data) : undefined,
-  });
-
-/** ---------------- AI helpers ---------------- */
-import type {
-  SummaryRequest,
-  SummaryResponse,
-  StrategiesRequest,
-  StrategiesResponse,
-} from "@/types/ai";
-
-export function postAiSummary(payload: SummaryRequest) {
-  return postJson<SummaryResponse>("/ai/summary", payload);
+/**
+ * Generates a short investment summary and key bullet points.
+ * Accepts a flat property object (title, price, ROI, yield, etc.)
+ * or old shape { property: {...} }.
+ */
+export async function postAiSummary(property: Record<string, any>) {
+  try {
+    const body = JSON.stringify(property?.title ? property : { property });
+    const data = await safeFetch("/ai/summary", {
+      method: "POST",
+      body,
+    });
+    return data;
+  } catch (err) {
+    console.error("AI Summary error:", err);
+    return {
+      summary: "Unable to generate summary.",
+      bullets: [],
+    };
+  }
 }
 
-export function postAiStrategies(payload: StrategiesRequest) {
-  return postJson<StrategiesResponse>("/ai/strategies", payload);
+// --------------- AI Exit Strategies ---------------
+
+/**
+ * Generates exit strategies for a given property deal.
+ */
+export async function postAiStrategies(payload: Record<string, any>) {
+  try {
+    const body = JSON.stringify(payload);
+    const data = await safeFetch("/ai/generate-strategies", {
+      method: "POST",
+      body,
+    });
+    return data;
+  } catch (err) {
+    console.error("AI Strategies error:", err);
+    return { strategies: ["Unable to generate strategies."] };
+  }
 }
 
-/** ------------- Back-compat for old imports ------------- */
-/** Some older pages do: `import { apiPost } from '@/lib/api'` */
-export const apiPost = postJson;
+// --------------- Other Helpers ---------------
+
+export async function getProperties() {
+  return safeFetch("/properties");
+}
+
+export async function getPropertyById(id: string) {
+  return safeFetch(`/properties/${id}`);
+}
+
+export async function triggerScraper(source: "rightmove" | "zoopla") {
+  return safeFetch(`/scrape-${source}`, { method: "POST" });
+}
