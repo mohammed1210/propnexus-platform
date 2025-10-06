@@ -24,7 +24,7 @@ export default function ExitStrategyGenerator(props: Props) {
     setLoading(true);
     setError(null);
     try {
-      // Backend expects a flat object (not nested under "property")
+      // Matches flat StrategiesRequest in '@/types/ai'
       const payload: StrategiesRequest = {
         title: props.title ?? '',
         location: props.location ?? '',
@@ -39,7 +39,7 @@ export default function ExitStrategyGenerator(props: Props) {
       const res: StrategiesResponse = await postAiStrategies(payload);
       setStrategies(res?.strategies ?? []);
     } catch (e: any) {
-      console.error('❌ Exit strategy generation failed:', e);
+      console.error('✖ Exit strategy generation failed:', e);
       setError(e?.message ?? 'Failed to generate strategies');
     } finally {
       setLoading(false);
@@ -48,15 +48,11 @@ export default function ExitStrategyGenerator(props: Props) {
 
   return (
     <div className="space-y-4">
-      <button
-        onClick={handleGenerate}
-        disabled={loading}
-        className="btn btn-outline"
-      >
+      <button onClick={handleGenerate} disabled={loading} className="btn btn-outline">
         {loading ? 'Generating…' : 'Generate exit strategies'}
       </button>
 
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error ? <p className="text-red-600 text-sm">{error}</p> : null}
 
       {Array.isArray(strategies) && strategies.length > 0 && (
         <ul className="list-disc pl-5 space-y-1">

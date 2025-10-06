@@ -27,12 +27,14 @@ export default function InvestmentSummary({ property }: Props) {
   const [data, setData] = useState<SummaryResponse | null>(null);
 
   useEffect(() => {
+    // Require at least a title OR location, otherwise bail
     if (!property?.title && !property?.location) {
       setLoading(false);
       return;
     }
 
     let cancelled = false;
+
     (async () => {
       setLoading(true);
       setError(null);
@@ -50,7 +52,7 @@ export default function InvestmentSummary({ property }: Props) {
           description: property.description ?? undefined,
         };
 
-        const res = await postAiSummary(payload);   // ← typed Promise<SummaryResponse>
+        const res: SummaryResponse = await postAiSummary(payload);
         if (!cancelled) setData(res);
       } catch (e: any) {
         if (!cancelled) setError(e?.message ?? 'Failed to load summary');
@@ -59,7 +61,9 @@ export default function InvestmentSummary({ property }: Props) {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [
     property?.title,
     property?.location,
