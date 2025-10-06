@@ -1,20 +1,35 @@
-"use client";
-import Image, { ImageProps } from "next/image";
-import { useState } from "react";
+'use client';
 
-export default function ImageWithFallback(props: ImageProps) {
-  const [err, setErr] = useState(false);
+import Image from 'next/image';
+import { useState } from 'react';
 
-  if (err) {
-    return (
-      <div
-        className="w-full h-full grid place-items-center bg-zinc-100 dark:bg-zinc-800 text-zinc-400 text-xs rounded-lg"
-        aria-label="No image available"
-      >
-        No image
-      </div>
-    );
-  }
+type Props = {
+  src: string;
+  alt?: string;
+  fallbackSrc?: string;
+  width?: number;
+  height?: number;
+  className?: string;
+};
 
-  return <Image {...props} onError={() => setErr(true)} />;
+export default function ImageWithFallback({
+  src,
+  alt = '',
+  fallbackSrc = '/placeholder.png',
+  width = 600,
+  height = 400,
+  className,
+}: Props) {
+  const [error, setError] = useState(false);
+
+  return (
+    <Image
+      src={error ? fallbackSrc : src}
+      alt={alt}
+      width={width}
+      height={height}
+      className={className}
+      onError={() => setError(true)}
+    />
+  );
 }
