@@ -1,5 +1,2 @@
-# Web API process (what Railway should run)
-web: uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
-
-# Optional worker. Comment out or keep if you run a second worker service.
-# worker: bash -lc './scripts/cron-ingest.sh'
+# Procfile
+web: bash -lc 'cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'
