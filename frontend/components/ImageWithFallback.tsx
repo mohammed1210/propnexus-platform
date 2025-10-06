@@ -1,35 +1,8 @@
-'use client';
+import Image, { ImageProps } from 'next/image';
 
-import Image from 'next/image';
-import { useState } from 'react';
+type Props = Omit<ImageProps, 'alt'> & { alt: string };
 
-type Props = {
-  src: string;
-  alt?: string;
-  fallbackSrc?: string;
-  width?: number;
-  height?: number;
-  className?: string;
-};
-
-export default function ImageWithFallback({
-  src,
-  alt = '',
-  fallbackSrc = '/placeholder.png',
-  width = 600,
-  height = 400,
-  className,
-}: Props) {
-  const [error, setError] = useState(false);
-
-  return (
-    <Image
-      src={error ? fallbackSrc : src}
-      alt={alt}
-      width={width}
-      height={height}
-      className={className}
-      onError={() => setError(true)}
-    />
-  );
+export default function ImageWithFallback({ alt, ...rest }: Props) {
+  // In v2 we could add onError fallback logic; for PO2 we just enforce alt text.
+  return <Image alt={alt} {...rest} />;
 }
