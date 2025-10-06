@@ -1,4 +1,3 @@
-// frontend/lib/ai.ts
 import { BASE } from "./api";
 
 /**
@@ -26,15 +25,16 @@ type StrategiesResponse = { strategies: any[] };
 /** Coerce possibly-formatted number input to a finite number, or return undefined. */
 function coerceNumber(n: unknown): number | undefined {
   if (n === null || n === undefined || n === "") return undefined;
-  const out =
-    typeof n === "string" ? Number(n.replace(/[^\d.-]/g, "")) : Number(n);
-  return Number.isFinite(out) ? out : undefined;
+  if (typeof n === "number") return Number.isFinite(n) ? n : undefined;
+  if (typeof n === "string") {
+    const cleaned = n.replace(/[,_£\s]/g, "");
+    const out = Number(cleaned);
+    return Number.isFinite(out) ? out : undefined;
+  }
+  return undefined;
 }
 
-/**
- * Build the body expected by POST /ai/summary.
- * Ensures required `title` exists and avoids sending misleading zeros.
- */
+/** Normalize title/location and numeric fields for the AI endpoints. */
 function buildSummaryBody(p: PropertyForAI) {
   const title =
     (p.title && p.title.trim()) ||
@@ -43,7 +43,7 @@ function buildSummaryBody(p: PropertyForAI) {
 
   return {
     title,
-    location: (p.location ?? p.address ?? "").toString(),
+    location: String(p.location ?? p.address ?? ""),
     price: coerceNumber(p.price),
     bedrooms: coerceNumber(p.bedrooms),
     bathrooms: coerceNumber(p.bathrooms),
@@ -56,34 +56,55 @@ function buildSummaryBody(p: PropertyForAI) {
 }
 
 /** Fetch wrapper that throws a helpful error message with backend details. */
-async function requestJSON<T>(url: string, init: RequestInit): Promise<T> {
-  if (!BASE) {
+async function requestJSON<T>(
+  url: string,
+  init: RequestInit & { timeoutMs?: number } = {}
+): Promise<T> {
+  const base = (BASE || "").replace(/\/+$/, "");
+  if (!base) {
     throw new Error(
       "[ai] BASE URL is empty. Set NEXT_PUBLIC_API_BASE (or legacy NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL)."
     );
   }
 
-  const res = await fetch(url, init);
-  if (!res.ok) {
-    let detail: unknown;
-    try {
-      detail = await res.json();
-    } catch {
-      /* ignore JSON parse errors */
+  const { timeoutMs, ...rest } = init;
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : undefined;
+  const id = timeoutMs && controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+
+  try {
+    const res = await fetch(url, {
+      ...rest,
+      signal: controller?.signal,
+    });
+
+    if (!res.ok) {
+      let detail: unknown;
+      try {
+        detail = await res.json();
+      } catch {/* ignore */}
+      const suffix = detail ? ` — ${JSON.stringify(detail)}` : ` — ${res.statusText}`;
+      throw new Error(`${rest.method ?? "GET"} ${url} failed (${res.status})${suffix}`);
     }
-    const suffix = detail ? ` — ${JSON.stringify(detail)}` : ` — ${res.statusText}`;
-    throw new Error(`${init.method ?? "GET"} ${url} failed (${res.status})${suffix}`);
+    return (await res.json()) as T;
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      throw new Error(`Request timed out: ${rest.method ?? "GET"} ${url}`);
+    }
+    throw err;
+  } finally {
+    if (id) clearTimeout(id);
   }
-  return res.json() as Promise<T>;
 }
 
 /** Call POST /ai/summary with a normalized payload. */
 export async function getAISummary(p: PropertyForAI): Promise<SummaryResponse> {
   const body = buildSummaryBody(p);
-  return requestJSON<SummaryResponse>(`${BASE}/ai/summary`, {
+  const base = (BASE || "").replace(/\/+$/, "");
+  return requestJSON<SummaryResponse>(`${base}/ai/summary`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
+    timeoutMs: 15_000,
   });
 }
 
@@ -93,9 +114,11 @@ export async function getAIStrategies(
   constraints?: Record<string, unknown>
 ): Promise<StrategiesResponse> {
   const property = buildSummaryBody(p);
-  return requestJSON<StrategiesResponse>(`${BASE}/ai/strategies`, {
+  const base = (BASE || "").replace(/\/+$/, "");
+  return requestJSON<StrategiesResponse>(`${base}/ai/strategies`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ property, constraints }),
+    timeoutMs: 25_000,
   });
 }
