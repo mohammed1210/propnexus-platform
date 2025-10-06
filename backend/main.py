@@ -16,14 +16,19 @@ if str(BACKEND_DIR) not in sys.path:
 app = FastAPI(title="PropNexus Backend", version="0.2.0")
 log = logging.getLogger("uvicorn.error")
 
-# CORS (relaxed for PO2; log origins for visibility)
+origins = [
+    "https://propnexus-platform-git-po2-mohammed-abbas-projects-8ab7e126.vercel.app",
+    "https://propnexus-platform*",
+    "https://github.com/mohammed1210/propnexus-platform",
+    "http://localhost:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    max_age=600,
 )
 
 
