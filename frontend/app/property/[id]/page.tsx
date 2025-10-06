@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 
 import Section from '@/components/ui/Section';
@@ -14,44 +14,74 @@ import NotesFields from '@/components/property_details/NotesFields';
 import AIChatbot from '@/components/property_details/AIChatbot';
 
 import type { Property } from '@/types';
+import { getSupabase } from '@/lib/supabaseClient';
 
-const API_BASE =
-  (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ??
-  (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ??
-  '';
+type LooseProperty = Partial<Property> & {
+  latitude?: number | null;
+  longitude?: number | null;
+  imageurl?: string | null; // some rows use this
+};
+
+const toNum = (v: unknown) =>
+  typeof v === 'number' ? v : v == null || v === '' ? undefined : Number(v);
 
 export default function PropertyDetailsPage() {
   const { id } = useParams() as { id: string };
-  const [property, setProperty] = useState<Partial<Property> | null>(null);
+  const sb = useMemo(() => getSupabase(), []);
+  const [property, setProperty] = useState<LooseProperty | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     if (!id) return;
 
-    setLoading(true);
-    setError(null);
-
     (async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const base = API_BASE.replace(/\/+$/, '');
-        const res = await fetch(`${base}/properties/${id}`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`Failed to fetch property (${res.status})`);
-        const data = await res.json();
-        setProperty(data ?? null);
+        // Read EXACTLY the same source as the listings page
+        const { data, error } = await sb
+          .from('properties')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+
+        // Normalize a few fields the UI expects
+        const p: LooseProperty | null = data
+          ? {
+              ...data,
+              // make sure these are numbers or undefined
+              price: toNum((data as any).price),
+              bedrooms: toNum((data as any).bedrooms),
+              bathrooms: toNum((data as any).bathrooms),
+              yield_percent: toNum((data as any).yield_percent),
+              roi_percent: toNum((data as any).roi_percent),
+              latitude: toNum((data as any).latitude) ?? null,
+              longitude: toNum((data as any).longitude) ?? null,
+            }
+          : null;
+
+        if (!cancelled) setProperty(p);
       } catch (e: any) {
         console.error(e);
-        setError(e?.message ?? 'Failed to load property.');
+        if (!cancelled) setError(e?.message ?? 'Failed to load property.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, [id]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, sb]);
 
   if (loading) {
     return (
       <Section>
-        <p>Loading property details...</p>
+        <p>Loading property details…</p>
       </Section>
     );
   }
@@ -70,7 +100,7 @@ export default function PropertyDetailsPage() {
     );
   }
 
-  const price = typeof property.price === 'number' ? property.price : undefined;
+  const price = typeof property.price === 'number' ? property.price : 0;
 
   return (
     <Section>
@@ -106,20 +136,20 @@ export default function PropertyDetailsPage() {
             <ExitStrategyGenerator
               title={String(property.title ?? '')}
               location={String(property.location ?? '')}
-              price={price}
+              price={typeof property.price === 'number' ? property.price : undefined}
               yield_percent={
                 typeof property.yield_percent === 'number' ? property.yield_percent : undefined
               }
               roi_percent={
                 typeof property.roi_percent === 'number' ? property.roi_percent : undefined
               }
-              propertyType={property.propertyType ?? undefined}
-              investmentType={property.investmentType ?? undefined}
-              description={property.description ?? undefined}
+              propertyType={(property as any).propertyType ?? undefined}
+              investmentType={(property as any).investmentType ?? undefined}
+              description={(property as any).description ?? undefined}
             />
           </div>
 
-          {/* Notes */}
+          {/* Notes (render sign-in nudge when signed out inside the component) */}
           <div className="border p-4 rounded-md">
             <h2 className="font-semibold text-lg mb-2">Investor Notes</h2>
             {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
@@ -131,19 +161,19 @@ export default function PropertyDetailsPage() {
           {/* Mortgage calculator */}
           <div className="border p-4 rounded-md">
             <h2 className="font-semibold text-lg mb-2">Mortgage & BRRR Calculator</h2>
-            <MortgageCalculator price={price ?? 0} />
+            <MortgageCalculator price={price} />
           </div>
 
           {/* Stamp Duty */}
           <div className="border p-4 rounded-md">
             <h2 className="font-semibold text-lg mb-2">Stamp Duty Calculator</h2>
-            <StampDutyCalculator price={price ?? 0} />
+            <StampDutyCalculator price={price} />
           </div>
 
           {/* Location */}
-          {typeof property.latitude === 'number' && typeof property.longitude === 'number' ? (
-            <div className="border p-4 rounded-md">
-              <h2 className="font-semibold text-lg mb-2">Location</h2>
+          <div className="border p-4 rounded-md">
+            <h2 className="font-semibold text-lg mb-2">Location</h2>
+            {typeof property.latitude === 'number' && typeof property.longitude === 'number' ? (
               <iframe
                 title="Map"
                 width="100%"
@@ -152,8 +182,10 @@ export default function PropertyDetailsPage() {
                 style={{ border: 0 }}
                 src={`https://www.google.com/maps?q=${property.latitude},${property.longitude}&z=14&output=embed`}
               />
-            </div>
-          ) : null}
+            ) : (
+              <p>Map unavailable — no coordinates provided.</p>
+            )}
+          </div>
         </div>
       </div>
 

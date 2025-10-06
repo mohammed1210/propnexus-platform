@@ -27,12 +27,6 @@ export default function InvestmentSummary({ property }: Props) {
   const [data, setData] = useState<SummaryResponse | null>(null);
 
   useEffect(() => {
-    // Require at least a title OR location, otherwise bail
-    if (!property?.title && !property?.location) {
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
 
     (async () => {
@@ -52,7 +46,7 @@ export default function InvestmentSummary({ property }: Props) {
           description: property.description ?? undefined,
         };
 
-        const res: SummaryResponse = await postAiSummary(payload);
+        const res = await postAiSummary(payload);
         if (!cancelled) setData(res);
       } catch (e: any) {
         if (!cancelled) setError(e?.message ?? 'Failed to load summary');
@@ -77,12 +71,9 @@ export default function InvestmentSummary({ property }: Props) {
     property?.description,
   ]);
 
-  if (!property?.title && !property?.location) {
-    return <p data-testid="investment-summary-loading">Loading property details…</p>;
-  }
   if (loading) return <p data-testid="investment-summary-loading">Loading summary…</p>;
   if (error) return <p role="alert" className="text-red-600">Error: {error}</p>;
-  if (!data) return null;
+  if (!data) return <p className="text-sm opacity-70">No summary available.</p>;
 
   return (
     <div data-testid="investment-summary-text" className="space-y-2">
