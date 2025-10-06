@@ -1,48 +1,28 @@
 // frontend/lib/api.ts
-/* Centralised API helpers + AI wrappers */
+type JSONValue = any;
 
-import type {
-  SummaryRequest,
-  SummaryResponse,
-  StrategiesRequest,
-  StrategiesResponse,
-} from '@/types/ai';
-
-const API_BASE =
+export const BASE =
   (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ??
   (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ??
-  '';
+  "";
 
-const base = API_BASE.replace(/\/+$/, '');
-
-const toUrl = (path: string) =>
-  path.startsWith('http') ? path : `${base}${path}`;
-
-/** GET helper with typing */
-export async function apiGet<T = unknown>(path: string): Promise<T> {
-  const r = await fetch(toUrl(path), { cache: 'no-store' });
-  if (!r.ok) throw new Error(`API error ${r.status}`);
-  return (await r.json()) as T;
-}
-
-/** POST helper with typing */
-export async function apiPost<T = unknown>(
-  path: string,
-  body?: unknown
-): Promise<T> {
-  const r = await fetch(toUrl(path), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+/** Generic POST */
+export async function apiPost<T>(path: string, body: JSONValue): Promise<T> {
+  const url = `${BASE.replace(/\/+$/, "")}${path.startsWith("/") ? "" : "/"}${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(`API error ${r.status}`);
-  return (await r.json()) as T;
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json() as Promise<T>;
 }
 
-/* ---------- AI wrappers (typed) ---------- */
+/** --- AI endpoints (typed) --- **/
+export async function postAiSummary(payload: any) {
+  return apiPost("/generate-summary", payload);
+}
 
-export const postAiSummary = (payload: SummaryRequest) =>
-  apiPost<SummaryResponse>('/ai/generate-summary', payload);
-
-export const postAiStrategies = (payload: StrategiesRequest) =>
-  apiPost<StrategiesResponse>('/ai/generate-strategies', payload);
+export async function postAiStrategies(payload: any) {
+  return apiPost("/generate-strategies", payload);
+}

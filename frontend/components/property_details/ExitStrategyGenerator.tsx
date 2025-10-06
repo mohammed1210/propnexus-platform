@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { postAiStrategies } from '@/lib/api';
-import type { StrategiesRequest, StrategiesResponse, Strategy } from '@/types/ai';
+import type { StrategiesRequest, StrategiesResponse } from '@/types/ai';
 
 type Props = {
   title?: string;
@@ -18,29 +18,28 @@ type Props = {
 export default function ExitStrategyGenerator(props: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [strategies, setStrategies] = useState<Strategy[] | null>(null);
+  const [strategies, setStrategies] = useState<string[] | null>(null);
 
   async function handleGenerate() {
     setLoading(true);
     setError(null);
     try {
-      // Our API expects a property object inside the request
+      // Backend expects a flat object (not nested under "property")
       const payload: StrategiesRequest = {
-        property: {
-          title: props.title ?? '',
-          location: props.location ?? '',
-          price: props.price,
-          yield_percent: props.yield_percent,
-          roi_percent: props.roi_percent,
-          propertyType: props.propertyType,
-          investmentType: props.investmentType,
-          description: props.description,
-        },
+        title: props.title ?? '',
+        location: props.location ?? '',
+        price: props.price,
+        yield_percent: props.yield_percent,
+        roi_percent: props.roi_percent,
+        propertyType: props.propertyType,
+        investmentType: props.investmentType,
+        description: props.description,
       };
 
       const res: StrategiesResponse = await postAiStrategies(payload);
       setStrategies(res?.strategies ?? []);
     } catch (e: any) {
+      console.error('❌ Exit strategy generation failed:', e);
       setError(e?.message ?? 'Failed to generate strategies');
     } finally {
       setLoading(false);
@@ -57,12 +56,12 @@ export default function ExitStrategyGenerator(props: Props) {
         {loading ? 'Generating…' : 'Generate exit strategies'}
       </button>
 
-      {error ? <p className="text-red-600 text-sm">{error}</p> : null}
+      {error && <p className="text-red-600 text-sm">{error}</p>}
 
       {Array.isArray(strategies) && strategies.length > 0 && (
         <ul className="list-disc pl-5 space-y-1">
           {strategies.map((s, i) => (
-            <li key={i}>{typeof s === 'string' ? s : s.text}</li>
+            <li key={i}>{s}</li>
           ))}
         </ul>
       )}
