@@ -1,32 +1,27 @@
-# backend/main.py
-from __future__ import annotations
-
+import logging
 import os
+import sys
+from pathlib import Path
+from time import time
 
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from supabase import Client, create_client
+# Ensure imports like "from routes.x import router" work on Railway/Docker
+BACKEND_DIR = Path(__file__).resolve().parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
-# Load env early
-load_dotenv()
+app = FastAPI(title="PropNexus Backend", version="0.2.0")
+log = logging.getLogger("uvicorn.error")
 
-# Routers (relative imports; keep at top for linter)
-from .routes import area_routes, comps_routes, gpt_routes, scrape_routes  # noqa: E402
-from .routes.ai import router as ai_router  # noqa: E402
-from .routes.notes import router as notes_router  # noqa: E402
-from .routes.off_market_routes import router as off_market_router  # noqa: E402
-from .routes.save_deal import router as save_deal_router  # noqa: E402
-from .routes.stripe_routes import router as stripe_router  # noqa: E402
-
-# Supabase client (prefer service role on server)
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-
-supabase: Client | None = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+origins = [
+    "https://propnexus-platform-git-po2-mohammed-abbas-projects-8ab7e126.vercel.app",
+    "https://propnexus-platform*",
+    "https://github.com/mohammed1210/propnexus-platform",
+    "http://localhost:3000",
+]
 
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
@@ -45,42 +40,69 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-async def root():
-    return {"message": "PropNexus backend is running."}
-
-
+# Health & tiny debug
 @app.get("/health")
-@app.get("/api/health")
-async def health():
-    return {"ok": True}
+@app.head("/health")
+def health() -> JSONResponse:
+    """Always return JSON so tests never fail decoding."""
+    return JSONResponse({"ok": True})
 
 
-# Routers
-app.include_router(save_deal_router)
-app.include_router(notes_router)
-app.include_router(gpt_routes.router)
-app.include_router(ai_router)  # <- PO2 additive include
-app.include_router(area_routes.router)
-app.include_router(comps_routes.router)
-app.include_router(scrape_routes.router)
-app.include_router(off_market_router)
-app.include_router(stripe_router)
+@app.get("/_debug/echo")
+def echo(origin: str | None = None):
+    return {
+        "ok": True,
+        "origin_param": origin,
+        "env": {"PORT": os.getenv("PORT"), "HOSTNAME": os.getenv("HOSTNAME")},
+    }
 
 
-# Supabase-backed property endpoints (unchanged)
-@app.get("/properties")
-async def get_properties():
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    return supabase.table("properties").select("*").execute().data
+# Basic request timing
+@app.middleware("http")
+async def timing_middleware(request: Request, call_next):
+    t0 = time()
+    try:
+        return await call_next(request)
+    finally:
+        dt = (time() - t0) * 1000.0
+        log.info("REQ %s %s -> %.1fms", request.method, request.url.path, dt)
 
 
-@app.get("/properties/{property_id}")
-async def get_property_by_id(property_id: str):
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    res = supabase.table("properties").select("*").eq("id", property_id).execute()
-    if not res.data:
-        raise HTTPException(status_code=404, detail="Property not found")
-    return res.data[0]
+# Mount routers with safe import
+def try_mount(module: str, attr: str = "router", name: str | None = None):
+    import importlib
+
+    disp = name or module
+    try:
+        mod = importlib.import_module(f"routes.{module}")
+        router = getattr(mod, attr)
+        app.include_router(router)
+        log.info("Router mounted: %s", disp)
+    except Exception as exc:
+        log.warning("Router NOT mounted (%s): %s", f"routes.{module}", exc)
+
+
+# Core routes
+try_mount("off_market_routes")
+try_mount("properties")
+try_mount("save_deal")
+try_mount("notes")
+try_mount("ai")
+# Optional routes
+try_mount("area_routes")
+try_mount("comps_routes")
+try_mount("scrape_routes")
+try_mount("stripe_routes")
+
+
+# Uniform error handler
+@app.exception_handler(Exception)
+async def unhandled(request: Request, exc: Exception):
+    log.exception("Unhandled error: %s", exc)
+    return JSONResponse(status_code=502, content={"detail": "Server error"})
+
+
+# Startup log (confirms Railway port)
+@app.on_event("startup")
+def _startup_log():
+    log.info("[startup] PORT=%r, HOSTNAME=%s", os.getenv("PORT"), os.getenv("HOSTNAME"))

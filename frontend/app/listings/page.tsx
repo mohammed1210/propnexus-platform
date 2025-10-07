@@ -1,13 +1,14 @@
+// frontend/app/listings/page.tsx
 "use client";
 export const dynamic = "force-dynamic";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import nextDynamic from "next/dynamic";
 import type { Map as LeafletMap, LatLngBoundsExpression } from "leaflet";
 import { FiSearch } from "react-icons/fi";
-import { LuPoundSterling } from "react-icons/lu";
-import { LuBedDouble } from "react-icons/lu";
+import { LuPoundSterling, LuBedDouble } from "react-icons/lu";
 
 import Section from "@/components/ui/Section";
 import SectionTitle from "@/components/ui/SectionTitle";
@@ -16,19 +17,19 @@ import { getSupabase } from "@/lib/supabaseClient";
 
 const MapContainer = nextDynamic(
   () => import("react-leaflet").then((m) => m.MapContainer),
-  { ssr: false }
+  { ssr: false },
 );
 const TileLayer = nextDynamic(
   () => import("react-leaflet").then((m) => m.TileLayer),
-  { ssr: false }
+  { ssr: false },
 );
 const Marker = nextDynamic(
   () => import("react-leaflet").then((m) => m.Marker),
-  { ssr: false }
+  { ssr: false },
 );
 const Popup = nextDynamic(
   () => import("react-leaflet").then((m) => m.Popup),
-  { ssr: false }
+  { ssr: false },
 );
 
 type RawProperty = {
@@ -43,6 +44,7 @@ type RawProperty = {
   imageurl?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  created_at?: string | null;
 };
 
 export default function ListingsPage() {
@@ -53,6 +55,7 @@ export default function ListingsPage() {
   );
 }
 
+/* ---------------- Map ---------------- */
 function ClientMap({
   points,
   defaultCenter,
@@ -94,11 +97,14 @@ function ClientMap({
         <Marker key={p.id} position={{ lat: p.lat, lng: p.lng }}>
           <Popup>
             <div className="text-sm font-medium">{p.title}</div>
-            {p.price ? (
-              <div className="text-xs opacity-70">
-                £{p.price.toLocaleString()}
-              </div>
-            ) : null}
+            {typeof p.price === "number" && (
+              <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
+            )}
+            <div className="mt-1">
+              <Link href={`/property/${p.id}`} className="underline text-xs">
+                View details
+              </Link>
+            </div>
           </Popup>
         </Marker>
       ))}
@@ -106,15 +112,15 @@ function ClientMap({
   );
 }
 
-/* ----------------------- Filters Bar ----------------------- */
+/* ---------------- Filters ---------------- */
 function FiltersBar() {
   const sp = useSearchParams();
   const router = useRouter();
 
-  const qInit = sp ? sp.get("q") ?? "" : "";
-  const minInit = sp ? sp.get("min") ?? "" : "";
-  const maxInit = sp ? sp.get("max") ?? "" : "";
-  const bedsInit = sp ? sp.get("beds") ?? "" : "";
+  const qInit = sp?.get("q") ?? "";
+  const minInit = sp?.get("min") ?? "";
+  const maxInit = sp?.get("max") ?? "";
+  const bedsInit = sp?.get("beds") ?? "";
 
   const [q, setQ] = useState(qInit);
   const [min, setMin] = useState(minInit);
@@ -196,7 +202,7 @@ function FiltersBar() {
   );
 }
 
-/* ----------------------- Listings (data) ----------------------- */
+/* ---------------- Data + Layout ---------------- */
 function ListingsInner() {
   const searchParams = useSearchParams();
 
@@ -214,21 +220,30 @@ function ListingsInner() {
       setLoading(true);
       const supabase = getSupabase();
 
-      let query = supabase.from("properties").select("*").limit(200);
+      // Fetch only the fields we actually use; keep ordering stable
+      let query = supabase
+        .from("properties")
+        .select(
+          "id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at",
+        )
+        .limit(200)
+        .order("created_at", { ascending: false });
 
-      if (q)
-        query = query.or(`title.ilike.%${q}%,location.ilike.%${q}%`);
+      if (q) query = query.or(`title.ilike.%${q}%,location.ilike.%${q}%`);
       if (minP) query = query.gte("price", minP);
       if (maxP) query = query.lte("price", maxP);
       if (beds) query = query.gte("bedrooms", beds);
 
       const { data, error } = await query;
+      if (cancelled) return;
 
-      if (!cancelled) {
-        if (error) console.error(error);
+      if (error) {
+        console.error("[listings] supabase error", error);
+        setRows([]);
+      } else {
         setRows(data || []);
-        setLoading(false);
       }
+      setLoading(false);
     })();
     return () => {
       cancelled = true;
@@ -240,18 +255,18 @@ function ListingsInner() {
       .filter((r) => r.latitude && r.longitude && r.id && r.title)
       .map((r) => ({
         id: String(r.id),
-        title: r.title as string,
-        lat: r.latitude as number,
-        lng: r.longitude as number,
+        title: String(r.title),
+        lat: Number(r.latitude),
+        lng: Number(r.longitude),
         price: r.price ?? undefined,
       }));
   }, [rows]);
 
   return (
     <Section>
+      <SectionTitle>PropNexus Listings</SectionTitle>
 
-
-      {/* Sticky shell directly under site header */}
+      {/* Sticky filter directly under site header */}
       <div className="sticky-filter">
         <div className="max-w-6xl mx-auto px-4 py-3">
           <FiltersBar />
@@ -266,8 +281,10 @@ function ListingsInner() {
           ) : rows.length === 0 ? (
             <div className="p-4">No results.</div>
           ) : (
-            rows.map((r, i) => (
-              <PropertyCard key={`${r.id}-${i}`} p={r as any} />
+            rows.map((r) => (
+              <Link key={r.id ?? Math.random()} href={`/property/${r.id}`} className="block">
+                <PropertyCard p={r as any} />
+              </Link>
             ))
           )}
         </div>
