@@ -1,4 +1,12 @@
 # backend/routes/scrape_routes.py
+# Package-first imports for scrapers with fallback
+try:
+    from backend.scraper.rightmove_scraper import scrape_rightmove_properties
+    from backend.scraper.zoopla_scraper import scrape_zoopla_properties
+except Exception:
+    from .scraper.rightmove_scraper import scrape_rightmove_properties
+    from .scraper.zoopla_scraper import scrape_zoopla_properties
+# (fallback to relative)
 import os
 
 from fastapi import APIRouter, HTTPException
@@ -7,8 +15,6 @@ from pydantic import BaseModel
 from supabase import Client, create_client
 
 # Import scrapers relative to backend package
-from ..scraper.rightmove_scraper import scrape_rightmove_properties
-from ..scraper.zoopla_scraper import scrape_zoopla_properties
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
@@ -19,10 +25,8 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 router = APIRouter()
 
-
 class ScrapeRequest(BaseModel):
     location: str
-
 
 @router.post("/scrape")
 async def scrape_all_sources(req: ScrapeRequest):

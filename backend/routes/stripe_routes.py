@@ -1,3 +1,9 @@
+# Package-first utils.billing import with fallback
+try:
+    from backend.utils.billing import get_entitlement_by_email, upsert_subscription
+except Exception:
+    from .utils.billing import get_entitlement_by_email, upsert_subscription
+# (fallback to relative)
 import json
 import logging
 import os
@@ -6,14 +12,11 @@ import stripe
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from ..utils.billing import get_entitlement_by_email, upsert_subscription
-
 router = APIRouter()
 log = logging.getLogger(__name__)
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-
 
 class CheckoutPayload(BaseModel):
     price_id: str
@@ -21,10 +24,8 @@ class CheckoutPayload(BaseModel):
     mode: str = "subscription"
     metadata: dict | None = None
 
-
 class PortalPayload(BaseModel):
     customer_id: str
-
 
 @router.post("/stripe/create-checkout-session")
 def create_checkout_session(payload: CheckoutPayload):
@@ -43,7 +44,6 @@ def create_checkout_session(payload: CheckoutPayload):
         log.exception("create_checkout_session failed")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.post("/stripe/create-portal-session")
 def create_portal_session(payload: PortalPayload):
     try:
@@ -56,11 +56,9 @@ def create_portal_session(payload: PortalPayload):
         log.exception("create_portal_session failed")
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.get("/me/entitlement")
 def get_entitlement(email: str = Query(...)):
     return get_entitlement_by_email(email)
-
 
 @router.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
