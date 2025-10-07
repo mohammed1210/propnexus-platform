@@ -1,5 +1,5 @@
-// frontend/types/ai.ts
-export type SummaryRequest = {
+// /frontend/types/ai.ts
+export interface SummaryRequest {
   title: string;
   location: string;
   price?: number;
@@ -10,29 +10,24 @@ export type SummaryRequest = {
   propertyType?: string;
   investmentType?: string;
   description?: string;
-};
+}
 
-export type SummaryResponse = {
-  summary?: string;
+export interface SummaryResponse {
+  summary: string;
   bullets?: string[];
-};
+}
 
-export type Strategy = {
+export interface StrategiesRequest {
   title: string;
-  rationale: string;
-  steps: string[];
-  risk?: string;
-};
+  location: string;
+  price?: number;
+  yield_percent?: number;
+  roi_percent?: number;
+  propertyType?: string;
+  investmentType?: string;
+  description?: string;
+}
 
-export type StrategiesResponse = {
-  strategies: Strategy[];
-};
-
-export type StrategiesRequest = {
-  property: Omit<SummaryRequest, 'bedrooms' | 'bathrooms'> & {
-    // bedrooms/bathrooms optional here too if you’ll use them for strategies
-    bedrooms?: number;
-    bathrooms?: number;
-  };
-  constraints?: Record<string, unknown>;
-};
+export interface StrategiesResponse {
+  strategies: string[];
+}

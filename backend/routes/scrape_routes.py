@@ -30,30 +30,31 @@ class ScrapeRequest(BaseModel):
 
 @router.post("/scrape")
 async def scrape_all_sources(req: ScrapeRequest):
+    """Run Zoopla + Rightmove scrapers, merge/dedupe, upsert to Supabase if configured."""
     location = (req.location or "").strip()
     if not location:
         raise HTTPException(status_code=400, detail="Location is required")
 
     try:
-        zoopla_results = scrape_zoopla_properties(location) or []
-        rightmove_results = scrape_rightmove_properties(location) or []
+        zoopla = await scrape_zoopla_properties(location) or []
+        rightmove = await scrape_rightmove_properties(location) or []
 
-        combined = zoopla_results + rightmove_results
-        seen, unique_props = set(), []
+        combined = zoopla + rightmove
+        seen: set[tuple] = set()
+        unique_props: list[dict] = []
         for p in combined:
             key = (p.get("title"), p.get("price"), p.get("location"))
             if key not in seen:
                 seen.add(key)
                 unique_props.append(p)
 
-        if supabase and unique_props:
+        if sb and unique_props:
             try:
-                supabase.table("properties").upsert(unique_props).execute()
-            except Exception as db_err:  # pragma: no cover
-                print("⚠️ DB insert skipped:", db_err)
+                sb.table("properties").upsert(unique_props).execute()
+            except Exception as db_err:  # best-effort insert
+                print("DB insert skipped:", db_err)
 
         return {"count": len(unique_props), "properties": unique_props}
-
     except HTTPException:
         raise
     except Exception as e:  # pragma: no cover

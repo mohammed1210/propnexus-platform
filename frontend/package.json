@@ -14,6 +14,8 @@
     "test": "jest",
     "format": "prettier --write .",
     "type-check": "tsc --noEmit",
+     "frontend:type-check": "cd frontend && tsc --noEmit",
+    "frontend:build": "cd frontend && next build",
     "ingest:csv": "ts-node scripts/ingest-csv.ts data/listings.sample.csv"
   },
   "dependencies": {

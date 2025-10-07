@@ -1,1 +1,2 @@
-# init file for scraper module
+# backend/scraper/__init__.py
+# (intentionally empty; marks package)
