@@ -1,2 +1,2 @@
-web: uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
-# worker: bash -lc './scripts/cron-ingest.sh'
+# Procfile
+web: bash -lc 'cd backend && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'
