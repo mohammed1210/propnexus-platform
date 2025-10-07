@@ -1,301 +1,196 @@
 'use client';
-export const dynamic = 'force-dynamic';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import nextDynamic from 'next/dynamic';
-import Image from 'next/image';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
-import CardActions from '@/components/ui/CardActions';
-import Badge from '@/components/ui/Badge';
 
-import MortgageCalculator from '@/components/property_details/MortgageCalculator';
-import StampDutyCalculator from '@/components/property_details/StampDutyCalculator';
-import AreaIntel from '@/components/property_details/AreaIntel';
-import NotesFields from '@/components/property_details/NotesFields';
-import InvestmentInsights from '@/components/property_details/InvestmentInsights';
-import AIScoreBars from '@/components/property_details/AIScoreBars';
-import AIScoreInfo from '@/components/property_details/AIScoreInfo';
 import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
+import MortgageCalculator from '@/components/property_details/MortgageCalculator';
+import StampDutyCalculator from '@/components/property_details/StampDutyCalculator';
+import NotesFields from '@/components/property_details/NotesFields';
 import AIChatbot from '@/components/property_details/AIChatbot';
 
-const MapSingle = nextDynamic(() => import('@/components/property_details/MapSingle'), { ssr: false });
+import type { Property } from '@/types';
+import { getSupabase } from '@/lib/supabaseClient';
 
-/** Shape coming from the API (nullable numeric fields allowed) */
-type Property = {
-  id: string;
-  title: string;
-  location: string;
-  price: number;
-  bedrooms: number | null;
-  bathrooms: number | null;
-  yield_percent: number | null;
-  roi_percent: number | null;
-  description?: string | null;
-  imageurl?: string | null;
+type LooseProperty = Partial<Property> & {
   latitude?: number | null;
   longitude?: number | null;
-  avg_rent?: number | null;
-  crime_index?: number | null;
-  ofsted_summary?: string | null;
-  transport_summary?: string | null;
-  propertyType?: string | null;
-  investmentType?: string | null;
-  source?: string | null;
-  created_at?: string | null;
+  imageurl?: string | null; // some rows use this
 };
 
-function getBackendBase(): string {
-  const raw =
-    process.env.NEXT_PUBLIC_BACKEND_URL ??
-    process.env.NEXT_PUBLIC_API_URL ??
-    '';
-  if (!raw) throw new Error('NEXT_PUBLIC_BACKEND_URL is not set');
-  return raw.replace(/\/+$/, '');
-}
+const toNum = (v: unknown) =>
+  typeof v === 'number' ? v : v == null || v === '' ? undefined : Number(v);
 
 export default function PropertyDetailsPage() {
-  const params = useParams<{ id: string }>() as { id?: string };
-  const id = params?.id ?? '';
-
-  const [property, setProperty] = useState<Property | null>(null);
+  const { id } = useParams() as { id: string };
+  const sb = useMemo(() => getSupabase(), []);
+  const [property, setProperty] = useState<LooseProperty | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [aiOverall, setAiOverall] = useState(0);
-  const [aiItems, setAiItems] = useState<{ label: string; value: number }[]>([]);
-
-  const fetchProperty = useCallback(async (propId: string) => {
-    setLoading(true);
-    try {
-      const base = getBackendBase();
-      const resp = await fetch(`${base}/properties/${encodeURIComponent(propId)}`, { cache: 'no-store' });
-      if (!resp.ok) {
-        console.error('Property fetch failed', resp.status, await resp.text());
-        setProperty(null);
-      } else {
-        const data = (await resp.json()) as Property;
-        setProperty(data);
-        computeAIScore(data);
-      }
-    } catch (e) {
-      console.error('Error fetching property:', e);
-      setProperty(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id) fetchProperty(id);
-  }, [id, fetchProperty]);
+    let cancelled = false;
+    if (!id) return;
 
-  function computeAIScore(p: Property) {
-    const items = [
-      { label: 'Yield',     value: Math.min(100, Number(p.yield_percent ?? 0) * 10) },
-      { label: 'ROI',       value: Math.min(100, Number(p.roi_percent ?? 0) * 10) },
-      { label: 'Bedrooms',  value: Math.min(100, Number(p.bedrooms ?? 0) * 20) },
-      { label: 'Bathrooms', value: Math.min(100, Number(p.bathrooms ?? 0) * 25) },
-    ];
-    setAiItems(items);
-    setAiOverall(Math.round(items.reduce((s, i) => s + i.value, 0) / items.length));
-  }
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Read EXACTLY the same source as the listings page
+        const { data, error } = await sb
+          .from('properties')
+          .select('*')
+          .eq('id', id)
+          .single();
 
-  async function handleSaveDeal() {
-    if (!property) return;
-    try {
-      const base = getBackendBase();
-      const resp = await fetch(`${base}/save-deal`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ property_id: property.id }),
-      });
-      if (!resp.ok) throw new Error(`Save failed: ${resp.status}`);
-      alert('Deal saved!');
-    } catch (e) {
-      console.error(e);
-      alert('Could not save this deal.');
-    }
-  }
+        if (error) throw error;
 
-  const hasCoords = useMemo(
-    () =>
-      property?.latitude != null &&
-      property?.longitude != null &&
-      Number.isFinite(property.latitude) &&
-      Number.isFinite(property.longitude),
-    [property]
-  );
+        // Normalize a few fields the UI expects
+        const p: LooseProperty | null = data
+          ? {
+              ...data,
+              // make sure these are numbers or undefined
+              price: toNum((data as any).price),
+              bedrooms: toNum((data as any).bedrooms),
+              bathrooms: toNum((data as any).bathrooms),
+              yield_percent: toNum((data as any).yield_percent),
+              roi_percent: toNum((data as any).roi_percent),
+              latitude: toNum((data as any).latitude) ?? null,
+              longitude: toNum((data as any).longitude) ?? null,
+            }
+          : null;
 
-  const postcode = useMemo(() => property?.location?.trim().split(/\s+/).pop(), [property]);
+        if (!cancelled) setProperty(p);
+      } catch (e: any) {
+        console.error(e);
+        if (!cancelled) setError(e?.message ?? 'Failed to load property.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
 
-  // Normalize nullable numerics for components that expect numbers
-  const normalizedForSummary = useMemo(() => {
-    if (!property) return null;
-    return {
-      ...property,
-      price: Number(property.price ?? 0),
-      bedrooms: Number(property.bedrooms ?? 0),
-      bathrooms: Number(property.bathrooms ?? 0),
-      yield_percent: Number(property.yield_percent ?? 0),
-      roi_percent: Number(property.roi_percent ?? 0),
+    return () => {
+      cancelled = true;
     };
-  }, [property]);
+  }, [id, sb]);
 
-  if (loading) return <p className="p-6">Loading…</p>;
+  if (loading) {
+    return (
+      <Section>
+        <p>Loading property details…</p>
+      </Section>
+    );
+  }
+  if (error) {
+    return (
+      <Section>
+        <p className="text-red-600">{error}</p>
+      </Section>
+    );
+  }
   if (!property) {
     return (
-      <div className="p-6">
-        <p>Property not found.</p>
-        <a href="/" className="text-blue-600 underline">← Back to listings</a>
-      </div>
+      <Section>
+        <p>No property found.</p>
+      </Section>
     );
   }
 
+  const price = typeof property.price === 'number' ? property.price : 0;
+
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
-      {/* LEFT */}
-      <div className="md:col-span-2 space-y-6">
-        {/* Header */}
-        <header className="mb-4 md:mb-6">
-          <h1 className="text-[clamp(1.5rem,4vw,2.25rem)] font-extrabold leading-tight tracking-tight">
-            {property.title}
-          </h1>
-          <p className="text-neutral-600 mt-1">{property.location}</p>
-          <div className="mt-3">
-            <CardActions
-              onSave={handleSaveDeal}
-              onPdf={() => alert('Export to PDF coming soon!')}
-              onCrm={() => alert('Sending to CRM…')}
+    <Section>
+      <SectionTitle>{property.title ?? 'Property Details'}</SectionTitle>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left column */}
+        <div className="space-y-6">
+          {/* Indicative scorecard */}
+          <div className="border p-4 rounded-md">
+            <h2 className="font-semibold text-lg mb-2">AI Deal Score (indicative)</h2>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>Yield:</div>
+              <div>{property.yield_percent ?? 0}%</div>
+              <div>ROI:</div>
+              <div>{property.roi_percent ?? 0}%</div>
+              <div>Bedrooms:</div>
+              <div>{property.bedrooms ?? '—'}</div>
+              <div>Bathrooms:</div>
+              <div>{property.bathrooms ?? '—'}</div>
+            </div>
+          </div>
+
+          {/* Investment Summary */}
+          <div className="border p-4 rounded-md">
+            <h2 className="font-semibold text-lg mb-2">Investment Summary</h2>
+            <InvestmentSummary property={property as any} />
+          </div>
+
+          {/* Exit Strategies */}
+          <div className="border p-4 rounded-md">
+            <h2 className="font-semibold text-lg mb-2">Exit Strategies</h2>
+            <ExitStrategyGenerator
+              title={String(property.title ?? '')}
+              location={String(property.location ?? '')}
+              price={typeof property.price === 'number' ? property.price : undefined}
+              yield_percent={
+                typeof property.yield_percent === 'number' ? property.yield_percent : undefined
+              }
+              roi_percent={
+                typeof property.roi_percent === 'number' ? property.roi_percent : undefined
+              }
+              propertyType={(property as any).propertyType ?? undefined}
+              investmentType={(property as any).investmentType ?? undefined}
+              description={(property as any).description ?? undefined}
             />
           </div>
-        </header>
 
-        {/* Hero Image */}
-        {property.imageurl && (
-          <div className="relative w-full h-72 md:h-96 rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-sm">
-            <Image
-              src={property.imageurl}
-              alt={property.title}
-              fill
-              sizes="(max-width: 768px) 100vw, 80vw"
-              style={{ objectFit: 'cover' }}
-              priority
-            />
+          {/* Notes (render sign-in nudge when signed out inside the component) */}
+          <div className="border p-4 rounded-md">
+            <h2 className="font-semibold text-lg mb-2">Investor Notes</h2>
+            {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
           </div>
-        )}
+        </div>
 
-        {/* AI Deal Score */}
-        <Section aria-labelledby="ai-deal-score">
-          <SectionTitle id="ai-deal-score" icon={<span>🧠</span>}>
-            AI Deal Score <span className="ml-2 text-xs font-medium text-neutral-500">beta</span>
-          </SectionTitle>
-          <AIScoreBars overall={aiOverall} items={aiItems} showHeader={false} className="mt-3" />
-          <div className="mt-3"><AIScoreInfo /></div>
-        </Section>
+        {/* Right column */}
+        <div className="space-y-6">
+          {/* Mortgage calculator */}
+          <div className="border p-4 rounded-md">
+            <h2 className="font-semibold text-lg mb-2">Mortgage & BRRR Calculator</h2>
+            <MortgageCalculator price={price} />
+          </div>
 
-        {/* Investment Summary */}
-        <Section aria-labelledby="investment-summary">
-          <SectionTitle id="investment-summary" icon={<span>📈</span>}>
-            Investment Summary
-          </SectionTitle>
-          {normalizedForSummary && (
-            <InvestmentSummary property={normalizedForSummary as any} />
-          )}
-        </Section>
+          {/* Stamp Duty */}
+          <div className="border p-4 rounded-md">
+            <h2 className="font-semibold text-lg mb-2">Stamp Duty Calculator</h2>
+            <StampDutyCalculator price={price} />
+          </div>
 
-        {/* Exit Strategies */}
-        <Section aria-labelledby="exit-strategies">
-          <SectionTitle id="exit-strategies" icon={<span>🚪</span>}>Exit Strategies</SectionTitle>
-          <ExitStrategyGenerator
-            title={property.title}
-            location={property.location}
-            price={Number(property.price)}
-            yield_percent={Number(property.yield_percent ?? 0)}
-            roi_percent={Number(property.roi_percent ?? 0)}
-            propertyType={property.propertyType ?? ''}
-            investmentType={property.investmentType ?? ''}
-            description={property.description ?? ''}
-          />
-        </Section>
-
-        {/* Mortgage */}
-        <Section aria-labelledby="mortgage">
-          <SectionTitle id="mortgage" icon={<span>🏦</span>}>Mortgage</SectionTitle>
-          <MortgageCalculator price={Number(property.price)} />
-        </Section>
-
-        {/* Stamp Duty */}
-        <Section aria-labelledby="stamp-duty">
-          <SectionTitle id="stamp-duty" icon={<span>🧾</span>}>Stamp Duty</SectionTitle>
-          <StampDutyCalculator price={Number(property.price)} />
-        </Section>
-
-        {/* Area Intelligence */}
-        <Section aria-labelledby="area-intel">
-          <SectionTitle id="area-intel" icon={<span>🗺️</span>}>Area Intelligence</SectionTitle>
-          <AreaIntel
-            locationLabel={property.location}
-            postcode={postcode}
-            data={{
-              avgYieldPct: property.yield_percent ?? undefined,
-              avgRent: property.avg_rent ?? undefined,
-              crimeRateIndex: property.crime_index ?? undefined,
-              ofstedSummary: property.ofsted_summary ?? undefined,
-              transportSummary: property.transport_summary ?? undefined,
-            }}
-          />
-        </Section>
-
-        {/* Investment Insights */}
-        <Section aria-labelledby="investment-insights">
-          <SectionTitle id="investment-insights">Investment Insights</SectionTitle>
-          <InvestmentInsights
-            price={Number(property.price)}
-            yield_percent={property.yield_percent ?? undefined}
-            roi_percent={property.roi_percent ?? undefined}
-            postcode={postcode}
-            aiOverall={aiOverall}
-            aiItems={aiItems}
-            hideTitle
-          />
-        </Section>
-
-        {/* Notes */}
-        <Section aria-labelledby="notes">
-          <SectionTitle id="notes" icon={<span>📝</span>}>Notes</SectionTitle>
-          <NotesFields propertyId={property.id} />
-        </Section>
+          {/* Location */}
+          <div className="border p-4 rounded-md">
+            <h2 className="font-semibold text-lg mb-2">Location</h2>
+            {typeof property.latitude === 'number' && typeof property.longitude === 'number' ? (
+              <iframe
+                title="Map"
+                width="100%"
+                height="250"
+                loading="lazy"
+                style={{ border: 0 }}
+                src={`https://www.google.com/maps?q=${property.latitude},${property.longitude}&z=14&output=embed`}
+              />
+            ) : (
+              <p>Map unavailable — no coordinates provided.</p>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* RIGHT — Sidebar */}
-      <aside className="md:col-span-1 space-y-6">
-        <Section aria-labelledby="deal-summary">
-          <SectionTitle id="deal-summary" icon={<span>📊</span>}>Deal Summary</SectionTitle>
-          <ul className="space-y-2 text-sm">
-            <li><Badge>Price</Badge> £{Number(property.price).toLocaleString()}</li>
-            <li><Badge>Yield</Badge> {property.yield_percent != null ? `${property.yield_percent}%` : '—'}</li>
-            <li><Badge>ROI</Badge> {property.roi_percent != null ? `${property.roi_percent}%` : '—'}</li>
-            <li><Badge>Beds</Badge> {property.bedrooms ?? '—'}</li>
-            <li><Badge>Baths</Badge> {property.bathrooms ?? '—'}</li>
-            {property.propertyType && (<li><Badge>Type</Badge> {property.propertyType}</li>)}
-            {property.investmentType && (<li><Badge>Investment</Badge> {property.investmentType}</li>)}
-          </ul>
-        </Section>
-
-        <Section aria-labelledby="location">
-          <SectionTitle id="location" icon={<span>🗺️</span>}>Location</SectionTitle>
-          {hasCoords ? (
-            <MapSingle property={property as any} height={260} zoom={14} scrollWheelZoom={false} />
-          ) : (
-            <p className="text-neutral-500">Map unavailable — no coordinates provided.</p>
-          )}
-        </Section>
-      </aside>
-
+      {/* Floating local chatbot */}
       <AIChatbot property={property as any} />
-    </div>
+    </Section>
   );
 }

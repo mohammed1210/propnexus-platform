@@ -1,41 +1,68 @@
+# .github/workflows/frontend-ci.yml
 name: Frontend CI
 
 on:
-  pull_request:
-    paths: ["frontend/**", ".github/workflows/frontend-ci.yml"]
   push:
-    branches: ["main"]
-    paths: ["frontend/**", ".github/workflows/frontend-ci.yml"]
+    branches: [ main, po2 ]
+  pull_request:
 
 jobs:
-  build:
+  frontend:
+    name: Frontend CI
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Use Node
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+          node-version: 20
 
-      - name: Install deps
-        run: npm ci
+      - name: Enable Corepack (pnpm/yarn shims)
+        run: corepack enable
 
-      - name: Type check (optional)
-        run: npm run type-check --if-present
+      - name: Install dependencies (auto-detect)
+        working-directory: frontend
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            echo "Using pnpm"
+            pnpm install --frozen-lockfile
+          elif [ -f yarn.lock ]; then
+            echo "Using yarn"
+            yarn install --frozen-lockfile
+          elif [ -f package-lock.json ]; then
+            echo "Using npm ci"
+            npm ci
+          else
+            echo "No lockfile found; using npm install"
+            npm install
+          fi
 
-      - name: Lint (optional)
-        run: npm run lint --if-present
+      - name: Type check (if script exists)
+        working-directory: frontend
+        run: |
+          if jq -e '.scripts.typecheck' package.json >/dev/null; then
+            pnpm run typecheck 2>/dev/null || yarn run typecheck 2>/dev/null || npm run typecheck
+          else
+            echo "No typecheck script; skipping"
+          fi
 
-      - name: Build
-        env:
-          # Safe fallbacks so the build doesn’t crash
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://wsfemkhxttddztnhthkc.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndzZmVta2h4dHRkZHp0bmh0aGtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA5NTc1MDQsImV4cCI6MjA2NjUzMzUwNH0.NzmPypOS8Yq5uAn98ea2nlb3KiWantreGEkDHzP0Bn8' }}
-          NEXT_PUBLIC_API_BASE: ${{ secrets.NEXT_PUBLIC_API_BASE || 'http://localhost:8000' }}
-        run: npm run build
+      - name: Lint (if script exists)
+        working-directory: frontend
+        run: |
+          if jq -e '.scripts.lint' package.json >/dev/null; then
+            pnpm run lint 2>/dev/null || yarn run lint 2>/dev/null || npm run lint
+          else
+            echo "No lint script; skipping"
+          fi
+
+      - name: Build (if script exists)
+        working-directory: frontend
+        run: |
+          if jq -e '.scripts.build' package.json >/dev/null; then
+            pnpm run build 2>/dev/null || yarn run build 2>/dev/null || npm run build
+          else
+            echo "No build script; skipping"
+          fi

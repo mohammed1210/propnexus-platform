@@ -21,7 +21,7 @@ const nextConfig = {
       // All paths relative to the FRONTEND folder
       '@components': resolve(__dirname, 'components'),
       '@details':    resolve(__dirname, 'components/property_details'),
-      '@map':        resolve(__dirname, 'components/map'),
+      '@MapView':        resolve(__dirname, 'components/MapView'),
       '@lib':        resolve(__dirname, 'lib'),
       '@':           resolve(__dirname, '.'), // allow imports like "@/lib/supabaseClient"
     };

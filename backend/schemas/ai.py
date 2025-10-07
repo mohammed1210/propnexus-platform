@@ -1,43 +1,40 @@
+# backend/schemas/ai.py
+from __future__ import annotations
+
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
 
 class SummaryRequest(BaseModel):
-    """Request payload for generating an investment summary."""
-
     title: str
-    price: Optional[float] = None
     location: str
-    yield_: Optional[float] = Field(default=None, alias="yield")
-    roi: Optional[float] = None
+    price: Optional[float] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    yield_percent: Optional[float] = Field(default=None, description="Gross yield %")
+    roi_percent: Optional[float] = Field(default=None, description="ROI %")
+    propertyType: Optional[str] = None
+    investmentType: Optional[str] = None
     description: Optional[str] = None
 
 
 class SummaryResponse(BaseModel):
-    """Response payload containing a summary and bullet points."""
+    summary: Optional[str] = None
+    bullets: list[str] | None = None
 
-    summary: str
-    bullets: List[str]
+
+class Strategy(BaseModel):
+    title: str
+    rationale: str
+    steps: List[str] = []
+    risk: Optional[str] = None
 
 
 class StrategiesRequest(BaseModel):
-    """Request payload for generating exit strategies."""
-
     property: Dict[str, Any]
     constraints: Optional[Dict[str, Any]] = None
 
 
-class Strategy(BaseModel):
-    """A single exit strategy with rationale, steps, and optional risk."""
-
-    title: str
-    rationale: str
-    steps: List[str]
-    risk: Optional[str] = None
-
-
 class StrategiesResponse(BaseModel):
-    """Response payload containing a list of strategies."""
-
     strategies: List[Strategy]
