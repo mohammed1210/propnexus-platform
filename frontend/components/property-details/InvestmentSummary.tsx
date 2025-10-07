@@ -1,87 +1,56 @@
 'use client';
 import { useEffect, useState } from 'react';
 
-type SummaryData = {
-  ok?: boolean;
-  summary?: string;
-  rationale?: string[];
-};
+type SummaryData = { summary: string } | null;
 
-type Props = {
-  /** Prefer passing the property id as `id` */
-  id?: string;
-  /** Accept alternative prop names so we don't break existing callers */
-  propertyId?: string;
-  property?: { id?: string };
-  data?: { id?: string };
-  /** User tier for rate caps (optional) */
-  userTier?: string;
-};
-
-export default function InvestmentSummary(props: Props) {
-  const propertyId =
-    props.id ??
-    props.propertyId ??
-    props.property?.id ??
-    props.data?.id ??
-    '';
-
-  const userTier = props.userTier ?? 'free';
-
-  const [data, setData] = useState<SummaryData | null>(null);
+export default function InvestmentSummary({ property }: { property: any }) {
+  const [data, setData] = useState<SummaryData>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
+
+  const fetchSummary = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE}/gpt/summary`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: property.title,
+            location: property.location,
+            price: property.price,
+            yield_percent: property.yield_percent,
+            roi_percent: property.roi_percent,
+            investmentType: property.investment_type,
+          }),
+        }
+      );
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || 'Request failed');
+      setData(json);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    // Only call the backend if we have an id and API base
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE;
-    if (!propertyId || !apiBase) return;
-
-    setLoading(true);
-    fetch(`${apiBase}/gpt/summary`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ property_id: propertyId, user_tier: userTier }),
-    })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`Bad response ${r.status}`);
-        return r.json();
-      })
-      .then((json) => setData(json as SummaryData))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, [propertyId, userTier]);
-
-  if (!propertyId) {
-    return (
-      <div className="text-sm text-zinc-500">
-        No property selected.
-      </div>
-    );
-  }
-
-  if (loading) {
-    return <div className="text-sm text-zinc-500">Generating summary…</div>;
-  }
-
-  if (error) {
-    return <div className="text-sm text-red-600">Error: {error}</div>;
-  }
-
-  if (!data || !data.summary) {
-    return <div className="text-sm text-zinc-500">No summary yet.</div>;
-  }
+    if (property?.title) fetchSummary();
+  }, [property]);
 
   return (
-    <div className="space-y-2">
-      <p className="text-sm leading-6">{data.summary}</p>
-      {!!data.rationale?.length && (
-        <ul className="list-disc pl-5 text-xs text-zinc-600 dark:text-zinc-300">
-          {data.rationale.map((r, i) => (
-            <li key={i}>{r}</li>
-          ))}
-        </ul>
+    <section className="bg-white dark:bg-gray-900 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+      <h2 className="text-lg font-semibold mb-2">AI Investment Summary</h2>
+      {loading && <p>Generating summary...</p>}
+      {error && <p className="text-red-500">Error: {error}</p>}
+      {data?.summary && (
+        <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">
+          {data.summary}
+        </p>
       )}
-    </div>
+    </section>
   );
 }
