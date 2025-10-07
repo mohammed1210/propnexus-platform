@@ -14,7 +14,7 @@ from supabase import Client, create_client
 load_dotenv()
 
 # Routers (relative imports; keep at top for linter)
-from .routes import area_routes, comps_routes, gpt_routes, scrape_routes  # noqa: E402
+from backend.routes import area_routes, comps_routes, gpt_routes, scrape_routes  # noqa: E402
 from .routes.ai import router as ai_router  # noqa: E402
 from .routes.notes import router as notes_router  # noqa: E402
 from .routes.off_market_routes import router as off_market_router  # noqa: E402
