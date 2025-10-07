@@ -7,7 +7,7 @@
 +router = APIRouter(prefix="/gpt", tags=["gpt"])
 +
 +OPENAI_KEY = os.getenv("OPENAI_API_KEY")
-+TIER_LIMITS = {"free": 4000, "pro": 16000, "pro_plus": 32000}  # token-ish budget gates
++TIER_LIMITS = {"free": 4000, "pro": 16000, "pro_plus": 32000}
 +
 +class SummaryIn(BaseModel):
 +    property_id: str
@@ -24,7 +24,6 @@
 +        raise HTTPException(status_code=500, detail="OPENAI_API_KEY missing")
 +
 +async def _simulate_llm(payload: dict, cap: int) -> dict:
-+    # Placeholder for your actual LLM call; keep API shape stable.
 +    await asyncio.sleep(0.2)
 +    return {
 +        "ok": True,
