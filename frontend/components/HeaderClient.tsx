@@ -68,7 +68,16 @@ export default function HeaderClient() {
         >
           Dark
         </button>
-      </div>
-    </header>
-  );
+     {scrolled && (
+  <button
+    onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+    className="fixed bottom-4 right-4 z-50 rounded-md bg-primary px-3 py-2 text-white shadow-lg dark:bg-zinc-800"
+  >
+    Back to top
+  </button>
+)}  </header>
+);
 }
+
+        
+    
