@@ -1,9 +1,9 @@
-# PO3: robust utils import (package first, fallback to relative)
+# Package-first utils.billing import with fallback
 try:
     from backend.utils.billing import get_entitlement_by_email, upsert_subscription
 except Exception:
     from .utils.billing import get_entitlement_by_email, upsert_subscription
-
+# (fallback to relative)
 import json
 import logging
 import os
