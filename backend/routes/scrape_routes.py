@@ -1,4 +1,12 @@
 # backend/routes/scrape_routes.py
+# Package-first imports for scrapers with fallback
+try:
+    from backend.scraper.rightmove_scraper import scrape_rightmove_properties
+    from backend.scraper.zoopla_scraper import scrape_zoopla_properties
+except Exception:
+    from .scraper.rightmove_scraper import scrape_rightmove_properties
+    from .scraper.zoopla_scraper import scrape_zoopla_properties
+# (fallback to relative)
 import os
 
 from fastapi import APIRouter, HTTPException
