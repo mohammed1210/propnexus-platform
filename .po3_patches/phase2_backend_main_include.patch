@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: backend/main.py
+@@
+-from fastapi import FastAPI
++from fastapi import FastAPI
++from backend.routes import gpt_routes
+@@
+ app = FastAPI()
+@@
++# PO3: AI routes
++app.include_router(gpt_routes.router)
+*** End Patch

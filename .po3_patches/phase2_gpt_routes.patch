@@ -1,0 +1,55 @@
+*** Begin Patch
+*** Add File: backend/routes/gpt_routes.py
++from fastapi import APIRouter, HTTPException, Request
++from pydantic import BaseModel
++import os, asyncio
++
++router = APIRouter(prefix="/gpt", tags=["gpt"])
++
++OPENAI_KEY = os.getenv("OPENAI_API_KEY")
++TIER_LIMITS = {"free": 4000, "pro": 16000, "pro_plus": 32000}  # token-ish budget gates
++
++class SummaryIn(BaseModel):
++    property_id: str
++    context: dict | None = None
++    user_tier: str = "free"
++
++class StrategyIn(BaseModel):
++    property_id: str
++    context: dict | None = None
++    user_tier: str = "free"
++
++def ensure_key():
++    if not OPENAI_KEY:
++        raise HTTPException(status_code=500, detail="OPENAI_API_KEY missing")
++
++async def _simulate_llm(payload: dict, cap: int) -> dict:
++    # Placeholder for your actual LLM call; keep API shape stable.
++    await asyncio.sleep(0.2)
++    return {
++        "ok": True,
++        "tokens_cap": cap,
++        "summary": f"Investment summary for {payload.get('property_id')}",
++        "rationale": ["Yield outlook", "Comparable rentals", "Exit timing"],
++    }
++
++@router.post("/summary")
++async def summary(inb: SummaryIn, request: Request):
++    ensure_key()
++    cap = TIER_LIMITS.get(inb.user_tier.replace("+","_"), TIER_LIMITS["free"])
++    try:
++        return await asyncio.wait_for(_simulate_llm(inb.dict(), cap), timeout=25)
++    except asyncio.TimeoutError:
++        raise HTTPException(504, "LLM summary timed out")
++
++@router.post("/strategies")
++async def strategies(inb: StrategyIn, request: Request):
++    ensure_key()
++    cap = TIER_LIMITS.get(inb.user_tier.replace("+","_"), TIER_LIMITS["free"])
++    try:
++        data = await asyncio.wait_for(_simulate_llm(inb.dict(), cap), timeout=25)
++        data["strategies"] = ["Hold 3–5y", "Refi at year 2", "Light refurb then rent"]
++        return data
++    except asyncio.TimeoutError:
++        raise HTTPException(504, "LLM strategies timed out")
+*** End Patch
