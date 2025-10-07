@@ -1,2 +1,2 @@
-# backend/routes/__init__.py
+# backend/schemas/__init__.py
 # (intentionally empty; marks package)

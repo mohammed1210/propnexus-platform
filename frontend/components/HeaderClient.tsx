@@ -1,5 +1,4 @@
 'use client';
-
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -11,64 +10,67 @@ export default function HeaderClient() {
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 4);
-    onScroll();
+    setScrolled(window.scrollY > 4);
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const nav = [
-    { href: '/listings',     label: 'Listings' },
-    { href: '/off-market',   label: 'Off-Market' },
-    { href: '/saved-deals',  label: 'Saved Deals' },
-    { href: '/analytics',    label: 'Analytics' },
-    { href: '/pricing',      label: 'Pricing' },
-  ];
+  const isActive = (href: string) => pathname === href;
 
   return (
-    <header
-      className={clsx(
-        'sticky top-0 z-40 bg-white/90 dark:bg-zinc-950/90 backdrop-blur supports-[backdrop-filter]:bg-white/70',
-        scrolled && 'shadow-sm border-b border-zinc-200/70 dark:border-zinc-800/60'
-      )}
-      style={{ ['--header-h' as any]: '56px' }}
-    >
-      <div className="max-w-6xl mx-auto h-14 px-4 flex items-center gap-3">
-        {/* brand */}
-        <Link href="/" className="font-semibold tracking-tight">
-          <span className="text-zinc-900 dark:text-zinc-100">PropNexus</span>{' '}
-          <span className="opacity-60">Listings</span>
-        </Link>
+    <>
+      <header
+        className={clsx(
+          'sticky top-0 z-40 w-full border-b bg-white/70 backdrop-blur supports-[backdrop-filter]:bg-white/50',
+          'dark:bg-zinc-900/70 dark:supports-[backdrop-filter]:bg-zinc-900/50',
+          scrolled ? 'shadow-sm' : ''
+        )}
+      >
+        <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-3 sm:px-4 lg:px-6">
+          <Link href="/" className="font-semibold tracking-tight">
+            PropNexus
+          </Link>
+          <nav className="flex items-center gap-1">
+            <Link
+              href="/"
+              className={clsx(
+                'rounded-md px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800',
+                isActive('/') && 'font-semibold underline underline-offset-4'
+              )}
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/saved-deals"
+              className={clsx(
+                'rounded-md px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800',
+                isActive('/saved') && 'font-semibold underline underline-offset-4'
+              )}
+            >
+              Saved
+            </Link>
+            <Link
+              href="/off-market"
+              className={clsx(
+                'rounded-md px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800',
+                isActive('/off-market') && 'font-semibold underline underline-offset-4'
+              )}
+            >
+              Off-Market
+            </Link>
+          </nav>
+        </div>
+      </header>
 
-        <div className="flex-1" />
-
-        {/* right-aligned tabs */}
-        <nav className="hidden md:flex items-center gap-1">
-          {nav.map(({ href, label }) => {
-            const active = pathname === href || pathname?.startsWith(href + '/');
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={clsx(
-                  'px-3 py-2 rounded-md text-sm',
-                  active
-                    ? 'text-zinc-900 dark:text-zinc-100 bg-zinc-100/70 dark:bg-zinc-800'
-                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/70 dark:text-zinc-300 dark:hover:text-white dark:hover:bg-zinc-800'
-                )}
-              >
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
-
+      {scrolled && (
         <button
-          className="ml-2 rounded-md border px-2 py-1 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800"
-          onClick={() => document.documentElement.classList.toggle('dark')}
+          aria-label="Back to top"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="fixed bottom-4 right-4 z-[60] rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm font-medium shadow-md hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-primary dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700"
         >
-          Dark
+          Back to top
         </button>
-      </div>
-    </header>
+      )}
+    </>
   );
 }
