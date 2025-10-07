@@ -18,29 +18,14 @@ log = logging.getLogger(__name__)
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
-class CheckoutRequest(BaseModel):
+class CheckoutPayload(BaseModel):
     price_id: str
-    customer_email: Optional[str] = None
-    mode: str = "subscription"  # or 'payment'
-    success_url: str
-    cancel_url: str
+    customer_email: str
+    mode: str = "subscription"
+    metadata: dict | None = None
 
 class PortalPayload(BaseModel):
     customer_id: str
-    return_url: str
-
-
-@router.get("/me/entitlement")
-def me_entitlement(email: str):
-    """
-    Lightweight helper so the frontend can know what features to show.
-    Always returns a JSON object; never crashes the app.
-    """
-    try:
-        return get_entitlement_by_email(email)
-    except Exception as exc:
-        # Keep this resilient — entitlement is non-critical
-        return {"email": email, "plan": "free", "active": False, "error": str(exc)}
 
 @router.post("/stripe/create-checkout-session")
 def create_checkout_session(body: CheckoutRequest):
@@ -59,9 +44,10 @@ def create_checkout_session(body: CheckoutRequest):
             cancel_url=body.cancel_url,
             allow_promotion_codes=True,
         )
-        return {"id": session["id"], "url": session["url"]}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Stripe error: {exc}") from exc
+        return {"id": session.id, "url": session.url}
+    except Exception as e:
+        log.exception("create_checkout_session failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/stripe/create-portal-session")
 def create_portal_session(body: PortalRequest):
