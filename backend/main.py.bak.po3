@@ -1,4 +1,3 @@
-from backend.routes import scrape_routes
 # backend/main.py
 from __future__ import annotations
 
