@@ -41,7 +41,7 @@ export default function HeaderClient() {
               Dashboard
             </Link>
             <Link
-              href="/saved"
+              href="/saved-deals"
               className={clsx(
                 'rounded-md px-3 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800',
                 isActive('/saved') && 'font-semibold underline underline-offset-4'

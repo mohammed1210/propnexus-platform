@@ -18,19 +18,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Optional: quick sanity check that main.py exports 'app'
-      - name: Backend deps (check)
-        run: |
-          python -V
-          python - <<'PY'
-          import importlib.util, os, sys
-          sys.path.insert(0, os.getcwd())
-          spec = importlib.util.spec_from_file_location("main", "main.py")
-          mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
-          assert hasattr(mod, "app"), "FastAPI 'app' not exported by main.py"
-          print("✅ FastAPI app found")
-          PY
-
       - name: Install Railway CLI
         run: |
           curl -fsSL https://railway.app/install.sh | sh
@@ -63,3 +50,16 @@ jobs:
           done
           echo "❌ Health check failed"
           exit 1
+
+      - name: Backend deps (sanity check)
+        working-directory: backend
+        run: |
+          python -V
+          python - <<'PY'
+          import importlib.util, sys
+          spec = importlib.util.spec_from_file_location("main", "main.py")
+          mod = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          assert hasattr(mod, "app"), "FastAPI 'app' not exported by main.py"
+          print("✓ FastAPI app found")
+          PY
