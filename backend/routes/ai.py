@@ -1,200 +1,190 @@
-"""AI routes for summary and exit strategy generation."""
-
-from __future__ import annotations
-
-import logging
+# backend/routes/ai.py
 import os
-from typing import Dict, List
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException
+from openai import OpenAI
+from pydantic import BaseModel
 
-from ..schemas.ai import (
-    StrategiesRequest,
-    StrategiesResponse,
-    Strategy,
-    SummaryRequest,
-    SummaryResponse,
-)
-from ..utils.openai_client import openai_client
-from ..utils.rate_limit import rate_limiter
+router = APIRouter()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/ai", tags=["ai"])
-
-
-def ensure_api_key() -> str:
-    """Ensure OPENAI_API_KEY is present; otherwise raise 503."""
-    key = os.getenv("OPENAI_API_KEY")
-    if not key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI service not configured: set OPENAI_API_KEY",
-        )
-    return key
+# ---------------------------------------------------------------------
+# Pydantic shapes
+# We allow BOTH:
+#   { property: { title, location, ... } }
+# and the flat legacy:
+#   { title, location, ... }
+# ---------------------------------------------------------------------
 
 
-def format_summary_prompt(req: SummaryRequest) -> List[Dict[str, str]]:
-    """Build messages for summary generation."""
-    sys_prompt = (
-        "You are an investment analyst for UK buy-to-let properties. "
-        "Be concise and factual. Currency GBP. Use UK property terms."
+class PropertyPayload(BaseModel):
+    title: Optional[str] = None
+    location: Optional[str] = None
+    price: Optional[float] = None
+    bedrooms: Optional[float] = None
+    bathrooms: Optional[float] = None
+    yield_percent: Optional[float] = None
+    roi_percent: Optional[float] = None
+    description: Optional[str] = None
+    propertyType: Optional[str] = None
+    investmentType: Optional[str] = None
+
+
+class SummaryEnvelope(BaseModel):
+    property: PropertyPayload
+
+
+class StrategiesEnvelope(BaseModel):
+    property: PropertyPayload
+
+
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
+
+
+def _extract_property(payload: Dict[str, Any]) -> PropertyPayload:
+    """
+    Accepts either:
+      {"property": {...}}  OR  a flat {...}
+    Returns a PropertyPayload instance.
+    """
+    if "property" in payload and isinstance(payload["property"], dict):
+        return PropertyPayload(**payload["property"])
+    return PropertyPayload(**payload)
+
+
+def _split_bullets(text: str) -> List[str]:
+    """Turn a free-form model response into neat bullet lines."""
+    lines = [line.strip(" -•\t\r") for line in text.splitlines()]
+    return [line for line in lines if line]
+
+
+def _chat(
+    messages: List[Dict[str, str]], max_tokens: int = 300, temperature: float = 0.7
+) -> str:
+    """
+    Small wrapper so we can swap models easily if needed.
+    """
+    # Prefer a fast, inexpensive model for summaries/ideas.
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    resp = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
-    user_prompt = (
-        f"Title: {req.title}\n"
-        f"Location: {req.location}\n"
-        f"Price: {req.price or 'N/A'}\n"
-        f"Yield: {req.yield_ or 'N/A'}\n"
-        f"ROI: {req.roi or 'N/A'}\n"
-        f"Description: {req.description or 'N/A'}\n\n"
-        "Provide a short summary followed by bullet points highlighting the key investment factors."
-    )
-    return [
-        {"role": "system", "content": sys_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
+    return (resp.choices[0].message.content or "").strip()
 
 
-def parse_summary_response(text: str) -> SummaryResponse:
-    """Split the OpenAI response into summary and bullet list."""
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if not lines:
-        return SummaryResponse(summary="No summary available.", bullets=[])
-
-    summary = lines[0]
-    bullets = []
-    for line in lines[1:]:
-        # Accept leading symbols like "-", "•", "1.", etc.
-        clean = line.lstrip("-•0123456789. ").strip()
-        if clean:
-            bullets.append(clean)
-    return SummaryResponse(summary=summary, bullets=bullets)
+# ---------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------
 
 
-def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
-    """Build messages for strategy generation."""
-    sys_prompt = (
-        "You are an investment analyst for UK buy-to-let properties. "
-        "Provide exit strategies with rationale, steps and risk. Currency GBP. Use UK property terms."
-    )
-    prop_lines = "\n".join(f"{k}: {v}" for k, v in req.property.items())
-    constraints = req.constraints or {}
-    constraint_lines = (
-        "\n" + "\n".join(f"{k}: {v}" for k, v in constraints.items())
-        if constraints
-        else ""
-    )
-    user_prompt = (
-        f"Property details:\n{prop_lines}{constraint_lines}\n\n"
-        "Suggest up to 3 exit strategies. For each strategy, provide a title, rationale, a numbered list of steps, and risk."
-    )
-    return [
-        {"role": "system", "content": sys_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
-
-
-def parse_strategies_response(text: str) -> StrategiesResponse:
-    """Parse OpenAI output into structured strategies."""
-    lines = [line.strip() for line in text.splitlines()]
-    strategies: List[Strategy] = []
-    current: Dict[str, List[str] | str] = {
-        "title": "",
-        "rationale": "",
-        "steps": [],
-        "risk": "",
-    }
-    for line in lines:
-        if not line:
-            continue
-        # New strategy starts when line looks like "1. <Title>"
-        if line[0].isdigit() and "." in line:
-            if current["title"]:
-                strategies.append(
-                    Strategy(
-                        title=current["title"],
-                        rationale=current["rationale"],
-                        steps=list(current["steps"]),
-                        risk=current["risk"] or None,
-                    )
-                )
-                current = {"title": "", "rationale": "", "steps": [], "risk": ""}
-            current["title"] = line.split(".", 1)[1].strip()
-        elif line.lower().startswith(("rationale:", "reason:")):
-            current["rationale"] = line.split(":", 1)[1].strip()
-        elif line.lower().startswith("risk:"):
-            current["risk"] = line.split(":", 1)[1].strip()
-        elif line[0] in ("-", "•") or line[:2].isdigit() and line[2] in (".", ")"):
-            # Step lines starting with bullet or number
-            step = line.lstrip("-•0123456789. )").strip()
-            current["steps"].append(step)
-    # Append the last strategy
-    if current["title"]:
-        strategies.append(
-            Strategy(
-                title=current["title"],
-                rationale=current["rationale"],
-                steps=list(current["steps"]),
-                risk=current["risk"] or None,
-            )
-        )
-    if not strategies:
-        # Fallback: put entire response as one strategy
-        strategies.append(
-            Strategy(title="General Exit Strategy", rationale=text, steps=[], risk=None)
-        )
-    return StrategiesResponse(strategies=strategies)
-
-
-@router.post("/summary", response_model=SummaryResponse)
-async def ai_summary(
-    req: SummaryRequest,
-    request: Request,
-    _api_key: str = Depends(ensure_api_key),
-) -> SummaryResponse:
-    # Rate limit by client IP
-    ip = request.client.host or "unknown"
-    if not rate_limiter.allow(ip):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded"
-        )
-
+@router.post("/generate-summary")
+async def generate_summary(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Returns:
+      {
+        "summary": "…",
+        "bullets": ["…", "…"]  # optional
+      }
+    """
     try:
-        messages = format_summary_prompt(req)
-        raw = await openai_client.chat_completion(messages, temperature=0.3)
-        return parse_summary_response(raw)
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
-        )
-    except Exception as exc:
-        logger.exception("Summary generation failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail="AI summary error"
-        )
+        prop = _extract_property(payload)
 
-
-@router.post("/strategies", response_model=StrategiesResponse)
-async def ai_strategies(
-    req: StrategiesRequest,
-    request: Request,
-    _api_key: str = Depends(ensure_api_key),
-) -> StrategiesResponse:
-    ip = request.client.host or "unknown"
-    if not rate_limiter.allow(ip):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded"
+        prompt = (
+            "Summarise this UK property investment for an investor in 2–3 sentences. "
+            "Be clear, neutral and practical.\n\n"
+            f"- Title: {prop.title}\n"
+            f"- Location: {prop.location}\n"
+            f"- Price: £{prop.price}\n"
+            f"- Yield: {prop.yield_percent}%\n"
+            f"- ROI: {prop.roi_percent}%\n"
+            f"- Bedrooms: {prop.bedrooms}\n"
+            f"- Bathrooms: {prop.bathrooms}\n"
+            f"- Investment Type: {prop.investmentType}\n"
+            f"- Property Type: {prop.propertyType}\n"
+            f"- Notes: {prop.description}\n"
         )
 
+        summary = _chat(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert UK property investment analyst. "
+                        "You write concise, factual summaries with no fluff."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=180,
+            temperature=0.5,
+        )
+
+        # Optional: quick 3 bullet “consider” list
+        bullets_raw = _chat(
+            [
+                {
+                    "role": "system",
+                    "content": "List 3 short bullet points of considerations or tips.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=120,
+            temperature=0.6,
+        )
+        bullets = _split_bullets(bullets_raw)[:3]
+
+        return {"summary": summary, "bullets": bullets}
+
+    except HTTPException:
+        raise
+    except Exception:
+        # Keep the API resilient for the UI
+        return {"summary": "Unable to generate summary.", "bullets": []}
+
+
+@router.post("/generate-strategies")
+async def generate_strategies(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Returns:
+      { "strategies": ["…", "…", "…"] }
+    """
     try:
-        messages = format_strategies_prompt(req)
-        raw = await openai_client.chat_completion(messages, temperature=0.5)
-        return parse_strategies_response(raw)
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
+        prop = _extract_property(payload)
+
+        prompt = (
+            "You are a UK property strategist. Suggest 3 sensible exit strategies "
+            "for this deal. Use one line per bullet, keep each to ~15 words.\n\n"
+            f"- Price: £{prop.price}\n"
+            f"- ROI: {prop.roi_percent}%   Yield: {prop.yield_percent}%\n"
+            f"- Location: {prop.location}\n"
+            f"- Type: {prop.propertyType or ''}  Investment: {prop.investmentType or ''}\n"
+            f"- Notes: {prop.description or 'N/A'}\n"
         )
-    except Exception as exc:
-        logger.exception("Strategy generation failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail="AI strategies error"
+
+        text = _chat(
+            [{"role": "user", "content": prompt}],
+            max_tokens=220,
+            temperature=0.7,
         )
+        strategies = _split_bullets(text)[:6]  # cap just in case
+
+        # Always return an array (frontend expects it)
+        return {
+            "strategies": strategies
+            or [
+                "Hold & rent until market improves",
+                "Refurb then refinance",
+                "Sell with light staging",
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception:
+        return {"strategies": ["Unable to generate strategies."]}
