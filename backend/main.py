@@ -1,27 +1,37 @@
-from backend.routes import scrape_routes
-# backend/main.py
 from __future__ import annotations
-
 import os
-
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
 from supabase import Client, create_client
 
-# Load env early
+# ----------------------------------------------------------
+# Load env first so routers can read credentials at import
+# ----------------------------------------------------------
 load_dotenv()
 
-# Routers (relative imports; keep at top for linter)
-from backend.routes import area_routes, comps_routes, gpt_routes, scrape_routes  # noqa: E402
-from .routes.ai import router as ai_router  # noqa: E402
-from .routes.notes import router as notes_router  # noqa: E402
-from .routes.off_market_routes import router as off_market_router  # noqa: E402
-from .routes.save_deal import router as save_deal_router  # noqa: E402
-from .routes.stripe_routes import router as stripe_router  # noqa: E402
+# ----------------------------------------------------------
+# Router imports — package first, fallback to script mode
+# ----------------------------------------------------------
+try:
+    from backend.routes import area_routes, comps_routes, gpt_routes, scrape_routes
+    from backend.routes.ai import router as ai_router
+    from backend.routes.notes import router as notes_router
+    from backend.routes.off_market_routes import router as off_market_router
+    from backend.routes.save_deal import router as save_deal_router
+    from backend.routes.stripe_routes import router as stripe_router
+except Exception:
+    # Running from inside backend/ (e.g., Railway: uvicorn main:app)
+    from routes import area_routes, comps_routes, gpt_routes, scrape_routes  # type: ignore
+    from routes.ai import router as ai_router  # type: ignore
+    from routes.notes import router as notes_router  # type: ignore
+    from routes.off_market_routes import router as off_market_router  # type: ignore
+    from routes.save_deal import router as save_deal_router  # type: ignore
+    from routes.stripe_routes import router as stripe_router  # type: ignore
 
+# ----------------------------------------------------------
 # Supabase client (prefer service role on server)
+# ----------------------------------------------------------
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
@@ -45,37 +55,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
 @app.get("/")
 async def root():
     return {"message": "PropNexus backend is running."}
-
 
 @app.get("/health")
 @app.get("/api/health")
 async def health():
     return {"ok": True}
 
-
-# Routers
+# Routers (order is fine now that env is loaded)
 app.include_router(save_deal_router)
 app.include_router(notes_router)
 app.include_router(gpt_routes.router)
-app.include_router(ai_router)  # <- PO2 additive include
+app.include_router(ai_router)
 app.include_router(area_routes.router)
 app.include_router(comps_routes.router)
 app.include_router(scrape_routes.router)
 app.include_router(off_market_router)
 app.include_router(stripe_router)
 
-
-# Supabase-backed property endpoints (unchanged)
+# Supabase-backed property endpoints
 @app.get("/properties")
 async def get_properties():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     return supabase.table("properties").select("*").execute().data
-
 
 @app.get("/properties/{property_id}")
 async def get_property_by_id(property_id: str):
