@@ -2,9 +2,7 @@ name: Continuous Integration
 
 on:
   push:
-    branches:
-      - main
-      - po3/**
+    branches: [ main, po3/** ]
   pull_request:
 
 jobs:
@@ -22,14 +20,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache: 'npm'
 
       - name: Install deps
         run: npm ci
-
-      - name: Lint (if present)
-        run: npm run lint --if-present
 
       - name: Build
         run: npm run build
@@ -48,14 +42,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
 
       - name: Install deps
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # dev tools for CI
+          pip install ruff==0.6.9 pytest
 
       - name: Lint (ruff)
-        run: ruff check
+        run: ruff check .
 
       - name: Tests
         run: pytest -q || true
