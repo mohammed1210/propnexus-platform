@@ -28,10 +28,10 @@ type SummaryData = { ok: boolean; summary?: string; rationale?: string[] };
        .finally(() => setLoading(false));
    }, [id, user_tier]);
 
-  if (loading) return <div className="text-sm text-zinc-500">Generating summary…</div>;
+  if (loading) return <div className="text-sm text-zinc-500">Generating summary</div>;
   if (error) return <div className="text-sm text-red-600">Error: {error}</div>;
   if (!data) return <div className="text-sm text-zinc-500">No summary yet.</div>;
-  if (loading) return <div className="text-sm text-zinc-500">Generating summary…</div>;
+  if (loading) return <div className="text-sm text-zinc-500">Generating summary</div>;
   if (error) return <div className="text-sm text-red-600">Error: {error}</div>;
   if (!data || !data.summary) return <div className="text-sm text-zinc-500">No summary yet.</div>;
 
