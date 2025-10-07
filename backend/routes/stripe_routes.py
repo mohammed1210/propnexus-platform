@@ -1,43 +1,22 @@
-# backend/routes/stripe_routes.py
-from __future__ import annotations
-
+# Package-first utils.billing import with fallback
+try:
+    from backend.utils.billing import get_entitlement_by_email, upsert_subscription
+except Exception:
+    from .utils.billing import get_entitlement_by_email, upsert_subscription
+# (fallback to relative)
+import json
+import logging
 import os
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel
 
-# Try to import billing helpers without crashing the app if they don't exist
-try:
-    from ..utils.billing import (  # type: ignore
-        get_entitlement_by_email,
-        upsert_subscription,
-    )
-except Exception:
-    # Safe fallbacks so the app can boot even if billing utils are absent
-    def get_entitlement_by_email(email: str) -> dict:
-        return {"email": email, "plan": "free", "active": False}
-
-    def upsert_subscription(*_args, **_kwargs) -> None:
-        return None
-
-
 router = APIRouter()
+log = logging.getLogger(__name__)
 
-# Stripe client is optional
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
-
-stripe = None
-if STRIPE_SECRET_KEY:
-    try:
-        import stripe as _stripe  # type: ignore
-
-        _stripe.api_key = STRIPE_SECRET_KEY
-        stripe = _stripe
-    except Exception:
-        stripe = None  # keep booting; routes will 503 if called
-
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 class CheckoutRequest(BaseModel):
     price_id: str
@@ -46,8 +25,7 @@ class CheckoutRequest(BaseModel):
     success_url: str
     cancel_url: str
 
-
-class PortalRequest(BaseModel):
+class PortalPayload(BaseModel):
     customer_id: str
     return_url: str
 
@@ -63,7 +41,6 @@ def me_entitlement(email: str):
     except Exception as exc:
         # Keep this resilient — entitlement is non-critical
         return {"email": email, "plan": "free", "active": False, "error": str(exc)}
-
 
 @router.post("/stripe/create-checkout-session")
 def create_checkout_session(body: CheckoutRequest):
@@ -86,7 +63,6 @@ def create_checkout_session(body: CheckoutRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Stripe error: {exc}") from exc
 
-
 @router.post("/stripe/create-portal-session")
 def create_portal_session(body: PortalRequest):
     if not stripe:
@@ -99,10 +75,14 @@ def create_portal_session(body: PortalRequest):
         session = stripe.billing_portal.Session.create(
             customer=body.customer_id, return_url=body.return_url
         )
-        return {"url": session["url"]}
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Stripe error: {exc}") from exc
+        return {"url": session.url}
+    except Exception as e:
+        log.exception("create_portal_session failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/me/entitlement")
+def get_entitlement(email: str = Query(...)):
+    return get_entitlement_by_email(email)
 
 @router.post("/stripe/webhook")
 async def stripe_webhook(request: Request):
@@ -135,4 +115,4 @@ async def stripe_webhook(request: Request):
         except Exception as e:
             print(f"⚠️ Failed to upsert subscription: {e}")
 
-    return {"ok": True}
+    return {"received": True}
