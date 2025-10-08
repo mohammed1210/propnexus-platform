@@ -1,29 +1,43 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import HeaderClient from '@/components/HeaderClient'
 
 export const metadata: Metadata = {
-  title: 'PropNexus',
-  description: 'AI-Powered Property Sourcing Platform',
-}
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app'),
+  title: {
+    default: 'PropNexus',
+    template: '%s · PropNexus',
+  },
+  description: 'AI-powered property sourcing: analyse yield & ROI, score deals, and track your portfolio.',
+  alternates: {
+    canonical: '/',
+  },
+  openGraph: {
+    type: 'website',
+    title: 'PropNexus',
+    description: 'AI-powered property sourcing platform.',
+    url: '/',
+    siteName: 'PropNexus',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'PropNexus',
+    description: 'AI-powered property sourcing platform.',
+  },
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
+  ],
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
-        {/* Sticky site header */}
-        <header
-          className="sticky top-0 z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-zinc-200/70 dark:border-zinc-800/70"
-          style={{ height: 'var(--site-header-h)' }}
-        >
-          <div className="max-w-6xl mx-auto px-4 h-full flex items-center">
-            <HeaderClient />
-          </div>
-        </header>
-
-        {/* Page content */}
-        <main>{children}</main>
+    <html lang="en" suppressHydrationWarning>
+      <body>
+        {/* header rendered via your shell */}
+        <main id="main" className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none">
+          {children}
+        </main>
       </body>
     </html>
-  )
+  );
 }
