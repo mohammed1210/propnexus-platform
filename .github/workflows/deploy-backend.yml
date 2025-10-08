@@ -2,9 +2,7 @@ name: Deploy Backend (Railway)
 
 on:
   push:
-    branches:
-      - po2
-      - main
+    branches: [po2, main]
   workflow_dispatch:
 
 jobs:
@@ -23,20 +21,18 @@ jobs:
           curl -fsSL https://railway.app/install.sh | sh
           echo "$HOME/.railway/bin" >> $GITHUB_PATH
 
-      - name: Deploy with Railway (no log streaming)
+      - name: Deploy with Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          railway up \
+          railway up . \
             --service "propnexus-backend" \
-            --root "." \
+            --environment production \
             --ci \
-            --no-stream
+            --detach
 
-      # Optional: wait for health
       - name: Wait for health
         env:
-          # Change to your live URL if different:
           URL: https://propnexus-backend-production.up.railway.app/health
         run: |
           for i in {1..30}; do
@@ -52,11 +48,10 @@ jobs:
           exit 1
 
       - name: Backend deps (sanity check)
-        working-directory: backend
         run: |
           python -V
           python - <<'PY'
-          import importlib.util, sys
+          import importlib.util
           spec = importlib.util.spec_from_file_location("main", "main.py")
           mod = importlib.util.module_from_spec(spec)
           spec.loader.exec_module(mod)
