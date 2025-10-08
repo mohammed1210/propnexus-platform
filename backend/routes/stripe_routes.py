@@ -1,31 +1,24 @@
 from __future__ import annotations
-
-import json
 import os
 import stripe
-
 from fastapi import APIRouter, HTTPException, Request
 
-# --- Stripe configuration from env (test or live) ---
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+# --- Stripe configuration from environment ---
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 
-if not STRIPE_SECRET_KEY:
-    # The app can still boot; individual endpoints may raise if missing.
-    # Keeping this import-time check quiet avoids crashing the whole API.
-    pass
-else:
+if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
+else:
+    # Keep quiet if missing; some endpoints may still load
+    print("⚠️ STRIPE_SECRET_KEY not set — Stripe client calls may fail.")
 
-router = APIRouter(prefix="/stripe", tags=["stripe"])
+router = APIRouter(prefix="/stripe", tags=["Stripe"])
 
 
 @router.get("/health")
 async def stripe_health():
-    """
-    Lightweight check that our Stripe server-side config is present.
-    Does not reveal secrets.
-    """
+    """Lightweight health check to confirm Stripe config presence."""
     return {
         "ok": True,
         "has_secret_key": bool(STRIPE_SECRET_KEY),
@@ -36,46 +29,44 @@ async def stripe_health():
 @router.post("/webhook")
 async def stripe_webhook(request: Request):
     """
-    Verify Stripe webhook signatures and handle selected events.
-
+    Verify Stripe webhook signatures and handle key events.
     Requires:
-      - STRIPE_WEBHOOK_SECRET = "whsec_..."
-      - STRIPE_SECRET_KEY = "sk_test_..." or "sk_live_..."
+      - STRIPE_WEBHOOK_SECRET = 'whsec_...'
+      - STRIPE_SECRET_KEY = 'sk_test_...' or 'sk_live_...'
     """
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
     if not STRIPE_WEBHOOK_SECRET:
-        # Misconfiguration: we can’t verify the payload.
-        raise HTTPException(status_code=500, detail="Stripe webhook secret not configured")
+        raise HTTPException(
+            status_code=500,
+            detail="Stripe webhook secret not configured on server",
+        )
 
     try:
-        # NOTE: construct_event will raise if the signature is invalid or payload malformed.
         event = stripe.Webhook.construct_event(
             payload=payload,
             sig_header=sig_header,
             secret=STRIPE_WEBHOOK_SECRET,
         )
-    except ValueError:
-        # Invalid payload
-        raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError:
-        # Invalid signature
-        raise HTTPException(status_code=400, detail="Invalid signature")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid payload: {exc}")
+    except stripe.error.SignatureVerificationError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid signature: {exc}")
 
     evt_type = event.get("type")
     data = event.get("data", {}).get("object", {})
 
-    # Handle the events you subscribed to in the Dashboard
+    # === Handle key Stripe events ===
     if evt_type == "checkout.session.completed":
-        # Example: session contains customer, subscription, etc. in data
-        # You can look up products/prices to map to your app tiers.
         session_id = data.get("id")
         customer_id = data.get("customer")
         subscription_id = data.get("subscription")
-        # TODO: write entitlements for customer_id/subscription_id in your DB.
-        # Keep the handler fast; do heavy work asynchronously if needed.
-        print(f"[stripe] checkout.session.completed session={session_id} customer={customer_id} sub={subscription_id}")
+        print(
+            f"[stripe] checkout.session.completed "
+            f"session={session_id} customer={customer_id} sub={subscription_id}"
+        )
+        # TODO: update your DB entitlements or trigger async worker here
 
     elif evt_type in {
         "customer.subscription.created",
@@ -85,8 +76,11 @@ async def stripe_webhook(request: Request):
         sub_id = data.get("id")
         status = data.get("status")
         customer_id = data.get("customer")
-        # TODO: upsert subscription status & map to tiers
-        print(f"[stripe] subscription event type={evt_type} id={sub_id} status={status} customer={customer_id}")
+        print(
+            f"[stripe] subscription event type={evt_type} "
+            f"id={sub_id} status={status} customer={customer_id}"
+        )
+        # TODO: upsert subscription status in DB
 
-    # Always 2xx if the event was processed/ignored successfully
+    # Always acknowledge the event
     return {"received": True}
