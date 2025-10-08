@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -110,7 +110,7 @@ export default function PropertyDetailsPage() {
         {/* Left column */}
         <div className="space-y-6">
           {/* Indicative scorecard */}
-          <div className="border p-4 rounded-md">
+          <div className="card p-4">
             <h2 className="font-semibold text-lg mb-2">AI Deal Score (indicative)</h2>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>Yield:</div>
@@ -125,13 +125,13 @@ export default function PropertyDetailsPage() {
           </div>
 
           {/* Investment Summary */}
-          <div className="border p-4 rounded-md">
+          <div className="card p-4">
             <h2 className="font-semibold text-lg mb-2">Investment Summary</h2>
             <InvestmentSummary property={property as any} />
           </div>
 
           {/* Exit Strategies */}
-          <div className="border p-4 rounded-md">
+          <div className="card p-4">
             <h2 className="font-semibold text-lg mb-2">Exit Strategies</h2>
             <ExitStrategyGenerator
               title={String(property.title ?? '')}
@@ -150,7 +150,7 @@ export default function PropertyDetailsPage() {
           </div>
 
           {/* Notes (render sign-in nudge when signed out inside the component) */}
-          <div className="border p-4 rounded-md">
+          <div className="card p-4">
             <h2 className="font-semibold text-lg mb-2">Investor Notes</h2>
             {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
           </div>
@@ -159,19 +159,19 @@ export default function PropertyDetailsPage() {
         {/* Right column */}
         <div className="space-y-6">
           {/* Mortgage calculator */}
-          <div className="border p-4 rounded-md">
+          <div className="card p-4">
             <h2 className="font-semibold text-lg mb-2">Mortgage & BRRR Calculator</h2>
             <MortgageCalculator price={price} />
           </div>
 
           {/* Stamp Duty */}
-          <div className="border p-4 rounded-md">
+          <div className="card p-4">
             <h2 className="font-semibold text-lg mb-2">Stamp Duty Calculator</h2>
             <StampDutyCalculator price={price} />
           </div>
 
           {/* Location */}
-          <div className="border p-4 rounded-md">
+          <div className="card p-4">
             <h2 className="font-semibold text-lg mb-2">Location</h2>
             {typeof property.latitude === 'number' && typeof property.longitude === 'number' ? (
               <iframe
