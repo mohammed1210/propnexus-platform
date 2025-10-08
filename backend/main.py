@@ -5,10 +5,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import Client, create_client
 
-# Load environment before importing routers
+# Load env before router imports
 load_dotenv()
 
-# Package-first, fallback to script mode (Railway runs from backend/)
+# Try package imports first, then fallback to script-local imports.
 try:
     from backend.routes import area_routes, comps_routes, gpt_routes, scrape_routes
     from backend.routes.ai import router as ai_router
@@ -24,10 +24,12 @@ except Exception:
     from routes.save_deal import router as save_deal_router  # type: ignore
     from routes.stripe_routes import router as stripe_router  # type: ignore
 
-# Supabase client (service role preferred)
+# Supabase (service role preferred on server)
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-supabase: Client | None = create_client(SUPABASE_URL, SUPABASE_KEY) if (SUPABASE_URL and SUPABASE_KEY) else None
+supabase: Client | None = (
+    create_client(SUPABASE_URL, SUPABASE_KEY) if (SUPABASE_URL and SUPABASE_KEY) else None
+)
 
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
