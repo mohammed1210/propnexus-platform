@@ -1,5 +1,10 @@
 from __future__ import annotations
-import os
+import os, pathlib, sys, logging
+logging.basicConfig(level=logging.INFO)
+logging.info("CWD=%s", os.getcwd())
+logging.info("PYTHONPATH=%s", os.environ.get("PYTHONPATH"))
+logging.info("Exists backend/main.py? %s",
+             pathlib.Path(__file__).resolve().is_file())
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
