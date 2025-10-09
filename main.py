@@ -33,6 +33,7 @@ if not spec or not spec.loader:
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)  # type: ignore[attr-defined]
 logging.info("Loaded backend.main via file path")
+logging.info("ROOT SHIM VERSION: 2025-10-09T12:xxZ")
 
 # Expose FastAPI app for `uvicorn main:app`
 app = getattr(mod, "app", None)
