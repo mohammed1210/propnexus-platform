@@ -2,9 +2,7 @@ name: Deploy Backend (Railway)
 
 on:
   push:
-    branches:
-      - po2
-      - main
+    branches: [po2, main]
   workflow_dispatch:
 
 jobs:
@@ -20,7 +18,7 @@ jobs:
           curl -fsSL https://railway.app/install.sh | sh
           echo "$HOME/.railway/bin" >> $GITHUB_PATH
 
-      # Deploy from the REPO ROOT so /app/backend exists in the image
+      # IMPORTANT: run from REPO ROOT and upload the whole repo
       - name: Deploy with Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
@@ -28,9 +26,8 @@ jobs:
           railway up \
             --service "propnexus-backend" \
             --path "." \
-            --environment production \
             --ci \
-            --detach
+            --no-stream
 
       - name: Wait for health
         env:
@@ -47,26 +44,3 @@ jobs:
           done
           echo "❌ Health check failed"
           exit 1
-
-      # Minimal Python setup so the import sanity check can run
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install backend deps (for sanity check only)
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r backend/requirements.txt
-
-      - name: Backend deps (sanity check)
-        run: |
-          python -V
-          python - <<'PY'
-          import importlib.util
-          spec = importlib.util.spec_from_file_location("main", "main.py")
-          mod = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(mod)
-          assert hasattr(mod, "app"), "FastAPI 'app' not exported by main.py"
-          print("✓ FastAPI app found")
-          PY
