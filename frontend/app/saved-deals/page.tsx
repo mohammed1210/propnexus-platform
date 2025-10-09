@@ -1,10 +1,13 @@
-'use client';
+"use client";
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 
+// A saved deal returned from the backend.  We include the same fields as
+// the existing page and mark optional properties appropriately.
 type Deal = {
   id: string;
   property_id: string | null;
@@ -20,16 +23,20 @@ type Deal = {
   investment_type?: string | null;
 };
 
+// Ensure this page is always rendered dynamically at the edge.  Without this
+// directive Next.js may cache the results and fail to reflect real‑time
+// updates when users add or remove saved deals.
 export const dynamic = 'force-dynamic';
 
-/** Resolve the FastAPI base URL from public env */
+/**
+ * Resolve the FastAPI base URL from public env.  Throws an error if the
+ * environment variables are not set, allowing runtime errors to surface
+ * clearly during development.
+ */
 function getBackendBase(): string {
-  const raw =
-    (process.env.NEXT_PUBLIC_API_URL ||
-      process.env.NEXT_PUBLIC_BACKEND_URL ||
-      '') as string;
+  const raw = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || '') as string;
   if (!raw) throw new Error('NEXT_PUBLIC_API_URL (or NEXT_PUBLIC_BACKEND_URL) is not set');
-  return raw.replace(/\/+$/, '');
+  return raw.replace(/\/+\$/, '');
 }
 
 export default function SavedDealsPage() {
@@ -47,8 +54,6 @@ export default function SavedDealsPage() {
         const resp = await fetch(`${base}/saved-deals`, { cache: 'no-store' });
         if (!resp.ok) throw new Error(`Load failed: ${resp.status}`);
         const data = (await resp.json()) as Deal[] | { data: Deal[] };
-
-        // handle either plain array or { data: [...] }
         const items = Array.isArray(data) ? data : (data as any)?.data ?? [];
         if (!cancelled) setRows(items);
       } catch (err) {
@@ -65,22 +70,17 @@ export default function SavedDealsPage() {
 
   const removeDeal = async (id: string) => {
     if (!window.confirm('Remove this saved deal?')) return;
-
     // optimistic update
     const prev = rows;
     setBusyId(id);
     setRows(r => r.filter(x => x.id !== id));
-
     try {
       const base = getBackendBase();
-      const resp = await fetch(`${base}/saved-deals/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
+      const resp = await fetch(`${base}/saved-deals/${encodeURIComponent(id)}`, { method: 'DELETE' });
       if (!resp.ok) throw new Error(`Delete failed: ${resp.status}`);
     } catch (err) {
       console.error('delete saved_deal', err);
-      // rollback on error
-      setRows(prev);
+      setRows(prev); // rollback on error
       window.alert('Sorry — failed to remove. Please try again.');
     } finally {
       setBusyId(null);
@@ -108,7 +108,6 @@ export default function SavedDealsPage() {
           </div>
         )}
       </div>
-
       {loading ? (
         <div className="p-4">Loading…</div>
       ) : rows.length === 0 ? (
@@ -120,19 +119,18 @@ export default function SavedDealsPage() {
             return (
               <li
                 key={d.id}
-                className="rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition"
+                className="card overflow-hidden transition hover:shadow-md"
               >
                 {/* image */}
-                <div className="aspect-[16/9] bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                <div className="aspect-[16/9] overflow-hidden">
+                  <Image
                     src={d.imageurl ?? 'https://placehold.co/640x360?text=PropNexus'}
                     alt={d.title ?? 'Property'}
+                    width={640}
+                    height={360}
                     className="w-full h-full object-cover"
-                    loading="lazy"
                   />
                 </div>
-
                 {/* body */}
                 <div className="p-4 space-y-2">
                   <div className="flex items-start justify-between gap-3">
@@ -142,16 +140,13 @@ export default function SavedDealsPage() {
                     >
                       {d.title ?? '—'}
                     </Link>
-
                     {d.investment_type ? (
                       <span className="shrink-0 text-[11px] px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300 tracking-wide">
                         {String(d.investment_type).toUpperCase()}
                       </span>
                     ) : null}
                   </div>
-
                   <div className="text-sm opacity-70">{d.location ?? '—'}</div>
-
                   <div className="flex items-center justify-between pt-1">
                     <div className="font-semibold">£{formatGBP(num(d.price))}</div>
                     <div className="flex gap-2 text-xs">
@@ -163,29 +158,28 @@ export default function SavedDealsPage() {
                       </span>
                     </div>
                   </div>
-
                   <div className="text-xs opacity-70">
                     {d.bedrooms ?? 0} beds • {d.bathrooms ?? 0} baths
                   </div>
-
-                  <div className="text-xs opacity-60">Saved {formatDate(d.saved_at)}</div>
-
+                  <div className="text-xs opacity-60">
+                    Saved {formatDate(d.saved_at)}
+                  </div>
                   <div className="pt-2 grid grid-cols-3 gap-2">
                     <Link
                       href={d.property_id ? `/property/${d.property_id}` : '#'}
-                      className="col-span-1 text-center rounded-xl border px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+                      className="btn btn-outline text-center"
                     >
                       View
                     </Link>
                     <button
-                      className="col-span-1 rounded-xl bg-zinc-900 text-white px-3 py-2 hover:bg-zinc-800 disabled:opacity-60 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+                      className="btn btn-primary"
                       onClick={() => window.open('mailto:sales@propnexus.ai')}
                       disabled={removing}
                     >
                       Enquire
                     </button>
                     <button
-                      className="col-span-1 rounded-xl border border-red-300 text-red-700 px-3 py-2 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-900/20 disabled:opacity-60"
+                      className="btn btn-outline border-red-300 text-red-700 dark:border-red-800 dark:text-red-300"
                       onClick={() => removeDeal(d.id)}
                       disabled={removing}
                       aria-busy={removing}
