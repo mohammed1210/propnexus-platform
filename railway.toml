@@ -8,7 +8,8 @@ builder = "NIXPACKS"
 buildCommand = "echo skip-next-build"
 
 [deploy]
-startCommand = "bash -lc './scripts/cron-ingest.sh'"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"
+healthcheckPath = "/health"
 
 [cron]
 schedule = "0 6 * * *"                  # every day at 06:00 UTC
