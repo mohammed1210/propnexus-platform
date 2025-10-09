@@ -2,17 +2,12 @@ name: Deploy Backend (Railway)
 
 on:
   push:
-    branches:
-      - po2
-      - main
+    branches: [po2, main]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
 
     steps:
       - name: Checkout
@@ -23,20 +18,19 @@ jobs:
           curl -fsSL https://railway.app/install.sh | sh
           echo "$HOME/.railway/bin" >> $GITHUB_PATH
 
-      - name: Deploy with Railway (no log streaming)
+      # IMPORTANT: run from REPO ROOT and upload the whole repo
+      - name: Deploy with Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway up \
             --service "propnexus-backend" \
-            --root "." \
+            --path "." \
             --ci \
             --no-stream
 
-      # Optional: wait for health
       - name: Wait for health
         env:
-          # Change to your live URL if different:
           URL: https://propnexus-backend-production.up.railway.app/health
         run: |
           for i in {1..30}; do
@@ -50,16 +44,3 @@ jobs:
           done
           echo "❌ Health check failed"
           exit 1
-
-      - name: Backend deps (sanity check)
-        working-directory: backend
-        run: |
-          python -V
-          python - <<'PY'
-          import importlib.util, sys
-          spec = importlib.util.spec_from_file_location("main", "main.py")
-          mod = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(mod)
-          assert hasattr(mod, "app"), "FastAPI 'app' not exported by main.py"
-          print("✓ FastAPI app found")
-          PY

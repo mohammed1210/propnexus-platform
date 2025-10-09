@@ -60,3 +60,4 @@ async def scrape_all_sources(req: ScrapeRequest):
     except Exception as e:  # pragma: no cover
         print("❌ Scrape failed:", type(e).__name__)
         raise HTTPException(status_code=500, detail="Scraping failed")
+    
