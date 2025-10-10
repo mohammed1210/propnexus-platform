@@ -8,7 +8,7 @@ builder = "NIXPACKS"
 buildCommand = "echo skip-next-build"
 
 [deploy]
-startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8080}"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"
 healthcheckPath = "/health"
 
 [cron]
@@ -17,3 +17,4 @@ command  = "npm --prefix . run ingest:csv"
 
 [env]
 NODE_ENV = "production"
+PYTHON_VERSION = "3.12.3"
