@@ -17,3 +17,4 @@ command  = "npm --prefix . run ingest:csv"
 
 [env]
 NODE_ENV = "production"
+PYTHON_VERSION = "3.12.3"
