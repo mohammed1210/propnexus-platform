@@ -47,9 +47,6 @@ export default function PropertyDetailsPage() {
           .eq('id', id)
           .single();
 
-<<<<<<< HEAD
-        if (error) throw error;
-=======
   async function handleSaveDeal() {
     if (!property) return;
     try {
@@ -66,7 +63,6 @@ export default function PropertyDetailsPage() {
       alert('Could not save this deal.');
     }
   }
->>>>>>> bd565100 (feat(ai): add strategy + summary fixes, scraper updates, and TS type cleanup)
 
         // Normalize a few fields the UI expects
         const p: LooseProperty | null = data
@@ -92,10 +88,6 @@ export default function PropertyDetailsPage() {
       }
     })();
 
-<<<<<<< HEAD
-    return () => {
-      cancelled = true;
-=======
   // Normalize nullable numerics for components that expect numbers
   const normalizedForSummary = useMemo(() => {
     if (!property) return null;
@@ -106,7 +98,6 @@ export default function PropertyDetailsPage() {
       bathrooms: Number(property.bathrooms ?? 0),
       yield_percent: Number(property.yield_percent ?? 0),
       roi_percent: Number(property.roi_percent ?? 0),
->>>>>>> bd565100 (feat(ai): add strategy + summary fixes, scraper updates, and TS type cleanup)
     };
   }, [id, sb]);
 
@@ -221,9 +212,6 @@ export default function PropertyDetailsPage() {
         </div>
       </div>
 
-<<<<<<< HEAD
-      {/* Floating local chatbot */}
-=======
       {/* RIGHT — Sidebar */}
       <aside className="md:col-span-1 space-y-6">
         <Section aria-labelledby="deal-summary">
@@ -249,7 +237,6 @@ export default function PropertyDetailsPage() {
         </Section>
       </aside>
 
->>>>>>> bd565100 (feat(ai): add strategy + summary fixes, scraper updates, and TS type cleanup)
       <AIChatbot property={property as any} />
     </Section>
   );
