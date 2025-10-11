@@ -25,3 +25,23 @@ textarea {
   color: #e5e7eb;
   border: 1px solid #3f3f46;
 }
+/* ===== A11y focus & skip link (polish) ===== */
+:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* Skip link (reveals on focus) */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  padding: 8px 12px;
+  background: #111;
+  color: #fff;
+  z-index: 1000;
+  border-radius: 4px;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+.skip-link:focus { top: 8px; }
