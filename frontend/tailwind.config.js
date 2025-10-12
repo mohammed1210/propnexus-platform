@@ -4,7 +4,7 @@ module.exports = {
     "./src/**/*.{js,ts,jsx,tsx}",
     "./components/**/*.{js,ts,jsx,tsx}",
     "./app/**/*.{js,ts,jsx,tsx}",
-    "./styles/**/*.css",
+    "./styles/**/*.css",           // ✅ correct glob
     "./pages/**/*.{ts,tsx,js,jsx}",
   ],
   darkMode: ["class", '[data-theme="dark"]'],

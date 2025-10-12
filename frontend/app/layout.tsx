@@ -1,5 +1,4 @@
-// frontend/app/layout.tsx
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 // ✅ import client helpers statically
@@ -16,9 +15,7 @@ export const metadata: Metadata = {
   },
   description:
     'AI-powered property sourcing: analyse yield & ROI, score deals, and track your portfolio.',
-  alternates: {
-    canonical: '/',
-  },
+  alternates: { canonical: '/' },
   openGraph: {
     type: 'website',
     title: 'PropNexus',
@@ -31,6 +28,10 @@ export const metadata: Metadata = {
     title: 'PropNexus',
     description: 'AI-powered property sourcing platform.',
   },
+};
+
+// ✅ Next 15+: themeColor must be in viewport export
+export const viewport: Viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
     { media: '(prefers-color-scheme: dark)', color: '#09090b' },
