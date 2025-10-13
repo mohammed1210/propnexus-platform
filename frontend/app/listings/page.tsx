@@ -1,36 +1,28 @@
 // frontend/app/listings/page.tsx
-"use client";
-export const dynamic = "force-dynamic";
+'use client';
+export const dynamic = 'force-dynamic';
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import nextDynamic from "next/dynamic";
-import type { Map as LeafletMap, LatLngBoundsExpression } from "leaflet";
-import { FiSearch } from "react-icons/fi";
-import { LuPoundSterling, LuBedDouble } from "react-icons/lu";
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
+import nextDynamic from 'next/dynamic';
+import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
+import { FiSearch } from 'react-icons/fi';
+import { LuPoundSterling, LuBedDouble } from 'react-icons/lu';
 
-import Section from "@/components/ui/Section";
-import SectionTitle from "@/components/ui/SectionTitle";
-import PropertyCard from "@/components/PropertyCard";
-import { getSupabase } from "@/lib/supabaseClient";
+import Section from '@/components/ui/Section';
+import SectionTitle from '@/components/ui/SectionTitle';
+import PropertyCard from '@/components/PropertyCard';
+import { getSupabase } from '@/lib/supabaseClient';
 
-const MapContainer = nextDynamic(
-  () => import("react-leaflet").then((m) => m.MapContainer),
-  { ssr: false },
-);
-const TileLayer = nextDynamic(
-  () => import("react-leaflet").then((m) => m.TileLayer),
-  { ssr: false },
-);
-const Marker = nextDynamic(
-  () => import("react-leaflet").then((m) => m.Marker),
-  { ssr: false },
-);
-const Popup = nextDynamic(
-  () => import("react-leaflet").then((m) => m.Popup),
-  { ssr: false },
-);
+const MapContainer = nextDynamic(() => import('react-leaflet').then((m) => m.MapContainer), {
+  ssr: false,
+});
+const TileLayer = nextDynamic(() => import('react-leaflet').then((m) => m.TileLayer), {
+  ssr: false,
+});
+const Marker = nextDynamic(() => import('react-leaflet').then((m) => m.Marker), { ssr: false });
+const Popup = nextDynamic(() => import('react-leaflet').then((m) => m.Popup), { ssr: false });
 
 type RawProperty = {
   id: string | null;
@@ -90,14 +82,14 @@ function ClientMap({
       ref={setMap as any}
       center={defaultCenter}
       zoom={6}
-      style={{ height: "100%", width: "100%" }}
+      style={{ height: '100%', width: '100%' }}
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       {points.map((p) => (
         <Marker key={p.id} position={{ lat: p.lat, lng: p.lng }}>
           <Popup>
             <div className="text-sm font-medium">{p.title}</div>
-            {typeof p.price === "number" && (
+            {typeof p.price === 'number' && (
               <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
             )}
             <div className="mt-1">
@@ -117,10 +109,10 @@ function FiltersBar() {
   const sp = useSearchParams();
   const router = useRouter();
 
-  const qInit = sp?.get("q") ?? "";
-  const minInit = sp?.get("min") ?? "";
-  const maxInit = sp?.get("max") ?? "";
-  const bedsInit = sp?.get("beds") ?? "";
+  const qInit = sp?.get('q') ?? '';
+  const minInit = sp?.get('min') ?? '';
+  const maxInit = sp?.get('max') ?? '';
+  const bedsInit = sp?.get('beds') ?? '';
 
   const [q, setQ] = useState(qInit);
   const [min, setMin] = useState(minInit);
@@ -129,10 +121,10 @@ function FiltersBar() {
 
   const apply = () => {
     const p = new URLSearchParams();
-    if (q) p.set("q", q);
-    if (min) p.set("min", min);
-    if (max) p.set("max", max);
-    if (beds) p.set("beds", beds);
+    if (q) p.set('q', q);
+    if (min) p.set('min', min);
+    if (max) p.set('max', max);
+    if (beds) p.set('beds', beds);
     router.push(`/listings?${p.toString()}`);
   };
 
@@ -183,15 +175,15 @@ function FiltersBar() {
 
       <div className="flex gap-2">
         <button onClick={apply} className="pnx-pnx-btn pnx-pnx-pnx-btn-primary flex-1">
-           Apply Filters
+          Apply Filters
         </button>
         <button
           onClick={() => {
-            setQ("");
-            setMin("");
-            setMax("");
-            setBeds("");
-            router.push("/listings");
+            setQ('');
+            setMin('');
+            setMax('');
+            setBeds('');
+            router.push('/listings');
           }}
           className="pnx-pnx-btn pnx-pnx-pnx-btn-outline"
         >
@@ -206,10 +198,10 @@ function FiltersBar() {
 function ListingsInner() {
   const searchParams = useSearchParams();
 
-  const q = searchParams?.get("q") ?? "";
-  const minP = Number(searchParams?.get("min") ?? "") || 0;
-  const maxP = Number(searchParams?.get("max") ?? "") || 0;
-  const beds = Number(searchParams?.get("beds") ?? "") || 0;
+  const q = searchParams?.get('q') ?? '';
+  const minP = Number(searchParams?.get('min') ?? '') || 0;
+  const maxP = Number(searchParams?.get('max') ?? '') || 0;
+  const beds = Number(searchParams?.get('beds') ?? '') || 0;
 
   const [rows, setRows] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
@@ -222,23 +214,23 @@ function ListingsInner() {
 
       // Fetch only the fields we actually use; keep ordering stable
       let query = supabase
-        .from("properties")
+        .from('properties')
         .select(
-          "id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at",
+          'id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at',
         )
         .limit(200)
-        .order("created_at", { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (q) query = query.or(`title.ilike.%${q}%,location.ilike.%${q}%`);
-      if (minP) query = query.gte("price", minP);
-      if (maxP) query = query.lte("price", maxP);
-      if (beds) query = query.gte("bedrooms", beds);
+      if (minP) query = query.gte('price', minP);
+      if (maxP) query = query.lte('price', maxP);
+      if (beds) query = query.gte('bedrooms', beds);
 
       const { data, error } = await query;
       if (cancelled) return;
 
       if (error) {
-        console.error("[listings] supabase error", error);
+        console.error('[listings] supabase error', error);
         setRows([]);
       } else {
         setRows(data || []);

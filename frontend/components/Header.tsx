@@ -13,9 +13,15 @@ export default function Header() {
 
       {/* Keep your existing action buttons */}
       <nav className={styles.nav} aria-label="Primary">
-        <button type="button" className={styles.button}>Search</button>
-        <button type="button" className={styles.button}>Filters</button>
-        <button type="button" className={styles.button}>Map / List</button>
+        <button type="button" className={styles.button}>
+          Search
+        </button>
+        <button type="button" className={styles.button}>
+          Filters
+        </button>
+        <button type="button" className={styles.button}>
+          Map / List
+        </button>
       </nav>
     </header>
   );

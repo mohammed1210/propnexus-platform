@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -41,11 +41,7 @@ export default function PropertyDetailsPage() {
       setError(null);
       try {
         // Read EXACTLY the same source as the listings page
-        const { data, error } = await sb
-          .from('properties')
-          .select('*')
-          .eq('id', id)
-          .single();
+        const { data, error } = await sb.from('properties').select('*').eq('id', id).single();
 
         if (error) throw error;
 

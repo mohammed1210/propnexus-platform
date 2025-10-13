@@ -7,7 +7,7 @@ import BackToTop from '@/components/BackToTop';
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app'
+    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app',
   ),
   title: {
     default: 'PropNexus',
@@ -38,11 +38,7 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>

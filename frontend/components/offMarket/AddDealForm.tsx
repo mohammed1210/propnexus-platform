@@ -37,8 +37,10 @@ export default function AddDealForm({ onCreated }: Props) {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    setF(s => ({ ...s, [k]: e.target.value }));
+  const set =
+    (k: keyof FormState) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setF((s) => ({ ...s, [k]: e.target.value }));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -105,26 +107,44 @@ export default function AddDealForm({ onCreated }: Props) {
       <div className="space-y-3">
         <label className="block text-sm">
           <span className="text-zinc-600">Title</span>
-          <input className="mt-1 w-full rounded-md border px-3 py-2"
-                 value={f.title} onChange={set('title')} placeholder="Spacious 3-bed semi" />
+          <input
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            value={f.title}
+            onChange={set('title')}
+            placeholder="Spacious 3-bed semi"
+          />
         </label>
 
         <label className="block text-sm">
           <span className="text-zinc-600">Price (£)</span>
-          <input className="mt-1 w-full rounded-md border px-3 py-2" inputMode="numeric"
-                 value={f.price} onChange={set('price')} placeholder="250000" />
+          <input
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            inputMode="numeric"
+            value={f.price}
+            onChange={set('price')}
+            placeholder="250000"
+          />
         </label>
 
         <label className="block text-sm">
           <span className="text-zinc-600">Bedrooms</span>
-          <input className="mt-1 w-full rounded-md border px-3 py-2" inputMode="numeric"
-                 value={f.bedrooms} onChange={set('bedrooms')} placeholder="3" />
+          <input
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            inputMode="numeric"
+            value={f.bedrooms}
+            onChange={set('bedrooms')}
+            placeholder="3"
+          />
         </label>
 
         <label className="block text-sm">
           <span className="text-zinc-600">Contact (email)</span>
-          <input className="mt-1 w-full rounded-md border px-3 py-2"
-                 value={f.contact} onChange={set('contact')} placeholder="agent@agency.co.uk" />
+          <input
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            value={f.contact}
+            onChange={set('contact')}
+            placeholder="agent@agency.co.uk"
+          />
         </label>
 
         <label className="block text-sm">
@@ -144,14 +164,22 @@ export default function AddDealForm({ onCreated }: Props) {
       <div className="space-y-3">
         <label className="block text-sm">
           <span className="text-zinc-600">Location *</span>
-          <input className="mt-1 w-full rounded-md border px-3 py-2"
-                 value={f.location} onChange={set('location')} placeholder="Liverpool" required />
+          <input
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            value={f.location}
+            onChange={set('location')}
+            placeholder="Liverpool"
+            required
+          />
         </label>
 
         <label className="block text-sm">
           <span className="text-zinc-600">Investment Type</span>
-          <select className="mt-1 w-full rounded-md border px-3 py-2"
-                  value={f.investment_type} onChange={set('investment_type')}>
+          <select
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            value={f.investment_type}
+            onChange={set('investment_type')}
+          >
             <option>HMO</option>
             <option>Single-let</option>
             <option>BRR</option>
@@ -162,27 +190,37 @@ export default function AddDealForm({ onCreated }: Props) {
 
         <label className="block text-sm">
           <span className="text-zinc-600">Bathrooms</span>
-          <input className="mt-1 w-full rounded-md border px-3 py-2" inputMode="numeric"
-                 value={f.bathrooms} onChange={set('bathrooms')} placeholder="1" />
+          <input
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            inputMode="numeric"
+            value={f.bathrooms}
+            onChange={set('bathrooms')}
+            placeholder="1"
+          />
         </label>
 
         <label className="block text-sm">
           <span className="text-zinc-600">Source</span>
-          <input className="mt-1 w-full rounded-md border px-3 py-2"
-                 value={f.source} onChange={set('source')} placeholder="Manual / Agent / Portal" />
+          <input
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            value={f.source}
+            onChange={set('source')}
+            placeholder="Manual / Agent / Portal"
+          />
         </label>
 
         <label className="block text-sm">
           <span className="text-zinc-600">Notes</span>
-          <textarea className="mt-1 w-full rounded-md border px-3 py-2 min-h-[84px]"
-                    value={f.notes} onChange={set('notes')}
-                    placeholder="Key details, works required, yield/ROI notes..." />
+          <textarea
+            className="mt-1 w-full rounded-md border px-3 py-2 min-h-[84px]"
+            value={f.notes}
+            onChange={set('notes')}
+            placeholder="Key details, works required, yield/ROI notes..."
+          />
         </label>
       </div>
 
-      {error && (
-        <div className="md:col-span-2 text-sm text-red-600">{error}</div>
-      )}
+      {error && <div className="md:col-span-2 text-sm text-red-600">{error}</div>}
 
       <div className="md:col-span-2 flex gap-3">
         <button

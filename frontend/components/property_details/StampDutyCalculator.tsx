@@ -12,20 +12,24 @@ interface StampDutyCalculatorProps {
 type Band = { upTo: number | null; rate: number; label: string };
 
 const BANDS_STANDARD: Band[] = [
-  { upTo: 250_000, rate: 0.0,  label: 'Up to £250k' },
+  { upTo: 250_000, rate: 0.0, label: 'Up to £250k' },
   { upTo: 925_000, rate: 0.05, label: '£250k–£925k' },
-  { upTo: 1_500_000, rate: 0.10, label: '£925k–£1.5m' },
-  { upTo: null,     rate: 0.12, label: '£1.5m+' },
+  { upTo: 1_500_000, rate: 0.1, label: '£925k–£1.5m' },
+  { upTo: null, rate: 0.12, label: '£1.5m+' },
 ];
 
 // First-time buyer relief (England & NI): 0% up to 425k, 5% on 425–625k, over 625k → standard
 const BANDS_FTB: Band[] = [
-  { upTo: 425_000, rate: 0.0,  label: 'Up to £425k (FTB relief)' },
+  { upTo: 425_000, rate: 0.0, label: 'Up to £425k (FTB relief)' },
   { upTo: 625_000, rate: 0.05, label: '£425k–£625k (FTB relief)' },
 ];
 
 const fmtGBP0 = (n: number) =>
-  new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(n);
+  new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    maximumFractionDigits: 0,
+  }).format(n);
 
 /** Calculate SDLT for a price using the provided band array. */
 function calcFromBands(price: number, bands: Band[]) {
@@ -68,12 +72,16 @@ export default function StampDutyCalculator({ price, className }: StampDutyCalcu
   const totalDuty = Math.round(Math.max(0, baseline.total + surcharge));
 
   return (
-    <div className={`bg-white dark:bg-neutral-900 shadow-md rounded-md p-5 mt-6 ${className ?? ''}`}>
+    <div
+      className={`bg-white dark:bg-neutral-900 shadow-md rounded-md p-5 mt-6 ${className ?? ''}`}
+    >
       <h3 className="text-lg font-semibold mb-4">🏛️ Stamp Duty Calculator</h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1" htmlFor="sdlt-price">Property Price (£)</label>
+          <label className="block text-sm font-medium mb-1" htmlFor="sdlt-price">
+            Property Price (£)
+          </label>
           <input
             id="sdlt-price"
             type="number"
@@ -86,7 +94,9 @@ export default function StampDutyCalculator({ price, className }: StampDutyCalcu
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1" htmlFor="sdlt-type">Buyer Type</label>
+          <label className="block text-sm font-medium mb-1" htmlFor="sdlt-type">
+            Buyer Type
+          </label>
           <select
             id="sdlt-type"
             className="w-full border rounded px-3 py-2 bg-white dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700"
@@ -146,7 +156,8 @@ export default function StampDutyCalculator({ price, className }: StampDutyCalcu
       </div>
 
       <p className="text-xs text-gray-500 mt-3">
-        England & Northern Ireland residential rates. Indicative only — reliefs and surcharges can vary by circumstances.
+        England & Northern Ireland residential rates. Indicative only — reliefs and surcharges can
+        vary by circumstances.
       </p>
     </div>
   );

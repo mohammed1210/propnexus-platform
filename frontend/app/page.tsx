@@ -56,8 +56,8 @@ export default function HomePage() {
             </h1>
 
             <p className="mt-4 text-slate-200/90 max-w-prose">
-              Discover investment opportunities, score deals with AI, and analyse
-              yield & ROI in seconds. Start by searching a location or postcode.
+              Discover investment opportunities, score deals with AI, and analyse yield & ROI in
+              seconds. Start by searching a location or postcode.
             </p>
 
             {/* Search */}

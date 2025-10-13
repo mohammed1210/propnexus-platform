@@ -54,7 +54,9 @@ export default function OffMarketPage() {
         setLoading(false);
       }
     })();
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [sb]);
 
   const refreshRows = async () => {
@@ -101,23 +103,20 @@ export default function OffMarketPage() {
       }));
 
       const existingKey = new Set(
-        rows.map(r => `${(r.title || '').trim().toLowerCase()}|${r.price ?? ''}`)
+        rows.map((r) => `${(r.title || '').trim().toLowerCase()}|${r.price ?? ''}`),
       );
       const toInsert = payload.filter(
-        d => !existingKey.has(`${(d.title || '').trim().toLowerCase()}|${d.price ?? ''}`)
+        (d) => !existingKey.has(`${(d.title || '').trim().toLowerCase()}|${d.price ?? ''}`),
       );
       if (toInsert.length === 0) {
         alert('No new unique deals to insert.');
         return;
       }
 
-      const { data, error } = await sb
-        .from('off_market_deals')
-        .insert(toInsert)
-        .select('*');
+      const { data, error } = await sb.from('off_market_deals').insert(toInsert).select('*');
       if (error) throw error;
 
-      setRows(prev => [ ...(data as OffMarket[]), ...prev ]);
+      setRows((prev) => [...(data as OffMarket[]), ...prev]);
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'Failed to generate / save deals.');
@@ -137,21 +136,21 @@ export default function OffMarketPage() {
             className="border rounded-lg px-3 py-2 w-[160px]"
             placeholder="Location"
             value={loc}
-            onChange={e => setLoc(e.target.value)}
+            onChange={(e) => setLoc(e.target.value)}
           />
           <input
             className="border rounded-lg px-3 py-2 w-[120px]"
             placeholder="Budget £"
             inputMode="numeric"
             value={budget}
-            onChange={e => setBudget(e.target.value)}
+            onChange={(e) => setBudget(e.target.value)}
           />
           <input
             className="border rounded-lg px-3 py-2 w-[90px]"
             placeholder="Count"
             inputMode="numeric"
             value={count}
-            onChange={e => setCount(e.target.value)}
+            onChange={(e) => setCount(e.target.value)}
           />
           <button
             onClick={generateDeals}
@@ -165,9 +164,7 @@ export default function OffMarketPage() {
 
       {/* Manual add form */}
       <details className="mb-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
-        <summary className="cursor-pointer select-none font-medium">
-          + Add Off-Market Deal
-        </summary>
+        <summary className="cursor-pointer select-none font-medium">+ Add Off-Market Deal</summary>
         <div className="mt-3">
           <AddDealForm onCreated={refreshRows} />
         </div>
@@ -179,7 +176,7 @@ export default function OffMarketPage() {
         <div className="p-4">No off-market deals yet.</div>
       ) : (
         <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {rows.map(d => (
+          {rows.map((d) => (
             <li
               key={d.id}
               className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm"
@@ -187,14 +184,14 @@ export default function OffMarketPage() {
               {/* Photo */}
               {d.image_url ? (
                 <div className="aspect-[16/10] w-full bg-zinc-100 dark:bg-zinc-800">
-  <Image
-    src={d.image_url}
-    alt={d.title || 'Off-market property image'}
-    fill
-    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-    className="object-cover"
-  />
-</div>
+                  <Image
+                    src={d.image_url}
+                    alt={d.title || 'Off-market property image'}
+                    fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    className="object-cover"
+                  />
+                </div>
               ) : (
                 <div className="aspect-[16/10] w-full grid place-items-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-sm">
                   No photo
@@ -224,7 +221,9 @@ export default function OffMarketPage() {
                 <div className="mt-3 flex items-center justify-between text-sm">
                   <span className="opacity-70">{d.source ?? '—'}</span>
                   {d.contact ? (
-                    <a className="underline" href={`mailto:${d.contact}`}>Contact</a>
+                    <a className="underline" href={`mailto:${d.contact}`}>
+                      Contact
+                    </a>
                   ) : (
                     <span className="opacity-50">No contact</span>
                   )}

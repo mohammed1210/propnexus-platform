@@ -7,8 +7,12 @@ export default function UiOverlaysClient() {
   useEffect(() => {
     const body = document.body;
     let locks = 0;
-    const lock = () => { if (!locks++) body.style.overflow = 'hidden'; };
-    const unlock = () => { if (locks && !--locks) body.style.overflow = ''; };
+    const lock = () => {
+      if (!locks++) body.style.overflow = 'hidden';
+    };
+    const unlock = () => {
+      if (locks && !--locks) body.style.overflow = '';
+    };
 
     const openSel = (sel: string | null) => {
       if (!sel) return;
@@ -17,7 +21,7 @@ export default function UiOverlaysClient() {
       el.dataset.open = 'true';
       lock();
       el.querySelector<HTMLElement>(
-        'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])'
+        'button,[href],input,select,textarea,[tabindex]:not([tabindex="-1"])',
       )?.focus();
     };
     const closeEl = (el: Element | null) => {
@@ -29,10 +33,12 @@ export default function UiOverlaysClient() {
     const click = (e: MouseEvent) => {
       const t = e.target as Element;
       if (t.matches('[data-modal-open]')) {
-        e.preventDefault(); openSel(t.getAttribute('data-modal-open'));
+        e.preventDefault();
+        openSel(t.getAttribute('data-modal-open'));
       }
       if (t.matches('[data-modal-close]')) {
-        e.preventDefault(); closeEl(t.closest('.pnx-modal'));
+        e.preventDefault();
+        closeEl(t.closest('.pnx-modal'));
       }
       if (t.matches('[data-panel-open]')) {
         e.preventDefault();
@@ -52,7 +58,10 @@ export default function UiOverlaysClient() {
 
     const key = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      document.querySelectorAll('.pnx-modal[data-open="true"], .pnx-panel[data-open="true"], .pnx-panel-overlay[data-open="true"]')
+      document
+        .querySelectorAll(
+          '.pnx-modal[data-open="true"], .pnx-panel[data-open="true"], .pnx-panel-overlay[data-open="true"]',
+        )
         .forEach(closeEl);
     };
 

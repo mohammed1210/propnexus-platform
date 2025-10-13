@@ -69,9 +69,7 @@ export default function CompsMini({
   }, [postcode]);
 
   const fmtMoney = (v?: number) =>
-    typeof v === 'number'
-      ? '£' + v.toLocaleString(undefined, { maximumFractionDigits: 0 })
-      : '—';
+    typeof v === 'number' ? '£' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—';
 
   const fmtDate = (iso?: string) => {
     if (!iso) return '';
@@ -103,7 +101,10 @@ export default function CompsMini({
           {[0, 1].map((col) => (
             <div key={col} className="space-y-2">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-4 bg-neutral-200 dark:bg-neutral-800 rounded animate-pulse" />
+                <div
+                  key={i}
+                  className="h-4 bg-neutral-200 dark:bg-neutral-800 rounded animate-pulse"
+                />
               ))}
             </div>
           ))}
