@@ -1,10 +1,10 @@
 from __future__ import annotations
 import os, pathlib, sys, logging
+
 logging.basicConfig(level=logging.INFO)
 logging.info("CWD=%s", os.getcwd())
 logging.info("PYTHONPATH=%s", os.environ.get("PYTHONPATH"))
-logging.info("Exists backend/main.py? %s",
-             pathlib.Path(__file__).resolve().is_file())
+logging.info("Exists backend/main.py? %s", pathlib.Path(__file__).resolve().is_file())
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,15 +47,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # --- Health ---
 @app.get("/")
 async def root():
     return {"message": "PropNexus backend is running."}
 
+
 @app.get("/health")
 @app.get("/api/health")
 async def health():
     return {"ok": True}
+
 
 # --- Routers ---
 app.include_router(save_deal_router)
@@ -68,12 +71,14 @@ app.include_router(scrape_routes.router)
 app.include_router(off_market_router)
 app.include_router(stripe_router)
 
+
 # --- Supabase-backed property endpoints ---
 @app.get("/properties")
 async def get_properties():
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     return supabase.table("properties").select("*").execute().data
+
 
 @app.get("/properties/{property_id}")
 async def get_property_by_id(property_id: str):

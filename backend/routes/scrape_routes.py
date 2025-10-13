@@ -4,8 +4,9 @@ try:
     from backend.scraper.rightmove_scraper import scrape_rightmove_properties
     from backend.scraper.zoopla_scraper import scrape_zoopla_properties
 except Exception:
-    from .scraper.rightmove_scraper import scrape_rightmove_properties
-    from .scraper.zoopla_scraper import scrape_zoopla_properties
+    from scraper.rightmove_scraper import scrape_rightmove_properties
+    from scraper.zoopla_scraper import scrape_zoopla_properties
+    from utils.supabase import supabase as sb
 # (fallback to relative)
 import os
 
@@ -25,8 +26,10 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 router = APIRouter()
 
+
 class ScrapeRequest(BaseModel):
     location: str
+
 
 @router.post("/scrape")
 async def scrape_all_sources(req: ScrapeRequest):
@@ -60,4 +63,3 @@ async def scrape_all_sources(req: ScrapeRequest):
     except Exception as e:  # pragma: no cover
         print("❌ Scrape failed:", type(e).__name__)
         raise HTTPException(status_code=500, detail="Scraping failed")
-    
