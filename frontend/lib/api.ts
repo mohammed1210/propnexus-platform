@@ -21,36 +21,79 @@ function buildUrl(path: string): string {
 /* ------------------------------------------------------------------ */
 
 export type FetchRetryOptions = {
-  retries?: number;      // default 2
-  retryDelayMs?: number; // default 400
-  timeoutMs?: number;    // default 10_000
+  retries?: number;       // default 2 (total attempts = retries + 1)
+  retryDelayMs?: number;  // default 400 (exponential-ish backoff)
+  timeoutMs?: number;     // default 10_000
 };
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/** Merge two AbortSignals into one (aborts if either aborts). */
+function mergeSignals(a?: AbortSignal | null, b?: AbortSignal | null) {
+  if (!a && !b) return undefined;
+  const c = new AbortController();
+
+  const onAbortA = () => c.abort((a as any)?.reason);
+  const onAbortB = () => c.abort((b as any)?.reason);
+
+  if (a) {
+    if (a.aborted) c.abort((a as any).reason);
+    else a.addEventListener("abort", onAbortA);
+  }
+  if (b) {
+    if (b.aborted) c.abort((b as any).reason);
+    else b.addEventListener("abort", onAbortB);
+  }
+
+  // Provide a small cleanup helper to callers
+  return {
+    signal: c.signal,
+    cleanup: () => {
+      a?.removeEventListener("abort", onAbortA);
+      b?.removeEventListener("abort", onAbortB);
+    },
+  };
+}
+
+/**
+ * fetchWithRetry
+ * - Respects an external init.signal (so React AbortController keeps working)
+ * - Adds a timeout (per attempt)
+ * - Retries on transient server errors (>=500) and 429
+ */
 export async function fetchWithRetry(
   input: RequestInfo | URL,
   init: RequestInit = {},
   opts: FetchRetryOptions = {}
 ): Promise<Response> {
   const retries = opts.retries ?? 2;
-  const delay = opts.retryDelayMs ?? 400;
-  const timeout = opts.timeoutMs ?? 10_000;
+  const baseDelay = opts.retryDelayMs ?? 400;
+  const timeoutMs = opts.timeoutMs ?? 10_000;
+
   let lastErr: unknown;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeout);
+    // Timeout controller (per attempt)
+    const timeoutCtrl = new AbortController();
+    const timer = setTimeout(() => timeoutCtrl.abort(new DOMException("Timeout", "AbortError")), timeoutMs);
+
+    // Respect external signal by merging with our timeout signal
+    const externalSignal = init.signal as AbortSignal | undefined;
+    const merged = mergeSignals(externalSignal, timeoutCtrl.signal);
 
     try {
-      const res = await fetch(input, { ...init, signal: controller.signal });
-      clearTimeout(id);
+      const res = await fetch(input, { ...init, signal: merged?.signal });
 
-      // Retry only on transient server errors
-      if (!res.ok && res.status >= 500 && attempt < retries) {
-        await sleep(delay * (attempt + 1));
+      // Done with listeners for this attempt
+      merged?.cleanup?.();
+      clearTimeout(timer);
+
+      // Retry only on transient errors
+      if (!res.ok && (res.status === 429 || res.status >= 500) && attempt < retries) {
+        const delay = baseDelay * (attempt + 1);
+        await sleep(delay);
         continue;
       }
 
@@ -62,9 +105,19 @@ export async function fetchWithRetry(
 
       return res;
     } catch (err) {
-      clearTimeout(id);
+      merged?.cleanup?.();
+      clearTimeout(timer);
       lastErr = err;
-      if (attempt < retries) await sleep(delay * (attempt + 1));
+
+      // If aborted by external signal, don’t retry
+      if ((err as any)?.name === "AbortError" && externalSignal?.aborted) {
+        throw err;
+      }
+
+      if (attempt < retries) {
+        const delay = baseDelay * (attempt + 1);
+        await sleep(delay);
+      }
     }
   }
 
