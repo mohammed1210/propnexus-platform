@@ -1,5 +1,6 @@
-from __future__ import annotations
 import os, pathlib, sys, logging
+
+from __future__ import annotations
 
 logging.basicConfig(level=logging.INFO)
 logging.info("CWD=%s", os.getcwd())

@@ -1,19 +1,20 @@
 # backend/routes/scrape_routes.py
 # Package-first imports for scrapers with fallback
+
+# (fallback to relative)
+import os
+
 try:
     from backend.scraper.rightmove_scraper import scrape_rightmove_properties
     from backend.scraper.zoopla_scraper import scrape_zoopla_properties
 except Exception:
     from scraper.rightmove_scraper import scrape_rightmove_properties
     from scraper.zoopla_scraper import scrape_zoopla_properties
+
     from utils.supabase import supabase as sb
-# (fallback to relative)
-import os
-
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-
-from supabase import Client, create_client
+    from fastapi import APIRouter, HTTPException
+    from pydantic import BaseModel
+    from supabase import Client, create_client
 
 # Import scrapers relative to backend package
 
