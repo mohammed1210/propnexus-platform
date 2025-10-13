@@ -5,6 +5,7 @@ from backend.scraper.zoopla import scrape_zoopla
 
 router = APIRouter()
 
+
 @router.post("/scrape-rightmove")
 async def scrape_rightmove_route(payload: dict):
     try:
