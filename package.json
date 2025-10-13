@@ -23,6 +23,9 @@
     "lint": "next lint",
     "format": "prettier --write .",
     "ingest:csv": "tsx scripts/ingest-csv.ts data/listings.sample.csv --source=rightmove",
-    "ingest:live": "tsx scripts/ingest-live.ts"
+    "ingest:live": "tsx scripts/ingest-live.ts",
+    "frontend:dev": "npm --prefix frontend run dev",
+    "frontend:build": "npm --prefix frontend run build",
+    "frontend:lint": "npm --prefix frontend run lint"
   }
 }

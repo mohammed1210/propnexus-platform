@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
+import { fetchWithRetry } from '@/lib/api';
 import Link from 'next/link';
 import Image from 'next/image';
 import Section from '@/components/ui/Section';
@@ -51,10 +52,9 @@ export default function SavedDealsPage() {
       setLoading(true);
       try {
         const base = getBackendBase();
-        const resp = await fetch(`${base}/saved-deals`, { cache: 'no-store' });
-        if (!resp.ok) throw new Error(`Load failed: ${resp.status}`);
-        const data = (await resp.json()) as Deal[] | { data: Deal[] };
-        const items = Array.isArray(data) ? data : (data as any)?.data ?? [];
+        const resp = await fetchWithRetry(`${base}/saved-deals`, { cache: 'no-store' });
+        const list = await resp.json();
+        const items = Array.isArray(list) ? list : (list as any)?.data ?? [];
         if (!cancelled) setRows(items);
       } catch (err) {
         console.error('load saved_deals', err);
@@ -76,7 +76,7 @@ export default function SavedDealsPage() {
     setRows(r => r.filter(x => x.id !== id));
     try {
       const base = getBackendBase();
-      const resp = await fetch(`${base}/saved-deals/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const resp = await fetchWithRetry(`${base}/saved-deals/${encodeURIComponent(id)}`, { method: 'DELETE' });
       if (!resp.ok) throw new Error(`Delete failed: ${resp.status}`);
     } catch (err) {
       console.error('delete saved_deal', err);
@@ -167,19 +167,19 @@ export default function SavedDealsPage() {
                   <div className="pt-2 grid grid-cols-3 gap-2">
                     <Link
                       href={d.property_id ? `/property/${d.property_id}` : '#'}
-                      className="btn btn-outline text-center"
+                      className="pnx-pnx-btn pxn-pnx-pnx-btn-outline text-center"
                     >
                       View
                     </Link>
                     <button
-                      className="btn btn-primary"
+                      className="pnx-pnx-btn pnx-pnx-pnx-btn-primary"
                       onClick={() => window.open('mailto:sales@propnexus.ai')}
                       disabled={removing}
                     >
                       Enquire
                     </button>
                     <button
-                      className="btn btn-outline border-red-300 text-red-700 dark:border-red-800 dark:text-red-300"
+                      className="pnx-pnx-btn pnx-pnx-pnx-btn-outline border-red-300 text-red-700 dark:border-red-800 dark:text-red-300"
                       onClick={() => removeDeal(d.id)}
                       disabled={removing}
                       aria-busy={removing}
