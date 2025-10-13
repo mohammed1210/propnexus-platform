@@ -56,7 +56,11 @@ export default function SavedDealsPage() {
         const base = getBackendBase();
         const resp = await fetchWithRetry(`${base}/saved-deals`, { cache: 'no-store' });
         const list = await resp.json();
+<<<<<<< HEAD
         const items = Array.isArray(list) ? list : ((list as any)?.data ?? []);
+=======
+        const items = Array.isArray(list) ? list : (list as any)?.data ?? [];
+>>>>>>> 7cc4b529 (Sprint 5 final fixes: InvestmentSummary, CompsMini, saved-deals fix, clean build)
         if (!cancelled) setRows(items);
       } catch (err) {
         console.error('load saved_deals', err);
@@ -78,9 +82,13 @@ export default function SavedDealsPage() {
     setRows((r) => r.filter((x) => x.id !== id));
     try {
       const base = getBackendBase();
+<<<<<<< HEAD
       const resp = await fetchWithRetry(`${base}/saved-deals/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       });
+=======
+      const resp = await fetchWithRetry(`${base}/saved-deals/${encodeURIComponent(id)}`, { method: 'DELETE' });
+>>>>>>> 7cc4b529 (Sprint 5 final fixes: InvestmentSummary, CompsMini, saved-deals fix, clean build)
       if (!resp.ok) throw new Error(`Delete failed: ${resp.status}`);
     } catch (err) {
       console.error('delete saved_deal', err);
@@ -166,7 +174,11 @@ export default function SavedDealsPage() {
                   <div className="pt-2 grid grid-cols-3 gap-2">
                     <Link
                       href={d.property_id ? `/property/${d.property_id}` : '#'}
+<<<<<<< HEAD
                       className="pnx-pnx-btn pnx-pnx-pnx-btn-outline text-center"
+=======
+                      className="pnx-pnx-btn pxn-pnx-pnx-btn-outline text-center"
+>>>>>>> 7cc4b529 (Sprint 5 final fixes: InvestmentSummary, CompsMini, saved-deals fix, clean build)
                     >
                       View
                     </Link>
