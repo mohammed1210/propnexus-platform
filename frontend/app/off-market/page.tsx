@@ -7,6 +7,7 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import { getSupabase } from '@/lib/supabaseClient';
 import { apiPost } from '@/lib/api';
 import AddDealForm from '@/components/offMarket/AddDealForm';
+import Image from 'next/image';
 
 type OffMarket = {
   id: string;
@@ -186,13 +187,14 @@ export default function OffMarketPage() {
               {/* Photo */}
               {d.image_url ? (
                 <div className="aspect-[16/10] w-full bg-zinc-100 dark:bg-zinc-800">
-                  <img
-                    src={d.image_url}
-                    alt={d.title || 'Off-market property image'}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                </div>
+  <Image
+    src={d.image_url}
+    alt={d.title || 'Off-market property image'}
+    fill
+    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+    className="object-cover"
+  />
+</div>
               ) : (
                 <div className="aspect-[16/10] w-full grid place-items-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-sm">
                   No photo

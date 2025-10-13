@@ -6,6 +6,7 @@ from openai import OpenAI
 router = APIRouter(prefix="/gpt")
 openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+
 class SummaryRequest(BaseModel):
     title: str
     location: str
@@ -13,6 +14,7 @@ class SummaryRequest(BaseModel):
     yield_percent: float
     roi_percent: float
     investmentType: str | None = None
+
 
 @router.post("/summary")
 async def generate_summary(req: SummaryRequest):
@@ -31,6 +33,7 @@ async def generate_summary(req: SummaryRequest):
         return {"summary": summary}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/strategies")
 async def generate_strategies(req: SummaryRequest):

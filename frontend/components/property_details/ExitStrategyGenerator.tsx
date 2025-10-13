@@ -48,7 +48,7 @@ export default function ExitStrategyGenerator(props: Props) {
 
   return (
     <div className="space-y-4">
-      <button onClick={handleGenerate} disabled={loading} className="btn btn-outline">
+      <button onClick={handleGenerate} disabled={loading} className="pnx-pnx-btn pnx-pnx-pnx-btn-outline" data-loading={loading ? 'true' : undefined}>
         {loading ? 'Generating…' : 'Generate exit strategies'}
       </button>
 

@@ -1,18 +1,20 @@
 # backend/routes/scrape_routes.py
 # Package-first imports for scrapers with fallback
+
+# (fallback to relative)
+import os
+
 try:
     from backend.scraper.rightmove_scraper import scrape_rightmove_properties
     from backend.scraper.zoopla_scraper import scrape_zoopla_properties
 except Exception:
-    from .scraper.rightmove_scraper import scrape_rightmove_properties
-    from .scraper.zoopla_scraper import scrape_zoopla_properties
-# (fallback to relative)
-import os
+    from scraper.rightmove_scraper import scrape_rightmove_properties
+    from scraper.zoopla_scraper import scrape_zoopla_properties
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-
-from supabase import Client, create_client
+    from utils.supabase import supabase as sb
+    from fastapi import APIRouter, HTTPException
+    from pydantic import BaseModel
+    from supabase import Client, create_client
 
 # Import scrapers relative to backend package
 
@@ -25,8 +27,10 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 router = APIRouter()
 
+
 class ScrapeRequest(BaseModel):
     location: str
+
 
 @router.post("/scrape")
 async def scrape_all_sources(req: ScrapeRequest):
@@ -60,4 +64,3 @@ async def scrape_all_sources(req: ScrapeRequest):
     except Exception as e:  # pragma: no cover
         print("❌ Scrape failed:", type(e).__name__)
         raise HTTPException(status_code=500, detail="Scraping failed")
-    
