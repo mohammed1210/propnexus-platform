@@ -7,13 +7,7 @@ from bs4 import (  # noqa: F401  (kept for when you replace the stub with real p
 )
 from fastapi import BackgroundTasks
 
-# Dual-import utils
-try:
-    from utils.postcode import get_lat_lng_from_postcode  # type: ignore
-except ModuleNotFoundError:
-    from backend.utils.postcode import get_lat_lng_from_postcode  # type: ignore
-
-# ...rest of file unchanged...
+from ..utils.postcode import get_lat_lng_from_postcode
 
 
 async def scrape_zoopla_properties(background_tasks: BackgroundTasks | None = None):

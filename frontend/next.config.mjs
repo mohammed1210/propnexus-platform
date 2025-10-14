@@ -11,7 +11,10 @@ const nextConfig = {
   // Silence multiple-lockfiles warning in monorepos
   outputFileTracingRoot: resolve(__dirname, '..'),
 
+  // Be permissive during development; tighten if you want later.
   images: {
+    // Wildcard is convenient for mixed sources (Unsplash, Cloudinary, etc.)
+    // For production hardening, replace with explicit host list or remotePatterns.
     remotePatterns: [{ protocol: 'https', hostname: '**' }],
   },
 
@@ -21,7 +24,7 @@ const nextConfig = {
       // All paths relative to the FRONTEND folder
       '@components': resolve(__dirname, 'components'),
       '@details':    resolve(__dirname, 'components/property_details'),
-      '@MapView':        resolve(__dirname, 'components/MapView'),
+      '@MapView':    resolve(__dirname, 'components/MapView'),
       '@lib':        resolve(__dirname, 'lib'),
       '@':           resolve(__dirname, '.'), // allow imports like "@/lib/supabaseClient"
     };

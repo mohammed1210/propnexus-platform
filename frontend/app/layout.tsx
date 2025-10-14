@@ -125,6 +125,10 @@ export default function RootLayout({
         >
           {children}
         </main>
+
+        {/* Client-side helpers */}
+        <UiOverlaysClient />
+        <BackToTop />
       </body>
     </html>
   );

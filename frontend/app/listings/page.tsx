@@ -182,8 +182,8 @@ function FiltersBar() {
       </div>
 
       <div className="flex gap-2">
-        <button onClick={apply} className="btn btn-primary flex-1">
-          Apply
+        <button onClick={apply} className="pnx-pnx-btn pnx-pnx-pnx-btn-primary flex-1">
+           Apply Filters
         </button>
         <button
           onClick={() => {
@@ -193,7 +193,7 @@ function FiltersBar() {
             setBeds("");
             router.push("/listings");
           }}
-          className="btn btn-outline"
+          className="pnx-pnx-btn pnx-pnx-pnx-btn-outline"
         >
           Reset
         </button>

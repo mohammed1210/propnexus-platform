@@ -1,13 +1,13 @@
-// frontend/components/property_details/InvestmentSummary.tsx
 'use client';
-import React, { useEffect, useState } from 'react';
+
+import { useEffect, useState } from 'react';
 import { postAiSummary } from '@/lib/api';
 import type { SummaryRequest, SummaryResponse } from '@/types/ai';
 
 type Props = {
   property: {
-    title?: string | null;
-    location?: string | null;
+    title: string;
+    location: string;
     price?: number | null;
     bedrooms?: number | null;
     bathrooms?: number | null;
@@ -30,16 +30,16 @@ export default function InvestmentSummary({ property }: Props) {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    async function run() {
       setLoading(true);
       setError(null);
       try {
         const payload: SummaryRequest = {
-          title: property.title ?? '',
-          location: property.location ?? '',
-          price: numOrUndef(property.price),
-          bedrooms: numOrUndef(property.bedrooms),
-          bathrooms: numOrUndef(property.bathrooms),
+          title: property.title,
+          location: String(property.location ?? ''),
+          price: numOrUndef(property.price),         // ✅ narrowed
+          bedrooms: numOrUndef(property.bedrooms),   // ✅ narrowed
+          bathrooms: numOrUndef(property.bathrooms), // ✅ narrowed
           yield_percent: numOrUndef(property.yield_percent),
           roi_percent: numOrUndef(property.roi_percent),
           propertyType: property.propertyType ?? undefined,
@@ -54,36 +54,33 @@ export default function InvestmentSummary({ property }: Props) {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    }
 
-    return () => {
-      cancelled = true;
-    };
+    run();
+    return () => { cancelled = true; };
   }, [
-    property?.title,
-    property?.location,
-    property?.price,
-    property?.bedrooms,
-    property?.bathrooms,
-    property?.yield_percent,
-    property?.roi_percent,
-    property?.propertyType,
-    property?.investmentType,
-    property?.description,
+    property.title,
+    property.location,
+    property.price,
+    property.bedrooms,
+    property.bathrooms,
+    property.yield_percent,
+    property.roi_percent,
+    property.propertyType,
+    property.investmentType,
+    property.description,
   ]);
 
   if (loading) return <p data-testid="investment-summary-loading">Loading summary…</p>;
   if (error) return <p role="alert" className="text-red-600">Error: {error}</p>;
-  if (!data) return <p className="text-sm opacity-70">No summary available.</p>;
+  if (!data) return null;
 
   return (
     <div data-testid="investment-summary-text" className="space-y-2">
       {data.summary && <p>{data.summary}</p>}
       {Array.isArray(data.bullets) && data.bullets.length > 0 && (
         <ul className="list-disc pl-5">
-          {data.bullets.map((b, i) => (
-            <li key={i}>{b}</li>
-          ))}
+          {data.bullets.map((b, i) => <li key={i}>{b}</li>)}
         </ul>
       )}
     </div>
