@@ -39,6 +39,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'anon-key-placeholder' }}
         run: |
           npm ci
+          npx playwright install --with-deps
           npm run build
       - name: Start frontend
         working-directory: frontend
@@ -47,13 +48,11 @@ jobs:
       # Smokes
       - name: Wait for servers
         run: |
-          for i in {1..30}; do
-            curl -fsS http://localhost:8000/properties && break || sleep 1
-          done
-          for i in {1..30}; do
-            curl -fsS http://localhost:3000 && break || sleep 1
-          done
-      - name: Check /properties
-        run: curl -fsS http://localhost:8000/properties | head
-      - name: Check frontend HTML
-        run: curl -fsS http://localhost:3000 | head
+          for i in {1..45}; do curl -fsS http://localhost:8000/properties && break || sleep 1; done
+          for i in {1..45}; do curl -fsS http://localhost:3000 && break || sleep 1; done
+
+      - name: Run Playwright
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: "http://localhost:3000"
+        run: npm run e2e

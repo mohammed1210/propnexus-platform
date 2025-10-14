@@ -128,7 +128,6 @@ export async function fetchWithRetry(
 /* Generic helpers                                                     */
 /* ------------------------------------------------------------------ */
 
-/** Generic POST that returns a typed JSON response */
 export async function apiPost<T = unknown>(
   path: string,
   body: JSONValue,
@@ -149,7 +148,6 @@ export async function apiPost<T = unknown>(
   return (await res.json()) as T;
 }
 
-/** Generic GET that returns a typed JSON response */
 export async function apiGet<T = unknown>(
   path: string,
   init?: RequestInit,
@@ -171,18 +169,15 @@ import type {
   StrategiesResponse,
 } from "@/types/ai";
 
-/** POST /generate-summary */
 export function postAiSummary(
   payload: SummaryRequest | { property: SummaryRequest },
   opts?: FetchRetryOptions
 ): Promise<SummaryResponse> {
-  // The backend accepts either flat {title,...} or {property:{...}}
   const body =
     "property" in payload ? payload : { property: payload as SummaryRequest };
   return apiPost<SummaryResponse>("/generate-summary", body, undefined, opts);
 }
 
-/** POST /generate-strategies */
 export function postAiStrategies(
   payload: StrategiesRequest | { property: StrategiesRequest },
   opts?: FetchRetryOptions
