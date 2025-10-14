@@ -1,37 +1,59 @@
-from __future__ import annotations
-import time
-from typing import Dict, Any
+from datetime import datetime, timedelta
 
-# NOTE: Stub provider layer. Replace with real integrations later.
-# Keep outputs stable/deterministic for caching tests.
+# NOTE: Stub providers for now; replace with real integrations later.
+# Keep outputs deterministic & structured for predictable caching/tests.
 
-def get_comps_from_provider(postcode: str) -> Dict[str, Any]:
-    seed = postcode.strip().upper().replace(" ", "")
-    # simple deterministic numbers from seed
-    base = sum(ord(c) for c in seed) % 100_000
+
+def get_comps_from_provider(postcode: str) -> dict:
+    base = postcode.strip().upper() or "N/A"
     return {
-        "postcode": postcode,
-        "fetched_at": int(time.time()),
+        "postcode": base,
         "sales": [
-            {"address": f"{i} High St, {postcode}", "price": base + i * 1000, "date": "2024-08-0{}".format(i+1), "type": "Terraced"}
-            for i in range(1, 6)
+            {
+                "address": f"10 {base} Street",
+                "price": 250000,
+                "date": (datetime.utcnow() - timedelta(days=30)).date().isoformat(),
+                "type": "Terraced",
+                "distance_km": 0.42,
+            },
+            {
+                "address": f"22 {base} Road",
+                "price": 310000,
+                "date": (datetime.utcnow() - timedelta(days=65)).date().isoformat(),
+                "type": "Semi-detached",
+                "distance_km": 0.87,
+            },
         ],
         "rents": [
-            {"address": f"{i} Market Rd, {postcode}", "price": (base//10) + i * 100, "date": "2024-07-0{}".format(i+1), "type": "Flat"}
-            for i in range(1, 6)
+            {
+                "address": f"Flat 2, 5 {base} Close",
+                "price": 1200,
+                "date": (datetime.utcnow() - timedelta(days=15)).date().isoformat(),
+                "type": "Flat",
+                "distance_km": 0.35,
+            },
+            {
+                "address": f"Flat 4, 3 {base} Court",
+                "price": 1450,
+                "date": (datetime.utcnow() - timedelta(days=40)).date().isoformat(),
+                "type": "Flat",
+                "distance_km": 1.12,
+            },
         ],
     }
 
-def get_area_intel_from_provider(key: str) -> Dict[str, Any]:
-    seed = key.strip().lower().replace(" ", "-")
-    base = sum(ord(c) for c in seed) % 100
+
+def get_area_intel_from_provider(key: str) -> dict:
+    k = key.strip().upper() or "UNKNOWN"
+    # Provide a stable shape: demographics, transport, schools, yields etc.
     return {
-        "key": key,
-        "summary": f"Mock area intel for {key}. Walkability {50+base%50}/100.",
-        "stats": {
-            "crime_index": 40 + (base % 30),
-            "schools_score": 60 + (base % 30),
-            "transport_score": 55 + (base % 40),
-        },
-        "fetched_at": int(time.time()),
+        "key": k,
+        "population": 125_000,
+        "avg_price": 305_000,
+        "avg_rent": 1350,
+        "rental_yield_percent": round((1350 * 12) / 305_000 * 100, 2),
+        "crime_index": 42,  # mock score 0..100 (lower is better)
+        "schools_rating": 3.9,  # mock 0..5
+        "transport_links": ["Rail", "Bus"],
+        "notes": f"Mock intel for {k}. Replace with live sources.",
     }
