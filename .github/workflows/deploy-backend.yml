@@ -1,3 +1,4 @@
+# .github/workflows/deploy-backend.yml
 name: Deploy Backend (Railway)
 
 on:
@@ -8,7 +9,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,16 +18,15 @@ jobs:
           curl -fsSL https://railway.app/install.sh | sh
           echo "$HOME/.railway/bin" >> $GITHUB_PATH
 
-      # IMPORTANT: run from REPO ROOT and upload the whole repo
       - name: Deploy with Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway up \
             --service "propnexus-backend" \
-            --path "." \
             --ci \
-            --no-stream
+            --no-stream \
+            --path-as-root
 
       - name: Wait for health
         env:
@@ -37,10 +36,8 @@ jobs:
             code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
             echo "Health attempt $i -> $code"
             if [ "$code" = "200" ]; then
-              echo "✅ Healthy"
-              exit 0
+              echo "✅ Healthy"; exit 0
             fi
             sleep 5
           done
-          echo "❌ Health check failed"
-          exit 1
+          echo "❌ Health check failed"; exit 1
