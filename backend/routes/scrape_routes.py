@@ -1,4 +1,5 @@
-fimport os
+import os
+from supabase import create_client, Client  # type: ignore
 SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 supabase: Client | None = None
