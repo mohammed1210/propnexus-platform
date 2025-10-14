@@ -1,15 +1,19 @@
 import { fetchWithRetry } from "@/lib/api";
+import type { NextRequest } from "next/server";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { key: string } }
-) {
+/**
+ * Keep typing relaxed for Next 15 route handler context to avoid TS mismatch.
+ * At runtime we only need params.key.
+ */
+export async function GET(_req: NextRequest, ctx: any) {
+  const key = ctx?.params?.key as string;
   const base =
     process.env.NEXT_PUBLIC_BACKEND_URL ??
     process.env.NEXT_PUBLIC_API_BASE ??
     "";
+
   const upstream = `${base.replace(/\/+$/, "")}/area-intel/${encodeURIComponent(
-    params.key
+    key
   )}`;
 
   try {
@@ -18,7 +22,6 @@ export async function GET(
       { headers: { accept: "application/json" } },
       { timeoutMs: 10_000 }
     );
-
     const text = await res.text();
     return new Response(text, {
       status: res.status,

@@ -1,16 +1,17 @@
 import { fetchWithRetry } from "@/lib/api";
+import type { NextRequest } from "next/server";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: { pc: string } }
-) {
+/**
+ * Relaxed context typing — we only need params.pc.
+ */
+export async function GET(_req: NextRequest, ctx: any) {
+  const pc = ctx?.params?.pc as string;
   const base =
     process.env.NEXT_PUBLIC_BACKEND_URL ??
     process.env.NEXT_PUBLIC_API_BASE ??
     "";
-  const upstream = `${base.replace(/\/+$/, "")}/comps/${encodeURIComponent(
-    params.pc
-  )}`;
+
+  const upstream = `${base.replace(/\/+$/, "")}/comps/${encodeURIComponent(pc)}`;
 
   try {
     const res = await fetchWithRetry(
@@ -18,7 +19,6 @@ export async function GET(
       { headers: { accept: "application/json" } },
       { timeoutMs: 10_000 }
     );
-
     const text = await res.text();
     return new Response(text, {
       status: res.status,
