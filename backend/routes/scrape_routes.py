@@ -8,7 +8,7 @@ if SUPABASE_URL and SUPABASE_KEY:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
         import logging; logging.warning('Supabase init failed: %s', e)
-rom supabase import create_client, Client  # type: ignore
+from supabase import create_client, Client  # type: ignore
 # backend/routes/scrape_routes.py
 # Package-first imports for scrapers with fallback
 
