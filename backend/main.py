@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os, pathlib, sys, logging
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -8,7 +9,6 @@ sentry_sdk.init(
 )
 from __future__ import annotations
 
-from __future__ import annotations
 
 logging.basicConfig(level=logging.INFO)
 logging.info("CWD=%s", os.getcwd())
