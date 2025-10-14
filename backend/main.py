@@ -88,3 +88,13 @@ async def get_property_by_id(property_id: str):
     if not res.data:
         raise HTTPException(status_code=404, detail="Property not found")
     return res.data[0]
+from backend.routes.comps_routes import router as comps_router
+from backend.routes.area_intel_routes import router as area_intel_router
+
+# --- Include cache routes ---
+try:
+    app.include_router(comps_router)
+    app.include_router(area_intel_router)
+except Exception:
+    # app may be defined later in some imports; if so, routers are imported in the file already.
+    pass
