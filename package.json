@@ -4,6 +4,7 @@
     "clsx": "^2.1.1",
     "csv-parse": "^6.1.0",
     "pdf-lib": "^1.17.1",
+    "stripe": "^19.1.0",
     "undici": "^6.21.3"
   },
   "devDependencies": {
