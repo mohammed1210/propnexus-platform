@@ -1,3 +1,13 @@
+fimport os
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+SUPABASE_KEY = os.getenv('SUPABASE_KEY')
+supabase: Client | None = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        import logging; logging.warning('Supabase init failed: %s', e)
+rom supabase import create_client, Client  # type: ignore
 # backend/routes/scrape_routes.py
 # Package-first imports for scrapers with fallback
 
