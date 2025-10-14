@@ -1,40 +1,19 @@
-import { fetchWithRetry } from "@/lib/api";
-import type { NextRequest } from "next/server";
+import { NextResponse } from 'next/server';
+import { fetchWithRetry, BASE as API_BASE } from '@/lib/api';
 
-/**
- * Relaxed context typing — we only need params.pc.
- */
-export async function GET(_req: NextRequest, ctx: any) {
-  const pc = ctx?.params?.pc as string;
-  const base =
-    process.env.NEXT_PUBLIC_BACKEND_URL ??
-    process.env.NEXT_PUBLIC_API_BASE ??
-    "";
-
-  const upstream = `${base.replace(/\/+$/, "")}/comps/${encodeURIComponent(pc)}`;
+export async function GET(request: Request, ctx: any) {
+  const pc = String(ctx?.params?.pc ?? '');
+  const base = process.env.NEXT_PUBLIC_BACKEND_URL || API_BASE;
+  const url = `${base}/comps/${encodeURIComponent(pc)}`;
 
   try {
-    const res = await fetchWithRetry(
-      upstream,
-      { headers: { accept: "application/json" } },
-      { timeoutMs: 10_000 }
-    );
-    const text = await res.text();
-    return new Response(text, {
-      status: res.status,
-      headers: {
-        "content-type":
-          res.headers.get("content-type") || "application/json; charset=utf-8",
-        "cache-control": res.headers.get("cache-control") || "no-store",
-      },
-    });
-  } catch (e: any) {
-    return new Response(
-      JSON.stringify({ error: e?.message || "Upstream /comps failed" }),
-      {
-        status: 502,
-        headers: { "content-type": "application/json; charset=utf-8" },
-      }
+    const res = await fetchWithRetry(url, { method: 'GET' });
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || 'Proxy error' },
+      { status: 502 }
     );
   }
 }
