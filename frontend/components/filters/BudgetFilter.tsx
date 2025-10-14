@@ -20,7 +20,11 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
 
 function fmtGBP(n: number | null) {
   if (n == null) return '';
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
 function parseIntSafe(v: string | null) {
@@ -135,7 +139,10 @@ export default function BudgetFilter({
 
   // detect active preset
   const activePreset = useMemo(() => {
-    return PRESETS.find(p => (p.min ?? null) === (min ?? null) && (p.max ?? null) === (max ?? null))?.label ?? null;
+    return (
+      PRESETS.find((p) => (p.min ?? null) === (min ?? null) && (p.max ?? null) === (max ?? null))
+        ?.label ?? null
+    );
   }, [min, max]);
 
   // (Optional) dual slider only on wide screens
@@ -230,10 +237,24 @@ export default function BudgetFilter({
       )}
 
       <style jsx>{`
-        .budget-filter { display: grid; gap: 8px; }
-        .bf-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .bf-label { font-weight: 600; }
-        .bf-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+        .budget-filter {
+          display: grid;
+          gap: 8px;
+        }
+        .bf-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-wrap: wrap;
+        }
+        .bf-label {
+          font-weight: 600;
+        }
+        .bf-presets {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+        }
         .bf-chip {
           border: 1px solid var(--border, #d0d5dd);
           padding: 6px 10px;
@@ -241,15 +262,28 @@ export default function BudgetFilter({
           font-size: 0.9rem;
           background: var(--chip-bg, #fff);
         }
-        .bf-chip.active { border-color: var(--primary, #0ea5e9); box-shadow: 0 0 0 2px rgba(14,165,233,0.15); }
+        .bf-chip.active {
+          border-color: var(--primary, #0ea5e9);
+          box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+        }
         .bf-clear {
           margin-left: auto;
           font-size: 0.9rem;
           text-decoration: underline;
           opacity: 0.8;
         }
-        .bf-input { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; min-width: 160px; }
-        .bf-input > label { grid-column: 1 / -1; font-size: 0.8rem; opacity: 0.8; }
+        .bf-input {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          gap: 6px;
+          align-items: center;
+          min-width: 160px;
+        }
+        .bf-input > label {
+          grid-column: 1 / -1;
+          font-size: 0.8rem;
+          opacity: 0.8;
+        }
         .bf-input > input {
           width: 100%;
           border: 1px solid var(--border, #d0d5dd);
@@ -257,27 +291,70 @@ export default function BudgetFilter({
           padding: 8px 10px;
           background: var(--bg, #fff);
         }
-        .bf-value { font-size: 0.85rem; opacity: 0.8; min-width: 80px; text-align: right; }
-        .bf-sep { opacity: 0.4; }
-        .bf-slider { position: relative; height: 26px; display: grid; align-items: center; margin-top: 6px; }
-        .bf-slider input[type="range"] {
-          position: absolute; left: 0; right: 0; width: 100%;
+        .bf-value {
+          font-size: 0.85rem;
+          opacity: 0.8;
+          min-width: 80px;
+          text-align: right;
+        }
+        .bf-sep {
+          opacity: 0.4;
+        }
+        .bf-slider {
+          position: relative;
+          height: 26px;
+          display: grid;
+          align-items: center;
+          margin-top: 6px;
+        }
+        .bf-slider input[type='range'] {
+          position: absolute;
+          left: 0;
+          right: 0;
+          width: 100%;
           pointer-events: none; /* stacked */
           background: none;
-          -webkit-appearance: none; appearance: none;
+          -webkit-appearance: none;
+          appearance: none;
         }
-        .bf-slider input[type="range"]::-webkit-slider-thumb {
-          -webkit-appearance: none; appearance: none;
-          height: 18px; width: 18px; border-radius: 50%;
-          background: var(--thumb, #0ea5e9); border: 2px solid white;
-          box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
-          pointer-events: auto; cursor: pointer;
+        .bf-slider input[type='range']::-webkit-slider-thumb {
+          -webkit-appearance: none;
+          appearance: none;
+          height: 18px;
+          width: 18px;
+          border-radius: 50%;
+          background: var(--thumb, #0ea5e9);
+          border: 2px solid white;
+          box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+          pointer-events: auto;
+          cursor: pointer;
         }
-        .bf-track { position: absolute; left: 0; right: 0; height: 6px; border-radius: 999px; background: #e5e7eb; }
-        .bf-range { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: var(--primary, #0ea5e9); }
-        :global(.dark) .bf-chip { background: #0b1220; border-color: #223; }
-        :global(.dark) .bf-input > input { background: #0b1220; border-color: #223; }
-        :global(.dark) .bf-track { background: #162036; }
+        .bf-track {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 6px;
+          border-radius: 999px;
+          background: #e5e7eb;
+        }
+        .bf-range {
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          border-radius: 999px;
+          background: var(--primary, #0ea5e9);
+        }
+        :global(.dark) .bf-chip {
+          background: #0b1220;
+          border-color: #223;
+        }
+        :global(.dark) .bf-input > input {
+          background: #0b1220;
+          border-color: #223;
+        }
+        :global(.dark) .bf-track {
+          background: #162036;
+        }
       `}</style>
     </div>
   );

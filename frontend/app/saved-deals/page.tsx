@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { fetchWithRetry } from '@/lib/api';
@@ -35,7 +35,9 @@ export const dynamic = 'force-dynamic';
  * clearly during development.
  */
 function getBackendBase(): string {
-  const raw = (process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || '') as string;
+  const raw = (process.env.NEXT_PUBLIC_API_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    '') as string;
   if (!raw) throw new Error('NEXT_PUBLIC_API_URL (or NEXT_PUBLIC_BACKEND_URL) is not set');
   return raw.replace(/\/+\$/, '');
 }
@@ -54,7 +56,7 @@ export default function SavedDealsPage() {
         const base = getBackendBase();
         const resp = await fetchWithRetry(`${base}/saved-deals`, { cache: 'no-store' });
         const list = await resp.json();
-        const items = Array.isArray(list) ? list : (list as any)?.data ?? [];
+        const items = Array.isArray(list) ? list : ((list as any)?.data ?? []);
         if (!cancelled) setRows(items);
       } catch (err) {
         console.error('load saved_deals', err);
@@ -73,10 +75,12 @@ export default function SavedDealsPage() {
     // optimistic update
     const prev = rows;
     setBusyId(id);
-    setRows(r => r.filter(x => x.id !== id));
+    setRows((r) => r.filter((x) => x.id !== id));
     try {
       const base = getBackendBase();
-      const resp = await fetchWithRetry(`${base}/saved-deals/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const resp = await fetchWithRetry(`${base}/saved-deals/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
       if (!resp.ok) throw new Error(`Delete failed: ${resp.status}`);
     } catch (err) {
       console.error('delete saved_deal', err);
@@ -89,8 +93,8 @@ export default function SavedDealsPage() {
 
   const kpis = useMemo(() => {
     const count = rows.length;
-    const avgYield = avg(rows.map(d => num(d.yield_percent)));
-    const avgRoi = avg(rows.map(d => num(d.roi_percent)));
+    const avgYield = avg(rows.map((d) => num(d.yield_percent)));
+    const avgRoi = avg(rows.map((d) => num(d.roi_percent)));
     const totalValue = rows.reduce((s, d) => s + num(d.price), 0);
     return { count, avgYield, avgRoi, totalValue };
   }, [rows]);
@@ -114,13 +118,10 @@ export default function SavedDealsPage() {
         <div className="p-4">No saved deals yet.</div>
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-          {rows.map(d => {
+          {rows.map((d) => {
             const removing = busyId === d.id;
             return (
-              <li
-                key={d.id}
-                className="card overflow-hidden transition hover:shadow-md"
-              >
+              <li key={d.id} className="card overflow-hidden transition hover:shadow-md">
                 {/* image */}
                 <div className="aspect-[16/9] overflow-hidden">
                   <Image
@@ -161,13 +162,11 @@ export default function SavedDealsPage() {
                   <div className="text-xs opacity-70">
                     {d.bedrooms ?? 0} beds • {d.bathrooms ?? 0} baths
                   </div>
-                  <div className="text-xs opacity-60">
-                    Saved {formatDate(d.saved_at)}
-                  </div>
+                  <div className="text-xs opacity-60">Saved {formatDate(d.saved_at)}</div>
                   <div className="pt-2 grid grid-cols-3 gap-2">
                     <Link
                       href={d.property_id ? `/property/${d.property_id}` : '#'}
-                      className="pnx-pnx-btn pxn-pnx-pnx-btn-outline text-center"
+                      className="pnx-pnx-btn pnx-pnx-pnx-btn-outline text-center"
                     >
                       View
                     </Link>
@@ -215,7 +214,7 @@ function round(n: number) {
   return Number(n.toFixed(2));
 }
 function avg(list: number[]) {
-  const arr = list.filter(x => Number.isFinite(x));
+  const arr = list.filter((x) => Number.isFinite(x));
   return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
 }
 function valOrDash(n?: number | null) {

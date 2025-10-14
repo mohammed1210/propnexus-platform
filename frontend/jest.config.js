@@ -1,6 +1,6 @@
 // frontend/jest.config.js
-const nextJest = require('next/jest')
-const createJestConfig = nextJest({ dir: './' })
+const nextJest = require('next/jest');
+const createJestConfig = nextJest({ dir: './' });
 
 const customJestConfig = {
   testEnvironment: 'jest-environment-jsdom',
@@ -8,6 +8,6 @@ const customJestConfig = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
   },
-}
+};
 
-module.exports = createJestConfig(customJestConfig)
+module.exports = createJestConfig(customJestConfig);

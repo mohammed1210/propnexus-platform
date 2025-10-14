@@ -9,9 +9,9 @@ const SITE_URL =
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
 
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-
-  // Titles
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app',
+  ),
   title: {
     default: 'PropNexus',
     template: '%s · PropNexus',
@@ -103,11 +103,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>

@@ -76,7 +76,7 @@ export default function AnalyticsPage() {
     const labels = Array.from(map.keys()).sort();
     const countSeries = labels.map((l) => map.get(l)!.count);
     const yieldSeries = labels.map((l) =>
-      round((map.get(l)!.sumYield / Math.max(map.get(l)!.count, 1)) || 0),
+      round(map.get(l)!.sumYield / Math.max(map.get(l)!.count, 1) || 0),
     );
     return { labels, countSeries, yieldSeries };
   }, [deals]);

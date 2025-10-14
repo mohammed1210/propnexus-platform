@@ -90,7 +90,8 @@ export default function AIScoreInfo({
                   <strong>Area Demand</strong>: local rental demand/comps (illustrative for now).
                 </li>
                 <li>
-                  <strong>Risk</strong>: down-valuation, cost overrun, void risk (illustrative for now).
+                  <strong>Risk</strong>: down-valuation, cost overrun, void risk (illustrative for
+                  now).
                 </li>
               </ul>
               <p className="text-xs text-neutral-500">

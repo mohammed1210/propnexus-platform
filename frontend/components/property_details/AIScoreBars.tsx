@@ -13,7 +13,7 @@ export default function AIScoreBars({
   showHeader = true,
   className = '',
 }: {
-  overall: number;        // 0–100
+  overall: number; // 0–100
   items: Item[];
   showHeader?: boolean;
   className?: string;

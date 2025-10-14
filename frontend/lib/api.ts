@@ -4,15 +4,15 @@
 export const BASE =
   (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ??
   (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ??
-  "";
+  '';
 
 // Narrow JSON typing isn’t critical here; keep it flexible.
 type JSONValue = any;
 
 /** Build an absolute URL from the public API base + path */
 function buildUrl(path: string): string {
-  const base = BASE.replace(/\/+$/, "");
-  const tail = path.startsWith("/") ? path : `/${path}`;
+  const base = BASE.replace(/\/+$/, '');
+  const tail = path.startsWith('/') ? path : `/${path}`;
   return `${base}${tail}`;
 }
 
@@ -21,9 +21,9 @@ function buildUrl(path: string): string {
 /* ------------------------------------------------------------------ */
 
 export type FetchRetryOptions = {
-  retries?: number;       // default 2 (total attempts = retries + 1)
-  retryDelayMs?: number;  // default 400 (exponential-ish backoff)
-  timeoutMs?: number;     // default 10_000
+  retries?: number; // default 2 (total attempts = retries + 1)
+  retryDelayMs?: number; // default 400 (exponential-ish backoff)
+  timeoutMs?: number; // default 10_000
 };
 
 function sleep(ms: number) {
@@ -40,19 +40,19 @@ function mergeSignals(a?: AbortSignal | null, b?: AbortSignal | null) {
 
   if (a) {
     if (a.aborted) c.abort((a as any).reason);
-    else a.addEventListener("abort", onAbortA);
+    else a.addEventListener('abort', onAbortA);
   }
   if (b) {
     if (b.aborted) c.abort((b as any).reason);
-    else b.addEventListener("abort", onAbortB);
+    else b.addEventListener('abort', onAbortB);
   }
 
   // Provide a small cleanup helper to callers
   return {
     signal: c.signal,
     cleanup: () => {
-      a?.removeEventListener("abort", onAbortA);
-      b?.removeEventListener("abort", onAbortB);
+      a?.removeEventListener('abort', onAbortA);
+      b?.removeEventListener('abort', onAbortB);
     },
   };
 }
@@ -66,7 +66,7 @@ function mergeSignals(a?: AbortSignal | null, b?: AbortSignal | null) {
 export async function fetchWithRetry(
   input: RequestInfo | URL,
   init: RequestInit = {},
-  opts: FetchRetryOptions = {}
+  opts: FetchRetryOptions = {},
 ): Promise<Response> {
   const retries = opts.retries ?? 2;
   const baseDelay = opts.retryDelayMs ?? 400;
@@ -77,7 +77,10 @@ export async function fetchWithRetry(
   for (let attempt = 0; attempt <= retries; attempt++) {
     // Timeout controller (per attempt)
     const timeoutCtrl = new AbortController();
-    const timer = setTimeout(() => timeoutCtrl.abort(new DOMException("Timeout", "AbortError")), timeoutMs);
+    const timer = setTimeout(
+      () => timeoutCtrl.abort(new DOMException('Timeout', 'AbortError')),
+      timeoutMs,
+    );
 
     // Respect external signal by merging with our timeout signal
     const externalSignal = init.signal as AbortSignal | undefined;
@@ -98,8 +101,8 @@ export async function fetchWithRetry(
       }
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        const detail = text || res.statusText || "Request failed";
+        const text = await res.text().catch(() => '');
+        const detail = text || res.statusText || 'Request failed';
         throw new Error(`HTTP ${res.status}: ${detail}`);
       }
 
@@ -110,7 +113,7 @@ export async function fetchWithRetry(
       lastErr = err;
 
       // If aborted by external signal, don’t retry
-      if ((err as any)?.name === "AbortError" && externalSignal?.aborted) {
+      if ((err as any)?.name === 'AbortError' && externalSignal?.aborted) {
         throw err;
       }
 
@@ -121,7 +124,7 @@ export async function fetchWithRetry(
     }
   }
 
-  throw lastErr instanceof Error ? lastErr : new Error("Network error");
+  throw lastErr instanceof Error ? lastErr : new Error('Network error');
 }
 
 /* ------------------------------------------------------------------ */
@@ -132,18 +135,18 @@ export async function apiPost<T = unknown>(
   path: string,
   body: JSONValue,
   init?: RequestInit,
-  opts?: FetchRetryOptions
+  opts?: FetchRetryOptions,
 ): Promise<T> {
   const url = buildUrl(path);
   const res = await fetchWithRetry(
     url,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
       body: JSON.stringify(body),
       ...init,
     },
-    opts
+    opts,
   );
   return (await res.json()) as T;
 }
@@ -151,10 +154,10 @@ export async function apiPost<T = unknown>(
 export async function apiGet<T = unknown>(
   path: string,
   init?: RequestInit,
-  opts?: FetchRetryOptions
+  opts?: FetchRetryOptions,
 ): Promise<T> {
   const url = buildUrl(path);
-  const res = await fetchWithRetry(url, { method: "GET", ...(init || {}) }, opts);
+  const res = await fetchWithRetry(url, { method: 'GET', ...(init || {}) }, opts);
   return (await res.json()) as T;
 }
 
@@ -167,22 +170,21 @@ import type {
   SummaryResponse,
   StrategiesRequest,
   StrategiesResponse,
-} from "@/types/ai";
+} from '@/types/ai';
 
 export function postAiSummary(
   payload: SummaryRequest | { property: SummaryRequest },
-  opts?: FetchRetryOptions
+  opts?: FetchRetryOptions,
 ): Promise<SummaryResponse> {
-  const body =
-    "property" in payload ? payload : { property: payload as SummaryRequest };
-  return apiPost<SummaryResponse>("/generate-summary", body, undefined, opts);
+  // The backend accepts either flat {title,...} or {property:{...}}
+  const body = 'property' in payload ? payload : { property: payload as SummaryRequest };
+  return apiPost<SummaryResponse>('/generate-summary', body, undefined, opts);
 }
 
 export function postAiStrategies(
   payload: StrategiesRequest | { property: StrategiesRequest },
-  opts?: FetchRetryOptions
+  opts?: FetchRetryOptions,
 ): Promise<StrategiesResponse> {
-  const body =
-    "property" in payload ? payload : { property: payload as StrategiesRequest };
-  return apiPost<StrategiesResponse>("/generate-strategies", body, undefined, opts);
+  const body = 'property' in payload ? payload : { property: payload as StrategiesRequest };
+  return apiPost<StrategiesResponse>('/generate-strategies', body, undefined, opts);
 }

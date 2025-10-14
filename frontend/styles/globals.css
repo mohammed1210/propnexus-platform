@@ -5,7 +5,7 @@
 @tailwind utilities;
 
 /* Include your component aliases */
-@import "../styles/components.css";
+@import '../styles/components.css';
 
 /* 1) Design tokens (light/dark) */
 :root {
@@ -16,30 +16,35 @@
   --pnx-surface: #ffffff;
   --pnx-surface-2: #f8fafc;
   --pnx-border: var(--pnx-input-border); /* reuse your token */
-  --pnx-shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.06);
+  --pnx-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.06);
 }
-:root.dark, .dark {
+:root.dark,
+.dark {
   --pnx-placeholder: #7c7f87;
   --pnx-surface: #0b0b0e;
   --pnx-surface-2: #0f1116;
   --pnx-border: var(--pnx-input-border);
-  --pnx-shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 24px rgba(0,0,0,.35);
+  --pnx-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 24px rgba(0, 0, 0, 0.35);
 }
 
 /* 2) Form control baseline */
-input[type="text"],
-input[type="number"],
-input[type="email"],
-input[type="search"],
+input[type='text'],
+input[type='number'],
+input[type='email'],
+input[type='search'],
 select,
 textarea {
   border-width: 1px;
   border-style: solid;
   border-radius: var(--pnx-radius);
-  padding: .6rem .8rem;
+  padding: 0.6rem 0.8rem;
   height: 42px;
   line-height: 1.2;
-  transition: border-color .15s ease, box-shadow .15s ease, background-color .2s ease, color .2s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.2s ease,
+    color 0.2s ease;
   box-shadow: var(--pnx-shadow);
 }
 textarea {
@@ -67,7 +72,9 @@ textarea:active {
 }
 
 /* 3) Focus ring (keyboard-only) */
-:focus:not(:focus-visible) { outline: none; }
+:focus:not(:focus-visible) {
+  outline: none;
+}
 :focus-visible {
   outline: var(--pnx-ring) solid var(--pnx-ring-color);
   outline-offset: 2px;
@@ -81,7 +88,9 @@ textarea:focus-visible {
 
 /* High contrast users get a thicker ring */
 @media (forced-colors: active) {
-  :focus-visible { outline-width: 3px; }
+  :focus-visible {
+    outline-width: 3px;
+  }
 }
 
 /* 4) Disabled/read-only */
@@ -90,7 +99,7 @@ select[disabled],
 textarea[disabled],
 input[readonly],
 textarea[readonly] {
-  opacity: .65;
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
@@ -103,25 +112,32 @@ select {
   background-position:
     calc(100% - 18px) 50%,
     calc(100% - 12px) 50%;
-  background-size: 6px 6px, 6px 6px;
+  background-size:
+    6px 6px,
+    6px 6px;
   background-repeat: no-repeat;
   padding-right: 2rem;
 }
 
 /* Remove spinners on number fields (Chrome/Edge/Safari) */
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button {
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
   margin: 0;
   -webkit-appearance: none;
 }
-input[type="number"] { -moz-appearance: textfield; }
+input[type='number'] {
+  -moz-appearance: textfield;
+}
 
 /* Tidy search cancel button */
-input[type="search"]::-webkit-search-cancel-button {
+input[type='search']::-webkit-search-cancel-button {
   -webkit-appearance: none;
-  height: 16px; width: 16px;
-  background: currentColor; mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4l-6.3 6.3L2.88 18.3l6.3-6.3-6.3-6.3L4.3 4.29l6.3 6.3 6.3-6.3z"/></svg>') center / contain no-repeat;
-  opacity: .45;
+  height: 16px;
+  width: 16px;
+  background: currentColor;
+  mask: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4l-6.3 6.3L2.88 18.3l6.3-6.3-6.3-6.3L4.3 4.29l6.3 6.3 6.3-6.3z"/></svg>')
+    center / contain no-repeat;
+  opacity: 0.45;
 }
 
 /* 6) Autofill (Chrome/Safari) */
@@ -144,15 +160,15 @@ select:-webkit-autofill {
 }
 
 /* 8) Tooltip theme (light + dark parity) */
-.tooltip[data-theme="default"] {
+.tooltip[data-theme='default'] {
   background: #111827;
   color: #e5e7eb;
   border: 1px solid #374151;
   border-radius: 8px;
-  padding: .5rem .65rem;
+  padding: 0.5rem 0.65rem;
 }
-.tooltip[data-theme="default"]::after {
-  content: "";
+.tooltip[data-theme='default']::after {
+  content: '';
   position: absolute;
   inset-inline-start: 1rem;
   bottom: -6px;
@@ -172,30 +188,46 @@ select:-webkit-autofill {
   border-radius: 6px;
   box-shadow: var(--pnx-shadow);
 }
-.skip-link:focus { top: 12px; }
+.skip-link:focus {
+  top: 12px;
+}
 
 /* 10) Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  * {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* 11) Scrollbar polish (WebKit/Chromium; harmless elsewhere) */
-*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
 *::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, currentColor 20%, transparent);
   border-radius: 999px;
   border: 3px solid transparent;
   background-clip: content-box;
 }
-*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
 
 /* 12) Visually-hidden utility for a11y-only text */
-.sr-only, .visually-hidden {
+.sr-only,
+.visually-hidden {
   position: absolute !important;
-  width: 1px; height: 1px;
-  padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0 0 0 0);
-  white-space: nowrap; border: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* ===== PropNexus Primitives: Buttons & Badges ===== */
@@ -204,10 +236,10 @@ select:-webkit-autofill {
 :root {
   --pnx-btn-radius: 10px;
   --pnx-btn-h: 42px;
-  --pnx-btn-pad-x: .95rem;
-  --pnx-btn-gap: .5rem;
+  --pnx-btn-pad-x: 0.95rem;
+  --pnx-btn-gap: 0.5rem;
 
-  --pnx-primary: #0ea5e9;   /* sky-500 */
+  --pnx-primary: #0ea5e9; /* sky-500 */
   --pnx-primary-ink: #ffffff;
   --pnx-primary-hover: #0284c7;
 
@@ -229,7 +261,8 @@ select:-webkit-autofill {
   --pnx-warning: #f59e0b;
   --pnx-info: #3b82f6;
 }
-:root.dark, .dark {
+:root.dark,
+.dark {
   --pnx-muted: #0f1116;
   --pnx-muted-ink: #e5e7eb;
   --pnx-secondary: #0f172a;
@@ -253,7 +286,12 @@ select:-webkit-autofill {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
-  transition: transform .06s ease, box-shadow .15s ease, background-color .15s ease, color .15s ease, border-color .15s ease;
+  transition:
+    transform 0.06s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
   box-shadow: var(--pnx-shadow);
   background: var(--pnx-surface-2);
   color: var(--pnx-input-fg);
@@ -264,25 +302,33 @@ select:-webkit-autofill {
   background: var(--pnx-primary);
   color: var(--pnx-primary-ink);
 }
-.btn--primary:hover { background: var(--pnx-primary-hover); }
+.btn--primary:hover {
+  background: var(--pnx-primary-hover);
+}
 .btn--secondary {
   background: var(--pnx-secondary);
   color: var(--pnx-secondary-ink);
 }
-.btn--secondary:hover { background: var(--pnx-secondary-hover); }
+.btn--secondary:hover {
+  background: var(--pnx-secondary-hover);
+}
 .btn--muted {
   background: var(--pnx-muted);
   color: var(--pnx-muted-ink);
   border-color: var(--pnx-border);
 }
-.btn--muted:hover { background: color-mix(in srgb, var(--pnx-muted) 85%, #000 15%); }
+.btn--muted:hover {
+  background: color-mix(in srgb, var(--pnx-muted) 85%, #000 15%);
+}
 .btn--ghost {
   background: var(--pnx-ghost);
   color: inherit;
   border-color: transparent;
   box-shadow: none;
 }
-.btn--ghost:hover { background: var(--pnx-ghost-hover); }
+.btn--ghost:hover {
+  background: var(--pnx-ghost-hover);
+}
 .btn--outline {
   background: transparent;
   color: inherit;
@@ -295,53 +341,80 @@ select:-webkit-autofill {
   background: var(--pnx-danger);
   color: #fff;
 }
-.btn--danger:hover { background: var(--pnx-danger-hover); }
+.btn--danger:hover {
+  background: var(--pnx-danger-hover);
+}
 
 /* Sizes */
-.btn--sm { height: 34px; padding: 0 .7rem; font-size: .875rem; }
-.btn--lg { height: 50px; padding: 0 1.1rem; font-size: 1rem; }
-.btn--icon { width: var(--pnx-btn-h); padding: 0; }
+.btn--sm {
+  height: 34px;
+  padding: 0 0.7rem;
+  font-size: 0.875rem;
+}
+.btn--lg {
+  height: 50px;
+  padding: 0 1.1rem;
+  font-size: 1rem;
+}
+.btn--icon {
+  width: var(--pnx-btn-h);
+  padding: 0;
+}
 
 /* State */
-.btn:active { transform: translateY(1px); }
+.btn:active {
+  transform: translateY(1px);
+}
 .btn[disabled],
 .btn:disabled {
-  opacity: .55;
+  opacity: 0.55;
   cursor: not-allowed;
-  filter: grayscale(.12);
+  filter: grayscale(0.12);
 }
 
 /* Focus (consistent with inputs) */
-.btn:focus:not(:focus-visible) { outline: none; }
+.btn:focus:not(:focus-visible) {
+  outline: none;
+}
 .btn:focus-visible {
   outline: var(--pnx-ring) solid var(--pnx-ring-color);
   outline-offset: 2px;
 }
 
 /* Loading (data attribute) */
-.btn[data-loading="true"] {
+.btn[data-loading='true'] {
   position: relative;
   pointer-events: none;
 }
-.btn[data-loading="true"] .btn__label { opacity: 0; }
-.btn[data-loading="true"]::after {
-  content: "";
+.btn[data-loading='true'] .btn__label {
+  opacity: 0;
+}
+.btn[data-loading='true']::after {
+  content: '';
   position: absolute;
-  width: 1.15em; height: 1.15em;
+  width: 1.15em;
+  height: 1.15em;
   border-radius: 50%;
   border: 2px solid color-mix(in srgb, var(--pnx-primary-ink, #fff) 60%, transparent);
   border-top-color: transparent;
-  animation: pnx-spin .8s linear infinite;
+  animation: pnx-spin 0.8s linear infinite;
 }
-@keyframes pnx-spin { to { transform: rotate(360deg); } }
+@keyframes pnx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .btn[data-loading="true"]::after { animation: none; }
+  .btn[data-loading='true']::after {
+    animation: none;
+  }
 }
 
 /* Icon alignment helpers */
 .btn .btn__icon {
   display: inline-flex;
-  width: 1.1em; height: 1.1em;
+  width: 1.1em;
+  height: 1.1em;
   line-height: 1;
 }
 
@@ -350,27 +423,37 @@ select:-webkit-autofill {
   display: inline-flex;
   gap: 8px;
 }
-.btn-group--tight { gap: 0; }
+.btn-group--tight {
+  gap: 0;
+}
 .btn-group--tight .btn {
   border-radius: 0;
   box-shadow: none;
 }
-.btn-group--tight .btn:first-child { border-top-left-radius: var(--pnx-btn-radius); border-bottom-left-radius: var(--pnx-btn-radius); }
-.btn-group--tight .btn:last-child { border-top-right-radius: var(--pnx-btn-radius); border-bottom-right-radius: var(--pnx-btn-radius); }
+.btn-group--tight .btn:first-child {
+  border-top-left-radius: var(--pnx-btn-radius);
+  border-bottom-left-radius: var(--pnx-btn-radius);
+}
+.btn-group--tight .btn:last-child {
+  border-top-right-radius: var(--pnx-btn-radius);
+  border-bottom-right-radius: var(--pnx-btn-radius);
+}
 
 /* Full-width helper */
-.btn--block { width: 100%; }
+.btn--block {
+  width: 100%;
+}
 
 /* ===== Badges ===== */
 .badge {
   display: inline-flex;
   align-items: center;
-  gap: .4rem;
+  gap: 0.4rem;
   line-height: 1;
   font-weight: 600;
-  font-size: .75rem;
+  font-size: 0.75rem;
   border-radius: 999px;
-  padding: .35rem .55rem;
+  padding: 0.35rem 0.55rem;
   border: 1px solid transparent;
   background: var(--pnx-muted);
   color: var(--pnx-muted-ink);
@@ -380,13 +463,30 @@ select:-webkit-autofill {
   color: inherit;
   border-color: var(--pnx-border);
 }
-.badge--primary { background: color-mix(in srgb, var(--pnx-primary) 18%, transparent); color: var(--pnx-primary); }
-.badge--success { background: color-mix(in srgb, var(--pnx-success) 18%, transparent); color: var(--pnx-success); }
-.badge--warning { background: color-mix(in srgb, var(--pnx-warning) 22%, transparent); color: var(--pnx-warning); }
-.badge--danger  { background: color-mix(in srgb, var(--pnx-danger) 18%, transparent);  color: var(--pnx-danger); }
-.badge--info    { background: color-mix(in srgb, var(--pnx-info) 18%, transparent);    color: var(--pnx-info); }
+.badge--primary {
+  background: color-mix(in srgb, var(--pnx-primary) 18%, transparent);
+  color: var(--pnx-primary);
+}
+.badge--success {
+  background: color-mix(in srgb, var(--pnx-success) 18%, transparent);
+  color: var(--pnx-success);
+}
+.badge--warning {
+  background: color-mix(in srgb, var(--pnx-warning) 22%, transparent);
+  color: var(--pnx-warning);
+}
+.badge--danger {
+  background: color-mix(in srgb, var(--pnx-danger) 18%, transparent);
+  color: var(--pnx-danger);
+}
+.badge--info {
+  background: color-mix(in srgb, var(--pnx-info) 18%, transparent);
+  color: var(--pnx-info);
+}
 
 .badge .badge__dot {
-  width: .45rem; height: .45rem; border-radius: 50%;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
   background: currentColor;
 }

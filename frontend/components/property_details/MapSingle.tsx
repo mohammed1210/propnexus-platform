@@ -35,12 +35,11 @@ export default function MapSingle(props: MapSingleProps) {
   const scrollWheelZoom = props.scrollWheelZoom ?? false;
 
   const hasCoords =
-    typeof lat === 'number' && !Number.isNaN(lat) &&
-    typeof lng === 'number' && !Number.isNaN(lng);
+    typeof lat === 'number' && !Number.isNaN(lat) && typeof lng === 'number' && !Number.isNaN(lng);
 
   const position: LatLngExpression = useMemo(
     () => (hasCoords ? [lat as number, lng as number] : [52.5, -1.5]),
-    [hasCoords, lat, lng]
+    [hasCoords, lat, lng],
   );
 
   const [mounted, setMounted] = useState(false);
@@ -50,7 +49,8 @@ export default function MapSingle(props: MapSingleProps) {
       // @ts-ignore
       delete L.Icon.Default.prototype._getIconUrl;
       L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+        iconRetinaUrl:
+          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
         iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
       });
@@ -70,7 +70,9 @@ export default function MapSingle(props: MapSingleProps) {
 
   if (!hasCoords) {
     return (
-      <div className={`w-full rounded-md border border-gray-200 p-3 text-sm text-gray-600 ${props.className ?? ''}`}>
+      <div
+        className={`w-full rounded-md border border-gray-200 p-3 text-sm text-gray-600 ${props.className ?? ''}`}
+      >
         Map unavailable — no coordinates provided.
       </div>
     );
@@ -82,14 +84,20 @@ export default function MapSingle(props: MapSingleProps) {
   const darkAttr = '&copy; OpenStreetMap contributors, &copy; CARTO';
 
   return (
-    <div className={`rounded-lg overflow-hidden ${props.className ?? ''}`} style={{ height, width: '100%' }}>
+    <div
+      className={`rounded-lg overflow-hidden ${props.className ?? ''}`}
+      style={{ height, width: '100%' }}
+    >
       <MapContainer
         center={position}
         zoom={zoom}
         scrollWheelZoom={scrollWheelZoom}
         style={{ height: '100%', width: '100%' }}
       >
-        <TileLayer attribution={darkMode ? darkAttr : lightAttr} url={darkMode ? darkUrl : lightUrl} />
+        <TileLayer
+          attribution={darkMode ? darkAttr : lightAttr}
+          url={darkMode ? darkUrl : lightUrl}
+        />
         <Marker position={position}>
           <Popup>{title}</Popup>
         </Marker>

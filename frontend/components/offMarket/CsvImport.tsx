@@ -58,7 +58,7 @@ export default function CsvImport({ onImported }: Props) {
         ref={fileRef}
         type="file"
         accept=".csv,text/csv"
-        onChange={e => e.target.files?.[0] && handleFile(e.target.files[0])}
+        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
       />
       <button
         type="button"

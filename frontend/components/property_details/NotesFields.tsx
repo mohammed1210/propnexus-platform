@@ -80,21 +80,30 @@ export default function NotesFields({ propertyId, className }: NotesFieldsProps)
         setTags(Array.isArray(parsed.tags) ? parsed.tags : []);
         setSavedAt(parsed.savedAt);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey]);
 
   // Debounced autosave
   useEffect(() => {
     const payload: StoredNotes = {
-      title, size, pinned, text, tags, savedAt: Date.now(),
+      title,
+      size,
+      pinned,
+      text,
+      tags,
+      savedAt: Date.now(),
     };
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       localStorage.setItem(storageKey, JSON.stringify(payload));
       setSavedAt(payload.savedAt);
     }, 500);
-    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
   }, [title, size, pinned, text, tags, storageKey]);
 
   const insertText = (snippet: string) => {
@@ -106,7 +115,9 @@ export default function NotesFields({ propertyId, className }: NotesFieldsProps)
 
   const onCopy = async () => {
     const composed = buildExport(title, size, pinned, tags, text);
-    try { await navigator.clipboard.writeText(composed); } catch {}
+    try {
+      await navigator.clipboard.writeText(composed);
+    } catch {}
   };
 
   const onDownload = () => {
@@ -171,7 +182,9 @@ export default function NotesFields({ propertyId, className }: NotesFieldsProps)
       {showTools && (
         <>
           <div className="flex flex-wrap items-center gap-2 px-4 pt-3">
-            <label className="sr-only" htmlFor="notes-title">Title</label>
+            <label className="sr-only" htmlFor="notes-title">
+              Title
+            </label>
             <input
               id="notes-title"
               className="min-w-[220px] flex-1 rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-sm outline-none"
@@ -180,7 +193,9 @@ export default function NotesFields({ propertyId, className }: NotesFieldsProps)
               onChange={(e) => setTitle(e.target.value)}
             />
 
-            <label className="sr-only" htmlFor="notes-priority">Priority</label>
+            <label className="sr-only" htmlFor="notes-priority">
+              Priority
+            </label>
             <select
               id="notes-priority"
               className="rounded-md border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-2 text-sm"
@@ -194,7 +209,11 @@ export default function NotesFields({ propertyId, className }: NotesFieldsProps)
             </select>
 
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={pinned}
+                onChange={(e) => setPinned(e.target.checked)}
+              />
               Pin to top
             </label>
           </div>
@@ -222,7 +241,9 @@ export default function NotesFields({ propertyId, className }: NotesFieldsProps)
 
       <div className="px-4 pt-3">
         <div className="rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900">
-          <label className="sr-only" htmlFor="notes-text">Notes</label>
+          <label className="sr-only" htmlFor="notes-text">
+            Notes
+          </label>
           <textarea
             id="notes-text"
             className="h-40 w-full resize-y rounded-lg bg-transparent px-3 py-2 text-sm leading-5 outline-none"
@@ -235,29 +256,52 @@ export default function NotesFields({ propertyId, className }: NotesFieldsProps)
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-        <div className="text-xs text-neutral-500">{used}/{MAX} chars</div>
+        <div className="text-xs text-neutral-500">
+          {used}/{MAX} chars
+        </div>
 
         <div className="flex flex-wrap gap-2">
-          <button onClick={onCopy} type="button" className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800">
+          <button
+            onClick={onCopy}
+            type="button"
+            className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+          >
             Copy
           </button>
-          <button onClick={onDownload} type="button" className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800">
+          <button
+            onClick={onDownload}
+            type="button"
+            className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+          >
             Download
           </button>
-          <button onClick={onClear} type="button" className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800">
+          <button
+            onClick={onClear}
+            type="button"
+            className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+          >
             Clear
           </button>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2 border-t border-neutral-200 dark:border-neutral-800 px-4 py-3">
-        <button onClick={() => insertText(VIEWING_CHECKLIST)} className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800">
+        <button
+          onClick={() => insertText(VIEWING_CHECKLIST)}
+          className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        >
           Insert: Viewing checklist
         </button>
-        <button onClick={() => insertText(RISKS_AND_MITS)} className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800">
+        <button
+          onClick={() => insertText(RISKS_AND_MITS)}
+          className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        >
           Insert: Risks & mitigations
         </button>
-        <button onClick={() => insertText(OFFER_ASSUMPTIONS)} className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800">
+        <button
+          onClick={() => insertText(OFFER_ASSUMPTIONS)}
+          className="rounded-md border border-neutral-300 dark:border-neutral-700 px-3 py-1.5 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        >
           Insert: Offer assumptions
         </button>
       </div>

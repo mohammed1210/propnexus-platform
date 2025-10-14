@@ -22,8 +22,7 @@ const base =
   'dark:focus:ring-offset-neutral-900';
 
 const byVariant: Record<Variant, string> = {
-  primary:
-    'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-600',
+  primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-600',
   secondary:
     'border border-neutral-300 text-neutral-800 hover:bg-neutral-50 ' +
     'dark:border-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-800 ' +
@@ -32,8 +31,7 @@ const byVariant: Record<Variant, string> = {
     'text-neutral-700 hover:bg-neutral-100 ' +
     'dark:text-neutral-200 dark:hover:bg-neutral-800 ' +
     'focus:ring-neutral-400 dark:focus:ring-neutral-600',
-  danger:
-    'bg-red-600 text-white hover:bg-red-700 focus:ring-red-600',
+  danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-600',
 };
 
 const bySize: Record<Size, string> = {
@@ -60,7 +58,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     disabled,
     ...rest
   },
-  ref
+  ref,
 ) {
   const isDisabled = disabled || loading;
 

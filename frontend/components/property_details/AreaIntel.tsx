@@ -67,7 +67,9 @@ export default function AreaIntel({
       .then((json) => {
         if (cancelled) return;
         setLiveData(json);
-        try { sessionStorage.setItem(cacheKey, JSON.stringify(json)); } catch {}
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(json));
+        } catch {}
       })
       .catch((e) => {
         if (cancelled) return;
@@ -101,7 +103,9 @@ export default function AreaIntel({
       aria-labelledby="area-intelligence"
     >
       <div className="mb-2 flex items-center justify-between">
-        <h3 id="area-intelligence" className="text-lg font-semibold">📍 Area Intelligence</h3>
+        <h3 id="area-intelligence" className="text-lg font-semibold">
+          📍 Area Intelligence
+        </h3>
         {locationLabel && <span className="text-xs text-neutral-500">{locationLabel}</span>}
       </div>
 
@@ -113,12 +117,28 @@ export default function AreaIntel({
         </div>
       ) : (
         <>
-          {err && <div className="mb-3 text-xs text-amber-600">{err} Showing illustrative figures instead.</div>}
+          {err && (
+            <div className="mb-3 text-xs text-amber-600">
+              {err} Showing illustrative figures instead.
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <InfoCard label="Average Yield" value={`${Number(d.avgYieldPct).toFixed(1)}%`} hint="Local average gross yield" />
-            <InfoCard label="Average Rent" value={`£${Math.round(Number(d.avgRent)).toLocaleString()}`} hint="Median monthly rent" />
-            <InfoCard label="Crime (Index)" value={String(d.crimeRateIndex)} hint="Composite index (0–100). Lower is better." />
+            <InfoCard
+              label="Average Yield"
+              value={`${Number(d.avgYieldPct).toFixed(1)}%`}
+              hint="Local average gross yield"
+            />
+            <InfoCard
+              label="Average Rent"
+              value={`£${Math.round(Number(d.avgRent)).toLocaleString()}`}
+              hint="Median monthly rent"
+            />
+            <InfoCard
+              label="Crime (Index)"
+              value={String(d.crimeRateIndex)}
+              hint="Composite index (0–100). Lower is better."
+            />
             <InfoCard label="Schools" value={d.ofstedSummary} hint="Ofsted ratings summary" />
           </div>
 
@@ -126,7 +146,8 @@ export default function AreaIntel({
             <div className="mb-1 font-medium">Transport</div>
             <div>{d.transportSummary}</div>
             <div className="mt-2 text-xs text-neutral-500">
-              Figures are illustrative for product design. Live feeds coming soon (ONS, Police, Ofsted, TfL/National Rail).
+              Figures are illustrative for product design. Live feeds coming soon (ONS, Police,
+              Ofsted, TfL/National Rail).
             </div>
           </div>
         </>
@@ -135,12 +156,24 @@ export default function AreaIntel({
   );
 }
 
-function InfoCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+function InfoCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+}) {
   return (
     <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-3">
       <div className="mb-1 flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300">
         <span>{label}</span>
-        {hint && <span className="cursor-help text-xs text-neutral-500" title={hint}>ⓘ</span>}
+        {hint && (
+          <span className="cursor-help text-xs text-neutral-500" title={hint}>
+            ⓘ
+          </span>
+        )}
       </div>
       <div className="text-base font-semibold">{value}</div>
     </div>

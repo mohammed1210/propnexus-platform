@@ -6,7 +6,10 @@ export default function Document() {
       <Head>
         <meta name="theme-color" content="#2563eb" />
         <meta name="color-scheme" content="light dark" />
-        <meta name="description" content="PropNexus — find, analyse, and compare UK property deals." />
+        <meta
+          name="description"
+          content="PropNexus — find, analyse, and compare UK property deals."
+        />
         <link rel="icon" href="/favicon.ico" />
         {/* OG basics */}
         <meta property="og:site_name" content="PropNexus" />
