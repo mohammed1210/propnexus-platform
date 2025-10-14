@@ -1,24 +1,24 @@
 # backend/routes/scrape_routes.py
 from __future__ import annotations
 
-import logging
 import os
-
-try:
-    from backend.scraper.rightmove_scraper import scrape_rightmove_properties
-    from backend.scraper.zoopla_scraper import scrape_zoopla_properties
-except Exception:
-    from scraper.rightmove_scraper import scrape_rightmove_properties
-    from scraper.zoopla_scraper import scrape_zoopla_properties
-
-    from utils.supabase import supabase as sb
-    from fastapi import APIRouter, HTTPException
-    from utils.email import send_email
-    from pydantic import BaseModel
-    from supabase import Client, create_client
+import logging
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from supabase import Client, create_client  # type: ignore
 
 from ..scraper.rightmove_scraper import scrape_rightmove_properties
 from ..scraper.zoopla_scraper import scrape_zoopla_properties
+
+SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+
+supabase: Client | None = None
+try:
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:  # pragma: no cover
+    logging.warning("Supabase init failed: %s", e)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
@@ -39,6 +39,7 @@ class ScrapeRequest(BaseModel):
 
 @router.post("/scrape")
 async def scrape_all_sources(req: ScrapeRequest) -> dict:
+async def scrape_all_sources(req: ScrapeRequest) -> dict:
     location = (req.location or "").strip()
     if not location:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -49,6 +50,9 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
         rightmove_results = scrape_rightmove_properties(location) or []
 
         combined = zoopla_results + rightmove_results
+        seen: set[tuple] = set()
+        unique_props: list[dict] = []
+
         seen: set[tuple] = set()
         unique_props: list[dict] = []
 
@@ -64,14 +68,12 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
             except Exception as db_err:  # pragma: no cover
                 logging.warning("DB insert skipped: %s", db_err)
 
-    count = len(unique_props)
-            
-                            await send_email("abbas_m90@hotmail.com", "Scrape Completed", f"{count} new properties added to PropNexus.")
-         
-       return {"count": len(unique_props), "properties": unique_props}
+        return {"count": len(unique_props), "properties": unique_props}
 
     except HTTPException:
         raise
     except Exception as e:  # pragma: no cover
         logging.exception("Scraping failed: %s", e)
+        logging.exception("Scraping failed: %s", e)
         raise HTTPException(status_code=500, detail="Scraping failed")
+    

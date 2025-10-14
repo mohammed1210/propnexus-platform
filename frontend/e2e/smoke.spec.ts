@@ -8,7 +8,9 @@ test('home loads and navigation shell is visible-ish', async ({ page }) => {
   expect(res?.ok()).toBeTruthy();
 
   // Polyfill TransformStream for CI (Node <20)
-undefined
+if (typeof (global as any).TransformStream === 'undefined') {
+  (global as any).TransformStream = require('web-streams-polyfill/ponyfill').TransformStream;
+}
 
   // accept header OR nav OR a generic top bar
   await expect(page.locator('body')).toBeVisible({ timeout: 5000 });
