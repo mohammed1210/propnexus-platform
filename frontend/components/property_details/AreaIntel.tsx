@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { fetchWithRetry } from '@/lib/api';
 
 type AreaIntelData = {
   avgYieldPct?: number;
@@ -58,7 +59,7 @@ export default function AreaIntel({
       /* ignore cache parse */
     }
 
-    fetch(`${backend}/area-intel/${encodeURIComponent(pc)}`, { signal: ctrl.signal })
+    fetchWithRetry(`${backend}/area-intel/${encodeURIComponent(pc)}`, { signal: ctrl.signal })
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();

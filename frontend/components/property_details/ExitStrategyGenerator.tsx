@@ -49,11 +49,7 @@ export default function ExitStrategyGenerator(props: Props) {
 
   return (
     <div className="space-y-4">
-      <button
-        onClick={handleGenerate}
-        disabled={loading}
-        className="rounded-md border px-3 py-2 text-sm font-medium hover:bg-neutral-50 disabled:opacity-50"
-      >
+      <button onClick={handleGenerate} disabled={loading} className="pnx-pnx-btn pnx-pnx-pnx-btn-outline" data-loading={loading ? 'true' : undefined}>
         {loading ? 'Generating…' : 'Generate exit strategies'}
       </button>
 

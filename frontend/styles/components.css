@@ -1,0 +1,172 @@
+/* ===== PropNexus UI Primitives (Tailwind-mapped, single layer) ===== */
+@layer components {
+
+  /* --- Buttons --- */
+  .pnx-btn {
+    @apply inline-flex items-center justify-center font-semibold whitespace-nowrap
+           rounded-[10px] h-[42px] px-[0.95rem] gap-2
+           border border-transparent shadow
+           transition-[transform,box-shadow,background-color,color,border-color] duration-150
+           select-none cursor-pointer;
+    background: var(--pnx-surface-2);
+    color: var(--pnx-input-fg);
+  }
+  .pnx-btn:hover { @apply shadow-md; }
+  .pnx-btn:active { transform: translateY(1px); }
+  .pnx-btn:focus:not(:focus-visible) { outline: none; }
+  .pnx-btn:focus-visible {
+    outline: var(--pnx-ring) solid var(--pnx-ring-color);
+    outline-offset: 2px;
+  }
+  .pnx-btn:disabled { @apply opacity-55 cursor-not-allowed; filter: grayscale(.12); }
+
+  .pnx-btn-primary   { color: var(--pnx-primary-ink); background: var(--pnx-primary); }
+  .pnx-btn-primary:hover { background: var(--pnx-primary-hover); }
+
+  .pnx-btn-secondary { color: var(--pnx-secondary-ink); background: var(--pnx-secondary); }
+  .pnx-btn-secondary:hover { background: var(--pnx-secondary-hover); }
+
+  .pnx-btn-muted     { background: var(--pnx-muted); color: var(--pnx-muted-ink); border-color: var(--pnx-border); }
+  .pnx-btn-muted:hover { background: color-mix(in srgb, var(--pnx-muted) 85%, #000 15%); }
+
+  .pnx-btn-ghost     { @apply shadow-none; background: transparent; color: inherit; border-color: transparent; }
+  .pnx-btn-ghost:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+
+  .pnx-btn-outline   { @apply shadow-none; background: transparent; color: inherit; border-color: currentColor; }
+
+  .pnx-btn-danger    { background: #ef4444; color: #fff; }
+  .pnx-btn-danger:hover { background: #dc2626; }
+
+  .pnx-btn-sm   { @apply h-[34px] px-3 text-[0.875rem]; }
+  .pnx-btn-lg   { @apply h-[50px] px-5 text-[1rem]; }
+  .pnx-btn-icon { @apply w-[42px] p-0; }
+  .pnx-btn-block { @apply w-full; }
+
+  .pnx-btn[data-loading="true"] { @apply relative pointer-events-none; }
+  .pnx-btn[data-loading="true"] .btn__label { opacity: 0; }
+  .pnx-btn[data-loading="true"]::after {
+    content: "";
+    position: absolute; width: 1.15em; height: 1.15em; border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--pnx-primary-ink,#fff) 60%, transparent);
+    border-top-color: transparent;
+    animation: pnx-spin .8s linear infinite;
+  }
+
+  .pnx-btn-group { @apply inline-flex gap-2; }
+  .pnx-btn-group-tight { @apply inline-flex gap-0; }
+  .pnx-btn-group-tight .pnx-btn { @apply rounded-none shadow-none; }
+  .pnx-btn-group-tight .pnx-btn:first-child { border-top-left-radius: 10px; border-bottom-left-radius: 10px; }
+  .pnx-btn-group-tight .pnx-btn:last-child  { border-top-right-radius: 10px; border-bottom-right-radius: 10px; }
+
+  @keyframes pnx-spin { to { transform: rotate(360deg); } }
+
+  /* --- Badges --- */
+  .pnx-badge {
+    @apply inline-flex items-center gap-2 px-2 py-1 text-xs font-semibold rounded-full border;
+    background: var(--pnx-muted);
+    color: var(--pnx-muted-ink);
+    border-color: var(--pnx-border);
+  }
+  .pnx-badge-outline { background: transparent; color: inherit; }
+  .pnx-badge-primary { background: color-mix(in srgb, var(--pnx-primary) 18%, transparent); color: var(--pnx-primary); }
+  .pnx-badge-success { background: color-mix(in srgb, #22c55e 18%, transparent); color: #22c55e; }
+  .pnx-badge-warning { background: color-mix(in srgb, #f59e0b 22%, transparent); color: #f59e0b; }
+  .pnx-badge-danger  { background: color-mix(in srgb, #ef4444 18%, transparent); color: #ef4444; }
+  .pnx-badge-info    { background: color-mix(in srgb, #3b82f6 18%, transparent); color: #3b82f6; }
+  .pnx-badge-dot { width: .45rem; height: .45rem; border-radius: 50%; background: currentColor; }
+
+  /* --- Cards --- */
+  .pnx-card {
+    @apply relative flex flex-col rounded-xl border shadow-sm overflow-hidden
+           transition-all duration-200;
+    background: var(--pnx-surface); color: var(--pnx-input-fg); border-color: var(--pnx-border);
+  }
+  .dark .pnx-card { background: var(--pnx-surface-2); }
+  .pnx-card:hover { @apply shadow-md -translate-y-[1px]; }
+
+  .pnx-card-header {
+    @apply flex items-center justify-between p-4 border-b;
+    border-color: var(--pnx-border);
+    background: color-mix(in srgb, var(--pnx-surface) 94%, var(--pnx-border) 6%);
+  }
+  .pnx-card-title { @apply font-semibold text-base leading-tight; }
+  .pnx-card-subtitle { @apply text-sm text-gray-500 dark:text-gray-400; }
+  .pnx-card-body { @apply p-4 space-y-3 text-sm leading-relaxed; }
+  .pnx-card-footer {
+    @apply flex items-center justify-end gap-2 p-4 border-t;
+    border-color: var(--pnx-border);
+    background: color-mix(in srgb, var(--pnx-surface) 94%, var(--pnx-border) 6%);
+  }
+  .pnx-card-media { @apply relative w-full overflow-hidden; }
+  .pnx-card-media img { @apply w-full h-auto object-cover transition-transform duration-300; }
+  .pnx-card-media:hover img { @apply scale-105; }
+  .pnx-card-badge { @apply absolute top-3 right-3; }
+  .pnx-card:focus-within, .pnx-card:hover {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--pnx-ring-color) 25%, transparent),
+                0 8px 20px rgba(0,0,0,.08);
+  }
+
+  /* --- Modal --- */
+  .pnx-modal { @apply fixed inset-0 z-[9998] hidden; background: color-mix(in srgb, #000 50%, transparent); }
+  .pnx-modal[data-open="true"] { @apply block; }
+
+  .pnx-modal__dialog { @apply fixed inset-0 z-[9999] grid place-items-center p-4; }
+
+  .pnx-modal__surface {
+    @apply relative w-full max-w-lg rounded-xl border shadow-xl outline-none;
+    background: var(--pnx-surface); color: var(--pnx-input-fg); border-color: var(--pnx-border);
+    transform: translateY(10px) scale(.98); opacity: 0;
+    transition: transform .18s ease, opacity .18s ease, box-shadow .18s ease;
+  }
+  .pnx-modal[data-open="true"] .pnx-modal__surface { transform: translateY(0) scale(1); opacity: 1; }
+
+  .pnx-modal--sm .pnx-modal__surface { @apply max-w-md; }
+  .pnx-modal--md .pnx-modal__surface { @apply max-w-lg; }
+  .pnx-modal--lg .pnx-modal__surface { @apply max-w-3xl; }
+  .pnx-modal--xl .pnx-modal__surface { @apply max-w-5xl; }
+  .pnx-modal--full .pnx-modal__surface { @apply max-w-none h-[96vh]; }
+
+  .pnx-modal__header {
+    @apply flex items-start justify-between gap-4 p-4 border-b;
+    border-color: var(--pnx-border);
+    background: color-mix(in srgb, var(--pnx-surface) 94%, var(--pnx-border) 6%);
+  }
+  .pnx-modal__title { @apply font-semibold text-base leading-tight; }
+  .pnx-modal__body  { @apply p-4 overflow-auto; max-height: calc(80vh - 120px); }
+  .pnx-modal__footer{
+    @apply flex items-center justify-end gap-2 p-4 border-t;
+    border-color: var(--pnx-border);
+    background: color-mix(in srgb, var(--pnx-surface) 94%, var(--pnx-border) 6%);
+  }
+  .pnx-modal__close { @apply absolute top-3 right-3 p-2 rounded-lg text-black/70 dark:text-white/70 hover:text-current; }
+  .pnx-modal__close:focus-visible {
+    outline: var(--pnx-ring) solid var(--pnx-ring-color);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pnx-modal__surface { transition: none; transform: none; opacity: 1; }
+  }
+
+  /* --- Panel (Sheet) + Overlay --- */
+  .pnx-panel {
+    @apply fixed inset-y-0 right-0 z-[9999] w-[92vw] max-w-xl hidden
+           border-l shadow-2xl;
+    background: var(--pnx-surface); color: var(--pnx-input-fg); border-color: var(--pnx-border);
+    transform: translateX(12px); opacity: 0; transition: transform .2s ease, opacity .2s ease;
+  }
+  .pnx-panel[data-open="true"] { @apply block; transform: translateX(0); opacity: 1; }
+  .pnx-panel--left { @apply left-0 right-auto border-l-0 border-r; transform: translateX(-12px); }
+  .pnx-panel--left[data-open="true"] { transform: translateX(0); }
+
+  .pnx-panel__header {
+    @apply flex items-center justify-between gap-4 p-4 border-b;
+    border-color: var(--pnx-border);
+    background: color-mix(in srgb, var(--pnx-surface) 94%, var(--pnx-border) 6%);
+  }
+  .pnx-panel__title { @apply font-semibold text-base; }
+  .pnx-panel__body  { @apply p-4 overflow-auto; height: calc(100vh - 128px); }
+  .pnx-panel__footer{ @apply flex items-center justify-end gap-2 p-4 border-t; border-color: var(--pnx-border); }
+
+  .pnx-panel-overlay { @apply fixed inset-0 z-[9998] hidden; background: color-mix(in srgb, #000 50%, transparent); }
+  .pnx-panel-overlay[data-open="true"] { @apply block; }
+}

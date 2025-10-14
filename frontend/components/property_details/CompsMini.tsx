@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { fetchWithRetry } from '@/lib/api';
 
 type Comp = {
   address: string;
@@ -43,7 +44,7 @@ export default function CompsMini({
     setLoading(true);
     setErr(null);
 
-    fetch(`/api/comps/${encodeURIComponent(pc)}`, {
+    fetchWithRetry(`/api/comps/${encodeURIComponent(pc)}`, {
       cache: 'no-store',
       signal: ctrl.signal,
     })
@@ -55,7 +56,7 @@ export default function CompsMini({
         setSales(Array.isArray(j?.sales) ? j.sales : []);
         setRents(Array.isArray(j?.rents) ? j.rents : []);
       })
-      .catch((e) => {
+      .catch((e: any) => {
         if (e?.name === 'AbortError') return;
         console.error('CompsMini fetch error', e);
         setErr('Could not load comps');
@@ -85,10 +86,14 @@ export default function CompsMini({
     <section
       className={`rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 ${className}`}
     >
-      <h3 className="text-lg font-semibold mb-3">📈 Nearby Comps <span className="text-xs text-neutral-500">(beta)</span></h3>
+      <h3 className="text-lg font-semibold mb-3">
+        📈 Nearby Comps <span className="text-xs text-neutral-500">(beta)</span>
+      </h3>
 
       {postcode ? (
-        <p className="text-xs text-neutral-500 -mt-2 mb-3">for <span className="font-mono">{postcode.toUpperCase()}</span></p>
+        <p className="text-xs text-neutral-500 -mt-2 mb-3">
+          for <span className="font-mono">{postcode.toUpperCase()}</span>
+        </p>
       ) : (
         <p className="text-sm text-neutral-500 -mt-1 mb-3">Add a postcode to load comps.</p>
       )}
@@ -121,7 +126,8 @@ export default function CompsMini({
                         {c.address}
                       </div>
                       <div className="text-[11px] text-neutral-500">
-                        {c.type ? `${c.type} • ` : ''}{fmtDate(c.date)} {fmtDist(c.distance_km)}
+                        {c.type ? `${c.type} • ` : ''}
+                        {fmtDate(c.date)} {fmtDist(c.distance_km)}
                       </div>
                     </div>
                     <span className="whitespace-nowrap font-medium">{fmtMoney(c.price)}</span>
@@ -145,7 +151,8 @@ export default function CompsMini({
                         {c.address}
                       </div>
                       <div className="text-[11px] text-neutral-500">
-                        {c.type ? `${c.type} • ` : ''}{fmtDate(c.date)} {fmtDist(c.distance_km)}
+                        {c.type ? `${c.type} • ` : ''}
+                        {fmtDate(c.date)} {fmtDist(c.distance_km)}
                       </div>
                     </div>
                     <span className="whitespace-nowrap font-medium">{fmtMoney(c.price)}</span>
@@ -159,9 +166,7 @@ export default function CompsMini({
         </div>
       )}
 
-      <p className="mt-3 text-xs text-neutral-500">
-        Live Land Registry & rent feeds coming next.
-      </p>
+      <p className="mt-3 text-xs text-neutral-500">Live Land Registry & rent feeds coming next.</p>
     </section>
   );
 }

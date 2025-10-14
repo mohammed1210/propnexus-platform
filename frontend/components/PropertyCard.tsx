@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { fetchWithRetry } from '@/lib/api';
 import Image from "next/image";
 import { useCallback, useMemo, useState } from "react";
 
@@ -54,7 +55,7 @@ async function postJSON<T>(
     const id = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
 
     try {
-      const res = await fetch(url, {
+      const res = await fetchWithRetry(url, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),

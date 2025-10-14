@@ -1,6 +1,6 @@
-// frontend/components/property_details/InvestmentSummary.tsx
 'use client';
-import React, { useEffect, useState } from 'react';
+
+import { useEffect, useState } from 'react';
 import { postAiSummary } from '@/lib/api';
 import type { SummaryRequest, SummaryResponse } from '@/types/ai';
 

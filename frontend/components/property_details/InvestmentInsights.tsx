@@ -10,6 +10,7 @@
    ────────────────────────────────────────────────────────────────── */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { fetchWithRetry } from '@/lib/api';
 import Button from '@/components/ui/Button';
 
 type RentComp = { monthly_rent?: number | string };
@@ -59,7 +60,7 @@ export default function InvestmentInsights({
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch(`/api/comps/${encodeURIComponent(pc)}`, {
+      const res = await fetchWithRetry(`/api/comps/${encodeURIComponent(pc)}`, {
         cache: 'no-store',
         signal: opts?.signal,
       });
