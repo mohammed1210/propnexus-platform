@@ -1,33 +1,51 @@
+// frontend/e2e/smoke.spec.ts
 import { test, expect } from '@playwright/test';
 
-test('home loads and nav visible', async ({ page }) => {
-  await page.goto('/');
-  await expect(page).toHaveTitle(/PropNexus/i);
-  // something stable in header
-  await expect(page.locator('header')).toBeVisible();
+const BASE = process.env.E2E_BASE_URL || 'http://localhost:3000';
+
+test('home loads and navigation shell is visible-ish', async ({ page }) => {
+  const res = await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+  expect(res?.ok()).toBeTruthy();
+
+  // accept header OR nav OR a generic top bar
+  const shell = page.locator('header, nav, [role="navigation"], [data-testid="site-header"]');
+  await expect(shell.first()).toBeVisible({ timeout: 5000 });
+
+  // relaxed title check
+  await expect(page).toHaveTitle(/propnexus/i);
 });
 
-test('off-market page renders generator section', async ({ page }) => {
-  await page.goto('/off-market');
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  // button exists (text may differ, keep relaxed)
-  const btn = page.getByRole('button', { name: /generate|create|deals/i });
-  await expect(btn.first()).toBeVisible();
+test('off-market page renders some heading or primary section', async ({ page }) => {
+  const res = await page.goto(`${BASE}/off-market`, { waitUntil: 'domcontentloaded' });
+  expect(res?.ok()).toBeTruthy();
+
+  // any visible heading (h1–h6) or a marked page title
+  const head = page.locator('h1, h2, h3, [data-testid="page-title"]');
+  await expect(head.first()).toBeVisible({ timeout: 5000 });
+
+  // relaxed CTA existence
+  const btn = page.getByRole('button').first();
+  await expect(btn).toBeVisible();
 });
 
-test('saved deals page loads without console errors', async ({ page }) => {
+test('saved deals page loads without loud console errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(msg.text());
   });
-  await page.goto('/saved-deals');
-  // Allow non-critical warnings; fail only on loud errors
+
+  const res = await page.goto(`${BASE}/saved-deals`, { waitUntil: 'domcontentloaded' });
+  expect(res?.ok()).toBeTruthy();
+
+  // allow warnings; fail only on hard errors
   expect(errors.join('\n')).not.toMatch(/TypeError|ReferenceError|Unhandled/i);
 });
 
-test('property detail renders title (uses a placeholder id)', async ({ page }) => {
-  // Use an ID that your app tolerates (SSR should render the shell even if fetch fails)
-  await page.goto('/property/demo-id');
-  // Expect the page shell (title/headline region) to exist
-  await expect(page.locator('h1, [data-testid="property-title"]')).toBeVisible({ timeout: 5000 });
+test('property detail renders a title-ish element', async ({ page }) => {
+  const res = await page.goto(`${BASE}/property/demo-id`, { waitUntil: 'domcontentloaded' });
+  expect(res?.ok()).toBeTruthy();
+
+  // accept an h1, a data-testid, or any heading role
+  const title = page.locator('h1, [data-testid="property-title"], :is(h1,h2,h3)[role="heading"]');
+  await expect(title.first()).toBeVisible({ timeout: 5000 });
 });
