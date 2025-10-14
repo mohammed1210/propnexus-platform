@@ -2,31 +2,30 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Request
 from backend.utils.supabase_client import get_supabase
-from backend.services.providers import get_comps_from_provider
+from backend.services.providers import get_area_intel_from_provider
 
-router = APIRouter(prefix="/comps", tags=["comps"])
+router = APIRouter(prefix="/area-intel", tags=["area-intel"])
 
 TTL = timedelta(hours=24)
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
-@router.get("/{postcode}")
-def get_comps(postcode: str, request: Request):
+@router.get("/{key}")
+def get_area_intel(key: str, request: Request):
     """
-    GET /comps/{postcode}
+    GET /area-intel/{key}
     - Return cached payload if fetched_at within 24h
-    - Otherwise call provider, upsert into comps_cache and return
+    - Otherwise call provider, upsert into area_intel_cache and return
     """
     sb = get_supabase()
     now = _now_utc()
 
     if sb:
-        # try cache
         try:
-            resp = sb.table("comps_cache") \
+            resp = sb.table("area_intel_cache") \
                 .select("*") \
-                .eq("postcode", postcode) \
+                .eq("area_key", key) \
                 .order("fetched_at", desc=True) \
                 .limit(1) \
                 .execute()
@@ -37,22 +36,18 @@ def get_comps(postcode: str, request: Request):
                 if now - fetched < TTL:
                     return row["payload"]
         except Exception:
-            # fall through to provider on any cache error
             pass
 
-    # miss or stale → provider
-    payload = get_comps_from_provider(postcode)
+    payload = get_area_intel_from_provider(key)
 
-    # write-through if sb present
     if sb:
         try:
-            sb.table("comps_cache").upsert({
-                "postcode": postcode,
+            sb.table("area_intel_cache").upsert({
+                "area_key": key,
                 "payload": payload,
                 "fetched_at": now.isoformat(),
             }).execute()
         except Exception:
-            # don't fail request because of cache write
             pass
 
     return payload

@@ -1,43 +1,21 @@
-import { fetchWithRetry } from "@/lib/api";
-import type { NextRequest } from "next/server";
+import { NextResponse } from 'next/server';
+import { fetchWithRetry, BASE as API_BASE } from '@/lib/api';
 
-/**
- * Keep typing relaxed for Next 15 route handler context to avoid TS mismatch.
- * At runtime we only need params.key.
- */
-export async function GET(_req: NextRequest, ctx: any) {
-  const key = ctx?.params?.key as string;
-  const base =
-    process.env.NEXT_PUBLIC_BACKEND_URL ??
-    process.env.NEXT_PUBLIC_API_BASE ??
-    "";
-
-  const upstream = `${base.replace(/\/+$/, "")}/area-intel/${encodeURIComponent(
-    key
-  )}`;
+// NOTE: Next 15 validator can reject inline context typing.
+// Use `any` and narrow inside to keep validation happy.
+export async function GET(request: Request, ctx: any) {
+  const key = String(ctx?.params?.key ?? '');
+  const base = process.env.NEXT_PUBLIC_BACKEND_URL || API_BASE;
+  const url = `${base}/area-intel/${encodeURIComponent(key)}`;
 
   try {
-    const res = await fetchWithRetry(
-      upstream,
-      { headers: { accept: "application/json" } },
-      { timeoutMs: 10_000 }
-    );
-    const text = await res.text();
-    return new Response(text, {
-      status: res.status,
-      headers: {
-        "content-type":
-          res.headers.get("content-type") || "application/json; charset=utf-8",
-        "cache-control": res.headers.get("cache-control") || "no-store",
-      },
-    });
-  } catch (e: any) {
-    return new Response(
-      JSON.stringify({ error: e?.message || "Upstream /area-intel failed" }),
-      {
-        status: 502,
-        headers: { "content-type": "application/json; charset=utf-8" },
-      }
+    const res = await fetchWithRetry(url, { method: 'GET' });
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error: any) {
+    return NextResponse.json(
+      { error: error?.message || 'Proxy error' },
+      { status: 502 }
     );
   }
 }
