@@ -92,8 +92,10 @@ export default function MortgageCalculator({ price }: Props) {
   const refiRate = refiApr / 100 / 12;
   const refiPayment = (refiLoan * refiRate) / (1 - Math.pow(1 + refiRate, -(25 * 12)));
   const equityReleased = Math.max(refiLoan - loan - refiFees, 0);
-  const cashLeftIn =
-    Math.max(cashInAtPurchase + refurbCost + contingency + holdingInterest - equityReleased, 0);
+  const cashLeftIn = Math.max(
+    cashInAtPurchase + refurbCost + contingency + holdingInterest - equityReleased,
+    0,
+  );
 
   // Cash flows
   const rentPre = typeof monthlyRent === 'number' ? monthlyRent : 0;
@@ -123,7 +125,9 @@ export default function MortgageCalculator({ price }: Props) {
                   className="w-full h-9 rounded border px-2"
                 />
               </label>
-              <div className="text-sm text-slate-600">Deposit: <strong>{fmt(deposit)}</strong></div>
+              <div className="text-sm text-slate-600">
+                Deposit: <strong>{fmt(deposit)}</strong>
+              </div>
 
               <label className="text-sm">
                 <span className="block text-slate-600 mb-1">APR (%)</span>
@@ -309,42 +313,75 @@ export default function MortgageCalculator({ price }: Props) {
         <div className="space-y-4">
           <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
             <div className="font-medium mb-2">Loan Snapshot</div>
-            <p>LTV: <strong>{pct(ltvPct)}</strong></p>
-            <p>Monthly Payment: <strong>{fmt(payment)}</strong></p>
-            <p>Stress Payment @ {stressApr.toFixed(2)}%: <strong>{fmt(stressPayment)}</strong></p>
+            <p>
+              LTV: <strong>{pct(ltvPct)}</strong>
+            </p>
+            <p>
+              Monthly Payment: <strong>{fmt(payment)}</strong>
+            </p>
+            <p>
+              Stress Payment @ {stressApr.toFixed(2)}%: <strong>{fmt(stressPayment)}</strong>
+            </p>
           </div>
 
           <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
             <div className="font-medium mb-2">Costs & Cash Needed</div>
-            <p>Stamp Duty (auto): <strong>{fmt(duty)}</strong></p>
-            <p>Holding Interest (works period): <strong>{fmt(holdingInterest)}</strong></p>
-            <p>Project Cost (all-in): <strong>{fmt(projectCost)}</strong></p>
-            <p>Cash In at Purchase: <strong>{fmt(cashInAtPurchase)}</strong></p>
+            <p>
+              Stamp Duty (auto): <strong>{fmt(duty)}</strong>
+            </p>
+            <p>
+              Holding Interest (works period): <strong>{fmt(holdingInterest)}</strong>
+            </p>
+            <p>
+              Project Cost (all-in): <strong>{fmt(projectCost)}</strong>
+            </p>
+            <p>
+              Cash In at Purchase: <strong>{fmt(cashInAtPurchase)}</strong>
+            </p>
           </div>
 
           <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
             <div className="font-medium mb-2">Sale Exit (GDV)</div>
-            <p>GDV Profit (ARV − project cost): <strong>{fmt(gdvProfit)}</strong></p>
-            <p>Profit on Cost: <strong>{pct(profitOnCost)}</strong></p>
+            <p>
+              GDV Profit (ARV − project cost): <strong>{fmt(gdvProfit)}</strong>
+            </p>
+            <p>
+              Profit on Cost: <strong>{pct(profitOnCost)}</strong>
+            </p>
           </div>
 
           <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
             <div className="font-medium mb-2">Refinance Exit (BRRR)</div>
-            <p>Refi Loan (LTV × ARV): <strong>{fmt(refiLoan)}</strong></p>
-            <p>Equity Released (refi − old loan − fees): <strong>{fmt(equityReleased)}</strong></p>
-            <p>Cash Left in Deal: <strong>{fmt(cashLeftIn)}</strong></p>
-            <p>New Monthly Payment (post-refi): <strong>{fmt(refiPayment)}</strong></p>
-            <p>Post-refurb Cash Flow: <strong>{fmt(cashflowPost)}</strong></p>
+            <p>
+              Refi Loan (LTV × ARV): <strong>{fmt(refiLoan)}</strong>
+            </p>
+            <p>
+              Equity Released (refi − old loan − fees): <strong>{fmt(equityReleased)}</strong>
+            </p>
+            <p>
+              Cash Left in Deal: <strong>{fmt(cashLeftIn)}</strong>
+            </p>
+            <p>
+              New Monthly Payment (post-refi): <strong>{fmt(refiPayment)}</strong>
+            </p>
+            <p>
+              Post-refurb Cash Flow: <strong>{fmt(cashflowPost)}</strong>
+            </p>
           </div>
 
           <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
             <div className="font-medium mb-2">Cash Flow (Current)</div>
-            <p>Monthly Rent: <strong>{fmt(rentPre)}</strong></p>
-            <p>Cash Flow (pre-refurb): <strong>{fmt(cashflowPre)}</strong></p>
+            <p>
+              Monthly Rent: <strong>{fmt(rentPre)}</strong>
+            </p>
+            <p>
+              Cash Flow (pre-refurb): <strong>{fmt(cashflowPre)}</strong>
+            </p>
           </div>
 
           <p className="text-xs text-slate-500">
-            This is an illustrative model; stress tests, bridging interest accruals and fees are approximated.
+            This is an illustrative model; stress tests, bridging interest accruals and fees are
+            approximated.
           </p>
         </div>
       </div>

@@ -2,18 +2,11 @@
 import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
 
-const MapContainer = dynamic(
-  async () => (await import('react-leaflet')).MapContainer,
-  { ssr: false }
-);
-const TileLayer = dynamic(
-  async () => (await import('react-leaflet')).TileLayer,
-  { ssr: false }
-);
-const Marker = dynamic(
-  async () => (await import('react-leaflet')).Marker,
-  { ssr: false }
-);
+const MapContainer = dynamic(async () => (await import('react-leaflet')).MapContainer, {
+  ssr: false,
+});
+const TileLayer = dynamic(async () => (await import('react-leaflet')).TileLayer, { ssr: false });
+const Marker = dynamic(async () => (await import('react-leaflet')).Marker, { ssr: false });
 
 type Property = {
   id: string | null;
@@ -26,9 +19,14 @@ export default function MapList({ items }: { items: Property[] }) {
   const points = useMemo(
     () =>
       items
-        .filter(p => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
-        .map(p => ({ id: p.id ?? '', title: p.title, lat: Number(p.latitude), lng: Number(p.longitude) })),
-    [items]
+        .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude))
+        .map((p) => ({
+          id: p.id ?? '',
+          title: p.title,
+          lat: Number(p.latitude),
+          lng: Number(p.longitude),
+        })),
+    [items],
   );
 
   if (!points.length) return null;
@@ -44,10 +42,10 @@ export default function MapList({ items }: { items: Property[] }) {
         scrollWheelZoom={false}
       >
         <TileLayer
-          attribution='&copy; OpenStreetMap'
+          attribution="&copy; OpenStreetMap"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        {points.map(p => (
+        {points.map((p) => (
           <Marker key={p.id} position={[p.lat, p.lng]} />
         ))}
       </MapContainer>

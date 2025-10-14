@@ -14,22 +14,29 @@ type LooseProperty = Property & {
 };
 
 type Message = { role: 'user' | 'assistant'; content: string };
-interface AIChatbotProps { property?: Partial<LooseProperty>; }
+interface AIChatbotProps {
+  property?: Partial<LooseProperty>;
+}
 
 export default function AIChatbot({ property }: AIChatbotProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: "Hi! I'm your AI Investment Assistant. Ask me anything about this deal." },
+    {
+      role: 'assistant',
+      content: "Hi! I'm your AI Investment Assistant. Ask me anything about this deal.",
+    },
   ]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const sendLocalReply = (prompt: string) => {
     const hints: string[] = [];
-    if (typeof property?.yield_percent === 'number') hints.push(`yield ≈ ${property.yield_percent}%`);
+    if (typeof property?.yield_percent === 'number')
+      hints.push(`yield ≈ ${property.yield_percent}%`);
     if (typeof property?.roi_percent === 'number') hints.push(`ROI ≈ ${property.roi_percent}%`);
-    if (typeof property?.price === 'number') hints.push(`price ≈ £${property.price.toLocaleString()}`);
+    if (typeof property?.price === 'number')
+      hints.push(`price ≈ £${property.price.toLocaleString()}`);
 
     const base =
       hints.length > 0
@@ -37,9 +44,12 @@ export default function AIChatbot({ property }: AIChatbotProps) {
         : '🤖 Share price, yield, ROI or postcode and I can give a sharper take.';
 
     const lower = prompt.toLowerCase();
-    if (lower.includes('risk')) return `${base} Key risks: down-valuation, refurb overrun, and void periods. Add contingency and model DSCR ≥ 1.25×.`;
-    if (lower.includes('exit')) return `${base} Consider: let & refinance (BRRR), flip at GDV, or leave as vanilla BTL.`;
-    if (lower.includes('good') || lower.includes('invest')) return `${base} Run both GDV and BRRR paths in the calculator and compare cash left in the deal.`;
+    if (lower.includes('risk'))
+      return `${base} Key risks: down-valuation, refurb overrun, and void periods. Add contingency and model DSCR ≥ 1.25×.`;
+    if (lower.includes('exit'))
+      return `${base} Consider: let & refinance (BRRR), flip at GDV, or leave as vanilla BTL.`;
+    if (lower.includes('good') || lower.includes('invest'))
+      return `${base} Run both GDV and BRRR paths in the calculator and compare cash left in the deal.`;
     return base;
   };
 
@@ -80,17 +90,27 @@ export default function AIChatbot({ property }: AIChatbotProps) {
         >
           <div className="bg-gray-800 text-white px-4 py-2 flex justify-between items-center text-sm font-semibold">
             AI Assistant
-            <button onClick={() => setIsOpen(false)} className="text-white text-xl leading-none" aria-label="Close">×</button>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-white text-xl leading-none"
+              aria-label="Close"
+            >
+              ×
+            </button>
           </div>
 
           <div className="flex-1 p-3 overflow-y-auto bg-gray-50 dark:bg-neutral-950 text-sm">
             {messages.map((m, i) => (
               <div key={i} className={`mb-2 ${m.role === 'user' ? 'text-right' : 'text-left'}`}>
-                <span className={`inline-block px-3 py-2 rounded-xl max-w-[80%] break-words ${
-                  m.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-800 dark:bg-neutral-800 dark:text-neutral-100'
-                }`}>{m.content}</span>
+                <span
+                  className={`inline-block px-3 py-2 rounded-xl max-w-[80%] break-words ${
+                    m.role === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-800 dark:bg-neutral-800 dark:text-neutral-100'
+                  }`}
+                >
+                  {m.content}
+                </span>
               </div>
             ))}
             <div ref={bottomRef} />
@@ -109,7 +129,9 @@ export default function AIChatbot({ property }: AIChatbotProps) {
           </div>
 
           <div className="p-2 border-t border-neutral-200 dark:border-neutral-800 flex gap-2 bg-white dark:bg-neutral-900">
-            <label className="sr-only" htmlFor="ai-chat-input">Message</label>
+            <label className="sr-only" htmlFor="ai-chat-input">
+              Message
+            </label>
             <input
               id="ai-chat-input"
               type="text"
@@ -119,7 +141,10 @@ export default function AIChatbot({ property }: AIChatbotProps) {
               placeholder="Type a question..."
               className="flex-1 px-3 py-2 text-sm border rounded-md outline-none bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700"
             />
-            <button onClick={handleSend} className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+            <button
+              onClick={handleSend}
+              className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
+            >
               Send
             </button>
           </div>

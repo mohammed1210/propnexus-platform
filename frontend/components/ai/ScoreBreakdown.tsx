@@ -67,7 +67,8 @@ export default function ScoreBreakdown(props: ScoreBreakdownProps) {
       </div>
 
       <p className="text-xs text-slate-500">
-        Tip: Scores combine deal metrics with local area intelligence. They’re guidance, not financial advice.
+        Tip: Scores combine deal metrics with local area intelligence. They’re guidance, not
+        financial advice.
       </p>
     </section>
   );

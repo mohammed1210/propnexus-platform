@@ -136,7 +136,8 @@ export default function InvestmentInsights({
   if ((roi_percent ?? 0) >= 12) upsides.push('Healthy ROI potential on current assumptions.');
   if (avgRent) upsides.push(`Local median rent around £${avgRent.toLocaleString()}.`);
 
-  if ((yield_percent ?? 0) < 4) risks.push('Below-average gross yield — pressure-test rent or price.');
+  if ((yield_percent ?? 0) < 4)
+    risks.push('Below-average gross yield — pressure-test rent or price.');
   if ((roi_percent ?? 0) < 8) risks.push('ROI looks light — review refurb scope and exit options.');
   if (salesCount + rentsCount < 4 && postcode)
     risks.push('Limited nearby comps — validate pricing with local agents.');
@@ -205,7 +206,8 @@ export default function InvestmentInsights({
       </div>
 
       <p className="text-xs text-neutral-500 mb-3">
-        Generated from property metrics and local intel. Indicative only — validate with your own due diligence.
+        Generated from property metrics and local intel. Indicative only — validate with your own
+        due diligence.
       </p>
 
       {/* Nearby Comps */}
@@ -233,7 +235,9 @@ export default function InvestmentInsights({
           </Button>
         </div>
 
-        {!postcode && <div className="text-sm text-neutral-500 mt-2">Add postcode to load sales & rents.</div>}
+        {!postcode && (
+          <div className="text-sm text-neutral-500 mt-2">Add postcode to load sales & rents.</div>
+        )}
 
         {postcode && loading && (
           <div className="text-sm text-neutral-500 mt-2" aria-live="polite">
@@ -267,12 +271,16 @@ export default function InvestmentInsights({
             )}
 
             {lastUpdated && (
-              <div className="text-[10px] text-neutral-500 mt-2">Last updated {lastUpdated.toLocaleTimeString()}</div>
+              <div className="text-[10px] text-neutral-500 mt-2">
+                Last updated {lastUpdated.toLocaleTimeString()}
+              </div>
             )}
           </div>
         )}
 
-        <div className="text-xs text-neutral-500 mt-3">Live Land Registry & rent sources coming next.</div>
+        <div className="text-xs text-neutral-500 mt-3">
+          Live Land Registry & rent sources coming next.
+        </div>
       </div>
     </section>
   );

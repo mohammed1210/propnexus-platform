@@ -1,4 +1,12 @@
 import os, pathlib, sys, logging
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    integrations=[FastApiIntegration()],
+    traces_sample_rate=0.15,
+)
+from __future__ import annotations
 
 from __future__ import annotations
 

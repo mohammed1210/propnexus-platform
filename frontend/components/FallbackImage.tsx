@@ -9,12 +9,5 @@ type Props = Omit<ImageProps, 'src' | 'alt'> & {
 export default function FallbackImage({ src, alt, ...rest }: Props) {
   const [err, setErr] = useState(false);
   const finalSrc = !err && src ? src : '/placeholder.jpg';
-  return (
-    <Image
-      src={finalSrc}
-      alt={alt}
-      onError={() => setErr(true)}
-      {...rest}
-    />
-  );
+  return <Image src={finalSrc} alt={alt} onError={() => setErr(true)} {...rest} />;
 }

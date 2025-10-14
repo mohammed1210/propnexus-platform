@@ -1,72 +1,68 @@
-# /backend/routes/area_routes.py
+from fastapi import APIRouter, HTTPException, Request
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
 
-import httpx
-from fastapi import APIRouter
+from main import sb  # Supabase client provided by backend/main.py
+from backend.services.providers import get_area_intel_from_provider
 
-router = APIRouter()
+router = APIRouter(prefix="/area-intel", tags=["area-intel"])
+
+TTL_HOURS = 24
 
 
-@router.get("/area-intel/{postcode}")
-async def get_area_intel(postcode: str):
-    """
-    Returns local area intelligence for a given postcode.
-    Uses ONS, Police, Ofsted, TfL/National Rail APIs.
-    Falls back to illustrative values if any API fails.
-    """
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
-    # Fallback data (matches your AreaIntel UI)
-    result = {
-        "avgYieldPct": 5.8,
-        "avgRent": 1350,
-        "crimeRateIndex": 42,
-        "ofstedSummary": "Ofsted Good nearby",
-        "transportSummary": "Excellent · ~18 mins to centre",
-    }
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        try:
-            # --------------------
-            # 1. Crime data (UK Police API)
-            # --------------------
-            # First: get lat/lng for postcode
-            pc_resp = await client.get(f"http://api.postcodes.io/postcodes/{postcode}")
-            if pc_resp.status_code == 200:
-                pc_data = pc_resp.json().get("result", {})
-                lat = pc_data.get("latitude")
-                lng = pc_data.get("longitude")
-                if lat and lng:
-                    # Police data - crime categories for last month
-                    crimes_resp = await client.get(
-                        f"https://data.police.uk/api/crimes-street/all-crime?lat={lat}&lng={lng}"
-                    )
-                    if crimes_resp.status_code == 200:
-                        crimes = crimes_resp.json()
-                        # crude crime index: crimes per 100 records
-                        crime_index = min(100, round(len(crimes) / 10))
-                        result["crimeRateIndex"] = crime_index
+def _is_fresh(ts_iso: Optional[str], ttl_h: int) -> bool:
+    if not ts_iso:
+        return False
+    try:
+        ts = datetime.fromisoformat(ts_iso.replace("Z", "+00:00"))
+    except Exception:
+        return False
+    return (_utcnow() - ts) < timedelta(hours=ttl_h)
 
-            # --------------------
-            # 2. ONS / rent & yield placeholder (requires integration or CSV lookup)
-            # --------------------
-            # You can replace with your real ONS/Valuation Office source later
-            # For now, use illustrative randomised numbers near fallback
-            import random
 
-            result["avgYieldPct"] = round(random.uniform(4.5, 6.5), 1)
-            result["avgRent"] = random.randint(1200, 1600)
+def _select_latest_area(key: str) -> Optional[Dict[str, Any]]:
+    # Expect schema: (area_key TEXT PK, payload JSONB, fetched_at TIMESTAMP)
+    res = (
+        sb.table("area_intel_cache")
+        .select("*")
+        .eq("area_key", key)
+        .order("fetched_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    data = getattr(res, "data", None) or []
+    return data[0] if data else None
 
-            # --------------------
-            # 3. Ofsted summary (illustrative)
-            # --------------------
-            # Real Ofsted API requires scraping or 3rd-party dataset.
-            result["ofstedSummary"] = "3 schools rated Good within 1 mile"
 
-            # --------------------
-            # 4. Transport summary (TfL/National Rail placeholder)
-            # --------------------
-            result["transportSummary"] = "Fast links · ~20 mins to city centre"
+def _upsert_area(key: str, payload: Dict[str, Any]) -> None:
+    now = _utcnow().isoformat()
+    sb.table("area_intel_cache").upsert(
+        {"area_key": key, "payload": payload, "fetched_at": now}
+    ).execute()
 
-        except Exception as e:
-            print(f"[AreaIntel] Error fetching data for {postcode}: {e}")
 
-    return result
+@router.get("/{key}")
+def get_area_intel(key: str, request: Request) -> Dict[str, Any]:
+    k = (key or "").strip().upper()
+    if not k:
+        raise HTTPException(status_code=400, detail="key required")
+
+    hit = _select_latest_area(k)
+    if hit and _is_fresh(hit.get("fetched_at"), TTL_HOURS):
+        return {"source": "cache", **(hit.get("payload") or {})}
+
+    try:
+        data = get_area_intel_from_provider(k)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"provider error: {e}")
+
+    try:
+        _upsert_area(k, data)
+    except Exception:
+        pass
+
+    return {"source": "provider", **data}

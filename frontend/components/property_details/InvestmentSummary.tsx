@@ -72,8 +72,13 @@ export default function InvestmentSummary({ property }: Props) {
   ]);
 
   if (loading) return <p data-testid="investment-summary-loading">Loading summary…</p>;
-  if (error) return <p role="alert" className="text-red-600">Error: {error}</p>;
-  if (!data) return null;
+  if (error)
+    return (
+      <p role="alert" className="text-red-600">
+        Error: {error}
+      </p>
+    );
+  if (!data) return <p className="text-sm opacity-70">No summary available.</p>;
 
   return (
     <div data-testid="investment-summary-text" className="space-y-2">

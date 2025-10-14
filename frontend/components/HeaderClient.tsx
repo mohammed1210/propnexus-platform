@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 
 /**
- * A polished, responsive header for the PropNexus platform.  
+ * A polished, responsive header for the PropNexus platform.
  *
  * The header sticks to the top of the viewport, provides a skip link for
  * accessibility, shows primary navigation, a dark‑mode toggle and a
@@ -30,11 +30,11 @@ export default function HeaderClient() {
   // Define the navigation links.  If more pages are added later
   // they can be appended here for automatic rendering.
   const nav = [
-    { href: '/listings',    label: 'Listings' },
-    { href: '/off-market',  label: 'Off‑Market' },
+    { href: '/listings', label: 'Listings' },
+    { href: '/off-market', label: 'Off‑Market' },
     { href: '/saved-deals', label: 'Saved Deals' },
-    { href: '/analytics',   label: 'Analytics' },
-    { href: '/pricing',     label: 'Pricing' },
+    { href: '/analytics', label: 'Analytics' },
+    { href: '/pricing', label: 'Pricing' },
   ];
 
   return (
@@ -43,7 +43,7 @@ export default function HeaderClient() {
         'sticky top-0 z-40 w-full backdrop-blur',
         scrolled
           ? 'shadow-md border-b border-blue-100 dark:border-zinc-800'
-          : 'border-b border-transparent'
+          : 'border-b border-transparent',
       )}
       style={{ ['--header-h' as any]: '64px' }}
     >
@@ -76,7 +76,7 @@ export default function HeaderClient() {
                   'rounded-md px-3 py-2 text-sm font-medium outline-2 outline-offset-2 focus:outline focus:outline-blue-500',
                   isActive
                     ? 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-zinc-800'
-                    : 'text-zinc-600 dark:text-zinc-300 hover:bg-blue-50/60 dark:hover:bg-zinc-800/50 hover:text-blue-700 dark:hover:text-blue-300'
+                    : 'text-zinc-600 dark:text-zinc-300 hover:bg-blue-50/60 dark:hover:bg-zinc-800/50 hover:text-blue-700 dark:hover:text-blue-300',
                 )}
                 aria-current={isActive ? 'page' : undefined}
               >
@@ -92,7 +92,9 @@ export default function HeaderClient() {
           onClick={() => document.documentElement.classList.toggle('dark')}
           aria-label="Toggle dark mode"
         >
-          {typeof document !== 'undefined' && document.documentElement.classList.contains('dark') ? 'Light' : 'Dark'}
+          {typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+            ? 'Light'
+            : 'Dark'}
         </button>
       </div>
 

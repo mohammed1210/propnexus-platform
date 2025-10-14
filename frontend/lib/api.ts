@@ -4,15 +4,15 @@
 export const BASE =
   (process.env.NEXT_PUBLIC_API_BASE as string | undefined) ??
   (process.env.NEXT_PUBLIC_API_BASE_URL as string | undefined) ??
-  "";
+  '';
 
 // Narrow JSON typing isn’t critical here; keep it flexible.
 type JSONValue = any;
 
 /** Build an absolute URL from the public API base + path */
 function buildUrl(path: string): string {
-  const base = BASE.replace(/\/+$/, "");
-  const tail = path.startsWith("/") ? path : `/${path}`;
+  const base = BASE.replace(/\/+$/, '');
+  const tail = path.startsWith('/') ? path : `/${path}`;
   return `${base}${tail}`;
 }
 
@@ -66,7 +66,7 @@ function mergeSignals(a?: AbortSignal | null, b?: AbortSignal | null) {
 export async function fetchWithRetry(
   input: RequestInfo | URL,
   init: RequestInit = {},
-  opts: FetchRetryOptions = {}
+  opts: FetchRetryOptions = {},
 ): Promise<Response> {
   const retries = opts.retries ?? 2;
   const baseDelay = opts.retryDelayMs ?? 400;
@@ -98,8 +98,8 @@ export async function fetchWithRetry(
       }
 
       if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        const detail = text || res.statusText || "Request failed";
+        const text = await res.text().catch(() => '');
+        const detail = text || res.statusText || 'Request failed';
         throw new Error(`HTTP ${res.status}: ${detail}`);
       }
 
@@ -121,7 +121,7 @@ export async function fetchWithRetry(
     }
   }
 
-  throw lastErr instanceof Error ? lastErr : new Error("Network error");
+  throw lastErr instanceof Error ? lastErr : new Error('Network error');
 }
 
 /* ------------------------------------------------------------------ */
@@ -132,18 +132,18 @@ export async function apiPost<T = unknown>(
   path: string,
   body: JSONValue,
   init?: RequestInit,
-  opts?: FetchRetryOptions
+  opts?: FetchRetryOptions,
 ): Promise<T> {
   const url = buildUrl(path);
   const res = await fetchWithRetry(
     url,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
       body: JSON.stringify(body),
       ...init,
     },
-    opts
+    opts,
   );
   return (await res.json()) as T;
 }
@@ -151,10 +151,10 @@ export async function apiPost<T = unknown>(
 export async function apiGet<T = unknown>(
   path: string,
   init?: RequestInit,
-  opts?: FetchRetryOptions
+  opts?: FetchRetryOptions,
 ): Promise<T> {
   const url = buildUrl(path);
-  const res = await fetchWithRetry(url, { method: "GET", ...(init || {}) }, opts);
+  const res = await fetchWithRetry(url, { method: 'GET', ...(init || {}) }, opts);
   return (await res.json()) as T;
 }
 
@@ -167,22 +167,21 @@ import type {
   SummaryResponse,
   StrategiesRequest,
   StrategiesResponse,
-} from "@/types/ai";
+} from '@/types/ai';
 
 export function postAiSummary(
   payload: SummaryRequest | { property: SummaryRequest },
-  opts?: FetchRetryOptions
+  opts?: FetchRetryOptions,
 ): Promise<SummaryResponse> {
-  const body =
-    "property" in payload ? payload : { property: payload as SummaryRequest };
-  return apiPost<SummaryResponse>("/generate-summary", body, undefined, opts);
+  // The backend accepts either flat {title,...} or {property:{...}}
+  const body = 'property' in payload ? payload : { property: payload as SummaryRequest };
+  return apiPost<SummaryResponse>('/generate-summary', body, undefined, opts);
 }
 
 export function postAiStrategies(
   payload: StrategiesRequest | { property: StrategiesRequest },
-  opts?: FetchRetryOptions
+  opts?: FetchRetryOptions,
 ): Promise<StrategiesResponse> {
-  const body =
-    "property" in payload ? payload : { property: payload as StrategiesRequest };
-  return apiPost<StrategiesResponse>("/generate-strategies", body, undefined, opts);
+  const body = 'property' in payload ? payload : { property: payload as StrategiesRequest };
+  return apiPost<StrategiesResponse>('/generate-strategies', body, undefined, opts);
 }

@@ -6,9 +6,9 @@ export type AreaIntel = {
   crimeRateIndex: number;
   ofstedSummary: string;
   transportSummary: string;
-  demandIndex?: number;     // 0–100 derived
-  transportScore?: number;  // 0–100 derived
-  schoolsScore?: number;    // 0–100 derived
+  demandIndex?: number; // 0–100 derived
+  transportScore?: number; // 0–100 derived
+  schoolsScore?: number; // 0–100 derived
 };
 
 const API = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -16,7 +16,9 @@ const API = process.env.NEXT_PUBLIC_BACKEND_URL;
 export async function fetchAreaIntel(postcode: string): Promise<AreaIntel> {
   if (!API) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
   const pc = postcode.replace(/\s+/g, '');
-  const res = await fetch(`${API}/area-intel/${encodeURIComponent(pc)}`, { next: { revalidate: 300 } });
+  const res = await fetch(`${API}/area-intel/${encodeURIComponent(pc)}`, {
+    next: { revalidate: 300 },
+  });
   if (!res.ok) throw new Error(`Area intel failed: ${res.status}`);
   const data = (await res.json()) as AreaIntel;
 

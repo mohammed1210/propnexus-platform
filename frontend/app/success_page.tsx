@@ -55,9 +55,8 @@ export default function SuccessPage() {
       {!sent ? (
         <>
           <p className="mb-4">
-            Thank you for subscribing! To complete your account setup please
-            enter the email address you used during checkout.  We will send you
-            a one‑time login link.
+            Thank you for subscribing! To complete your account setup please enter the email address
+            you used during checkout. We will send you a one‑time login link.
           </p>
           <form onSubmit={handleSend} className="space-y-4">
             <input
@@ -68,9 +67,7 @@ export default function SuccessPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
-            {error && (
-              <div className="text-red-500 text-sm">{error}</div>
-            )}
+            {error && <div className="text-red-500 text-sm">{error}</div>}
             <button
               type="submit"
               disabled={sending}
@@ -82,8 +79,8 @@ export default function SuccessPage() {
         </>
       ) : (
         <p>
-          A sign‑in link has been sent to <strong>{email}</strong>. Please check
-          your inbox and follow the instructions to log in.
+          A sign‑in link has been sent to <strong>{email}</strong>. Please check your inbox and
+          follow the instructions to log in.
         </p>
       )}
     </div>
