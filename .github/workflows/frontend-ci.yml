@@ -1,68 +1,26 @@
-# .github/workflows/frontend-ci.yml
 name: Frontend CI
 
 on:
-  push:
-    branches: [ main, po2 ]
   pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
 
 jobs:
-  frontend:
-    name: Frontend CI
+  test:
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        node-version: [20]
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
+      - uses: actions/checkout@v4
+      - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: Enable Corepack (pnpm/yarn shims)
-        run: corepack enable
-
-      - name: Install dependencies (auto-detect)
-        working-directory: frontend
-        run: |
-          if [ -f pnpm-lock.yaml ]; then
-            echo "Using pnpm"
-            pnpm install --frozen-lockfile
-          elif [ -f yarn.lock ]; then
-            echo "Using yarn"
-            yarn install --frozen-lockfile
-          elif [ -f package-lock.json ]; then
-            echo "Using npm ci"
-            npm ci
-          else
-            echo "No lockfile found; using npm install"
-            npm install
-          fi
-
-      - name: Type check (if script exists)
-        working-directory: frontend
-        run: |
-          if jq -e '.scripts.typecheck' package.json >/dev/null; then
-            pnpm run typecheck 2>/dev/null || yarn run typecheck 2>/dev/null || npm run typecheck
-          else
-            echo "No typecheck script; skipping"
-          fi
-
-      - name: Lint (if script exists)
-        working-directory: frontend
-        run: |
-          if jq -e '.scripts.lint' package.json >/dev/null; then
-            pnpm run lint 2>/dev/null || yarn run lint 2>/dev/null || npm run lint
-          else
-            echo "No lint script; skipping"
-          fi
-
-      - name: Build (if script exists)
-        working-directory: frontend
-        run: |
-          if jq -e '.scripts.build' package.json >/dev/null; then
-            pnpm run build 2>/dev/null || yarn run build 2>/dev/null || npm run build
-          else
-            echo "No build script; skipping"
-          fi
+          node-version: ${{ matrix.node-version }}
+      - name: Install dependencies
+        run: npm install
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+      - name: Run Playwright payments spec
+        run: npx playwright test frontend/e2e/payments.spec.ts
