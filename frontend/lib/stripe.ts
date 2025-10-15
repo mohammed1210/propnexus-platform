@@ -15,7 +15,6 @@ if (!stripeSecret) {
 }
 
 const stripe = new Stripe(stripeSecret, {
-  apiVersion: '2023-10-16',
   typescript: true,
 });
 
