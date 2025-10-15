@@ -16,6 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    env:
+      VERCEL_BYPASS_TOKEN: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,10 +43,11 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps
 
-      - name: Run Playwright tests (webServer launches Next on :3100)
+      - name: Run Playwright tests (webServer launches Next)
         working-directory: frontend
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3100
+          VERCEL_BYPASS_TOKEN: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: npx playwright test -c playwright.config.ts
 
       - name: Upload Playwright HTML report
