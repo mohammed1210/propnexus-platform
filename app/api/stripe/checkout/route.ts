@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 // server-only import
-import stripe from '../../../lib/stripe';
+import stripe from '../../../../lib/stripe';
 
 export async function POST() {
   const priceId = process.env.STRIPE_PRICE_ID;
