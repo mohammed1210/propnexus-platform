@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 // @ts-ignore - server-only
-import stripe from '../../../lib/stripe';
+import stripe from '../../../../lib/stripe';
 
 /**
  * POST /api/stripe/checkout
