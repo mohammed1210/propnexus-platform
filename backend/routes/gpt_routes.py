@@ -1,53 +1,32 @@
-import os
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 from openai import OpenAI
+import os
 
-router = APIRouter(prefix="/gpt")
-openai = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+router = APIRouter()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-
-class SummaryRequest(BaseModel):
-    title: str
-    location: str
-    price: float
-    yield_percent: float
-    roi_percent: float
-    investmentType: str | None = None
-
-
-@router.post("/summary")
-async def generate_summary(req: SummaryRequest):
+@router.post("/generate-summary")
+async def generate_summary(data: dict):
+    prompt = f"Summarize this property for investors: {data.get('description')}"
     try:
-        prompt = (
-            f"Summarize this property investment: {req.title} in {req.location} "
-            f"priced at £{req.price:,}. Yield {req.yield_percent}%, ROI {req.roi_percent}%. "
-            f"Investment type: {req.investmentType or 'general'}."
-        )
-        resp = openai.chat.completions.create(
+        res = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=150,
+            messages=[{"role":"user","content":prompt}]
         )
-        summary = resp.choices[0].message.content.strip()
-        return {"summary": summary}
+        text = res.choices[0].message.content
+        return {"summary": text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@router.post("/strategies")
-async def generate_strategies(req: SummaryRequest):
+@router.post("/generate-strategies")
+async def generate_strategies(data: dict):
+    prompt = f"Suggest 3 exit strategies for this investment: {data.get('description')}"
     try:
-        prompt = (
-            f"Suggest three investment exit strategies for {req.title} in {req.location}. "
-            f"Include ROI of {req.roi_percent}% and yield {req.yield_percent}%."
-        )
-        resp = openai.chat.completions.create(
+        res = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
+            messages=[{"role":"user","content":prompt}]
         )
-        text = resp.choices[0].message.content.strip()
+        text = res.choices[0].message.content
         return {"strategies": text}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
