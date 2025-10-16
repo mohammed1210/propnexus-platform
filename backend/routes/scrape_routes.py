@@ -13,6 +13,7 @@ except Exception:
 
     from utils.supabase import supabase as sb
     from fastapi import APIRouter, HTTPException
+    from utils.email import send_email
     from pydantic import BaseModel
     from supabase import Client, create_client
 
@@ -42,6 +43,7 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
         raise HTTPException(status_code=400, detail="Location is required")
 
     try:
+       
         zoopla_results = scrape_zoopla_properties(location) or []
         rightmove_results = scrape_rightmove_properties(location) or []
 
@@ -61,7 +63,11 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
             except Exception as db_err:  # pragma: no cover
                 logging.warning("DB insert skipped: %s", db_err)
 
-        return {"count": len(unique_props), "properties": unique_props}
+    count = len(unique_props)
+            
+            await send_email("Scrape Completed", f"{count} new properties added to PropNexus.")
+         
+       return {"count": len(unique_props), "properties": unique_props}
 
     except HTTPException:
         raise
