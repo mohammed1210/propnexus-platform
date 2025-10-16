@@ -1,3 +1,4 @@
+// frontend/e2e/payments.spec.ts
 import { test, expect } from '@playwright/test';
 
 /**
@@ -16,6 +17,7 @@ test('Upgrade button navigates to Stripe checkout', async ({ page }) => {
     });
   });
 
+  // 👇 this is the line you asked about
   await page.goto('/pricing');
 
   // Try several CTA variants commonly used on pricing pages
@@ -24,32 +26,17 @@ test('Upgrade button navigates to Stripe checkout', async ({ page }) => {
     page.getByRole('link', { name: /upgrade/i }),
     page.getByRole('button', { name: /(get pro|go pro|start pro|pro plan)/i }),
     page.getByRole('link', { name: /(get pro|go pro|start pro|pro plan)/i }),
-    page.getByRole('button', { name: /(subscribe|start|buy|continue)/i }),
-    page.getByRole('link', { name: /(subscribe|start|buy|continue)/i }),
-    page.locator('[data-testid="upgrade"], [data-test="upgrade"]'),
-    page.locator('button:has-text("Upgrade"), a:has-text("Upgrade")'),
-    page.locator('button:has-text("Pro"), a:has-text("Pro")'),
   ];
 
   let clicked = false;
-  for (const loc of candidates) {
-    const n = await loc.count();
-    if (n > 0) {
-      await loc.first().click({ force: true });
+  for (const c of candidates) {
+    if (await c.isVisible().catch(() => false)) {
+      await c.click().catch(() => {});
       clicked = true;
       break;
     }
   }
-
-  // If the page is gated or CTA is hidden, simulate the action as a last resort
-  if (!clicked) {
-    await page.evaluate(async () => {
-      const res = await fetch('/api/stripe/checkout', { method: 'POST' });
-      const j = await res.json();
-      // Simulate client redirect behaviour
-      window.location.href = j.url;
-    });
-  }
+  expect(clicked).toBeTruthy();
 
   await expect(page).toHaveURL((url) => url.host === 'checkout.stripe.com');
 });

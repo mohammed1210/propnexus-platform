@@ -8,8 +8,10 @@ router = APIRouter(prefix="/area-intel", tags=["area-intel"])
 
 TTL = timedelta(hours=24)
 
+
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
 
 @router.get("/{key}")
 def get_area_intel(key: str, request: Request):
@@ -23,16 +25,20 @@ def get_area_intel(key: str, request: Request):
 
     if sb:
         try:
-            resp = sb.table("area_intel_cache") \
-                .select("*") \
-                .eq("area_key", key) \
-                .order("fetched_at", desc=True) \
-                .limit(1) \
+            resp = (
+                sb.table("area_intel_cache")
+                .select("*")
+                .eq("area_key", key)
+                .order("fetched_at", desc=True)
+                .limit(1)
                 .execute()
+            )
             rows = resp.data or []
             if rows:
                 row = rows[0]
-                fetched = datetime.fromisoformat(row["fetched_at"].replace("Z", "+00:00"))
+                fetched = datetime.fromisoformat(
+                    row["fetched_at"].replace("Z", "+00:00")
+                )
                 if now - fetched < TTL:
                     return row["payload"]
         except Exception:
@@ -42,11 +48,13 @@ def get_area_intel(key: str, request: Request):
 
     if sb:
         try:
-            sb.table("area_intel_cache").upsert({
-                "area_key": key,
-                "payload": payload,
-                "fetched_at": now.isoformat(),
-            }).execute()
+            sb.table("area_intel_cache").upsert(
+                {
+                    "area_key": key,
+                    "payload": payload,
+                    "fetched_at": now.isoformat(),
+                }
+            ).execute()
         except Exception:
             pass
 
