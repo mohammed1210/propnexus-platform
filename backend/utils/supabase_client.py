@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 
 
+
 def get_supabase():
     """
     Return a Supabase client if env is present, else None.
