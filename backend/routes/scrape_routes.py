@@ -65,7 +65,7 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
 
     count = len(unique_props)
             
-            await send_email("Scrape Completed", f"{count} new properties added to PropNexus.")
+                            await send_email("abbas_m90@hotmail.com", "Scrape Completed", f"{count} new properties added to PropNexus.")
          
        return {"count": len(unique_props), "properties": unique_props}
 
