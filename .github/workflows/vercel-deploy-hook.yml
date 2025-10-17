@@ -1,17 +1,17 @@
-name: Deploy Preview via Vercel Hook
+name: Vercel Deploy Hook
 
 on:
   push:
-    branches: [sprint7/payments]
-  workflow_dispatch:
+    branches:
+      - payments-merge
+      - sprint7/payments
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Vercel Deploy Hook (bypass protection)
+      - name: Call Vercel Deploy Hook
         run: |
-          set -euo pipefail
           curl -fsSL -X POST \
-            -H "x-vercel-protection-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}" \
-            "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}?force=1"
+            "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}" \
+            -H "x-vercel-protection-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}"
