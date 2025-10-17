@@ -2,6 +2,7 @@
 cat > .github/workflows/vercel-deploy-hook.yml <<'YAML'
 name: Deploy Frontend (Vercel Hook)
 
+
 on:
   push:
     branches:
