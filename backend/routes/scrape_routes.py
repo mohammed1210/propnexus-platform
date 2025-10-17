@@ -1,8 +1,11 @@
 # backend/routes/scrape_routes.py
-# Package-first imports for scrapers with fallback
+from __future__ import annotations
 
-# (fallback to relative)
 import os
+import logging
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from supabase import Client, create_client  # type: ignore
 
 try:
     from backend.scraper.rightmove_scraper import scrape_rightmove_properties
@@ -17,7 +20,12 @@ except Exception:
 
     from supabase import Client, create_client
 
-# Import scrapers relative to backend package
+supabase: Client | None = None
+try:
+    if SUPABASE_URL and SUPABASE_KEY:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:  # pragma: no cover
+    logging.warning("Supabase init failed: %s", e)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
@@ -38,6 +46,7 @@ class ScrapeRequest(BaseModel):
 
 @router.post("/scrape")
 async def scrape_all_sources(req: ScrapeRequest) -> dict:
+async def scrape_all_sources(req: ScrapeRequest) -> dict:
     location = (req.location or "").strip()
     if not location:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -48,6 +57,9 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
         rightmove_results = scrape_rightmove_properties(location) or []
 
         combined = zoopla_results + rightmove_results
+        seen: set[tuple] = set()
+        unique_props: list[dict] = []
+
         seen: set[tuple] = set()
         unique_props: list[dict] = []
 
@@ -73,4 +85,6 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
         raise
     except Exception as e:  # pragma: no cover
         logging.exception("Scraping failed: %s", e)
+        logging.exception("Scraping failed: %s", e)
         raise HTTPException(status_code=500, detail="Scraping failed")
+    

@@ -1,6 +1,6 @@
 # Final Polish Report for PropNexus
 
-**Branch**: sprint-8
+**Branch**: sprint-8  
 **Date**: 16 Oct 2025
 
 ## Overview

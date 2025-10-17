@@ -21,9 +21,9 @@ function buildUrl(path: string): string {
 /* ------------------------------------------------------------------ */
 
 export type FetchRetryOptions = {
-  retries?: number; // default 2 (total attempts = retries + 1)
-  retryDelayMs?: number; // default 400 (exponential-ish backoff)
-  timeoutMs?: number; // default 10_000
+  retries?: number;       // default 2 (total attempts = retries + 1)
+  retryDelayMs?: number;  // default 400 (exponential-ish backoff)
+  timeoutMs?: number;     // default 10_000
 };
 
 function sleep(ms: number) {
@@ -40,19 +40,19 @@ function mergeSignals(a?: AbortSignal | null, b?: AbortSignal | null) {
 
   if (a) {
     if (a.aborted) c.abort((a as any).reason);
-    else a.addEventListener('abort', onAbortA);
+    else a.addEventListener("abort", onAbortA);
   }
   if (b) {
     if (b.aborted) c.abort((b as any).reason);
-    else b.addEventListener('abort', onAbortB);
+    else b.addEventListener("abort", onAbortB);
   }
 
   // Provide a small cleanup helper to callers
   return {
     signal: c.signal,
     cleanup: () => {
-      a?.removeEventListener('abort', onAbortA);
-      b?.removeEventListener('abort', onAbortB);
+      a?.removeEventListener("abort", onAbortA);
+      b?.removeEventListener("abort", onAbortB);
     },
   };
 }
@@ -77,10 +77,7 @@ export async function fetchWithRetry(
   for (let attempt = 0; attempt <= retries; attempt++) {
     // Timeout controller (per attempt)
     const timeoutCtrl = new AbortController();
-    const timer = setTimeout(
-      () => timeoutCtrl.abort(new DOMException('Timeout', 'AbortError')),
-      timeoutMs,
-    );
+    const timer = setTimeout(() => timeoutCtrl.abort(new DOMException("Timeout", "AbortError")), timeoutMs);
 
     // Respect external signal by merging with our timeout signal
     const externalSignal = init.signal as AbortSignal | undefined;
@@ -113,7 +110,7 @@ export async function fetchWithRetry(
       lastErr = err;
 
       // If aborted by external signal, don’t retry
-      if ((err as any)?.name === 'AbortError' && externalSignal?.aborted) {
+      if ((err as any)?.name === "AbortError" && externalSignal?.aborted) {
         throw err;
       }
 
