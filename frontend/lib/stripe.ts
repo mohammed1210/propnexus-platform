@@ -1,11 +1,14 @@
+// frontend/lib/stripe.ts
 import Stripe from 'stripe';
 
-const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
+const secret = process.env.STRIPE_SECRET_KEY ?? '';
 
-let client: Stripe | null = null;
-if (STRIPE_KEY && STRIPE_KEY.startsWith('sk_')) {
-  client = new Stripe(STRIPE_KEY);
-}
+/**
+ * Export a nullable client so builds don’t crash when secrets are absent.
+ * Routes should guard with: if (!stripe) { ...fallback... }
+ */
+const stripe = secret
+  ? new Stripe(secret, { /* rely on default API version */ typescript: true })
+  : null;
 
-export default client;
-export type { Stripe };
+export default stripe;

@@ -1,21 +1,23 @@
+// frontend/app/api/stripe/webhook/route.ts
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import stripe from '../../../../lib/stripe';
 
+/**
+ * POST /api/stripe/webhook
+ * Verifies signature and acknowledges events.
+ */
 export async function POST(req: Request) {
-  if (!stripe) {
-    return NextResponse.json(
-      { ok: false, message: 'Stripe not configured in this environment' },
-      { status: 200 }
-    );
-  }
-
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
-    return NextResponse.json({ error: 'Missing STRIPE_WEBHOOK_SECRET' }, { status: 200 });
+
+  // No Stripe or no webhook secret in Preview/CI — acknowledge and exit.
+  if (!stripe || !webhookSecret) {
+    return NextResponse.json({ received: true, note: 'Webhook disabled in this env.' });
   }
 
-  const signature = headers().get('stripe-signature');
+  // Your type defs treat headers() as async -> await it
+  const h = await headers();
+  const signature = h.get('stripe-signature');
   if (!signature) {
     return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
   }
@@ -32,7 +34,6 @@ export async function POST(req: Request) {
       default:
         console.log(`Unhandled event type ${event.type}`);
     }
-
     return NextResponse.json({ received: true });
   } catch (err) {
     console.error('Error verifying Stripe webhook', err);
