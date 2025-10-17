@@ -11,8 +11,14 @@ logging.basicConfig(level=logging.INFO)
 root = os.path.dirname(os.path.abspath(__file__))  # e.g. /app
 logging.info("CWD=%s", os.getcwd())
 logging.info("PYTHONPATH=%s", os.getenv("PYTHONPATH"))
-logging.info("Exists backend/main.py? %s", os.path.exists(os.path.join(root, "backend", "main.py")))
-logging.info("Exists backend/__init__.py? %s", os.path.exists(os.path.join(root, "backend", "__init__.py")))
+logging.info(
+    "Exists backend/main.py? %s",
+    os.path.exists(os.path.join(root, "backend", "main.py")),
+)
+logging.info(
+    "Exists backend/__init__.py? %s",
+    os.path.exists(os.path.join(root, "backend", "__init__.py")),
+)
 
 # Ensure repo root on sys.path (nice to have)
 if root not in sys.path:
@@ -27,7 +33,9 @@ if "backend" not in sys.modules:
     sys.modules["backend"] = pkg
 
 # Load backend/main.py as module "backend.main"
-spec = importlib.util.spec_from_file_location("backend.main", os.path.join(backend_dir, "main.py"))
+spec = importlib.util.spec_from_file_location(
+    "backend.main", os.path.join(backend_dir, "main.py")
+)
 if not spec or not spec.loader:
     raise RuntimeError("Could not create spec for backend.main")
 mod = importlib.util.module_from_spec(spec)

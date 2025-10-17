@@ -1,7 +1,7 @@
 # backend/routes/scrape_routes.py
-# Package-first imports for scrapers with fallback
+from __future__ import annotations
 
-# (fallback to relative)
+import logging
 import os
 
 try:
@@ -17,7 +17,8 @@ except Exception:
     from pydantic import BaseModel
     from supabase import Client, create_client
 
-# Import scrapers relative to backend package
+from ..scraper.rightmove_scraper import scrape_rightmove_properties
+from ..scraper.zoopla_scraper import scrape_zoopla_properties
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")

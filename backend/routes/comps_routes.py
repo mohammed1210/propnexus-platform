@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Request
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-from main import sb  # Supabase client provided by backend/main.py
+from fastapi import APIRouter, HTTPException, Request
+
 from backend.services.providers import get_comps_from_provider
+from main import sb  # Supabase client provided by backend/main.py
 
 router = APIRouter(prefix="/comps", tags=["comps"])
 

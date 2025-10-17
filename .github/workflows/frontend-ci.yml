@@ -1,68 +1,67 @@
-# .github/workflows/frontend-ci.yml
 name: Frontend CI
 
 on:
   push:
-    branches: [ main, po2 ]
+    branches: [ main, sprint7/payments ]
   pull_request:
+    branches: [ main, sprint7/payments ]
+
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  frontend:
-    name: Frontend CI
+  e2e:
+    name: Playwright E2E
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      VERCEL_BYPASS_TOKEN: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
 
-      - name: Enable Corepack (pnpm/yarn shims)
-        run: corepack enable
+      - name: Install root deps
+        run: npm ci
 
-      - name: Install dependencies (auto-detect)
+      - name: Install frontend deps
         working-directory: frontend
-        run: |
-          if [ -f pnpm-lock.yaml ]; then
-            echo "Using pnpm"
-            pnpm install --frozen-lockfile
-          elif [ -f yarn.lock ]; then
-            echo "Using yarn"
-            yarn install --frozen-lockfile
-          elif [ -f package-lock.json ]; then
-            echo "Using npm ci"
-            npm ci
-          else
-            echo "No lockfile found; using npm install"
-            npm install
-          fi
+        run: npm ci
 
-      - name: Type check (if script exists)
+      - name: Install Playwright browsers
         working-directory: frontend
-        run: |
-          if jq -e '.scripts.typecheck' package.json >/dev/null; then
-            pnpm run typecheck 2>/dev/null || yarn run typecheck 2>/dev/null || npm run typecheck
-          else
-            echo "No typecheck script; skipping"
-          fi
+        run: npx playwright install --with-deps
 
-      - name: Lint (if script exists)
+      - name: Run Playwright tests (webServer launches Next)
         working-directory: frontend
-        run: |
-          if jq -e '.scripts.lint' package.json >/dev/null; then
-            pnpm run lint 2>/dev/null || yarn run lint 2>/dev/null || npm run lint
-          else
-            echo "No lint script; skipping"
-          fi
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3100
+          VERCEL_BYPASS_TOKEN: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+        run: npx playwright test -c playwright.config.ts
 
-      - name: Build (if script exists)
-        working-directory: frontend
-        run: |
-          if jq -e '.scripts.build' package.json >/dev/null; then
-            pnpm run build 2>/dev/null || yarn run build 2>/dev/null || npm run build
-          else
-            echo "No build script; skipping"
-          fi
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+          if-no-files-found: ignore
+
+      - name: Upload test-results (screenshots/traces)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: frontend/test-results
+          if-no-files-found: ignore
