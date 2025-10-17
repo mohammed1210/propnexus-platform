@@ -184,7 +184,6 @@ export default function OffMarketPage() {
               {/* Photo */}
               {d.image_url ? (
                 <div className="aspect-[16/10] w-full bg-zinc-100 dark:bg-zinc-800">
-<<<<<<< HEAD
                   <Image
                     src={d.image_url}
                     alt={d.title || 'Off-market property image'}
@@ -193,16 +192,6 @@ export default function OffMarketPage() {
                     className="object-cover"
                   />
                 </div>
-=======
-  <Image
-    src={d.image_url}
-    alt={d.title || 'Off-market property image'}
-    fill
-    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-    className="object-cover"
-  />
-</div>
->>>>>>> 7cc4b529 (Sprint 5 final fixes: InvestmentSummary, CompsMini, saved-deals fix, clean build)
               ) : (
                 <div className="aspect-[16/10] w-full grid place-items-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-sm">
                   No photo
