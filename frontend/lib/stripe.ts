@@ -1,16 +1,12 @@
 import Stripe from 'stripe';
 
 /**
- * If STRIPE_SECRET_KEY exists and looks like an sk_* key, export a configured
- * Stripe instance. Otherwise export `null` so server code can short-circuit
- * safely in CI/preview environments without secrets.
+ * Returns a configured Stripe instance if STRIPE_SECRET_KEY looks valid (sk_...),
+ * otherwise exports `null` so server routes can short-circuit in CI/preview.
  */
-const secret = process.env.STRIPE_SECRET_KEY;
+const secret = process.env.STRIPE_SECRET_KEY ?? '';
 
-const stripe =
-  secret && secret.startsWith('sk_')
-    ? new Stripe(secret, { apiVersion: '2024-06-20' })
-    : null;
+const stripe = secret.startsWith('sk_') ? new Stripe(secret) : null;
 
 export type { Stripe };
 export default stripe;

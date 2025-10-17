@@ -1,4 +1,0 @@
-{
-  "version": 2,
-  "ignoreCommand": "echo force-build && exit 1"
-}
