@@ -1,6 +1,3 @@
-# ruff: noqa: E402
-from __future__ import annotations
-
 import logging
 import os
 import pathlib
@@ -13,6 +10,7 @@ sentry_sdk.init(
     integrations=[FastApiIntegration()],
     traces_sample_rate=0.15,
 )
+from __future__ import annotations
 
 logging.basicConfig(level=logging.INFO)
 logging.info("CWD=%s", os.getcwd())

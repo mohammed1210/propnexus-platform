@@ -7,11 +7,18 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from supabase import Client, create_client  # type: ignore
 
-from ..scraper.rightmove_scraper import scrape_rightmove_properties
-from ..scraper.zoopla_scraper import scrape_zoopla_properties
+try:
+    from backend.scraper.rightmove_scraper import scrape_rightmove_properties
+    from backend.scraper.zoopla_scraper import scrape_zoopla_properties
+except Exception:
+    from fastapi import APIRouter, HTTPException
+    from pydantic import BaseModel
+    from scraper.rightmove_scraper import scrape_rightmove_properties
+    from scraper.zoopla_scraper import scrape_zoopla_properties
+    from utils.email import send_email
+    from utils.supabase import supabase as sb
 
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+    from supabase import Client, create_client
 
 supabase: Client | None = None
 try:
@@ -45,7 +52,7 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
         raise HTTPException(status_code=400, detail="Location is required")
 
     try:
-       
+
         zoopla_results = scrape_zoopla_properties(location) or []
         rightmove_results = scrape_rightmove_properties(location) or []
 
@@ -68,7 +75,16 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
             except Exception as db_err:  # pragma: no cover
                 logging.warning("DB insert skipped: %s", db_err)
 
-        return {"count": len(unique_props), "properties": unique_props}
+    count = len(unique_props)
+
+        # ✅ same notification for Zoopla
+        await send_email(
+            "abbas_m90@hotmail.com",
+            "Scrape Completed",
+            f"{count} properties scraped successfully from Zoopla."
+        )
+
+        return {"count": count, "properties": unique_props}
 
     except HTTPException:
         raise
