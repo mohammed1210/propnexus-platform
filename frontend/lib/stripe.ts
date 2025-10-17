@@ -1,9 +1,9 @@
 import Stripe from 'stripe';
 
 /**
- * Return a configured Stripe instance when STRIPE_SECRET_KEY exists and
- * looks like an `sk_...` key. Otherwise export `null` so server code can
- * gracefully short-circuit in non-secret environments (CI/preview).
+ * If STRIPE_SECRET_KEY exists and looks like an sk_* key, export a configured
+ * Stripe instance. Otherwise export `null` so server code can short-circuit
+ * safely in CI/preview environments without secrets.
  */
 const secret = process.env.STRIPE_SECRET_KEY;
 

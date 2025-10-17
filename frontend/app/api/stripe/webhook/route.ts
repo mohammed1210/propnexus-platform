@@ -1,7 +1,7 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-// @ts-ignore - server-only import (server runtime)
-import stripe from '../../../../lib/stripe';
+// server-only import
+import stripe, { Stripe as StripeSDK } from '../../../../lib/stripe';
 
 /**
  * POST /api/stripe/webhook
@@ -11,16 +11,24 @@ import stripe from '../../../../lib/stripe';
 export async function POST(req: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!webhookSecret) {
-    return NextResponse.json({ error: 'Missing STRIPE_WEBHOOK_SECRET' }, { status: 500 });
+  // If Stripe isn't configured, acknowledge so previews never 500.
+  if (!webhookSecret || !stripe) {
+    return NextResponse.json({ received: true, note: 'Stripe not configured' });
   }
 
-  // NOTE: Next 15: headers() -> Promise<ReadonlyHeaders>
-  const signature = (await headers()).get('stripe-signature');
+  // Next 15: headers() is async
+  const h = await headers();
+  const signature = h.get('stripe-signature');
   const body = await req.text();
 
+  if (!signature) {
+    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
+  }
+
+  const s = stripe as StripeSDK;
+
   try {
-    const event = stripe.webhooks.constructEvent(body, signature as string, webhookSecret);
+    const event = s.webhooks.constructEvent(body, signature, webhookSecret);
 
     switch (event.type) {
       case 'checkout.session.completed':

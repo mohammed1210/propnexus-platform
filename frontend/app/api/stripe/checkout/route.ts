@@ -1,37 +1,35 @@
 import { NextResponse } from 'next/server';
-import stripe, { Stripe } from '../../../../lib/stripe';
+// server-only import
+import stripe, { Stripe as StripeSDK } from '../../../../lib/stripe';
 
 /**
  * POST /api/stripe/checkout
  * Creates a Stripe Checkout Session for a subscription.
- * Returns a structured JSON payload: { url } or { error }.
+ * Returns { url } or a harmless fallback when Stripe isn't configured.
  */
 export async function POST() {
   const priceId = process.env.STRIPE_PRICE_ID;
-  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
-  // Safeguard for CI/preview: if anything important is missing, return a harmless test URL.
-  if (!priceId || !publishableKey || !stripe) {
-    return NextResponse.json(
-      {
-        url: 'https://checkout.stripe.com/test',
-        note:
-          'Missing Stripe configuration in this environment; returned a test URL instead.',
-      },
-      { status: 200 },
-    );
+  // Missing config? Return a safe deterministic URL so the app still works in preview/CI.
+  if (!priceId || !stripe) {
+    return NextResponse.json({
+      url: 'https://checkout.stripe.com/test',
+      note: 'Stripe not configured; using test URL.',
+    });
   }
 
+  // `stripe` is narrowed via the guard above; keep TS happy explicitly as well.
+  const s = stripe as StripeSDK;
+
   try {
-    // After the guard, coerce to non-null for this scope.
-    const s = stripe as Stripe;
     const session = await s.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/pricing?canceled=1`,
     });
+
     return NextResponse.json({ url: session.url });
   } catch (err: any) {
     console.error('Error creating Stripe checkout session', err);
