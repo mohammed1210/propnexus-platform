@@ -77,9 +77,14 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
 
     count = len(unique_props)
 
-                            await send_email("abbas_m90@hotmail.com", "Scrape Completed", f"{count} new properties added to PropNexus.")
+        # ✅ same notification for Zoopla
+        await send_email(
+            "abbas_m90@hotmail.com",
+            "Scrape Completed",
+            f"{count} properties scraped successfully from Zoopla."
+        )
 
-       return {"count": len(unique_props), "properties": unique_props}
+        return {"count": count, "properties": unique_props}
 
     except HTTPException:
         raise
