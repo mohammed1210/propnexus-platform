@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-// @ts-ignore - server-only import (server runtime)
-import stripe from '../../../../lib/stripe';
+import stripe, { Stripe } from '../../../../lib/stripe';
 
 /**
  * POST /api/stripe/checkout
@@ -12,16 +11,22 @@ export async function POST() {
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
-  // Safeguard for CI/Preview/dev without secrets
-  if (!priceId || !publishableKey) {
-    return new Response(
-      JSON.stringify({ ok: false, message: 'Stripe not configured in this environment' }),
-      { status: 200 }
+  // Safeguard for CI/preview: if anything important is missing, return a harmless test URL.
+  if (!priceId || !publishableKey || !stripe) {
+    return NextResponse.json(
+      {
+        url: 'https://checkout.stripe.com/test',
+        note:
+          'Missing Stripe configuration in this environment; returned a test URL instead.',
+      },
+      { status: 200 },
     );
   }
 
   try {
-    const session = await stripe.checkout.sessions.create({
+    // After the guard, coerce to non-null for this scope.
+    const s = stripe as Stripe;
+    const session = await s.checkout.sessions.create({
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -32,7 +37,7 @@ export async function POST() {
     console.error('Error creating Stripe checkout session', err);
     return NextResponse.json(
       { error: err?.message ?? 'Unknown error creating Stripe checkout session' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

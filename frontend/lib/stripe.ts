@@ -1,14 +1,16 @@
-// frontend/lib/stripe.ts
 import Stripe from 'stripe';
 
-const secret = process.env.STRIPE_SECRET_KEY ?? '';
-
 /**
- * Export a nullable client so builds don’t crash when secrets are absent.
- * Routes should guard with: if (!stripe) { ...fallback... }
+ * Return a configured Stripe instance when STRIPE_SECRET_KEY exists and
+ * looks like an `sk_...` key. Otherwise export `null` so server code can
+ * gracefully short-circuit in non-secret environments (CI/preview).
  */
-const stripe = secret
-  ? new Stripe(secret, { /* rely on default API version */ typescript: true })
-  : null;
+const secret = process.env.STRIPE_SECRET_KEY;
 
+const stripe =
+  secret && secret.startsWith('sk_')
+    ? new Stripe(secret, { apiVersion: '2024-06-20' })
+    : null;
+
+export type { Stripe };
 export default stripe;
