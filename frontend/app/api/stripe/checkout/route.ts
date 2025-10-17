@@ -1,19 +1,22 @@
-// frontend/app/api/stripe/checkout/route.ts
 import { NextResponse } from 'next/server';
+// @ts-ignore - server-only import (server runtime)
 import stripe from '../../../../lib/stripe';
 
+/**
+ * POST /api/stripe/checkout
+ * Creates a Stripe Checkout Session for a subscription.
+ * Returns a structured JSON payload: { url } or { error }.
+ */
 export async function POST() {
   const priceId = process.env.STRIPE_PRICE_ID;
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
-  // ---- Safeguard when Stripe isn’t configured (Preview/CI) ----
-  if (!stripe || !priceId) {
-    return NextResponse.json(
-      {
-        url: 'https://checkout.stripe.com/test',
-        note: 'Stripe not configured in this environment; returning test URL.',
-      },
-      { status: 200 },
+  // Safeguard for CI/Preview/dev without secrets
+  if (!priceId || !publishableKey) {
+    return new Response(
+      JSON.stringify({ ok: false, message: 'Stripe not configured in this environment' }),
+      { status: 200 }
     );
   }
 
@@ -29,7 +32,7 @@ export async function POST() {
     console.error('Error creating Stripe checkout session', err);
     return NextResponse.json(
       { error: err?.message ?? 'Unknown error creating Stripe checkout session' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

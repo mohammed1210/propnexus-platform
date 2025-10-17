@@ -1,10 +1,12 @@
 # backend/routes/scrape_routes.py
 from __future__ import annotations
 
-import os
 import logging
+import os
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 from supabase import Client, create_client  # type: ignore
 
 from ..scraper.rightmove_scraper import scrape_rightmove_properties

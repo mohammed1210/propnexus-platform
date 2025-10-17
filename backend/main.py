@@ -1,7 +1,10 @@
+# ruff: noqa: E402
 from __future__ import annotations
+
+import logging
 import os
 import pathlib
-import logging
+
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
@@ -99,8 +102,8 @@ async def get_property_by_id(property_id: str):
     return res.data[0]
 
 
-from backend.routes.comps_routes import router as comps_router
 from backend.routes.area_intel_routes import router as area_intel_router
+from backend.routes.comps_routes import router as comps_router
 
 # --- Include cache routes ---
 try:
