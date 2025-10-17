@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Request
-from backend.utils.supabase_client import get_supabase
+
 from backend.services.providers import get_area_intel_from_provider
+from backend.utils.supabase_client import get_supabase
 
 router = APIRouter(prefix="/area-intel", tags=["area-intel"])
 

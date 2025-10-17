@@ -1,31 +1,26 @@
-// frontend/app/api/stripe/webhook/route.ts
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
+// @ts-ignore - server-only import (server runtime)
 import stripe from '../../../../lib/stripe';
 
 /**
  * POST /api/stripe/webhook
  * Verifies signature and acknowledges events.
+ * Returns { received: true } or { error } with appropriate status.
  */
 export async function POST(req: Request) {
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
-  // No Stripe or no webhook secret in Preview/CI — acknowledge and exit.
-  if (!stripe || !webhookSecret) {
-    return NextResponse.json({ received: true, note: 'Webhook disabled in this env.' });
+  if (!webhookSecret) {
+    return NextResponse.json({ error: 'Missing STRIPE_WEBHOOK_SECRET' }, { status: 500 });
   }
 
-  // Your type defs treat headers() as async -> await it
-  const h = await headers();
-  const signature = h.get('stripe-signature');
-  if (!signature) {
-    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
-  }
-
+  // NOTE: Next 15: headers() -> Promise<ReadonlyHeaders>
+  const signature = (await headers()).get('stripe-signature');
   const body = await req.text();
 
   try {
-    const event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+    const event = stripe.webhooks.constructEvent(body, signature as string, webhookSecret);
 
     switch (event.type) {
       case 'checkout.session.completed':
