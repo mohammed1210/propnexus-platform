@@ -13,4 +13,3 @@
 - Provider stubs live in `backend/services/providers.py` — replace with real APIs later.
 - Cache write failures are non-fatal; the API still returns provider data.
 - Tests monkeypatch the DB layer and providers for deterministic behavior.
-

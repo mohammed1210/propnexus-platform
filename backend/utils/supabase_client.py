@@ -1,6 +1,7 @@
 from __future__ import annotations
+
 import os
-from typing import Optional
+
 
 def get_supabase():
     """
@@ -13,6 +14,7 @@ def get_supabase():
         return None
     try:
         from supabase import create_client
+
         return create_client(url, key)
     except Exception:
         return None

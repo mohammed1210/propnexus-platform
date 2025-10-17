@@ -1,6 +1,6 @@
+import importlib
 import types
 from datetime import datetime, timedelta, timezone
-import importlib
 
 import pytest
 

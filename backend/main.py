@@ -1,13 +1,16 @@
-import os, pathlib, sys, logging
+import logging
+import os
+import pathlib
+
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
+
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN"),
     integrations=[FastApiIntegration()],
     traces_sample_rate=0.15,
 )
 from __future__ import annotations
-
 
 logging.basicConfig(level=logging.INFO)
 logging.info("CWD=%s", os.getcwd())
@@ -95,8 +98,10 @@ async def get_property_by_id(property_id: str):
     if not res.data:
         raise HTTPException(status_code=404, detail="Property not found")
     return res.data[0]
-from backend.routes.comps_routes import router as comps_router
+
+
 from backend.routes.area_intel_routes import router as area_intel_router
+from backend.routes.comps_routes import router as comps_router
 
 # --- Include cache routes ---
 try:

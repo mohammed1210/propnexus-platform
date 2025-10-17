@@ -13,3 +13,4 @@ requests
 openai>=1.14.0
 
 stripe
+sentry-sdk>=2.0.0
