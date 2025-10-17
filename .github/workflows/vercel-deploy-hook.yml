@@ -15,4 +15,4 @@ jobs:
           set -euo pipefail
           curl -fsSL -X POST \
             -H "x-vercel-protection-bypass: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}" \
-            "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}?force=1"
+            "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}?force=1"# Move (or create) the branch pointer at the current commit and switch to it
