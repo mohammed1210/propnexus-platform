@@ -1,45 +1,29 @@
-# overwrite .github/workflows/vercel-deploy-hook.yml
-cat > .github/workflows/vercel-deploy-hook.yml <<'YAML'
 name: Deploy Frontend (Vercel Hook)
-
 
 on:
   push:
     branches:
       - main
-      - sprint-*
-      - release/*
-    paths:
-      - 'frontend/**'
-      - '.github/workflows/vercel-deploy-hook.yml'
-  workflow_dispatch:
+      - 'sprint-*'
+      - 'release/**'
 
 jobs:
   ping-vercel:
     runs-on: ubuntu-latest
     steps:
-      - name: Show context
-        run: |
-          echo "event:      ${{ github.event_name }}"
-          echo "ref name:   ${{ github.ref_name }}"
-          echo "sha:        ${{ github.sha }}"
       - name: Call Vercel Deploy Hook
         env:
           HOOK:   ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
           BYPASS: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          BRANCH: ${{ github.ref_name }}
+          SHA:    ${{ github.sha }}
         run: |
-          if [ -z "$HOOK" ]; then
-            echo "::error title=Missing secret::Add VERCEL_DEPLOY_HOOK_URL in repo Secrets"; exit 1
+          set -euo pipefail
+          if [ -z "${HOOK:-}" ]; then
+            echo "Missing VERCEL_DEPLOY_HOOK_URL secret"; exit 1
           fi
-
-
-          echo "Triggering Vercel for branch '${{ github.ref_name }}'…"
-          # If you have a Protection Bypass token configured on Vercel, we send it. Safe if empty.
+          json=$(printf '{"branch":"%s","sha":"%s"}' "$BRANCH" "$SHA")
           curl -fsS -X POST "$HOOK" \
-            -H "x-vercel-protection-bypass: ${BYPASS}" \
             -H "Content-Type: application/json" \
-            -d "{\"branch\":\"${{ github.ref_name }}\",\"sha\":\"${{ github.sha }}\"}"
-YAML
-git add .github/workflows/vercel-deploy-hook.yml
-git commit -m "ci(vercel): deploy on main, sprint-* & release/*; only when frontend changes"
-git push
+            -H "x-vercel-protection-bypass: ${BYPASS:-}" \
+            --data "$json"
