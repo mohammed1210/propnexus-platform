@@ -2,12 +2,15 @@
   "buildCommand": "next build",
   "outputDirectory": ".next",
   "framework": "nextjs",
-  "ignoreCommand": "echo no-ignore",
+  "ignoreCommand": null,
   "installCommand": "npm install",
   "routes": [
     {
       "src": "/(.*)",
       "dest": "/$1"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": true
+  }
 }
