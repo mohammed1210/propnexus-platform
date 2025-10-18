@@ -1,38 +1,43 @@
-import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
-// @ts-ignore - server-only import (server runtime)
-import stripe from '../../../../lib/stripe';
+import stripe from '@/lib/stripe';
 
-/**
- * POST /api/stripe/webhook
- * Verifies signature and acknowledges events.
- * Returns { received: true } or { error } with appropriate status.
- */
+export const runtime = 'nodejs'; // ensure Node runtime for webhooks
+
 export async function POST(req: Request) {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-  if (!webhookSecret) {
-    return NextResponse.json({ error: 'Missing STRIPE_WEBHOOK_SECRET' }, { status: 500 });
+  if (!stripe) {
+    // In preview/CI we just acknowledge so the endpoint is idempotent
+    return NextResponse.json({ received: true, skipped: 'no-stripe' });
   }
 
-  // NOTE: Next 15: headers() -> Promise<ReadonlyHeaders>
-  const signature = (await headers()).get('stripe-signature');
   const body = await req.text();
+  const signature = req.headers.get('stripe-signature');
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!signature || !webhookSecret) {
+    return NextResponse.json({ error: 'Missing webhook config' }, { status: 400 });
+  }
 
   try {
-    const event = stripe.webhooks.constructEvent(body, signature as string, webhookSecret);
+    const event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
 
     switch (event.type) {
       case 'checkout.session.completed':
-        console.log('Checkout session completed:', event.data.object);
+        // TODO: handle subscription activation
         break;
+      // Add other event types as needed
       default:
-        console.log(`Unhandled event type ${event.type}`);
+        break;
     }
+
     return NextResponse.json({ received: true });
-  } catch (err) {
-    console.error('Error verifying Stripe webhook', err);
-    // 400 to reflect bad signature in configured envs
+  } catch (err: any) {
+    console.error('stripe webhook', err);
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 }
+
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
