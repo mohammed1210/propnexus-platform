@@ -110,3 +110,11 @@ try:
 except Exception:
     # app may be defined later in some imports; if so, routers are imported in the file already.
     pass
+
+from backend.routes import health as health_router
+
+# register health router
+try:
+    app.include_router(health_router.router)
+except Exception as e:
+    print('health router registration failed:', e)

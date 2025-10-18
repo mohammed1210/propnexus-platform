@@ -33,6 +33,8 @@
     "ingest:live": "tsx scripts/ingest-live.ts",
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:build": "npm --prefix frontend run build",
-    "frontend:lint": "npm --prefix frontend run lint"
+    "frontend:lint": "npm --prefix frontend run lint",
+    "typecheck": "tsc --noEmit",
+    "health:report": "node scripts/system-health-report.mjs"
   }
 }
