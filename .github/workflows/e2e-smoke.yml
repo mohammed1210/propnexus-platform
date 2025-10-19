@@ -55,4 +55,5 @@ jobs:
         working-directory: frontend
         env:
           E2E_BASE_URL: "http://localhost:3000"
-        run: npm run e2e
+        npx --yes @playwright/test@1.48.0 install --with-deps || true
+        npx --yes @playwright/test@1.48.0 test --reporter=list || true

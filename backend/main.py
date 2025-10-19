@@ -21,6 +21,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.routes import health as health_router
+from backend.routes.area_intel_routes import router as area_intel_router
+from backend.routes.comps_routes import router as comps_router
 from supabase import Client, create_client
 
 # Load env early
@@ -100,10 +103,6 @@ async def get_property_by_id(property_id: str):
         raise HTTPException(status_code=404, detail="Property not found")
     return res.data[0]
 
-
-from backend.routes import health as health_router
-from backend.routes.area_intel_routes import router as area_intel_router
-from backend.routes.comps_routes import router as comps_router
 
 # --- Include cache routes ---
 try:

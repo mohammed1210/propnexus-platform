@@ -37,6 +37,8 @@
     "frontend:build": "npm --prefix frontend run build",
     "frontend:lint": "npm --prefix frontend run lint",
     "typecheck": "tsc --noEmit",
-    "health:report": "node scripts/system-health-report.mjs"
+    "health:report": "node scripts/system-health-report.mjs",
+    "test": "jest --passWithNoTests --testPathIgnorePatterns='e2e/'",
+    "e2e": "playwright test --reporter=list"
   }
 }
