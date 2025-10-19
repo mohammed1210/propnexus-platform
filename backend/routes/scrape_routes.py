@@ -1,10 +1,12 @@
 # backend/routes/scrape_routes.py
 from __future__ import annotations
 
-import os
 import logging
+import os
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 from supabase import Client, create_client  # type: ignore
 
 try:
@@ -92,4 +94,4 @@ async def scrape_all_sources(req: ScrapeRequest) -> dict:
         logging.exception("Scraping failed: %s", e)
         logging.exception("Scraping failed: %s", e)
         raise HTTPException(status_code=500, detail="Scraping failed")
-    
+

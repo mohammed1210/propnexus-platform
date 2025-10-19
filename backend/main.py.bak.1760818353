@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import logging
 import os
 import pathlib
@@ -12,6 +10,7 @@ sentry_sdk.init(
     integrations=[FastApiIntegration()],
     traces_sample_rate=0.15,
 )
+from __future__ import annotations
 
 logging.basicConfig(level=logging.INFO)
 logging.info("CWD=%s", os.getcwd())
@@ -111,11 +110,3 @@ try:
 except Exception:
     # app may be defined later in some imports; if so, routers are imported in the file already.
     pass
-
-from backend.routes import health as health_router
-
-# register health router
-try:
-    app.include_router(health_router.router)
-except Exception as e:
-    print("health router registration failed:", e)

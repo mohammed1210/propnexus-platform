@@ -2,7 +2,6 @@ import os
 
 from fastapi import APIRouter, HTTPException
 from openai import OpenAI
-from pydantic import BaseModel
 
 router = APIRouter()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
