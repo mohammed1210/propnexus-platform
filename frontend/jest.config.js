@@ -2,7 +2,7 @@
 module.exports = {
   testEnvironment: 'jsdom',
   testPathIgnorePatterns: [
-    '<rootDir>/e2e/',
+    '<rootDir>/e2e/',          // ✅ don't let Jest touch Playwright specs
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
   ],
