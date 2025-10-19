@@ -40,5 +40,10 @@
     "health:report": "node scripts/system-health-report.mjs",
     "test": "jest --passWithNoTests --testPathIgnorePatterns='e2e/'",
     "e2e": "playwright test --reporter=list"
+  },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "<rootDir>/frontend/e2e/"
+    ]
   }
 }

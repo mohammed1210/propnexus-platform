@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import logging
-import os
-from typing import Any
-
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
 # Route modules
 try:
     from backend.routes.health import router as health_router  # type: ignore
@@ -14,7 +11,9 @@ except Exception:  # pragma: no cover
     health_router = None  # type: ignore
 
 try:
-    from backend.routes.area_intel_routes import router as area_intel_router  # type: ignore
+    from backend.routes.area_intel_routes import (
+        router as area_intel_router,  # type: ignore
+    )
 except Exception:  # pragma: no cover
     area_intel_router = None  # type: ignore
 
@@ -45,14 +44,7 @@ from .routes.off_market_routes import router as off_market_router  # noqa: E402
 from .routes.save_deal import router as save_deal_router  # noqa: E402
 from .routes.stripe_routes import router as stripe_router  # noqa: E402
 
-# Supabase client (prefer service role on server)
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-
-supabase: Client | None = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
+# Supabase client (prefer service role on server)SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
 # CORS
