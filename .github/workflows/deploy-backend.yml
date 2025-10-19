@@ -1,14 +1,14 @@
-# .github/workflows/deploy-backend.yml
 name: Deploy Backend (Railway)
 
 on:
   push:
-    branches: [po2, main]
+    branches: [ main, sprint-*, po* ]
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,8 +25,7 @@ jobs:
           railway up \
             --service "propnexus-backend" \
             --ci \
-            --no-stream \
-            --path-as-root
+            --no-stream
 
       - name: Wait for health
         env:
@@ -35,9 +34,7 @@ jobs:
           for i in {1..30}; do
             code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
             echo "Health attempt $i -> $code"
-            if [ "$code" = "200" ]; then
-              echo "✅ Healthy"; exit 0
-            fi
+            [ "$code" = "200" ] && echo "✅ Healthy" && exit 0
             sleep 5
           done
           echo "❌ Health check failed"; exit 1
