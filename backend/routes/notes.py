@@ -51,6 +51,7 @@ def get_notes(property_id: str, user_id: Optional[str] = None):
     )
     return data
 
+
 @router.post("")
 def upsert_notes(payload: NotesPayload):
     """Create/update notes for (user_id, property_id)."""

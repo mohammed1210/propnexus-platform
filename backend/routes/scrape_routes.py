@@ -1,5 +1,12 @@
+# backend/routes/scrape_routes.py
+from __future__ import annotations
+
+import logging
+import os
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
 from supabase import Client, create_client  # type: ignore
 
 try:
@@ -80,5 +87,10 @@ async def scrape_zoopla_route(payload: dict):
 
         return {"count": count, "properties": unique_props}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:  # pragma: no cover
+        logging.exception("Scraping failed: %s", e)
+        logging.exception("Scraping failed: %s", e)
+        raise HTTPException(status_code=500, detail="Scraping failed")
+

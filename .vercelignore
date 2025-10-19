@@ -1,0 +1,9 @@
+node_modules
+.DS_Store
+*.log
+*.tmp
+coverage
+dist
+build
+tmp
+temp

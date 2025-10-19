@@ -6,5 +6,10 @@
     "frontend/**/*.tsx",
     "frontend/.next/types/**/*.ts",
     ".next/types/**/*.ts"
+  ],
+  "plugins": [
+    {
+      "name": "next"
+    }
   ]
 }

@@ -1,0 +1,50 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [ main, po2 ]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          # Install project deps if present
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          # Ensure tooling is available even if not in requirements
+          pip install ruff black pytest
+
+      - name: Lint (ruff + black --check)
+        working-directory: backend
+        run: |
+          # Ruff (use the modern "ruff check" subcommand)
+          ruff check .
+          # Black (format check only)
+          black --check .
+
+      - name: Run tests (if any)
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+        run: |
+          if ls -1 *_test.py tests 2>/dev/null | grep -q '.'; then
+            pytest -q
+          else
+            echo "No tests found, skipping pytest"
+          fi
