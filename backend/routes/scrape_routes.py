@@ -6,20 +6,22 @@ from supabase import create_client, Client  # type: ignore
 from ..scraper.rightmove_scraper import scrape_rightmove_properties
 from ..scraper.zoopla_scraper import scrape_zoopla_properties
 
-SUPABASE_URL = os.getenv('SUPABASE_URL') or os.getenv('NEXT_PUBLIC_SUPABASE_URL')
-SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_KEY')
+SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
 supabase: Client | None = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
-        logging.warning('Supabase init failed: %s', e)
+        logging.warning("Supabase init failed: %s", e)
 
 router = APIRouter()
 
+
 class ScrapeRequest(BaseModel):
     location: str
+
 
 @router.post("/scrape")
 async def scrape_all_sources(req: ScrapeRequest):
