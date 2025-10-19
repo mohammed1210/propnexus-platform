@@ -1,21 +1,17 @@
 import { NextResponse } from 'next/server';
-import stripe from '../../../../lib/stripe';
+import stripe from '@/lib/stripe';
 
-/**
- * POST /api/stripe/checkout
- * Creates a Stripe Checkout Session for a subscription.
- * If Stripe isn't configured (preview/CI), return a harmless test URL.
- */
-export async function POST() {
-  const priceId = process.env.STRIPE_PRICE_ID;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL ?? '';
 
-  // No secrets in preview/CI? Return a fake URL so UI/E2E can proceed.
-  if (!stripe || !priceId) {
-    return NextResponse.json({
-      url: 'https://checkout.stripe.com/test',
-      note: 'Stripe not configured; returning test URL.',
-    });
+export async function POST(req: Request) {
+  const { priceId } = await req.json();
+
+  if (!stripe) {
+    // No server secret in this environment – report a clear 503
+    return NextResponse.json(
+      { error: 'Stripe is not configured in this environment.' },
+      { status: 503 }
+    );
   }
 
   try {
@@ -23,14 +19,16 @@ export async function POST() {
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/pricing?canceled=1`,
+      cancel_url: `${appUrl}/pricing`,
+      allow_promotion_codes: true,
     });
-    return NextResponse.json({ url: session.url });
+
+    return NextResponse.json({ id: session.id, url: session.url });
   } catch (err: any) {
-    console.error('Error creating Stripe checkout session', err);
+    console.error('stripe checkout create', err);
     return NextResponse.json(
-      { error: err?.message ?? 'Unknown error creating Stripe checkout session' },
-      { status: 500 },
+      { error: err?.message ?? 'Stripe error' },
+      { status: 500 }
     );
   }
 }

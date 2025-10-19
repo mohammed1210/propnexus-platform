@@ -174,8 +174,8 @@ function FiltersBar() {
       </div>
 
       <div className="flex gap-2">
-        <button onClick={apply} className="pnx-pnx-btn pnx-pnx-pnx-btn-primary flex-1">
-          Apply Filters
+        <button onClick={apply} className="btn btn-primary flex-1">
+          Apply
         </button>
         <button
           onClick={() => {
