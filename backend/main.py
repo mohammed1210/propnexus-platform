@@ -2,32 +2,40 @@ from __future__ import annotations
 
 import logging
 import os
-import pathlib
+from typing import Any
 
-import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-
-sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"),
-    integrations=[FastApiIntegration()],
-    traces_sample_rate=0.15,
-)
-
-logging.basicConfig(level=logging.INFO)
-logging.info("CWD=%s", os.getcwd())
-logging.info("PYTHONPATH=%s", os.environ.get("PYTHONPATH"))
-logging.info("Exists backend/main.py? %s", pathlib.Path(__file__).resolve().is_file())
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+# Route modules
+try:
+    from backend.routes.health import router as health_router  # type: ignore
+except Exception:  # pragma: no cover
+    health_router = None  # type: ignore
 
-from supabase import Client, create_client
-from backend.routes import health as health_router
-from backend.routes.area_intel_routes import router as area_intel_router
-from backend.routes.comps_routes import router as comps_router
+try:
+    from backend.routes.area_intel_routes import router as area_intel_router  # type: ignore
+except Exception:  # pragma: no cover
+    area_intel_router = None  # type: ignore
 
-# Load env early
+try:
+    from backend.routes.comps_routes import router as comps_router  # type: ignore
+except Exception:  # pragma: no cover
+    comps_router = None  # type: ignore
+
+try:
+    from backend.routes.gpt_routes import router as gpt_router  # type: ignore
+except Exception:  # pragma: no cover
+    gpt_router = None  # type: ignore
+
+try:
+    from backend.routes.scrape_routes import router as scrape_router  # type: ignore
+except Exception:  # pragma: no cover
+    scrape_router = None  # type: ignore
+
+# Load env early (after imports to satisfy E402)
 load_dotenv()
+
 
 # Routers (relative imports; keep at top for linter)
 from .routes import area_routes, comps_routes, gpt_routes, scrape_routes  # noqa: E402

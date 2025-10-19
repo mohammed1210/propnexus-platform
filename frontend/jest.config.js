@@ -11,3 +11,7 @@ const customJestConfig = {
 };
 
 module.exports = createJestConfig(customJestConfig);
+
+// CI: ignore Playwright e2e specs
+module.exports = (module.exports || require("./jest.config.base") || {});
+module.exports.testPathIgnorePatterns = (module.exports.testPathIgnorePatterns || []).concat(["<rootDir>/e2e/"]); 
