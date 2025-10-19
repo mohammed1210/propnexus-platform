@@ -1,0 +1,26 @@
+name: System Health – Daily
+
+on:
+  schedule:
+    - cron: "0 8 * * *" # runs at 08:00 UTC (~09:00 UK winter / 09:00-10:00 summer)
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run report
+        env:
+          FRONTEND_URL: ${{ vars.FRONTEND_URL }}
+          BACKEND_URL:  ${{ vars.BACKEND_URL }}
+        run: |
+          node scripts/system-health-report.mjs
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-health-report
+          path: SYSTEM_HEALTH_REPORT.md

@@ -1,0 +1,32 @@
+name: CI – Backend Import (lite)
+
+on:
+  pull_request:
+    branches: [ "main", "sprint-*" ]
+  push:
+    branches: [ "sprint-*" ]
+
+jobs:
+  backend_import:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps (best-effort)
+        run: |
+          if [ -f backend/requirements.txt ]; then
+            python -m pip install --upgrade pip
+            pip install -r backend/requirements.txt || true
+          fi
+      - name: Smoke import
+        run: |
+          python - <<'PY'
+import importlib
+try:
+    importlib.import_module("backend.routes.health")
+    print("OK: imported backend.routes.health")
+except Exception as e:
+    raise SystemExit(f"ImportError: {e}")
+PY
