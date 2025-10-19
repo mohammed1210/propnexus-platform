@@ -1,8 +1,11 @@
-import os
 import logging
+import os
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from supabase import create_client, Client  # type: ignore
+
+from supabase import Client, create_client  # type: ignore
+
 from ..scraper.rightmove_scraper import scrape_rightmove_properties
 from ..scraper.zoopla_scraper import scrape_zoopla_properties
 
