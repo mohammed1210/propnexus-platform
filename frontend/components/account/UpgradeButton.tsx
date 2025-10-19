@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { fetchWithRetry } from '@/lib/api';
-import { fetchWithRetry } from '@/lib/api';
 
 export default function UpgradeButton() {
   const [loading, setLoading] = useState(false);
