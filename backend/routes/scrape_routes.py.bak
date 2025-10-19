@@ -1,9 +1,8 @@
+from fastapi import APIRouter, HTTPException
+from backend.db import sb
 import logging
 
-from fastapi import APIRouter, HTTPException
-
 router = APIRouter()
-
 
 @router.post("/scrape")
 async def scrape_all_sources(req: dict) -> dict:
