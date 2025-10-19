@@ -27,3 +27,4 @@ frontend/.env
 
 # Lock-in for repo hygiene
 *.sqlite
+.vercel

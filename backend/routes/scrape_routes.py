@@ -42,40 +42,39 @@ except Exception as e:  # pragma: no cover
 router = APIRouter()
 
 
-class ScrapeRequest(BaseModel):
-    location: str
+@router.post("/scrape-rightmove")
+async def scrape_rightmove_route(payload: dict):
+    try:
+        unique_props = await scrape_rightmove(payload)
+        count = len(unique_props)
 
+        # ✅ send notification after successful scrape
+        await send_email(
+            "abbas_m90@hotmail.com",
+            "Scrape Completed",
+            f"{count} properties scraped successfully from Rightmove."
+        )
 
-@router.post("/scrape")
-async def scrape_all_sources(req: ScrapeRequest) -> dict:
-async def scrape_all_sources(req: ScrapeRequest) -> dict:
-    location = (req.location or "").strip()
-    if not location:
-        raise HTTPException(status_code=400, detail="Location is required")
+        return {"count": count, "properties": unique_props}
 
     try:
 
         zoopla_results = scrape_zoopla_properties(location) or []
         rightmove_results = scrape_rightmove_properties(location) or []
 
-        combined = zoopla_results + rightmove_results
-        seen: set[tuple] = set()
-        unique_props: list[dict] = []
 
-        seen: set[tuple] = set()
-        unique_props: list[dict] = []
+@router.post("/scrape-zoopla")
+async def scrape_zoopla_route(payload: dict):
+    try:
+        unique_props = await scrape_zoopla(payload)
+        count = len(unique_props)
 
-        for p in combined:
-            key = (p.get("title"), p.get("price"), p.get("location"))
-            if key not in seen:
-                seen.add(key)
-                unique_props.append(p)
-
-        if supabase and unique_props:
-            try:
-                supabase.table("properties").upsert(unique_props).execute()
-            except Exception as db_err:  # pragma: no cover
-                logging.warning("DB insert skipped: %s", db_err)
+        # ✅ same notification for Zoopla
+        await send_email(
+            "abbas_m90@hotmail.com",
+            "Scrape Completed",
+            f"{count} properties scraped successfully from Zoopla."
+        )
 
     count = len(unique_props)
 
