@@ -1,42 +1,17 @@
-# backend/db.py
 from __future__ import annotations
-
 import os
-from typing import Optional
-
 from dotenv import load_dotenv
-
-from supabase import Client, create_client
+from supabase import Client, create_client  # type: ignore
 
 load_dotenv()
 
-# Lazily created singleton
-_SUPABASE: Optional[Client] = None
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("SUPABASE_ANON_KEY")
+)
 
+if not SUPABASE_URL or not SUPABASE_KEY:
+    raise RuntimeError("Missing SUPABASE_URL / SUPABASE_*_KEY env vars")
 
-def make_supabase() -> Optional[Client]:
-    """
-    Create a Supabase client if env vars are present.
-    We avoid passing custom ClientOptions to stay compatible with the
-    supabase-py version installed in Railway.
-    """
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
-
-    if not url or not key:
-        # Missing credentials — callers should handle None
-        return None
-
-    try:
-        return create_client(url, key)
-    except Exception:
-        # If the library version or env are off, don't crash the app;
-        # routers can choose to 404/503 gracefully.
-        return None
-
-
-def get_supabase() -> Optional[Client]:
-    global _SUPABASE
-    if _SUPABASE is None:
-        _SUPABASE = make_supabase()
-    return _SUPABASE
+sb: Client = create_client(SUPABASE_URL, SUPABASE_KEY)

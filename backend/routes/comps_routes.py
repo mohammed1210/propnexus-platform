@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Request
 
 from backend.services.providers import get_comps_from_provider
-from main import sb  # Supabase client provided by backend/main.py
+from ..db import sb  # Supabase client provided by backend/main.py
 
 router = APIRouter(prefix="/comps", tags=["comps"])
 
