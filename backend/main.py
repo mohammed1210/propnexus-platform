@@ -6,7 +6,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 # Local deps (only relative imports; no duplicates)
-from .db import sb  # shared Supabase client
+try:
+    from .db import sb  # shared Supabase client
+except ImportError:
+    from db import sb  # fallback for pytest/CI when package context isn't set
+
 from .routes.ai import router as ai_router
 from .routes.area_intel_routes import router as area_intel_router
 from .routes.comps_routes import router as comps_router
@@ -19,10 +23,7 @@ from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
 from .routes.stripe_routes import router as stripe_router
 
-# Stdlib
-
-
-# Load env AFTER imports (fixes Ruff E402)
+# Load env AFTER imports (keeps imports grouped for linters)
 load_dotenv()
 
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
