@@ -48,3 +48,8 @@ backend/.env
 
 # Other IDE
 .idea/
+
+# Never commit secrets
+.env
+*.env
+backend/.env

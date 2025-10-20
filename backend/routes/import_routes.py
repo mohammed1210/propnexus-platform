@@ -1,0 +1,94 @@
+# backend/routes/import_routes.py
+from __future__ import annotations
+
+from typing import Any, Dict, List, Tuple
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+# Scrapers (existing)
+from ..scraper.rightmove_scraper import scrape_rightmove_properties
+from ..scraper.zoopla_scraper import scrape_zoopla_properties
+
+# Shared Supabase client
+try:
+    from backend.db import sb  # type: ignore
+except Exception:
+    sb = None  # graceful if local-only
+
+
+router = APIRouter(prefix="/import", tags=["import"])
+
+
+class ImportRequest(BaseModel):
+    location: str
+
+
+def _unique_key(p: Dict[str, Any]) -> Tuple[Any, Any, Any]:
+    return (p.get("title"), p.get("price"), p.get("location"))
+
+
+@router.post("/all")
+async def import_all(req: ImportRequest):
+    """
+    Scrape Zoopla + Rightmove for `location`, dedupe, upsert to Supabase.
+    Returns { count } and the first few items (preview).
+    """
+    loc = (req.location or "").strip()
+    if not loc:
+        raise HTTPException(status_code=400, detail="Location is required")
+
+    try:
+        zoopla: List[Dict[str, Any]] = scrape_zoopla_properties(loc) or []
+        rightmove: List[Dict[str, Any]] = scrape_rightmove_properties(loc) or []
+
+        combined = zoopla + rightmove
+        seen, unique_props = set(), []
+        for p in combined:
+            k = _unique_key(p)
+            if k not in seen:
+                seen.add(k)
+                unique_props.append(p)
+
+        # Optional: upsert if supabase configured
+        if sb and unique_props:
+            try:
+                sb.table("properties").upsert(unique_props).execute()
+            except Exception:
+                # Don't fail the import if DB write fails
+                pass
+
+        preview = unique_props[:10]
+        return {"count": len(unique_props), "preview": preview}
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=f"Import failed: {type(e).__name__}")
+
+
+@router.post("/zoopla")
+async def import_zoopla(req: ImportRequest):
+    loc = (req.location or "").strip()
+    if not loc:
+        raise HTTPException(status_code=400, detail="Location is required")
+
+    items = scrape_zoopla_properties(loc) or []
+    if sb and items:
+        try:
+            sb.table("properties").upsert(items).execute()
+        except Exception:
+            pass
+    return {"count": len(items)}
+
+
+@router.post("/rightmove")
+async def import_rightmove(req: ImportRequest):
+    loc = (req.location or "").strip()
+    if not loc:
+        raise HTTPException(status_code=400, detail="Location is required")
+
+    items = scrape_rightmove_properties(loc) or []
+    if sb and items:
+        try:
+            sb.table("properties").upsert(items).execute()
+        except Exception:
+            pass
+    return {"count": len(items)}
