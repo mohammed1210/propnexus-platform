@@ -33,9 +33,7 @@ if "backend" not in sys.modules:
     sys.modules["backend"] = pkg
 
 # Load backend/main.py as module "backend.main"
-spec = importlib.util.spec_from_file_location(
-    "backend.main", os.path.join(backend_dir, "main.py")
-)
+spec = importlib.util.spec_from_file_location("backend.main", os.path.join(backend_dir, "main.py"))
 if not spec or not spec.loader:
     raise RuntimeError("Could not create spec for backend.main")
 mod = importlib.util.module_from_spec(spec)
