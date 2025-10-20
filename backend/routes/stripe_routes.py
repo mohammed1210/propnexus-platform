@@ -87,9 +87,7 @@ async def stripe_webhook(request: Request):
             subscription_id = data.get("subscription")
             if subscription_id and customer_id and email:
                 sub = stripe.Subscription.retrieve(subscription_id)
-                upsert_subscription(
-                    email=email, stripe_customer_id=customer_id, subscription=sub
-                )
+                upsert_subscription(email=email, stripe_customer_id=customer_id, subscription=sub)
 
         elif t in ("customer.subscription.created", "customer.subscription.updated"):
             sub = data
@@ -97,9 +95,7 @@ async def stripe_webhook(request: Request):
             customer = stripe.Customer.retrieve(customer_id) if customer_id else None
             email = customer.email if customer else None
             if email and customer_id:
-                upsert_subscription(
-                    email=email, stripe_customer_id=customer_id, subscription=sub
-                )
+                upsert_subscription(email=email, stripe_customer_id=customer_id, subscription=sub)
 
         elif t == "customer.subscription.deleted":
             sub = data
@@ -107,9 +103,7 @@ async def stripe_webhook(request: Request):
             customer = stripe.Customer.retrieve(customer_id) if customer_id else None
             email = customer.email if customer else None
             if email and customer_id:
-                upsert_subscription(
-                    email=email, stripe_customer_id=customer_id, subscription=sub
-                )
+                upsert_subscription(email=email, stripe_customer_id=customer_id, subscription=sub)
 
     except Exception:
         log.exception("Failed to upsert subscription from webhook")

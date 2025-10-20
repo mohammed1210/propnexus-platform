@@ -22,9 +22,7 @@ async def scrape_rightmove_properties():
     for card in cards[:5]:  # Limit to 5 for now
         try:
             title = card.select_one(".propertyCard-title").get_text(strip=True)
-            price_text = card.select_one(".propertyCard-priceValue").get_text(
-                strip=True
-            )
+            price_text = card.select_one(".propertyCard-priceValue").get_text(strip=True)
             location = card.select_one(".propertyCard-address").get_text(strip=True)
             price = int(price_text.replace("£", "").replace(",", "").strip())
 

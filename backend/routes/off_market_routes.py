@@ -26,9 +26,7 @@ def require_admin(x_api_key: Optional[str] = Header(default=None)):
     If the env var is empty, the check is skipped (useful for local dev).
     """
     if ADMIN_TOKEN and (x_api_key or "").strip() != ADMIN_TOKEN:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
     return True
 
 
@@ -65,9 +63,7 @@ class CreateDealResponse(BaseModel):
 
 
 # ---------- Routes ----------
-@router.post(
-    "/create", response_model=CreateDealResponse, dependencies=[Depends(require_admin)]
-)
+@router.post("/create", response_model=CreateDealResponse, dependencies=[Depends(require_admin)])
 def create_off_market_deal(payload: CreateDealRequest):
     """
     Insert a new row into off_market_deals (Supabase-py v2).

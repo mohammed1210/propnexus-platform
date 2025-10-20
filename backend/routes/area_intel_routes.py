@@ -39,9 +39,7 @@ def get_area_intel(key: str, request: Request):
             rows = resp.data or []
             if rows:
                 row = rows[0]
-                fetched = datetime.fromisoformat(
-                    row["fetched_at"].replace("Z", "+00:00")
-                )
+                fetched = datetime.fromisoformat(row["fetched_at"].replace("Z", "+00:00"))
                 if now - fetched < TTL:
                     return row["payload"]
         except Exception:
