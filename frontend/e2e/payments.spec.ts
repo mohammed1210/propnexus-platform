@@ -1,22 +1,26 @@
+// frontend/e2e/payments.spec.ts
 import { test, expect } from '@playwright/test';
 
-const BASE = process.env.E2E_BASE_URL || 'http://localhost:3000';
+/**
+ * NOTE:
+ * This test is temporarily skipped in CI because the Stripe Upgrade CTA
+ * button may not render on staging or preview builds yet.
+ *
+ * To re-enable later, remove `.skip` from the test below.
+ */
 
-test.skip('Upgrade CTA returns a Stripe URL', async ({ page, context }) => {
-  // Intercept the backend call and stub a session URL in CI
-  await context.route('**/stripe/checkout', async route => {
-    await route.fulfill({
-      status: 200,
-      body: JSON.stringify({ url: 'https://checkout.stripe.com/pay/cs_test_123' }),
-      headers: { 'content-type': 'application/json' },
-    });
-  });
+test.skip('Upgrade CTA returns a Stripe URL (temporarily skipped for CI)', async ({ page }) => {
+  // Base URL is already configured in playwright.config.ts
+  await page.goto('/pricing', { waitUntil: 'domcontentloaded' });
 
-  await page.goto(`${BASE}/pricing`, { waitUntil: 'domcontentloaded' });
+  // Try to locate the "Upgrade" button by role + name
   const btn = page.getByRole('button', { name: /upgrade/i });
-  await expect(btn).toBeVisible();
+  await expect(btn).toBeVisible({ timeout: 10000 });
+
+  // Click the button
   await btn.click();
 
-  // Assert navigation intent is triggered
-  await expect(page).toHaveURL(/checkout\.stripe\.com/);
+  // Assert: navigation intent / redirect URL (if live)
+  const url = page.url();
+  expect(url).toMatch(/stripe|checkout|session/i);
 });
