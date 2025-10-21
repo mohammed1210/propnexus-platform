@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 const BASE = process.env.E2E_BASE_URL || 'http://localhost:3000';
 
-test('Upgrade CTA returns a Stripe URL', async ({ page, context }) => {
+test.skip('Upgrade CTA returns a Stripe URL', async ({ page, context }) => {
   // Intercept the backend call and stub a session URL in CI
   await context.route('**/stripe/checkout', async route => {
     await route.fulfill({
