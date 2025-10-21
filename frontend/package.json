@@ -47,6 +47,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@babel/core": "^7.28.4",
     "@playwright/test": "^1.55.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -59,6 +60,7 @@
     "@types/react-dom": "^18.2.7",
     "@types/trusted-types": "^2.0.7",
     "autoprefixer": "^10.4.21",
+    "babel-jest": "^30.2.0",
     "eslint": "8.45.0",
     "eslint-config-next": "13.5.6",
     "identity-obj-proxy": "^3.0.0",
