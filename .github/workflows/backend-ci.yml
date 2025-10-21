@@ -2,7 +2,7 @@ name: Backend CI
 
 on:
   push:
-    branches: [ main, po2 ]
+    branches: [ main, sprint*, po* ]
   pull_request:
 
 jobs:
@@ -18,33 +18,34 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          # Install project deps if present
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
-          # Ensure tooling is available even if not in requirements
+          # Ensure linters and pytest available
           pip install ruff black pytest
 
-      - name: Lint (ruff + black --check)
+      - name: Lint (Ruff + Black)
         working-directory: backend
         run: |
-          # Ruff (use the modern "ruff check" subcommand)
+          echo "Running Ruff and Black checks..."
           ruff check .
-          # Black (format check only)
           black --check .
 
-      - name: Run tests (if any)
+      - name: Run tests
         working-directory: backend
         env:
-          PYTHONPATH: .
+          PYTHONPATH: backend
         run: |
           if ls -1 *_test.py tests 2>/dev/null | grep -q '.'; then
+            echo "Running pytest..."
             pytest -q
           else
-            echo "No tests found, skipping pytest"
+            echo "No tests found, skipping pytest."
           fi
