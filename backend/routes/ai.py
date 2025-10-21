@@ -79,9 +79,7 @@ def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
     prop_lines = "\n".join(f"{k}: {v}" for k, v in req.property.items())
     constraints = req.constraints or {}
     constraint_lines = (
-        "\n" + "\n".join(f"{k}: {v}" for k, v in constraints.items())
-        if constraints
-        else ""
+        "\n" + "\n".join(f"{k}: {v}" for k, v in constraints.items()) if constraints else ""
     )
     user_prompt = (
         f"Property details:\n{prop_lines}{constraint_lines}\n\n"
@@ -163,14 +161,10 @@ async def ai_summary(
         raw = await openai_client.chat_completion(messages, temperature=0.3)
         return parse_summary_response(raw)
     except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     except Exception as exc:
         logger.exception("Summary generation failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail="AI summary error"
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI summary error")
 
 
 @router.post("/strategies", response_model=StrategiesResponse)
@@ -190,11 +184,7 @@ async def ai_strategies(
         raw = await openai_client.chat_completion(messages, temperature=0.5)
         return parse_strategies_response(raw)
     except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)
-        )
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     except Exception as exc:
         logger.exception("Strategy generation failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY, detail="AI strategies error"
-        )
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI strategies error")

@@ -1,3 +1,5 @@
+import UpgradeButton from '@/components/UpgradeButton';
+
 export const dynamic = 'force-dynamic';
 
 export default function PricingPage() {

@@ -1,46 +1,30 @@
 from __future__ import annotations
 
-import logging
-import os
-import pathlib
-
-import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-
-sentry_sdk.init(
-    dsn=os.getenv("SENTRY_DSN"),
-    integrations=[FastApiIntegration()],
-    traces_sample_rate=0.15,
-)
-
-logging.basicConfig(level=logging.INFO)
-logging.info("CWD=%s", os.getcwd())
-logging.info("PYTHONPATH=%s", os.environ.get("PYTHONPATH"))
-logging.info("Exists backend/main.py? %s", pathlib.Path(__file__).resolve().is_file())
+# 3rd party
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from supabase import Client, create_client
+# Local deps (only relative imports; no duplicates)
+try:
+    from .db import sb  # shared Supabase client
+except ImportError:
+    from db import sb  # fallback for pytest/CI when package context isn't set
 
-# Load env early
+from .routes.ai import router as ai_router
+from .routes.area_intel_routes import router as area_intel_router
+from .routes.comps_routes import router as comps_router
+from .routes.gpt_routes import router as gpt_router
+from .routes.health import router as health_router
+from .routes.import_routes import router as import_router
+from .routes.notes import router as notes_router
+from .routes.off_market_routes import router as off_market_router
+from .routes.save_deal import router as save_deal_router
+from .routes.scrape_routes import router as scrape_router
+from .routes.stripe_routes import router as stripe_router
+
+# Load env AFTER imports (keeps imports grouped for linters)
 load_dotenv()
-
-# Routers (relative imports; keep at top for linter)
-from .routes import area_routes, comps_routes, gpt_routes, scrape_routes  # noqa: E402
-from .routes.ai import router as ai_router  # noqa: E402
-from .routes.notes import router as notes_router  # noqa: E402
-from .routes.off_market_routes import router as off_market_router  # noqa: E402
-from .routes.save_deal import router as save_deal_router  # noqa: E402
-from .routes.stripe_routes import router as stripe_router  # noqa: E402
-
-# Supabase client (prefer service role on server)
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-
-supabase: Client | None = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
@@ -74,48 +58,30 @@ async def health():
 # --- Routers ---
 app.include_router(save_deal_router)
 app.include_router(notes_router)
-app.include_router(gpt_routes.router)
-app.include_router(ai_router)  # <- PO2 additive include
-app.include_router(area_routes.router)
-app.include_router(comps_routes.router)
-app.include_router(scrape_routes.router)
+app.include_router(gpt_router)
+app.include_router(ai_router)
+app.include_router(area_intel_router)
+app.include_router(comps_router)
+app.include_router(scrape_router)
 app.include_router(off_market_router)
 app.include_router(stripe_router)
+app.include_router(import_router)
+app.include_router(health_router)
 
 
 # --- Supabase-backed property endpoints ---
 @app.get("/properties")
 async def get_properties():
-    if not supabase:
+    if not sb:
         raise HTTPException(status_code=500, detail="Supabase not configured")
-    return supabase.table("properties").select("*").execute().data
+    return sb.table("properties").select("*").execute().data
 
 
 @app.get("/properties/{property_id}")
 async def get_property_by_id(property_id: str):
-    if not supabase:
+    if not sb:
         raise HTTPException(status_code=500, detail="Supabase not configured")
-    res = supabase.table("properties").select("*").eq("id", property_id).execute()
+    res = sb.table("properties").select("*").eq("id", property_id).execute()
     if not res.data:
         raise HTTPException(status_code=404, detail="Property not found")
     return res.data[0]
-
-
-from backend.routes.area_intel_routes import router as area_intel_router
-from backend.routes.comps_routes import router as comps_router
-
-# --- Include cache routes ---
-try:
-    app.include_router(comps_router)
-    app.include_router(area_intel_router)
-except Exception:
-    # app may be defined later in some imports; if so, routers are imported in the file already.
-    pass
-
-from backend.routes import health as health_router
-
-# register health router
-try:
-    app.include_router(health_router.router)
-except Exception as e:
-    print("health router registration failed:", e)

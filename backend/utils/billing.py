@@ -23,21 +23,14 @@ def get_or_create_customer(email: str, stripe_customer_id: str | None):
     data = {"email": email}
     if stripe_customer_id:
         data["stripe_customer_id"] = stripe_customer_id
-    resp = (
-        supabase.table("customers")
-        .upsert(data, on_conflict="email")
-        .select("*")
-        .execute()
-    )
+    resp = supabase.table("customers").upsert(data, on_conflict="email").select("*").execute()
     return resp.data[0] if resp.data else None
 
 
 def upsert_subscription(email: str, stripe_customer_id: str, subscription):
     if supabase is None:
         return None
-    customer = get_or_create_customer(
-        email=email, stripe_customer_id=stripe_customer_id
-    )
+    customer = get_or_create_customer(email=email, stripe_customer_id=stripe_customer_id)
     if not customer:
         return None
 

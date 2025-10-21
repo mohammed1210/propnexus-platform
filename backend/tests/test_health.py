@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 try:
     # Attempt to import the FastAPI app from the main module.
-    from main import app  # type: ignore
+    from backend.main import app  # instead of: from main import app
 except ImportError as exc:
     raise RuntimeError(
         "Could not import the FastAPI app. Ensure your backend exposes 'app' in main.py."

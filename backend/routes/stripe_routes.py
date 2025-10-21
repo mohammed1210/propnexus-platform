@@ -1,118 +1,107 @@
+# backend/routes/stripe_routes.py
+from __future__ import annotations
+
 import json
 import logging
 import os
+from typing import Any
 
 import stripe
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from ..utils.billing import get_entitlement_by_email, upsert_subscription
+# ---- Env / Stripe init -------------------------------------------------------
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
+STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")  # optional in dev
 
-router = APIRouter()
-log = logging.getLogger(__name__)
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
+else:
+    logging.warning("⚠️ STRIPE_SECRET_KEY not set; /stripe/* endpoints will 400")
 
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-
-
-class CheckoutPayload(BaseModel):
-    price_id: str
-    customer_email: str
-    mode: str = "subscription"
-    metadata: dict | None = None
+router = APIRouter(prefix="/stripe", tags=["stripe"])
 
 
-class PortalPayload(BaseModel):
-    customer_id: str
+# ---- Models ------------------------------------------------------------------
+class CheckoutReq(BaseModel):
+    email: str | None = None
+    success_url: str | None = None
+    cancel_url: str | None = None
 
 
-@router.post("/stripe/create-checkout-session")
-def create_checkout_session(payload: CheckoutPayload):
+# ---- Routes ------------------------------------------------------------------
+@router.post("/checkout")
+async def create_checkout_session(payload: CheckoutReq) -> dict[str, Any]:
+    """
+    Creates a hosted Stripe Checkout session for a subscription.
+
+    Requires:
+      - STRIPE_SECRET_KEY
+      - STRIPE_PRICE_ID  (Price in test mode)
+    """
+    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
+        raise HTTPException(
+            status_code=400,
+            detail="Stripe not configured (missing STRIPE_SECRET_KEY or STRIPE_PRICE_ID)",
+        )
+
     try:
+        success_url = payload.success_url or os.getenv(
+            "STRIPE_SUCCESS_URL", "http://localhost:3000/success"
+        )
+        cancel_url = payload.cancel_url or os.getenv(
+            "STRIPE_CANCEL_URL", "http://localhost:3000/pricing"
+        )
+
         session = stripe.checkout.Session.create(
-            mode=payload.mode,
-            line_items=[{"price": payload.price_id, "quantity": 1}],
-            customer_email=payload.customer_email,
-            success_url=f"{FRONTEND_URL}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{FRONTEND_URL}/billing/cancel",
-            metadata=payload.metadata or {},
+            mode="subscription",
+            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
+            customer_email=payload.email,
             allow_promotion_codes=True,
+            billing_address_collection="auto",
+            success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=cancel_url,
+            automatic_tax={"enabled": True},
         )
         return {"id": session.id, "url": session.url}
-    except Exception as e:
-        log.exception("create_checkout_session failed")
+    except Exception as e:  # pragma: no cover
+        logging.exception("Stripe checkout error")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/stripe/create-portal-session")
-def create_portal_session(payload: PortalPayload):
-    try:
-        session = stripe.billing_portal.Session.create(
-            customer=payload.customer_id,
-            return_url=f"{FRONTEND_URL}/account",
-        )
-        return {"url": session.url}
-    except Exception as e:
-        log.exception("create_portal_session failed")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/me/entitlement")
-def get_entitlement(email: str = Query(...)):
-    return get_entitlement_by_email(email)
-
-
-@router.post("/stripe/webhook")
-async def stripe_webhook(request: Request):
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+@router.post("/webhook")
+async def stripe_webhook(request: Request) -> dict[str, str]:
+    """
+    Handles Stripe webhooks. In dev you can run:
+      stripe listen --forward-to localhost:8000/stripe/webhook
+    """
     payload = await request.body()
-    sig_header = request.headers.get("stripe-signature")
+    sig = request.headers.get("stripe-signature")
 
+    event = None
     try:
-        if webhook_secret:
-            event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+        if STRIPE_WEBHOOK_SECRET and sig:
+            event = stripe.Webhook.construct_event(
+                payload=payload, sig_header=sig, secret=STRIPE_WEBHOOK_SECRET
+            )
         else:
-            event = json.loads(payload)
+            # Accept unsigned events in dev to keep flow simple
+            event = json.loads(payload or "{}")
     except Exception as e:
-        log.warning("Webhook signature verify failed: %s", e)
-        raise HTTPException(status_code=400, detail="Invalid payload")
+        raise HTTPException(status_code=400, detail=f"Webhook error: {e}")
 
-    t = event["type"]
-    data = event["data"]["object"]
+    et = (event or {}).get("type")
+    data = (event or {}).get("data", {}).get("object", {})
 
-    try:
-        if t == "checkout.session.completed":
-            customer_id = data.get("customer")
-            email = (data.get("customer_details") or {}).get("email")
-            subscription_id = data.get("subscription")
-            if subscription_id and customer_id and email:
-                sub = stripe.Subscription.retrieve(subscription_id)
-                upsert_subscription(
-                    email=email, stripe_customer_id=customer_id, subscription=sub
-                )
+    # Minimal demo reactions (extend to persist in Supabase, etc.)
+    if et == "checkout.session.completed":
+        logging.info("💰 Checkout completed: %s", data.get("id"))
+    elif et == "customer.subscription.updated":
+        logging.info("🔁 Subscription updated: %s", data.get("id"))
+    elif et == "customer.subscription.deleted":
+        logging.info("❌ Subscription cancelled: %s", data.get("id"))
+    else:
+        logging.info("ℹ️ Unhandled event: %s", et)
 
-        elif t in ("customer.subscription.created", "customer.subscription.updated"):
-            sub = data
-            customer_id = sub.get("customer")
-            customer = stripe.Customer.retrieve(customer_id) if customer_id else None
-            email = customer.email if customer else None
-            if email and customer_id:
-                upsert_subscription(
-                    email=email, stripe_customer_id=customer_id, subscription=sub
-                )
-
-        elif t == "customer.subscription.deleted":
-            sub = data
-            customer_id = sub.get("customer")
-            customer = stripe.Customer.retrieve(customer_id) if customer_id else None
-            email = customer.email if customer else None
-            if email and customer_id:
-                upsert_subscription(
-                    email=email, stripe_customer_id=customer_id, subscription=sub
-                )
-
-    except Exception:
-        log.exception("Failed to upsert subscription from webhook")
-        return {"received": True, "warning": "upsert failed"}
-
-    return {"received": True}
+    return {"status": "ok"}

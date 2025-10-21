@@ -1,20 +1,18 @@
-# railway.toml
-# ─────────────────────────────────────────────────────────────────────────────
-# DEFAULT SERVICE (what you already had): runs ./scripts/cron-ingest.sh
-# Uses a no-op build (we're not building Next.js here), and a daily CSV ingest.
-# ─────────────────────────────────────────────────────────────────────────────
+# Railway config for PropNexus – Backend (FastAPI)
+# Build the Python backend and run uvicorn from the backend package.
+
 [build]
 builder = "NIXPACKS"
-buildCommand = "echo skip-next-build"
+# Install backend deps during build
+buildCommand = "pip install -r backend/requirements.txt"
 
 [deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"
+# Run FastAPI (backend.main:app) on the provided PORT
+startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+# FastAPI health route
 healthcheckPath = "/health"
 
-[cron]
-schedule = "0 6 * * *"                  # every day at 06:00 UTC
-command  = "npm --prefix . run ingest:csv"
-
 [env]
-NODE_ENV = "production"
+# Let Nixpacks choose Python, but ensure version if needed
 PYTHON_VERSION = "3.12.3"
+NODE_ENV = "production"
