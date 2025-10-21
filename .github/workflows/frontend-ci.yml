@@ -10,14 +10,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Step 1: Pin Node 20 and enable npm cache
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Step 2: Ensure npm 9 (matches local/Codespaces)
+      - name: Ensure npm compatibility
+        run: |
+          npm i -g npm@9
+          echo "Using Node $(node -v) and npm $(npm -v)"
+
       - run: npm ci --prefer-offline
         working-directory: frontend
+
       - name: Lint (optional)
         run: npm run lint --if-present
         working-directory: frontend
+
       - name: Build
         run: NEXT_TELEMETRY_DISABLED=1 npm run build
         working-directory: frontend
@@ -29,17 +42,31 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
+      # Step 1: Pin Node 20 and enable npm cache
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # Step 2: Ensure npm 9
+      - name: Ensure npm compatibility
+        run: |
+          npm i -g npm@9
+          echo "Using Node $(node -v) and npm $(npm -v)"
+
       - run: npm ci --prefer-offline
         working-directory: frontend
+
       - name: Install Playwright (browsers)
         run: npx playwright install --with-deps
         working-directory: frontend
+
       - name: Build Next
         run: NEXT_TELEMETRY_DISABLED=1 npm run build
         working-directory: frontend
+
       - name: Run Playwright (webServer launches Next)
         env:
           E2E_BASE_URL: http://localhost:3000
