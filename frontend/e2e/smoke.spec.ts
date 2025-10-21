@@ -1,30 +1,23 @@
 // frontend/e2e/smoke.spec.ts
 import { test, expect } from '@playwright/test';
 
-const BASE = process.env.E2E_BASE_URL || 'http://localhost:3000';
+// NOTE: baseURL is configured in playwright.config.ts; use relative paths.
 
-test('home loads and navigation shell is visible-ish', async ({ page }) => {
-  const res = await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
+test('home loads and body is visible', async ({ page }) => {
+  const res = await page.goto('/', { waitUntil: 'domcontentloaded' });
   expect(res?.ok()).toBeTruthy();
 
-  // Polyfill TransformStream for CI (Node <20)
-if (typeof (global as any).TransformStream === 'undefined') {
-  (global as any).TransformStream = require('web-streams-polyfill/ponyfill').TransformStream;
-}
-
-  // accept header OR nav OR a generic top bar
   await expect(page.locator('body')).toBeVisible({ timeout: 5000 });
 
-  // relaxed title check
+  // relaxed title match (case-insensitive, doesn’t break on wording tweaks)
   await expect(page).toHaveTitle(/propnexus/i);
 });
 
-test('off-market page renders some heading or primary section', async ({ page }) => {
-  const res = await page.goto(`${BASE}/off-market`, { waitUntil: 'domcontentloaded' });
+test('off-market page renders a heading-ish element', async ({ page }) => {
+  const res = await page.goto('/off-market', { waitUntil: 'domcontentloaded' });
   expect(res?.ok()).toBeTruthy();
 
-  // any visible heading (h1–h6) or a marked page title
-  const head = page.locator('h1, h2, h3, [data-testid="page-title"]');
+  const head = page.locator('h1, h2, h3, [data-testid="page-title"], [role="heading"]');
   await expect(head.first()).toBeVisible({ timeout: 5000 });
 
   // relaxed CTA existence
@@ -32,23 +25,22 @@ test('off-market page renders some heading or primary section', async ({ page })
   await expect(btn).toBeVisible();
 });
 
-test('saved deals page loads without loud console errors', async ({ page }) => {
+test('saved deals page loads without hard console errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(msg.text());
   });
 
-  const res = await page.goto(`${BASE}/saved-deals`, { waitUntil: 'domcontentloaded' });
+  const res = await page.goto('/saved-deals', { waitUntil: 'domcontentloaded' });
   expect(res?.ok()).toBeTruthy();
 
-  // allow warnings; fail only on hard errors
+  // allow warnings; fail on common hard errors only
   expect(errors.join('\n')).not.toMatch(/TypeError|ReferenceError|Unhandled/i);
 });
 
-test('property detail renders a title-ish element', async ({ page }) => {
-  const res = await page.goto(`${BASE}/property/demo-id`, { waitUntil: 'domcontentloaded' });
+test('property detail renders page content', async ({ page }) => {
+  const res = await page.goto('/property/demo-id', { waitUntil: 'domcontentloaded' });
   expect(res?.ok()).toBeTruthy();
 
-  // accept an h1, a data-testid, or any heading role
   await expect(page.locator('body')).toBeVisible({ timeout: 5000 });
 });

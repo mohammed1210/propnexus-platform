@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 127.0.0.1 -p 3000",
     "lint": "next lint",
     "test": "jest",
     "format": "prettier --write .",
@@ -17,7 +17,8 @@
     "frontend:type-check": "cd frontend && tsc --noEmit",
     "frontend:build": "cd frontend && next build",
     "ingest:csv": "ts-node scripts/ingest-csv.ts data/listings.sample.csv",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "@pdf-lib/standard-fonts": "^1.0.0",
@@ -45,7 +46,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.48.0",
+    "@playwright/test": "^1.55.0",
     "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@types/geojson": "^7946.0.16",

@@ -15,8 +15,8 @@ export default defineConfig({
   webServer: {
     command: `NEXT_PUBLIC_API_BASE="${API_BASE}" npx next start -p ${PORT}`,
     url: BASE,
-    reuseExistingServer: !process.env.CI, // locally reuse if already running
-    timeout: 60_000
+    reuseExistingServer: !process.env.CI,
+    timeout: 60_000,
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
