@@ -2,7 +2,7 @@ name: Backend CI
 
 on:
   push:
-    branches: [ main, sprint*, po* ]
+    branches: [ main, po2 ]
   pull_request:
 
 jobs:
@@ -28,13 +28,13 @@ jobs:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
-          # Ensure linters and pytest available
-          pip install ruff black pytest
+          # Ensure test and lint tools available
+          pip install ruff black pytest httpx uvicorn
 
       - name: Lint (Ruff + Black)
         working-directory: backend
         run: |
-          echo "Running Ruff and Black checks..."
+          echo "🔍 Running Ruff and Black checks..."
           ruff check .
           black --check .
 
@@ -44,8 +44,21 @@ jobs:
           PYTHONPATH: backend
         run: |
           if ls -1 *_test.py tests 2>/dev/null | grep -q '.'; then
-            echo "Running pytest..."
+            echo "⚙️ Running pytest..."
             pytest -q
           else
             echo "No tests found, skipping pytest."
           fi
+
+      - name: Backend Sanity Smoke Test
+        working-directory: backend
+        env:
+          PYTHONPATH: backend
+        run: |
+          echo "🚀 Launching FastAPI app for health check..."
+          uvicorn main:app --port 8000 --host 127.0.0.1 --log-level warning &
+          sleep 5
+          echo "🔍 Checking /health endpoint..."
+          curl -f http://127.0.0.1:8000/health | tee health_response.json
+          pkill -f "uvicorn" || true
+          echo "✅ Sanity test passed"

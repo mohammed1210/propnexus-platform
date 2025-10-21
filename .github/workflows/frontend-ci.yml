@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Step 1: Pin Node 20 and enable npm cache
+      # Step 1: Pin Node 20 and cache npm
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -35,6 +35,51 @@ jobs:
         run: NEXT_TELEMETRY_DISABLED=1 npm run build
         working-directory: frontend
 
+  # ✅ NEW: boot the built app and ping /
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install (for start script)
+        run: npm ci --prefer-offline
+        working-directory: frontend
+
+      - name: Build (ensure prod build exists)
+        run: NEXT_TELEMETRY_DISABLED=1 npm run build
+        working-directory: frontend
+
+      - name: Start Next (background)
+        working-directory: frontend
+        env:
+          PORT: 3000
+          HOST: 127.0.0.1
+          NEXT_TELEMETRY_DISABLED: 1
+        run: |
+          npm run start &> .next-start.log &
+          # wait until port is ready
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/ >/dev/null 2>&1; then
+              echo "Next.js is up"; break
+            fi
+            sleep 1
+          done
+
+      - name: Smoke: GET /
+        run: |
+          curl -fsS http://127.0.0.1:3000/ | head -n 20
+          curl -fsS http://127.0.0.1:3000/robots.txt || true
+        working-directory: frontend
+
+      - name: Stop server
+        run: pkill -f "next start" || true
+
   e2e:
     if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
     needs: build
@@ -43,7 +88,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Step 1: Pin Node 20 and enable npm cache
+      # Step 1: Pin Node 20 and cache npm
       - uses: actions/setup-node@v4
         with:
           node-version: 20
