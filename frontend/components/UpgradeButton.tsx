@@ -1,52 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import * as React from 'react';
+import { startCheckout } from '@/lib/stripe';
 
-export default function UpgradeButton({
-  email,
-  className,
-  children = 'Upgrade',
-}: {
-  email?: string;
+type Props = {
+  priceId: string;
+  email?: string | null;
   className?: string;
   children?: React.ReactNode;
-}) {
-  const [loading, setLoading] = useState(false);
-  const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+};
 
-  const onClick = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch(`${API}/stripe/checkout`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          success_url: `${window.location.origin}/success`,
-          cancel_url: `${window.location.origin}/pricing`,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.detail || `HTTP ${res.status}`);
-      }
-      const data = await res.json();
-      if (data?.url) window.location.href = data.url;
-    } catch (e) {
-      console.error('Upgrade failed', e);
-      alert(`Upgrade failed: ${String(e)}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export default function UpgradeButton({ priceId, email, className, children }: Props) {
+  const [loading, setLoading] = React.useState(false);
   return (
     <button
-      onClick={onClick}
+      className={className || 'px-4 py-2 rounded bg-black text-white'}
       disabled={loading}
-      className={className ?? 'px-4 py-2 rounded bg-cyan-600 text-white'}
+      onClick={async () => {
+        try {
+          setLoading(true);
+          const { url } = await startCheckout({ priceId, email: email || undefined });
+          window.location.href = url;
+        } catch (e) {
+          console.error(e);
+          alert('Unable to start checkout right now.');
+        } finally {
+          setLoading(false);
+        }
+      }}
     >
-      {loading ? 'Redirecting…' : children}
+      {children || (loading ? 'Loading…' : 'Upgrade')}
     </button>
   );
 }

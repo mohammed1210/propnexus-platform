@@ -1,15 +1,12 @@
-import Stripe from 'stripe';
-
-/**
- * Returns a configured Stripe instance when STRIPE_SECRET_KEY looks like an `sk_...` key.
- * Otherwise export `null` so server code can short-circuit in preview/CI.
- */
-const secret = process.env.STRIPE_SECRET_KEY ?? null;
-
-const stripe =
-  secret && secret.startsWith('sk_')
-    ? new Stripe(secret, { apiVersion: '2025-09-30.clover' })
-    : null;
-
-export type { Stripe };
-export default stripe;
+export async function startCheckout(opts: { priceId: string; email?: string }) {
+  const API = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+  const res = await fetch(`${API}/stripe/checkout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(opts),
+  });
+  if (!res.ok) {
+    throw new Error(`Checkout failed (${res.status})`);
+  }
+  return res.json() as Promise<{ id: string; url: string }>;
+}
