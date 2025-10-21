@@ -2,7 +2,6 @@
 module.exports = {
   testEnvironment: 'jsdom',
 
-  // Only unit/integration tests (exclude Playwright e2e)
   testMatch: ['**/__tests__/**/*.(test|spec).tsx?', '**/*.spec.tsx'],
   testPathIgnorePatterns: [
     '<rootDir>/e2e/',
@@ -12,13 +11,18 @@ module.exports = {
 
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 
-  // 🔽 Transform TS/TSX/JS/JSX via babel-jest + next/babel
   transform: {
     '^.+\\.(ts|tsx|js|jsx)$': ['babel-jest', { rootMode: 'upward' }],
   },
 
   moduleNameMapper: {
+    // ✅ Add support for Next.js alias '@/'
+    '^@/(.*)$': '<rootDir>/$1',
+
+    // CSS Modules / global CSS
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+
+    // Images → your file mock
     '\\.(jpg|jpeg|png|gif|webp|avif|svg)$': '<rootDir>/__mocks__/fileMock.js',
   },
 
