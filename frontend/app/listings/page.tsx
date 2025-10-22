@@ -215,11 +215,9 @@ function ListingsInner() {
       // Fetch only the fields we actually use; keep ordering stable
       let query = supabase
         .from('properties')
-        .select(
-          'id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at',
-        )
-        .limit(200)
-        .order('created_at', { ascending: false });
+        .select('id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at')
+.range(0, 199)
+.order('created_at', { ascending: false })
 
       if (q) query = query.or(`title.ilike.%${q}%,location.ilike.%${q}%`);
       if (minP) query = query.gte('price', minP);
