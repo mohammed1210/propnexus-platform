@@ -36,7 +36,7 @@ app.add_middleware(
         "http://localhost:3001",
         "https://propnexus-platform.vercel.app",
     ],
-    allow_origin_regex=r"^https://.*\.vercel\.app$",
+    allow_origin_regex=r"^(https://.*.vercel.app|https://.*.app.github.dev)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
