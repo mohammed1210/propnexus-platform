@@ -33,15 +33,26 @@ async def stripe_webhook(request: Request):
     sig_header = request.headers.get("stripe-signature")
     if not sig_header:
         raise HTTPException(status_code=400, detail="Missing stripe-signature header")
+
     try:
         event = construct_event_from_request(payload, sig_header, WEBHOOK_SECRET)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid payload: {e}")
 
     etype = event.get("type")
-    # Minimal sample handling; extend to update Supabase user tier on completed checkout
+
+    # --- Subscription & payment sync logic ---
     if etype in {"checkout.session.completed", "invoice.payment_succeeded"}:
-        # TODO: lookup customer -> user and mark subscription_tier in Supabase
+        # TODO: lookup the Supabase user via customer_email
+        # then upsert subscription status ("active"/"trialing"/"canceled")
+        pass
+
+    elif etype == "customer.subscription.updated":
+        # TODO: update tier or expiry based on subscription changes
+        pass
+
+    elif etype == "customer.subscription.deleted":
+        # TODO: mark user as downgraded/free
         pass
 
     return JSONResponse({"ok": True})
