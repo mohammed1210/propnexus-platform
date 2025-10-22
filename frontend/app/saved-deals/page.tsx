@@ -7,8 +7,6 @@ import Image from 'next/image';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 
-// A saved deal returned from the backend.  We include the same fields as
-// the existing page and mark optional properties appropriately.
 type Deal = {
   id: string;
   property_id: string | null;
@@ -24,22 +22,22 @@ type Deal = {
   investment_type?: string | null;
 };
 
-// Ensure this page is always rendered dynamically at the edge.  Without this
-// directive Next.js may cache the results and fail to reflect real‑time
-// updates when users add or remove saved deals.
 export const dynamic = 'force-dynamic';
 
-/**
- * Resolve the FastAPI base URL from public env.  Throws an error if the
- * environment variables are not set, allowing runtime errors to surface
- * clearly during development.
- */
+/** Resolve the FastAPI base URL from public env, with safe fallbacks. */
 function getBackendBase(): string {
-  const raw = (process.env.NEXT_PUBLIC_API_URL ||
-    process.env.NEXT_PUBLIC_BACKEND_URL ||
-    '') as string;
-  if (!raw) throw new Error('NEXT_PUBLIC_API_URL (or NEXT_PUBLIC_BACKEND_URL) is not set');
-  return raw.replace(/\/+\$/, '');
+  const raw =
+    (process.env.NEXT_PUBLIC_API_BASE ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      '') as string;
+
+  // In the browser, fall back to same-origin if nothing is set
+  if (!raw && typeof window !== 'undefined') {
+    return window.location.origin.replace(/\/+$/, '');
+  }
+  // In SSR, default to localhost
+  return (raw || 'http://127.0.0.1:8000').replace(/\/+$/, '');
 }
 
 export default function SavedDealsPage() {
@@ -47,7 +45,6 @@ export default function SavedDealsPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Load saved deals from backend
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -72,8 +69,7 @@ export default function SavedDealsPage() {
 
   const removeDeal = async (id: string) => {
     if (!window.confirm('Remove this saved deal?')) return;
-    // optimistic update
-    const prev = rows;
+    const prev = rows; // optimistic
     setBusyId(id);
     setRows((r) => r.filter((x) => x.id !== id));
     try {
@@ -84,7 +80,7 @@ export default function SavedDealsPage() {
       if (!resp.ok) throw new Error(`Delete failed: ${resp.status}`);
     } catch (err) {
       console.error('delete saved_deal', err);
-      setRows(prev); // rollback on error
+      setRows(prev); // rollback
       window.alert('Sorry — failed to remove. Please try again.');
     } finally {
       setBusyId(null);
@@ -112,6 +108,7 @@ export default function SavedDealsPage() {
           </div>
         )}
       </div>
+
       {loading ? (
         <div className="p-4">Loading…</div>
       ) : rows.length === 0 ? (
@@ -122,7 +119,6 @@ export default function SavedDealsPage() {
             const removing = busyId === d.id;
             return (
               <li key={d.id} className="card overflow-hidden transition hover:shadow-md">
-                {/* image */}
                 <div className="aspect-[16/9] overflow-hidden">
                   <Image
                     src={d.imageurl ?? 'https://placehold.co/640x360?text=PropNexus'}
@@ -132,7 +128,6 @@ export default function SavedDealsPage() {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                {/* body */}
                 <div className="p-4 space-y-2">
                   <div className="flex items-start justify-between gap-3">
                     <Link
