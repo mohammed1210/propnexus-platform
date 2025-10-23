@@ -10,7 +10,7 @@ import Stripe from 'stripe';
  * Uses secret key only available on the backend.
  */
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', {
-  apiVersion: Stripe.LatestApiVersion, // ✅ Fixes type issue for current SDK
+  apiVersion: '2024-06-20', // ✅ Fixes type issue for current SDK
 });
 
 /**
