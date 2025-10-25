@@ -79,6 +79,12 @@ export const metadata: Metadata = {
     shortcut: ['/favicon.ico'],
   },
   manifest: ABS('/site.webmanifest').toString(),
+
+  // Theme color per scheme
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
+  ],
+
   // Site verification (fill when you have tokens)
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
