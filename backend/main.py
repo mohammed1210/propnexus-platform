@@ -1,14 +1,21 @@
 from __future__ import annotations
 
+# Load env BEFORE importing modules that read env
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
 # 3rd party
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-# Local deps (only relative imports; no duplicates)
+# Local deps
 try:
-    from .db import sb  # shared Supabase client
+    from .db import sb  # shared Supabase client (may be None)
 except ImportError:
-    from db import sb  # fallback for pytest/CI when package context isn't set
+    from db import sb
 
 from .routes.ai import router as ai_router
 from .routes.area_intel_routes import router as area_intel_router
@@ -22,10 +29,9 @@ from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
 from .routes.stripe_routes import router as stripe_router
 
-# Load env AFTER imports (keeps imports grouped for linters)
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
-# CORS
+# --- CORS ---
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -40,7 +46,6 @@ app.add_middleware(
 )
 
 
-# --- Health ---
 @app.get("/")
 async def root():
     return {"message": "PropNexus backend is running."}
@@ -66,7 +71,7 @@ app.include_router(import_router)
 app.include_router(health_router)
 
 
-# --- Supabase-backed property endpoints ---
+# --- Supabase-backed endpoints ---
 @app.get("/properties")
 async def get_properties():
     if not sb:
