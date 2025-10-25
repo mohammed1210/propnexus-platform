@@ -85,14 +85,13 @@ export const metadata: Metadata = {
   },
 };
 
-// Viewport (LCP boost on mobile)
+// Viewport (LCP boost on mobile + theme colors)
 export const viewport: Viewport = {
+  themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
     { media: '(prefers-color-scheme: dark)', color: '#09090b' },
   ],
   width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
