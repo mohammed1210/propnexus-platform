@@ -29,6 +29,9 @@ from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
 from .routes.stripe_routes import router as stripe_router
 
+# Load env AFTER imports (keeps imports grouped for linters)
+load_dotenv()
+
 app = FastAPI(title="PropNexus Backend", version="0.1.0")
 
 # --- CORS ---

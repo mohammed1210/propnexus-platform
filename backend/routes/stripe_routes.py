@@ -41,6 +41,15 @@ def price_to_tier(price_id: Optional[str]) -> str:
     env_key = f"TIER_FOR_{price_id}".upper()
     return os.getenv(env_key, DEFAULT_TIER)
 
+    Requires:
+      - STRIPE_SECRET_KEY
+      - STRIPE_PRICE_ID  (Price in test mode)
+    """
+    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
+        raise HTTPException(
+            status_code=400,
+            detail="Stripe not configured (missing STRIPE_SECRET_KEY or STRIPE_PRICE_ID)",
+        )
 
 def iso8601_from_unix(ts: Optional[int]) -> Optional[str]:
     if not ts:
@@ -100,6 +109,7 @@ async def stripe_webhook(request: Request):
     if not sig_header:
         raise HTTPException(status_code=400, detail="Missing stripe-signature header")
 
+    event = None
     try:
         event = construct_event_from_request(payload, sig_header, WEBHOOK_SECRET)
     except Exception as e:
