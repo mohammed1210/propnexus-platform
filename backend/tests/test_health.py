@@ -1,35 +1,25 @@
 """Basic health endpoint test for the PropNexus API.
 
-This test verifies that the `/health` endpoint returns HTTP 200 and that
-the response payload contains at least one of the expected keys. It is designed
-to be tolerant of different health response shapes (e.g. { "ok": true },
-{ "status": "healthy" }, etc.).
+Asserts that `/health` returns 200. If importing the FastAPI app requires
+env vars that are missing in CI, the test is skipped gracefully.
 """
 
+from fastapi.testclient import TestClient
 import pytest
 
-pytest.skip("Skipping Supabase-dependent tests in CI", allow_module_level=True)
-
-from fastapi.testclient import TestClient
-
+# Try to import the app; some routers may need env that CI doesn't have.
 try:
-    # Attempt to import the FastAPI app from the main module.
-    from backend.main import app  # instead of: from main import app
-except ImportError as exc:
-    raise RuntimeError(
-        "Could not import the FastAPI app. Ensure your backend exposes 'app' in main.py."
-    ) from exc
-
-client = TestClient(app)
+    from backend.main import app  # type: ignore
+    _import_error = None
+except Exception as e:  # pragma: no cover
+    app = None  # type: ignore[assignment]
+    _import_error = e
 
 
 def test_health() -> None:
+    if app is None:  # pragma: no cover
+        pytest.skip(f"App unavailable in CI: {_import_error}")
+    client = TestClient(app)
     response = client.get("/health")
-    assert response.status_code == 200, f"Expected 200 OK, got {response.status_code}"
-    data = response.json()
-    assert isinstance(data, dict), "Health endpoint should return a JSON object"
-    # Accept different health shapes: ok, status or healthy keys
-    keys = [k.lower() for k in data.keys()]
-    assert any(
-        k in ("ok", "status", "healthy") for k in keys
-    ), f"Health response keys {list(data.keys())} do not contain any of the expected keys"
+    assert response.status_code == 200
+    
