@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import UpgradeButton from '@/components/UpgradeButton';
 
 const PRICE_PRO =

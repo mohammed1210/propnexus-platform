@@ -5,6 +5,7 @@ import pytest
 
 try:
     from backend.main import app  # type: ignore
+
     _import_error = None
 except Exception as e:  # pragma: no cover
     app = None  # type: ignore[assignment]
