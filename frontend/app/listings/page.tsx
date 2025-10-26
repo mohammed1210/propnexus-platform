@@ -223,7 +223,7 @@ function ListingsInner() {
       let query = supabase
         .from('properties')
         .select(
-          'id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at'
+          'id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at',
         )
         .limit(200)
         .order('created_at', { ascending: false });

@@ -9,11 +9,14 @@ export default function UpgradeButton() {
   async function onClick() {
     try {
       setLoading(true);
-      const res = await fetchWithRetry(`${process.env.NEXT_PUBLIC_BACKEND_URL}/billing/create-checkout-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: 'premium' }),
-      });
+      const res = await fetchWithRetry(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/billing/create-checkout-session`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan: 'premium' }),
+        },
+      );
       if (!res.ok) throw new Error(await res.text());
       const { url } = await res.json();
       window.location.href = url;

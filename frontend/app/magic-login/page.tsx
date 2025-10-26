@@ -11,7 +11,9 @@ export default function MagicLoginPage() {
     e.preventDefault();
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined },
+      options: {
+        emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+      },
     });
     if (error) alert(error.message);
     else alert('Check your inbox for a magic link');

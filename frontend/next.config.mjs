@@ -4,7 +4,7 @@ import { dirname, resolve } from 'path';
 import { withSentryConfig } from '@sentry/nextjs';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname  = dirname(__filename);
+const __dirname = dirname(__filename);
 
 const nextConfig = {
   reactStrictMode: true,
@@ -24,10 +24,10 @@ const nextConfig = {
       ...(config.resolve.alias ?? {}),
       // All paths relative to the FRONTEND folder
       '@components': resolve(__dirname, 'components'),
-      '@details':    resolve(__dirname, 'components/property_details'),
-      '@MapView':    resolve(__dirname, 'components/MapView'),
-      '@lib':        resolve(__dirname, 'lib'),
-      '@':           resolve(__dirname, '.'), // allow imports like "@/lib/supabaseClient"
+      '@details': resolve(__dirname, 'components/property_details'),
+      '@MapView': resolve(__dirname, 'components/MapView'),
+      '@lib': resolve(__dirname, 'lib'),
+      '@': resolve(__dirname, '.'), // allow imports like "@/lib/supabaseClient"
     };
     return config;
   },

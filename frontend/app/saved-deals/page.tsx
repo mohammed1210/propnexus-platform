@@ -26,11 +26,10 @@ export const dynamic = 'force-dynamic';
 
 /** Resolve the FastAPI base URL from public env, with safe fallbacks. */
 function getBackendBase(): string {
-  const raw =
-    (process.env.NEXT_PUBLIC_API_BASE ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      process.env.NEXT_PUBLIC_BACKEND_URL ||
-      '') as string;
+  const raw = (process.env.NEXT_PUBLIC_API_BASE ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    '') as string;
 
   // In the browser, fall back to same-origin if nothing is set
   if (!raw && typeof window !== 'undefined') {

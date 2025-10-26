@@ -11,9 +11,6 @@ export async function GET(request: Request, ctx: any) {
     const data = await res.json();
     return NextResponse.json(data, { status: res.status });
   } catch (error: any) {
-    return NextResponse.json(
-      { error: error?.message || 'Proxy error' },
-      { status: 502 }
-    );
+    return NextResponse.json({ error: error?.message || 'Proxy error' }, { status: 502 });
   }
 }

@@ -1,11 +1,10 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import UiOverlaysClient from "@components/ui/UiOverlaysClient";
-import BackToTop from "@components/BackToTop";
+import UiOverlaysClient from '@components/ui/UiOverlaysClient';
+import BackToTop from '@components/BackToTop';
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
 
 export const metadata: Metadata = {
@@ -39,7 +38,7 @@ export const metadata: Metadata = {
     canonical: '/',
     languages: {
       'en-GB': '/en-GB',
-      'en': '/',
+      en: '/',
     },
   },
 
@@ -108,10 +107,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* header rendered via your shell */}
 
-        <main
-          id="main"
-          className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none"
-        >
+        <main id="main" className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none">
           {children}
         </main>
 
