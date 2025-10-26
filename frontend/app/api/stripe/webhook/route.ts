@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 
-// Force Node runtime and avoid static optimization. Important for webhooks.
+// Force Node runtime and avoid static optimization (important for webhooks).
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
