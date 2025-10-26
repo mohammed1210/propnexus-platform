@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import os
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Local routers
@@ -18,17 +16,16 @@ from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
 from .routes.stripe_routes import router as stripe_router
 
-# Load env AFTER imports are declared (but still no executable code above them)
+# Load env AFTER imports are declared
 try:
     from dotenv import load_dotenv
-
     load_dotenv()
 except Exception:
     pass
 
 app = FastAPI()
 
-# CORS (relax as needed)
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
