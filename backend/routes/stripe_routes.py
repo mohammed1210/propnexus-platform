@@ -18,8 +18,8 @@ router = APIRouter(prefix="/stripe", tags=["stripe"])
 
 # --- ENV (backend) ---
 PRICE_ID_DEFAULT = os.getenv("STRIPE_PRICE_ID", "").strip()
-SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "https://propnexus-platform.vercel.app/success")
-CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "https://propnexus-platform.vercel.app/billing/cancel")
+SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "https://propnexus-platform.vercel.app/success").strip()
+CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "https://propnexus-platform.vercel.app/billing/cancel").strip()
 WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 
 # Supabase mapping (customize with envs to match your schema)
@@ -31,7 +31,6 @@ SUB_CUST_COL = os.getenv("SUBSCRIPTION_CUSTOMER_COL", "stripe_customer_id")
 SUB_PERIOD_END_COL = os.getenv("SUBSCRIPTION_CURRENT_PERIOD_END_COL", "current_period_end")
 
 # Basic tier mapping: default price → tier (override per-price with env)
-# e.g. export TIER_FOR_price_123="pro"
 DEFAULT_TIER = os.getenv("STRIPE_DEFAULT_TIER", "pro")
 
 
@@ -41,15 +40,6 @@ def price_to_tier(price_id: Optional[str]) -> str:
     env_key = f"TIER_FOR_{price_id}".upper()
     return os.getenv(env_key, DEFAULT_TIER)
 
-    Requires:
-      - STRIPE_SECRET_KEY
-      - STRIPE_PRICE_ID  (Price in test mode)
-    """
-    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
-        raise HTTPException(
-            status_code=400,
-            detail="Stripe not configured (missing STRIPE_SECRET_KEY or STRIPE_PRICE_ID)",
-        )
 
 def iso8601_from_unix(ts: Optional[int]) -> Optional[str]:
     if not ts:
@@ -68,10 +58,7 @@ def upsert_subscription(
     price_id: Optional[str],
     period_end_unix: Optional[int],
 ) -> None:
-    """
-    Upsert a user's subscription info into Supabase.
-    Defaults assume a 'profiles' table keyed by email. Adjust envs to match your DB.
-    """
+    """Upsert a user's subscription info into Supabase."""
     if not sb:
         # Supabase not configured; just no-op
         return
@@ -109,7 +96,6 @@ async def stripe_webhook(request: Request):
     if not sig_header:
         raise HTTPException(status_code=400, detail="Missing stripe-signature header")
 
-    event = None
     try:
         event = construct_event_from_request(payload, sig_header, WEBHOOK_SECRET)
     except Exception as e:
@@ -128,7 +114,7 @@ async def stripe_webhook(request: Request):
             or retrieve_customer_email(data_obj.get("customer"))
         )
         if email:
-            # Period end is not guaranteed here; rely on invoice event, but set active now.
+            # Period end may not be here; invoice event will set it later.
             upsert_subscription(
                 email=email,
                 customer_id=data_obj.get("customer"),
@@ -138,9 +124,8 @@ async def stripe_webhook(request: Request):
             )
 
     elif etype == "invoice.payment_succeeded":
-        # This contains definitive line/price + current_period_end.
+        # Contains definitive line/price + current_period_end.
         email = data_obj.get("customer_email") or retrieve_customer_email(data_obj.get("customer"))
-        # best-effort to pull price_id and period end from first line
         line = ((data_obj.get("lines") or {}).get("data") or [{}])[0]
         price_id = ((line or {}).get("price") or {}).get("id")
         period_end = ((line or {}).get("period") or {}).get("end")
