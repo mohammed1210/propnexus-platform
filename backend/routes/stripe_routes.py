@@ -18,8 +18,12 @@ router = APIRouter(prefix="/stripe", tags=["stripe"])
 
 # --- ENV (backend) ---
 PRICE_ID_DEFAULT = os.getenv("STRIPE_PRICE_ID", "").strip()
-SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "https://propnexus-platform.vercel.app/success").strip()
-CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "https://propnexus-platform.vercel.app/billing/cancel").strip()
+SUCCESS_URL = os.getenv(
+    "STRIPE_SUCCESS_URL", "https://propnexus-platform.vercel.app/success"
+).strip()
+CANCEL_URL = os.getenv(
+    "STRIPE_CANCEL_URL", "https://propnexus-platform.vercel.app/billing/cancel"
+).strip()
 WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 
 # Supabase mapping (customize with envs to match your schema)
