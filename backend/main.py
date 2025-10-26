@@ -19,6 +19,7 @@ from .routes.stripe_routes import router as stripe_router
 # Load env AFTER imports are declared
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except Exception:
     pass
@@ -46,6 +47,7 @@ app.include_router(off_market_router)
 app.include_router(save_deal_router)
 app.include_router(scrape_router)
 app.include_router(stripe_router)
+
 
 @app.get("/")
 def root():
