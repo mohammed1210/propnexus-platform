@@ -12,7 +12,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const stripe = new Stripe(key, { apiVersion: "2024-06-20" });
+const stripe = new Stripe(key, {
+  apiVersion: "2024-06-20" as Stripe.LatestApiVersion,
+});
 
   const { email } = await req.json().catch(() => ({ email: undefined }));
   const price = process.env.STRIPE_PRICE_PRO_MONTH as string;
