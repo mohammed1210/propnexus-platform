@@ -1,13 +1,8 @@
-"""Basic health endpoint test for the PropNexus API.
-
-Asserts that `/health` returns 200. If importing the FastAPI app requires
-env vars that are missing in CI, the test is skipped gracefully.
-"""
+"""Basic health endpoint test for the PropNexus API."""
 
 from fastapi.testclient import TestClient
 import pytest
 
-# Try to import the app; some routers may need env that CI doesn't have.
 try:
     from backend.main import app  # type: ignore
     _import_error = None
@@ -22,4 +17,3 @@ def test_health() -> None:
     client = TestClient(app)
     response = client.get("/health")
     assert response.status_code == 200
-    
