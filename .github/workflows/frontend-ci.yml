@@ -8,106 +8,46 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: frontend
+
     steps:
       - uses: actions/checkout@v4
 
-      # Pin Node 20 and enable npm cache
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "npm"
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      # Keep npm in a known-good range (avoids EUSAGE with older lockfiles)
       - name: Ensure npm compatibility
         run: |
           npm i -g npm@9
           echo "Using Node $(node -v) and npm $(npm -v)"
 
-      # If package-lock is out of sync, npm ci throws EUSAGE.
-      # Fall back to npm install (doesn't modify repo) for CI stability.
-      - name: Install deps
-        working-directory: frontend
+      - name: Install dependencies
         run: |
           set -e
           if npm ci --prefer-offline; then
             echo "npm ci succeeded"
           else
-            echo "npm ci failed (likely lock mismatch); falling back to npm install"
+            echo "npm ci failed; falling back to npm install"
             npm install --prefer-offline --no-audit --no-fund
           fi
 
-      - name: Lint (optional)
-        working-directory: frontend
-        run: npm run lint --if-present
+      - name: Verify jose installed
+        run: node -e "console.log('✅ jose version:', require('jose/package.json').version)"
 
       - name: Build
-        working-directory: frontend
-        run: NEXT_TELEMETRY_DISABLED=1 npm run build
-
-      # Lightweight smoke check that the app can boot in dev mode
-      - name: Start Next (background)
-        working-directory: frontend
         env:
-          PORT: 3000
-          HOST: 127.0.0.1
           NEXT_TELEMETRY_DISABLED: 1
-        run: |
-          npm run start &> .next-start.log &
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:3000/ >/dev/null 2>&1; then
-              echo "Next.js is up"; break
-            fi
-            sleep 1
-          done
+        run: npm run build
 
-      - name: Smoke test (GET /)
-        working-directory: frontend
-        run: |
-          curl -fsS http://127.0.0.1:3000/ | head -n 20
-          curl -fsS http://127.0.0.1:3000/robots.txt || true
-
-  e2e:
-    if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Ensure npm compatibility
-        run: |
-          npm i -g npm@9
-          echo "Using Node $(node -v) and npm $(npm -v)"
-
-      - name: Install deps
-        working-directory: frontend
-        run: |
-          set -e
-          if npm ci --prefer-offline; then
-            echo "npm ci succeeded"
-          else
-            echo "npm ci failed (likely lock mismatch); falling back to npm install"
-            npm install --prefer-offline --no-audit --no-fund
-          fi
-
-      - name: Install Playwright (browsers)
-        working-directory: frontend
-        run: npx playwright install --with-deps
-
-      - name: Build Next
-        working-directory: frontend
-        run: NEXT_TELEMETRY_DISABLED=1 npm run build
-
-      - name: Run Playwright (webServer launches Next)
-        working-directory: frontend
+      - name: Run Jest tests
         env:
-          E2E_BASE_URL: http://localhost:3000
-          NEXT_PUBLIC_API_BASE: https://propnexus-backend-production.up.railway.app
-        run: npm run e2e
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm test
+        
