@@ -4,8 +4,8 @@ This test tries to import the FastAPI app and hit /health. In CI environments
 where importing the app fails due to missing secrets, we skip gracefully.
 """
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 try:
     # type: ignore[reportUnknownVariableType]
