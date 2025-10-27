@@ -1,7 +1,7 @@
 """Basic health endpoint test for the PropNexus API."""
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 
 try:
     from backend.main import app  # type: ignore
