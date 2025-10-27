@@ -1,31 +1,22 @@
-// frontend/app/api/stripe/checkout/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
 
-export const dynamic = "force-dynamic";
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2025-09-30.clover', // or keep '2024-06-20' with ts-ignore
+});
 
-export async function POST(req: NextRequest) {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) {
-    return NextResponse.json({ ok: false, error: "Stripe not configured" }, { status: 503 });
+export async function POST(req: Request) {
+  try {
+    const { priceId } = await req.json();
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/billing/success`,
+      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/billing/cancel`,
+    });
+    return NextResponse.json({ url: session.url });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: 'Stripe session creation failed' }, { status: 500 });
   }
-
-  // ⬇️ don't pass apiVersion; the SDK will use the package’s bundled version
-  const stripe = new Stripe(key);
-
-  const { email } = await req.json().catch(() => ({ email: undefined }));
-  const price = process.env.STRIPE_PRICE_PRO_MONTH as string;
-  const origin =
-    process.env.NEXT_PUBLIC_APP_BASE_URL || req.headers.get("origin") || "http://localhost:3000";
-
-  const session = await stripe.checkout.sessions.create({
-    mode: "subscription",
-    billing_address_collection: "auto",
-    customer_email: email || undefined,
-    line_items: [{ price, quantity: 1 }],
-    success_url: `${origin}/checkout/success`,
-    cancel_url: `${origin}/pricing?cancelled=1`,
-  });
-
-  return NextResponse.json({ url: session.url }, { status: 200 });
 }
