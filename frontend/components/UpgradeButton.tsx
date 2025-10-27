@@ -1,35 +1,51 @@
 'use client';
 
-import * as React from 'react';
-import { startCheckout } from '@/lib/stripe';
+import { useState } from 'react';
 
 type Props = {
   priceId: string;
-  email?: string | null;
-  className?: string;
   children?: React.ReactNode;
 };
 
-export default function UpgradeButton({ priceId, email, className, children }: Props) {
-  const [loading, setLoading] = React.useState(false);
+export default function UpgradeButton({ priceId, children }: Props) {
+  const [loading, setLoading] = useState(false);
+
+  async function onClick() {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ priceId }),
+      });
+
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j?.error || `Checkout failed (${res.status})`);
+      }
+
+      const { url } = (await res.json()) as { url?: string };
+      if (url) {
+        window.location.href = url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-alert
+      alert((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <button
-      className={className || 'px-4 py-2 rounded bg-black text-white'}
+      type="button"
+      onClick={onClick}
       disabled={loading}
-      onClick={async () => {
-        try {
-          setLoading(true);
-          const { url } = await startCheckout({ priceId, email: email || undefined });
-          window.location.href = url;
-        } catch (e) {
-          console.error(e);
-          alert('Unable to start checkout right now.');
-        } finally {
-          setLoading(false);
-        }
-      }}
+      className="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
     >
-      {children || (loading ? 'Loading…' : 'Upgrade')}
+      {loading ? 'Redirecting…' : children ?? 'Upgrade'}
     </button>
   );
 }
