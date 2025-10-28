@@ -5,34 +5,44 @@ import { useState } from 'react';
 type Props = {
   priceId: string;
   children?: React.ReactNode;
+  className?: string;
 };
 
-export default function UpgradeButton({ priceId, children }: Props) {
+export default function UpgradeButton({ priceId, children, className }: Props) {
   const [loading, setLoading] = useState(false);
 
-  async function onClick() {
+  async function handleClick() {
+    if (!priceId) {
+      alert('Missing priceId');
+      return;
+    }
     try {
       setLoading(true);
+
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
+        // The API validates this priceId against NEXT_PUBLIC_STRIPE_ALLOWED_PRICE_IDS
         body: JSON.stringify({ priceId }),
       });
 
+      // Attempt to parse the JSON either way to get a useful error
+      const data = await res.json().catch(() => ({} as any));
+
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j?.error || `Checkout failed (${res.status})`);
+        console.error('Checkout error', data);
+        alert(data?.error || 'Checkout failed (bad request).');
+        return;
       }
 
-      const { url } = (await res.json()) as { url?: string };
-      if (url) {
-        window.location.href = url;
+      if (data?.url) {
+        window.location.href = data.url as string; // Redirect to Stripe Checkout
       } else {
-        throw new Error('No checkout URL returned');
+        alert('Checkout failed: no redirect URL returned.');
       }
     } catch (err) {
-      // eslint-disable-next-line no-alert
-      alert((err as Error).message);
+      console.error('Checkout exception', err);
+      alert('Checkout failed (network/client error).');
     } finally {
       setLoading(false);
     }
@@ -41,9 +51,12 @@ export default function UpgradeButton({ priceId, children }: Props) {
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={handleClick}
       disabled={loading}
-      className="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
+      className={
+        className ??
+        'w-full rounded-md bg-black text-white px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed'
+      }
     >
       {loading ? 'Redirecting…' : children ?? 'Upgrade'}
     </button>
