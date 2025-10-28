@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 const key = process.env.STRIPE_SECRET_KEY;
 
 const stripe = key
-  ? new Stripe(key as string, { apiVersion: '2024-06-20' })
+  ? new Stripe(key as string, { apiVersion: '2025-09-30.clover' as Stripe.StripeConfig['apiVersion'] })
   : (null as unknown as Stripe);
 
 // TEMP health endpoint so we can verify envs at runtime in Production
