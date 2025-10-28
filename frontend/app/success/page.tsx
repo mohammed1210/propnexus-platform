@@ -1,4 +1,15 @@
-'use client';
+export const metadata = { title: 'Payment Successful • PropNexus' };
 
-import SuccessPage from '../success_page';
-export default SuccessPage;
+export default function SuccessPage() {
+  return (
+    <main className="max-w-2xl mx-auto py-24 text-center">
+      <h1 className="text-3xl font-semibold mb-4">✅ Payment Successful</h1>
+      <p className="text-lg mb-2">
+        A sign-in link has been sent to your email.
+      </p>
+      <p className="opacity-70">
+        Please check your inbox and follow the link to log in to your premium PropNexus account.
+      </p>
+    </main>
+  );
+}
