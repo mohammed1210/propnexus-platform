@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,7 +18,7 @@ from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
 from .routes.stripe_routes import router as stripe_router
 
-# Load env AFTER imports are declared
+# Load environment variables (after imports)
 try:
     from dotenv import load_dotenv
 
@@ -26,16 +28,26 @@ except Exception:
 
 app = FastAPI()
 
-# CORS
+# ======================
+# 🔒 Secure CORS Config
+# ======================
+# Use explicit origins when allow_credentials=True to comply with browser CORS rules
+_ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS", "http://localhost:3000,https://propnexus-platform.vercel.app"
+)
+ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,  # no wildcard when credentials=True
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Mount routers
+# ======================
+# 🧩 Mount Routers
+# ======================
 app.include_router(ai_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
@@ -49,6 +61,9 @@ app.include_router(scrape_router)
 app.include_router(stripe_router)
 
 
+# ======================
+# 🏠 Root Route
+# ======================
 @app.get("/")
 def root():
     return {"ok": True}
