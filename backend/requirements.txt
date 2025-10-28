@@ -8,8 +8,9 @@ sqlalchemy
 pydantic
 beautifulsoup4
 playwright
-python-dotenv
-requests
+python-dotenv>=1.0.0
+python-jose==3.3.0
+requests>=2.31.0
 openai>=1.14.0
 stripe==13.0.1
 sentry-sdk>=2.0.0

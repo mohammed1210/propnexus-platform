@@ -1,11 +1,10 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
-import UiOverlaysClient from "@components/ui/UiOverlaysClient";
-import BackToTop from "@components/BackToTop";
+import UiOverlaysClient from '@components/ui/UiOverlaysClient';
+import BackToTop from '@components/BackToTop';
 
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
 
 export const metadata: Metadata = {
@@ -39,7 +38,7 @@ export const metadata: Metadata = {
     canonical: '/',
     languages: {
       'en-GB': '/en-GB',
-      'en': '/',
+      en: '/',
     },
   },
 
@@ -79,28 +78,19 @@ export const metadata: Metadata = {
     shortcut: ['/favicon.ico'],
   },
   manifest: ABS('/site.webmanifest').toString(),
-
-  // Theme color per scheme
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#09090b' },
-  ],
-
   // Site verification (fill when you have tokens)
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
   },
 };
 
-// Viewport (LCP boost on mobile)
+// Viewport (LCP boost on mobile + theme colors)
 export const viewport: Viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
     { media: '(prefers-color-scheme: dark)', color: '#09090b' },
   ],
   width: 'device-width',
-  initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -117,10 +107,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         {/* header rendered via your shell */}
 
-        <main
-          id="main"
-          className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none"
-        >
+        <main id="main" className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none">
           {children}
         </main>
 

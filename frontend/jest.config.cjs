@@ -3,11 +3,7 @@ module.exports = {
   testEnvironment: 'jsdom',
 
   testMatch: ['**/__tests__/**/*.(test|spec).tsx?', '**/*.spec.tsx'],
-  testPathIgnorePatterns: [
-    '<rootDir>/e2e/',
-    '<rootDir>/.next/',
-    '<rootDir>/node_modules/',
-  ],
+  testPathIgnorePatterns: ['<rootDir>/e2e/', '<rootDir>/.next/', '<rootDir>/node_modules/'],
 
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 

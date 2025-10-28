@@ -1,19 +1,32 @@
-name: CI – Frontend Build (lite)
+name: CI – Frontend Lite
 
 on:
-  pull_request:
-    branches: [ "main", "sprint-*" ]
   push:
-    branches: [ "sprint-*" ]
+    branches: [ main, sprint-* ]
+  pull_request:
 
 jobs:
-  build_frontend:
+  build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm ci || npm i
-      - run: NEXT_TELEMETRY_DISABLED=1 npm run build --if-present
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Verify jose installed
+        run: node -e "console.log('✅ jose version:', require('jose/package.json').version)"
+
+      - name: Build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run build

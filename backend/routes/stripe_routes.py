@@ -1,107 +1,167 @@
-# backend/routes/stripe_routes.py
 from __future__ import annotations
 
-import json
-import logging
+import datetime as dt
 import os
-from typing import Any
+from typing import Any, Dict, Optional
 
-import stripe
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse
 
-# ---- Env / Stripe init -------------------------------------------------------
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY") or os.getenv("STRIPE_API_KEY")
-STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")  # optional in dev
-
-if STRIPE_SECRET_KEY:
-    stripe.api_key = STRIPE_SECRET_KEY
-else:
-    logging.warning("⚠️ STRIPE_SECRET_KEY not set; /stripe/* endpoints will 400")
+from ..db import sb  # shared Supabase client (may be None if not configured)
+from ..utils.stripe_utils import (
+    construct_event_from_request,
+    create_checkout_session,
+    retrieve_customer_email,
+)
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
 
+# --- ENV (backend) ---
+PRICE_ID_DEFAULT = os.getenv("STRIPE_PRICE_ID", "").strip()
+SUCCESS_URL = os.getenv(
+    "STRIPE_SUCCESS_URL", "https://propnexus-platform.vercel.app/success"
+).strip()
+CANCEL_URL = os.getenv(
+    "STRIPE_CANCEL_URL", "https://propnexus-platform.vercel.app/billing/cancel"
+).strip()
+WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 
-# ---- Models ------------------------------------------------------------------
-class CheckoutReq(BaseModel):
-    email: str | None = None
-    success_url: str | None = None
-    cancel_url: str | None = None
+# Supabase mapping (customize with envs to match your schema)
+SUB_TABLE = os.getenv("SUBSCRIPTION_TABLE", "profiles")
+SUB_EMAIL_COL = os.getenv("SUBSCRIPTION_EMAIL_COL", "email")
+SUB_TIER_COL = os.getenv("SUBSCRIPTION_TIER_COL", "subscription_tier")
+SUB_STATUS_COL = os.getenv("SUBSCRIPTION_STATUS_COL", "subscription_status")
+SUB_CUST_COL = os.getenv("SUBSCRIPTION_CUSTOMER_COL", "stripe_customer_id")
+SUB_PERIOD_END_COL = os.getenv("SUBSCRIPTION_CURRENT_PERIOD_END_COL", "current_period_end")
+
+# Basic tier mapping: default price → tier (override per-price with env)
+DEFAULT_TIER = os.getenv("STRIPE_DEFAULT_TIER", "pro")
 
 
-# ---- Routes ------------------------------------------------------------------
-@router.post("/checkout")
-async def create_checkout_session(payload: CheckoutReq) -> dict[str, Any]:
-    """
-    Creates a hosted Stripe Checkout session for a subscription.
+def price_to_tier(price_id: Optional[str]) -> str:
+    if not price_id:
+        return DEFAULT_TIER
+    env_key = f"TIER_FOR_{price_id}".upper()
+    return os.getenv(env_key, DEFAULT_TIER)
 
-    Requires:
-      - STRIPE_SECRET_KEY
-      - STRIPE_PRICE_ID  (Price in test mode)
-    """
-    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
-        raise HTTPException(
-            status_code=400,
-            detail="Stripe not configured (missing STRIPE_SECRET_KEY or STRIPE_PRICE_ID)",
-        )
 
+def iso8601_from_unix(ts: Optional[int]) -> Optional[str]:
+    if not ts:
+        return None
     try:
-        success_url = payload.success_url or os.getenv(
-            "STRIPE_SUCCESS_URL", "http://localhost:3000/success"
-        )
-        cancel_url = payload.cancel_url or os.getenv(
-            "STRIPE_CANCEL_URL", "http://localhost:3000/pricing"
-        )
+        return dt.datetime.utcfromtimestamp(int(ts)).replace(tzinfo=dt.timezone.utc).isoformat()
+    except Exception:
+        return None
 
-        session = stripe.checkout.Session.create(
-            mode="subscription",
-            line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
-            customer_email=payload.email,
-            allow_promotion_codes=True,
-            billing_address_collection="auto",
-            success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url=cancel_url,
-            automatic_tax={"enabled": True},
-        )
-        return {"id": session.id, "url": session.url}
-    except Exception as e:  # pragma: no cover
-        logging.exception("Stripe checkout error")
-        raise HTTPException(status_code=500, detail=str(e))
+
+def upsert_subscription(
+    *,
+    email: str,
+    customer_id: Optional[str],
+    status: str,
+    price_id: Optional[str],
+    period_end_unix: Optional[int],
+) -> None:
+    """Upsert a user's subscription info into Supabase."""
+    if not sb:
+        # Supabase not configured; just no-op
+        return
+
+    payload: Dict[str, Any] = {
+        SUB_EMAIL_COL: email,
+        SUB_STATUS_COL: status,
+        SUB_TIER_COL: price_to_tier(price_id),
+    }
+    if customer_id:
+        payload[SUB_CUST_COL] = customer_id
+    iso = iso8601_from_unix(period_end_unix)
+    if iso:
+        payload[SUB_PERIOD_END_COL] = iso
+
+    # Upsert on email (change ON CONFLICT key by using envs if needed)
+    sb.table(SUB_TABLE).upsert(payload, on_conflict=SUB_EMAIL_COL).execute()
+
+
+@router.post("/checkout")
+async def stripe_checkout(req: Request):
+    data = await req.json()
+    price_id = (data.get("priceId") or PRICE_ID_DEFAULT or "").strip()
+    if not price_id:
+        raise HTTPException(status_code=400, detail="Missing priceId")
+    email = (data.get("email") or "").strip() or None
+    session = create_checkout_session(price_id, SUCCESS_URL, CANCEL_URL, email)
+    return JSONResponse(session)
 
 
 @router.post("/webhook")
-async def stripe_webhook(request: Request) -> dict[str, str]:
-    """
-    Handles Stripe webhooks. In dev you can run:
-      stripe listen --forward-to localhost:8000/stripe/webhook
-    """
+async def stripe_webhook(request: Request):
     payload = await request.body()
-    sig = request.headers.get("stripe-signature")
+    sig_header = request.headers.get("stripe-signature")
+    if not sig_header:
+        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
 
-    event = None
     try:
-        if STRIPE_WEBHOOK_SECRET and sig:
-            event = stripe.Webhook.construct_event(
-                payload=payload, sig_header=sig, secret=STRIPE_WEBHOOK_SECRET
-            )
-        else:
-            # Accept unsigned events in dev to keep flow simple
-            event = json.loads(payload or "{}")
+        event = construct_event_from_request(payload, sig_header, WEBHOOK_SECRET)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Webhook error: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid payload: {e}")
 
-    et = (event or {}).get("type")
-    data = (event or {}).get("data", {}).get("object", {})
+    etype: str = event.get("type", "")
+    data_obj: Dict[str, Any] = (event.get("data", {}) or {}).get("object", {}) or {}
 
-    # Minimal demo reactions (extend to persist in Supabase, etc.)
-    if et == "checkout.session.completed":
-        logging.info("💰 Checkout completed: %s", data.get("id"))
-    elif et == "customer.subscription.updated":
-        logging.info("🔁 Subscription updated: %s", data.get("id"))
-    elif et == "customer.subscription.deleted":
-        logging.info("❌ Subscription cancelled: %s", data.get("id"))
-    else:
-        logging.info("ℹ️ Unhandled event: %s", et)
+    # --- Handle key events to keep Supabase in sync ---
 
-    return {"status": "ok"}
+    if etype == "checkout.session.completed":
+        # Prefer customer_email from session; otherwise look up by customer id.
+        email = (
+            (data_obj.get("customer_details") or {}).get("email")
+            or data_obj.get("customer_email")
+            or retrieve_customer_email(data_obj.get("customer"))
+        )
+        if email:
+            # Period end may not be here; invoice event will set it later.
+            upsert_subscription(
+                email=email,
+                customer_id=data_obj.get("customer"),
+                status="active",
+                price_id=os.getenv("STRIPE_PRICE_ID") or None,
+                period_end_unix=None,
+            )
+
+    elif etype == "invoice.payment_succeeded":
+        # Contains definitive line/price + current_period_end.
+        email = data_obj.get("customer_email") or retrieve_customer_email(data_obj.get("customer"))
+        line = ((data_obj.get("lines") or {}).get("data") or [{}])[0]
+        price_id = ((line or {}).get("price") or {}).get("id")
+        period_end = ((line or {}).get("period") or {}).get("end")
+        if email:
+            upsert_subscription(
+                email=email,
+                customer_id=data_obj.get("customer"),
+                status="active",
+                price_id=price_id,
+                period_end_unix=period_end,
+            )
+
+    elif etype in {"customer.subscription.updated", "customer.subscription.deleted"}:
+        # Reflect cancellation / status changes
+        sub = data_obj
+        status = sub.get("status") or ("canceled" if etype.endswith(".deleted") else "active")
+        customer_id = sub.get("customer")
+        price_id = None
+        items = (sub.get("items") or {}).get("data") or []
+        if items:
+            price_id = ((items[0] or {}).get("price") or {}).get("id")
+        period_end = sub.get("current_period_end") or None
+
+        email = retrieve_customer_email(customer_id)
+        if email:
+            upsert_subscription(
+                email=email,
+                customer_id=customer_id,
+                status=status,
+                price_id=price_id,
+                period_end_unix=period_end,
+            )
+
+    # Always acknowledge to Stripe
+    return JSONResponse({"ok": True, "type": etype})

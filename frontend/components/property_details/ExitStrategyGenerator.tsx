@@ -58,7 +58,11 @@ export default function ExitStrategyGenerator(props: Props) {
         {loading ? 'Generating…' : 'Generate exit strategies'}
       </button>
 
-      {error && <p role="alert" className="text-red-600 text-sm">Error: {error}</p>}
+      {error && (
+        <p role="alert" className="text-red-600 text-sm">
+          Error: {error}
+        </p>
+      )}
 
       {strategies?.slice(0, 4).map((s, i) => (
         <article key={i} aria-label={`strategy-${i + 1}`} className="rounded-lg border p-4">
@@ -85,7 +89,9 @@ export default function ExitStrategyGenerator(props: Props) {
               onClick={() => {
                 const text =
                   `${s.title}\n\n${s.rationale ?? ''}\n\n` +
-                  (s.steps?.length ? `Steps:\n${s.steps.map((x, n) => `${n + 1}. ${x}`).join('\n')}\n\n` : '') +
+                  (s.steps?.length
+                    ? `Steps:\n${s.steps.map((x, n) => `${n + 1}. ${x}`).join('\n')}\n\n`
+                    : '') +
                   `Risk: ${s.risk ?? ''}`;
                 if (navigator?.clipboard) {
                   navigator.clipboard.writeText(text);

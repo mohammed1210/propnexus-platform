@@ -1,34 +1,31 @@
-import { NextResponse } from 'next/server';
-import stripe from '@/lib/stripe';
+import { NextRequest, NextResponse } from 'next/server';
+import Stripe from 'stripe';
 
-const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL ?? '';
+export const dynamic = 'force-dynamic';
 
-export async function POST(req: Request) {
-  const { priceId } = await req.json();
-
-  if (!stripe) {
-    // No server secret in this environment – report a clear 503
-    return NextResponse.json(
-      { error: 'Stripe is not configured in this environment.' },
-      { status: 503 }
-    );
+export async function POST(req: NextRequest) {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    return NextResponse.json({ ok: false, error: 'Stripe not configured' }, { status: 503 });
   }
 
-  try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${appUrl}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/pricing`,
-      allow_promotion_codes: true,
-    });
+  const stripe = new Stripe(key, {
+    apiVersion: '2024-06-20' as Stripe.LatestApiVersion,
+  });
 
-    return NextResponse.json({ id: session.id, url: session.url });
-  } catch (err: any) {
-    console.error('stripe checkout create', err);
-    return NextResponse.json(
-      { error: err?.message ?? 'Stripe error' },
-      { status: 500 }
-    );
-  }
+  const { email } = await req.json().catch(() => ({ email: undefined }));
+  const price = process.env.STRIPE_PRICE_PRO_MONTH as string;
+  const origin =
+    process.env.NEXT_PUBLIC_APP_BASE_URL || req.headers.get('origin') || 'http://localhost:3000';
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'subscription',
+    billing_address_collection: 'auto',
+    customer_email: email || undefined,
+    line_items: [{ price, quantity: 1 }],
+    success_url: `${origin}/checkout/success`,
+    cancel_url: `${origin}/pricing?cancelled=1`,
+  });
+
+  return NextResponse.json({ url: session.url }, { status: 200 });
 }

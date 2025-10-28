@@ -1,16 +1,9 @@
 from __future__ import annotations
 
-# 3rd party
-from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Local deps (only relative imports; no duplicates)
-try:
-    from .db import sb  # shared Supabase client
-except ImportError:
-    from db import sb  # fallback for pytest/CI when package context isn't set
-
+# Local routers
 from .routes.ai import router as ai_router
 from .routes.area_intel_routes import router as area_intel_router
 from .routes.comps_routes import router as comps_router
@@ -23,65 +16,39 @@ from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
 from .routes.stripe_routes import router as stripe_router
 
-# Load env AFTER imports (keeps imports grouped for linters)
-load_dotenv()
+# Load env AFTER imports are declared
+try:
+    from dotenv import load_dotenv
 
-app = FastAPI(title="PropNexus Backend", version="0.1.0")
+    load_dotenv()
+except Exception:
+    pass
+
+app = FastAPI()
 
 # CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://propnexus-platform.vercel.app",
-    ],
-    allow_origin_regex=r"^https://.*\.vercel\.app$",
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-# --- Health ---
-@app.get("/")
-async def root():
-    return {"message": "PropNexus backend is running."}
-
-
-@app.get("/health")
-@app.get("/api/health")
-async def health():
-    return {"ok": True}
-
-
-# --- Routers ---
-app.include_router(save_deal_router)
-app.include_router(notes_router)
-app.include_router(gpt_router)
+# Mount routers
 app.include_router(ai_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
-app.include_router(scrape_router)
-app.include_router(off_market_router)
-app.include_router(stripe_router)
-app.include_router(import_router)
+app.include_router(gpt_router)
 app.include_router(health_router)
+app.include_router(import_router)
+app.include_router(notes_router)
+app.include_router(off_market_router)
+app.include_router(save_deal_router)
+app.include_router(scrape_router)
+app.include_router(stripe_router)
 
 
-# --- Supabase-backed property endpoints ---
-@app.get("/properties")
-async def get_properties():
-    if not sb:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    return sb.table("properties").select("*").execute().data
-
-
-@app.get("/properties/{property_id}")
-async def get_property_by_id(property_id: str):
-    if not sb:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
-    res = sb.table("properties").select("*").eq("id", property_id).execute()
-    if not res.data:
-        raise HTTPException(status_code=404, detail="Property not found")
-    return res.data[0]
+@app.get("/")
+def root():
+    return {"ok": True}

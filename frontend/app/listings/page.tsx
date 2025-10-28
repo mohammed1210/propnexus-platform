@@ -1,4 +1,3 @@
-// frontend/app/listings/page.tsx
 'use client';
 export const dynamic = 'force-dynamic';
 
@@ -75,10 +74,19 @@ function ClientMap({
     if (!m) return;
     if (points.length) fit(m, points);
     else m.setView(defaultCenter, 6);
+
+    // cleanup to avoid “already initialized”
+    return () => {
+      try {
+        m.remove();
+      } catch {}
+      mapRef.current = null;
+    };
   }, [points, defaultCenter]);
 
   return (
     <MapContainer
+      key="map-root"
       ref={setMap as any}
       center={defaultCenter}
       zoom={6}
@@ -212,7 +220,6 @@ function ListingsInner() {
       setLoading(true);
       const supabase = getSupabase();
 
-      // Fetch only the fields we actually use; keep ordering stable
       let query = supabase
         .from('properties')
         .select(
@@ -258,7 +265,6 @@ function ListingsInner() {
     <Section>
       <SectionTitle>PropNexus Listings</SectionTitle>
 
-      {/* Sticky filter directly under site header */}
       <div className="sticky-filter">
         <div className="max-w-6xl mx-auto px-4 py-3">
           <FiltersBar />

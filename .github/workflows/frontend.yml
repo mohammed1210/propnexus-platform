@@ -1,27 +1,30 @@
-name: Frontend CI
+name: Frontend CI (Typecheck + Lint + Build)
+
 on:
-  pull_request:
-    paths:
-      - "frontend/**"
   push:
-    branches:
-      - po3/**
+    branches: [ main, sprint-* ]
+  pull_request:
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
+          node-version: 20
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
+
       - name: Install deps
-        working-directory: frontend
         run: npm ci
-      - name: Typecheck & Lint & Build
-        working-directory: frontend
+
+      - name: Typecheck + Lint + Build
         run: |
-          npm run typecheck || true
-          npm run lint || true
+          npm run typecheck --if-present
+          npm run lint --if-present
           npm run build

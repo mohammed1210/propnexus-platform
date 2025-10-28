@@ -37,8 +37,8 @@ export default function InvestmentSummary({ property }: Props) {
         const payload: SummaryRequest = {
           title: property.title,
           location: String(property.location ?? ''),
-          price: numOrUndef(property.price),         // ✅ narrowed
-          bedrooms: numOrUndef(property.bedrooms),   // ✅ narrowed
+          price: numOrUndef(property.price), // ✅ narrowed
+          bedrooms: numOrUndef(property.bedrooms), // ✅ narrowed
           bathrooms: numOrUndef(property.bathrooms), // ✅ narrowed
           yield_percent: numOrUndef(property.yield_percent),
           roi_percent: numOrUndef(property.roi_percent),
@@ -57,7 +57,9 @@ export default function InvestmentSummary({ property }: Props) {
     }
 
     run();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [
     property.title,
     property.location,
@@ -85,7 +87,9 @@ export default function InvestmentSummary({ property }: Props) {
       {data.summary && <p>{data.summary}</p>}
       {Array.isArray(data.bullets) && data.bullets.length > 0 && (
         <ul className="list-disc pl-5">
-          {data.bullets.map((b, i) => <li key={i}>{b}</li>)}
+          {data.bullets.map((b, i) => (
+            <li key={i}>{b}</li>
+          ))}
         </ul>
       )}
     </div>
