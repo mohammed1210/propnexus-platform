@@ -28,3 +28,9 @@ frontend/.env
 # Lock-in for repo hygiene
 *.sqlite
 .vercel
+
+# never commit env files
+*.env
+backend/.env
+frontend/.env
+
