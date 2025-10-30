@@ -1,39 +1,3 @@
-export const metadata = { title: 'Payment Successful \u2022 PropNexus' };
-
-export default function SuccessPage() {
-  return (
-    <div className="container mx-auto p-12 text-center">
-      <h1 className="text-3xl font-bold text-green-500">Payment Successful \uD83C\uDF89</h1>
-      <p className="mt-4 text-lg">Your PropNexus subscription is now active.</p>
-      <a href="/billing/account" className="btn mt-6 bg-blue-600 text-white px-4 py-2 rounded">
-        Manage Subscription
-      </a>
-    </div>
-  );
-backend/routes/stripe_routes.py
-}
-export default function SuccessPage() {
-  return (
-    <div className="container mx-auto p-12 text-center">
-      <h1 className="text-3xl font-bold text-green-500">Payment Successful 🎉</h1>
-      <p className="mt-4 text-lg">Your PropNexus subscription is now active.</p>
-      <a href="/billing/account" className="btn mt-6 bg-blue-600 text-white px-4 py-2 rounded">
-        Manage Subscription
-      </a>
-    </div>
-  );
-}
-export default function SuccessPage() {
-  return (
-    <div className="container mx-auto p-12 text-center">
-      <h1 className="text-3xl font-bold text-green-500">Payment Successful 🎉</h1>
-      <p className="mt-4 text-lg">Your PropNexus subscription is now active.</p>
-      <a href="/billing/account" className="btn mt-6 bg-blue-600 text-white px-4 py-2 rounded">
-        Manage Subscription
-      </a>
-    </div>
-  );
-}
 export default function SuccessPage() {
   return (
     <div className="container mx-auto p-12 text-center">
