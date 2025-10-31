@@ -4,37 +4,42 @@ import Stripe from 'stripe';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const key = process.env.STRIPE_SECRET_KEY;
-const base = process.env.NEXT_PUBLIC_APP_BASE_URL || '';
-const stripe = key
-  ? new Stripe(key as string, { apiVersion: '2025-09-30.clover' })
-  : (null as unknown as Stripe);
+const KEY = process.env.STRIPE_SECRET_KEY;
+const BASE = process.env.NEXT_PUBLIC_APP_BASE_URL ?? '';
 
-// NOTE: replace this with your real "lookup" for the Stripe customer ID from your auth/session DB.
+/**
+ * TODO: Replace with a real lookup that maps the signed-in user
+ * to their Stripe customer ID (e.g., from your DB via webhook sync).
+ */
 async function getCustomerIdForCurrentUser(): Promise<string | null> {
-  // TEMP: return null to force portal creation via latest session if available.
+  // Return null until you store/lookup real Stripe customer IDs.
   return null;
 }
 
 export async function POST() {
   try {
-    if (!stripe || !key) {
-      return NextResponse.json({ ok: false, error: 'Stripe not configured' }, { status: 500 });
+    if (!KEY) {
+      return NextResponse.json(
+        { ok: false, error: 'Stripe not configured' },
+        { status: 500 }
+      );
     }
+
+    const stripe = new Stripe(KEY, { apiVersion: '2025-09-30.clover' });
 
     const customer = await getCustomerIdForCurrentUser();
-
-    // Build session params safely
-    const sessionParams: Stripe.BillingPortal.SessionCreateParams = {
-      return_url: `${base}/billing/account`,
-    };
-
-    // Only attach customer if it's a valid non-empty string
-    if (customer) {
-      sessionParams.customer = customer;
+    if (!customer) {
+      // Keep types happy and avoid calling the API without a customer.
+      return NextResponse.json(
+        { ok: false, error: 'No Stripe customer on file for this user.' },
+        { status: 400 }
+      );
     }
 
-    const session = await stripe.billingPortal.sessions.create(sessionParams);
+    const session = await stripe.billingPortal.sessions.create({
+      customer,
+      return_url: `${BASE || 'http://localhost:3000'}/billing/account`,
+    });
 
     return NextResponse.json({ ok: true, url: session.url });
   } catch (err: any) {
@@ -43,6 +48,9 @@ export async function POST() {
       code: err?.code,
       type: err?.type,
     });
-    return NextResponse.json({ ok: false, error: 'Portal failed' }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: 'Portal failed' },
+      { status: 500 }
+    );
   }
 }
