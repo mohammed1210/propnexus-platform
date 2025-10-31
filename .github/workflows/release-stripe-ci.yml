@@ -1,0 +1,37 @@
+name: Release • Stripe Smoke
+
+on:
+  push:
+    branches:
+      - main
+      - 'sprint-*'
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  stripe-smoke:
+    name: Stripe & Pricing Smoke
+    runs-on: ubuntu-latest
+
+    env:
+      # Provide these via GitHub “Repository variables / secrets”
+      # Vars (preferred): Settings → Variables → Actions
+      # Secrets: Settings → Secrets → Actions
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      NEXT_PUBLIC_STRIPE_ALLOWED_PRICE_IDS: ${{ vars.NEXT_PUBLIC_STRIPE_ALLOWED_PRICE_IDS }}
+      BASE_URL: ${{ vars.RELEASE_BASE_URL || secrets.RELEASE_BASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run Stripe smoke checks
+        run: |
+          node ./frontend/ops/smoke/stripe-check.mjs
