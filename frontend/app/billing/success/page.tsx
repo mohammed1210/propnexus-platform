@@ -1,11 +1,14 @@
+export const metadata = { title: 'Payment Successful • PropNexus' };
+
 export default function SuccessPage() {
   return (
-    <div className="container mx-auto p-12 text-center">
-      <h1 className="text-3xl font-bold text-green-500">Payment Successful 🎉</h1>
-      <p className="mt-4 text-lg">Your PropNexus Pro subscription is now active.</p>
-      <a href="/listings" className="btn mt-6 bg-blue-600 text-white px-4 py-2 rounded">
-        Browse Deals
-      </a>
-    </div>
+    <main className="max-w-2xl mx-auto py-24 px-6 text-center">
+      <h1 className="text-3xl font-semibold mb-4">✅ Payment Successful</h1>
+      <p className="text-lg mb-2">A sign-in link has been sent to your email.</p>
+      <p className="opacity-70">Please check your inbox and follow the link to log in to your premium PropNexus account.</p>
+      <div className="mt-8">
+        <a className="btn" href="/billing/account">Manage Subscription</a>
+      </div>
+    </main>
   );
 }

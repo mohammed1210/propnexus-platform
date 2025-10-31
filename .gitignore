@@ -34,3 +34,11 @@ frontend/.env
 backend/.env
 frontend/.env
 
+
+# --- ops guardrails ---
+*.env
+backend/.env
+frontend/.env
+.env.local
+.env.production.local
+

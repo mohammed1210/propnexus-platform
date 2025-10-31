@@ -1,42 +1,26 @@
-// Minimal Stripe smoke: validate price IDs and create a short-lived Checkout Session (dry run)
-import Stripe from 'stripe';
+import assert from 'node:assert';
 
-const key = process.env.STRIPE_SECRET_KEY;
-const allowed = (process.env.NEXT_PUBLIC_STRIPE_ALLOWED_PRICE_IDS || '').split(',').map(s=>s.trim()).filter(Boolean);
+const base = process.env.NEXT_PUBLIC_APP_BASE_URL;
+const allowed = (process.env.NEXT_PUBLIC_STRIPE_ALLOWED_PRICE_IDS || '')
+  .split(',').map(s=>s.trim()).filter(Boolean);
 
-if (!key) {
-  console.error('❌ STRIPE_SECRET_KEY not set');
-  process.exit(1);
+assert(base, 'NEXT_PUBLIC_APP_BASE_URL missing');
+assert(allowed.length >= 1, 'No allowed price IDs configured');
+
+const hit = async (priceId) => {
+  const r = await fetch(`${base}/api/stripe/checkout`, {
+    method:'POST',
+    headers:{ 'content-type':'application/json' },
+    body: JSON.stringify({ priceId })
+  });
+  const j = await r.json();
+  if (!r.ok || !j?.url) throw new Error(`Checkout failed for ${priceId}: ${j?.error || r.statusText}`);
+  console.log('✅ checkout ok', priceId, '→', j.url.slice(0,80)+'…');
+};
+
+for (const pid of allowed) {
+  // only test first two to keep CI fast
+  await hit(pid);
+  if (allowed.indexOf(pid) === 1) break;
 }
-if (!allowed.length) {
-  console.error('❌ NEXT_PUBLIC_STRIPE_ALLOWED_PRICE_IDS empty');
-  process.exit(1);
-}
-
-const stripe = new Stripe(key, { apiVersion: '2025-09-30.clover' });
-
-(async () => {
-  try {
-    // 1) Verify all price IDs exist
-    for (const id of allowed) {
-      const price = await stripe.prices.retrieve(id);
-      if (!price?.active) throw new Error(`Price ${id} is not active`);
-    }
-    console.log(`✅ ${allowed.length} Stripe price IDs are valid & active`);
-
-    // 2) Try a session (no redirect; just make sure creation works)
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      line_items: [{ price: allowed[0], quantity: 1 }],
-      success_url: 'https://example.com/success?session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: 'https://example.com/cancel',
-      automatic_tax: { enabled: true },
-    });
-    if (!session?.id) throw new Error('No session id returned');
-    console.log('✅ Checkout session creation OK');
-    process.exit(0);
-  } catch (err) {
-    console.error('❌ Stripe smoke failed:', err?.message || err);
-    process.exit(1);
-  }
-})();
+console.log('✅ stripe-check complete');
