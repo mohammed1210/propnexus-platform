@@ -4,6 +4,8 @@ import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from backend.routes.stripe_webhook import router as stripe_webhook_router
+
 
 # Local routers
 from .routes.ai import router as ai_router
@@ -59,7 +61,7 @@ app.include_router(off_market_router)
 app.include_router(save_deal_router)
 app.include_router(scrape_router)
 app.include_router(stripe_router)
-
+app.include_router(stripe_webhook_router)
 
 # ======================
 # 🏠 Root Route
