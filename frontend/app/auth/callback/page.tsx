@@ -1,4 +1,3 @@
-// app/auth/callback/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -14,7 +13,7 @@ function getSupabase() {
 
 export default function AuthCallback() {
   const router = useRouter();
-  const params = useSearchParams();
+  const params = useSearchParams(); // can be null in TS types depending on setup
   const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle');
 
   useEffect(() => {
@@ -27,15 +26,19 @@ export default function AuthCallback() {
       }
 
       try {
-        // Handle both magic link (#access_token) and OAuth code flows.
-        // exchangeCodeForSession safely no-ops if nothing to exchange.
+        // Works for both magic-link (#access_token) and OAuth code flows.
         await supabase.auth.exchangeCodeForSession(window.location.href).catch(() => {});
 
         const { data } = await supabase.auth.getSession();
         if (!data.session) throw new Error('No session from magic link');
 
         setStatus('ok');
-        const returnTo = params.get('returnTo') || '/account';
+
+        // Null-safe read of returnTo
+        const returnTo =
+          (params?.get('returnTo') as string | null) ??
+          '/account';
+
         router.replace(returnTo);
       } catch (e) {
         console.error(e);
