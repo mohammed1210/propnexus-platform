@@ -3,24 +3,22 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import UiOverlaysClient from '@components/ui/UiOverlaysClient';
 import BackToTop from '@components/BackToTop';
+import Header from '@components/Header';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app',
+    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app'
   ),
   title: {
     default: 'PropNexus',
     template: '%s · PropNexus',
   },
-
-  // Descriptions
   description:
     'AI-powered property sourcing: analyse yield & ROI, score deals, and track your portfolio.',
-
-  // Robots
   robots: {
     index: true,
     follow: true,
@@ -32,17 +30,10 @@ export const metadata: Metadata = {
       'max-video-preview': -1,
     },
   },
-
-  // Canonicals & i18n alternates
   alternates: {
     canonical: '/',
-    languages: {
-      'en-GB': '/en-GB',
-      en: '/',
-    },
+    languages: { 'en-GB': '/en-GB', en: '/' },
   },
-
-  // Open Graph
   openGraph: {
     type: 'website',
     url: ABS('/'),
@@ -58,17 +49,13 @@ export const metadata: Metadata = {
       },
     ],
   },
-
-  // Twitter Cards
   twitter: {
     card: 'summary_large_image',
     title: 'PropNexus',
     description: 'AI-powered property sourcing platform.',
     images: [ABS('/og/cover.png')],
-    creator: '@propnexus', // change if you have a handle
+    creator: '@propnexus',
   },
-
-  // Icons / PWA bits
   icons: {
     icon: [
       { url: '/icons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
@@ -78,13 +65,11 @@ export const metadata: Metadata = {
     shortcut: ['/favicon.ico'],
   },
   manifest: ABS('/site.webmanifest').toString(),
-  // Site verification (fill when you have tokens)
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
   },
 };
 
-// Viewport (LCP boost on mobile + theme colors)
 export const viewport: Viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
@@ -105,9 +90,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
 
-        {/* header rendered via your shell */}
+        {/* ✅ App Header (includes conditional Billing link) */}
+        <Header />
 
-        <main id="main" className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none">
+        <main
+          id="main"
+          className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none"
+        >
           {children}
         </main>
 
