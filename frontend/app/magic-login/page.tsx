@@ -3,6 +3,15 @@
 import { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+function getSiteUrl(): string {
+  if (typeof window !== 'undefined') return window.location.origin;
+  const env =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_VERCEL_URL; // e.g. my-app.vercel.app
+  if (!env) return 'https://propnexus-platform.vercel.app';
+  return env.startsWith('http') ? env : `https://${env}`;
+}
+
 export default function MagicLoginPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
@@ -14,32 +23,25 @@ export default function MagicLoginPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
   );
 
-  // Fallback for build-time (no window), but we’ll prefer window.location.origin at runtime.
-  const siteFallback =
-    process.env.NEXT_PUBLIC_SITE_URL || 'https://propnexus-platform.vercel.app';
-
   async function sendLink(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
-      const origin =
-        typeof window !== 'undefined' && window.location.origin
-          ? window.location.origin
-          : siteFallback;
-
+      const site = getSiteUrl();
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${origin}/auth/callback`,
+          // Always bounce back to the SAME ORIGIN you started from
+          emailRedirectTo: `${site}/auth/callback?returnTo=/account`,
         },
       });
 
       if (error) throw error;
       setSent(true);
     } catch (err: any) {
-      setError(err.message || 'Failed to send link');
+      setError(err.message || 'Could not send magic link');
     } finally {
       setLoading(false);
     }
@@ -66,9 +68,7 @@ export default function MagicLoginPage() {
         </button>
       </form>
 
-      {sent && (
-        <p className="mt-4 text-green-600">✅ Email sent successfully — check your inbox!</p>
-      )}
+      {sent && <p className="mt-4 text-green-600">✅ Email sent — check your inbox!</p>}
       {error && <p className="mt-4 text-red-600">⚠️ {error}</p>}
     </main>
   );

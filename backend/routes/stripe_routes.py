@@ -9,18 +9,27 @@ router = APIRouter(prefix="/stripe", tags=["stripe"])
 # --- ENV ---
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")  # sk_test_... or sk_live_...
 SUPABASE_URL = os.getenv("SUPABASE_URL")
+# Prefer service_role key (for upsert), fall back to SUPABASE_KEY if you use that var
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-SITE_URL = os.getenv("SITE_URL") or os.getenv("NEXT_PUBLIC_SITE_URL") or "https://propnexus-platform.vercel.app"
+
+# Site/return URLs: prefer explicit SITE_URL, then NEXT_PUBLIC_SITE_URL, then production fallback
+SITE_URL = (
+    os.getenv("SITE_URL")
+    or os.getenv("NEXT_PUBLIC_SITE_URL")
+    or "https://propnexus-platform.vercel.app"
+)
 PORTAL_RETURN_URL = os.getenv("PORTAL_RETURN_URL") or SITE_URL
 
 stripe.api_key = STRIPE_SECRET_KEY
+
 sb: Client | None = None
 if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
-    sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+  sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+# Table/column names (override via env if your schema differs)
 USERS_TABLE = os.getenv("USERS_TABLE", "users")
 EMAIL_COL = os.getenv("USERS_EMAIL_COL", "email")
-CUST_COL = os.getenv("USERS_STRIPE_COL", "stripe_customer_id")
+CUST_COL  = os.getenv("USERS_STRIPE_COL", "stripe_customer_id")
 
 def get_or_create_customer(email: str) -> str:
     """
@@ -31,19 +40,19 @@ def get_or_create_customer(email: str) -> str:
     """
     customer_id = None
 
+    # 1) Supabase lookup
     if sb:
         res = sb.table(USERS_TABLE).select("*").eq(EMAIL_COL, email).maybe_single().execute()
         row = (res.data or {}) if isinstance(res.data, dict) else (res.data[0] if res.data else None)
         if row and row.get(CUST_COL):
             return row[CUST_COL]
 
-    # 2) Stripe search (safe: returns only test or live depending on key)
+    # 2) Stripe search/list
     try:
         found = stripe.Customer.search(query=f"email:'{email}'", limit=1)
         if found.data:
             customer_id = found.data[0].id
     except Exception:
-        # Some accounts may not have search enabled; fall back to list
         customers = stripe.Customer.list(email=email, limit=1)
         if customers.data:
             customer_id = customers.data[0].id
@@ -53,7 +62,7 @@ def get_or_create_customer(email: str) -> str:
         created = stripe.Customer.create(email=email)
         customer_id = created.id
 
-    # 4) Upsert to Supabase for future calls
+    # 4) Upsert back to Supabase
     if sb:
         try:
             sb.table(USERS_TABLE).upsert(
@@ -83,7 +92,7 @@ async def create_portal_session(req: Request):
         )
         return JSONResponse({"url": session.url})
     except stripe.error.StripeError as e:
-        raise HTTPException(status_code=502, detail=f"Stripe error: {e.user_message or str(e)}")
+        raise HTTPException(status_code=502, detail=f"Stripe error: {getattr(e, 'user_message', None) or str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
