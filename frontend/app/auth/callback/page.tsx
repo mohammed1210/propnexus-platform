@@ -1,50 +1,85 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@supabase/supabase-js';
 
-export const dynamic = 'force-dynamic'; // don’t prerender this route
+type Status = 'idle' | 'ok' | 'error';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
-  const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
+  const [status, setStatus] = useState<Status>('idle');
+  const [message, setMessage] = useState<string>('');
 
   useEffect(() => {
     const run = async () => {
       try {
         const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
         const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
-        if (!url || !key) throw new Error('Supabase env missing');
-
         const supabase = createClient(url, key);
 
-        // Give supabase-js a tick to parse the URL hash and set the session.
-        await new Promise((r) => setTimeout(r, 50));
+        // Read tokens from URL hash (Supabase magic link format)
+        const hash = typeof window !== 'undefined' ? window.location.hash.slice(1) : '';
+        const qs = new URLSearchParams(hash || '');
 
-        const { data } = await supabase.auth.getSession();
-        if (!data.session) throw new Error('No session from magic link');
+        // Check for error cases first
+        const error = qs.get('error') || qs.get('error_code');
+        const errorDesc = qs.get('error_description');
+        if (error) {
+          setStatus('error');
+          setMessage(errorDesc || error);
+          return;
+        }
+
+        // If tokens exist, set the session explicitly
+        const access_token = qs.get('access_token');
+        const refresh_token = qs.get('refresh_token');
+        if (access_token && refresh_token) {
+          const { error: setErr } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+          if (setErr) throw setErr;
+        } else {
+          // If no tokens in hash, try reading any existing session
+          const { data } = await supabase.auth.getSession();
+          if (!data.session) {
+            setStatus('error');
+            setMessage('No session returned from magic link.');
+            return;
+          }
+        }
 
         setStatus('ok');
-        router.replace('/account'); // ✅ send users to the Account page
-      } catch (e) {
+
+        // Optional returnTo support (read from hash). Default to /account.
+        const returnTo = qs.get('returnTo') || '/account';
+        router.replace(returnTo);
+      } catch (e: any) {
         console.error(e);
         setStatus('error');
+        setMessage(e?.message || 'Sign-in failed.');
       }
     };
+
     run();
   }, [router]);
 
   return (
     <main className="mx-auto max-w-md px-6 py-12">
-      <h1 className="text-2xl font-semibold mb-3">Signing you in…</h1>
-      {status === 'loading' && <p>Verifying your link…</p>}
-      {status === 'ok' && <p>Success. Redirecting…</p>}
+      {status === 'idle' && <p>Finishing sign-in…</p>}
+      {status === 'ok' && <p>Signed in. Redirecting…</p>}
       {status === 'error' && (
-        <p className="text-red-600">
-          Couldn’t verify your link. Please request a new one from{' '}
-          <a className="underline" href="/magic-login">Magic Login</a>.
-        </p>
+        <div className="space-y-3">
+          <p className="text-red-600 font-medium">Couldn’t complete sign-in.</p>
+          {message && <p className="text-sm text-zinc-600">{message}</p>}
+          <a
+            href="/magic-login"
+            className="inline-flex items-center px-3 py-2 rounded-md bg-zinc-900 text-white hover:bg-zinc-800"
+          >
+            Send a new magic link
+          </a>
+        </div>
       )}
     </main>
   );

@@ -14,10 +14,9 @@ export default function MagicLoginPage() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
   );
 
-  // 👇 Define the SITE URL properly here
-  const site =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    'https://propnexus-platform.vercel.app'; // fallback for build env
+  // Fallback for build-time (no window), but we’ll prefer window.location.origin at runtime.
+  const siteFallback =
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://propnexus-platform.vercel.app';
 
   async function sendLink(e: React.FormEvent) {
     e.preventDefault();
@@ -25,17 +24,22 @@ export default function MagicLoginPage() {
     setLoading(true);
 
     try {
+      const origin =
+        typeof window !== 'undefined' && window.location.origin
+          ? window.location.origin
+          : siteFallback;
+
       const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: `${site}/auth/callback`,
+          emailRedirectTo: `${origin}/auth/callback`,
         },
       });
 
       if (error) throw error;
       setSent(true);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Failed to send link');
     } finally {
       setLoading(false);
     }
@@ -63,15 +67,9 @@ export default function MagicLoginPage() {
       </form>
 
       {sent && (
-        <p className="mt-4 text-green-600">
-          ✅ Email sent successfully — check your inbox!
-        </p>
+        <p className="mt-4 text-green-600">✅ Email sent successfully — check your inbox!</p>
       )}
-      {error && (
-        <p className="mt-4 text-red-600">
-          ⚠️ {error}
-        </p>
-      )}
+      {error && <p className="mt-4 text-red-600">⚠️ {error}</p>}
     </main>
   );
 }
