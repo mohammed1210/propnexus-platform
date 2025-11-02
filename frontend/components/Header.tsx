@@ -1,86 +1,64 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import styles from './Header.module.css';
+import { usePathname } from 'next/navigation';
+import clsx from 'clsx';
 
-/**
- * Lightweight client-side auth check using Supabase.
- * - No SSR issues (lazy imports)
- * - If env vars are missing (e.g., Preview/CI), it simply hides the auth-aware links.
- */
-async function isAuthenticated(): Promise<boolean> {
-  try {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return false;
-
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(url, key);
-    const { data } = await supabase.auth.getUser();
-    return Boolean(data.user);
-  } catch {
-    return false;
-  }
-}
+const links = [
+  { href: '/', label: 'Home' },
+  { href: '/listings', label: 'Listings' },
+  { href: '/analytics', label: 'Analytics' },   // or /dashboard if that’s your route
+  { href: '/pricing', label: 'Pricing' },
+  { href: '/account', label: 'Account' },       // customer portal lives here
+];
 
 export default function Header() {
-  const [authed, setAuthed] = useState(false);
-
-  useEffect(() => {
-    // fire-and-forget, do not block paint
-    (async () => setAuthed(await isAuthenticated()))();
-  }, []);
+  const pathname = usePathname();
 
   return (
-    <header className={styles.header} role="banner">
-      {/* Brand → Home */}
-      <Link href="/" className={styles.logo} aria-label="PropNexus — Home">
-        PropNexus
-      </Link>
+    <header
+      className={clsx(
+        'sticky top-0 z-40 w-full bg-white/70 backdrop-blur border-b border-zinc-200 dark:bg-zinc-900/70 dark:border-zinc-800'
+      )}
+      role="banner"
+      style={{ ['--header-h' as any]: '64px' }}
+    >
+      <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4">
+        {/* Brand -> Home */}
+        <Link href="/" className="text-2xl font-semibold tracking-tight" aria-label="PropNexus — Home">
+          <span className="text-blue-600 dark:text-blue-400">Prop</span>
+          <span className="text-zinc-900 dark:text-zinc-100">Nexus</span>
+        </Link>
 
-      {/* Your existing action buttons */}
-      <nav className={styles.nav} aria-label="Primary">
-        <button type="button" className={styles.button}>
-          Search
-        </button>
-        <button type="button" className={styles.button}>
-          Filters
-        </button>
-        <button type="button" className={styles.button}>
-          Map / List
-        </button>
+        <nav className="ml-auto flex items-center gap-1" aria-label="Primary">
+          {links.map(({ href, label }) => {
+            const active = pathname === href || pathname?.startsWith(href + '/');
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={clsx(
+                  'rounded-md px-3 py-2 text-sm font-medium',
+                  active
+                    ? 'bg-blue-50 text-blue-700 dark:bg-zinc-800 dark:text-blue-300'
+                    : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+                )}
+                aria-current={active ? 'page' : undefined}
+              >
+                {label}
+              </Link>
+            );
+          })}
 
-        {/* --- Right-side auth-aware actions --- */}
-        <div className={styles.rightActions} aria-label="Account actions">
-          {authed ? (
-            <>
-              <Link
-                href="/billing/account"
-                className={styles.linkButton}
-                aria-label="Open billing and manage subscription"
-              >
-                Billing
-              </Link>
-              <Link
-                href="/dashboard"
-                className={styles.linkButton}
-                aria-label="Open dashboard"
-              >
-                Dashboard
-              </Link>
-            </>
-          ) : (
-            <Link
-              href="/magic-login"
-              className={styles.linkPrimary}
-              aria-label="Sign in with magic link"
-            >
-              Sign in
-            </Link>
-          )}
-        </div>
-      </nav>
+          {/* Sign in */}
+          <Link
+            href="/magic-login"
+            className="ml-2 rounded-md bg-black px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800"
+          >
+            Sign in
+          </Link>
+        </nav>
+      </div>
     </header>
   );
 }
