@@ -19,13 +19,20 @@ export default function MagicLoginPage() {
     setStatus('sending');
 
     // Important: use your public site URL, not window.origin (prevents localhost redirects)
-    const site = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
-    const redirectTo = `${site.replace(/\/$/, '')}/auth/callback`;
+    // ...
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (typeof window !== 'undefined' ? window.location.origin : undefined);
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo },
-    });
+const { error } = await supabase.auth.signInWithOtp({
+  email,
+  options: {
+    // Always send users to our callback page (handles tokens & redirects)
+    emailRedirectTo: SITE_URL
+      ? `${SITE_URL}/auth/callback`
+      : undefined,
+  },
+});
 
     if (error) {
       console.error(error);
