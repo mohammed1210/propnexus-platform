@@ -1,43 +1,61 @@
+// app/auth/callback/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
-import { useRouter } from 'next/navigation';
+
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
 export default function AuthCallback() {
   const router = useRouter();
-  const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
+  const params = useSearchParams();
+  const [status, setStatus] = useState<'idle' | 'ok' | 'error'>('idle');
 
   useEffect(() => {
     const run = async () => {
-      try {
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-        const supabase = createClient(url, key);
+      const supabase = getSupabase();
+      if (!supabase) {
+        setStatus('error');
+        router.replace('/magic-login?err=env');
+        return;
+      }
 
-        // Exchange the URL hash for a session (works for magic-link & oauth)
-        const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
+      try {
+        // Handle both magic link (#access_token) and OAuth code flows.
+        // exchangeCodeForSession safely no-ops if nothing to exchange.
+        await supabase.auth.exchangeCodeForSession(window.location.href).catch(() => {});
+
+        const { data } = await supabase.auth.getSession();
         if (!data.session) throw new Error('No session from magic link');
 
         setStatus('ok');
-
-        // Send users to their account/billing page (or home)
-        router.replace('/account');
+        const returnTo = params.get('returnTo') || '/account';
+        router.replace(returnTo);
       } catch (e) {
         console.error(e);
         setStatus('error');
+        router.replace('/magic-login?err=callback');
       }
     };
+
     run();
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <main className="max-w-md mx-auto px-6 py-16 text-center">
-      {status === 'loading' && <p>Signing you in…</p>}
-      {status === 'error' && (
-        <p className="text-red-600">We couldn’t complete sign-in. Please try again.</p>
-      )}
+    <main className="mx-auto max-w-md px-6 py-16 text-center">
+      <h1 className="text-2xl font-semibold mb-3">Signing you in…</h1>
+      <p className="text-zinc-600 dark:text-zinc-300">
+        {status === 'error'
+          ? 'We could not complete sign in. Please request a new magic link.'
+          : 'Please wait while we complete your sign in.'}
+      </p>
     </main>
   );
 }
