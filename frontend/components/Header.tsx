@@ -86,6 +86,7 @@ export default function Header() {
             );
           })}
 
+
           {/* Session-aware actions */}
           {sessionEmail ? (
             <div className="flex items-center gap-3 ml-3 text-sm">
