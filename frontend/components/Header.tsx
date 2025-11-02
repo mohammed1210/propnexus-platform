@@ -6,19 +6,10 @@ import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const links = [
-  { href: '/', label: 'Home' },
-  { href: '/listings', label: 'Listings' },
-  { href: '/analytics', label: 'Analytics' },
-  { href: '/pricing', label: 'Pricing' },
-  { href: '/account', label: 'Account' },
-];
-
 export default function Header() {
   const pathname = usePathname();
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
 
-  // Check current session on mount
   useEffect(() => {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,14 +23,11 @@ export default function Header() {
 
     loadSession();
 
-    // Listen for login/logout
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setSessionEmail(session?.user?.email ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   const handleSignOut = async () => {
@@ -52,30 +40,38 @@ export default function Header() {
     window.location.href = '/';
   };
 
+  const links = [
+    { href: '/', label: 'Home' },
+    { href: '/listings', label: 'Listings' },
+    { href: '/analytics', label: 'Analytics' },
+    { href: '/pricing', label: 'Pricing' },
+    ...(sessionEmail ? [{ href: '/account', label: 'Account' }] : []),
+  ];
+
   return (
     <header
       className={clsx(
-        'sticky top-0 z-40 w-full bg-white/70 backdrop-blur border-b border-zinc-200 dark:bg-zinc-900/70 dark:border-zinc-800'
+        'sticky top-0 z-40 w-full border-b border-zinc-200 bg-white/70 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70'
       )}
       role="banner"
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
         {/* Brand */}
-        <Link href="/" className="text-2xl font-semibold tracking-tight">
+        <Link href="/" className="text-2xl font-semibold tracking-tight flex items-end gap-1">
           <span className="text-blue-600 dark:text-blue-400">Prop</span>
           <span className="text-zinc-900 dark:text-zinc-100">Nexus</span>
         </Link>
 
-        <nav className="ml-auto flex items-center gap-1" aria-label="Primary">
+        {/* Nav */}
+        <nav className="flex items-center gap-2" aria-label="Primary">
           {links.map(({ href, label }) => {
-            const active =
-              pathname === href || pathname?.startsWith(href + '/');
+            const active = pathname === href || pathname?.startsWith(href + '/');
             return (
               <Link
                 key={href}
                 href={href}
                 className={clsx(
-                  'rounded-md px-3 py-2 text-sm font-medium',
+                  'rounded-md px-3 py-2 text-sm font-medium transition',
                   active
                     ? 'bg-blue-50 text-blue-700 dark:bg-zinc-800 dark:text-blue-300'
                     : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
@@ -86,8 +82,7 @@ export default function Header() {
             );
           })}
 
-
-          {/* Session-aware actions */}
+          {/* Auth actions */}
           {sessionEmail ? (
             <div className="flex items-center gap-3 ml-3 text-sm">
               <span className="text-zinc-600 dark:text-zinc-300">
