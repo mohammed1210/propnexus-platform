@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  
   return createClient(url, key);
 }
 
@@ -27,10 +28,7 @@ const SITE_URL =
 const { error } = await supabase.auth.signInWithOtp({
   email,
   options: {
-    // Always send users to our callback page (handles tokens & redirects)
-    emailRedirectTo: SITE_URL
-      ? `${SITE_URL}/auth/callback`
-      : undefined,
+    emailRedirectTo: site ? `${site}/auth/callback` : undefined,
   },
 });
 

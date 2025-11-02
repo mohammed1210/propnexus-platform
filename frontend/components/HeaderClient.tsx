@@ -5,33 +5,22 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import clsx from 'clsx';
 
-/** Lazy, client-only Supabase auth probe */
-async function isAuthenticated(): Promise<boolean> {
-  try {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key) return false; // CI/preview safety
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(url, key);
-    const { data } = await supabase.auth.getUser();
-    return Boolean(data.user);
-  } catch {
-    return false;
-  }
+/** Lazy, client-only Supabase helpers */
+function getSupabaseSafe() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  // dynamic import so SSR/build won’t choke
+  const client = import('@supabase/supabase-js').then(m => m.createClient(url, key));
+  return client;
 }
 
-/**
- * Polished, responsive header for PropNexus.
- * - Sticky, with subtle shadow on scroll
- * - Primary navigation
- * - Dark mode toggle
- * - Back-to-top button
- * - Auth-aware actions: Billing (when authed) or Sign in
- */
+type UserBits = { email: string | null };
+
 export default function HeaderClient() {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
-  const [authed, setAuthed] = useState(false);
+  const [user, setUser] = useState<UserBits>({ email: null });
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 4);
@@ -40,26 +29,39 @@ export default function HeaderClient() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Probe auth (non-blocking)
   useEffect(() => {
-    // Fire-and-forget auth probe; do not block paint
-    (async () => setAuthed(await isAuthenticated()))();
+    (async () => {
+      const supabaseP = getSupabaseSafe();
+      if (!supabaseP) return;
+      const supabase = await supabaseP;
+      const { data } = await supabase.auth.getUser();
+      setUser({ email: data.user?.email ?? null });
+    })();
   }, []);
 
+  async function signOut() {
+    const supabaseP = getSupabaseSafe();
+    if (!supabaseP) return;
+    const supabase = await supabaseP;
+    await supabase.auth.signOut();
+    location.href = '/';
+  }
+
   const nav = [
+    { href: '/', label: 'Home' },
     { href: '/listings', label: 'Listings' },
-    { href: '/off-market', label: 'Off-Market' },
-    { href: '/saved-deals', label: 'Saved Deals' },
     { href: '/analytics', label: 'Analytics' },
     { href: '/pricing', label: 'Pricing' },
   ];
+
+  const authed = Boolean(user.email);
 
   return (
     <header
       className={clsx(
         'sticky top-0 z-40 w-full backdrop-blur bg-white/80 dark:bg-zinc-900/80',
-        scrolled
-          ? 'shadow-md border-b border-blue-100 dark:border-zinc-800'
-          : 'border-b border-transparent',
+        scrolled ? 'shadow-md border-b border-blue-100 dark:border-zinc-800' : 'border-b border-transparent',
       )}
       style={{ ['--header-h' as any]: '64px' }}
     >
@@ -113,12 +115,15 @@ export default function HeaderClient() {
               >
                 Billing
               </Link>
-              <Link
-                href="/dashboard"
-                className="rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              <span className="text-xs text-zinc-600 dark:text-zinc-400 hidden sm:inline">
+                {user.email}
+              </span>
+              <button
+                onClick={signOut}
+                className="rounded-md bg-zinc-900 text-white px-3 py-2 text-sm font-semibold hover:bg-zinc-800"
               >
-                Dashboard
-              </Link>
+                Sign out
+              </button>
             </>
           ) : (
             <Link
