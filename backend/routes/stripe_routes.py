@@ -1,167 +1,98 @@
-from __future__ import annotations
-
-import datetime as dt
-import os
-from typing import Any, Dict, Optional
-
+# backend/routes/stripe_routes.py
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
-
-from ..db import sb  # shared Supabase client (may be None if not configured)
-from ..utils.stripe_utils import (
-    construct_event_from_request,
-    create_checkout_session,
-    retrieve_customer_email,
-)
+import os, stripe
+from supabase import create_client, Client
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
 
-# --- ENV (backend) ---
-PRICE_ID_DEFAULT = os.getenv("STRIPE_PRICE_ID", "").strip()
-SUCCESS_URL = os.getenv(
-    "STRIPE_SUCCESS_URL", "https://propnexus-platform.vercel.app/success"
-).strip()
-CANCEL_URL = os.getenv(
-    "STRIPE_CANCEL_URL", "https://propnexus-platform.vercel.app/billing/cancel"
-).strip()
-WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+# --- ENV ---
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")  # sk_test_... or sk_live_...
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+# Prefer service_role key (for upsert), fall back to SUPABASE_KEY if you use that var
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
-# Supabase mapping (customize with envs to match your schema)
-SUB_TABLE = os.getenv("SUBSCRIPTION_TABLE", "profiles")
-SUB_EMAIL_COL = os.getenv("SUBSCRIPTION_EMAIL_COL", "email")
-SUB_TIER_COL = os.getenv("SUBSCRIPTION_TIER_COL", "subscription_tier")
-SUB_STATUS_COL = os.getenv("SUBSCRIPTION_STATUS_COL", "subscription_status")
-SUB_CUST_COL = os.getenv("SUBSCRIPTION_CUSTOMER_COL", "stripe_customer_id")
-SUB_PERIOD_END_COL = os.getenv("SUBSCRIPTION_CURRENT_PERIOD_END_COL", "current_period_end")
+# Site/return URLs: prefer explicit SITE_URL, then NEXT_PUBLIC_SITE_URL, then production fallback
+SITE_URL = (
+    os.getenv("SITE_URL")
+    or os.getenv("NEXT_PUBLIC_SITE_URL")
+    or "https://propnexus-platform.vercel.app"
+)
+PORTAL_RETURN_URL = os.getenv("PORTAL_RETURN_URL") or SITE_URL
 
-# Basic tier mapping: default price → tier (override per-price with env)
-DEFAULT_TIER = os.getenv("STRIPE_DEFAULT_TIER", "pro")
+stripe.api_key = STRIPE_SECRET_KEY
 
+sb: Client | None = None
+if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+  sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-def price_to_tier(price_id: Optional[str]) -> str:
-    if not price_id:
-        return DEFAULT_TIER
-    env_key = f"TIER_FOR_{price_id}".upper()
-    return os.getenv(env_key, DEFAULT_TIER)
+# Table/column names (override via env if your schema differs)
+USERS_TABLE = os.getenv("USERS_TABLE", "users")
+EMAIL_COL = os.getenv("USERS_EMAIL_COL", "email")
+CUST_COL  = os.getenv("USERS_STRIPE_COL", "stripe_customer_id")
 
+def get_or_create_customer(email: str) -> str:
+    """
+    1) Try Supabase users.{stripe_customer_id}
+    2) Try search in Stripe
+    3) Create new Stripe customer
+    4) Persist customer id back to Supabase
+    """
+    customer_id = None
 
-def iso8601_from_unix(ts: Optional[int]) -> Optional[str]:
-    if not ts:
-        return None
+    # 1) Supabase lookup
+    if sb:
+        res = sb.table(USERS_TABLE).select("*").eq(EMAIL_COL, email).maybe_single().execute()
+        row = (res.data or {}) if isinstance(res.data, dict) else (res.data[0] if res.data else None)
+        if row and row.get(CUST_COL):
+            return row[CUST_COL]
+
+    # 2) Stripe search/list
     try:
-        return dt.datetime.utcfromtimestamp(int(ts)).replace(tzinfo=dt.timezone.utc).isoformat()
+        found = stripe.Customer.search(query=f"email:'{email}'", limit=1)
+        if found.data:
+            customer_id = found.data[0].id
     except Exception:
-        return None
+        customers = stripe.Customer.list(email=email, limit=1)
+        if customers.data:
+            customer_id = customers.data[0].id
 
+    # 3) Create if still missing
+    if not customer_id:
+        created = stripe.Customer.create(email=email)
+        customer_id = created.id
 
-def upsert_subscription(
-    *,
-    email: str,
-    customer_id: Optional[str],
-    status: str,
-    price_id: Optional[str],
-    period_end_unix: Optional[int],
-) -> None:
-    """Upsert a user's subscription info into Supabase."""
-    if not sb:
-        # Supabase not configured; just no-op
-        return
+    # 4) Upsert back to Supabase
+    if sb:
+        try:
+            sb.table(USERS_TABLE).upsert(
+                {EMAIL_COL: email, CUST_COL: customer_id},
+                on_conflict=EMAIL_COL
+            ).execute()
+        except Exception:
+            pass
 
-    payload: Dict[str, Any] = {
-        SUB_EMAIL_COL: email,
-        SUB_STATUS_COL: status,
-        SUB_TIER_COL: price_to_tier(price_id),
-    }
-    if customer_id:
-        payload[SUB_CUST_COL] = customer_id
-    iso = iso8601_from_unix(period_end_unix)
-    if iso:
-        payload[SUB_PERIOD_END_COL] = iso
+    return customer_id
 
-    # Upsert on email (change ON CONFLICT key by using envs if needed)
-    sb.table(SUB_TABLE).upsert(payload, on_conflict=SUB_EMAIL_COL).execute()
+@router.post("/create-portal-session")
+async def create_portal_session(req: Request):
+    body = await req.json()
+    email = (body or {}).get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Missing email")
 
-
-@router.post("/checkout")
-async def stripe_checkout(req: Request):
-    data = await req.json()
-    price_id = (data.get("priceId") or PRICE_ID_DEFAULT or "").strip()
-    if not price_id:
-        raise HTTPException(status_code=400, detail="Missing priceId")
-    email = (data.get("email") or "").strip() or None
-    session = create_checkout_session(price_id, SUCCESS_URL, CANCEL_URL, email)
-    return JSONResponse(session)
-
-
-@router.post("/webhook")
-async def stripe_webhook(request: Request):
-    payload = await request.body()
-    sig_header = request.headers.get("stripe-signature")
-    if not sig_header:
-        raise HTTPException(status_code=400, detail="Missing stripe-signature header")
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
 
     try:
-        event = construct_event_from_request(payload, sig_header, WEBHOOK_SECRET)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid payload: {e}")
-
-    etype: str = event.get("type", "")
-    data_obj: Dict[str, Any] = (event.get("data", {}) or {}).get("object", {}) or {}
-
-    # --- Handle key events to keep Supabase in sync ---
-
-    if etype == "checkout.session.completed":
-        # Prefer customer_email from session; otherwise look up by customer id.
-        email = (
-            (data_obj.get("customer_details") or {}).get("email")
-            or data_obj.get("customer_email")
-            or retrieve_customer_email(data_obj.get("customer"))
+        customer_id = get_or_create_customer(email)
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=PORTAL_RETURN_URL,
         )
-        if email:
-            # Period end may not be here; invoice event will set it later.
-            upsert_subscription(
-                email=email,
-                customer_id=data_obj.get("customer"),
-                status="active",
-                price_id=os.getenv("STRIPE_PRICE_ID") or None,
-                period_end_unix=None,
-            )
-
-    elif etype == "invoice.payment_succeeded":
-        # Contains definitive line/price + current_period_end.
-        email = data_obj.get("customer_email") or retrieve_customer_email(data_obj.get("customer"))
-        line = ((data_obj.get("lines") or {}).get("data") or [{}])[0]
-        price_id = ((line or {}).get("price") or {}).get("id")
-        period_end = ((line or {}).get("period") or {}).get("end")
-        if email:
-            upsert_subscription(
-                email=email,
-                customer_id=data_obj.get("customer"),
-                status="active",
-                price_id=price_id,
-                period_end_unix=period_end,
-            )
-
-    elif etype in {"customer.subscription.updated", "customer.subscription.deleted"}:
-        # Reflect cancellation / status changes
-        sub = data_obj
-        status = sub.get("status") or ("canceled" if etype.endswith(".deleted") else "active")
-        customer_id = sub.get("customer")
-        price_id = None
-        items = (sub.get("items") or {}).get("data") or []
-        if items:
-            price_id = ((items[0] or {}).get("price") or {}).get("id")
-        period_end = sub.get("current_period_end") or None
-
-        email = retrieve_customer_email(customer_id)
-        if email:
-            upsert_subscription(
-                email=email,
-                customer_id=customer_id,
-                status=status,
-                price_id=price_id,
-                period_end_unix=period_end,
-            )
-
-    # Always acknowledge to Stripe
-    return JSONResponse({"ok": True, "type": etype})
+        return JSONResponse({"url": session.url})
+    except stripe.error.StripeError as e:
+        raise HTTPException(status_code=502, detail=f"Stripe error: {getattr(e, 'user_message', None) or str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    

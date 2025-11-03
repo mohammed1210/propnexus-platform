@@ -3,80 +3,73 @@
 import { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// ✅ Lazy-safe Supabase client (prevents CI build failures)
-function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) {
-    console.warn('Supabase env vars missing (CI or Preview build)');
-    return null; // allows build to continue safely
-  }
-  return createClient(url, key);
+function getSiteUrl(): string {
+  if (typeof window !== 'undefined') return window.location.origin;
+  const env =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_VERCEL_URL; // e.g. my-app.vercel.app
+  if (!env) return 'https://propnexus-platform.vercel.app';
+  return env.startsWith('http') ? env : `https://${env}`;
 }
 
 export default function MagicLoginPage() {
-  const supabase = getSupabase();
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+  );
 
   async function sendLink(e: React.FormEvent) {
     e.preventDefault();
-    if (!supabase) {
-      alert('Supabase not configured. Please try again later.');
-      return;
-    }
+    setError(null);
+    setLoading(true);
 
-    setStatus('sending');
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo:
-          typeof window !== 'undefined' ? window.location.origin : undefined,
-      },
-    });
+    try {
+      const site = getSiteUrl();
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          // Always bounce back to the SAME ORIGIN you started from
+          emailRedirectTo: `${site}/auth/callback?returnTo=/account`,
+        },
+      });
 
-    if (error) {
-      console.error(error);
-      setStatus('error');
-      alert(error.message);
-    } else {
-      setStatus('sent');
-      alert('Check your inbox for a magic link!');
+      if (error) throw error;
+      setSent(true);
+    } catch (err: any) {
+      setError(err.message || 'Could not send magic link');
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <main className="max-w-md mx-auto px-6 py-12 text-center">
-      <h1 className="text-2xl font-semibold mb-4 text-gray-900 dark:text-gray-100">
-        Magic Link Login
-      </h1>
-      <form onSubmit={sendLink} className="space-y-3">
+    <main className="mx-auto max-w-md px-6 py-12">
+      <h1 className="text-2xl font-semibold mb-4">Magic Link Login</h1>
+      <form onSubmit={sendLink} className="space-y-4">
         <input
           type="email"
-          required
-          placeholder="you@example.com"
-          className="w-full border rounded px-3 py-2 dark:bg-gray-800 dark:text-white"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          required
+          className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2"
         />
         <button
-          disabled={status === 'sending'}
-          className="px-4 py-2 rounded bg-black text-white hover:bg-gray-800 disabled:opacity-50"
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-md bg-zinc-900 text-white py-2 font-medium hover:bg-zinc-800 disabled:opacity-60"
         >
-          {status === 'sending' ? 'Sending...' : 'Send Magic Link'}
+          {loading ? 'Sending link…' : 'Send Magic Link'}
         </button>
       </form>
 
-      {status === 'sent' && (
-        <p className="mt-4 text-green-600 dark:text-green-400">
-          ✅ Email sent successfully — check your inbox!
-        </p>
-      )}
-      {status === 'error' && (
-        <p className="mt-4 text-red-600 dark:text-red-400">
-          ⚠️ Something went wrong. Please try again.
-        </p>
-      )}
+      {sent && <p className="mt-4 text-green-600">✅ Email sent — check your inbox!</p>}
+      {error && <p className="mt-4 text-red-600">⚠️ {error}</p>}
     </main>
   );
 }

@@ -1,4 +1,6 @@
+# backend/main.py
 from __future__ import annotations
+import os
 
 import os
 
@@ -16,38 +18,35 @@ from .routes.notes import router as notes_router
 from .routes.off_market_routes import router as off_market_router
 from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
-from .routes.stripe_routes import router as stripe_router
 
-# Load environment variables (after imports)
+# ✅ Stripe routers (named distinctly to avoid duplicate includes)
+from .routes.stripe_webhook import router as stripe_webhook_router        # POST /stripe/webhook
+from .routes.stripe_routes import router as stripe_routes_router          # POST /stripe/create-portal-session
+# If you also have a dedicated "create-checkout-session" router, import/include it here as well.
+
 try:
     from dotenv import load_dotenv
-
     load_dotenv()
 except Exception:
     pass
 
 app = FastAPI()
 
-# ======================
-# 🔒 Secure CORS Config
-# ======================
-# Use explicit origins when allow_credentials=True to comply with browser CORS rules
 _ALLOWED_ORIGINS = os.getenv(
-    "ALLOWED_ORIGINS", "http://localhost:3000,https://propnexus-platform.vercel.app"
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,https://propnexus-platform.vercel.app,https://*.vercel.app",
 )
 ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,  # no wildcard when credentials=True
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ======================
-# 🧩 Mount Routers
-# ======================
+# Core routers
 app.include_router(ai_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
@@ -58,8 +57,10 @@ app.include_router(notes_router)
 app.include_router(off_market_router)
 app.include_router(save_deal_router)
 app.include_router(scrape_router)
-app.include_router(stripe_router)
 
+# ✅ Stripe (include exactly once each)
+app.include_router(stripe_webhook_router)   # POST /stripe/webhook
+app.include_router(stripe_routes_router)    # POST /stripe/create-portal-session
 
 # ======================
 # 🏠 Root Route

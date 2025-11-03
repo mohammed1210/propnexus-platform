@@ -19,7 +19,8 @@
     "frontend:build": "cd frontend && next build",
     "ingest:csv": "ts-node scripts/ingest-csv.ts data/listings.sample.csv",
     "e2e": "playwright test",
-    "e2e:headed": "playwright test --headed"
+    "e2e:headed": "playwright test --headed",
+    "smoke:stripe": "node ops/smoke/stripe-check.mjs"
   },
   "dependencies": {
     "@pdf-lib/standard-fonts": "^1.0.0",
@@ -43,6 +44,7 @@
     "react-dom": "^18.2.0",
     "react-icons": "^5.5.0",
     "react-leaflet": "^4.2.1",
+    "sonner": "^2.0.7",
     "stripe": "^19.1.0",
     "tslib": "^1.14.1",
     "uuid": "^9.0.1"
