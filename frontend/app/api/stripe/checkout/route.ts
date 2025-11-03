@@ -1,35 +1,65 @@
-import { NextResponse } from 'next/server';
-import Stripe from 'stripe';
+// app/api/stripe/checkout/route.ts
+import { NextRequest } from "next/server";
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
-const key = process.env.STRIPE_SECRET_KEY;
-const base = process.env.NEXT_PUBLIC_APP_BASE_URL || '';
-const allowed = (process.env.NEXT_PUBLIC_STRIPE_ALLOWED_PRICE_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
-
-const stripe = key ? new Stripe(key as string, { apiVersion: '2025-09-30.clover' }) : (null as unknown as Stripe);
-
-export async function POST(req: Request) {
+/**
+ * Minimal proxy for Stripe checkout/portal creation.
+ * Tries common backend endpoints in order and forwards the JSON body.
+ * Works in previews (avoids cross-origin) and production.
+ */
+export async function POST(req: NextRequest) {
   try {
-    if (!stripe || !key) return NextResponse.json({ ok:false, error:'Stripe not configured' }, { status: 500 });
-
-    const { priceId } = await req.json();
-    if (!priceId || !allowed.includes(priceId)) {
-      return NextResponse.json({ ok:false, error:'Invalid or missing priceId' }, { status: 400 });
+    const body = await req.json().catch(() => ({}));
+    const backend = process.env.NEXT_PUBLIC_BACKEND_URL;
+    if (!backend) {
+      return new Response(
+        JSON.stringify({ error: "NEXT_PUBLIC_BACKEND_URL not set" }),
+        { status: 500, headers: { "content-type": "application/json" } }
+      );
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: `${base}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${base}/billing/cancel`,
-      automatic_tax: { enabled: true },
-    });
+    // Try possible backend endpoints in order
+    const candidates = [
+      "/stripe/checkout",                 // if you implemented this
+      "/stripe/create-checkout-session",  // common name
+      "/stripe/create-portal-session",    // graceful fallback (opens portal)
+    ];
 
-    return NextResponse.json({ ok:true, url: session.url });
-  } catch (err:any) {
-    console.error('Stripe checkout error', { message: err?.message, code: err?.code, type: err?.type });
-    return NextResponse.json({ ok:false, error:'Checkout failed' }, { status: 500 });
+    for (const path of candidates) {
+      try {
+        const r = await fetch(`${backend}${path}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        if (r.ok) {
+          // Return JSON (e.g., { url })
+          const data = await r.json().catch(() => ({}));
+          return new Response(JSON.stringify(data), {
+            status: r.status,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        // If not 404, bubble the error back (useful for Stripe messages)
+        if (r.status !== 404) {
+          const text = await r.text();
+          return new Response(text, { status: r.status });
+        }
+        // else: try next candidate
+      } catch {
+        // try next candidate
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ error: "No Stripe endpoint found on backend" }),
+      { status: 502, headers: { "content-type": "application/json" } }
+    );
+  } catch (e: any) {
+    return new Response(
+      JSON.stringify({ error: e?.message ?? "Unexpected error" }),
+      { status: 500, headers: { "content-type": "application/json" } }
+    );
   }
 }
