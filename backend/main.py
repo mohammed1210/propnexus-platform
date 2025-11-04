@@ -18,6 +18,7 @@ from .routes.notes import router as notes_router
 from .routes.off_market_routes import router as off_market_router
 from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
+from .routes.properties_routes import router as properties_router
 
 # ✅ Stripe routers (named distinctly to avoid duplicate includes)
 from .routes.stripe_webhook import router as stripe_webhook_router        # POST /stripe/webhook
@@ -57,6 +58,7 @@ app.include_router(notes_router)
 app.include_router(off_market_router)
 app.include_router(save_deal_router)
 app.include_router(scrape_router)
+app.include_router(properties_router)   # GET /properties
 
 # ✅ Stripe (include exactly once each)
 app.include_router(stripe_webhook_router)   # POST /stripe/webhook
