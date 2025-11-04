@@ -6,9 +6,12 @@ export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   'https://propnexus-backend-production.up.railway.app';
 
-/* -------------------- Generic Helpers -------------------- */
+/* ---------------------------------------------------
+   Generic Helpers (new + legacy compatibility)
+--------------------------------------------------- */
 
-async function safeFetch<T = any>(url: string, opts?: RequestInit): Promise<T> {
+/** Simple fetch with consistent error handling */
+export async function safeFetch<T = any>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, { cache: 'no-store', ...opts });
   if (!res.ok) {
     const msg = await res.text().catch(() => '');
@@ -17,7 +20,41 @@ async function safeFetch<T = any>(url: string, opts?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-/* -------------------- Property Listings -------------------- */
+/** ✅ Legacy alias for safeFetch (keeps older components working) */
+export const fetchWithRetry = async <T = any>(
+  url: string,
+  options: RequestInit = {},
+  retries = 2,
+  delay = 500
+): Promise<T> => {
+  try {
+    return await safeFetch<T>(url, options);
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise((r) => setTimeout(r, delay));
+      return fetchWithRetry(url, options, retries - 1, delay * 2);
+    }
+    throw err;
+  }
+};
+
+/** ✅ Legacy POST helper */
+export async function apiPost<T = any>(path: string, body: any): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => '');
+    throw new Error(`[POST ${res.status}] ${msg}`);
+  }
+  return (await res.json()) as T;
+}
+
+/* ---------------------------------------------------
+   Property Listings
+--------------------------------------------------- */
 
 export type ListParams = {
   q?: string;
@@ -57,35 +94,21 @@ export async function listProperties(params: ListParams = {}): Promise<PropertyR
   return safeFetch<PropertyRow[]>(`${API_BASE}/properties?${sp.toString()}`);
 }
 
-/* -------------------- Stripe: Checkout / Portal -------------------- */
+/* ---------------------------------------------------
+   Stripe Endpoints
+--------------------------------------------------- */
 
 export async function createCheckoutSession(planId: string, email: string) {
-  const res = await fetch(`${API_BASE}/stripe/create-checkout-session`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ plan_id: planId, email }),
-  });
-  if (!res.ok) {
-    const msg = await res.text().catch(() => '');
-    throw new Error(`[Checkout] ${msg}`);
-  }
-  return res.json();
+  return apiPost('/stripe/create-checkout-session', { plan_id: planId, email });
 }
 
 export async function createPortalSession(email: string) {
-  const res = await fetch(`${API_BASE}/stripe/create-portal-session`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-  });
-  if (!res.ok) {
-    const msg = await res.text().catch(() => '');
-    throw new Error(`[Portal] ${msg}`);
-  }
-  return res.json();
+  return apiPost('/stripe/create-portal-session', { email });
 }
 
-/* -------------------- Magic Link Login -------------------- */
+/* ---------------------------------------------------
+   Magic Link Authentication
+--------------------------------------------------- */
 
 export async function sendMagicLink(email: string): Promise<{ success: boolean; message: string }> {
   try {
@@ -104,7 +127,21 @@ export async function sendMagicLink(email: string): Promise<{ success: boolean; 
   }
 }
 
-/* -------------------- Healthcheck -------------------- */
+/* ---------------------------------------------------
+   AI Features (compatibility)
+--------------------------------------------------- */
+
+export async function postAiSummary(data: any) {
+  return apiPost('/ai/generate-summary', data);
+}
+
+export async function postAiStrategies(data: any) {
+  return apiPost('/ai/generate-strategies', data);
+}
+
+/* ---------------------------------------------------
+   Healthcheck
+--------------------------------------------------- */
 
 export async function checkHealth(): Promise<boolean> {
   try {

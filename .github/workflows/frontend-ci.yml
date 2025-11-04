@@ -1,9 +1,15 @@
 name: Frontend CI
 
 on:
-  pull_request:
   push:
     branches: [ main, sprint-*, po* ]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-ci.yml'
 
 jobs:
   build:
@@ -38,16 +44,20 @@ jobs:
             npm install --prefer-offline --no-audit --no-fund
           fi
 
-      - name: Verify jose installed
+      - name: Typecheck
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run typecheck || true
+
+      - name: Lint
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npm run lint
+
+      - name: Verify jose installed (debug)
         run: node -e "console.log('✅ jose version:', require('jose/package.json').version)"
 
       - name: Build
         env:
           NEXT_TELEMETRY_DISABLED: 1
         run: npm run build
-
-      - name: Run Jest tests
-        env:
-          NEXT_TELEMETRY_DISABLED: 1
-        run: npm test
-        

@@ -2,13 +2,22 @@ name: Backend CI
 
 on:
   push:
-    branches: [ main, po2 ]
+    branches: [ main, po2, sprint-*, po* ]
+    paths:
+      - 'backend/**'
+      - 'pyproject.toml'
+      - '.github/workflows/backend-ci.yml'
   pull_request:
+    paths:
+      - 'backend/**'
+      - 'pyproject.toml'
+      - '.github/workflows/backend-ci.yml'
 
 jobs:
   backend:
     name: Backend CI
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -26,7 +35,8 @@ jobs:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
-          pip install ruff black pytest
+          # pin for reproducible CI
+          pip install ruff==0.6.9 black==24.10.0 pytest==8.3.3
 
       - name: Lint (ruff + black --check)
         working-directory: backend
@@ -35,7 +45,6 @@ jobs:
           black --check .
 
       - name: Run tests (if any)
-        # Put repo root on PYTHONPATH so `from backend.main import app` works
         env:
           PYTHONPATH: ${{ github.workspace }}
         working-directory: backend
@@ -46,19 +55,3 @@ jobs:
           else
             echo "No tests found, skipping pytest"
           fi
-
-      # Optional: quick HTTP smoke against the running dev server (uvicorn)
-      # - name: Smoke Start (background)
-      #   working-directory: backend
-      #   env:
-      #     PORT: 8000
-      #   run: |
-      #     python -m uvicorn main:app --host 127.0.0.1 --port $PORT &> uvicorn.log &
-      #     for i in {1..30}; do
-      #       if curl -fsS http://127.0.0.1:$PORT/health >/dev/null 2>&1; then
-      #         echo "API is up"; break
-      #       fi
-      #       sleep 1
-      #     done
-      # - name: Smoke: GET /health
-      #   run: curl -fsS http://127.0.0.1:8000/health
