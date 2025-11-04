@@ -10,6 +10,8 @@ export const API_BASE =
    Generic Helpers (new + legacy compatibility)
 --------------------------------------------------- */
 
+export const BASE = API_BASE; // ✅ legacy alias for older imports
+
 /** Simple fetch with consistent error handling */
 export async function safeFetch<T = any>(url: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(url, { cache: 'no-store', ...opts });
