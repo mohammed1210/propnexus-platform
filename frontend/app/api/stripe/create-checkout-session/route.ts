@@ -1,15 +1,25 @@
 import { NextResponse } from 'next/server';
 
-const BE = process.env.NEXT_PUBLIC_BACKEND_URL!;
+const BACKEND_BASE =
+  (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/$/, '') || 'http://localhost:8000';
+
+export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
-  const body = await req.json().catch(() => ({}));
-  const r = await fetch(`${BE}/stripe/create-checkout-session`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-
-  const data = await r.json().catch(() => ({}));
-  return NextResponse.json(data, { status: r.status });
+  try {
+    const body = await req.json().catch(() => ({}));
+    const r = await fetch(`${BACKEND_BASE}/stripe/create-checkout-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      let detail = '';
+      try { detail = (await r.json())?.detail ?? ''; } catch {}
+      return NextResponse.json({ detail: detail || `Upstream error (${r.status})` }, { status: r.status });
+    }
+    return NextResponse.json(await r.json());
+  } catch (e: any) {
+    return NextResponse.json({ detail: e?.message || 'Proxy error' }, { status: 500 });
+  }
 }

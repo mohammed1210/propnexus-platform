@@ -29,19 +29,6 @@ async function signOut(): Promise<void> {
   if (supabase) await supabase.auth.signOut();
 }
 
-/** Choose backend base:
- * - Prefer NEXT_PUBLIC_BACKEND_URL
- * - Else fall back to same-origin /api (if you ever add a proxy)
- */
-function getBackendBase(): string {
-  const envBase = process.env.NEXT_PUBLIC_BACKEND_URL?.replace(/\/$/, '');
-  if (envBase) return envBase;
-  if (typeof window !== 'undefined') {
-    return `${window.location.origin.replace(/\/$/, '')}/api`;
-  }
-  return '/api';
-}
-
 /** Force dynamic so we don’t cache auth state */
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +55,7 @@ export default function AccountPage() {
     const t = setTimeout(() => controller.abort(), 20_000);
 
     try {
-      const res = await fetch(`${getBackendBase()}/stripe/create-portal-session`, {
+      const res = await fetch(`/api/stripe/create-portal-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -77,7 +64,9 @@ export default function AccountPage() {
 
       if (!res.ok) {
         let detail = '';
-        try { detail = (await res.json())?.detail ?? ''; } catch {}
+        try {
+          detail = (await res.json())?.detail ?? '';
+        } catch {}
         throw new Error(detail || `Portal request failed (${res.status})`);
       }
 
@@ -124,7 +113,7 @@ export default function AccountPage() {
           {/* Primary shadcn-styled portal button */}
           <StripePortalButton email={email} />
 
-          {/* Optional fallback button */}
+          {/* Optional fallback */}
           <button
             onClick={openPortalManually}
             disabled={loadingPortal}

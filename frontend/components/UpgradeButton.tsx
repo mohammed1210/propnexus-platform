@@ -1,62 +1,71 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
-type Props = {
+async function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
+  if (!url || !key) return null;
+  const { createClient } = await import('@supabase/supabase-js');
+  return createClient(url, key);
+}
+async function getUserEmail(): Promise<string | null> {
+  try {
+    const supabase = await getSupabase();
+    if (!supabase) return null;
+    const { data } = await supabase.auth.getUser();
+    return data.user?.email ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export default function UpgradeButton({
+  priceId,
+  children,
+}: {
   priceId: string;
   children?: React.ReactNode;
-  className?: string;
-};
-
-export default function UpgradeButton({ priceId, children, className }: Props) {
+}) {
+  const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function handleClick() {
-    if (!priceId) {
-      alert('Missing priceId');
-      return;
-    }
-    try {
-      setLoading(true);
+  useEffect(() => { (async () => setEmail(await getUserEmail()))(); }, []);
 
-      const res = await fetch('/api/stripe/checkout', {
+  const startCheckout = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/stripe/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // The API validates this priceId against NEXT_PUBLIC_STRIPE_ALLOWED_PRICE_IDS
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({
+          price_id: priceId,
+          email: email ?? undefined, // backend can still create customer without it
+        }),
       });
-
-      // Attempt to parse the JSON either way to get a useful error
-      const data = await res.json().catch(() => ({} as any));
-
-      if (!res.ok) {
-        console.error('Checkout error', data);
-        alert(data?.error || 'Checkout failed (bad request).');
-        return;
-      }
-
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
       if (data?.url) {
-        window.location.href = data.url as string; // Redirect to Stripe Checkout
+        toast.success('Redirecting to Stripe…');
+        window.location.href = data.url;
       } else {
-        alert('Checkout failed: no redirect URL returned.');
+        throw new Error('No checkout URL returned');
       }
-    } catch (err) {
-      console.error('Checkout exception', err);
-      alert('Checkout failed (network/client error).');
+    } catch (e: any) {
+      toast.error(e?.message || 'Checkout failed.');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
     <button
-      type="button"
-      onClick={handleClick}
+      onClick={startCheckout}
       disabled={loading}
-      className={
-        className ??
-        'w-full rounded-md bg-black text-white px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed'
-      }
+      className={`inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition
+        ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary/90'}
+        bg-primary text-white`}
     >
       {loading ? 'Redirecting…' : children ?? 'Upgrade'}
     </button>
