@@ -42,3 +42,6 @@ frontend/.env
 .env.local
 .env.production.local
 
+
+# Local env
+backend/.env
