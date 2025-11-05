@@ -28,3 +28,14 @@ jobs:
           npm run typecheck --if-present
           npm run lint --if-present
           npm run build
+
+      - name: Lightweight smoke test
+        run: |
+          echo "Starting Next.js server in background..."
+          npm run start &
+          SERVER_PID=$!
+          sleep 10
+          echo "Testing root endpoint..."
+          curl -f http://localhost:3000/ || (echo "Smoke test failed"; kill $SERVER_PID; exit 1)
+          echo "Smoke test passed!"
+          kill $SERVER_PID

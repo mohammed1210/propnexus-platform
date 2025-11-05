@@ -5,6 +5,8 @@ on:
       - "backend/**"
   push:
     branches:
+      - main
+      - sprint-*
       - po3/**
 jobs:
   build:
@@ -23,3 +25,9 @@ jobs:
       - name: Import check
         working-directory: backend
         run: python -c "import importlib; importlib.import_module('fastapi')"
+      - name: Verify new routes import
+        working-directory: backend
+        run: |
+          python -c "from routes.stripe_routes import router; print('✓ stripe_routes')"
+          python -c "from routes.stripe_webhook import router; print('✓ stripe_webhook')"
+          python -c "from routes.users_routes import router; print('✓ users_routes')"
