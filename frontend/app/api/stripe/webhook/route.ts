@@ -47,17 +47,49 @@ export async function POST(req: NextRequest) {
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
-        // TODO: handle subscription activation
+        const session = event.data.object as Stripe.Checkout.Session;
+        const logData = {
+          event_type: event.type,
+          customer: session.customer,
+          subscription: session.subscription,
+          email: session.customer_details?.email,
+          timestamp: new Date().toISOString(),
+        };
+        console.log('[Stripe Webhook] Checkout completed:', logData);
+        // Backend webhook handles the actual subscription activation
+        // This frontend webhook is primarily for logging/monitoring
+        // TODO: Consider sending to monitoring service (e.g., Sentry, Datadog)
         break;
       }
-      // add other cases as needed
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        const logData = {
+          event_type: event.type,
+          id: subscription.id,
+          customer: subscription.customer,
+          status: subscription.status,
+          timestamp: new Date().toISOString(),
+        };
+        console.log(`[Stripe Webhook] Subscription ${event.type}:`, logData);
+        // TODO: Consider sending to monitoring service (e.g., Sentry, Datadog)
+        break;
+      }
       default:
+        console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
         break;
     }
 
     return NextResponse.json({ received: true });
   } catch (err) {
-    console.error('stripe webhook handler error:', err);
+    const error = err as Error;
+    console.error('[Stripe Webhook] Handler error:', {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+    });
+    // TODO: Send error to monitoring service
     return NextResponse.json({ error: 'handler-error' }, { status: 500 });
   }
 }
