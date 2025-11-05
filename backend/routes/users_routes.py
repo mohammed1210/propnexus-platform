@@ -86,11 +86,16 @@ async def get_user_plan(authorization: str = Header(None)):
     try:
         user_response = supabase.auth.get_user(token)
         if not user_response or not user_response.user:
-            raise HTTPException(status_code=401, detail="Invalid token")
+            raise HTTPException(status_code=401, detail="Invalid or expired token")
         
         user_email = user_response.user.email
         if not user_email:
             raise HTTPException(status_code=401, detail="No email in token")
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except ValueError as e:
+        print(f"[users_routes] Token format error: {e}")
+        raise HTTPException(status_code=401, detail="Malformed token")
     except Exception as e:
         print(f"[users_routes] Auth verification failed: {e}")
         raise HTTPException(status_code=401, detail="Authentication failed")

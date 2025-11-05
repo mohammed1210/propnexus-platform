@@ -50,7 +50,9 @@ export default function PlanGate({ children, requiredPlan, fallback }: PlanGateP
   }
 
   // Not authenticated or insufficient plan
-  const userPlan = data?.plan || 'free';
+  // If no data, user is not authenticated - treat as 'free'
+  // If data exists but plan is missing, something is wrong - also treat as 'free' but could log
+  const userPlan = data ? (data.plan || 'free') : 'free';
   const hasAccess = checkPlanAccess(userPlan, requiredPlan);
 
   if (!hasAccess) {

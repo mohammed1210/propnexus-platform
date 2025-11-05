@@ -25,6 +25,18 @@ BEGIN
   END IF;
 END $$;
 
+-- Add CHECK constraint for plan values if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'users_plan_check'
+  ) THEN
+    ALTER TABLE users ADD CONSTRAINT users_plan_check 
+    CHECK (plan IN ('free', 'pro', 'enterprise'));
+  END IF;
+END $$;
+
 -- Create index on stripe_customer_id if it doesn't exist
 DO $$
 BEGIN
