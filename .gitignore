@@ -1,47 +1,21 @@
-# Node / Next / monorepo
-node_modules/
-.next/
-.turbo/
-.vercel/
-dist/
-build/
-coverage/
+# Node / Next / Vercel
+frontend/.next
+frontend/.vercel
+**/.vercel/*
+**/.next/*
 
 # Python
-.venv/
-__pycache__/
-.pytest_cache/
+backend/.venv
+**/__pycache__/
+**/*.pyc
 
-# OS / editor
-.DS_Store
-*.log
-
-# Env files (never commit real envs)
+# Env
 .env
-**/.env
-.env.local
-.env.production
-.env.development
+.env.*
+frontend/.env.local
+frontend/.env*
 backend/.env
-frontend/.env
+backend/.env.*
 
-# Lock-in for repo hygiene
-*.sqlite
-.vercel
-
-# never commit env files
-*.env
-backend/.env
-frontend/.env
-
-
-# --- ops guardrails ---
-*.env
-backend/.env
-frontend/.env
-.env.local
-.env.production.local
-
-
-# Local env
-backend/.env
+# Misc
+.DS_Store
