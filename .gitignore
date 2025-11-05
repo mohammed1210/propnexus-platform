@@ -45,3 +45,13 @@ frontend/.env
 
 # Local env
 backend/.env
+
+# Temporary files
+/tmp/
+*.tmp
+*.swp
+*~
+
+# Test results
+test-results/
+playwright-report/

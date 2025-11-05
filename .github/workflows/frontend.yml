@@ -28,3 +28,12 @@ jobs:
           npm run typecheck --if-present
           npm run lint --if-present
           npm run build
+
+      - name: Smoke Test (Start Server)
+        run: |
+          npm run start &
+          SERVER_PID=$!
+          sleep 10
+          curl -f http://localhost:3000/ || (echo "Smoke test failed" && kill $SERVER_PID && exit 1)
+          kill $SERVER_PID || true
+        continue-on-error: true
