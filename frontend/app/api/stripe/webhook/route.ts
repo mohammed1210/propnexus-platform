@@ -47,11 +47,29 @@ export async function POST(req: NextRequest) {
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
-        // TODO: handle subscription activation
+        const session = event.data.object as Stripe.Checkout.Session;
+        console.log('Checkout completed:', {
+          customer: session.customer,
+          subscription: session.subscription,
+          email: session.customer_details?.email,
+        });
+        // Backend webhook handles the actual subscription activation
+        // This frontend webhook is primarily for logging/monitoring
         break;
       }
-      // add other cases as needed
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        console.log(`Subscription ${event.type}:`, {
+          id: subscription.id,
+          customer: subscription.customer,
+          status: subscription.status,
+        });
+        break;
+      }
       default:
+        console.log(`Unhandled event type: ${event.type}`);
         break;
     }
 
