@@ -16,14 +16,14 @@ create table if not exists public.users (
 -- Subscriptions table - tracks user subscription status
 create table if not exists public.subscriptions (
   id uuid primary key default uuid_generate_v4(),
+  user_id uuid references public.users(id) on delete cascade,
   email text unique not null,
   stripe_customer_id text not null,
   subscription_id text unique,
   status text not null default 'inactive',
   price_id text,
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now(),
-  foreign key (email) references public.users(email) on delete cascade
+  updated_at timestamp with time zone default now()
 );
 
 -- Saved deals table - user-saved property deals
@@ -79,6 +79,7 @@ create table if not exists public.property_notes (
 -- Create indexes for better query performance
 create index if not exists idx_users_email on public.users(email);
 create index if not exists idx_users_stripe_customer on public.users(stripe_customer_id);
+create index if not exists idx_subscriptions_user on public.subscriptions(user_id);
 create index if not exists idx_subscriptions_email on public.subscriptions(email);
 create index if not exists idx_subscriptions_customer on public.subscriptions(stripe_customer_id);
 create index if not exists idx_subscriptions_status on public.subscriptions(status);
@@ -143,7 +144,7 @@ create policy "Users can view their own record" on public.users
 -- Allow authenticated users to view their own subscription
 drop policy if exists "Users can view their own subscription" on public.subscriptions;
 create policy "Users can view their own subscription" on public.subscriptions
-  for select using (auth.jwt() ->> 'email' = email);
+  for select using (auth.uid() = user_id or auth.jwt() ->> 'email' = email);
 
 -- Function to automatically update updated_at timestamp
 create or replace function public.handle_updated_at()

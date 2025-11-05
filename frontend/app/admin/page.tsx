@@ -26,11 +26,13 @@ async function getAdminStats() {
       console.error('Error fetching subscription data:', subDataError);
     }
 
-    // Calculate MRR based on price IDs (these would need to be configured in your environment)
+    // Calculate MRR based on price IDs
+    // Note: In production, consider fetching actual prices from Stripe API for accuracy
     const priceMap: { [key: string]: number } = {
-      // Example prices - adjust these based on your actual Stripe price IDs
-      [process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO || '']: 29,
-      [process.env.NEXT_PUBLIC_STRIPE_PRICE_INVESTOR || '']: 99,
+      [process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO || '']: 
+        parseFloat(process.env.NEXT_PUBLIC_STRIPE_AMOUNT_PRO || '29'),
+      [process.env.NEXT_PUBLIC_STRIPE_PRICE_INVESTOR || '']: 
+        parseFloat(process.env.NEXT_PUBLIC_STRIPE_AMOUNT_INVESTOR || '99'),
     };
 
     let mrrGBP = 0;
