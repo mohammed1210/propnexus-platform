@@ -9,6 +9,10 @@ PropNexus is a comprehensive real estate platform for property investment analys
 
 - 🏠 **Property Listings** - Browse and search properties from multiple sources
 - 🤖 **AI Analysis** - Investment summaries and exit strategies powered by GPT-4
+- 💬 **AI Chatbot** - Interactive GPT-powered assistant for real-time investment advice (Sprint 11)
+- 🎯 **AI Deal Scoring** - Automated investment scoring with detailed breakdown (Sprint 11)
+- 🏘️ **Area Intelligence** - Crime rates, schools, transport links, and market data (Sprint 11)
+- 📊 **Comparable Sales** - Recent sales and rental data for price validation (Sprint 11)
 - 💰 **Deal Tracking** - Save and manage potential investment opportunities
 - 📊 **Analytics** - Property metrics, area intelligence, and comparables
 - 🔐 **Authentication** - Secure user accounts with Supabase Auth
@@ -258,6 +262,102 @@ cd frontend && npm run lint
 1. Run `supabase/schema.sql` in SQL Editor
 2. Configure RLS policies
 3. Set up backups and monitoring
+
+## Sprint 11: AI Features
+
+### AI Chatbot
+The platform now includes a floating AI assistant that provides real-time investment advice using GPT-4. Features:
+- Persistent conversation history per property (localStorage)
+- Context-aware responses using property details
+- Support for custom quick prompts
+- Dark mode support
+
+**Enable:** Set `NEXT_PUBLIC_FEATURE_AI_CHATBOT=true` in frontend environment.
+
+### AI Deal Scoring
+Automated investment scoring system that analyzes properties across 6 key categories:
+- **Rental Yield** (0-20 points) - Cash flow potential
+- **ROI Potential** (0-20 points) - Return on investment
+- **Price-to-Rent Ratio** (0-15 points) - Value assessment
+- **Area Demand** (0-15 points) - Market strength
+- **Safety Index** (0-15 points) - Crime data inverse
+- **Schools Access** (0-15 points) - Educational amenities
+
+Total score: 0-100 with animated visual breakdown.
+
+**Enable:** Set `FEATURE_DEAL_SCORING=true` in backend environment.
+
+### AI Score Explanation
+GPT-powered explanation feature that provides:
+- Natural language summary of the deal score
+- 5-7 key bullet points highlighting factors
+- Personalized insights based on property data
+
+### Area Intelligence
+Displays comprehensive area data:
+- Population and demographics
+- Average property prices and rents
+- Rental yield percentages
+- Crime index with visual indicators
+- School ratings (0-5 scale)
+- Transport links (rail, bus, etc.)
+
+**Enable:** Set `FEATURE_AREA_INTEL_PANEL=true` in backend environment.
+
+### Comparable Sales (Comps)
+Shows recent transactions near the property:
+- Recent sales with prices and dates
+- Rental listings with monthly rates
+- Property types and distances
+- Average prices across comparables
+- Cache indicators (live vs cached data)
+
+**Enable:** Set `FEATURE_COMPS_PANEL=true` in backend environment.
+
+### API Endpoints
+
+**Chat:**
+```
+POST /gpt/chat
+Body: {
+  "messages": [{"role": "user", "content": "..."}],
+  "context": {"property_id": "...", "summary": "...", ...}
+}
+```
+
+**Scoring:**
+```
+POST /gpt/score
+Body: { property data with yield_percent, roi_percent, etc. }
+```
+
+**Explanation:**
+```
+POST /gpt/score/explain
+Body: { "score": 75, "property": {...} }
+```
+
+**Area Intel:**
+```
+GET /area-intel/{area_key}
+```
+
+**Comps:**
+```
+GET /comps/{postcode}
+```
+
+### Testing
+All new features are fully tested:
+- `backend/tests/test_gpt_chat.py` - AI chat endpoint tests
+- `backend/tests/test_scoring.py` - Scoring algorithm tests
+- Mock OpenAI responses to avoid API costs in CI
+
+Run tests:
+```bash
+cd backend
+pytest tests/ -v
+```
 
 ## Contributing
 
