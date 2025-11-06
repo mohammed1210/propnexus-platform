@@ -105,6 +105,9 @@ export default function AccountPage() {
             <div>
               <div className="text-sm text-zinc-500">Signed in as</div>
               <div className="font-semibold">{email}</div>
+              <div className="mt-2">
+                <PlanBadge />
+              </div>
             </div>
             <button
               onClick={handleSignOut}

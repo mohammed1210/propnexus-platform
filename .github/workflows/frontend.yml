@@ -24,6 +24,10 @@ jobs:
         run: npm ci
 
       - name: Typecheck + Lint + Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key
+          NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
         run: |
           npm run typecheck --if-present
           npm run lint --if-present

@@ -5,6 +5,8 @@ on:
       - "backend/**"
   push:
     branches:
+      - main
+      - sprint-*
       - po3/**
 jobs:
   build:

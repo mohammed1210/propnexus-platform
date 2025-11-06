@@ -25,6 +25,9 @@ from .routes.stripe_webhook import router as stripe_webhook_router        # POST
 from .routes.stripe_routes import router as stripe_routes_router          # POST /stripe/create-portal-session
 from .routes.users_routes import router as users_router                   # GET /users/plan
 
+# Users router
+from .routes.users_routes import router as users_router                    # GET /users/plan
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
