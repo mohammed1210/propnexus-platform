@@ -45,3 +45,4 @@ frontend/.env
 
 # Local env
 backend/.env
+frontend/tsconfig.tsbuildinfo

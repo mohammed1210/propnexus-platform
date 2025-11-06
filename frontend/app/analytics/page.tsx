@@ -15,6 +15,7 @@ import {
   Legend,
 } from 'chart.js';
 import { getSupabase } from '@/lib/supabaseClient';
+import PlanGate from '@/components/PlanGate';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -82,8 +83,9 @@ export default function AnalyticsPage() {
   }, [deals]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-6">
-      <aside className="md:col-span-1 bg-slate-900 text-white rounded-xl p-4 h-fit">
+    <PlanGate requiredPlan="pro">
+      <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <aside className="md:col-span-1 bg-slate-900 text-white rounded-xl p-4 h-fit">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 bg-blue-500 rounded-md grid place-items-center font-bold">PN</div>
           <div className="font-bold">PropNexus</div>
@@ -210,6 +212,7 @@ export default function AnalyticsPage() {
         </Section>
       </main>
     </div>
+    </PlanGate>
   );
 }
 

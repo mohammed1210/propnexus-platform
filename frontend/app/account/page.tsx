@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import StripePortalButton from '@/components/StripePortalButton';
+import PlanBadge from '@/components/PlanBadge';
 
 /** Lazy, client-only Supabase helpers (safe for CI/preview) */
 async function getSupabase() {
@@ -101,6 +102,9 @@ export default function AccountPage() {
             <div>
               <div className="text-sm text-zinc-500">Signed in as</div>
               <div className="font-semibold">{email}</div>
+              <div className="mt-2">
+                <PlanBadge />
+              </div>
             </div>
             <button
               onClick={handleSignOut}

@@ -25,6 +25,9 @@ from .routes.stripe_webhook import router as stripe_webhook_router        # POST
 from .routes.stripe_routes import router as stripe_routes_router          # POST /stripe/create-portal-session
 # If you also have a dedicated "create-checkout-session" router, import/include it here as well.
 
+# Users router
+from .routes.users_routes import router as users_router                    # GET /users/plan
+
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -63,6 +66,9 @@ app.include_router(properties_router)   # GET /properties
 # ✅ Stripe (include exactly once each)
 app.include_router(stripe_webhook_router)   # POST /stripe/webhook
 app.include_router(stripe_routes_router)    # POST /stripe/create-portal-session
+
+# Users
+app.include_router(users_router)            # GET /users/plan
 
 # ======================
 # 🏠 Root Route
