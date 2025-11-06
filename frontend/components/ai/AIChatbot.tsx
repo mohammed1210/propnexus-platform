@@ -120,7 +120,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
         context,
       });
 
-      if (response.ok && response.reply) {
+      if (response && response.reply) {
         setMessages((p) => p.concat({ role: 'assistant', content: response.reply }));
       } else {
         throw new Error('Invalid response from AI service');

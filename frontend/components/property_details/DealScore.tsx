@@ -4,8 +4,22 @@
 import { useEffect, useState } from 'react';
 import { postAIScore, postAIScoreExplain } from '@/lib/api';
 
+interface PropertyData {
+  id?: string;
+  price?: number;
+  location?: string;
+  bedrooms?: number;
+  yield_percent?: number;
+  roi_percent?: number;
+  rent?: number;
+  avg_rent?: number;
+  crime_index?: number;
+  schools_rating?: number;
+  [key: string]: any;
+}
+
 interface DealScoreProps {
-  property: any;
+  property: PropertyData;
 }
 
 interface ScoreData {
@@ -39,7 +53,7 @@ export default function DealScore({ property }: DealScoreProps) {
       setLoading(true);
       try {
         const response = await postAIScore(property);
-        if (response.ok) {
+        if (response && typeof response.score === 'number') {
           setScoreData({
             score: response.score,
             categories: response.categories,
@@ -69,10 +83,10 @@ export default function DealScore({ property }: DealScoreProps) {
         score: scoreData?.score || 0,
         property,
       });
-      if (response.ok) {
+      if (response && response.explanation) {
         setExplanation({
           explanation: response.explanation,
-          bullets: response.bullets,
+          bullets: response.bullets || [],
         });
       }
     } catch (err) {
