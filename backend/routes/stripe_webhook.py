@@ -34,10 +34,10 @@ else:
 # === Supabase helpers =========================================================
 
 USERS_TABLE = "users"
-USERS_EMAIL_COL = "email"               # must be UNIQUE in your schema
+USERS_EMAIL_COL = "email"  # must be UNIQUE in your schema
 USERS_CUSTOMER_COL = "stripe_customer_id"
 
-SUBS_TABLE = "subscriptions"            # optional table for status tracking
+SUBS_TABLE = "subscriptions"  # optional table for status tracking
 SUBS_EMAIL_COL = "email"
 SUBS_CUSTOMER_COL = "stripe_customer_id"
 SUBS_STATUS_COL = "status"
@@ -95,6 +95,7 @@ def upsert_subscription_record(
 
 # === Utilities ================================================================
 
+
 def _extract_email_from_session(session_obj: dict) -> Optional[str]:
     # Stripe can put email in different places depending on how Checkout was created
     return (
@@ -114,6 +115,7 @@ def _get_customer_email(customer_id: str) -> Optional[str]:
 
 
 # === Webhook =================================================================
+
 
 @router.post("/webhook")
 async def stripe_webhook(

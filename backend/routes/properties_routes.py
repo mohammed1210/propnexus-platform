@@ -14,6 +14,7 @@ router = APIRouter(prefix="/properties", tags=["properties"])
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
+
 def get_sb() -> Client:
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         raise HTTPException(
@@ -25,12 +26,14 @@ def get_sb() -> Client:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Supabase init failed: {e}")
 
+
 ALLOWED_SORT = {"price", "created_at", "bedrooms", "yield_percent", "roi_percent"}
 
 SELECT_COLS = (
     "id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,"
     "imageurl,latitude,longitude,created_at"
 )
+
 
 @router.get("")
 def list_properties(
@@ -46,7 +49,7 @@ def list_properties(
 
     # Validate sort
     sort_col = sort if sort in ALLOWED_SORT else "created_at"
-    desc = (dir.lower() != "asc")
+    desc = dir.lower() != "asc"
 
     try:
         query = sb.table("properties").select(SELECT_COLS).limit(limit)
@@ -71,6 +74,7 @@ def list_properties(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to list properties: {e}")
 
+
 @router.get("/{prop_id}")
 def get_property(prop_id: str):
     sb = get_sb()
@@ -84,4 +88,3 @@ def get_property(prop_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch property: {e}")
-    

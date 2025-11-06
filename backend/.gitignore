@@ -30,7 +30,7 @@ build/
 .env
 .env.local
 .env.*.local
-backend/.env
+*.env
 
 # Temporary
 *.zip
@@ -48,8 +48,3 @@ backend/.env
 
 # Other IDE
 .idea/
-
-# Never commit secrets
-.env
-*.env
-backend/.env

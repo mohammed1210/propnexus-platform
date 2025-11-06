@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
-import os, stripe
+import os
+import stripe
 from supabase import create_client
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
@@ -42,4 +43,3 @@ async def create_portal_session(request: Request):
         return JSONResponse({"url": session.url})
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    

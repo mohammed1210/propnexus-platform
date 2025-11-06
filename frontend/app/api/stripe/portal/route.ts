@@ -19,10 +19,7 @@ async function getCustomerIdForCurrentUser(): Promise<string | null> {
 export async function POST() {
   try {
     if (!KEY) {
-      return NextResponse.json(
-        { ok: false, error: 'Stripe not configured' },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: 'Stripe not configured' }, { status: 500 });
     }
 
     const stripe = new Stripe(KEY, { apiVersion: '2025-09-30.clover' });
@@ -32,7 +29,7 @@ export async function POST() {
       // Keep types happy and avoid calling the API without a customer.
       return NextResponse.json(
         { ok: false, error: 'No Stripe customer on file for this user.' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -48,9 +45,6 @@ export async function POST() {
       code: err?.code,
       type: err?.type,
     });
-    return NextResponse.json(
-      { ok: false, error: 'Portal failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: 'Portal failed' }, { status: 500 });
   }
 }

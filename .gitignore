@@ -1,58 +1,33 @@
-# Node / Next / monorepo
+# Node / Next
 node_modules/
 .next/
-.turbo/
+out/
 .vercel/
-dist/
-build/
-coverage/
+
+# TypeScript build info
+**/*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
+
+# Logs & caches
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+.yarn/cache/
+.pnpm-store/
+
+# Env files (never commit real secrets)
+.env
+.env.*
+frontend/.env.local
+backend/.env.local
 
 # Python
-.venv/
 __pycache__/
-.pytest_cache/
+*.pyc
+.venv/
 
-# OS / editor
+# OS / Editor
 .DS_Store
-*.log
-
-# Env files (never commit real envs)
-.env
-**/.env
-.env.local
-.env.production
-.env.development
-backend/.env
-frontend/.env
-
-# Lock-in for repo hygiene
-*.sqlite
-.vercel
-
-# never commit env files
-*.env
-backend/.env
-frontend/.env
-
-
-# --- ops guardrails ---
-*.env
-backend/.env
-frontend/.env
-.env.local
-.env.production.local
-
-
-# Local env
-backend/.env
-
-# Temporary files
-/tmp/
-*.tmp
 *.swp
-*~
-
-# Test results
-test-results/
-playwright-report/
-frontend/tsconfig.tsbuildinfo
+.vscode/
+.idea/

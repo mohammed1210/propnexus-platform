@@ -13,7 +13,7 @@ export default function Header() {
   useEffect(() => {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     );
 
     const loadSession = async () => {
@@ -33,7 +33,7 @@ export default function Header() {
   const handleSignOut = async () => {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     );
     await supabase.auth.signOut();
     setSessionEmail(null);
@@ -51,7 +51,7 @@ export default function Header() {
   return (
     <header
       className={clsx(
-        'sticky top-0 z-40 w-full border-b border-zinc-200 bg-white/70 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70'
+        'sticky top-0 z-40 w-full border-b border-zinc-200 bg-white/70 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70',
       )}
       role="banner"
     >
@@ -74,7 +74,7 @@ export default function Header() {
                   'rounded-md px-3 py-2 text-sm font-medium transition',
                   active
                     ? 'bg-blue-50 text-blue-700 dark:bg-zinc-800 dark:text-blue-300'
-                    : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800'
+                    : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800',
                 )}
               >
                 {label}

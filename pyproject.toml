@@ -2,8 +2,8 @@
 line-length = 100
 target-version = "py312"
 # Common lint sets: F (pyflakes), E,W (pycodestyle)
-select = ["F", "E", "W"]
-ignore = ["E501",  # line length (Black handles wrapping; keep off if you prefer)]
+lint.select = ["F", "E", "W"]
+lint.ignore = ["E501"]  # line length (Black handles wrapping; keep off if you prefer)
 exclude = [".git", "node_modules", ".venv", "backend/.venv", "dist", "build"]
 extend-exclude = ["**/*.py.bak", "__pycache__", "frontend/node_modules"]
 

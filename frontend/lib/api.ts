@@ -27,7 +27,7 @@ export const fetchWithRetry = async <T = any>(
   url: string,
   options: RequestInit = {},
   retries = 2,
-  delay = 500
+  delay = 500,
 ): Promise<T> => {
   try {
     return await safeFetch<T>(url, options);
