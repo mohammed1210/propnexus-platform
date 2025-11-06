@@ -67,7 +67,11 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
     );
   }
 
-  if (!data || (!data.sales?.length && !data.rents?.length)) {
+  // Guard against missing or invalid sales/rents arrays
+  const sales = Array.isArray(data?.sales) ? data.sales : [];
+  const rents = Array.isArray(data?.rents) ? data.rents : [];
+
+  if (!data || (sales.length === 0 && rents.length === 0)) {
     return (
       <div className="text-gray-600 dark:text-neutral-400">
         <p>No comparable sales data available</p>
@@ -75,12 +79,12 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
     );
   }
 
-  const avgSalePrice = data.sales.length
-    ? data.sales.reduce((sum, s) => sum + s.price, 0) / data.sales.length
+  const avgSalePrice = sales.length
+    ? sales.reduce((sum, s) => sum + s.price, 0) / sales.length
     : 0;
 
-  const avgRentPrice = data.rents.length
-    ? data.rents.reduce((sum, r) => sum + r.price, 0) / data.rents.length
+  const avgRentPrice = rents.length
+    ? rents.reduce((sum, r) => sum + r.price, 0) / rents.length
     : 0;
 
   return (
@@ -100,7 +104,7 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
             {avgSalePrice > 0 ? `£${Math.round(avgSalePrice).toLocaleString()}` : 'N/A'}
           </div>
           <div className="text-xs text-gray-500 dark:text-neutral-500">
-            {data.sales.length} sale{data.sales.length !== 1 ? 's' : ''}
+            {sales.length} sale{sales.length !== 1 ? 's' : ''}
           </div>
         </div>
         <div className="space-y-1">
@@ -109,19 +113,19 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
             {avgRentPrice > 0 ? `£${Math.round(avgRentPrice).toLocaleString()}` : 'N/A'}
           </div>
           <div className="text-xs text-gray-500 dark:text-neutral-500">
-            {data.rents.length} rental{data.rents.length !== 1 ? 's' : ''}
+            {rents.length} rental{rents.length !== 1 ? 's' : ''}
           </div>
         </div>
       </div>
 
       {/* Sales list */}
-      {data.sales.length > 0 && (
+      {sales.length > 0 && (
         <div className="mb-6">
           <h4 className="text-sm font-semibold text-gray-700 dark:text-neutral-300 mb-2">
             Recent Sales
           </h4>
           <div className="space-y-2">
-            {data.sales.slice(0, 3).map((sale, idx) => (
+            {sales.slice(0, 3).map((sale, idx) => (
               <div
                 key={idx}
                 className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-md text-sm"
@@ -142,22 +146,22 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
               </div>
             ))}
           </div>
-          {data.sales.length > 3 && (
+          {sales.length > 3 && (
             <div className="text-xs text-gray-500 dark:text-neutral-500 mt-2">
-              +{data.sales.length - 3} more sale{data.sales.length - 3 !== 1 ? 's' : ''}
+              +{sales.length - 3} more sale{sales.length - 3 !== 1 ? 's' : ''}
             </div>
           )}
         </div>
       )}
 
       {/* Rents list */}
-      {data.rents.length > 0 && (
+      {rents.length > 0 && (
         <div>
           <h4 className="text-sm font-semibold text-gray-700 dark:text-neutral-300 mb-2">
             Recent Rentals
           </h4>
           <div className="space-y-2">
-            {data.rents.slice(0, 3).map((rent, idx) => (
+            {rents.slice(0, 3).map((rent, idx) => (
               <div
                 key={idx}
                 className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-md text-sm"
@@ -178,9 +182,9 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
               </div>
             ))}
           </div>
-          {data.rents.length > 3 && (
+          {rents.length > 3 && (
             <div className="text-xs text-gray-500 dark:text-neutral-500 mt-2">
-              +{data.rents.length - 3} more rental{data.rents.length - 3 !== 1 ? 's' : ''}
+              +{rents.length - 3} more rental{rents.length - 3 !== 1 ? 's' : ''}
             </div>
           )}
         </div>
