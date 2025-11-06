@@ -19,6 +19,7 @@ from .routes.off_market_routes import router as off_market_router
 from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
 from .routes.properties_routes import router as properties_router
+from .routes.users_routes import router as users_router
 
 # ✅ Stripe routers (named distinctly to avoid duplicate includes)
 from .routes.stripe_webhook import router as stripe_webhook_router  # POST /stripe/webhook
