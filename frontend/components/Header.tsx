@@ -43,6 +43,7 @@ export default function Header() {
   const links = [
     { href: '/', label: 'Home' },
     { href: '/listings', label: 'Listings' },
+    { href: '/off-market', label: 'Off-Market' },
     { href: '/analytics', label: 'Analytics' },
     { href: '/pricing', label: 'Pricing' },
     ...(sessionEmail ? [{ href: '/account', label: 'Account' }] : []),
@@ -51,7 +52,7 @@ export default function Header() {
   return (
     <header
       className={clsx(
-        'sticky top-0 z-40 w-full border-b border-zinc-200 bg-white/70 backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70',
+        'sticky top-0 z-50 w-full border-b border-zinc-200 bg-white backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900',
       )}
       role="banner"
     >

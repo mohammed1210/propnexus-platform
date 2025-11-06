@@ -14,6 +14,11 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
 
+// Import Leaflet CSS
+if (typeof window !== 'undefined') {
+  import('leaflet/dist/leaflet.css');
+}
+
 const MapContainer = nextDynamic(() => import('react-leaflet').then((m) => m.MapContainer), {
   ssr: false,
 });
@@ -89,8 +94,17 @@ function ClientMap({
       center={defaultCenter}
       zoom={6}
       style={{ height: '100%', width: '100%' }}
+      zoomControl={true}
+      scrollWheelZoom={true}
     >
-      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        maxZoom={19}
+        minZoom={3}
+        tileSize={256}
+        zoomOffset={0}
+      />
       {points.map((p) => (
         <Marker key={p.id} position={{ lat: p.lat, lng: p.lng }}>
           <Popup>
