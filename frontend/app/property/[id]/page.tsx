@@ -18,6 +18,7 @@ import CompsPanel from '@/components/property_details/CompsPanel';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
+import { FF } from '@/lib/flags';
 
 type LooseProperty = Partial<Property> & {
   latitude?: number | null;
@@ -109,10 +110,12 @@ export default function PropertyDetailsPage() {
         {/* Left column */}
         <div className="space-y-6">
           {/* ===== AI Deal Score ===== */}
-          <div className="card p-4">
-            <h2 className="font-semibold text-lg mb-4">AI Deal Score</h2>
-            <DealScore property={property} />
-          </div>
+          {FF.DEAL_SCORE && (
+            <div className="card p-4">
+              <h2 className="font-semibold text-lg mb-4">AI Deal Score</h2>
+              <DealScore property={property} />
+            </div>
+          )}
 
           {/* Investment Summary */}
           <div className="card p-4">
@@ -180,22 +183,26 @@ export default function PropertyDetailsPage() {
           {/* ===== Area Intelligence & Comps ===== */}
           {property.location && (
             <>
-              <div className="card p-4">
-                <h2 className="font-semibold text-lg mb-4">Area Intelligence</h2>
-                <AreaIntelPanel areaKey={property.location} />
-              </div>
+              {FF.AREA_INTEL && (
+                <div className="card p-4">
+                  <h2 className="font-semibold text-lg mb-4">Area Intelligence</h2>
+                  <AreaIntelPanel areaKey={property.location} />
+                </div>
+              )}
 
-              <div className="card p-4">
-                <h2 className="font-semibold text-lg mb-4">Comparable Sales</h2>
-                <CompsPanel postcode={property.location} />
-              </div>
+              {FF.COMPS && (
+                <div className="card p-4">
+                  <h2 className="font-semibold text-lg mb-4">Comparable Sales</h2>
+                  <CompsPanel postcode={property.location} />
+                </div>
+              )}
             </>
           )}
         </div>
       </div>
 
       {/* Floating local chatbot */}
-      <AIChatbot property={property as any} />
+      {FF.AI_CHAT && <AIChatbot property={property as any} />}
     </Section>
   );
 }
