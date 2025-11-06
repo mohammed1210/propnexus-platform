@@ -1,3 +1,5 @@
+"""API routes for managing property notes and annotations."""
+
 from __future__ import annotations
 
 import os

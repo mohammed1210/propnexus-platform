@@ -134,11 +134,11 @@ export async function sendMagicLink(email: string): Promise<{ success: boolean; 
 --------------------------------------------------- */
 
 export async function postAiSummary(data: any) {
-  return apiPost('/ai/generate-summary', data);
+  return apiPost('/ai/summary', data);
 }
 
 export async function postAiStrategies(data: any) {
-  return apiPost('/ai/generate-strategies', data);
+  return apiPost('/ai/strategies', data);
 }
 
 /* ---------------------------------------------------
