@@ -15,8 +15,13 @@ export async function POST(req: Request) {
     });
     if (!r.ok) {
       let detail = '';
-      try { detail = (await r.json())?.detail ?? ''; } catch {}
-      return NextResponse.json({ detail: detail || `Upstream error (${r.status})` }, { status: r.status });
+      try {
+        detail = (await r.json())?.detail ?? '';
+      } catch {}
+      return NextResponse.json(
+        { detail: detail || `Upstream error (${r.status})` },
+        { status: r.status },
+      );
     }
     return NextResponse.json(await r.json());
   } catch (e: any) {

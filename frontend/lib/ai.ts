@@ -95,11 +95,11 @@ async function requestJSON<T>(
   }
 }
 
-/** Call POST /ai/generate-summary with a normalized payload. */
+/** Call POST /ai/summary with a normalized payload. */
 export async function getAISummary(p: PropertyForAI): Promise<SummaryResponse> {
   const body = buildSummaryBody(p);
   const base = (BASE || '').replace(/\/+$/, '');
-  return requestJSON<SummaryResponse>(`${base}/ai/generate-summary`, {
+  return requestJSON<SummaryResponse>(`${base}/ai/summary`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -107,14 +107,14 @@ export async function getAISummary(p: PropertyForAI): Promise<SummaryResponse> {
   });
 }
 
-/** Call POST /ai/generate-strategies with a normalized payload (and optional constraints). */
+/** Call POST /ai/strategies with a normalized payload (and optional constraints). */
 export async function getAIStrategies(
   p: PropertyForAI,
   constraints?: Record<string, unknown>,
 ): Promise<StrategiesResponse> {
   const property = buildSummaryBody(p);
   const base = (BASE || '').replace(/\/+$/, '');
-  return requestJSON<StrategiesResponse>(`${base}/ai/generate-strategies`, {
+  return requestJSON<StrategiesResponse>(`${base}/ai/strategies`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ property, constraints }),

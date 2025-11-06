@@ -114,10 +114,12 @@ p {
   position: sticky;
   top: calc(var(--header-h) + 56px); /* header + filter bar */
   height: calc(100vh - (var(--header-h) + 56px) - 16px);
+  z-index: 10;
 }
 .leaflet-panel {
   height: 100%;
   overflow: hidden;
+  border-radius: 12px;
 }
 .leaflet-panel .leaflet-container {
   width: 100% !important;
@@ -125,6 +127,12 @@ p {
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow);
+  background: var(--card-bg);
+}
+/* Improve Leaflet tile rendering */
+.leaflet-tile-container img {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
 }
 
 /* Mobile map becomes a simple block */
@@ -142,7 +150,7 @@ p {
 .sticky-filter {
   position: sticky;
   top: var(--header-h);
-  z-index: 30;
+  z-index: 40;
   background: var(--card-bg);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);

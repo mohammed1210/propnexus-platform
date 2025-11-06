@@ -1,3 +1,5 @@
+"""Health check endpoint for monitoring backend service status."""
+
 from datetime import datetime
 
 from fastapi import APIRouter

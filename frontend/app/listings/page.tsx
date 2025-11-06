@@ -14,8 +14,12 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
 
-const MapContainer = nextDynamic(() => import('react-leaflet').then((m) => m.MapContainer), { ssr: false });
-const TileLayer = nextDynamic(() => import('react-leaflet').then((m) => m.TileLayer), { ssr: false });
+const MapContainer = nextDynamic(() => import('react-leaflet').then((m) => m.MapContainer), {
+  ssr: false,
+});
+const TileLayer = nextDynamic(() => import('react-leaflet').then((m) => m.TileLayer), {
+  ssr: false,
+});
 const Marker = nextDynamic(() => import('react-leaflet').then((m) => m.Marker), { ssr: false });
 const Popup = nextDynamic(() => import('react-leaflet').then((m) => m.Popup), { ssr: false });
 
@@ -52,6 +56,19 @@ function ClientMap({
 }) {
   const mapRef = useRef<LeafletMap | null>(null);
 
+  // Load Leaflet CSS dynamically
+  useEffect(() => {
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+      link.crossOrigin = '';
+      document.head.appendChild(link);
+    }
+  }, []);
+
   const fit = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return;
     const bounds: LatLngBoundsExpression = pts.map((p) => [p.lat, p.lng]) as any;
@@ -71,14 +88,31 @@ function ClientMap({
     if (points.length) fit(m, points);
     else m.setView(defaultCenter, 6);
     return () => {
-      try { m.remove(); } catch {}
+      try {
+        m.remove();
+      } catch {}
       mapRef.current = null;
     };
   }, [points, defaultCenter]);
 
   return (
-    <MapContainer key="map-root" ref={setMap as any} center={defaultCenter} zoom={6} style={{ height: '100%', width: '100%' }}>
-      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+    <MapContainer
+      key="map-root"
+      ref={setMap as any}
+      center={defaultCenter}
+      zoom={6}
+      style={{ height: '100%', width: '100%' }}
+      zoomControl={true}
+      scrollWheelZoom={true}
+    >
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        maxZoom={19}
+        minZoom={3}
+        tileSize={256}
+        zoomOffset={0}
+      />
       {points.map((p) => (
         <Marker key={p.id} position={{ lat: p.lat, lng: p.lng }}>
           <Popup>
@@ -87,7 +121,9 @@ function ClientMap({
               <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
             )}
             <div className="mt-1">
-              <Link href={`/property/${p.id}`} className="underline text-xs">View details</Link>
+              <Link href={`/property/${p.id}`} className="underline text-xs">
+                View details
+              </Link>
             </div>
           </Popup>
         </Marker>
@@ -98,7 +134,7 @@ function ClientMap({
 
 /* ---------------- Filters (with Sort) ---------------- */
 const SORTABLE = ['created_at', 'price', 'bedrooms', 'roi_percent', 'yield_percent'] as const;
-type SortKey = typeof SORTABLE[number];
+type SortKey = (typeof SORTABLE)[number];
 
 function FiltersBar() {
   const sp = useSearchParams();
@@ -109,7 +145,7 @@ function FiltersBar() {
   const maxInit = sp?.get('max') ?? '';
   const bedsInit = sp?.get('beds') ?? '';
   const sortInit = (sp?.get('sort') as SortKey) || 'created_at';
-  const dirInit = (sp?.get('dir') === 'asc' ? 'asc' : 'desc');
+  const dirInit = sp?.get('dir') === 'asc' ? 'asc' : 'desc';
 
   const [q, setQ] = useState(qInit);
   const [min, setMin] = useState(minInit);
@@ -130,8 +166,12 @@ function FiltersBar() {
   };
 
   const reset = () => {
-    setQ(''); setMin(''); setMax(''); setBeds('');
-    setSort('created_at'); setDir('desc');
+    setQ('');
+    setMin('');
+    setMax('');
+    setBeds('');
+    setSort('created_at');
+    setDir('desc');
     router.push('/listings');
   };
 
@@ -209,8 +249,12 @@ function FiltersBar() {
       </div>
 
       <div className="flex gap-2">
-        <button onClick={apply} className="btn btn-primary flex-1">Apply</button>
-        <button onClick={reset} className="pnx-pnx-btn pnx-pnx-pnx-btn-outline">Reset</button>
+        <button onClick={apply} className="btn btn-primary flex-1">
+          Apply
+        </button>
+        <button onClick={reset} className="pnx-pnx-btn pnx-pnx-pnx-btn-outline">
+          Reset
+        </button>
       </div>
     </div>
   );
@@ -243,7 +287,9 @@ function ListingsInner() {
 
       let query = supabase
         .from('properties')
-        .select('id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at')
+        .select(
+          'id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at',
+        )
         .limit(200);
 
       // order first to allow index use; fallback to created_at desc
@@ -271,7 +317,9 @@ function ListingsInner() {
       setLoading(false);
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [q, minP, maxP, beds, sort, dir]);
 
   const points = useMemo(() => {

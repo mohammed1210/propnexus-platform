@@ -1,5 +1,5 @@
 // app/api/stripe/checkout/route.ts
-import { NextRequest } from "next/server";
+import { NextRequest } from 'next/server';
 
 /**
  * Minimal proxy for Stripe checkout/portal creation.
@@ -11,24 +11,24 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const backend = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!backend) {
-      return new Response(
-        JSON.stringify({ error: "NEXT_PUBLIC_BACKEND_URL not set" }),
-        { status: 500, headers: { "content-type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: 'NEXT_PUBLIC_BACKEND_URL not set' }), {
+        status: 500,
+        headers: { 'content-type': 'application/json' },
+      });
     }
 
     // Try possible backend endpoints in order
     const candidates = [
-      "/stripe/checkout",                 // if you implemented this
-      "/stripe/create-checkout-session",  // common name
-      "/stripe/create-portal-session",    // graceful fallback (opens portal)
+      '/stripe/checkout', // if you implemented this
+      '/stripe/create-checkout-session', // common name
+      '/stripe/create-portal-session', // graceful fallback (opens portal)
     ];
 
     for (const path of candidates) {
       try {
         const r = await fetch(`${backend}${path}`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
           body: JSON.stringify(body),
         });
 
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
           const data = await r.json().catch(() => ({}));
           return new Response(JSON.stringify(data), {
             status: r.status,
-            headers: { "content-type": "application/json" },
+            headers: { 'content-type': 'application/json' },
           });
         }
 
@@ -52,14 +52,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return new Response(
-      JSON.stringify({ error: "No Stripe endpoint found on backend" }),
-      { status: 502, headers: { "content-type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: 'No Stripe endpoint found on backend' }), {
+      status: 502,
+      headers: { 'content-type': 'application/json' },
+    });
   } catch (e: any) {
-    return new Response(
-      JSON.stringify({ error: e?.message ?? "Unexpected error" }),
-      { status: 500, headers: { "content-type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: e?.message ?? 'Unexpected error' }), {
+      status: 500,
+      headers: { 'content-type': 'application/json' },
+    });
   }
 }

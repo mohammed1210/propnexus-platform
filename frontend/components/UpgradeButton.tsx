@@ -56,7 +56,9 @@ export default function UpgradeButton({ priceId, children = 'Upgrade', className
 
       if (!r.ok) {
         let msg = '';
-        try { msg = (await r.json())?.detail ?? ''; } catch {}
+        try {
+          msg = (await r.json())?.detail ?? '';
+        } catch {}
         throw new Error(msg || `Checkout failed (HTTP ${r.status})`);
       }
 

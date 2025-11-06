@@ -27,7 +27,7 @@ export const fetchWithRetry = async <T = any>(
   url: string,
   options: RequestInit = {},
   retries = 2,
-  delay = 500
+  delay = 500,
 ): Promise<T> => {
   try {
     return await safeFetch<T>(url, options);
@@ -134,11 +134,11 @@ export async function sendMagicLink(email: string): Promise<{ success: boolean; 
 --------------------------------------------------- */
 
 export async function postAiSummary(data: any) {
-  return apiPost('/ai/generate-summary', data);
+  return apiPost('/ai/summary', data);
 }
 
 export async function postAiStrategies(data: any) {
-  return apiPost('/ai/generate-strategies', data);
+  return apiPost('/ai/strategies', data);
 }
 
 /* ---------------------------------------------------

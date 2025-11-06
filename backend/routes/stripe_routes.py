@@ -27,8 +27,16 @@ except Exception:  # pragma: no cover
     try:
         from stripe._error import StripeError as StripeLibError  # fallback on some builds
     except Exception:
-        class StripeLibError(Exception):  # last-resort fallback
+
+        class StripeLibError(Exception):
+            """Fallback exception class for Stripe errors.
+
+            Used when Stripe library imports fail or are unavailable.
+            This ensures the module can still be imported in test environments.
+            """
+
             pass
+
 
 # Optional Supabase client (best-effort only)
 sb: Client | None = None
@@ -55,13 +63,7 @@ def get_or_create_customer(email: str) -> str:
     # 1) Supabase lookup
     if sb:
         try:
-            res = (
-                sb.table(USERS_TABLE)
-                .select("*")
-                .eq(EMAIL_COL, email)
-                .maybe_single()
-                .execute()
-            )
+            res = sb.table(USERS_TABLE).select("*").eq(EMAIL_COL, email).maybe_single().execute()
             row = None
             if res and hasattr(res, "data"):
                 if isinstance(res.data, dict):
@@ -172,4 +174,3 @@ async def create_checkout_session(req: Request):
         raise HTTPException(status_code=502, detail=f"Stripe error: {msg}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
