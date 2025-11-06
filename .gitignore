@@ -45,4 +45,13 @@ frontend/.env
 
 # Local env
 backend/.env
-frontend/tsconfig.tsbuildinfo
+
+# Temporary files
+/tmp/
+*.tmp
+*.swp
+*~
+
+# Test results
+test-results/
+playwright-report/

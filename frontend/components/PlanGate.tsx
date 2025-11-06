@@ -1,113 +1,144 @@
 // frontend/components/PlanGate.tsx
-/**
- * Plan gating component - restricts access based on user plan
- */
 'use client';
 
-import { ReactNode } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { useUserPlan, UserPlan } from '@/lib/useUserPlan';
 
 interface PlanGateProps {
-  children: ReactNode;
-  requiredPlan: UserPlan;
-  fallback?: ReactNode;
+  /**
+   * Required plan level to access the content.
+   * Options: 'free', 'pro', 'investor'
+   */
+  require: UserPlan;
+  
+  /**
+   * Content to show if user has the required plan or higher
+   */
+  children: React.ReactNode;
+  
+  /**
+   * Optional custom message for when access is denied
+   */
+  deniedMessage?: string;
+  
+  /**
+   * Optional custom component to show when access is denied
+   */
+  deniedComponent?: React.ReactNode;
 }
 
-/**
- * PlanGate - Conditionally render content based on user's plan
- * 
- * @param children - Content to render if user has required plan
- * @param requiredPlan - Minimum plan required ('free', 'pro', 'enterprise')
- * @param fallback - Optional custom fallback when access is denied
- */
-export default function PlanGate({ children, requiredPlan, fallback }: PlanGateProps) {
-  const { data, loading, error } = useUserPlan();
+// Plan hierarchy: free < pro < investor
+const PLAN_LEVELS: Record<UserPlan, number> = {
+  free: 0,
+  pro: 1,
+  investor: 2,
+};
 
-  // Loading state
+/**
+ * PlanGate - A component that restricts content based on user subscription plan.
+ * 
+ * Features:
+ * - Shows loading state while checking plan
+ * - Shows upgrade message if user doesn't have required plan
+ * - Supports plan hierarchy (investor > pro > free)
+ * - Customizable denied message and component
+ * 
+ * Example usage:
+ *   <PlanGate require="investor">
+ *     <AdvancedAnalytics />
+ *   </PlanGate>
+ */
+export default function PlanGate({
+  require,
+  children,
+  deniedMessage,
+  deniedComponent,
+}: PlanGateProps) {
+  const { plan, loading, error } = useUserPlan();
+
+  // Show loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-[200px]">
         <div className="text-center">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" />
-          <p className="mt-4 text-slate-600">Loading...</p>
+          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Error state
+  // Show error state (but don't block access - fail open)
   if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center max-w-md">
-          <div className="text-red-500 text-xl mb-2">⚠️</div>
-          <p className="text-slate-600">Unable to verify your plan.</p>
-          <p className="text-sm text-slate-500 mt-2">{error}</p>
-        </div>
-      </div>
-    );
+    console.warn('[PlanGate] Error checking plan, allowing access:', error);
+    return <>{children}</>;
   }
 
-  // Not authenticated or insufficient plan
-  // If no data, user is not authenticated - treat as 'free'
-  // If data exists but plan is missing, something is wrong - also treat as 'free' but could log
-  const userPlan = data ? (data.plan || 'free') : 'free';
-  const hasAccess = checkPlanAccess(userPlan, requiredPlan);
+  // Check if user has required plan or higher
+  const userLevel = PLAN_LEVELS[plan] || 0;
+  const requiredLevel = PLAN_LEVELS[require] || 0;
+  const hasAccess = userLevel >= requiredLevel;
 
-  if (!hasAccess) {
-    if (fallback) {
-      return <>{fallback}</>;
-    }
-
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center max-w-lg p-8 rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="text-4xl mb-4">🔒</div>
-          <h2 className="text-2xl font-bold mb-2">Upgrade Required</h2>
-          <p className="text-slate-600 mb-6">
-            This feature requires a <span className="font-semibold capitalize">{requiredPlan}</span> plan or higher.
-          </p>
-          <div className="flex gap-3 justify-center">
-            <Link
-              href="/pricing"
-              className="inline-flex items-center px-6 py-3 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors"
-            >
-              View Plans
-            </Link>
-            <Link
-              href="/"
-              className="inline-flex items-center px-6 py-3 rounded-md border border-slate-300 text-slate-700 font-medium hover:bg-slate-50 transition-colors"
-            >
-              Go Home
-            </Link>
-          </div>
-          {!data && (
-            <p className="text-sm text-slate-500 mt-4">
-              Already have an account?{' '}
-              <Link href="/magic-login" className="text-blue-600 hover:underline">
-                Sign in
-              </Link>
-            </p>
-          )}
-        </div>
-      </div>
-    );
+  if (hasAccess) {
+    return <>{children}</>;
   }
 
-  // User has access
-  return <>{children}</>;
-}
+  // User doesn't have access - show denied component or message
+  if (deniedComponent) {
+    return <>{deniedComponent}</>;
+  }
 
-/**
- * Check if user's plan meets the required plan level
- */
-function checkPlanAccess(userPlan: UserPlan, requiredPlan: UserPlan): boolean {
-  const planHierarchy: Record<UserPlan, number> = {
-    free: 0,
-    pro: 1,
-    enterprise: 2,
-  };
+  const defaultMessage =
+    deniedMessage ||
+    `This feature requires ${require === 'investor' ? 'an' : 'a'} ${require.toUpperCase()} plan.`;
 
-  return planHierarchy[userPlan] >= planHierarchy[requiredPlan];
+  return (
+    <div className="flex items-center justify-center min-h-[400px] px-4">
+      <div className="max-w-md w-full text-center space-y-6">
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white text-2xl font-bold shadow-lg">
+          <svg
+            className="w-8 h-8"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+            />
+          </svg>
+        </div>
+        
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            Upgrade Required
+          </h2>
+          <p className="text-gray-600">{defaultMessage}</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link
+            href="/pricing"
+            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+          >
+            View Pricing
+          </Link>
+          <Link
+            href="/account"
+            className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+          >
+            Manage Plan
+          </Link>
+        </div>
+
+        <p className="text-sm text-gray-500">
+          Current plan: <span className="font-semibold capitalize">{plan}</span>
+        </p>
+      </div>
+    </div>
+  );
 }
