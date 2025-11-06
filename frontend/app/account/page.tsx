@@ -89,10 +89,7 @@ export default function AccountPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
-      <div className="flex items-center gap-3 mb-2">
-        <h1 className="text-2xl font-bold tracking-tight">Manage Subscription</h1>
-        <PlanBadge size="md" />
-      </div>
+      <h1 className="text-2xl font-bold tracking-tight mb-2">Manage Subscription</h1>
       <p className="text-zinc-600 dark:text-zinc-300 mb-6">
         Update your plan, billing details, or cancel anytime.
       </p>
