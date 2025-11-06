@@ -16,7 +16,6 @@ import {
   Legend,
 } from 'chart.js';
 import { getSupabase } from '@/lib/supabaseClient';
-import PlanGate from '@/components/PlanGate';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
