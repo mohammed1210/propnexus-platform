@@ -12,6 +12,9 @@ import MortgageCalculator from '@/components/property_details/MortgageCalculator
 import StampDutyCalculator from '@/components/property_details/StampDutyCalculator';
 import NotesFields from '@/components/property_details/NotesFields';
 import AIChatbot from '@/components/property_details/AIChatbot';
+import DealScore from '@/components/property_details/DealScore';
+import AreaIntelPanel from '@/components/property_details/AreaIntelPanel';
+import CompsPanel from '@/components/property_details/CompsPanel';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
@@ -105,19 +108,10 @@ export default function PropertyDetailsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left column */}
         <div className="space-y-6">
-          {/* Indicative scorecard */}
+          {/* ===== AI Deal Score ===== */}
           <div className="card p-4">
-            <h2 className="font-semibold text-lg mb-2">AI Deal Score (indicative)</h2>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>Yield:</div>
-              <div>{property.yield_percent ?? 0}%</div>
-              <div>ROI:</div>
-              <div>{property.roi_percent ?? 0}%</div>
-              <div>Bedrooms:</div>
-              <div>{property.bedrooms ?? '—'}</div>
-              <div>Bathrooms:</div>
-              <div>{property.bathrooms ?? '—'}</div>
-            </div>
+            <h2 className="font-semibold text-lg mb-4">AI Deal Score</h2>
+            <DealScore property={property} />
           </div>
 
           {/* Investment Summary */}
@@ -182,6 +176,21 @@ export default function PropertyDetailsPage() {
               <p>Map unavailable — no coordinates provided.</p>
             )}
           </div>
+
+          {/* ===== Area Intelligence & Comps ===== */}
+          {property.location && (
+            <>
+              <div className="card p-4">
+                <h2 className="font-semibold text-lg mb-4">Area Intelligence</h2>
+                <AreaIntelPanel areaKey={property.location} />
+              </div>
+
+              <div className="card p-4">
+                <h2 className="font-semibold text-lg mb-4">Comparable Sales</h2>
+                <CompsPanel postcode={property.location} />
+              </div>
+            </>
+          )}
         </div>
       </div>
 

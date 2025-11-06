@@ -153,3 +153,76 @@ export async function checkHealth(): Promise<boolean> {
     return false;
   }
 }
+
+/* ---------------------------------------------------
+   Sprint 11: AI Chat, Scoring, Area Intel & Comps
+--------------------------------------------------- */
+
+export interface AIChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface AIChatRequest {
+  messages: AIChatMessage[];
+  context?: {
+    property_id?: string;
+    summary?: string;
+    area_key?: string;
+    postcode?: string;
+  };
+}
+
+export interface AIChatResponse {
+  ok: boolean;
+  reply: string;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+  };
+}
+
+export interface AIScoreResponse {
+  ok: boolean;
+  score: number;
+  categories: {
+    yield: number;
+    roi: number;
+    price_to_rent: number;
+    area_demand: number;
+    crime_index_inverse: number;
+    schools_access: number;
+  };
+  version: string;
+}
+
+export interface AIScoreExplainRequest {
+  score: number;
+  property: Record<string, any>;
+}
+
+export interface AIScoreExplainResponse {
+  ok: boolean;
+  explanation: string;
+  bullets: string[];
+}
+
+export async function postAIChat(body: AIChatRequest): Promise<AIChatResponse> {
+  return apiPost('/gpt/chat', body);
+}
+
+export async function postAIScore(body: Record<string, any>): Promise<AIScoreResponse> {
+  return apiPost('/gpt/score', body);
+}
+
+export async function postAIScoreExplain(body: AIScoreExplainRequest): Promise<AIScoreExplainResponse> {
+  return apiPost('/gpt/score/explain', body);
+}
+
+export async function getAreaIntel(key: string) {
+  return safeFetch(`${API_BASE}/area-intel/${encodeURIComponent(key)}`);
+}
+
+export async function getComps(postcode: string) {
+  return safeFetch(`${API_BASE}/comps/${encodeURIComponent(postcode)}`);
+}
