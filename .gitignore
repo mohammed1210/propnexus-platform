@@ -55,3 +55,4 @@ backend/.env
 # Test results
 test-results/
 playwright-report/
+frontend/tsconfig.tsbuildinfo
