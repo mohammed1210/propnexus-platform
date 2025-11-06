@@ -153,3 +153,27 @@ export async function checkHealth(): Promise<boolean> {
     return false;
   }
 }
+
+/* ---------------------------------------------------
+   Sprint 11: AI Chat, Scoring, Area Intel & Comps
+--------------------------------------------------- */
+
+export async function postAIChat(body: any) {
+  return apiPost('/gpt/chat', body);
+}
+
+export async function postAIScore(body: any) {
+  return apiPost('/gpt/score', body);
+}
+
+export async function postAIScoreExplain(body: any) {
+  return apiPost('/gpt/score/explain', body);
+}
+
+export async function getAreaIntel(key: string) {
+  return safeFetch(`${API_BASE}/area-intel/${encodeURIComponent(key)}`);
+}
+
+export async function getComps(postcode: string) {
+  return safeFetch(`${API_BASE}/comps/${encodeURIComponent(postcode)}`);
+}

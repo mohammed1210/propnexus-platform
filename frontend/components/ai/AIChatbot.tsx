@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { Property } from '@/types';
+import { postAIChat } from '@/lib/api';
 
 type LooseProperty = Property & {
   latitude?: number | null;
@@ -18,9 +19,14 @@ interface AIChatbotProps {
   property?: Partial<LooseProperty>;
 }
 
+const STORAGE_KEY_PREFIX = 'pn_chat_history_';
+const FEATURE_AI_CHATBOT = process.env.NEXT_PUBLIC_FEATURE_AI_CHATBOT === 'true';
+
 export default function AIChatbot({ property }: AIChatbotProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -29,6 +35,31 @@ export default function AIChatbot({ property }: AIChatbotProps) {
   ]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const propertyId = property?.id || 'default';
+
+  // Load conversation history from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storageKey = STORAGE_KEY_PREFIX + propertyId;
+    const stored = localStorage.getItem(storageKey);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      } catch (e) {
+        // Ignore parse errors
+      }
+    }
+  }, [propertyId]);
+
+  // Save conversation history to localStorage whenever messages change
+  useEffect(() => {
+    if (typeof window === 'undefined' || messages.length <= 1) return;
+    const storageKey = STORAGE_KEY_PREFIX + propertyId;
+    localStorage.setItem(storageKey, JSON.stringify(messages));
+  }, [messages, propertyId]);
 
   const sendLocalReply = (prompt: string) => {
     const hints: string[] = [];
@@ -53,19 +84,62 @@ export default function AIChatbot({ property }: AIChatbotProps) {
     return base;
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = input.trim();
-    if (!text) return;
-    setMessages((prev) => prev.concat({ role: 'user', content: text }));
+    if (!text || isLoading) return;
+    
+    const userMessage: Message = { role: 'user', content: text };
+    setMessages((prev) => prev.concat(userMessage));
     setInput('');
-    const reply = sendLocalReply(text);
-    setTimeout(() => setMessages((p) => p.concat({ role: 'assistant', content: reply })), 500);
+    setError(null);
+
+    // If AI chatbot feature is disabled or no backend key, use local reply
+    if (!FEATURE_AI_CHATBOT) {
+      const reply = sendLocalReply(text);
+      setTimeout(() => setMessages((p) => p.concat({ role: 'assistant', content: reply })), 500);
+      return;
+    }
+
+    // Use real GPT backend
+    setIsLoading(true);
+    try {
+      const context = {
+        property_id: propertyId,
+        summary: property?.title || '',
+        area_key: property?.location || '',
+        postcode: property?.location || '',
+      };
+
+      // Send only user messages to backend (exclude initial greeting)
+      const conversationMessages = messages
+        .filter((m) => m.role === 'user' || (m.role === 'assistant' && m.content !== messages[0].content))
+        .concat(userMessage);
+
+      const response = await postAIChat({
+        messages: conversationMessages,
+        context,
+      });
+
+      if (response.ok && response.reply) {
+        setMessages((p) => p.concat({ role: 'assistant', content: response.reply }));
+      } else {
+        throw new Error('Invalid response from AI service');
+      }
+    } catch (err: any) {
+      console.error('AI chat error:', err);
+      setError('Sorry, I encountered an error. Please try again.');
+      // Fallback to local reply
+      const reply = sendLocalReply(text);
+      setMessages((p) => p.concat({ role: 'assistant', content: reply }));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleQuickPrompt = (prompt: string) => {
-    setMessages((p) => p.concat({ role: 'user', content: prompt }));
-    const reply = sendLocalReply(prompt);
-    setTimeout(() => setMessages((p) => p.concat({ role: 'assistant', content: reply })), 400);
+    setInput(prompt);
+    // Trigger send after a brief delay to show the prompt in input
+    setTimeout(() => handleSend(), 100);
   };
 
   useEffect(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
@@ -113,6 +187,18 @@ export default function AIChatbot({ property }: AIChatbotProps) {
                 </span>
               </div>
             ))}
+            {isLoading && (
+              <div className="text-left mb-2">
+                <span className="inline-block px-3 py-2 rounded-xl bg-gray-200 text-gray-800 dark:bg-neutral-800 dark:text-neutral-100">
+                  <span className="animate-pulse">Thinking...</span>
+                </span>
+              </div>
+            )}
+            {error && (
+              <div className="text-center mb-2">
+                <span className="text-xs text-red-600 dark:text-red-400">{error}</span>
+              </div>
+            )}
             <div ref={bottomRef} />
           </div>
 
@@ -143,9 +229,10 @@ export default function AIChatbot({ property }: AIChatbotProps) {
             />
             <button
               onClick={handleSend}
-              className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700"
+              disabled={isLoading}
+              className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Send
+              {isLoading ? '...' : 'Send'}
             </button>
           </div>
         </div>
