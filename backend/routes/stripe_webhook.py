@@ -32,12 +32,26 @@ else:
     print("[stripe_webhook] Supabase not fully configured; writes will be skipped.")
 
 # === Supabase helpers =========================================================
+# Database schema configuration for Stripe webhook processing
+# These constants define the expected table and column names in Supabase.
+# Ensure your database schema matches these definitions:
+#
+# users table:
+#   - email (text, UNIQUE): user email address
+#   - stripe_customer_id (text): Stripe customer ID
+#
+# subscriptions table:
+#   - email (text): user email address
+#   - stripe_customer_id (text): Stripe customer ID
+#   - status (text): subscription status
+#   - price_id (text): Stripe price ID
+#   - subscription_id (text): Stripe subscription ID
 
 USERS_TABLE = "users"
-USERS_EMAIL_COL = "email"  # must be UNIQUE in your schema
+USERS_EMAIL_COL = "email"
 USERS_CUSTOMER_COL = "stripe_customer_id"
 
-SUBS_TABLE = "subscriptions"  # optional table for status tracking
+SUBS_TABLE = "subscriptions"
 SUBS_EMAIL_COL = "email"
 SUBS_CUSTOMER_COL = "stripe_customer_id"
 SUBS_STATUS_COL = "status"

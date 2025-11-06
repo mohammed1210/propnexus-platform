@@ -28,7 +28,13 @@ except Exception:  # pragma: no cover
         from stripe._error import StripeError as StripeLibError  # fallback on some builds
     except Exception:
 
-        class StripeLibError(Exception):  # last-resort fallback
+        class StripeLibError(Exception):
+            """Fallback exception class for Stripe errors.
+
+            Used when Stripe library imports fail or are unavailable.
+            This ensures the module can still be imported in test environments.
+            """
+
             pass
 
 
