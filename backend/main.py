@@ -23,7 +23,7 @@ from .routes.properties_routes import router as properties_router
 # ✅ Stripe routers (named distinctly to avoid duplicate includes)
 from .routes.stripe_webhook import router as stripe_webhook_router        # POST /stripe/webhook
 from .routes.stripe_routes import router as stripe_routes_router          # POST /stripe/create-portal-session
-from .routes.users_routes import router as users_router                   # GET /users/plan
+# If you also have a dedicated "create-checkout-session" router, import/include it here as well.
 
 # Users router
 from .routes.users_routes import router as users_router                    # GET /users/plan
@@ -67,7 +67,7 @@ app.include_router(properties_router)   # GET /properties
 app.include_router(stripe_webhook_router)   # POST /stripe/webhook
 app.include_router(stripe_routes_router)    # POST /stripe/create-portal-session
 
-# ✅ Users router
+# Users
 app.include_router(users_router)            # GET /users/plan
 
 # ======================

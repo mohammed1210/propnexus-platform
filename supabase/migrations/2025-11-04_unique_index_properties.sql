@@ -1,25 +1,38 @@
--- supabase/migrations/2025-11-04_unique_index_properties.sql
--- Add unique index on properties to prevent duplicates
+-- Migration: Add unique index on properties table
+-- Date: 2025-11-04
+-- Purpose: Ensure property_id uniqueness for deduplication
 
--- Create properties table if it doesn't exist (basic structure)
-CREATE TABLE IF NOT EXISTS properties (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  property_id TEXT,
-  address TEXT,
-  postcode TEXT,
-  price NUMERIC,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- Create unique index on property_id if it doesn't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes 
+    WHERE tablename = 'properties' 
+    AND indexname = 'idx_properties_property_id_unique'
+  ) THEN
+    CREATE UNIQUE INDEX idx_properties_property_id_unique ON properties(property_id);
+  END IF;
+END $$;
 
--- Create unique index on property_id to prevent duplicates (if not exists)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_properties_property_id_unique ON properties(property_id);
+-- Add additional helpful indexes if they don't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes 
+    WHERE tablename = 'properties' 
+    AND indexname = 'idx_properties_location'
+  ) THEN
+    CREATE INDEX idx_properties_location ON properties(location);
+  END IF;
+END $$;
 
--- Create index on postcode for geographic searches (if not exists)
-CREATE INDEX IF NOT EXISTS idx_properties_postcode ON properties(postcode);
-
--- Create index on price for filtering (if not exists)
-CREATE INDEX IF NOT EXISTS idx_properties_price ON properties(price);
-
--- Add comment to document the unique constraint
-COMMENT ON INDEX idx_properties_property_id_unique IS 'Ensures each property_id is unique to prevent duplicates';
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes 
+    WHERE tablename = 'properties' 
+    AND indexname = 'idx_properties_price'
+  ) THEN
+    CREATE INDEX idx_properties_price ON properties(price);
+  END IF;
+END $$;
