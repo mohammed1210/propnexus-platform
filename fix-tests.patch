@@ -1,0 +1,10 @@
+*** Begin Patch
+*** Update File: backend/main.py
+@@
+ from .routes.properties_routes import router as properties_router
++from .routes.users_routes import router as users_router
+@@
+     app.include_router(properties_router)   # GET /properties
++    app.include_router(users_router)        # GET /users/plan
+ 
+*** End Patch
