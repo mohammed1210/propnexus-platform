@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
+import PlanGate from '@/components/PlanGate';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -83,9 +84,9 @@ export default function AnalyticsPage() {
   }, [deals]);
 
   return (
-    <PlanGate requiredPlan="pro">
-      <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <aside className="md:col-span-1 bg-slate-900 text-white rounded-xl p-4 h-fit">
+    <PlanGate require="investor">
+    <div className="mx-auto max-w-7xl px-4 py-6 md:py-10 grid grid-cols-1 md:grid-cols-3 gap-6">
+      <aside className="md:col-span-1 bg-slate-900 text-white rounded-xl p-4 h-fit">
         <div className="flex items-center gap-2 mb-4">
           <div className="w-8 h-8 bg-blue-500 rounded-md grid place-items-center font-bold">PN</div>
           <div className="font-bold">PropNexus</div>
