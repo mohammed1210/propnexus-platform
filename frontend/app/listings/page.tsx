@@ -14,11 +14,6 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
 
-// Import Leaflet CSS
-if (typeof window !== 'undefined') {
-  import('leaflet/dist/leaflet.css');
-}
-
 const MapContainer = nextDynamic(() => import('react-leaflet').then((m) => m.MapContainer), {
   ssr: false,
 });
@@ -60,6 +55,19 @@ function ClientMap({
   defaultCenter: [number, number];
 }) {
   const mapRef = useRef<LeafletMap | null>(null);
+
+  // Load Leaflet CSS dynamically
+  useEffect(() => {
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
+      link.crossOrigin = '';
+      document.head.appendChild(link);
+    }
+  }, []);
 
   const fit = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return;
