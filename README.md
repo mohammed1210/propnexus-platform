@@ -159,6 +159,12 @@ STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 NEXT_PUBLIC_STRIPE_PRICE_PRO=price_xxx
 NEXT_PUBLIC_STRIPE_PRICE_INVESTOR=price_xxx
+
+# Sprint 11: Feature Flags (toggle AI features on/off)
+NEXT_PUBLIC_FEATURE_AI_CHATBOT=true
+NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE=true
+NEXT_PUBLIC_FEATURE_AREA_INTEL=true
+NEXT_PUBLIC_FEATURE_COMPS=true
 ```
 
 ### Backend Environment Variables
@@ -170,7 +176,7 @@ Required for development and production:
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
-# API Keys
+# API Keys (Sprint 11: OpenAI required for GPT features)
 OPENAI_API_KEY=sk-xxx
 RESEND_API_KEY=re_xxx
 
@@ -178,9 +184,14 @@ RESEND_API_KEY=re_xxx
 STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 
-# CORS
-ALLOWED_ORIGINS=http://localhost:3000,https://your-domain.vercel.app
+# CORS (Sprint 11: Added Vercel preview domains)
+ALLOWED_ORIGINS=http://localhost:3000,https://your-domain.vercel.app,https://*.vercel.app
+
+# Sprint 11: Caching (optional, defaults to 1800 seconds = 30 minutes)
+CACHE_TTL_SECONDS=1800
 ```
+
+See [docs/FEATURE_FLAGS.md](docs/FEATURE_FLAGS.md) for detailed feature flag documentation.
 
 ## Stripe Configuration
 
@@ -240,11 +251,238 @@ cd frontend && npm run lint
 
 ## Documentation
 
+- [Feature Flags Guide](docs/FEATURE_FLAGS.md) - Sprint 11 feature flag configuration
+- [Changelog](docs/CHANGELOG.md) - Version history and release notes
 - [Sprint 10 Completion Report](docs/sprint-10-completion.md) - Latest sprint details
 - [Database Setup](supabase/README.md) - Database schema and RLS policies
 - [Development Guide](docs/README-DEV.md) - Development workflow
 - [Roadmap](docs/po-roadmap.md) - Product roadmap
 - [Contributing](docs/CONTRIBUTING.md) - Contribution guidelines
+
+## Sprint 11 Features
+
+### AI Chatbot
+Interactive GPT-powered assistant available on property detail pages. Features:
+- Floating bottom-right button for easy access
+- Context-aware responses using property data
+- Conversation history persistence (localStorage)
+- Fallback to rule-based responses when OpenAI unavailable
+- Toggle with `NEXT_PUBLIC_FEATURE_AI_CHATBOT=true`
+
+**Backend:** `POST /gpt/chat`  
+**Frontend:** `components/property_details/AIChatbot.tsx`
+
+### AI Deal Score
+Automated investment scoring with detailed breakdown:
+- Overall score (0-100) based on 6 key metrics
+- Category breakdown with progress bars:
+  - Rental Yield (20 pts)
+  - ROI Potential (20 pts)
+  - Price-to-Rent (15 pts)
+  - Area Demand (15 pts)
+  - Safety Index (15 pts)
+  - Schools Access (15 pts)
+- "Why this score?" GPT explanation
+- Toggle with `NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE=true`
+
+**Backend:** `POST /gpt/score`, `POST /gpt/score/explain`  
+**Frontend:** `components/property_details/DealScore.tsx`
+
+### Area Intelligence
+Comprehensive area metrics with 24-hour caching:
+- Population, avg price, avg rent
+- Crime index (0-100) with visualization
+- Schools rating (0-5.0)
+- Transport links
+- Cache/Live data source indicator
+- Toggle with `NEXT_PUBLIC_FEATURE_AREA_INTEL=true`
+
+**Backend:** `GET /area-intel/{key}`  
+**Frontend:** `components/property_details/AreaIntelPanel.tsx`
+
+### Comparable Sales
+Recent sales and rental listings in the area:
+- Average sale price and rent calculations
+- Top 3 recent sales and rentals
+- Property details: address, price, date, type, distance
+- 24-hour caching for performance
+- Toggle with `NEXT_PUBLIC_FEATURE_COMPS=true`
+
+**Backend:** `GET /comps/{postcode}`  
+**Frontend:** `components/property_details/CompsPanel.tsx`
+
+### Local Setup for Sprint 11
+
+1. Set backend API key:
+```bash
+cd backend
+echo "OPENAI_API_KEY=sk-your-key-here" >> .env
+```
+
+2. Enable frontend features:
+```bash
+cd frontend
+cat >> .env.local <<EOF
+NEXT_PUBLIC_FEATURE_AI_CHATBOT=true
+NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE=true
+NEXT_PUBLIC_FEATURE_AREA_INTEL=true
+NEXT_PUBLIC_FEATURE_COMPS=true
+NEXT_PUBLIC_API_BASE=http://localhost:8000
+EOF
+```
+
+3. Run both servers:
+```bash
+# Terminal 1: Backend
+cd backend && uvicorn main:app --reload
+
+# Terminal 2: Frontend
+cd frontend && npm run dev
+```
+
+4. Visit http://localhost:3000 and navigate to any property detail page to see the new features.
+
+### API Route Documentation
+
+#### POST /gpt/chat
+```bash
+curl -X POST http://localhost:8000/gpt/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Is this a good investment?"}],
+    "context": {
+      "property_id": "123",
+      "summary": "2-bed flat in Manchester",
+      "area_key": "M1 1AA",
+      "postcode": "M1 1AA"
+    }
+  }'
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "reply": "Based on the property details...",
+  "usage": {
+    "prompt_tokens": 150,
+    "completion_tokens": 75
+  }
+}
+```
+
+#### POST /gpt/score
+```bash
+curl -X POST http://localhost:8000/gpt/score \
+  -H "Content-Type: application/json" \
+  -d '{
+    "price": 200000,
+    "yield_percent": 6.5,
+    "roi_percent": 12,
+    "rent": 1100,
+    "crime_index": 30,
+    "schools_rating": 4.2
+  }'
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "score": 78.5,
+  "categories": {
+    "yield": 20.0,
+    "roi": 20.0,
+    "price_to_rent": 12.3,
+    "area_demand": 11.0,
+    "crime_index_inverse": 10.5,
+    "schools_access": 12.6
+  },
+  "version": "v1.0"
+}
+```
+
+#### POST /gpt/score/explain
+```bash
+curl -X POST http://localhost:8000/gpt/score/explain \
+  -H "Content-Type: application/json" \
+  -d '{
+    "score": 78,
+    "property": {
+      "price": 200000,
+      "location": "Manchester M1",
+      "bedrooms": 2,
+      "yield_percent": 6.5,
+      "roi_percent": 12
+    }
+  }'
+```
+
+Response:
+```json
+{
+  "ok": true,
+  "explanation": "This property scores well due to strong yield and ROI...",
+  "bullets": [
+    "Excellent rental yield of 6.5% indicates strong cash flow",
+    "ROI of 12% suggests good capital appreciation potential",
+    "..."
+  ]
+}
+```
+
+#### GET /area-intel/{key}
+```bash
+curl http://localhost:8000/area-intel/M1%201AA
+```
+
+Response:
+```json
+{
+  "key": "M1 1AA",
+  "population": 45000,
+  "avg_price": 220000,
+  "avg_rent": 1200,
+  "rental_yield_percent": 6.5,
+  "crime_index": 35,
+  "schools_rating": 4.1,
+  "transport_links": ["Piccadilly Station", "Metrolink"],
+  "notes": "City center location",
+  "source": "cache",
+  "cached_at": "2025-11-06T18:00:00Z"
+}
+```
+
+#### GET /comps/{postcode}
+```bash
+curl http://localhost:8000/comps/M1%201AA
+```
+
+Response:
+```json
+{
+  "postcode": "M1 1AA",
+  "sales": [
+    {
+      "address": "Flat 5, City Tower",
+      "price": 195000,
+      "date": "2024-10-15",
+      "type": "Flat",
+      "distance_km": 0.3
+    }
+  ],
+  "rents": [
+    {
+      "address": "Apt 12, Urban Heights",
+      "price": 1150,
+      "date": "2024-11-01",
+      "type": "Flat",
+      "distance_km": 0.5
+    }
+  ],
+  "source": "provider"
+}
+```
 
 ## Deployment
 
