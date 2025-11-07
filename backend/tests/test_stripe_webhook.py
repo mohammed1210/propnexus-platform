@@ -1,7 +1,6 @@
 """
 Tests for Stripe webhook handling
 """
-
 import json
 import os
 from unittest.mock import Mock, patch
@@ -17,9 +16,8 @@ def client():
     os.environ["STRIPE_SECRET_KEY"] = "sk_test_fake"
     os.environ["SUPABASE_URL"] = "https://fake.supabase.co"
     os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "fake_key"
-
+    
     from backend.main import app
-
     return TestClient(app)
 
 
@@ -37,26 +35,25 @@ def test_webhook_requires_stripe_config(client):
     old_key = os.environ.get("STRIPE_SECRET_KEY")
     if old_key:
         del os.environ["STRIPE_SECRET_KEY"]
-
+    
     # Reimport to pick up missing env var
     import importlib
     from backend.routes import stripe_webhook
-
     importlib.reload(stripe_webhook)
-
+    
     # Should indicate missing configuration
     response = client.post("/stripe/webhook", json={})
-
+    
     # Restore env var
     if old_key:
         os.environ["STRIPE_SECRET_KEY"] = old_key
-
+    
     # Expect error due to missing config
     assert response.status_code in [400, 500]
 
 
-@patch("backend.routes.stripe_webhook.stripe")
-@patch("backend.routes.stripe_webhook.supabase")
+@patch('backend.routes.stripe_webhook.stripe')
+@patch('backend.routes.stripe_webhook.supabase')
 def test_checkout_completed_event(mock_supabase, mock_stripe, client):
     """Test handling of checkout.session.completed event"""
     # Mock the Stripe webhook verification
@@ -66,34 +63,36 @@ def test_checkout_completed_event(mock_supabase, mock_stripe, client):
             "object": {
                 "customer": "cus_test123",
                 "customer_details": {"email": "test@example.com"},
-                "subscription": "sub_test123",
+                "subscription": "sub_test123"
             }
-        },
+        }
     }
-
+    
     mock_stripe.Webhook.construct_event.return_value = mock_event
     mock_stripe.Subscription.retrieve.return_value = {
         "status": "active",
-        "items": {"data": [{"price": {"id": "price_test"}}]},
+        "items": {
+            "data": [{"price": {"id": "price_test"}}]
+        }
     }
-
+    
     # Mock Supabase upsert
     mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
-
+    
     # Set webhook secret
     os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
-
+    
     response = client.post(
         "/stripe/webhook",
         data=json.dumps(mock_event),
-        headers={"Stripe-Signature": "test_signature"},
+        headers={"Stripe-Signature": "test_signature"}
     )
-
+    
     assert response.status_code == 200
     assert response.json()["ok"] is True
 
 
-@patch("backend.routes.stripe_webhook.stripe")
+@patch('backend.routes.stripe_webhook.stripe')
 def test_subscription_updated_event(mock_stripe, client):
     """Test handling of subscription update event"""
     mock_event = {
@@ -103,21 +102,23 @@ def test_subscription_updated_event(mock_stripe, client):
                 "id": "sub_test123",
                 "customer": "cus_test123",
                 "status": "active",
-                "items": {"data": [{"price": {"id": "price_test"}}]},
+                "items": {
+                    "data": [{"price": {"id": "price_test"}}]
+                }
             }
-        },
+        }
     }
-
+    
     mock_stripe.Webhook.construct_event.return_value = mock_event
     mock_stripe.Customer.retrieve.return_value = {"email": "test@example.com"}
-
+    
     os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
-
+    
     response = client.post(
         "/stripe/webhook",
         data=json.dumps(mock_event),
-        headers={"Stripe-Signature": "test_signature"},
+        headers={"Stripe-Signature": "test_signature"}
     )
-
+    
     assert response.status_code == 200
     assert response.json()["ok"] is True
