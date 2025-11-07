@@ -376,6 +376,8 @@ function FiltersBar() {
 
 /* ---------------- Data + Layout ---------------- */
 function ListingsInner() {
+  // Default toggle for heatmap (feature flag controlled)
+  const heatmapEnabled = process.env.NEXT_PUBLIC_FEATURE_HEATMAP === "true";
   const searchParams = useSearchParams();
 
   const qRaw = searchParams?.get('q') ?? '';
@@ -402,7 +404,7 @@ function ListingsInner() {
       const supabase = getSupabase();
     // FIX: ensure selectedTypes is defined before use
     // FIX: use only searchParams for selectedTypes
-    const selectedTypesStr = (searchParams?.selectedTypes || "");
+    const selectedTypesStr = (searchParams.get("selectedTypes") || "");
     const selectedTypes = selectedTypesStr.split(",").filter(Boolean);
 
       let query = supabase
