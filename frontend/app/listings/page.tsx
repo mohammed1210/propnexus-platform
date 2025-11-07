@@ -205,8 +205,8 @@ function FiltersBar() {
   };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-9 gap-2" role="search" aria-label="Property filters">
-      <div className="col-span-2 flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
+    <div className="grid grid-cols-2 md:grid-cols-10 gap-2" role="search" aria-label="Property filters">
+      <div className="col-span-2 md:col-span-2 flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
         <FiSearch className="opacity-60" />
         <input
           value={q}
@@ -293,7 +293,7 @@ function FiltersBar() {
         </select>
       </div>
 
-      <div className="flex gap-2">
+      <div className="col-span-2 flex gap-2">
         <button onClick={apply} className="btn btn-primary flex-1">
           Apply
         </button>

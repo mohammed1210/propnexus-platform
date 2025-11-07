@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { fetchWithRetry } from '@/lib/api';
 import Image from 'next/image';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -81,6 +81,16 @@ async function postJSON<T>(
 export default function PropertyCard({ p }: { p: Property }) {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const priceText = useMemo(() => {
     const n = p.price ?? 0;
@@ -121,8 +131,12 @@ export default function PropertyCard({ p }: { p: Property }) {
         property_id: p.id,
       });
       setSaveSuccess(true);
+      // Clear any existing timeout
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
       // Revert success state after 1.5s
-      setTimeout(() => setSaveSuccess(false), 1500);
+      successTimeoutRef.current = setTimeout(() => setSaveSuccess(false), 1500);
     } catch (e) {
       console.error(e);
       alert('Could not save this deal.');
@@ -154,6 +168,7 @@ export default function PropertyCard({ p }: { p: Property }) {
                 'text-xs font-semibold px-2 py-1 rounded-md',
                 getBadgeColor('yield', p.yield_percent),
               )}
+              aria-label={`Yield percentage: ${p.yield_percent.toFixed(1)}%`}
             >
               {p.yield_percent.toFixed(1)}% Yield
             </span>
@@ -164,6 +179,7 @@ export default function PropertyCard({ p }: { p: Property }) {
                 'text-xs font-semibold px-2 py-1 rounded-md',
                 getBadgeColor('roi', p.roi_percent),
               )}
+              aria-label={`ROI percentage: ${p.roi_percent.toFixed(1)}%`}
             >
               {p.roi_percent.toFixed(1)}% ROI
             </span>
