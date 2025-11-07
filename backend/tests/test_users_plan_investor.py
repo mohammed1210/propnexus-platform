@@ -113,8 +113,8 @@ def test_webhook_pro_plan_checkout():
                     assert call_args["plan"] == "pro"
 
 
-def test_webhook_unknown_price_defaults_to_free():
-    """Test that unknown price_id defaults to 'free' plan."""
+def test_webhook_unknown_price_preserves_existing_plan():
+    """Test that unknown price_id does NOT overwrite existing plan."""
     from backend.main import app
     
     client = TestClient(app)
@@ -159,8 +159,8 @@ def test_webhook_unknown_price_defaults_to_free():
                     assert data["ok"] is True
                     
                     call_args = mock_table.upsert.call_args[0][0]
-                    # Unknown price_id should default to 'free'
-                    assert call_args["plan"] == "free"
+                    # Unknown price_id should NOT set plan field (preserves existing plan)
+                    assert "plan" not in call_args
 
 
 def test_users_plan_endpoint_returns_investor():

@@ -9,6 +9,10 @@ from ..utils.jwt_utils import make_magic_token
 from .supabase_client import supabase  # your existing client module
 
 router = APIRouter(prefix="/payments", tags=["payments"])
+
+# NOTE: These secrets are captured at import time.
+# For better test reliability (allowing env var changes without module reload),
+# consider refactoring to retrieve these per-request like in stripe_webhook.py
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
 APP_BASE = os.getenv("NEXT_PUBLIC_APP_BASE_URL", "http://localhost:3000")
