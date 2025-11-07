@@ -155,6 +155,13 @@ STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 NEXT_PUBLIC_STRIPE_PRICE_PRO=price_xxx
 NEXT_PUBLIC_STRIPE_PRICE_INVESTOR=price_xxx
+
+# Feature Flags (Optional - defaults to false)
+# AI features are disabled by default for safety and cost control
+NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE=false        # Enable AI-powered deal scoring
+NEXT_PUBLIC_FEATURE_AI_CHATBOT=false           # Enable AI investment chatbot
+NEXT_PUBLIC_FEATURE_AREA_INTEL=false           # Enable area intelligence panel
+NEXT_PUBLIC_FEATURE_COMPS_PANEL=false          # Enable comparable sales panel
 ```
 
 ### Backend Environment Variables
@@ -174,9 +181,65 @@ RESEND_API_KEY=re_xxx
 STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 
+# Stripe Price ID Mapping (for subscription tier detection)
+# Map Stripe price IDs to plan tiers: pro, investor, enterprise
+STRIPE_PRICE_PRO=price_xxx
+STRIPE_PRICE_INVESTOR=price_xxx
+STRIPE_PRICE_ENTERPRISE=price_xxx
+
 # CORS
 ALLOWED_ORIGINS=http://localhost:3000,https://your-domain.vercel.app
 ```
+
+## Feature Flags
+
+PropNexus uses feature flags to control AI-powered features. All flags default to `false` for safety and cost control.
+
+**Available Flags:**
+- `NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE` - AI-powered investment score (requires OpenAI API key)
+- `NEXT_PUBLIC_FEATURE_AI_CHATBOT` - AI chatbot for property advice (requires OpenAI API key)
+- `NEXT_PUBLIC_FEATURE_AREA_INTEL` - Area intelligence with demographics and crime data
+- `NEXT_PUBLIC_FEATURE_COMPS_PANEL` - Comparable sales panel
+
+Set flags to `true` or `1` to enable. Example:
+```env
+NEXT_PUBLIC_FEATURE_AI_CHATBOT=true
+NEXT_PUBLIC_FEATURE_AREA_INTEL=1
+```
+
+## Subscription Tiers
+
+PropNexus supports three subscription tiers:
+- **Free** - Basic property browsing
+- **Pro** - Enhanced features and analytics
+- **Investor** - Premium features with AI-powered insights
+
+### Tier Management
+
+The `/users/plan` endpoint supports two authentication methods:
+
+1. **Query Parameter** (backward compatible):
+   ```bash
+   GET /users/plan?email=user@example.com
+   ```
+
+2. **Authorization Header** (recommended):
+   ```bash
+   GET /users/plan
+   Authorization: Bearer <jwt-token>
+   ```
+
+When both are provided, the Authorization header takes precedence. This ensures upgraded users see their correct tier immediately after refresh.
+
+### Stripe Configuration
+
+Configure price ID mappings in backend environment:
+```env
+STRIPE_PRICE_PRO=price_xxx
+STRIPE_PRICE_INVESTOR=price_xxx
+```
+
+Unknown price IDs will NOT downgrade existing users to 'free' - they preserve the current tier.
 
 ## Stripe Configuration
 
