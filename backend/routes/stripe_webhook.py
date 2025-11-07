@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Dict, Optional
 
 import stripe
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 # The tests patch both `stripe` and this module-level `supabase` symbol.
 # Provide a placeholder here to make patching possible without import-time failures.
@@ -60,8 +64,9 @@ def get_supabase_client():
         from supabase import create_client
         client = create_client(url, key)
         return client
-    except Exception:
+    except Exception as e:
         # If client creation fails (e.g., DNS issues in test), gracefully return None
+        logger.debug(f"Failed to create Supabase client: {e}")
         return None
 
 
@@ -126,8 +131,9 @@ async def stripe_webhook(request: Request):
                 
                 try:
                     sb_client.table("users").upsert(upsert_data).execute()
-                except Exception:
+                except Exception as e:
                     # Log error but don't fail the webhook - gracefully skip DB write
+                    logger.warning(f"Failed to upsert user data in checkout.session.completed: {e}")
                     pass
 
             return JSONResponse({"ok": True})
@@ -144,8 +150,9 @@ async def stripe_webhook(request: Request):
                 if customer_id:
                     customer = stripe.Customer.retrieve(customer_id)
                     email = customer.get("email")
-            except Exception:
+            except Exception as e:
                 # If we can't retrieve customer email, continue without it
+                logger.debug(f"Failed to retrieve customer email for {customer_id}: {e}")
                 pass
             
             # Map price_id to plan - returns None for unknown IDs
@@ -170,8 +177,9 @@ async def stripe_webhook(request: Request):
                 
                 try:
                     sb_client.table("users").upsert(upsert_data).execute()
-                except Exception:
+                except Exception as e:
                     # Log error but don't fail the webhook - gracefully skip DB write
+                    logger.warning(f"Failed to upsert user data in subscription.updated: {e}")
                     pass
 
             return JSONResponse({"ok": True})
