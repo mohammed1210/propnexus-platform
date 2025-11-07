@@ -77,6 +77,9 @@ export default function DealScore({ property }: DealScoreProps) {
 
   // Sprint 11.3: Intersection Observer for animation trigger
   useEffect(() => {
+    const element = scoreRef.current;
+    if (!element) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -88,14 +91,10 @@ export default function DealScore({ property }: DealScoreProps) {
       { threshold: 0.2 }
     );
 
-    if (scoreRef.current) {
-      observer.observe(scoreRef.current);
-    }
+    observer.observe(element);
 
     return () => {
-      if (scoreRef.current) {
-        observer.unobserve(scoreRef.current);
-      }
+      observer.unobserve(element);
     };
   }, [isVisible]);
 

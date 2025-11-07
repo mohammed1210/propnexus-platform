@@ -40,18 +40,23 @@ export default function QuickActions({
           url: window.location.href,
         });
       } catch (err) {
-        console.log('Share cancelled');
+        // User cancelled share
       }
     } else {
       // Fallback: copy to clipboard
-      await navigator.clipboard.writeText(window.location.href);
-      alert('Link copied to clipboard!');
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        // TODO: Show toast notification
+        console.log('Link copied to clipboard!');
+      } catch (err) {
+        console.error('Failed to copy link');
+      }
     }
   };
 
   const handleExportPDF = () => {
     // TODO: Integrate with PDF export
-    alert('PDF export coming soon!');
+    console.log('PDF export coming soon!');
   };
 
   const handleCopyJSON = async () => {
