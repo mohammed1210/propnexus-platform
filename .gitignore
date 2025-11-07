@@ -31,3 +31,7 @@ __pycache__/
 *.swp
 .vscode/
 .idea/
+
+# Build metadata
+*.tsbuildinfo
+tsconfig.tsbuildinfo
