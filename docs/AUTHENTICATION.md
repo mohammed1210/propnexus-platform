@@ -103,10 +103,23 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # JWT secret for verifying tokens (found in Supabase Dashboard > Settings > API)
+# This is REQUIRED for token-based authentication and must be set explicitly
 SUPABASE_JWT_SECRET=your-jwt-secret
 ```
 
-**Note:** The JWT secret can be found in your Supabase project settings under API → JWT Secret. It's used to verify the signature of JWT tokens.
+**Important Security Notes:**
+
+1. **JWT Secret is Required**: The `SUPABASE_JWT_SECRET` must be explicitly configured. The system will not fallback to using the service role key as they serve different security purposes.
+
+2. **Finding the JWT Secret**: 
+   - Log into your Supabase project dashboard
+   - Go to Settings → API
+   - Look for "JWT Secret" under the API settings
+   - Copy the exact secret value
+
+3. **Do Not Confuse with Service Role Key**: The JWT secret and service role key are different:
+   - JWT Secret: Used to verify JWT token signatures
+   - Service Role Key: Used for direct API access with elevated permissions
 
 ### Testing
 

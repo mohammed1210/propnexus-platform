@@ -16,26 +16,29 @@ def verify_supabase_token(token: str) -> Optional[dict]:
     
     Returns:
         The token payload dict if valid, None otherwise
+    
+    Security Notes:
+        - Requires SUPABASE_JWT_SECRET to be set in environment
+        - JWT secret is different from service role key
+        - Audience verification is disabled as Supabase tokens may not include 'aud' claim
     """
     supabase_jwt_secret = os.getenv("SUPABASE_JWT_SECRET")
     
     if not supabase_jwt_secret:
-        # If no JWT secret is configured, try to use the anon key
-        # In Supabase, the JWT secret is typically derived from the service role key
-        # For development, we might need to use the service role key
-        supabase_jwt_secret = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    
-    if not supabase_jwt_secret:
+        # JWT secret must be explicitly configured - do not fallback to service role key
+        # as they serve different security purposes
         return None
     
     try:
         # Decode the JWT token
         # Supabase uses HS256 algorithm
+        # Note: verify_aud is disabled because Supabase tokens may not include audience claim
+        # This is acceptable as we're verifying the signature with the correct JWT secret
         payload = jwt.decode(
             token,
             supabase_jwt_secret,
             algorithms=["HS256"],
-            options={"verify_aud": False}  # Supabase tokens don't always have aud
+            options={"verify_aud": False}
         )
         return payload
     except JWTError:
