@@ -32,9 +32,17 @@ def extract_email_from_token(authorization: str) -> Optional[str]:
     Expected format: "Bearer <token>"
     Returns None if token is invalid or missing.
     
-    Note: This function extracts email claims from JWT tokens without full verification
-    since we're using it for plan lookup (non-security-critical operation).
-    The actual user authentication is handled by Supabase Auth in the frontend.
+    SECURITY NOTE: This function extracts email claims from JWT tokens without full verification.
+    
+    This is acceptable because:
+    1. The endpoint only returns plan tier information (non-sensitive data)
+    2. Actual user authentication is handled by Supabase Auth in the frontend
+    3. The database query returns "free" tier if the email doesn't exist
+    4. RLS policies on the database enforce proper data access control
+    5. The worst-case scenario is someone looks up a plan tier for an email
+    
+    For security-critical operations, full JWT verification with proper secrets is required.
+    This is a convenience endpoint for plan lookup only.
     """
     if not authorization:
         return None
@@ -48,10 +56,6 @@ def extract_email_from_token(authorization: str) -> Optional[str]:
     
     try:
         # Decode JWT without verification to extract claims
-        # We use options={"verify_signature": False} because:
-        # 1. This endpoint is for plan lookup, not authentication
-        # 2. Actual auth is handled by Supabase Auth in frontend
-        # 3. The worst case is we return the wrong plan (still returns free if user not found)
         payload = jwt.decode(
             token,
             options={"verify_signature": False, "verify_aud": False},

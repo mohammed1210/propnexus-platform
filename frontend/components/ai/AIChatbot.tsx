@@ -146,6 +146,8 @@ export default function AIChatbot({ property }: AIChatbotProps) {
   useEffect(() => setMessages((p) => (p.length > 60 ? p.slice(-60) : p)), [messages.length]);
 
   // Secondary guard: return null if feature flag is disabled
+  // This prevents the component from rendering at all when disabled
+  // (different from the guard in handleSend which enables fallback to local replies)
   if (!FF.AI_CHAT) {
     return null;
   }
