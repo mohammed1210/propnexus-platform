@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Property } from '@/types';
 import { postAIChat } from '@/lib/api';
+import { FF } from '@/lib/flags';
 
 type LooseProperty = Property & {
   latitude?: number | null;
@@ -20,7 +21,6 @@ interface AIChatbotProps {
 }
 
 const STORAGE_KEY_PREFIX = 'pn_chat_history_';
-const FEATURE_AI_CHATBOT = process.env.NEXT_PUBLIC_FEATURE_AI_CHATBOT === 'true';
 
 export default function AIChatbot({ property }: AIChatbotProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -94,7 +94,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
     setError(null);
 
     // If AI chatbot feature is disabled or no backend key, use local reply
-    if (!FEATURE_AI_CHATBOT) {
+    if (!FF.AI_CHAT) {
       const reply = sendLocalReply(text);
       setTimeout(() => setMessages((p) => p.concat({ role: 'assistant', content: reply })), 500);
       return;

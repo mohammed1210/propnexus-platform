@@ -1,9 +1,10 @@
 # backend/routes/users_routes.py
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Header
 from fastapi.responses import JSONResponse
 import os
 from supabase import create_client, Client
 from typing import Optional
+from ..utils.supabase_jwt import verify_supabase_token, extract_bearer_token
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -26,19 +27,51 @@ CUST_COL = os.getenv("USERS_STRIPE_COL", "stripe_customer_id")
 
 
 @router.get("/plan")
-async def get_user_plan(email: str = Query(..., description="User email address")):
+async def get_user_plan(
+    email: Optional[str] = Query(None, description="User email address (optional if using Authorization header)"),
+    authorization: Optional[str] = Header(None)
+):
     """
     Get user plan information from Supabase users table.
     
-    Query params:
-    - email: User email address (required)
+    Supports two authentication methods:
+    1. Query parameter: ?email=user@example.com
+    2. Authorization header: Bearer <supabase_jwt_token>
+    
+    If both are provided, email parameter takes precedence.
+    If neither is provided, returns 401 Unauthorized.
     
     Returns:
     - plan: Subscription plan (free, pro, investor)
     - stripe_customer_id: Stripe customer ID
     """
-    if not email:
-        raise HTTPException(status_code=400, detail="Missing email parameter")
+    user_email = None
+    
+    # Method 1: Check if email query parameter is provided
+    if email:
+        user_email = email
+    # Method 2: Check Authorization header for JWT token
+    elif authorization:
+        token = extract_bearer_token(authorization)
+        if token:
+            payload = verify_supabase_token(token)
+            if payload and "email" in payload:
+                user_email = payload["email"]
+            else:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid or expired token"
+                )
+        else:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid Authorization header format. Expected: Bearer <token>"
+            )
+    else:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing authentication. Provide either email query parameter or Authorization header."
+        )
     
     if not sb:
         raise HTTPException(
@@ -51,7 +84,7 @@ async def get_user_plan(email: str = Query(..., description="User email address"
         res = (
             sb.table(USERS_TABLE)
             .select("*")
-            .eq(EMAIL_COL, email)
+            .eq(EMAIL_COL, user_email)
             .maybe_single()
             .execute()
         )
