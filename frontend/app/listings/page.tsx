@@ -400,7 +400,7 @@ function ListingsInner() {
     (async () => {
       setLoading(true);
       const supabase = getSupabase();
-      const selectedTypes = selectedTypesStr.split(',').filter(Boolean);
+      const selectedTypes = selectedTypes.split(',').filter(Boolean);
 
       let query = supabase
         .from('properties')
