@@ -404,7 +404,7 @@ function ListingsInner() {
       const supabase = getSupabase();
       
       // Parse selectedTypes from searchParams only
-      const selectedTypesParam = (searchParams?.get("selectedTypes") ?? "") as string;
+      const selectedTypesParam = searchParams?.get("selectedTypes") ?? "";
       const selectedTypes = selectedTypesParam ? selectedTypesParam.split(",").filter(Boolean) : [];
 
       let query = supabase
