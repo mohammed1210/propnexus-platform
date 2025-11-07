@@ -13,6 +13,7 @@ import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
+import ListingsFilters from '@/components/listings/ListingsFilters';
 
 /* ---------------- Helper Functions ---------------- */
 /**
@@ -54,6 +55,9 @@ const TileLayer = nextDynamic(() => import('react-leaflet').then((m) => m.TileLa
 const Marker = nextDynamic(() => import('react-leaflet').then((m) => m.Marker), { ssr: false });
 const Popup = nextDynamic(() => import('react-leaflet').then((m) => m.Popup), { ssr: false });
 
+const SORTABLE = ['created_at', 'price', 'bedrooms', 'roi_percent', 'yield_percent'] as const;
+type SortKey = (typeof SORTABLE)[number];
+
 type RawProperty = {
   id: string | null;
   title: string | null;
@@ -67,6 +71,7 @@ type RawProperty = {
   latitude?: number | null;
   longitude?: number | null;
   created_at?: string | null;
+  investment_type?: string | null;
 };
 
 export default function ListingsPage() {
@@ -81,11 +86,14 @@ export default function ListingsPage() {
 function ClientMap({
   points,
   defaultCenter,
+  heatmapEnabled = false,
 }: {
   points: { id: string; title: string; lat: number; lng: number; price?: number }[];
   defaultCenter: [number, number];
+  heatmapEnabled?: boolean;
 }) {
   const mapRef = useRef<LeafletMap | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Load Leaflet CSS dynamically
   useEffect(() => {
@@ -99,6 +107,59 @@ function ClientMap({
       document.head.appendChild(link);
     }
   }, []);
+
+  // Draw heatmap overlay
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const map = mapRef.current;
+    if (!canvas || !map) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const drawHeatmap = () => {
+      const bounds = map.getBounds();
+      const size = map.getSize();
+      canvas.width = size.x;
+      canvas.height = size.y;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, size.x, size.y);
+
+      if (!heatmapEnabled || points.length === 0) return;
+
+      // Draw radial gradients at each point
+      points.forEach((point) => {
+        const pixelPoint = map.latLngToContainerPoint([point.lat, point.lng]);
+        
+        const gradient = ctx.createRadialGradient(
+          pixelPoint.x,
+          pixelPoint.y,
+          0,
+          pixelPoint.x,
+          pixelPoint.y,
+          60
+        );
+        
+        // Dark mode palette - deep purple to transparent
+        gradient.addColorStop(0, 'rgba(139, 92, 246, 0.6)');
+        gradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.3)');
+        gradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size.x, size.y);
+      });
+    };
+
+    drawHeatmap();
+
+    // Redraw on map move/zoom
+    map.on('moveend zoomend', drawHeatmap);
+
+    return () => {
+      map.off('moveend zoomend', drawHeatmap);
+    };
+  }, [heatmapEnabled, points]);
 
   const fit = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return;
@@ -337,11 +398,12 @@ function ListingsInner() {
     (async () => {
       setLoading(true);
       const supabase = getSupabase();
+      const selectedTypes = selectedTypesStr.split(',').filter(Boolean);
 
       let query = supabase
         .from('properties')
         .select(
-          'id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at',
+          'id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at,investment_type:investmentType',
         )
         .limit(200);
 
@@ -392,11 +454,7 @@ function ListingsInner() {
     <Section>
       <SectionTitle>PropNexus Listings</SectionTitle>
 
-      <div className="sticky-filter">
-        <div className="max-w-6xl mx-auto px-4 py-3">
-          <FiltersBar />
-        </div>
-      </div>
+      <ListingsFilters />
 
       <div className="content-layout pt-4">
         {/* left: list */}
@@ -417,7 +475,7 @@ function ListingsInner() {
         {/* right: sticky map */}
         <div className="map-sticky">
           <div className="leaflet-panel">
-            <ClientMap points={points} defaultCenter={[53.5, -2]} />
+            <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={heatmapEnabled} />
           </div>
         </div>
       </div>

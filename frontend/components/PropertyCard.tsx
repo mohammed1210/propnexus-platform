@@ -160,7 +160,7 @@ export default function PropertyCard({ p }: { p: Property }) {
     <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30">
       <Link
         href={href}
-        className="block relative w-full h-48 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="block relative w-full h-48 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
         aria-label={`Open ${p.title ?? 'property'}`}
       >
         <Image
@@ -169,6 +169,7 @@ export default function PropertyCard({ p }: { p: Property }) {
           fill
           sizes="(max-width: 768px) 100vw, 33vw"
           style={{ objectFit: 'cover' }}
+          className="transition-transform duration-300 group-hover:scale-110"
           priority={false}
         />
         {/* Badges for yield and ROI */}

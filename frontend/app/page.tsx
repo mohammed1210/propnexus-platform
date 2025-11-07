@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FiSearch, FiTrendingUp, FiZap, FiMapPin, FiDollarSign } from 'react-icons/fi';
@@ -11,9 +11,68 @@ export default function HomePage() {
   const router = useRouter();
   const [q, setQ] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [heatmapDarkMode, setHeatmapDarkMode] = useState(true);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Avoid hydration mismatch for random SVG lines
+  // Avoid hydration mismatch
   useEffect(() => setMounted(true), []);
+
+  // Draw animated heatmap on hero canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const parent = canvas.parentElement;
+    if (!parent) return;
+
+    canvas.width = parent.offsetWidth;
+    canvas.height = parent.offsetHeight;
+
+    let animationId: number;
+    let offset = 0;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Generate some decorative heatmap spots
+      const spots = [
+        { x: canvas.width * 0.3, y: canvas.height * 0.4, r: 120 },
+        { x: canvas.width * 0.7, y: canvas.height * 0.6, r: 100 },
+        { x: canvas.width * 0.5, y: canvas.height * 0.3, r: 80 },
+      ];
+
+      spots.forEach((spot) => {
+        const gradient = ctx.createRadialGradient(spot.x, spot.y, 0, spot.x, spot.y, spot.r);
+
+        if (heatmapDarkMode) {
+          // Dark palette
+          gradient.addColorStop(0, 'rgba(139, 92, 246, 0.4)');
+          gradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.2)');
+          gradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
+        } else {
+          // Warm palette
+          gradient.addColorStop(0, 'rgba(251, 146, 60, 0.4)');
+          gradient.addColorStop(0.5, 'rgba(251, 146, 60, 0.2)');
+          gradient.addColorStop(1, 'rgba(251, 146, 60, 0)');
+        }
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      });
+
+      offset += 0.5;
+      animationId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+    };
+  }, [heatmapDarkMode]);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,16 +92,30 @@ export default function HomePage() {
             'radial-gradient(80rem 40rem at 10% -10%, rgba(99,102,241,.35), transparent 60%), radial-gradient(80rem 40rem at 110% 10%, rgba(56,189,248,.35), transparent 60%), radial-gradient(60rem 30rem at 50% 50%, rgba(168,85,247,.2), transparent 70%), linear-gradient(180deg, rgba(15,23,42,.65), rgba(15,23,42,.65))',
         }}
       />
+
+      {/* Map grid pattern */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.15]"
+        className="pointer-events-none absolute inset-0 opacity-[0.12]"
         style={{
           backgroundImage:
-            'radial-gradient(#ffffff 1px, transparent 1px), radial-gradient(#ffffff 1px, transparent 1px)',
-          backgroundSize: '24px 24px, 24px 24px',
-          backgroundPosition: '0 0, 12px 12px',
+            'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
         }}
       />
+
+      {/* Scanning ring animation */}
+      {mounted && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-30"
+          style={{
+            background:
+              'radial-gradient(circle at 50% 50%, rgba(99,102,241,0.3) 0%, transparent 30%)',
+            animation: 'pulse 4s ease-in-out infinite',
+          }}
+        />
+      )}
 
       <main className="relative z-10">
         <div className="mx-auto max-w-7xl px-4 py-14 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
