@@ -133,8 +133,13 @@ async def ai_score(data: dict):
     roi_pct = data.get("roi_percent") or 0
     price = data.get("price") or 0
     rent = data.get("rent") or data.get("avg_rent") or 0
-    crime = data.get("crime_index") or 50  # default mid-range
-    schools = data.get("schools_rating") or 3.0  # default mid-range
+    
+    # Use explicit None checks to preserve 0 values
+    crime = data.get("crime_index")
+    crime = 50 if crime is None else float(crime)
+    
+    schools = data.get("schools_rating")
+    schools = 3.0 if schools is None else float(schools)
 
     # Calculate price-to-rent ratio (lower is better)
     price_to_rent_ratio = (price / (rent * 12)) if (rent and price) else 0

@@ -195,10 +195,30 @@ See [docs/FEATURE_FLAGS.md](docs/FEATURE_FLAGS.md) for detailed feature flag doc
 
 ## Stripe Configuration
 
-### Price IDs
-Set up two subscription tiers in Stripe Dashboard:
-- **Pro Plan**: Monthly subscription for basic features
-- **Investor Plan**: Monthly subscription for premium features
+### Price IDs and Plan Mapping
+
+Set up subscription tiers in Stripe Dashboard and map them to plan names:
+
+**Environment Variables (Backend `.env`):**
+```env
+STRIPE_PRICE_PRO=price_xxx       # Maps to "pro" plan
+STRIPE_PRICE_INVESTOR=price_yyy  # Maps to "investor" plan
+STRIPE_PRICE_ENTERPRISE=price_zzz # Maps to "enterprise" plan
+```
+
+**Plans:**
+- **Free Plan**: Default for all users (no Stripe price_id)
+- **Pro Plan**: Monthly subscription for basic premium features
+- **Investor Plan**: Monthly subscription for advanced investment tools
+- **Enterprise Plan**: Custom pricing for teams/organizations
+
+**How it works:**
+1. User completes Stripe checkout
+2. Webhook receives `checkout.session.completed` event
+3. Backend retrieves subscription and extracts `price_id`
+4. `price_id` is mapped to plan name using environment variables
+5. User record in database is updated with: `plan`, `plan_status`, `current_period_end`
+6. Frontend queries `/users/plan?email=...` to display current tier
 
 ### Webhooks
 
@@ -589,12 +609,120 @@ GET /comps/{postcode}
 All new features are fully tested:
 - `backend/tests/test_gpt_chat.py` - AI chat endpoint tests
 - `backend/tests/test_scoring.py` - Scoring algorithm tests
+- `backend/tests/test_ai_score_zero_values.py` - Zero value handling in scoring
+- `backend/tests/test_comps_optional_lists.py` - Comps with missing arrays
+- `backend/tests/test_users_plan_investor.py` - Investor plan webhook tests
 - Mock OpenAI responses to avoid API costs in CI
 
 Run tests:
 ```bash
 cd backend
 pytest tests/ -v
+```
+
+## Troubleshooting (Sprint 11)
+
+### Logged-in Users See No Listings
+
+**Symptom:** After signing in, property listings page shows empty results. Signing out shows properties again.
+
+**Cause:** Row-Level Security (RLS) policies on the `properties` table only allow anonymous access but deny authenticated users.
+
+**Fix:** Applied in migration `20251106_fix_rls_properties.sql`:
+```sql
+-- Allow both authenticated and anonymous users to read published properties
+CREATE POLICY "properties_read_auth" ON public.properties
+  FOR SELECT TO authenticated
+  USING (published = true);
+
+CREATE POLICY "properties_read_anon" ON public.properties
+  FOR SELECT TO anon
+  USING (published = true);
+```
+
+### Saved Deals Not Rendering
+
+**Symptom:** User saves deals, data appears in database, but `/saved-deals` page shows nothing.
+
+**Cause:** Missing or incorrect RLS policies on `saved_deals` table prevent users from reading their own rows.
+
+**Fix:** Applied in migration `20251106_saved_deals_rls.sql`:
+```sql
+-- Allow users to read/write their own saved deals
+CREATE POLICY "saved_deals_rw_owner" ON public.saved_deals
+  FOR SELECT TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "saved_deals_insert_owner" ON public.saved_deals
+  FOR INSERT TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "saved_deals_delete_owner" ON public.saved_deals
+  FOR DELETE TO authenticated
+  USING (auth.uid() = user_id);
+```
+
+### Plan Shows "Free" After Upgrade
+
+**Symptom:** User purchases Pro or Investor plan, but app still shows "Free" tier.
+
+**Cause:** Stripe webhook not mapping `price_id` to plan name correctly.
+
+**Fix:** 
+1. Updated `backend/routes/stripe_webhook.py` to map Stripe price IDs to plan names:
+   - Set environment variables: `STRIPE_PRICE_PRO`, `STRIPE_PRICE_INVESTOR`, `STRIPE_PRICE_ENTERPRISE`
+   - Webhook now upserts `plan`, `plan_status`, and `current_period_end` fields
+2. Database migration adds `investor` to plan constraint (`20251106_add_investor_to_plan.sql`)
+3. Frontend should revalidate `/users/plan` after returning from Stripe checkout
+
+### Feature Flags Not Working
+
+**Symptom:** Feature flag environment variables set, but features still showing/hidden.
+
+**Cause:** 
+- Frontend: Not importing/using the flags helper (`lib/flags.ts`)
+- Backend: Backend feature flags are different (not `NEXT_PUBLIC_*` prefixed)
+
+**Fix:**
+1. Frontend uses `frontend/lib/flags.ts` helper:
+   ```typescript
+   import { FF } from '@/lib/flags';
+   {FF.DEAL_SCORE && <DealScoreCard property={property} />}
+   ```
+2. Set variables in `frontend/.env.local`:
+   ```bash
+   NEXT_PUBLIC_FEATURE_AI_CHATBOT=true
+   NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE=true
+   NEXT_PUBLIC_FEATURE_AREA_INTEL=true
+   NEXT_PUBLIC_FEATURE_COMPS=true
+   ```
+3. Remember to rebuild frontend after changing environment variables
+
+### AI Score Shows Incorrect Values for Safe Areas
+
+**Symptom:** Properties in very safe areas (crime_index=0) receive lower safety scores than expected.
+
+**Cause:** Backend treats `0` as falsy and replaces with default value `50`.
+
+**Fix:** Updated `backend/routes/gpt_routes.py` to explicitly check for `None`:
+```python
+crime = data.get("crime_index")
+crime = 50 if crime is None else float(crime)  # Preserves 0
+
+schools = data.get("schools_rating")
+schools = 3.0 if schools is None else float(schools)  # Preserves 0
+```
+
+### Comps Panel Crashes with Missing Data
+
+**Symptom:** Comparable sales panel shows error when provider returns incomplete data.
+
+**Cause:** Frontend assumes `sales` and `rents` arrays always exist.
+
+**Fix:** Updated `frontend/components/property_details/CompsPanel.tsx` to guard against missing arrays:
+```typescript
+const sales = Array.isArray(data?.sales) ? data.sales : [];
+const rents = Array.isArray(data?.rents) ? data.rents : [];
 ```
 
 ## Contributing

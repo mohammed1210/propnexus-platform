@@ -13,6 +13,16 @@ supabase = None  # will be monkeypatched by tests
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
 
+def get_plan_from_price_id(price_id: str) -> str:
+    """Map Stripe price ID to plan name. Defaults to 'free' if not found."""
+    # Build mapping at runtime to support test environment variable injection
+    price_to_plan = {
+        os.getenv("STRIPE_PRICE_PRO", ""): "pro",
+        os.getenv("STRIPE_PRICE_INVESTOR", ""): "investor",
+        os.getenv("STRIPE_PRICE_ENTERPRISE", ""): "enterprise",
+    }
+    return price_to_plan.get(price_id, "free")
+
 @router.post("/webhook")
 async def stripe_webhook(request: Request):
     """
@@ -42,10 +52,22 @@ async def stripe_webhook(request: Request):
             # In tests, these calls are patched
             sub = stripe.Subscription.retrieve(sub_id) if sub_id else {"status": "active", "items": {"data": []}}
             price_id = ((sub.get("items") or {}).get("data") or [{}])[0].get("price", {}).get("id")
+            status = sub.get("status", "active")
+            current_period_end = sub.get("current_period_end")
+            
+            # Map price_id to plan
+            plan = get_plan_from_price_id(price_id) if price_id else "free"
+            plan_status = status if status in ["active", "past_due", "canceled"] else "active"
 
             if supabase:
                 (supabase.table("users")
-                         .upsert({"stripe_customer_id": customer_id, "email": customer_email, "price_id": price_id})
+                         .upsert({
+                             "stripe_customer_id": customer_id, 
+                             "email": customer_email, 
+                             "plan": plan,
+                             "plan_status": plan_status,
+                             "current_period_end": current_period_end
+                         })
                          .execute())
 
             return JSONResponse({"ok": True})
@@ -53,12 +75,24 @@ async def stripe_webhook(request: Request):
         if etype == "customer.subscription.updated":
             customer_id = data_obj.get("customer")
             price_id = ((data_obj.get("items") or {}).get("data") or [{}])[0].get("price", {}).get("id")
+            status = data_obj.get("status", "active")
+            current_period_end = data_obj.get("current_period_end")
             customer = stripe.Customer.retrieve(customer_id) if customer_id else {}
             email = customer.get("email")
+            
+            # Map price_id to plan
+            plan = get_plan_from_price_id(price_id) if price_id else "free"
+            plan_status = status if status in ["active", "past_due", "canceled"] else "active"
 
             if supabase:
                 (supabase.table("users")
-                         .upsert({"stripe_customer_id": customer_id, "email": email, "price_id": price_id})
+                         .upsert({
+                             "stripe_customer_id": customer_id, 
+                             "email": email, 
+                             "plan": plan,
+                             "plan_status": plan_status,
+                             "current_period_end": current_period_end
+                         })
                          .execute())
 
             return JSONResponse({"ok": True})
