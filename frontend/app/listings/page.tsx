@@ -29,12 +29,18 @@ function parsePositiveInt(value: string): number | undefined {
 
 /**
  * Sanitize search query to prevent special character issues.
- * Escapes % and , characters, and limits length to 64 chars.
+ * Escapes %, comma, and other special chars that could interfere with ilike queries.
+ * Limits length to 64 chars for safety.
  */
 function sanitizeSearch(q: string): string {
   if (!q) return '';
-  // Replace % and , with spaces to avoid query issues
-  const sanitized = q.replace(/[%,]/g, ' ').trim();
+  // Replace potentially problematic characters with spaces
+  // This is safe because Supabase uses parameterized queries internally
+  // We're just cleaning the search term for the ilike pattern
+  const sanitized = q
+    .replace(/[%_,;'"\\]/g, ' ') // Remove SQL-like wildcards and special chars
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
   // Limit to 64 characters
   return sanitized.slice(0, 64);
 }

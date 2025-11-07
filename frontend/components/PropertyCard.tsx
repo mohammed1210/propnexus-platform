@@ -78,6 +78,9 @@ async function postJSON<T>(
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
+// Duration in milliseconds to show the "Saved" success state
+const SAVE_SUCCESS_DURATION_MS = 1500;
+
 export default function PropertyCard({ p }: { p: Property }) {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -136,7 +139,7 @@ export default function PropertyCard({ p }: { p: Property }) {
         clearTimeout(successTimeoutRef.current);
       }
       // Revert success state after 1.5s
-      successTimeoutRef.current = setTimeout(() => setSaveSuccess(false), 1500);
+      successTimeoutRef.current = setTimeout(() => setSaveSuccess(false), SAVE_SUCCESS_DURATION_MS);
     } catch (e) {
       console.error(e);
       alert('Could not save this deal.');
