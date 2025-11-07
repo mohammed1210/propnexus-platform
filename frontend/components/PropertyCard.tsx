@@ -81,6 +81,12 @@ async function postJSON<T>(
 // Duration in milliseconds to show the "Saved" success state
 const SAVE_SUCCESS_DURATION_MS = 1500;
 
+// Badge color thresholds for yield and ROI percentages
+const YIELD_THRESHOLD_EXCELLENT = 6; // >= 6% is green
+const YIELD_THRESHOLD_GOOD = 4; // >= 4% is amber, < 4% is red
+const ROI_THRESHOLD_EXCELLENT = 12; // >= 12% is green
+const ROI_THRESHOLD_GOOD = 8; // >= 8% is amber, < 8% is red
+
 export default function PropertyCard({ p }: { p: Property }) {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -113,14 +119,16 @@ export default function PropertyCard({ p }: { p: Property }) {
   // Helper to determine badge color based on value and thresholds
   const getBadgeColor = (type: 'yield' | 'roi', value: number) => {
     if (type === 'yield') {
-      if (value >= 6) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-      if (value >= 4)
+      if (value >= YIELD_THRESHOLD_EXCELLENT)
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      if (value >= YIELD_THRESHOLD_GOOD)
         return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
       return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
     } else {
       // ROI
-      if (value >= 12) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-      if (value >= 8)
+      if (value >= ROI_THRESHOLD_EXCELLENT)
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      if (value >= ROI_THRESHOLD_GOOD)
         return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
       return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
     }
@@ -165,7 +173,7 @@ export default function PropertyCard({ p }: { p: Property }) {
         />
         {/* Badges for yield and ROI */}
         <div className="absolute top-2 right-2 flex gap-1">
-          {typeof p.yield_percent === 'number' && p.yield_percent > 0 && (
+          {typeof p.yield_percent === 'number' && (
             <span
               className={cx(
                 'text-xs font-semibold px-2 py-1 rounded-md',
@@ -176,7 +184,7 @@ export default function PropertyCard({ p }: { p: Property }) {
               {p.yield_percent.toFixed(1)}% Yield
             </span>
           )}
-          {typeof p.roi_percent === 'number' && p.roi_percent > 0 && (
+          {typeof p.roi_percent === 'number' && (
             <span
               className={cx(
                 'text-xs font-semibold px-2 py-1 rounded-md',
