@@ -48,6 +48,8 @@ async def get_user_plan(
     user_email = None
     
     # Method 1: Check if email query parameter is provided
+    # Note: Email parameter takes precedence for backward compatibility with existing clients
+    # This allows gradual migration to token-based auth
     if email:
         user_email = email
     # Method 2: Check Authorization header for JWT token
