@@ -5,12 +5,25 @@
 
 PropNexus is a comprehensive real estate platform for property investment analysis, featuring AI-powered insights, property listings, and subscription-based access.
 
+## Recent Updates (Sprint 11.3 - Nov 2025)
+
+✨ **UI/UX Polish & Consistency**
+- Lighter hero gradient with improved contrast
+- Prominent "Save" button with heart icon on property cards
+- Collapsible filters on listings page for cleaner interface
+- Unified panel styling across property detail pages
+- Leaflet maps replacing Google Maps for better performance
+- Floating Quick Actions sidebar on property details
+- Animated AI score bars with count-up effects
+- Gated feature panels show locked previews with upgrade prompts
+
 ## Features
 
-- 🏠 **Property Listings** - Browse and search properties from multiple sources
+- 🏠 **Property Listings** - Browse and search properties with advanced filters
 - 🤖 **AI Analysis** - Investment summaries and exit strategies powered by GPT-4
-- 💰 **Deal Tracking** - Save and manage potential investment opportunities
+- 💰 **Deal Tracking** - Save and manage potential investment opportunities with one click
 - 📊 **Analytics** - Property metrics, area intelligence, and comparables
+- 🗺️ **Interactive Maps** - Leaflet-powered maps with property markers and heatmaps
 - 🔐 **Authentication** - Secure user accounts with Supabase Auth
 - 💳 **Subscriptions** - Three-tier plans (Free, Pro, Investor) powered by Stripe
 - 👨‍💼 **Admin Dashboard** - Subscriber metrics and MRR tracking

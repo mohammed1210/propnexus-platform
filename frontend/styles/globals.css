@@ -17,6 +17,17 @@
   --pnx-surface-2: #f8fafc;
   --pnx-border: var(--pnx-input-border); /* reuse your token */
   --pnx-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.06);
+  
+  /* Sprint 11.3: Panel tokens */
+  --panel-border: rgba(0, 0, 0, 0.1);
+  --panel-bg: rgba(255, 255, 255, 0.5);
+  --accent: #6ae0ff;
+  --accent-2: #7c6cff;
+  
+  /* Sprint 11.3: Hero gradient - lighter purple */
+  --hero-gradient: radial-gradient(1200px 500px at 70% -10%, rgba(120, 80, 255, 0.12), transparent 60%),
+                   radial-gradient(800px 400px at 10% 10%, rgba(0, 150, 255, 0.10), transparent 60%),
+                   linear-gradient(180deg, #0b1016, #0b1016);
 }
 :root.dark,
 .dark {
@@ -25,6 +36,10 @@
   --pnx-surface-2: #0f1116;
   --pnx-border: var(--pnx-input-border);
   --pnx-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 24px rgba(0, 0, 0, 0.35);
+  
+  /* Sprint 11.3: Panel tokens - dark mode */
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-bg: rgba(255, 255, 255, 0.03);
 }
 
 /* 2) Form control baseline */
@@ -489,4 +504,81 @@ select:-webkit-autofill {
   height: 0.45rem;
   border-radius: 50%;
   background: currentColor;
+}
+
+/* ===== Sprint 11.3: Panel & Button Utilities ===== */
+
+/* Unified panel style for property details */
+.panel {
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  border-radius: 16px;
+  padding: 1rem;
+}
+
+@media (min-width: 768px) {
+  .panel {
+    padding: 1.5rem;
+  }
+}
+
+/* Ghost button variant */
+.btn-ghost {
+  border: 1px solid var(--panel-border);
+  background: transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-ghost:hover {
+  background: var(--panel-bg);
+  border-color: var(--accent);
+}
+
+/* Save button animation */
+@keyframes save-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.save-animation {
+  animation: save-pop 0.3s ease;
+}
+
+/* AI Score bar animations */
+@keyframes score-bar-fill {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes score-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(106, 224, 255, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(106, 224, 255, 0.6);
+  }
+}
+
+.score-bar {
+  animation: score-bar-fill 1s ease-out;
+}
+
+.score-bar-glow {
+  animation: score-glow 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .save-animation,
+  .score-bar,
+  .score-bar-glow {
+    animation: none !important;
+  }
 }

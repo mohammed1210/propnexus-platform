@@ -83,13 +83,12 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-[88vh] overflow-hidden">
-      {/* Animated gradient background */}
+      {/* Animated gradient background - Sprint 11.3: lighter purple */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 animate-pulse-slow"
+        className="pointer-events-none absolute inset-0"
         style={{
-          background:
-            'radial-gradient(80rem 40rem at 10% -10%, rgba(99,102,241,.35), transparent 60%), radial-gradient(80rem 40rem at 110% 10%, rgba(56,189,248,.35), transparent 60%), radial-gradient(60rem 30rem at 50% 50%, rgba(168,85,247,.2), transparent 70%), linear-gradient(180deg, rgba(15,23,42,.65), rgba(15,23,42,.65))',
+          background: 'var(--hero-gradient)',
         }}
       />
 

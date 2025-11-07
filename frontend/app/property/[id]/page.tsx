@@ -15,6 +15,8 @@ import AIChatbot from '@/components/property_details/AIChatbot';
 import DealScore from '@/components/property_details/DealScore';
 import AreaIntelPanel from '@/components/property_details/AreaIntelPanel';
 import CompsPanel from '@/components/property_details/CompsPanel';
+import MapSingle from '@/components/property_details/MapSingle';
+import QuickActions from '@/components/property_details/QuickActions';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
@@ -106,25 +108,33 @@ export default function PropertyDetailsPage() {
     <Section>
       <SectionTitle>{property.title ?? 'Property Details'}</SectionTitle>
 
+      {/* Sprint 11.3: Quick Actions Sidebar */}
+      <QuickActions
+        propertyId={String(property.id ?? id)}
+        price={property.price ?? undefined}
+        yieldPercent={property.yield_percent ?? undefined}
+        roiPercent={property.roi_percent ?? undefined}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left column */}
         <div className="space-y-6">
           {/* ===== AI Deal Score ===== */}
           {FF.DEAL_SCORE && (
-            <div className="card p-4">
+            <div className="panel">
               <h2 className="font-semibold text-lg mb-4">AI Deal Score</h2>
               <DealScore property={property} />
             </div>
           )}
 
           {/* Investment Summary */}
-          <div className="card p-4">
+          <div className="panel">
             <h2 className="font-semibold text-lg mb-2">Investment Summary</h2>
             <InvestmentSummary property={property as any} />
           </div>
 
           {/* Exit Strategies */}
-          <div className="card p-4">
+          <div className="panel">
             <h2 className="font-semibold text-lg mb-2">Exit Strategies</h2>
             <ExitStrategyGenerator
               title={String(property.title ?? '')}
@@ -143,7 +153,7 @@ export default function PropertyDetailsPage() {
           </div>
 
           {/* Notes (render sign-in nudge when signed out inside the component) */}
-          <div className="card p-4">
+          <div className="panel">
             <h2 className="font-semibold text-lg mb-2">Investor Notes</h2>
             {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
           </div>
@@ -152,46 +162,40 @@ export default function PropertyDetailsPage() {
         {/* Right column */}
         <div className="space-y-6">
           {/* Mortgage calculator */}
-          <div className="card p-4">
+          <div className="panel">
             <h2 className="font-semibold text-lg mb-2">Mortgage & BRRR Calculator</h2>
             <MortgageCalculator price={price} />
           </div>
 
           {/* Stamp Duty */}
-          <div className="card p-4">
+          <div className="panel">
             <h2 className="font-semibold text-lg mb-2">Stamp Duty Calculator</h2>
             <StampDutyCalculator price={price} />
           </div>
 
-          {/* Location */}
-          <div className="card p-4">
+          {/* Location - Sprint 11.3: Leaflet map */}
+          <div className="panel">
             <h2 className="font-semibold text-lg mb-2">Location</h2>
-            {typeof property.latitude === 'number' && typeof property.longitude === 'number' ? (
-              <iframe
-                title="Map"
-                width="100%"
-                height="250"
-                loading="lazy"
-                style={{ border: 0 }}
-                src={`https://www.google.com/maps?q=${property.latitude},${property.longitude}&z=14&output=embed`}
-              />
-            ) : (
-              <p>Map unavailable — no coordinates provided.</p>
-            )}
+            <MapSingle
+              property={property}
+              height={300}
+              zoom={14}
+              scrollWheelZoom={false}
+            />
           </div>
 
           {/* ===== Area Intelligence & Comps ===== */}
           {property.location && (
             <>
               {FF.AREA_INTEL && (
-                <div className="card p-4">
+                <div className="panel">
                   <h2 className="font-semibold text-lg mb-4">Area Intelligence</h2>
                   <AreaIntelPanel areaKey={property.location} />
                 </div>
               )}
 
               {FF.COMPS && (
-                <div className="card p-4">
+                <div className="panel">
                   <h2 className="font-semibold text-lg mb-4">Comparable Sales</h2>
                   <CompsPanel postcode={property.location} />
                 </div>

@@ -1,7 +1,7 @@
 // frontend/components/property_details/DealScore.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { postAIScore, postAIScoreExplain } from '@/lib/api';
 import { FF } from '@/lib/flags';
 
@@ -46,6 +46,11 @@ export default function DealScore({ property }: DealScoreProps) {
   const [loading, setLoading] = useState(true);
   const [showExplanation, setShowExplanation] = useState(false);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
+  
+  // Sprint 11.3: Animation state
+  const [isVisible, setIsVisible] = useState(false);
+  const [animatedScore, setAnimatedScore] = useState(0);
+  const scoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!property) return;
@@ -69,6 +74,54 @@ export default function DealScore({ property }: DealScoreProps) {
 
     fetchScore();
   }, [property]);
+
+  // Sprint 11.3: Intersection Observer for animation trigger
+  useEffect(() => {
+    const element = scoreRef.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !isVisible) {
+            setIsVisible(true);
+          }
+        });
+      },
+      { threshold: 0.2 }
+    );
+
+    observer.observe(element);
+
+    return () => {
+      observer.unobserve(element);
+    };
+  }, [isVisible]);
+
+  // Sprint 11.3: Count-up animation for score
+  useEffect(() => {
+    if (!isVisible || !scoreData) return;
+
+    const duration = 1000; // 1 second
+    const start = performance.now();
+    const targetScore = scoreData.score;
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - start;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Ease-out cubic
+      const easeProgress = 1 - Math.pow(1 - progress, 3);
+      
+      setAnimatedScore(targetScore * easeProgress);
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }, [isVisible, scoreData]);
 
   const handleExplainScore = async () => {
     if (explanation) {
@@ -155,11 +208,13 @@ export default function DealScore({ property }: DealScoreProps) {
   };
 
   return (
-    <div>
+    <div ref={scoreRef}>
       {/* Score badge */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <div className={`text-6xl font-bold ${getScoreColor(score)}`}>{Math.round(score)}</div>
+          <div className={`text-6xl font-bold ${getScoreColor(score)}`}>
+            {Math.round(animatedScore)}
+          </div>
           <div className="text-gray-600 dark:text-neutral-400">
             <div className="text-sm font-medium">AI Deal Score</div>
             <div className="text-xs">Out of 100</div>
@@ -190,8 +245,13 @@ export default function DealScore({ property }: DealScoreProps) {
               </div>
               <div className="w-full bg-gray-200 dark:bg-neutral-700 rounded-full h-2 overflow-hidden">
                 <div
-                  className="bg-blue-600 dark:bg-blue-500 h-full rounded-full transition-all duration-1000 ease-out"
-                  style={{ width: `${percentage}%` }}
+                  className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                    isVisible ? 'score-bar score-bar-glow' : ''
+                  }`}
+                  style={{ 
+                    width: isVisible ? `${percentage}%` : '0%',
+                    background: 'linear-gradient(90deg, #6ae0ff, #7c6cff)',
+                  }}
                 ></div>
               </div>
             </div>

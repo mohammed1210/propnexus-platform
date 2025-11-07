@@ -5,6 +5,69 @@ All notable changes to the PropNexus Platform will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.3.0] - 2025-11-07
+
+### Added - Sprint 11.3: UI/UX Polish & Consistency
+
+#### Home Page
+- Lighter hero gradient with reduced purple intensity
+- New CSS variable `--hero-gradient` for consistent theming
+- Improved contrast and neutral dark tech aesthetic
+
+#### Listings Page
+- Prominent "Save" button moved to property card image overlay (top-left)
+- Heart icon (FiHeart) with filled state on save
+- Micro-animation on save with `.save-animation` class
+- Collapsible "More filters" section (collapsed by default)
+- Added bathrooms filter to primary filters row
+- Secondary filters (Investment Type, Sort, Heatmap) now hidden by default
+- Filter state persisted via URL parameter `?more=1`
+
+#### Property Detail Page
+- Unified `.panel` class for all sections (removes double borders)
+- Replaced Google Maps iframe with Leaflet MapSingle component
+- Floating "Quick Actions" sidebar on desktop (sticky at 140px from top)
+  - Quick stats: Price, Yield, ROI, AI Score
+  - Actions: Save Deal, Share, Export PDF, Copy JSON
+- Mobile: compact actions bar at bottom of screen
+- Created LockedFeature component for gated AI features
+  - Shows blurred/minimized preview of content
+  - Displays upgrade CTA with "View Pricing" and "Manage Plan" buttons
+  - Prevents API calls when feature is locked
+
+#### AI Score Animations
+- IntersectionObserver triggers animations when component is visible
+- Count-up animation for main score (1s ease-out cubic)
+- Smooth width animation for category bars with gradient background
+- Subtle glow effect on score bars (`.score-bar-glow` class)
+- Respects `prefers-reduced-motion` user preference
+
+#### CSS Utilities & Tokens
+- `--panel-border`: rgba(255,255,255,0.08) dark, rgba(0,0,0,0.1) light
+- `--panel-bg`: rgba(255,255,255,0.03) dark, rgba(255,255,255,0.5) light
+- `--accent`: #6ae0ff
+- `--accent-2`: #7c6cff
+- `.panel` class: unified styling with 1px border, rounded-xl, responsive padding
+- `.btn-ghost` class: ghost button variant
+- Animation keyframes: `save-pop`, `score-bar-fill`, `score-glow`
+
+#### New Components
+- `LockedFeature.tsx` - Reusable component for gated features
+- `QuickActions.tsx` - Floating sidebar for property actions
+
+### Changed
+- PropertyCard: Save button moved from bottom to image overlay
+- PropertyCard: Yield/ROI badges repositioned to top-right, stacked vertically
+- ListingsFilters: Reorganized into always-visible and collapsible sections
+- DealScore: Added intersection observer and animation effects
+- All property detail sections now use `.panel` instead of `.card p-4`
+
+### Technical
+- Type safety maintained across all changes
+- No breaking changes to existing APIs or feature flags
+- All animations respect `prefers-reduced-motion`
+- Mobile-responsive design for all new components
+
 ## [11.0.0] - 2025-11-06
 
 ### Added - Sprint 11: AI-Powered Property Analysis

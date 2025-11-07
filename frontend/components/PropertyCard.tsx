@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { fetchWithRetry } from '@/lib/api';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FiHeart } from 'react-icons/fi';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -172,12 +173,73 @@ export default function PropertyCard({ p }: { p: Property }) {
           className="transition-transform duration-300 group-hover:scale-110"
           priority={false}
         />
-        {/* Badges for yield and ROI */}
-        <div className="absolute top-2 right-2 flex gap-1">
+        
+        {/* Sprint 11.3: Prominent Save button in top-left */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleSaveDeal();
+          }}
+          disabled={saving || saveSuccess}
+          className={cx(
+            'absolute top-2 left-2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
+            saveSuccess
+              ? 'bg-green-600 text-white border-2 border-white shadow-lg save-animation'
+              : 'bg-white/90 backdrop-blur-sm text-slate-900 border-2 border-white/50 hover:bg-white hover:border-white shadow-md',
+            (saving || saveSuccess) && 'cursor-not-allowed',
+          )}
+          aria-label={
+            saveSuccess ? 'Deal saved successfully' : saving ? 'Saving deal' : 'Save this property'
+          }
+          aria-pressed={saveSuccess}
+          title={saveSuccess ? 'Saved' : 'Save this property'}
+        >
+          {saveSuccess ? (
+            <>
+              <FiHeart className="w-4 h-4 fill-current" />
+              <span className="text-xs font-semibold">Saved</span>
+            </>
+          ) : saving ? (
+            <>
+              <svg
+                className="animate-spin h-4 w-4"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <span className="text-xs">Saving…</span>
+            </>
+          ) : (
+            <>
+              <FiHeart className="w-4 h-4" />
+              <span className="text-xs font-semibold">Save</span>
+            </>
+          )}
+        </button>
+        
+        {/* Badges for yield and ROI - moved to top-right */}
+        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
           {typeof p.yield_percent === 'number' && (
             <span
               className={cx(
-                'text-xs font-semibold px-2 py-1 rounded-md',
+                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
                 getBadgeColor('yield', p.yield_percent),
               )}
               aria-label={`Yield percentage: ${p.yield_percent.toFixed(1)}%`}
@@ -188,7 +250,7 @@ export default function PropertyCard({ p }: { p: Property }) {
           {typeof p.roi_percent === 'number' && (
             <span
               className={cx(
-                'text-xs font-semibold px-2 py-1 rounded-md',
+                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
                 getBadgeColor('roi', p.roi_percent),
               )}
               aria-label={`ROI percentage: ${p.roi_percent.toFixed(1)}%`}
@@ -215,55 +277,6 @@ export default function PropertyCard({ p }: { p: Property }) {
               {p.bedrooms ?? '—'} bd · {p.bathrooms ?? '—'} ba
             </span>
           </div>
-
-          <button
-            type="button"
-            onClick={handleSaveDeal}
-            disabled={saving || saveSuccess}
-            className={cx(
-              'rounded-md px-3 py-1.5 text-sm border transition-all',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-              saveSuccess
-                ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700'
-                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800',
-              (saving || saveSuccess) && 'cursor-not-allowed',
-            )}
-            aria-label={
-              saveSuccess ? 'Deal saved successfully' : saving ? 'Saving deal' : 'Save deal'
-            }
-          >
-            {saveSuccess ? (
-              <span className="flex items-center gap-1">
-                Saved <span>✓</span>
-              </span>
-            ) : saving ? (
-              <span className="flex items-center gap-1">
-                <svg
-                  className="animate-spin h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                Saving…
-              </span>
-            ) : (
-              'Save'
-            )}
-          </button>
         </div>
       </div>
     </article>
