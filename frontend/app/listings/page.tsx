@@ -225,8 +225,10 @@ function ClientMap({
 }
 
 /* ---------------- Filters (with Sort) ---------------- */
-const SORTABLE = ['created_at', 'price', 'bedrooms', 'roi_percent', 'yield_percent'] as const;
-type SortKey = (typeof SORTABLE)[number];
+// FIX: duplicate SORTABLE removed
+// const SORTABLE = ['created_at', 'price', 'bedrooms', 'roi_percent', 'yield_percent'] as const;
+// FIX: duplicate SortKey removed
+// type SortKey = (typeof SORTABLE)[number];
 
 function FiltersBar() {
   const sp = useSearchParams();
