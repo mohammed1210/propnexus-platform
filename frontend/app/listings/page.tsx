@@ -401,7 +401,8 @@ function ListingsInner() {
       setLoading(true);
       const supabase = getSupabase();
     // FIX: ensure selectedTypes is defined before use
-    const selectedTypesStr = (filters?.selectedTypes || searchParams?.selectedTypes || "");
+    // FIX: use only searchParams for selectedTypes
+    const selectedTypesStr = (searchParams?.selectedTypes || "");
     const selectedTypes = selectedTypesStr.split(",").filter(Boolean);
 
       let query = supabase
