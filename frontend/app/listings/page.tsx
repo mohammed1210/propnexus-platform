@@ -6,13 +6,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import nextDynamic from 'next/dynamic';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
-import { FiSearch } from 'react-icons/fi';
-import { LuPoundSterling, LuBedDouble } from 'react-icons/lu';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
+import ListingsFilters from '@/components/listings/ListingsFilters';
 
 const MapContainer = nextDynamic(() => import('react-leaflet').then((m) => m.MapContainer), {
   ssr: false,
@@ -22,6 +21,9 @@ const TileLayer = nextDynamic(() => import('react-leaflet').then((m) => m.TileLa
 });
 const Marker = nextDynamic(() => import('react-leaflet').then((m) => m.Marker), { ssr: false });
 const Popup = nextDynamic(() => import('react-leaflet').then((m) => m.Popup), { ssr: false });
+
+const SORTABLE = ['created_at', 'price', 'bedrooms', 'roi_percent', 'yield_percent'] as const;
+type SortKey = (typeof SORTABLE)[number];
 
 type RawProperty = {
   id: string | null;
@@ -36,6 +38,7 @@ type RawProperty = {
   latitude?: number | null;
   longitude?: number | null;
   created_at?: string | null;
+  investment_type?: string | null;
 };
 
 export default function ListingsPage() {
@@ -50,11 +53,14 @@ export default function ListingsPage() {
 function ClientMap({
   points,
   defaultCenter,
+  heatmapEnabled = false,
 }: {
   points: { id: string; title: string; lat: number; lng: number; price?: number }[];
   defaultCenter: [number, number];
+  heatmapEnabled?: boolean;
 }) {
   const mapRef = useRef<LeafletMap | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Load Leaflet CSS dynamically
   useEffect(() => {
@@ -68,6 +74,59 @@ function ClientMap({
       document.head.appendChild(link);
     }
   }, []);
+
+  // Draw heatmap overlay
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const map = mapRef.current;
+    if (!canvas || !map) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const drawHeatmap = () => {
+      const bounds = map.getBounds();
+      const size = map.getSize();
+      canvas.width = size.x;
+      canvas.height = size.y;
+
+      // Clear canvas
+      ctx.clearRect(0, 0, size.x, size.y);
+
+      if (!heatmapEnabled || points.length === 0) return;
+
+      // Draw radial gradients at each point
+      points.forEach((point) => {
+        const pixelPoint = map.latLngToContainerPoint([point.lat, point.lng]);
+        
+        const gradient = ctx.createRadialGradient(
+          pixelPoint.x,
+          pixelPoint.y,
+          0,
+          pixelPoint.x,
+          pixelPoint.y,
+          60
+        );
+        
+        // Dark mode palette - deep purple to transparent
+        gradient.addColorStop(0, 'rgba(139, 92, 246, 0.6)');
+        gradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.3)');
+        gradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size.x, size.y);
+      });
+    };
+
+    drawHeatmap();
+
+    // Redraw on map move/zoom
+    map.on('moveend zoomend', drawHeatmap);
+
+    return () => {
+      map.off('moveend zoomend', drawHeatmap);
+    };
+  }, [heatmapEnabled, points]);
 
   const fit = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return;
@@ -96,166 +155,51 @@ function ClientMap({
   }, [points, defaultCenter]);
 
   return (
-    <MapContainer
-      key="map-root"
-      ref={setMap as any}
-      center={defaultCenter}
-      zoom={6}
-      style={{ height: '100%', width: '100%' }}
-      zoomControl={true}
-      scrollWheelZoom={true}
-    >
-      <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        maxZoom={19}
-        minZoom={3}
-        tileSize={256}
-        zoomOffset={0}
+    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
+      <MapContainer
+        key="map-root"
+        ref={setMap as any}
+        center={defaultCenter}
+        zoom={6}
+        style={{ height: '100%', width: '100%' }}
+        zoomControl={true}
+        scrollWheelZoom={true}
+      >
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          maxZoom={19}
+          minZoom={3}
+          tileSize={256}
+          zoomOffset={0}
+        />
+        {points.map((p) => (
+          <Marker key={p.id} position={{ lat: p.lat, lng: p.lng }}>
+            <Popup>
+              <div className="text-sm font-medium">{p.title}</div>
+              {typeof p.price === 'number' && (
+                <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
+              )}
+              <div className="mt-1">
+                <Link href={`/property/${p.id}`} className="underline text-xs">
+                  View details
+                </Link>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+      </MapContainer>
+      <canvas
+        ref={canvasRef}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          pointerEvents: 'none',
+          zIndex: 400,
+        }}
+        aria-hidden="true"
       />
-      {points.map((p) => (
-        <Marker key={p.id} position={{ lat: p.lat, lng: p.lng }}>
-          <Popup>
-            <div className="text-sm font-medium">{p.title}</div>
-            {typeof p.price === 'number' && (
-              <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
-            )}
-            <div className="mt-1">
-              <Link href={`/property/${p.id}`} className="underline text-xs">
-                View details
-              </Link>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
-    </MapContainer>
-  );
-}
-
-/* ---------------- Filters (with Sort) ---------------- */
-const SORTABLE = ['created_at', 'price', 'bedrooms', 'roi_percent', 'yield_percent'] as const;
-type SortKey = (typeof SORTABLE)[number];
-
-function FiltersBar() {
-  const sp = useSearchParams();
-  const router = useRouter();
-
-  const qInit = sp?.get('q') ?? '';
-  const minInit = sp?.get('min') ?? '';
-  const maxInit = sp?.get('max') ?? '';
-  const bedsInit = sp?.get('beds') ?? '';
-  const sortInit = (sp?.get('sort') as SortKey) || 'created_at';
-  const dirInit = sp?.get('dir') === 'asc' ? 'asc' : 'desc';
-
-  const [q, setQ] = useState(qInit);
-  const [min, setMin] = useState(minInit);
-  const [max, setMax] = useState(maxInit);
-  const [beds, setBeds] = useState(bedsInit);
-  const [sort, setSort] = useState<SortKey>(sortInit);
-  const [dir, setDir] = useState<'asc' | 'desc'>(dirInit);
-
-  const apply = () => {
-    const p = new URLSearchParams();
-    if (q) p.set('q', q);
-    if (min) p.set('min', min);
-    if (max) p.set('max', max);
-    if (beds) p.set('beds', beds);
-    if (sort) p.set('sort', sort);
-    if (dir) p.set('dir', dir);
-    router.push(`/listings?${p.toString()}`);
-  };
-
-  const reset = () => {
-    setQ('');
-    setMin('');
-    setMax('');
-    setBeds('');
-    setSort('created_at');
-    setDir('desc');
-    router.push('/listings');
-  };
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-8 gap-2">
-      <div className="col-span-2 flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <FiSearch className="opacity-60" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search area, title, or postcode"
-          className="w-full bg-transparent outline-none"
-        />
-      </div>
-
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <LuPoundSterling className="opacity-60" />
-        <input
-          value={min}
-          onChange={(e) => setMin(e.target.value)}
-          placeholder="Min"
-          inputMode="numeric"
-          className="w-full bg-transparent outline-none"
-        />
-      </div>
-
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <LuPoundSterling className="opacity-60" />
-        <input
-          value={max}
-          onChange={(e) => setMax(e.target.value)}
-          placeholder="Max"
-          inputMode="numeric"
-          className="w-full bg-transparent outline-none"
-        />
-      </div>
-
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <LuBedDouble className="opacity-60" />
-        <input
-          value={beds}
-          onChange={(e) => setBeds(e.target.value)}
-          placeholder="Any beds"
-          inputMode="numeric"
-          className="w-full bg-transparent outline-none"
-        />
-      </div>
-
-      {/* Sort */}
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <select
-          value={sort}
-          onChange={(e) => setSort((e.target.value as SortKey) || 'created_at')}
-          className="w-full bg-transparent outline-none"
-          aria-label="Sort field"
-        >
-          <option value="created_at">Newest</option>
-          <option value="price">Price</option>
-          <option value="bedrooms">Bedrooms</option>
-          <option value="roi_percent">ROI %</option>
-          <option value="yield_percent">Yield %</option>
-        </select>
-      </div>
-
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <select
-          value={dir}
-          onChange={(e) => setDir(e.target.value === 'asc' ? 'asc' : 'desc')}
-          className="w-full bg-transparent outline-none"
-          aria-label="Sort direction"
-        >
-          <option value="desc">Desc</option>
-          <option value="asc">Asc</option>
-        </select>
-      </div>
-
-      <div className="flex gap-2">
-        <button onClick={apply} className="btn btn-primary flex-1">
-          Apply
-        </button>
-        <button onClick={reset} className="pnx-pnx-btn pnx-pnx-pnx-btn-outline">
-          Reset
-        </button>
-      </div>
     </div>
   );
 }
@@ -268,6 +212,8 @@ function ListingsInner() {
   const minP = Number(searchParams?.get('min') ?? '') || 0;
   const maxP = Number(searchParams?.get('max') ?? '') || 0;
   const beds = Number(searchParams?.get('beds') ?? '') || 0;
+  const heatmapEnabled = searchParams?.get('heatmap') === '1';
+  const selectedTypesStr = searchParams?.get('types') ?? '';
 
   const sort = ((): SortKey => {
     const s = (searchParams?.get('sort') || '').toLowerCase();
@@ -284,11 +230,12 @@ function ListingsInner() {
     (async () => {
       setLoading(true);
       const supabase = getSupabase();
+      const selectedTypes = selectedTypesStr.split(',').filter(Boolean);
 
       let query = supabase
         .from('properties')
         .select(
-          'id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at',
+          'id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at,investment_type:investmentType',
         )
         .limit(200);
 
@@ -304,6 +251,9 @@ function ListingsInner() {
       if (minP) query = query.gte('price', minP);
       if (maxP) query = query.lte('price', maxP);
       if (beds) query = query.gte('bedrooms', beds);
+      if (selectedTypes.length > 0) {
+        query = query.in('investment_type', selectedTypes);
+      }
 
       const { data, error } = await query;
       if (cancelled) return;
@@ -320,7 +270,7 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, sort, dir]);
+  }, [q, minP, maxP, beds, sort, dir, selectedTypesStr]);
 
   const points = useMemo(() => {
     return rows
@@ -338,11 +288,7 @@ function ListingsInner() {
     <Section>
       <SectionTitle>PropNexus Listings</SectionTitle>
 
-      <div className="sticky-filter">
-        <div className="max-w-6xl mx-auto px-4 py-3">
-          <FiltersBar />
-        </div>
-      </div>
+      <ListingsFilters />
 
       <div className="content-layout pt-4">
         {/* left: list */}
@@ -363,7 +309,7 @@ function ListingsInner() {
         {/* right: sticky map */}
         <div className="map-sticky">
           <div className="leaflet-panel">
-            <ClientMap points={points} defaultCenter={[53.5, -2]} />
+            <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={heatmapEnabled} />
           </div>
         </div>
       </div>

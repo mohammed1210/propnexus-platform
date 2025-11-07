@@ -198,3 +198,18 @@ button.btn-outline {
   opacity: 1;
   transform: translateY(-2px);
 }
+
+/* ========================================
+7) ANIMATIONS
+======================================== */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.05);
+  }
+}
