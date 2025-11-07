@@ -7,12 +7,37 @@ import Link from 'next/link';
 import nextDynamic from 'next/dynamic';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
 import { FiSearch } from 'react-icons/fi';
-import { LuPoundSterling, LuBedDouble } from 'react-icons/lu';
+import { LuPoundSterling, LuBedDouble, LuBath } from 'react-icons/lu';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
+
+/* ---------------- Helper Functions ---------------- */
+/**
+ * Parse a string to a positive integer.
+ * Returns undefined if the value is blank, NaN, or <= 0.
+ */
+function parsePositiveInt(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const num = Number(trimmed);
+  if (isNaN(num) || num <= 0) return undefined;
+  return Math.floor(num);
+}
+
+/**
+ * Sanitize search query to prevent special character issues.
+ * Escapes % and , characters, and limits length to 64 chars.
+ */
+function sanitizeSearch(q: string): string {
+  if (!q) return '';
+  // Replace % and , with spaces to avoid query issues
+  const sanitized = q.replace(/[%,]/g, ' ').trim();
+  // Limit to 64 characters
+  return sanitized.slice(0, 64);
+}
 
 const MapContainer = nextDynamic(() => import('react-leaflet').then((m) => m.MapContainer), {
   ssr: false,
@@ -144,6 +169,7 @@ function FiltersBar() {
   const minInit = sp?.get('min') ?? '';
   const maxInit = sp?.get('max') ?? '';
   const bedsInit = sp?.get('beds') ?? '';
+  const bathsInit = sp?.get('baths') ?? '';
   const sortInit = (sp?.get('sort') as SortKey) || 'created_at';
   const dirInit = sp?.get('dir') === 'asc' ? 'asc' : 'desc';
 
@@ -151,6 +177,7 @@ function FiltersBar() {
   const [min, setMin] = useState(minInit);
   const [max, setMax] = useState(maxInit);
   const [beds, setBeds] = useState(bedsInit);
+  const [baths, setBaths] = useState(bathsInit);
   const [sort, setSort] = useState<SortKey>(sortInit);
   const [dir, setDir] = useState<'asc' | 'desc'>(dirInit);
 
@@ -160,6 +187,7 @@ function FiltersBar() {
     if (min) p.set('min', min);
     if (max) p.set('max', max);
     if (beds) p.set('beds', beds);
+    if (baths) p.set('baths', baths);
     if (sort) p.set('sort', sort);
     if (dir) p.set('dir', dir);
     router.push(`/listings?${p.toString()}`);
@@ -170,13 +198,14 @@ function FiltersBar() {
     setMin('');
     setMax('');
     setBeds('');
+    setBaths('');
     setSort('created_at');
     setDir('desc');
     router.push('/listings');
   };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-8 gap-2">
+    <div className="grid grid-cols-2 md:grid-cols-9 gap-2" role="search" aria-label="Property filters">
       <div className="col-span-2 flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
         <FiSearch className="opacity-60" />
         <input
@@ -184,6 +213,7 @@ function FiltersBar() {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search area, title, or postcode"
           className="w-full bg-transparent outline-none"
+          aria-label="Search properties"
         />
       </div>
 
@@ -195,6 +225,7 @@ function FiltersBar() {
           placeholder="Min"
           inputMode="numeric"
           className="w-full bg-transparent outline-none"
+          aria-label="Minimum price"
         />
       </div>
 
@@ -206,6 +237,7 @@ function FiltersBar() {
           placeholder="Max"
           inputMode="numeric"
           className="w-full bg-transparent outline-none"
+          aria-label="Maximum price"
         />
       </div>
 
@@ -214,9 +246,22 @@ function FiltersBar() {
         <input
           value={beds}
           onChange={(e) => setBeds(e.target.value)}
-          placeholder="Any beds"
+          placeholder="Beds"
           inputMode="numeric"
           className="w-full bg-transparent outline-none"
+          aria-label="Minimum bedrooms"
+        />
+      </div>
+
+      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
+        <LuBath className="opacity-60" />
+        <input
+          value={baths}
+          onChange={(e) => setBaths(e.target.value)}
+          placeholder="Baths"
+          inputMode="numeric"
+          className="w-full bg-transparent outline-none"
+          aria-label="Minimum bathrooms"
         />
       </div>
 
@@ -264,10 +309,12 @@ function FiltersBar() {
 function ListingsInner() {
   const searchParams = useSearchParams();
 
-  const q = searchParams?.get('q') ?? '';
-  const minP = Number(searchParams?.get('min') ?? '') || 0;
-  const maxP = Number(searchParams?.get('max') ?? '') || 0;
-  const beds = Number(searchParams?.get('beds') ?? '') || 0;
+  const qRaw = searchParams?.get('q') ?? '';
+  const q = sanitizeSearch(qRaw);
+  const minP = parsePositiveInt(searchParams?.get('min') ?? '');
+  const maxP = parsePositiveInt(searchParams?.get('max') ?? '');
+  const beds = parsePositiveInt(searchParams?.get('beds') ?? '');
+  const baths = parsePositiveInt(searchParams?.get('baths') ?? '');
 
   const sort = ((): SortKey => {
     const s = (searchParams?.get('sort') || '').toLowerCase();
@@ -299,11 +346,12 @@ function ListingsInner() {
         query = query.order('created_at', { ascending: false });
       }
 
-      // filters
+      // filters - only apply when defined
       if (q) query = query.or(`title.ilike.%${q}%,location.ilike.%${q}%`);
-      if (minP) query = query.gte('price', minP);
-      if (maxP) query = query.lte('price', maxP);
-      if (beds) query = query.gte('bedrooms', beds);
+      if (minP !== undefined) query = query.gte('price', minP);
+      if (maxP !== undefined) query = query.lte('price', maxP);
+      if (beds !== undefined) query = query.gte('bedrooms', beds);
+      if (baths !== undefined) query = query.gte('bathrooms', baths);
 
       const { data, error } = await query;
       if (cancelled) return;
@@ -320,7 +368,7 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, sort, dir]);
+  }, [q, minP, maxP, beds, baths, sort, dir]);
 
   const points = useMemo(() => {
     return rows

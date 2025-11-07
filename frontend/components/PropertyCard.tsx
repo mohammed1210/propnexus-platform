@@ -17,6 +17,8 @@ type Property = {
   price?: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
+  yield_percent?: number | null;
+  roi_percent?: number | null;
   imageurl?: string | null;
 };
 
@@ -78,6 +80,7 @@ async function postJSON<T>(
 
 export default function PropertyCard({ p }: { p: Property }) {
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const priceText = useMemo(() => {
     const n = p.price ?? 0;
@@ -94,6 +97,22 @@ export default function PropertyCard({ p }: { p: Property }) {
 
   const href = useMemo(() => `/property/${encodeURIComponent(p.id)}`, [p.id]);
 
+  // Helper to determine badge color based on value and thresholds
+  const getBadgeColor = (type: 'yield' | 'roi', value: number) => {
+    if (type === 'yield') {
+      if (value >= 6) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      if (value >= 4)
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
+      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+    } else {
+      // ROI
+      if (value >= 12) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
+      if (value >= 8)
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
+      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
+    }
+  };
+
   const handleSaveDeal = useCallback(async () => {
     try {
       setSaving(true);
@@ -101,7 +120,9 @@ export default function PropertyCard({ p }: { p: Property }) {
       await postJSON<{ ok: boolean }>(`${base}/save-deal`, {
         property_id: p.id,
       });
-      alert('Deal saved!');
+      setSaveSuccess(true);
+      // Revert success state after 1.5s
+      setTimeout(() => setSaveSuccess(false), 1500);
     } catch (e) {
       console.error(e);
       alert('Could not save this deal.');
@@ -111,7 +132,7 @@ export default function PropertyCard({ p }: { p: Property }) {
   }, [p.id]);
 
   return (
-    <article className="card p-0 overflow-hidden">
+    <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30">
       <Link
         href={href}
         className="block relative w-full h-48 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
@@ -125,6 +146,29 @@ export default function PropertyCard({ p }: { p: Property }) {
           style={{ objectFit: 'cover' }}
           priority={false}
         />
+        {/* Badges for yield and ROI */}
+        <div className="absolute top-2 right-2 flex gap-1">
+          {typeof p.yield_percent === 'number' && p.yield_percent > 0 && (
+            <span
+              className={cx(
+                'text-xs font-semibold px-2 py-1 rounded-md',
+                getBadgeColor('yield', p.yield_percent),
+              )}
+            >
+              {p.yield_percent.toFixed(1)}% Yield
+            </span>
+          )}
+          {typeof p.roi_percent === 'number' && p.roi_percent > 0 && (
+            <span
+              className={cx(
+                'text-xs font-semibold px-2 py-1 rounded-md',
+                getBadgeColor('roi', p.roi_percent),
+              )}
+            >
+              {p.roi_percent.toFixed(1)}% ROI
+            </span>
+          )}
+        </div>
       </Link>
 
       <div className="p-4 space-y-2">
@@ -147,16 +191,50 @@ export default function PropertyCard({ p }: { p: Property }) {
           <button
             type="button"
             onClick={handleSaveDeal}
-            disabled={saving}
+            disabled={saving || saveSuccess}
             className={cx(
-              'rounded-md px-3 py-1.5 text-sm border transition',
-              'hover:bg-zinc-100 dark:hover:bg-zinc-800',
+              'rounded-md px-3 py-1.5 text-sm border transition-all',
               'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-              saving && 'opacity-60 cursor-not-allowed',
+              saveSuccess
+                ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700'
+                : 'hover:bg-zinc-100 dark:hover:bg-zinc-800',
+              (saving || saveSuccess) && 'cursor-not-allowed',
             )}
-            aria-label={saving ? 'Saving deal' : 'Save deal'}
+            aria-label={
+              saveSuccess ? 'Deal saved successfully' : saving ? 'Saving deal' : 'Save deal'
+            }
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saveSuccess ? (
+              <span className="flex items-center gap-1">
+                Saved <span>✓</span>
+              </span>
+            ) : saving ? (
+              <span className="flex items-center gap-1">
+                <svg
+                  className="animate-spin h-4 w-4"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                Saving…
+              </span>
+            ) : (
+              'Save'
+            )}
           </button>
         </div>
       </div>
