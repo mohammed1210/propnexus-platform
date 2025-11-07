@@ -36,16 +36,13 @@ export async function POST(req: Request) {
       }
       return NextResponse.json(
         { detail: detail || `Upstream error (${res.status})` },
-        { status: res.status }
+        { status: res.status },
       );
     }
 
     const data = await res.json();
     return NextResponse.json(data);
   } catch (e: any) {
-    return NextResponse.json(
-      { detail: e?.message || 'Proxy error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ detail: e?.message || 'Proxy error' }, { status: 500 });
   }
 }

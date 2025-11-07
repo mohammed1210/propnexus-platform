@@ -5,6 +5,8 @@ on:
       - "backend/**"
   push:
     branches:
+      - main
+      - sprint-*
       - po3/**
 jobs:
   build:
@@ -23,3 +25,18 @@ jobs:
       - name: Import check
         working-directory: backend
         run: python -c "import importlib; importlib.import_module('fastapi')"
+      
+      - name: Python syntax check
+        working-directory: backend
+        run: python -m py_compile main.py routes/*.py
+        continue-on-error: true
+      
+      - name: Smoke Test (Start Server)
+        working-directory: backend
+        run: |
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          SERVER_PID=$!
+          sleep 5
+          curl -f http://localhost:8000/ || (echo "Smoke test failed" && kill $SERVER_PID && exit 1)
+          kill $SERVER_PID || true
+        continue-on-error: true

@@ -27,7 +27,7 @@ export const fetchWithRetry = async <T = any>(
   url: string,
   options: RequestInit = {},
   retries = 2,
-  delay = 500
+  delay = 500,
 ): Promise<T> => {
   try {
     return await safeFetch<T>(url, options);
@@ -134,11 +134,11 @@ export async function sendMagicLink(email: string): Promise<{ success: boolean; 
 --------------------------------------------------- */
 
 export async function postAiSummary(data: any) {
-  return apiPost('/ai/generate-summary', data);
+  return apiPost('/ai/summary', data);
 }
 
 export async function postAiStrategies(data: any) {
-  return apiPost('/ai/generate-strategies', data);
+  return apiPost('/ai/strategies', data);
 }
 
 /* ---------------------------------------------------
@@ -152,4 +152,77 @@ export async function checkHealth(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+/* ---------------------------------------------------
+   Sprint 11: AI Chat, Scoring, Area Intel & Comps
+--------------------------------------------------- */
+
+export interface AIChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface AIChatRequest {
+  messages: AIChatMessage[];
+  context?: {
+    property_id?: string;
+    summary?: string;
+    area_key?: string;
+    postcode?: string;
+  };
+}
+
+export interface AIChatResponse {
+  ok: boolean;
+  reply: string;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+  };
+}
+
+export interface AIScoreResponse {
+  ok: boolean;
+  score: number;
+  categories: {
+    yield: number;
+    roi: number;
+    price_to_rent: number;
+    area_demand: number;
+    crime_index_inverse: number;
+    schools_access: number;
+  };
+  version: string;
+}
+
+export interface AIScoreExplainRequest {
+  score: number;
+  property: Record<string, any>;
+}
+
+export interface AIScoreExplainResponse {
+  ok: boolean;
+  explanation: string;
+  bullets: string[];
+}
+
+export async function postAIChat(body: AIChatRequest): Promise<AIChatResponse> {
+  return apiPost('/gpt/chat', body);
+}
+
+export async function postAIScore(body: Record<string, any>): Promise<AIScoreResponse> {
+  return apiPost('/gpt/score', body);
+}
+
+export async function postAIScoreExplain(body: AIScoreExplainRequest): Promise<AIScoreExplainResponse> {
+  return apiPost('/gpt/score/explain', body);
+}
+
+export async function getAreaIntel(key: string) {
+  return safeFetch(`${API_BASE}/area-intel/${encodeURIComponent(key)}`);
+}
+
+export async function getComps(postcode: string) {
+  return safeFetch(`${API_BASE}/comps/${encodeURIComponent(postcode)}`);
 }

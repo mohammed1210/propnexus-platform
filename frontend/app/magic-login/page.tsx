@@ -5,9 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 
 function getSiteUrl(): string {
   if (typeof window !== 'undefined') return window.location.origin;
-  const env =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.NEXT_PUBLIC_VERCEL_URL; // e.g. my-app.vercel.app
+  const env = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_VERCEL_URL; // e.g. my-app.vercel.app
   if (!env) return 'https://propnexus-platform.vercel.app';
   return env.startsWith('http') ? env : `https://${env}`;
 }
@@ -20,7 +18,7 @@ export default function MagicLoginPage() {
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
   );
 
   async function sendLink(e: React.FormEvent) {

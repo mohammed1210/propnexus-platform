@@ -20,8 +20,18 @@ except Exception:
     try:
         from stripe._error import StripeError as StripeLibError
     except Exception:
-        class StripeLibError(Exception): ...
-        
+
+        class StripeLibError(Exception):
+            """Fallback exception class for Stripe errors.
+
+            Used when Stripe library imports fail or are unavailable.
+            This ensures the module can still be imported in test environments.
+            """
+
+            pass
+
+
+# Optional Supabase client (best-effort only)
 sb: Client | None = None
 if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
     try:
@@ -38,7 +48,12 @@ def get_or_create_customer(email: str) -> str:
     if sb:
         try:
             res = sb.table(USERS_TABLE).select("*").eq(EMAIL_COL, email).maybe_single().execute()
-            row = res.data if isinstance(res.data, dict) else (res.data[0] if res.data else None)
+            row = None
+            if res and hasattr(res, "data"):
+                if isinstance(res.data, dict):
+                    row = res.data
+                elif isinstance(res.data, list) and res.data:
+                    row = res.data[0]
             if row and row.get(CUST_COL):
                 return row[CUST_COL]
         except Exception:

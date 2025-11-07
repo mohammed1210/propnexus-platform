@@ -19,11 +19,17 @@ from .routes.off_market_routes import router as off_market_router
 from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
 from .routes.properties_routes import router as properties_router
+from .routes.users_routes import router as users_router
 
 # ✅ Stripe routers (named distinctly to avoid duplicate includes)
-from .routes.stripe_webhook import router as stripe_webhook_router        # POST /stripe/webhook
-from .routes.stripe_routes import router as stripe_routes_router          # POST /stripe/create-portal-session
-# If you also have a dedicated "create-checkout-session" router, import/include it here as well.
+from .routes.stripe_webhook import router as stripe_webhook_router  # POST /stripe/webhook
+from .routes.stripe_routes import (
+    router as stripe_routes_router,
+)  # POST /stripe/create-portal-session
+
+# Note: Additional route files exist but are not yet integrated:
+# - digests_routes.py, email_routes.py, metrics_routes.py, payments_routes.py
+# These may be activated in future releases when the features are ready.
 
 try:
     from dotenv import load_dotenv
@@ -63,6 +69,9 @@ app.include_router(properties_router)   # GET /properties
 # ✅ Stripe (include exactly once each)
 app.include_router(stripe_webhook_router)   # POST /stripe/webhook
 app.include_router(stripe_routes_router)    # POST /stripe/create-portal-session
+
+# ✅ Users router
+app.include_router(users_router)            # GET /users/plan
 
 # ======================
 # 🏠 Root Route

@@ -1,4 +1,5 @@
-# backend/routes/save_deal.py
+"""API routes for saving and managing investment deals."""
+
 from __future__ import annotations
 
 import os

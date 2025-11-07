@@ -1,21 +1,33 @@
-# Node / Next / Vercel
-frontend/.next
-frontend/.vercel
-**/.vercel/*
-**/.next/*
+# Node / Next
+node_modules/
+.next/
+out/
+.vercel/
 
-# Python
-backend/.venv
-**/__pycache__/
-**/*.pyc
+# TypeScript build info
+**/*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
 
-# Env
+# Logs & caches
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+.yarn/cache/
+.pnpm-store/
+
+# Env files (never commit real secrets)
 .env
 .env.*
 frontend/.env.local
-frontend/.env*
-backend/.env
-backend/.env.*
+backend/.env.local
 
-# Misc
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS / Editor
 .DS_Store
+*.swp
+.vscode/
+.idea/

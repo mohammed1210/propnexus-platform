@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 type Props = {
-  priceId: string;               // Stripe Price ID
-  email?: string | null;         // optional (we’ll also try to read server-side if needed)
-  successUrl?: string;           // optional override
-  cancelUrl?: string;            // optional override
-  label?: string;                // button text
+  priceId: string; // Stripe Price ID
+  email?: string | null; // optional (we’ll also try to read server-side if needed)
+  successUrl?: string; // optional override
+  cancelUrl?: string; // optional override
+  label?: string; // button text
 };
 
 export default function StripeCheckoutButton({

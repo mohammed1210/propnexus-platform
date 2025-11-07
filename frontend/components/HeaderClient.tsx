@@ -11,7 +11,7 @@ function getSupabaseSafe() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   // dynamic import so SSR/build won’t choke
-  const client = import('@supabase/supabase-js').then(m => m.createClient(url, key));
+  const client = import('@supabase/supabase-js').then((m) => m.createClient(url, key));
   return client;
 }
 
@@ -61,7 +61,9 @@ export default function HeaderClient() {
     <header
       className={clsx(
         'sticky top-0 z-40 w-full backdrop-blur bg-white/80 dark:bg-zinc-900/80',
-        scrolled ? 'shadow-md border-b border-blue-100 dark:border-zinc-800' : 'border-b border-transparent',
+        scrolled
+          ? 'shadow-md border-b border-blue-100 dark:border-zinc-800'
+          : 'border-b border-transparent',
       )}
       style={{ ['--header-h' as any]: '64px' }}
     >

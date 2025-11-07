@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import StripePortalButton from '@/components/StripePortalButton';
+import PlanBadge from '@/components/PlanBadge';
 
 /** Lazy, client-only Supabase helpers (safe for CI/preview) */
 async function getSupabase() {
@@ -88,7 +89,10 @@ export default function AccountPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
-      <h1 className="text-2xl font-bold tracking-tight mb-2">Manage Subscription</h1>
+      <div className="flex items-center gap-3 mb-2">
+        <h1 className="text-2xl font-bold tracking-tight">Manage Subscription</h1>
+        <PlanBadge size="md" />
+      </div>
       <p className="text-zinc-600 dark:text-zinc-300 mb-6">
         Update your plan, billing details, or cancel anytime.
       </p>
@@ -101,6 +105,9 @@ export default function AccountPage() {
             <div>
               <div className="text-sm text-zinc-500">Signed in as</div>
               <div className="font-semibold">{email}</div>
+              <div className="mt-2">
+                <PlanBadge />
+              </div>
             </div>
             <button
               onClick={handleSignOut}
