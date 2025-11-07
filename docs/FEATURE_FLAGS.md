@@ -137,6 +137,35 @@ NEXT_PUBLIC_FEATURE_COMPS=true
 
 ## Backend Configuration
 
+### Subscription Plans
+
+**Available Tiers:** `free`, `pro`, `investor`  
+**Location:** `backend/.env` and Stripe configuration
+
+PropNexus Platform supports three subscription tiers:
+
+1. **free** - Default tier for all users
+   - Access to basic property listings
+   - Basic calculators and tools
+   - Limited feature access
+
+2. **pro** - Professional investor tier
+   - All free features
+   - Advanced analytics
+   - Priority support
+   - Configurable via `STRIPE_PRICE_PRO` environment variable
+
+3. **investor** - Premium investor tier
+   - All pro features
+   - Advanced AI features (when enabled)
+   - Unlimited saved deals
+   - Premium support
+   - Configurable via `STRIPE_PRICE_INVESTOR` environment variable
+
+**Note:** The `enterprise` tier has been removed in Sprint 11.2. The database constraint only allows `free`, `pro`, or `investor` values.
+
+---
+
 ### OPENAI_API_KEY
 
 **Required for:** AI Chatbot (GPT responses), Deal Score Explanation  
@@ -256,6 +285,10 @@ Set environment variables in your backend hosting platform:
 
 ## Version History
 
+- **v11.2.0** (Sprint 11.2): 
+  - Limited subscription plans to free, pro, investor (removed enterprise tier)
+  - Refined feature flag enforcement for AI panels
+  - Updated Stripe webhook to only map pro and investor price IDs
 - **v11.1.0** (Sprint 11 Polish): 
   - Centralized feature flag enforcement in `lib/flags.ts`
   - Removed direct `process.env` access from components
