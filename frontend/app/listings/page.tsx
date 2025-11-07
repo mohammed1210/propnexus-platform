@@ -6,12 +6,45 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import nextDynamic from 'next/dynamic';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
+import { FiSearch } from 'react-icons/fi';
+import { LuPoundSterling, LuBedDouble, LuBath } from 'react-icons/lu';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
 import ListingsFilters from '@/components/listings/ListingsFilters';
+
+/* ---------------- Helper Functions ---------------- */
+/**
+ * Parse a string to a positive integer.
+ * Returns undefined if the value is blank, NaN, or <= 0.
+ */
+function parsePositiveInt(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const num = Number(trimmed);
+  if (isNaN(num) || num <= 0) return undefined;
+  return Math.floor(num);
+}
+
+/**
+ * Sanitize search query to prevent special character issues.
+ * Escapes %, comma, and other special chars that could interfere with ilike queries.
+ * Limits length to 64 chars for safety.
+ */
+function sanitizeSearch(q: string): string {
+  if (!q) return '';
+  // Replace potentially problematic characters with spaces
+  // This is safe because Supabase uses parameterized queries internally
+  // We're just cleaning the search term for the ilike pattern
+  const sanitized = q
+    .replace(/[%_,;'"\\]/g, ' ') // Remove SQL-like wildcards and special chars
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .trim();
+  // Limit to 64 characters
+  return sanitized.slice(0, 64);
+}
 
 const MapContainer = nextDynamic(() => import('react-leaflet').then((m) => m.MapContainer), {
   ssr: false,
@@ -155,51 +188,186 @@ function ClientMap({
   }, [points, defaultCenter]);
 
   return (
-    <div style={{ position: 'relative', height: '100%', width: '100%' }}>
-      <MapContainer
-        key="map-root"
-        ref={setMap as any}
-        center={defaultCenter}
-        zoom={6}
-        style={{ height: '100%', width: '100%' }}
-        zoomControl={true}
-        scrollWheelZoom={true}
-      >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          maxZoom={19}
-          minZoom={3}
-          tileSize={256}
-          zoomOffset={0}
-        />
-        {points.map((p) => (
-          <Marker key={p.id} position={{ lat: p.lat, lng: p.lng }}>
-            <Popup>
-              <div className="text-sm font-medium">{p.title}</div>
-              {typeof p.price === 'number' && (
-                <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
-              )}
-              <div className="mt-1">
-                <Link href={`/property/${p.id}`} className="underline text-xs">
-                  View details
-                </Link>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          pointerEvents: 'none',
-          zIndex: 400,
-        }}
-        aria-hidden="true"
+    <MapContainer
+      key="map-root"
+      ref={setMap as any}
+      center={defaultCenter}
+      zoom={6}
+      style={{ height: '100%', width: '100%' }}
+      zoomControl={true}
+      scrollWheelZoom={true}
+    >
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        maxZoom={19}
+        minZoom={3}
+        tileSize={256}
+        zoomOffset={0}
       />
+      {points.map((p) => (
+        <Marker key={p.id} position={{ lat: p.lat, lng: p.lng }}>
+          <Popup>
+            <div className="text-sm font-medium">{p.title}</div>
+            {typeof p.price === 'number' && (
+              <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
+            )}
+            <div className="mt-1">
+              <Link href={`/property/${p.id}`} className="underline text-xs">
+                View details
+              </Link>
+            </div>
+          </Popup>
+        </Marker>
+      ))}
+    </MapContainer>
+  );
+}
+
+/* ---------------- Filters (with Sort) ---------------- */
+const SORTABLE = ['created_at', 'price', 'bedrooms', 'roi_percent', 'yield_percent'] as const;
+type SortKey = (typeof SORTABLE)[number];
+
+function FiltersBar() {
+  const sp = useSearchParams();
+  const router = useRouter();
+
+  const qInit = sp?.get('q') ?? '';
+  const minInit = sp?.get('min') ?? '';
+  const maxInit = sp?.get('max') ?? '';
+  const bedsInit = sp?.get('beds') ?? '';
+  const bathsInit = sp?.get('baths') ?? '';
+  const sortInit = (sp?.get('sort') as SortKey) || 'created_at';
+  const dirInit = sp?.get('dir') === 'asc' ? 'asc' : 'desc';
+
+  const [q, setQ] = useState(qInit);
+  const [min, setMin] = useState(minInit);
+  const [max, setMax] = useState(maxInit);
+  const [beds, setBeds] = useState(bedsInit);
+  const [baths, setBaths] = useState(bathsInit);
+  const [sort, setSort] = useState<SortKey>(sortInit);
+  const [dir, setDir] = useState<'asc' | 'desc'>(dirInit);
+
+  const apply = () => {
+    const p = new URLSearchParams();
+    if (q) p.set('q', q);
+    if (min) p.set('min', min);
+    if (max) p.set('max', max);
+    if (beds) p.set('beds', beds);
+    if (baths) p.set('baths', baths);
+    if (sort) p.set('sort', sort);
+    if (dir) p.set('dir', dir);
+    router.push(`/listings?${p.toString()}`);
+  };
+
+  const reset = () => {
+    setQ('');
+    setMin('');
+    setMax('');
+    setBeds('');
+    setBaths('');
+    setSort('created_at');
+    setDir('desc');
+    router.push('/listings');
+  };
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-10 gap-2" role="search" aria-label="Property filters">
+      <div className="col-span-2 md:col-span-2 flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
+        <FiSearch className="opacity-60" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search area, title, or postcode"
+          className="w-full bg-transparent outline-none"
+          aria-label="Search properties"
+        />
+      </div>
+
+      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
+        <LuPoundSterling className="opacity-60" />
+        <input
+          value={min}
+          onChange={(e) => setMin(e.target.value)}
+          placeholder="Min"
+          inputMode="numeric"
+          className="w-full bg-transparent outline-none"
+          aria-label="Minimum price"
+        />
+      </div>
+
+      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
+        <LuPoundSterling className="opacity-60" />
+        <input
+          value={max}
+          onChange={(e) => setMax(e.target.value)}
+          placeholder="Max"
+          inputMode="numeric"
+          className="w-full bg-transparent outline-none"
+          aria-label="Maximum price"
+        />
+      </div>
+
+      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
+        <LuBedDouble className="opacity-60" />
+        <input
+          value={beds}
+          onChange={(e) => setBeds(e.target.value)}
+          placeholder="Beds"
+          inputMode="numeric"
+          className="w-full bg-transparent outline-none"
+          aria-label="Minimum bedrooms"
+        />
+      </div>
+
+      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
+        <LuBath className="opacity-60" />
+        <input
+          value={baths}
+          onChange={(e) => setBaths(e.target.value)}
+          placeholder="Baths"
+          inputMode="numeric"
+          className="w-full bg-transparent outline-none"
+          aria-label="Minimum bathrooms"
+        />
+      </div>
+
+      {/* Sort */}
+      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
+        <select
+          value={sort}
+          onChange={(e) => setSort((e.target.value as SortKey) || 'created_at')}
+          className="w-full bg-transparent outline-none"
+          aria-label="Sort field"
+        >
+          <option value="created_at">Newest</option>
+          <option value="price">Price</option>
+          <option value="bedrooms">Bedrooms</option>
+          <option value="roi_percent">ROI %</option>
+          <option value="yield_percent">Yield %</option>
+        </select>
+      </div>
+
+      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
+        <select
+          value={dir}
+          onChange={(e) => setDir(e.target.value === 'asc' ? 'asc' : 'desc')}
+          className="w-full bg-transparent outline-none"
+          aria-label="Sort direction"
+        >
+          <option value="desc">Desc</option>
+          <option value="asc">Asc</option>
+        </select>
+      </div>
+
+      <div className="col-span-2 flex gap-2">
+        <button onClick={apply} className="btn btn-primary flex-1">
+          Apply
+        </button>
+        <button onClick={reset} className="pnx-pnx-btn pnx-pnx-pnx-btn-outline">
+          Reset
+        </button>
+      </div>
     </div>
   );
 }
@@ -208,12 +376,12 @@ function ClientMap({
 function ListingsInner() {
   const searchParams = useSearchParams();
 
-  const q = searchParams?.get('q') ?? '';
-  const minP = Number(searchParams?.get('min') ?? '') || 0;
-  const maxP = Number(searchParams?.get('max') ?? '') || 0;
-  const beds = Number(searchParams?.get('beds') ?? '') || 0;
-  const heatmapEnabled = searchParams?.get('heatmap') === '1';
-  const selectedTypesStr = searchParams?.get('types') ?? '';
+  const qRaw = searchParams?.get('q') ?? '';
+  const q = sanitizeSearch(qRaw);
+  const minP = parsePositiveInt(searchParams?.get('min') ?? '');
+  const maxP = parsePositiveInt(searchParams?.get('max') ?? '');
+  const beds = parsePositiveInt(searchParams?.get('beds') ?? '');
+  const baths = parsePositiveInt(searchParams?.get('baths') ?? '');
 
   const sort = ((): SortKey => {
     const s = (searchParams?.get('sort') || '').toLowerCase();
@@ -246,14 +414,12 @@ function ListingsInner() {
         query = query.order('created_at', { ascending: false });
       }
 
-      // filters
+      // filters - only apply when defined
       if (q) query = query.or(`title.ilike.%${q}%,location.ilike.%${q}%`);
-      if (minP) query = query.gte('price', minP);
-      if (maxP) query = query.lte('price', maxP);
-      if (beds) query = query.gte('bedrooms', beds);
-      if (selectedTypes.length > 0) {
-        query = query.in('investment_type', selectedTypes);
-      }
+      if (minP !== undefined) query = query.gte('price', minP);
+      if (maxP !== undefined) query = query.lte('price', maxP);
+      if (beds !== undefined) query = query.gte('bedrooms', beds);
+      if (baths !== undefined) query = query.gte('bathrooms', baths);
 
       const { data, error } = await query;
       if (cancelled) return;
@@ -270,7 +436,7 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, sort, dir, selectedTypesStr]);
+  }, [q, minP, maxP, beds, baths, sort, dir]);
 
   const points = useMemo(() => {
     return rows
