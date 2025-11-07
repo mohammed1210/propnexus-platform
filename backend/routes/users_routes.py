@@ -41,6 +41,8 @@ def extract_email_from_token(authorization: str) -> Optional[str]:
     4. RLS policies on the database enforce proper data access control
     5. The worst-case scenario is someone looks up a plan tier for an email
     
+    TODO: Consider adding rate limiting to prevent email enumeration attacks.
+    
     For security-critical operations, full JWT verification with proper secrets is required.
     This is a convenience endpoint for plan lookup only.
     """
@@ -65,8 +67,14 @@ def extract_email_from_token(authorization: str) -> Optional[str]:
         # Try common JWT email fields
         # Supabase tokens use 'email', custom tokens may use 'sub'
         return payload.get("email") or payload.get("sub")
-    except Exception:
-        # If decode fails for any reason, return None and fall back to query param
+    except JWTError as e:
+        # JWT decode failed - invalid token format
+        return None
+    except Exception as e:
+        # Unexpected error during token processing
+        # Log but don't expose details to client
+        import logging
+        logging.warning(f"Unexpected error extracting email from token: {e}")
         return None
 
 
