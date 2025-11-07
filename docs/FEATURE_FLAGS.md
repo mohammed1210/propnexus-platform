@@ -77,6 +77,13 @@ NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE=true
 - `/gpt/score` endpoint (deterministic, no API key required)
 - `/gpt/score/explain` endpoint (requires `OPENAI_API_KEY` for detailed explanation)
 
+**Sprint 11.3 Update - Gated Panel Behavior:**
+When disabled or plan insufficient, the AI Deal Score panel shows:
+- Blurred/minimized preview of content (~140px height)
+- "Locked" overlay with upgrade CTA
+- No API calls made to `/gpt/score` or `/gpt/score/explain`
+- Links to "/pricing" and "/account" for upgrading
+
 ---
 
 ### NEXT_PUBLIC_FEATURE_AREA_INTEL
@@ -105,6 +112,13 @@ NEXT_PUBLIC_FEATURE_AREA_INTEL=true
 - `/area-intel/{key}` endpoint
 - Supabase `area_intel_cache` table for caching
 
+**Sprint 11.3 Update - Gated Panel Behavior:**
+When disabled or plan insufficient:
+- Shows blurred/minimized preview of area data
+- "Locked" overlay with lock icon and upgrade message
+- No API call made to `/area-intel/{key}`
+- Upgrade CTAs link to pricing and account pages
+
 ---
 
 ### NEXT_PUBLIC_FEATURE_COMPS
@@ -132,6 +146,13 @@ NEXT_PUBLIC_FEATURE_COMPS=true
 **Requirements:**
 - `/comps/{postcode}` endpoint
 - Supabase `comps_cache` table for caching
+
+**Sprint 11.3 Update - Gated Panel Behavior:**
+When disabled or plan insufficient:
+- Displays blurred preview of comparable sales data
+- "Locked" overlay prevents interaction
+- No API call made to `/comps/{postcode}`
+- Shows upgrade options for accessing feature
 
 ---
 
