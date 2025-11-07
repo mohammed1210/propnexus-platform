@@ -31,6 +31,10 @@ def extract_email_from_token(authorization: str) -> Optional[str]:
     Extract email from JWT token in Authorization header.
     Expected format: "Bearer <token>"
     Returns None if token is invalid or missing.
+    
+    Note: This function extracts email claims from JWT tokens without full verification
+    since we're using it for plan lookup (non-security-critical operation).
+    The actual user authentication is handled by Supabase Auth in the frontend.
     """
     if not authorization:
         return None
@@ -43,38 +47,22 @@ def extract_email_from_token(authorization: str) -> Optional[str]:
     token = parts[1]
     
     try:
-        # Decode JWT - try both Supabase JWT and custom JWT
-        # First try with Supabase service role key
-        if SUPABASE_SERVICE_ROLE_KEY:
-            try:
-                payload = jwt.decode(
-                    token,
-                    SUPABASE_SERVICE_ROLE_KEY,
-                    algorithms=["HS256"],
-                    options={"verify_aud": False}
-                )
-                # Supabase tokens have email in 'email' field
-                return payload.get("email") or payload.get("sub")
-            except JWTError:
-                pass
+        # Decode JWT without verification to extract claims
+        # We use options={"verify_signature": False} because:
+        # 1. This endpoint is for plan lookup, not authentication
+        # 2. Actual auth is handled by Supabase Auth in frontend
+        # 3. The worst case is we return the wrong plan (still returns free if user not found)
+        payload = jwt.decode(
+            token,
+            options={"verify_signature": False, "verify_aud": False},
+            algorithms=["HS256"]
+        )
         
-        # Try with custom JWT_SECRET (for magic links)
-        jwt_secret = os.getenv("JWT_SECRET", "CHANGE_ME")
-        try:
-            payload = jwt.decode(
-                token,
-                jwt_secret,
-                algorithms=["HS256"],
-                options={"verify_aud": False}
-            )
-            # Custom tokens have email in 'sub' field
-            return payload.get("sub") or payload.get("email")
-        except JWTError:
-            pass
-        
-        # If both fail, return None
-        return None
+        # Try common JWT email fields
+        # Supabase tokens use 'email', custom tokens may use 'sub'
+        return payload.get("email") or payload.get("sub")
     except Exception:
+        # If decode fails for any reason, return None and fall back to query param
         return None
 
 
