@@ -402,10 +402,10 @@ function ListingsInner() {
     (async () => {
       setLoading(true);
       const supabase = getSupabase();
-    // FIX: ensure selectedTypes is defined before use
-    // FIX: use only searchParams for selectedTypes
-    const selectedTypesStr = (searchParams?.get?.("selectedTypes") ?? "");
-    const selectedTypes = selectedTypesStr.split(",").filter(Boolean);
+      
+      // Parse selectedTypes from searchParams only
+      const selectedTypesParam = (searchParams?.get("selectedTypes") ?? "") as string;
+      const selectedTypes = selectedTypesParam ? selectedTypesParam.split(",").filter(Boolean) : [];
 
       let query = supabase
         .from('properties')
@@ -443,7 +443,7 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, baths, sort, dir]);
+  }, [q, minP, maxP, beds, baths, sort, dir, searchParams]);
 
   const points = useMemo(() => {
     return rows

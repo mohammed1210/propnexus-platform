@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { getComps } from '@/lib/api';
+import { FF } from '@/lib/flags';
 
 interface CompsPanelProps {
   postcode: string;
@@ -56,6 +57,11 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
 
     fetchData();
   }, [postcode]);
+
+  // Feature flag guard - return null if feature is disabled
+  if (!FF.COMPS) {
+    return null;
+  }
 
   if (loading) {
     return (

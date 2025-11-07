@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { postAIScore, postAIScoreExplain } from '@/lib/api';
+import { FF } from '@/lib/flags';
 
 interface PropertyData {
   id?: string;
@@ -99,6 +100,11 @@ export default function DealScore({ property }: DealScoreProps) {
       setLoadingExplanation(false);
     }
   };
+
+  // Feature flag guard - return null if feature is disabled
+  if (!FF.DEAL_SCORE) {
+    return null;
+  }
 
   if (loading) {
     return (

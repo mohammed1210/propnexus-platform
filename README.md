@@ -12,8 +12,32 @@ PropNexus is a comprehensive real estate platform for property investment analys
 - 💰 **Deal Tracking** - Save and manage potential investment opportunities
 - 📊 **Analytics** - Property metrics, area intelligence, and comparables
 - 🔐 **Authentication** - Secure user accounts with Supabase Auth
-- 💳 **Subscriptions** - Stripe-powered Pro and Investor tier plans
+- 💳 **Subscriptions** - Three-tier plans (Free, Pro, Investor) powered by Stripe
 - 👨‍💼 **Admin Dashboard** - Subscriber metrics and MRR tracking
+
+## Subscription Tiers
+
+PropNexus Platform offers three subscription tiers:
+
+1. **Free** - Default tier for all users
+   - Access to basic property listings
+   - Basic calculators and tools
+   - Limited feature access
+
+2. **Pro** - Professional investor tier ($29/month)
+   - All free features
+   - Advanced analytics
+   - Priority support
+   - Configurable via `STRIPE_PRICE_PRO` environment variable
+
+3. **Investor** - Premium investor tier ($99/month)
+   - All pro features
+   - Advanced AI features (when enabled via feature flags)
+   - Unlimited saved deals
+   - Premium support
+   - Configurable via `STRIPE_PRICE_INVESTOR` environment variable
+
+**Note:** The `enterprise` tier has been removed in Sprint 11.2. Only `free`, `pro`, and `investor` tiers are supported.
 
 ## Tech Stack
 

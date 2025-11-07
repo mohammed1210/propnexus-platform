@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { getAreaIntel } from '@/lib/api';
+import { FF } from '@/lib/flags';
 
 interface AreaIntelPanelProps {
   areaKey: string;
@@ -46,6 +47,11 @@ export default function AreaIntelPanel({ areaKey }: AreaIntelPanelProps) {
 
     fetchData();
   }, [areaKey]);
+
+  // Feature flag guard - return null if feature is disabled
+  if (!FF.AREA_INTEL) {
+    return null;
+  }
 
   if (loading) {
     return (
