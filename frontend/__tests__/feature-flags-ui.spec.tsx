@@ -7,15 +7,21 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
+// Helper function to mock feature flags with overrides
+function mockFeatureFlags(overrides = {}) {
+  return {
+    FF: {
+      AI_CHAT: false,
+      DEAL_SCORE: false,
+      AREA_INTEL: false,
+      COMPS: false,
+      ...overrides,
+    },
+  };
+}
+
 // Mock the flags module
-jest.mock('@/lib/flags', () => ({
-  FF: {
-    AI_CHAT: false,
-    DEAL_SCORE: false,
-    AREA_INTEL: false,
-    COMPS: false,
-  },
-}));
+jest.mock('@/lib/flags', () => mockFeatureFlags());
 
 // Mock Supabase client to avoid errors
 jest.mock('@/lib/supabaseClient', () => ({
@@ -57,80 +63,44 @@ describe('Feature Flag UI Gating', () => {
 
   describe('AI Deal Score Panel', () => {
     it('should not render when DEAL_SCORE flag is false', async () => {
-      // Re-mock with DEAL_SCORE = false
-      jest.doMock('@/lib/flags', () => ({
-        FF: {
-          AI_CHAT: false,
-          DEAL_SCORE: false,
-          AREA_INTEL: false,
-          COMPS: false,
-        },
-      }));
+      jest.doMock('@/lib/flags', () => mockFeatureFlags());
 
       const PropertyPage = require('@/app/property/[id]/page').default;
       const { container } = render(<PropertyPage />);
 
-      // Wait for component to render
       await screen.findByText(/Property Details/i, {}, { timeout: 3000 });
 
-      // Verify AI Deal Score is NOT present
       expect(container.textContent).not.toMatch(/AI Deal Score/i);
     });
 
     it('should render when DEAL_SCORE flag is true', async () => {
-      // Re-mock with DEAL_SCORE = true
-      jest.doMock('@/lib/flags', () => ({
-        FF: {
-          AI_CHAT: false,
-          DEAL_SCORE: true,
-          AREA_INTEL: false,
-          COMPS: false,
-        },
-      }));
+      jest.doMock('@/lib/flags', () => mockFeatureFlags({ DEAL_SCORE: true }));
 
-      // Clear module cache to pick up new mock
       jest.resetModules();
       
       const PropertyPage = require('@/app/property/[id]/page').default;
       const { container } = render(<PropertyPage />);
 
-      // Wait for component to render
       await screen.findByText(/Property Details/i, {}, { timeout: 3000 });
 
-      // Verify AI Deal Score IS present
       expect(container.textContent).toMatch(/AI Deal Score/i);
     });
   });
 
   describe('Area Intelligence Panel', () => {
     it('should not render when AREA_INTEL flag is false', async () => {
-      jest.doMock('@/lib/flags', () => ({
-        FF: {
-          AI_CHAT: false,
-          DEAL_SCORE: false,
-          AREA_INTEL: false,
-          COMPS: false,
-        },
-      }));
+      jest.doMock('@/lib/flags', () => mockFeatureFlags());
 
       const PropertyPage = require('@/app/property/[id]/page').default;
       const { container } = render(<PropertyPage />);
 
       await screen.findByText(/Property Details/i, {}, { timeout: 3000 });
 
-      // Verify Area Intelligence is NOT present
       expect(container.textContent).not.toMatch(/Area Intelligence/i);
     });
 
     it('should render when AREA_INTEL flag is true', async () => {
-      jest.doMock('@/lib/flags', () => ({
-        FF: {
-          AI_CHAT: false,
-          DEAL_SCORE: false,
-          AREA_INTEL: true,
-          COMPS: false,
-        },
-      }));
+      jest.doMock('@/lib/flags', () => mockFeatureFlags({ AREA_INTEL: true }));
 
       jest.resetModules();
       
@@ -139,40 +109,24 @@ describe('Feature Flag UI Gating', () => {
 
       await screen.findByText(/Property Details/i, {}, { timeout: 3000 });
 
-      // Verify Area Intelligence IS present
       expect(container.textContent).toMatch(/Area Intelligence/i);
     });
   });
 
   describe('Comparable Sales Panel', () => {
     it('should not render when COMPS flag is false', async () => {
-      jest.doMock('@/lib/flags', () => ({
-        FF: {
-          AI_CHAT: false,
-          DEAL_SCORE: false,
-          AREA_INTEL: false,
-          COMPS: false,
-        },
-      }));
+      jest.doMock('@/lib/flags', () => mockFeatureFlags());
 
       const PropertyPage = require('@/app/property/[id]/page').default;
       const { container } = render(<PropertyPage />);
 
       await screen.findByText(/Property Details/i, {}, { timeout: 3000 });
 
-      // Verify Comparable Sales is NOT present
       expect(container.textContent).not.toMatch(/Comparable Sales/i);
     });
 
     it('should render when COMPS flag is true', async () => {
-      jest.doMock('@/lib/flags', () => ({
-        FF: {
-          AI_CHAT: false,
-          DEAL_SCORE: false,
-          AREA_INTEL: false,
-          COMPS: true,
-        },
-      }));
+      jest.doMock('@/lib/flags', () => mockFeatureFlags({ COMPS: true }));
 
       jest.resetModules();
       
@@ -181,21 +135,13 @@ describe('Feature Flag UI Gating', () => {
 
       await screen.findByText(/Property Details/i, {}, { timeout: 3000 });
 
-      // Verify Comparable Sales IS present
       expect(container.textContent).toMatch(/Comparable Sales/i);
     });
   });
 
   describe('AI Chatbot', () => {
     it('should not render when AI_CHAT flag is false', async () => {
-      jest.doMock('@/lib/flags', () => ({
-        FF: {
-          AI_CHAT: false,
-          DEAL_SCORE: false,
-          AREA_INTEL: false,
-          COMPS: false,
-        },
-      }));
+      jest.doMock('@/lib/flags', () => mockFeatureFlags());
 
       const PropertyPage = require('@/app/property/[id]/page').default;
       const { container } = render(<PropertyPage />);
@@ -203,7 +149,6 @@ describe('Feature Flag UI Gating', () => {
       await screen.findByText(/Property Details/i, {}, { timeout: 3000 });
 
       // Chatbot should not be rendered
-      // Note: Chatbot component structure may vary
       expect(container.querySelector('[data-testid="ai-chatbot"]')).toBeNull();
     });
   });
