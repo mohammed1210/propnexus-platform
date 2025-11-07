@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -10,9 +10,68 @@ export default function HomePage() {
   const router = useRouter();
   const [q, setQ] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [heatmapDarkMode, setHeatmapDarkMode] = useState(true);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Avoid hydration mismatch for random SVG lines
+  // Avoid hydration mismatch
   useEffect(() => setMounted(true), []);
+
+  // Draw animated heatmap on hero canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const parent = canvas.parentElement;
+    if (!parent) return;
+
+    canvas.width = parent.offsetWidth;
+    canvas.height = parent.offsetHeight;
+
+    let animationId: number;
+    let offset = 0;
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Generate some decorative heatmap spots
+      const spots = [
+        { x: canvas.width * 0.3, y: canvas.height * 0.4, r: 120 },
+        { x: canvas.width * 0.7, y: canvas.height * 0.6, r: 100 },
+        { x: canvas.width * 0.5, y: canvas.height * 0.3, r: 80 },
+      ];
+
+      spots.forEach((spot) => {
+        const gradient = ctx.createRadialGradient(spot.x, spot.y, 0, spot.x, spot.y, spot.r);
+
+        if (heatmapDarkMode) {
+          // Dark palette
+          gradient.addColorStop(0, 'rgba(139, 92, 246, 0.4)');
+          gradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.2)');
+          gradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
+        } else {
+          // Warm palette
+          gradient.addColorStop(0, 'rgba(251, 146, 60, 0.4)');
+          gradient.addColorStop(0.5, 'rgba(251, 146, 60, 0.2)');
+          gradient.addColorStop(1, 'rgba(251, 146, 60, 0)');
+        }
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      });
+
+      offset += 0.5;
+      animationId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+    };
+  }, [heatmapDarkMode]);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,25 +82,39 @@ export default function HomePage() {
 
   return (
     <div className="relative min-h-[88vh] overflow-hidden">
-      {/* Background */}
+      {/* Layered gradient background */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(80rem 40rem at 10% -10%, rgba(99,102,241,.25), transparent 60%), radial-gradient(80rem 40rem at 110% 10%, rgba(56,189,248,.25), transparent 60%), linear-gradient(180deg, rgba(15,23,42,.65), rgba(15,23,42,.65))',
+            'radial-gradient(80rem 40rem at 10% -10%, rgba(99,102,241,.25), transparent 60%), radial-gradient(80rem 40rem at 110% 10%, rgba(56,189,248,.25), transparent 60%), linear-gradient(180deg, rgba(15,23,42,.75), rgba(15,23,42,.85))',
         }}
       />
+
+      {/* Map grid pattern */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.15]"
+        className="pointer-events-none absolute inset-0 opacity-[0.12]"
         style={{
           backgroundImage:
-            'radial-gradient(#ffffff 1px, transparent 1px), radial-gradient(#ffffff 1px, transparent 1px)',
-          backgroundSize: '24px 24px, 24px 24px',
-          backgroundPosition: '0 0, 12px 12px',
+            'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
         }}
       />
+
+      {/* Scanning ring animation */}
+      {mounted && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-30"
+          style={{
+            background:
+              'radial-gradient(circle at 50% 50%, rgba(99,102,241,0.3) 0%, transparent 30%)',
+            animation: 'pulse 4s ease-in-out infinite',
+          }}
+        />
+      )}
 
       <main className="relative z-10">
         <div className="mx-auto max-w-7xl px-4 py-14 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
@@ -145,38 +218,31 @@ export default function HomePage() {
           {/* Right: Decorative tile */}
           <section className="hidden md:block">
             <div className="relative mx-auto w-full max-w-xl aspect-[16/10] rounded-2xl border border-white/10 bg-slate-900/40 backdrop-blur-md shadow-2xl overflow-hidden">
-              <svg viewBox="0 0 600 380" className="absolute inset-0 h-full w-full">
-                <defs>
-                  <radialGradient id="g1" cx="50%" cy="50%" r="60%">
-                    <stop offset="0%" stopColor="rgba(99,102,241,0.9)" />
-                    <stop offset="100%" stopColor="rgba(99,102,241,0)" />
-                  </radialGradient>
-                </defs>
+              {/* AI Assisted Badge */}
+              <div className="absolute top-4 right-4 z-20">
+                <div className="px-3 py-1.5 rounded-full bg-indigo-600/90 text-white text-xs font-medium flex items-center gap-1.5 shadow-lg">
+                  <span aria-hidden>✨</span>
+                  <span>AI Assisted</span>
+                </div>
+              </div>
 
-                {/* Render random lines only on client to avoid hydration mismatch */}
-                {mounted && (
-                  <g opacity="0.7">
-                    {Array.from({ length: 26 }).map((_, i) => {
-                      const x1 = Math.random() * 600;
-                      const y1 = Math.random() * 380;
-                      const x2 = Math.random() * 600;
-                      const y2 = Math.random() * 380;
-                      return (
-                        <line
-                          key={i}
-                          x1={x1}
-                          y1={y1}
-                          x2={x2}
-                          y2={y2}
-                          stroke="rgba(148,163,184,0.35)"
-                          strokeWidth="1"
-                        />
-                      );
-                    })}
-                  </g>
-                )}
-                <circle cx="460" cy="200" r="140" fill="url(#g1)" />
-              </svg>
+              {/* Heatmap canvas */}
+              <canvas
+                ref={canvasRef}
+                className="absolute inset-0 w-full h-full"
+                aria-hidden="true"
+              />
+
+              {/* Heatmap toggle */}
+              <div className="absolute top-4 left-4 z-20">
+                <button
+                  onClick={() => setHeatmapDarkMode(!heatmapDarkMode)}
+                  className="px-3 py-1.5 rounded-full bg-white/90 text-slate-900 text-xs font-medium hover:bg-white transition-colors shadow-md"
+                  aria-label={`Switch to ${heatmapDarkMode ? 'warm' : 'dark'} palette`}
+                >
+                  {heatmapDarkMode ? '🌙 Dark' : '☀️ Warm'}
+                </button>
+              </div>
 
               <div className="relative z-10 h-full w-full p-6 flex flex-col justify-end">
                 <div className="rounded-lg bg-white/90 p-4 shadow">
