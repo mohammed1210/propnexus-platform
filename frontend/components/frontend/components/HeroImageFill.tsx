@@ -1,27 +1,23 @@
+import Image from "next/image";
 import Link from "next/link";
 
-export default function HeroBackground() {
+export default function HeroImageFill() {
   return (
     <section
       aria-label="AI Deal Sourcing — PropNexus"
       className="relative min-h-[480px] md:min-h-[560px] rounded-2xl overflow-hidden"
     >
-      {/* Background image */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/branding/hero_deal-sourcing.webp?v=3')" }}
+      <Image
+        src="/branding/hero_deal-sourcing.webp?v=3"
+        alt="Agents reviewing top-scored property deals with AI assistant"
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover"
       />
 
-      {/* Primary dark gradient for contrast */}
+      <div className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/40 to-transparent" />
       <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-gradient-to-r from-slate-950/75 via-slate-950/40 to-transparent"
-      />
-
-      {/* Brand color mesh */}
-      <div
-        aria-hidden="true"
         className="absolute inset-0 mix-blend-soft-light opacity-70"
         style={{
           backgroundImage:
@@ -29,10 +25,7 @@ export default function HeroBackground() {
             "radial-gradient(700px 520px at 85% 65%, rgba(16,185,129,0.18), transparent)",
         }}
       />
-
-      {/* Subtle dot pattern (optional) */}
       <div
-        aria-hidden="true"
         className="absolute inset-0 opacity-20"
         style={{ backgroundImage: "url('/branding/overlays/dots.svg')" }}
       />
