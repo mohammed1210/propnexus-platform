@@ -161,7 +161,7 @@ NEXT_PUBLIC_STRIPE_PRICE_INVESTOR=price_xxx
 NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE=false        # Enable AI-powered deal scoring
 NEXT_PUBLIC_FEATURE_AI_CHATBOT=false           # Enable AI investment chatbot
 NEXT_PUBLIC_FEATURE_AREA_INTEL=false           # Enable area intelligence panel
-NEXT_PUBLIC_FEATURE_COMPS_PANEL=false          # Enable comparable sales panel
+NEXT_PUBLIC_FEATURE_COMPS=false          # Enable comparable sales panel
 ```
 
 ### Backend Environment Variables
@@ -182,10 +182,9 @@ STRIPE_SECRET_KEY=sk_test_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 
 # Stripe Price ID Mapping (for subscription tier detection)
-# Map Stripe price IDs to plan tiers: pro, investor, enterprise
+# Map Stripe price IDs to plan tiers: pro, investor
 STRIPE_PRICE_PRO=price_xxx
 STRIPE_PRICE_INVESTOR=price_xxx
-STRIPE_PRICE_ENTERPRISE=price_xxx
 
 # CORS
 ALLOWED_ORIGINS=http://localhost:3000,https://your-domain.vercel.app
@@ -199,7 +198,7 @@ PropNexus uses feature flags to control AI-powered features. All flags default t
 - `NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE` - AI-powered investment score (requires OpenAI API key)
 - `NEXT_PUBLIC_FEATURE_AI_CHATBOT` - AI chatbot for property advice (requires OpenAI API key)
 - `NEXT_PUBLIC_FEATURE_AREA_INTEL` - Area intelligence with demographics and crime data
-- `NEXT_PUBLIC_FEATURE_COMPS_PANEL` - Comparable sales panel
+- `NEXT_PUBLIC_FEATURE_COMPS` - Comparable sales panel
 
 Set flags to `true` or `1` to enable. Example:
 ```env
