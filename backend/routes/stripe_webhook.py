@@ -22,13 +22,14 @@ def map_price_to_plan(price_id: str) -> Optional[str]:
     """
     Map Stripe price ID to plan name.
     Returns None for unknown price IDs to prevent downgrading users to 'free'.
-    Sprint 11.2: Only supports free, pro, investor plans (enterprise removed).
+    
+    Sprint 11.2: Limited to three tiers - free, pro, investor.
     """
     if not price_id:
         return None
     
     # Build mapping at runtime to support test environment variable injection
-    # Sprint 11.2: Removed STRIPE_PRICE_ENTERPRISE - only 3 tiers supported
+    # Sprint 11.2: Only pro and investor tiers (free is default)
     price_to_plan = {
         os.getenv("STRIPE_PRICE_PRO", ""): "pro",
         os.getenv("STRIPE_PRICE_INVESTOR", ""): "investor",
