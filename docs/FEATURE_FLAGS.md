@@ -2,6 +2,29 @@
 
 This document describes the feature flags available in PropNexus Platform (Sprint 11+).
 
+## Overview
+
+Feature flags are centralized in `frontend/lib/flags.ts` to ensure consistent behavior across the application. All flags default to `false` when the environment variable is not set, providing fail-safe defaults.
+
+### Centralized Flag Management
+
+All feature flag logic is implemented in a single location (`frontend/lib/flags.ts`), which provides:
+
+- **Consistent behavior**: All components use the same flag evaluation logic
+- **Safe defaults**: Flags default to `false` when environment variables are missing
+- **Type safety**: TypeScript ensures proper usage of flags
+
+**Important:** Never use `process.env.NEXT_PUBLIC_FEATURE_*` directly in components. Always import and use flags from `lib/flags.ts`.
+
+```typescript
+// ✅ Correct - use centralized flags
+import { FF } from '@/lib/flags';
+if (FF.AI_CHAT) { /* ... */ }
+
+// ❌ Wrong - direct environment variable access
+if (process.env.NEXT_PUBLIC_FEATURE_AI_CHATBOT === 'true') { /* ... */ }
+```
+
 ## Frontend Feature Flags
 
 All frontend feature flags are environment variables prefixed with `NEXT_PUBLIC_FEATURE_` and should be set in `frontend/.env.local` or deployment environment.
@@ -233,4 +256,9 @@ Set environment variables in your backend hosting platform:
 
 ## Version History
 
+- **v11.1.0** (Sprint 11 Polish): 
+  - Centralized feature flag enforcement in `lib/flags.ts`
+  - Removed direct `process.env` access from components
+  - Added token-based authentication for `/users/plan` endpoint
+  - Updated `.env.example` with consistent flag naming
 - **v11.0.0** (Sprint 11): Initial release of all four feature flags

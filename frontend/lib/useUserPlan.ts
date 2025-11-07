@@ -14,8 +14,8 @@ export interface UserPlanData {
 /**
  * Custom hook to fetch and track the current user's subscription plan.
  * 
- * 1. Gets the authenticated user email from Supabase auth
- * 2. Fetches plan details from backend /users/plan endpoint
+ * 1. Gets the authenticated user session from Supabase auth
+ * 2. Fetches plan details from backend /users/plan endpoint using JWT token
  * 3. Returns plan, stripe_customer_id, loading state, and error
  * 
  * Usage:
@@ -37,16 +37,16 @@ export function useUserPlan(): UserPlanData {
         setLoading(true);
         setError(null);
 
-        // Get authenticated user email from Supabase
+        // Get authenticated user session from Supabase
         const sb = getSupabase();
-        const { data: userData, error: authError } = await sb.auth.getUser();
+        const { data: sessionData, error: authError } = await sb.auth.getSession();
 
         if (authError) {
           throw new Error(`Auth error: ${authError.message}`);
         }
 
-        const email = userData?.user?.email;
-        if (!email) {
+        const session = sessionData?.session;
+        if (!session || !session.access_token) {
           // User not logged in - default to free
           if (!cancelled) {
             setPlan('free');
@@ -56,14 +56,15 @@ export function useUserPlan(): UserPlanData {
           return;
         }
 
-        // Fetch plan from backend
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+        // Fetch plan from backend using token-based authentication
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
         const response = await fetch(
-          `${backendUrl}/users/plan?email=${encodeURIComponent(email)}`,
+          `${backendUrl}/users/plan`,
           {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
             },
           }
         );
