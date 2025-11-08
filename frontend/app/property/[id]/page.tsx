@@ -19,6 +19,7 @@ import CompsPanel from '@/components/property_details/CompsPanel';
 import MapSingle from '@/components/property_details/MapSingle';
 import QuickActions from '@/components/property_details/QuickActions';
 import PlanBadge from '@/components/PlanBadge';
+import GatedPanel from '@/components/property_details/GatedPanel';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
@@ -164,7 +165,13 @@ export default function PropertyDetailsPage() {
                 <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
                   AI Deal Score
                 </h2>
-                <DealScore property={property} />
+                <GatedPanel
+                  title="AI Deal Score"
+                  requiredPlan="pro"
+                  featureEnabled={FF.DEAL_SCORE}
+                >
+                  <DealScore property={property} />
+                </GatedPanel>
               </div>
             )}
 
@@ -176,7 +183,13 @@ export default function PropertyDetailsPage() {
                     <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
                       Area Intelligence
                     </h2>
-                    <AreaIntelPanel areaKey={property.location} />
+                    <GatedPanel
+                      title="Area Intelligence"
+                      requiredPlan="pro"
+                      featureEnabled={FF.AREA_INTEL}
+                    >
+                      <AreaIntelPanel areaKey={property.location} />
+                    </GatedPanel>
                   </div>
                 )}
 
@@ -185,7 +198,13 @@ export default function PropertyDetailsPage() {
                     <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
                       Comparable Sales
                     </h2>
-                    <CompsPanel postcode={property.location} />
+                    <GatedPanel
+                      title="Comparable Sales"
+                      requiredPlan="investor"
+                      featureEnabled={FF.COMPS}
+                    >
+                      <CompsPanel postcode={property.location} />
+                    </GatedPanel>
                   </div>
                 )}
               </>
