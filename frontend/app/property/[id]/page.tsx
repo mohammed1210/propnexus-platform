@@ -2,35 +2,52 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 
 import Section from '@/components/ui/Section';
-import SectionTitle from '@/components/ui/SectionTitle';
 import PageWrapper from '@/components/PageWrapper';
 
 import PropertySummaryCard from '@/components/property_details/PropertySummaryCard';
 import QuickStatsCard from '@/components/property_details/QuickStatsCard';
 import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
-import InvestmentCalculator from '@/components/property_details/InvestmentCalculator';
-import StampDutyCalculator from '@/components/property_details/StampDutyCalculator';
-import NotesFields from '@/components/property_details/NotesFields';
-import AIChatbot from '@/components/property_details/AIChatbot';
 import DealScore from '@/components/property_details/DealScore';
 import AreaIntelPanel from '@/components/property_details/AreaIntelPanel';
 import CompsPanel from '@/components/property_details/CompsPanel';
 import MapSingle from '@/components/property_details/MapSingle';
 import QuickActions from '@/components/property_details/QuickActions';
-import PlanBadge from '@/components/PlanBadge';
-import GatedPanel from '@/components/property_details/GatedPanel';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
 import { FF } from '@/lib/flags';
 
+/** ---- Client-only widgets (no SSR) ---- */
+const MortgageCalculator = dynamic(
+  () => import('@/components/property_details/MortgageCalculator'),
+  { ssr: false }
+);
+
+const StampDutyCalculator = dynamic(
+  () => import('@/components/property_details/StampDutyCalculator'),
+  { ssr: false }
+);
+
+const NotesFields = dynamic(
+  () => import('@/components/property_details/NotesFields'),
+  { ssr: false }
+);
+
+const AIChatbot = dynamic(
+  () => import('@/components/property_details/AIChatbot'),
+  { ssr: false }
+);
+
+/** ------------------------------------- */
+
 type LooseProperty = Partial<Property> & {
   latitude?: number | null;
   longitude?: number | null;
-  imageurl?: string | null; // some rows use this
+  imageurl?: string | null;
 };
 
 const toNum = (v: unknown) =>
@@ -51,16 +68,12 @@ export default function PropertyDetailsPage() {
       setLoading(true);
       setError(null);
       try {
-        // Read EXACTLY the same source as the listings page
         const { data, error } = await sb.from('properties').select('*').eq('id', id).single();
-
         if (error) throw error;
 
-        // Normalize a few fields the UI expects
         const p: LooseProperty | null = data
           ? {
               ...data,
-              // make sure these are numbers or undefined
               price: toNum((data as any).price),
               bedrooms: toNum((data as any).bedrooms),
               bathrooms: toNum((data as any).bathrooms),
@@ -129,7 +142,6 @@ export default function PropertyDetailsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
           {/* Left column - Main content */}
           <div className="space-y-6">
-            {/* Property Summary with integrated metrics */}
             <PropertySummaryCard
               property={{
                 title: property.title,
@@ -216,7 +228,6 @@ export default function PropertyDetailsPage() {
           {/* Right column - Sticky sidebar (Desktop only) */}
           <div className="hidden lg:block space-y-6">
             <div className="sticky top-6 space-y-6">
-              {/* Quick Stats */}
               <QuickStatsCard
                 price={property.price ?? undefined}
                 yieldPercent={property.yield_percent ?? undefined}
@@ -228,12 +239,7 @@ export default function PropertyDetailsPage() {
                 <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
                   Location
                 </h3>
-                <MapSingle
-                  property={property}
-                  height={250}
-                  zoom={14}
-                  scrollWheelZoom={false}
-                />
+                <MapSingle property={property} height={250} zoom={14} scrollWheelZoom={false} />
               </div>
             </div>
           </div>
@@ -245,12 +251,7 @@ export default function PropertyDetailsPage() {
             <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
               Location
             </h3>
-            <MapSingle
-              property={property}
-              height={250}
-              zoom={14}
-              scrollWheelZoom={false}
-            />
+            <MapSingle property={property} height={250} zoom={14} scrollWheelZoom={false} />
           </div>
         </div>
 
