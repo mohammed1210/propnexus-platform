@@ -5,6 +5,7 @@ import UiOverlaysClient from '@components/ui/UiOverlaysClient';
 import BackToTop from '@components/BackToTop';
 import Header from '@components/Header';
 import { ThemeProvider } from '@components/ThemeProvider';
+import { Toaster } from 'sonner';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
@@ -101,6 +102,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* Client-side helpers */}
           <UiOverlaysClient />
           <BackToTop />
+          <Toaster position="top-right" richColors />
         </ThemeProvider>
       </body>
     </html>

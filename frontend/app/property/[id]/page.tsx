@@ -7,6 +7,8 @@ import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import PageWrapper from '@/components/PageWrapper';
 
+import PropertySummaryCard from '@/components/property_details/PropertySummaryCard';
+import QuickStatsCard from '@/components/property_details/QuickStatsCard';
 import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
 import InvestmentCalculator from '@/components/property_details/InvestmentCalculator';
@@ -114,29 +116,68 @@ export default function PropertyDetailsPage() {
   const price = typeof property.price === 'number' ? property.price : 0;
 
   return (
-    <PageWrapper showOrbs={false} className="bg-white/50 dark:bg-zinc-900/30">
+    <PageWrapper showOrbs={false} className="bg-white/50 dark:bg-slate-900/30">
       <Section>
-        <SectionTitle>{property.title ?? 'Property Details'}</SectionTitle>
+        {/* Quick Actions Sidebar (Desktop: right fixed, Mobile: bottom fixed) */}
+        <QuickActions
+          propertyId={String(property.id ?? id)}
+          price={property.price ?? undefined}
+          yieldPercent={property.yield_percent ?? undefined}
+          roiPercent={property.roi_percent ?? undefined}
+        />
 
-        {/* Sprint 11.3: Desktop sticky sidebar + mobile bottom bar */}
-        <div className="lg:flex lg:gap-6">
-          {/* Main content - left side on desktop */}
-          <div className="flex-1 space-y-6">
-            {/* Investment Summary */}
-            <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
-              <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
-                Investment Summary
-              </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+          {/* Left column - Main content */}
+          <div className="space-y-6">
+            {/* Property Summary with integrated metrics */}
+            <PropertySummaryCard
+              property={{
+                title: property.title,
+                location: property.location,
+                price: property.price,
+                bedrooms: property.bedrooms,
+                bathrooms: property.bathrooms,
+                propertyType: (property as any).propertyType,
+                investmentType: (property as any).investmentType,
+              }}
+              metrics={{
+                yield: property.yield_percent,
+                roi: property.roi_percent,
+              }}
+            />
+
+            {/* AI Deal Score */}
+            {FF.DEAL_SCORE && (
+              <div className="card">
+                <h2 className="font-semibold text-lg mb-4">AI Deal Score</h2>
+                <DealScore property={property} />
+              </div>
+            )}
+
+            {/* Investment Summary (AI-generated text) */}
+            <div className="card">
+              <h2 className="font-semibold text-lg mb-2">Investment Summary</h2>
               <InvestmentSummary property={property as any} />
             </div>
 
-            {/* Notes */}
-            <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
-              <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
-                Investor Notes
-              </h2>
-              {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
-            </div>
+            {/* Area Intelligence & Comps */}
+            {property.location && (
+              <>
+                {FF.AREA_INTEL && (
+                  <div className="card">
+                    <h2 className="font-semibold text-lg mb-4">Area Intelligence</h2>
+                    <AreaIntelPanel areaKey={property.location} />
+                  </div>
+                )}
+
+                {FF.COMPS && (
+                  <div className="card">
+                    <h2 className="font-semibold text-lg mb-4">Comparable Sales</h2>
+                    <CompsPanel postcode={property.location} />
+                  </div>
+                )}
+              </>
+            )}
 
             {/* Exit Strategies */}
             <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
@@ -159,131 +200,57 @@ export default function PropertyDetailsPage() {
               />
             </div>
 
-            {/* ===== AI Deal Score ===== */}
-            {FF.DEAL_SCORE && (
-              <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
-                <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
-                  AI Deal Score
-                </h2>
-                <GatedPanel
-                  title="AI Deal Score"
-                  requiredPlan="pro"
-                  featureEnabled={FF.DEAL_SCORE}
-                >
-                  <DealScore property={property} />
-                </GatedPanel>
-              </div>
-            )}
-
-            {/* ===== Area Intelligence & Comps ===== */}
-            {property.location && (
-              <>
-                {FF.AREA_INTEL && (
-                  <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
-                    <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
-                      Area Intelligence
-                    </h2>
-                    <GatedPanel
-                      title="Area Intelligence"
-                      requiredPlan="pro"
-                      featureEnabled={FF.AREA_INTEL}
-                    >
-                      <AreaIntelPanel areaKey={property.location} />
-                    </GatedPanel>
-                  </div>
-                )}
-
-                {FF.COMPS && (
-                  <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
-                    <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
-                      Comparable Sales
-                    </h2>
-                    <GatedPanel
-                      title="Comparable Sales"
-                      requiredPlan="investor"
-                      featureEnabled={FF.COMPS}
-                    >
-                      <CompsPanel postcode={property.location} />
-                    </GatedPanel>
-                  </div>
-                )}
-              </>
-            )}
-
-            {/* Sprint 11.3: Investment Calculator */}
-            <InvestmentCalculator propertyId={String(property.id ?? id)} initialPrice={price} />
-
-            {/* Stamp Duty */}
-            <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
-              <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
-                Stamp Duty Calculator
-              </h2>
-              <StampDutyCalculator price={price} />
+            {/* Investor Notes */}
+            <div className="card">
+              <h2 className="font-semibold text-lg mb-2">Investor Notes</h2>
+              {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
             </div>
+
+            {/* Mortgage & BRRR Calculator */}
+            <MortgageCalculator price={price} />
+
+            {/* Stamp Duty Calculator */}
+            <StampDutyCalculator price={price} />
           </div>
 
-          {/* Right sidebar - sticky on desktop, stacks on mobile */}
-          <div className="lg:w-80 xl:w-96 space-y-6 mt-6 lg:mt-0">
-            <div className="lg:sticky lg:top-6 space-y-6">
+          {/* Right column - Sticky sidebar (Desktop only) */}
+          <div className="hidden lg:block space-y-6">
+            <div className="sticky top-6 space-y-6">
               {/* Quick Stats */}
-              <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
-                <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
-                  Quick Stats
-                </h3>
-                <div className="space-y-3">
-                  {price !== undefined && price > 0 && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Price</div>
-                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                        £{price.toLocaleString()}
-                      </div>
-                    </div>
-                  )}
-                  {property.yield_percent !== undefined && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">Yield</div>
-                      <div className="text-lg font-bold text-green-600 dark:text-green-400">
-                        {property.yield_percent.toFixed(1)}%
-                      </div>
-                    </div>
-                  )}
-                  {property.roi_percent !== undefined && (
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">ROI</div>
-                      <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                        {property.roi_percent.toFixed(1)}%
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <QuickStatsCard
+                price={property.price ?? undefined}
+                yieldPercent={property.yield_percent ?? undefined}
+                roiPercent={property.roi_percent ?? undefined}
+              />
 
-              {/* Plan Badge */}
-              <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4">
-                <PlanBadge />
-              </div>
-
-              {/* Map */}
-              <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
-                <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
+              {/* Location Map */}
+              <div className="panel">
+                <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
                   Location
-                </h2>
-                <MapSingle property={property} height={240} zoom={14} scrollWheelZoom={false} />
-              </div>
-
-              {/* Quick Actions - desktop version */}
-              <div className="hidden lg:block rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4">
-                <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
-                  Quick Actions
                 </h3>
-                <QuickActions
-                  propertyId={String(property.id ?? id)}
-                  price={property.price ?? undefined}
-                  yieldPercent={property.yield_percent ?? undefined}
-                  roiPercent={property.roi_percent ?? undefined}
+                <MapSingle
+                  property={property}
+                  height={250}
+                  zoom={14}
+                  scrollWheelZoom={false}
                 />
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Mobile: Show map in main content */}
+        <div className="lg:hidden mt-6">
+          <div className="panel">
+            <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
+              Location
+            </h3>
+            <MapSingle
+              property={property}
+              height={250}
+              zoom={14}
+              scrollWheelZoom={false}
+            />
           </div>
         </div>
 
