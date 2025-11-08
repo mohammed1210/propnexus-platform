@@ -82,12 +82,15 @@ export default function ListingsFilters() {
   }, [router]);
 
   return (
-    <div className="border-b bg-white/95 dark:bg-zinc-900/95 backdrop-blur-sm sticky top-[var(--header-h)] z-20">
+    <div className="border-b backdrop-blur-sm sticky top-[var(--header-h)] z-20" style={{ 
+      borderColor: 'var(--border-primary)',
+      background: 'var(--card-bg)'
+    }}>
       <div className="max-w-7xl mx-auto px-4 py-3">
         {/* Mobile toggle button */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="md:hidden w-full flex items-center justify-between px-4 py-2 rounded-lg border bg-white dark:bg-zinc-900 mb-3"
+          className="md:hidden w-full flex items-center justify-between px-4 py-2 rounded-lg mb-3 card"
           aria-expanded={isExpanded}
           aria-controls="filters-panel"
         >
@@ -102,18 +105,19 @@ export default function ListingsFilters() {
         >
           {/* Primary filters: Search + Budget + Beds + Baths - always visible */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-            <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white dark:bg-zinc-900">
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2 input-field">
               <FiSearch className="opacity-60" aria-hidden />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search area, title, or postcode"
                 className="w-full bg-transparent outline-none"
+                style={{ color: 'var(--text-primary)' }}
                 aria-label="Search by area, title, or postcode"
               />
             </div>
 
-            <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white dark:bg-zinc-900">
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2 input-field">
               <LuPoundSterling className="opacity-60" aria-hidden />
               <input
                 value={min}
@@ -121,11 +125,12 @@ export default function ListingsFilters() {
                 placeholder="Min price"
                 inputMode="numeric"
                 className="w-full bg-transparent outline-none"
+                style={{ color: 'var(--text-primary)' }}
                 aria-label="Minimum price"
               />
             </div>
 
-            <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white dark:bg-zinc-900">
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2 input-field">
               <LuPoundSterling className="opacity-60" aria-hidden />
               <input
                 value={max}
@@ -133,11 +138,12 @@ export default function ListingsFilters() {
                 placeholder="Max price"
                 inputMode="numeric"
                 className="w-full bg-transparent outline-none"
+                style={{ color: 'var(--text-primary)' }}
                 aria-label="Maximum price"
               />
             </div>
 
-            <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white dark:bg-zinc-900">
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2 input-field">
               <LuBedDouble className="opacity-60" aria-hidden />
               <input
                 value={beds}
@@ -145,11 +151,12 @@ export default function ListingsFilters() {
                 placeholder="Any beds"
                 inputMode="numeric"
                 className="w-full bg-transparent outline-none"
+                style={{ color: 'var(--text-primary)' }}
                 aria-label="Minimum bedrooms"
               />
             </div>
 
-            <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white dark:bg-zinc-900">
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2 input-field">
               <LuBath className="opacity-60" aria-hidden />
               <input
                 value={baths}
@@ -157,6 +164,7 @@ export default function ListingsFilters() {
                 placeholder="Any baths"
                 inputMode="numeric"
                 className="w-full bg-transparent outline-none"
+                style={{ color: 'var(--text-primary)' }}
                 aria-label="Minimum bathrooms"
               />
             </div>
@@ -166,7 +174,8 @@ export default function ListingsFilters() {
           <div className="flex items-center justify-between">
             <button
               onClick={() => setMoreFiltersOpen(!moreFiltersOpen)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium transition-colors"
+              style={{ color: 'var(--accent-primary)' }}
               aria-expanded={moreFiltersOpen}
               aria-controls="more-filters-section"
             >
@@ -177,13 +186,13 @@ export default function ListingsFilters() {
             <div className="flex gap-2">
               <button
                 onClick={apply}
-                className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-500 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                className="px-4 py-2 rounded-xl btn-primary"
               >
                 Apply
               </button>
               <button
                 onClick={reset}
-                className="px-4 py-2 rounded-xl border bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                className="px-4 py-2 rounded-xl surface-panel transition-colors focus:outline-none"
                 aria-label="Reset all filters"
               >
                 Reset
@@ -193,10 +202,10 @@ export default function ListingsFilters() {
 
           {/* Secondary filters - collapsible */}
           {moreFiltersOpen && (
-            <div id="more-filters-section" className="space-y-3 pt-2 border-t">
+            <div id="more-filters-section" className="space-y-3 pt-2" style={{ borderTop: '1px solid var(--border-secondary)' }}>
               {/* Investment Types */}
               <div>
-                <label className="block text-sm font-medium mb-2" id="investment-types-label">
+                <label className="block text-sm font-medium mb-2" id="investment-types-label" style={{ color: 'var(--text-secondary)' }}>
                   Investment Type
                 </label>
                 <div

@@ -14,6 +14,7 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
 import ListingsFilters from '@/components/listings/ListingsFilters';
+import PageWrapper from '@/components/PageWrapper';
 
 /* ---------------- Helper Functions ---------------- */
 /**
@@ -458,34 +459,36 @@ function ListingsInner() {
   }, [rows]);
 
   return (
-    <Section>
-      <SectionTitle>PropNexus Listings</SectionTitle>
+    <PageWrapper showOrbs={true}>
+      <Section>
+        <SectionTitle>PropNexus Listings</SectionTitle>
 
-      <ListingsFilters />
+        <ListingsFilters />
 
-      <div className="content-layout pt-4">
-        {/* left: list */}
-        <div className="space-y-3">
-          {loading ? (
-            <div className="p-4">Loading…</div>
-          ) : rows.length === 0 ? (
-            <div className="p-4">No results.</div>
-          ) : (
-            rows.map((r) => (
-              <Link key={r.id ?? Math.random()} href={`/property/${r.id}`} className="block">
-                <PropertyCard p={r as any} />
-              </Link>
-            ))
-          )}
-        </div>
+        <div className="content-layout pt-4">
+          {/* left: list */}
+          <div className="space-y-3">
+            {loading ? (
+              <div className="p-4 card">Loading…</div>
+            ) : rows.length === 0 ? (
+              <div className="p-4 card">No results.</div>
+            ) : (
+              rows.map((r) => (
+                <Link key={r.id ?? Math.random()} href={`/property/${r.id}`} className="block">
+                  <PropertyCard p={r as any} />
+                </Link>
+              ))
+            )}
+          </div>
 
-        {/* right: sticky map */}
-        <div className="map-sticky">
-          <div className="leaflet-panel">
-            <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={heatmapEnabled} />
+          {/* right: sticky map */}
+          <div className="map-sticky">
+            <div className="leaflet-panel card">
+              <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={heatmapEnabled} />
+            </div>
           </div>
         </div>
-      </div>
-    </Section>
+      </Section>
+    </PageWrapper>
   );
 }
