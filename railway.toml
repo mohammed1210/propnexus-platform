@@ -4,7 +4,7 @@
 [build]
 builder = "NIXPACKS"
 # Install backend deps during build
-buildCommand = "pip install -r backend/requirements.txt"
+buildCommand = "pip3 install -r backend/requirements.txt && yarn install --frozen-lockfile"
 
 [deploy]
 # Run FastAPI (backend.main:app) on the provided PORT

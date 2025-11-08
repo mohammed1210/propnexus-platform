@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import os
+import jwt  # PyJWT
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
+<<<<<<< HEAD
 from fastapi import APIRouter, HTTPException, Header, Request, status
 from jose import jwt, JWTError
 
+=======
+from fastapi import APIRouter, HTTPException, Request, status
+>>>>>>> e27c09d9 (save_deal)
 from supabase import Client, create_client
 
 load_dotenv()
@@ -20,7 +25,7 @@ router = APIRouter()
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
-supabase: Client | None = None
+supabase: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -38,6 +43,7 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+<<<<<<< HEAD
 def _extract_user_id_from_token(authorization: Optional[str]) -> Optional[str]:
     """
     Extract user_id from JWT token in Authorization header.
@@ -88,6 +94,18 @@ def _extract_user_id_from_token(authorization: Optional[str]) -> Optional[str]:
         return None
     except Exception:
         # Unexpected error during token processing
+=======
+def _extract_user_id(request: Request) -> Optional[str]:
+    """Extract user ID from JWT token (unverified decode is fine for filtering)."""
+    try:
+        auth_header = request.headers.get("authorization")
+        if not auth_header or not auth_header.lower().startswith("bearer "):
+            return None
+        token = auth_header.split(" ")[1]
+        decoded = jwt.decode(token, options={"verify_signature": False})
+        return decoded.get("sub") or decoded.get("user_id") or decoded.get("email")
+    except Exception:
+>>>>>>> e27c09d9 (save_deal)
         return None
 
 
@@ -97,9 +115,14 @@ async def save_deal(
     authorization: Optional[str] = Header(None)
 ) -> Dict[str, Any]:
     """
+<<<<<<< HEAD
     Insert one saved deal.
     Frontend can post minimal payload like {"property_id": "..."} or a richer record.
     Attaches user_id from Authorization: Bearer JWT (sub claim) on insert.
+=======
+    Save a property deal for the authenticated user.
+    Payload: { "property_id": "...", "notes": "...", ... }
+>>>>>>> e27c09d9 (save_deal)
     """
     sb = _require_supabase()
     
@@ -111,22 +134,40 @@ async def save_deal(
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="Body must be a JSON object")
 
-        # Ensure a timestamp
+        # Attach user_id from JWT if available
+        user_id = _extract_user_id(request)
+        if user_id:
+            payload["user_id"] = user_id
+
+        # Timestamp
         payload.setdefault("saved_at", _now_iso())
         
         # Attach user_id if we have one from the token
         if user_id:
             payload["user_id"] = user_id
 
-        res = sb.table("saved_deals").insert(payload).select("*").execute()
-        return {"message": "Deal saved", "data": res.data}
+        # Defensive: ensure property_id is present
+        if "property_id" not in payload:
+            raise HTTPException(status_code=400, detail="Missing property_id")
+
+        # Insert with conflict tolerance (skip duplicate saves)
+        res = (
+            sb.table("saved_deals")
+            .insert(payload, upsert=True)
+            .execute()
+        )
+
+        return {"ok": True, "data": res.data}
+
     except HTTPException:
         raise
     except Exception as e:
+        print(f"[save-deal-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
 
 
 @router.get("/saved-deals")
+<<<<<<< HEAD
 async def list_saved_deals(
     authorization: Optional[str] = Header(None)
 ) -> Dict[str, Any]:
@@ -137,6 +178,10 @@ async def list_saved_deals(
     
     Returns empty list if no valid token is provided (for security).
     """
+=======
+async def list_saved_deals(request: Request) -> Dict[str, Any]:
+    """Return saved deals for current user (or empty if unauthenticated)."""
+>>>>>>> e27c09d9 (save_deal)
     sb = _require_supabase()
     
     # Extract user_id from JWT token
@@ -147,6 +192,7 @@ async def list_saved_deals(
         return {"data": []}
     
     try:
+<<<<<<< HEAD
         query = sb.table("saved_deals").select("*").order("saved_at", desc=True)
         
         # Filter by user_id (RLS will also enforce this)
@@ -154,31 +200,58 @@ async def list_saved_deals(
         
         res = query.execute()
         return {"data": res.data or []}
+=======
+        user_id = _extract_user_id(request)
+        query = sb.table("saved_deals").select("*").order("saved_at", desc=True)
+        if user_id:
+            query = query.eq("user_id", user_id)
+
+        res = query.execute()
+        return {"ok": True, "data": res.data or []}
+
+>>>>>>> e27c09d9 (save_deal)
     except Exception as e:
+        print(f"[list-saved-deals-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
 
 
 @router.get("/saved-deals/{deal_id}")
-async def get_saved_deal(deal_id: str) -> Dict[str, Any]:
+async def get_saved_deal(deal_id: str, request: Request) -> Dict[str, Any]:
+    """Retrieve a specific saved deal."""
     sb = _require_supabase()
     try:
-        res = sb.table("saved_deals").select("*").eq("id", deal_id).single().execute()
+        user_id = _extract_user_id(request)
+        query = sb.table("saved_deals").select("*").eq("id", deal_id)
+        if user_id:
+            query = query.eq("user_id", user_id)
+        res = query.single().execute()
+
         if not res.data:
             raise HTTPException(status_code=404, detail="Saved deal not found")
-        return {"data": res.data}
+
+        return {"ok": True, "data": res.data}
+
     except HTTPException:
         raise
     except Exception as e:
+        print(f"[get-saved-deal-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
 
 
 @router.delete("/saved-deals/{deal_id}")
-async def delete_saved_deal(deal_id: str) -> Dict[str, Any]:
-    """Delete one saved deal by id."""
+async def delete_saved_deal(deal_id: str, request: Request) -> Dict[str, Any]:
+    """Delete a saved deal belonging to the user."""
     sb = _require_supabase()
     try:
-        res = sb.table("saved_deals").delete().eq("id", deal_id).execute()
-        # Supabase returns count only if enabled on table; still treat as success if no error.
-        return {"deleted": True, "result": res.data}
+        user_id = _extract_user_id(request)
+        query = sb.table("saved_deals").delete().eq("id", deal_id)
+        if user_id:
+            query = query.eq("user_id", user_id)
+
+        res = query.execute()
+        return {"ok": True, "deleted": True, "data": res.data}
+
     except Exception as e:
+        print(f"[delete-saved-deal-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
+    
