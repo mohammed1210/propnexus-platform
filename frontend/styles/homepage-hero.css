@@ -1,0 +1,104 @@
+/* ===== Homepage Hero Background Pattern =====
+ * Robust layering with pseudo-elements for background image and overlays.
+ * Ensures the background is visible and not covered by other layers.
+ * Text legibility maintained through gradient overlays.
+ */
+
+.homepage-hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(2rem, 8vw, 6rem);
+  color: #fff;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Background layer with image and dark gradient overlay */
+.homepage-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(215deg, rgba(14, 32, 52, 0.80) 0%, rgba(14, 32, 52, 0.55) 40%, rgba(0, 0, 0, 0.65) 100%),
+              url("/images/home-cart-house.webp") center / cover no-repeat;
+  filter: brightness(0.85) saturate(1.05);
+  z-index: -2;
+}
+
+/* Light overlay for depth and visual interest */
+.homepage-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.12), transparent 55%),
+              radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.08), transparent 50%);
+  mix-blend-mode: overlay;
+  opacity: 0.45;
+  z-index: -1;
+}
+
+/* Hero content container with glassmorphism effect */
+.homepage-hero .hero-content {
+  position: relative;
+  z-index: 1;
+  max-width: 60ch;
+  backdrop-filter: blur(6px) saturate(1.15);
+  background: linear-gradient(to bottom right, rgba(25, 35, 50, 0.55), rgba(20, 30, 45, 0.45));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 2.25rem 2.75rem;
+  border-radius: 1.25rem;
+  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5);
+}
+
+/* Heading styles with text shadow for readability */
+.homepage-hero h1 {
+  margin: 0 0 1rem;
+  font-size: clamp(2.2rem, 5.2vw, 3.5rem);
+  line-height: 1.05;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+}
+
+/* Paragraph text */
+.homepage-hero p {
+  font-size: clamp(1rem, 1.4vw, 1.25rem);
+  margin: 0 0 1.75rem;
+  opacity: 0.92;
+}
+
+/* Call-to-action button */
+.cta-btn {
+  display: inline-block;
+  background: linear-gradient(135deg, #4f7ccf, #2d5aa2);
+  color: #fff;
+  font-weight: 600;
+  padding: 0.9rem 1.6rem;
+  border-radius: 0.65rem;
+  text-decoration: none;
+  box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.45);
+  transition: background 250ms ease, transform 250ms ease;
+}
+
+.cta-btn:hover {
+  background: linear-gradient(135deg, #5f8ee2, #3a6bb4);
+  transform: translateY(-2px);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+  .homepage-hero .hero-content {
+    padding: 1.75rem 1.9rem;
+  }
+}
+
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .cta-btn {
+    transition: none;
+  }
+  
+  .cta-btn:hover {
+    transform: none;
+  }
+}

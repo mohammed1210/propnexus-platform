@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FiSearch, FiTrendingUp, FiZap, FiMapPin, FiDollarSign } from 'react-icons/fi';
+import '../styles/homepage-hero.css';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,20 @@ export default function HomePage() {
   const [mounted, setMounted] = useState(false);
   const [heatmapDarkMode, setHeatmapDarkMode] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Preload hero image for better LCP
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = '/images/home-cart-house.webp';
+    link.type = 'image/webp';
+    document.head.appendChild(link);
+    
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, []);
 
   // Avoid hydration mismatch
   useEffect(() => setMounted(true), []);
@@ -82,41 +97,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="relative min-h-[88vh] overflow-hidden">
-      {/* Animated gradient background - Sprint 11.3: lighter purple */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background: 'var(--hero-gradient)',
-        }}
-      />
-
-      {/* Map grid pattern */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.12]"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
-          backgroundSize: '40px 40px',
-        }}
-      />
-
-      {/* Scanning ring animation */}
-      {mounted && (
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-30"
-          style={{
-            background:
-              'radial-gradient(circle at 50% 50%, rgba(99,102,241,0.3) 0%, transparent 30%)',
-            animation: 'pulse 4s ease-in-out infinite',
-          }}
-        />
-      )}
-
-      <main className="relative z-10">
+    <div className="homepage-hero">
+      <main className="relative z-10 w-full">
         <div className="mx-auto max-w-7xl px-4 py-14 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
           {/* Left: Headline + Search */}
           <section>
