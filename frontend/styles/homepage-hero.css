@@ -1,6 +1,6 @@
 /* ===== Modern AI-Powered Homepage Hero =====
  * Gradient-based design with animated elements
- * No external images required - all CSS-based
+ * Supports light and dark modes
  * AI-focused property investment theme
  */
 
@@ -11,21 +11,17 @@
   align-items: center;
   justify-content: center;
   padding: clamp(2rem, 4vw, 4rem);
-  color: #fff;
+  color: var(--text-inverse);
   isolation: isolate;
   overflow: hidden;
 }
 
-/* Animated gradient background - AI theme colors */
+/* Animated gradient background - adapts to theme */
 .homepage-hero::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.3), transparent),
-    radial-gradient(ellipse 60% 50% at 0% 50%, rgba(88, 86, 214, 0.2), transparent),
-    radial-gradient(ellipse 60% 50% at 100% 50%, rgba(139, 92, 246, 0.2), transparent),
-    linear-gradient(180deg, #0a0e1a 0%, #0f1629 50%, #0a0e1a 100%);
+  background: var(--bg-hero);
   z-index: -2;
   animation: gradient-shift 15s ease-in-out infinite;
 }
@@ -45,8 +41,8 @@
   position: absolute;
   inset: 0;
   background-image: 
-    linear-gradient(rgba(99, 102, 241, 0.03) 1.5px, transparent 1.5px),
-    linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1.5px, transparent 1.5px);
+    linear-gradient(var(--border-primary) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, var(--border-primary) 1.5px, transparent 1.5px);
   background-size: 60px 60px;
   z-index: -1;
   animation: grid-flow 20s linear infinite;
@@ -61,7 +57,7 @@
   }
 }
 
-/* Floating orbs for visual interest */
+/* Floating orbs for visual interest - defined in theme.css */
 .homepage-hero .orb {
   position: absolute;
   border-radius: 50%;
@@ -124,11 +120,21 @@
   }
 }
 
+/* Light mode adjustments for homepage */
+:root .homepage-hero {
+  color: var(--text-primary);
+}
+
+/* Dark mode adjustments for homepage */
+.dark .homepage-hero {
+  color: var(--text-inverse);
+}
+
 /* Accessibility: Reduce motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
   .homepage-hero::before,
   .homepage-hero::after,
   .homepage-hero .orb {
-    animation: none;
+    animation: none !important;
   }
 }

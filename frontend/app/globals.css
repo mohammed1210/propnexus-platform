@@ -6,6 +6,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Import AI-focused theme system */
+@import '../styles/theme.css';
+
 /* ========================================
    CUSTOM ANIMATIONS
    ======================================== */

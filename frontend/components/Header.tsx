@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import ThemeToggle from './ThemeToggle';
 
 export default function Header() {
   const pathname = usePathname();
@@ -82,6 +83,9 @@ export default function Header() {
               </Link>
             );
           })}
+
+          {/* Theme Toggle */}
+          <ThemeToggle />
 
           {/* Auth actions */}
           {sessionEmail ? (
