@@ -8,6 +8,7 @@ import { getSupabase } from '@/lib/supabaseClient';
 import { apiPost } from '@/lib/api';
 import AddDealForm from '@/components/offMarket/AddDealForm';
 import Image from 'next/image';
+import PageWrapper from '@/components/PageWrapper';
 
 type OffMarket = {
   id: string;
@@ -126,117 +127,119 @@ export default function OffMarketPage() {
   };
 
   return (
-    <Section>
-      <SectionTitle>Off-Market Deals</SectionTitle>
+    <PageWrapper showOrbs={true}>
+      <Section>
+        <SectionTitle>Off-Market Deals</SectionTitle>
 
-      {/* Sticky generator bar */}
-      <div className="sticky-filter">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-2 justify-end">
-          <input
-            className="border rounded-lg px-3 py-2 w-[160px]"
-            placeholder="Location"
-            value={loc}
-            onChange={(e) => setLoc(e.target.value)}
-          />
-          <input
-            className="border rounded-lg px-3 py-2 w-[120px]"
-            placeholder="Budget £"
-            inputMode="numeric"
-            value={budget}
-            onChange={(e) => setBudget(e.target.value)}
-          />
-          <input
-            className="border rounded-lg px-3 py-2 w-[90px]"
-            placeholder="Count"
-            inputMode="numeric"
-            value={count}
-            onChange={(e) => setCount(e.target.value)}
-          />
-          <button
-            onClick={generateDeals}
-            disabled={generating}
-            className="rounded-lg bg-indigo-600 text-white px-3 py-2 hover:bg-indigo-500 disabled:opacity-60"
-          >
-            {generating ? 'Generating…' : 'Generate Deals'}
-          </button>
-        </div>
-      </div>
-
-      {/* Manual add form */}
-      <details className="mb-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
-        <summary className="cursor-pointer select-none font-medium">+ Add Off-Market Deal</summary>
-        <div className="mt-3">
-          <AddDealForm onCreated={refreshRows} />
-        </div>
-      </details>
-
-      {loading ? (
-        <div className="p-4">Loading…</div>
-      ) : rows.length === 0 ? (
-        <div className="p-4">No off-market deals yet.</div>
-      ) : (
-        <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {rows.map((d) => (
-            <li
-              key={d.id}
-              className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm"
+        {/* Sticky generator bar */}
+        <div className="sticky-filter">
+          <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-2 justify-end">
+            <input
+              className="input-field w-[160px]"
+              placeholder="Location"
+              value={loc}
+              onChange={(e) => setLoc(e.target.value)}
+            />
+            <input
+              className="input-field w-[120px]"
+              placeholder="Budget £"
+              inputMode="numeric"
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+            />
+            <input
+              className="input-field w-[90px]"
+              placeholder="Count"
+              inputMode="numeric"
+              value={count}
+              onChange={(e) => setCount(e.target.value)}
+            />
+            <button
+              onClick={generateDeals}
+              disabled={generating}
+              className="rounded-lg btn-primary px-3 py-2 disabled:opacity-60"
             >
-              {/* Photo */}
-              {d.image_url ? (
-                <div className="aspect-[16/10] w-full bg-zinc-100 dark:bg-zinc-800">
-                  <Image
-                    src={d.image_url}
-                    alt={d.title || 'Off-market property image'}
-                    fill
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    className="object-cover"
-                  />
-                </div>
-              ) : (
-                <div className="aspect-[16/10] w-full grid place-items-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-sm">
-                  No photo
-                </div>
-              )}
+              {generating ? 'Generating…' : 'Generate Deals'}
+            </button>
+          </div>
+        </div>
 
-              {/* Body */}
-              <div className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="font-medium">{d.title ?? '—'}</div>
-                  <span className="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
-                    {d.investment_type ?? '—'}
-                  </span>
-                </div>
+        {/* Manual add form */}
+        <details className="mb-5 card">
+          <summary className="cursor-pointer select-none font-medium">+ Add Off-Market Deal</summary>
+          <div className="mt-3">
+            <AddDealForm onCreated={refreshRows} />
+          </div>
+        </details>
 
-                <div className="text-sm opacity-70">{d.location ?? '—'}</div>
+        {loading ? (
+          <div className="p-4 card">Loading…</div>
+        ) : rows.length === 0 ? (
+          <div className="p-4 card">No off-market deals yet.</div>
+        ) : (
+          <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {rows.map((d) => (
+              <li
+                key={d.id}
+                className="card overflow-hidden"
+              >
+                {/* Photo */}
+                {d.image_url ? (
+                  <div className="aspect-[16/10] w-full bg-zinc-100 dark:bg-zinc-800">
+                    <Image
+                      src={d.image_url}
+                      alt={d.title || 'Off-market property image'}
+                      fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-[16/10] w-full grid place-items-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-sm">
+                    No photo
+                  </div>
+                )}
 
-                <div className="mt-2 flex items-center justify-between">
-                  <div className="font-semibold">£{Number(d.price ?? 0).toLocaleString()}</div>
-                  <div className="text-xs opacity-70">
-                    {d.bedrooms ?? 0} beds • {d.bathrooms ?? 0} baths
+                {/* Body */}
+                <div className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="font-medium">{d.title ?? '—'}</div>
+                    <span className="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
+                      {d.investment_type ?? '—'}
+                    </span>
+                  </div>
+
+                  <div className="text-sm opacity-70">{d.location ?? '—'}</div>
+
+                  <div className="mt-2 flex items-center justify-between">
+                    <div className="font-semibold">£{Number(d.price ?? 0).toLocaleString()}</div>
+                    <div className="text-xs opacity-70">
+                      {d.bedrooms ?? 0} beds • {d.bathrooms ?? 0} baths
+                    </div>
+                  </div>
+
+                  {d.notes ? <p className="mt-2 text-sm">{d.notes}</p> : null}
+
+                  <div className="mt-3 flex items-center justify-between text-sm">
+                    <span className="opacity-70">{d.source ?? '—'}</span>
+                    {d.contact ? (
+                      <a className="underline" href={`mailto:${d.contact}`}>
+                        Contact
+                      </a>
+                    ) : (
+                      <span className="opacity-50">No contact</span>
+                    )}
+                  </div>
+
+                  <div className="mt-2 text-xs opacity-60">
+                    Added {d.created_at ? new Date(d.created_at).toLocaleDateString() : '—'}
                   </div>
                 </div>
-
-                {d.notes ? <p className="mt-2 text-sm">{d.notes}</p> : null}
-
-                <div className="mt-3 flex items-center justify-between text-sm">
-                  <span className="opacity-70">{d.source ?? '—'}</span>
-                  {d.contact ? (
-                    <a className="underline" href={`mailto:${d.contact}`}>
-                      Contact
-                    </a>
-                  ) : (
-                    <span className="opacity-50">No contact</span>
-                  )}
-                </div>
-
-                <div className="mt-2 text-xs opacity-60">
-                  Added {d.created_at ? new Date(d.created_at).toLocaleDateString() : '—'}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+    </PageWrapper>
   );
 }

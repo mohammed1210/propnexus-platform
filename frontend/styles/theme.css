@@ -1,0 +1,335 @@
+/* ===== PropNexus AI-Focused Theme System =====
+ * Modern gradient-based design system for light and dark modes
+ * Applies consistent AI theme across all pages
+ */
+
+/* ========================================
+   1) LIGHT MODE (Default)
+   ======================================== */
+:root {
+  /* AI-focused gradient backgrounds */
+  --bg-primary: linear-gradient(180deg, #f8f9fc 0%, #e8ebf5 100%);
+  --bg-secondary: linear-gradient(135deg, #ffffff 0%, #f5f7fb 100%);
+  --bg-hero: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.08), transparent),
+             radial-gradient(ellipse 60% 50% at 0% 50%, rgba(139, 92, 246, 0.06), transparent),
+             linear-gradient(180deg, #f8f9fc 0%, #e8ebf5 100%);
+  
+  /* Text colors */
+  --text-primary: #1a202c;
+  --text-secondary: #4a5568;
+  --text-muted: #718096;
+  --text-inverse: #ffffff;
+  
+  /* Surface colors */
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
+  --surface-subtle: rgba(255, 255, 255, 0.6);
+  
+  /* Border colors */
+  --border-primary: rgba(99, 102, 241, 0.1);
+  --border-secondary: rgba(203, 213, 225, 0.6);
+  
+  /* Accent colors - AI theme */
+  --accent-primary: #6366f1;
+  --accent-secondary: #8b5cf6;
+  --accent-tertiary: #a78bfa;
+  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  
+  /* Shadow system */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  
+  /* Card backgrounds */
+  --card-bg: rgba(255, 255, 255, 0.8);
+  --card-bg-hover: rgba(255, 255, 255, 0.95);
+  --card-border: rgba(99, 102, 241, 0.1);
+  
+  /* Input colors */
+  --input-bg: #ffffff;
+  --input-border: rgba(203, 213, 225, 0.6);
+  --input-focus: #6366f1;
+  
+  /* Status colors */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #3b82f6;
+}
+
+/* ========================================
+   2) DARK MODE
+   ======================================== */
+.dark {
+  /* AI-focused gradient backgrounds - dark */
+  --bg-primary: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.15), transparent),
+                radial-gradient(ellipse 60% 50% at 0% 50%, rgba(88, 86, 214, 0.1), transparent),
+                radial-gradient(ellipse 60% 50% at 100% 50%, rgba(139, 92, 246, 0.1), transparent),
+                linear-gradient(180deg, #0a0e1a 0%, #0f1629 50%, #0a0e1a 100%);
+  --bg-secondary: linear-gradient(135deg, #0f1629 0%, #1a1f3a 100%);
+  --bg-hero: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.3), transparent),
+             radial-gradient(ellipse 60% 50% at 0% 50%, rgba(88, 86, 214, 0.2), transparent),
+             radial-gradient(ellipse 60% 50% at 100% 50%, rgba(139, 92, 246, 0.2), transparent),
+             linear-gradient(180deg, #0a0e1a 0%, #0f1629 50%, #0a0e1a 100%);
+  
+  /* Text colors */
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --text-inverse: #0a0e1a;
+  
+  /* Surface colors */
+  --surface: rgba(15, 22, 41, 0.8);
+  --surface-elevated: rgba(26, 31, 58, 0.9);
+  --surface-subtle: rgba(15, 22, 41, 0.4);
+  
+  /* Border colors */
+  --border-primary: rgba(99, 102, 241, 0.2);
+  --border-secondary: rgba(148, 163, 184, 0.1);
+  
+  /* Accent colors - AI theme (brighter in dark mode) */
+  --accent-primary: #818cf8;
+  --accent-secondary: #a78bfa;
+  --accent-tertiary: #c4b5fd;
+  --accent-gradient: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+  
+  /* Shadow system - more prominent in dark */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+  
+  /* Card backgrounds */
+  --card-bg: rgba(26, 31, 58, 0.6);
+  --card-bg-hover: rgba(26, 31, 58, 0.8);
+  --card-border: rgba(99, 102, 241, 0.2);
+  
+  /* Input colors */
+  --input-bg: rgba(15, 22, 41, 0.6);
+  --input-border: rgba(148, 163, 184, 0.2);
+  --input-focus: #818cf8;
+  
+  /* Status colors - adjusted for dark mode */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --info: #60a5fa;
+}
+
+/* ========================================
+   3) BASE STYLES WITH THEME
+   ======================================== */
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ========================================
+   4) PAGE WRAPPER UTILITY
+   ======================================== */
+.page-wrapper {
+  position: relative;
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+.page-wrapper::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: var(--bg-primary);
+  z-index: -2;
+  pointer-events: none;
+}
+
+/* Animated grid pattern for all pages */
+.page-wrapper::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: 
+    linear-gradient(var(--border-primary) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, var(--border-primary) 1.5px, transparent 1.5px);
+  background-size: 60px 60px;
+  z-index: -1;
+  opacity: 0.3;
+  pointer-events: none;
+  animation: grid-flow 20s linear infinite;
+}
+
+@keyframes grid-flow {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 60px 60px;
+  }
+}
+
+/* ========================================
+   5) COMPONENT UTILITIES
+   ======================================== */
+
+/* Cards */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  background: var(--card-bg-hover);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* Buttons with gradient */
+.btn-primary {
+  background: var(--accent-gradient);
+  color: var(--text-inverse);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Surface panels */
+.surface-panel {
+  background: var(--surface);
+  border: 1px solid var(--border-secondary);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(12px);
+}
+
+/* Input fields */
+.input-field {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  color: var(--text-primary);
+  transition: all 0.2s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.dark .input-field:focus {
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2);
+}
+
+/* ========================================
+   6) FLOATING ORBS FOR ALL PAGES
+   ======================================== */
+.page-orbs {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.4;
+  animation: float 20s ease-in-out infinite;
+}
+
+.orb-1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.6), rgba(99, 102, 241, 0) 70%);
+  top: 10%;
+  left: 10%;
+  animation-delay: 0s;
+}
+
+.orb-2 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.5), rgba(139, 92, 246, 0) 70%);
+  bottom: 10%;
+  right: 10%;
+  animation-delay: -10s;
+}
+
+.orb-3 {
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.4), rgba(168, 85, 247, 0) 70%);
+  top: 50%;
+  right: 20%;
+  animation-delay: -5s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  75% {
+    transform: translate(20px, 30px) scale(1.05);
+  }
+}
+
+/* Hide orbs on mobile for performance */
+@media (max-width: 768px) {
+  .orb {
+    display: none;
+  }
+}
+
+/* ========================================
+   7) ACCESSIBILITY
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .page-wrapper::after,
+  .orb {
+    animation: none !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border-primary: rgba(99, 102, 241, 0.4);
+    --border-secondary: rgba(203, 213, 225, 1);
+  }
+  
+  .dark {
+    --border-primary: rgba(99, 102, 241, 0.6);
+    --border-secondary: rgba(148, 163, 184, 0.4);
+  }
+}

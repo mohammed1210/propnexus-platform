@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
+import PageWrapper from '@/components/PageWrapper';
 
 import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
@@ -82,131 +83,139 @@ export default function PropertyDetailsPage() {
 
   if (loading) {
     return (
-      <Section>
-        <p>Loading property details…</p>
-      </Section>
+      <PageWrapper showOrbs={false}>
+        <Section>
+          <p className="card p-4">Loading property details…</p>
+        </Section>
+      </PageWrapper>
     );
   }
   if (error) {
     return (
-      <Section>
-        <p className="text-red-600">{error}</p>
-      </Section>
+      <PageWrapper showOrbs={false}>
+        <Section>
+          <p className="text-red-600 card p-4">{error}</p>
+        </Section>
+      </PageWrapper>
     );
   }
   if (!property) {
     return (
-      <Section>
-        <p>No property found.</p>
-      </Section>
+      <PageWrapper showOrbs={false}>
+        <Section>
+          <p className="card p-4">No property found.</p>
+        </Section>
+      </PageWrapper>
     );
   }
 
   const price = typeof property.price === 'number' ? property.price : 0;
 
   return (
-    <Section>
-      <SectionTitle>{property.title ?? 'Property Details'}</SectionTitle>
+    <PageWrapper showOrbs={false} className="bg-white/50 dark:bg-zinc-900/30">
+      <Section>
+        <SectionTitle>{property.title ?? 'Property Details'}</SectionTitle>
 
-      {/* Sprint 11.3: Quick Actions Sidebar */}
-      <QuickActions
-        propertyId={String(property.id ?? id)}
-        price={property.price ?? undefined}
-        yieldPercent={property.yield_percent ?? undefined}
-        roiPercent={property.roi_percent ?? undefined}
-      />
+        {/* Sprint 11.3: Quick Actions Sidebar */}
+        <QuickActions
+          propertyId={String(property.id ?? id)}
+          price={property.price ?? undefined}
+          yieldPercent={property.yield_percent ?? undefined}
+          roiPercent={property.roi_percent ?? undefined}
+        />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left column */}
-        <div className="space-y-6">
-          {/* ===== AI Deal Score ===== */}
-          {FF.DEAL_SCORE && (
-            <div className="panel">
-              <h2 className="font-semibold text-lg mb-4">AI Deal Score</h2>
-              <DealScore property={property} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left column */}
+          <div className="space-y-6">
+            {/* ===== AI Deal Score ===== */}
+            {FF.DEAL_SCORE && (
+              <div className="card">
+                <h2 className="font-semibold text-lg mb-4">AI Deal Score</h2>
+                <DealScore property={property} />
+              </div>
+            )}
+
+            {/* Investment Summary */}
+            <div className="card">
+              <h2 className="font-semibold text-lg mb-2">Investment Summary</h2>
+              <InvestmentSummary property={property as any} />
             </div>
-          )}
 
-          {/* Investment Summary */}
-          <div className="panel">
-            <h2 className="font-semibold text-lg mb-2">Investment Summary</h2>
-            <InvestmentSummary property={property as any} />
+            {/* Exit Strategies */}
+            <div className="card">
+              <h2 className="font-semibold text-lg mb-2">Exit Strategies</h2>
+              <ExitStrategyGenerator
+                title={String(property.title ?? '')}
+                location={String(property.location ?? '')}
+                price={typeof property.price === 'number' ? property.price : undefined}
+                yield_percent={
+                  typeof property.yield_percent === 'number' ? property.yield_percent : undefined
+                }
+                roi_percent={
+                  typeof property.roi_percent === 'number' ? property.roi_percent : undefined
+                }
+                propertyType={(property as any).propertyType ?? undefined}
+                investmentType={(property as any).investmentType ?? undefined}
+                description={(property as any).description ?? undefined}
+              />
+            </div>
+
+            {/* Notes (render sign-in nudge when signed out inside the component) */}
+            <div className="card">
+              <h2 className="font-semibold text-lg mb-2">Investor Notes</h2>
+              {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
+            </div>
           </div>
 
-          {/* Exit Strategies */}
-          <div className="panel">
-            <h2 className="font-semibold text-lg mb-2">Exit Strategies</h2>
-            <ExitStrategyGenerator
-              title={String(property.title ?? '')}
-              location={String(property.location ?? '')}
-              price={typeof property.price === 'number' ? property.price : undefined}
-              yield_percent={
-                typeof property.yield_percent === 'number' ? property.yield_percent : undefined
-              }
-              roi_percent={
-                typeof property.roi_percent === 'number' ? property.roi_percent : undefined
-              }
-              propertyType={(property as any).propertyType ?? undefined}
-              investmentType={(property as any).investmentType ?? undefined}
-              description={(property as any).description ?? undefined}
-            />
-          </div>
+          {/* Right column */}
+          <div className="space-y-6">
+            {/* Mortgage calculator */}
+            <div className="card">
+              <h2 className="font-semibold text-lg mb-2">Mortgage & BRRR Calculator</h2>
+              <MortgageCalculator price={price} />
+            </div>
 
-          {/* Notes (render sign-in nudge when signed out inside the component) */}
-          <div className="panel">
-            <h2 className="font-semibold text-lg mb-2">Investor Notes</h2>
-            {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
+            {/* Stamp Duty */}
+            <div className="card">
+              <h2 className="font-semibold text-lg mb-2">Stamp Duty Calculator</h2>
+              <StampDutyCalculator price={price} />
+            </div>
+
+            {/* Location - Sprint 11.3: Leaflet map */}
+            <div className="card">
+              <h2 className="font-semibold text-lg mb-2">Location</h2>
+              <MapSingle
+                property={property}
+                height={300}
+                zoom={14}
+                scrollWheelZoom={false}
+              />
+            </div>
+
+            {/* ===== Area Intelligence & Comps ===== */}
+            {property.location && (
+              <>
+                {FF.AREA_INTEL && (
+                  <div className="card">
+                    <h2 className="font-semibold text-lg mb-4">Area Intelligence</h2>
+                    <AreaIntelPanel areaKey={property.location} />
+                  </div>
+                )}
+
+                {FF.COMPS && (
+                  <div className="card">
+                    <h2 className="font-semibold text-lg mb-4">Comparable Sales</h2>
+                    <CompsPanel postcode={property.location} />
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
 
-        {/* Right column */}
-        <div className="space-y-6">
-          {/* Mortgage calculator */}
-          <div className="panel">
-            <h2 className="font-semibold text-lg mb-2">Mortgage & BRRR Calculator</h2>
-            <MortgageCalculator price={price} />
-          </div>
-
-          {/* Stamp Duty */}
-          <div className="panel">
-            <h2 className="font-semibold text-lg mb-2">Stamp Duty Calculator</h2>
-            <StampDutyCalculator price={price} />
-          </div>
-
-          {/* Location - Sprint 11.3: Leaflet map */}
-          <div className="panel">
-            <h2 className="font-semibold text-lg mb-2">Location</h2>
-            <MapSingle
-              property={property}
-              height={300}
-              zoom={14}
-              scrollWheelZoom={false}
-            />
-          </div>
-
-          {/* ===== Area Intelligence & Comps ===== */}
-          {property.location && (
-            <>
-              {FF.AREA_INTEL && (
-                <div className="panel">
-                  <h2 className="font-semibold text-lg mb-4">Area Intelligence</h2>
-                  <AreaIntelPanel areaKey={property.location} />
-                </div>
-              )}
-
-              {FF.COMPS && (
-                <div className="panel">
-                  <h2 className="font-semibold text-lg mb-4">Comparable Sales</h2>
-                  <CompsPanel postcode={property.location} />
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Floating local chatbot */}
-      {FF.AI_CHAT && <AIChatbot property={property as any} />}
-    </Section>
+        {/* Floating local chatbot */}
+        {FF.AI_CHAT && <AIChatbot property={property as any} />}
+      </Section>
+    </PageWrapper>
   );
 }

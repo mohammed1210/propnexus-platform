@@ -1,0 +1,140 @@
+/* ===== Modern AI-Powered Homepage Hero =====
+ * Gradient-based design with animated elements
+ * Supports light and dark modes
+ * AI-focused property investment theme
+ */
+
+.homepage-hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(2rem, 4vw, 4rem);
+  color: var(--text-inverse);
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Animated gradient background - adapts to theme */
+.homepage-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--bg-hero);
+  z-index: -2;
+  animation: gradient-shift 15s ease-in-out infinite;
+}
+
+@keyframes gradient-shift {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* Animated grid pattern overlay */
+.homepage-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(var(--border-primary) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, var(--border-primary) 1.5px, transparent 1.5px);
+  background-size: 60px 60px;
+  z-index: -1;
+  animation: grid-flow 20s linear infinite;
+}
+
+@keyframes grid-flow {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 60px 60px;
+  }
+}
+
+/* Floating orbs for visual interest - defined in theme.css */
+.homepage-hero .orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.4;
+  z-index: -1;
+  animation: float 20s ease-in-out infinite;
+}
+
+.homepage-hero .orb-1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.6), rgba(99, 102, 241, 0) 70%);
+  top: 10%;
+  left: 10%;
+  animation-delay: 0s;
+}
+
+.homepage-hero .orb-2 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.5), rgba(139, 92, 246, 0) 70%);
+  bottom: 10%;
+  right: 10%;
+  animation-delay: -10s;
+}
+
+.homepage-hero .orb-3 {
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.4), rgba(168, 85, 247, 0) 70%);
+  top: 50%;
+  right: 20%;
+  animation-delay: -5s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  75% {
+    transform: translate(20px, 30px) scale(1.05);
+  }
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 640px) {
+  .homepage-hero {
+    padding: clamp(1.5rem, 5vw, 3rem);
+  }
+  
+  .homepage-hero .orb {
+    display: none; /* Hide orbs on mobile for performance */
+  }
+}
+
+/* Light mode adjustments for homepage */
+:root .homepage-hero {
+  color: var(--text-primary);
+}
+
+/* Dark mode adjustments for homepage */
+.dark .homepage-hero {
+  color: var(--text-inverse);
+}
+
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  .homepage-hero::before,
+  .homepage-hero::after,
+  .homepage-hero .orb {
+    animation: none !important;
+  }
+}

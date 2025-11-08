@@ -4,6 +4,7 @@ import './globals.css';
 import UiOverlaysClient from '@components/ui/UiOverlaysClient';
 import BackToTop from '@components/BackToTop';
 import Header from '@components/Header';
+import { ThemeProvider } from '@components/ThemeProvider';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
@@ -89,16 +90,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
 
-        {/* ✅ App Header (includes conditional Billing link) */}
-        <Header />
+        <ThemeProvider>
+          {/* ✅ App Header (includes conditional Billing link) */}
+          <Header />
 
-        <main id="main" className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none">
-          {children}
-        </main>
+          <main id="main" className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none">
+            {children}
+          </main>
 
-        {/* Client-side helpers */}
-        <UiOverlaysClient />
-        <BackToTop />
+          {/* Client-side helpers */}
+          <UiOverlaysClient />
+          <BackToTop />
+        </ThemeProvider>
       </body>
     </html>
   );
