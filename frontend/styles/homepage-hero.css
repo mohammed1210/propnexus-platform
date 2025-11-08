@@ -1,7 +1,7 @@
-/* ===== Homepage Hero Background Pattern =====
- * Robust layering with pseudo-elements for background image and overlays.
- * Ensures the background is visible and not covered by other layers.
- * Text legibility maintained through gradient overlays.
+/* ===== Modern AI-Powered Homepage Hero =====
+ * Gradient-based design with animated elements
+ * No external images required - all CSS-based
+ * AI-focused property investment theme
  */
 
 .homepage-hero {
@@ -10,95 +10,125 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(2rem, 8vw, 6rem);
+  padding: clamp(2rem, 4vw, 4rem);
   color: #fff;
   isolation: isolate;
   overflow: hidden;
 }
 
-/* Background layer with image and dark gradient overlay */
+/* Animated gradient background - AI theme colors */
 .homepage-hero::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(215deg, rgba(14, 32, 52, 0.80) 0%, rgba(14, 32, 52, 0.55) 40%, rgba(0, 0, 0, 0.65) 100%),
-              url("/images/home-cart-house.webp") center / cover no-repeat;
-  filter: brightness(0.85) saturate(1.05);
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.3), transparent),
+    radial-gradient(ellipse 60% 50% at 0% 50%, rgba(88, 86, 214, 0.2), transparent),
+    radial-gradient(ellipse 60% 50% at 100% 50%, rgba(139, 92, 246, 0.2), transparent),
+    linear-gradient(180deg, #0a0e1a 0%, #0f1629 50%, #0a0e1a 100%);
   z-index: -2;
+  animation: gradient-shift 15s ease-in-out infinite;
 }
 
-/* Light overlay for depth and visual interest */
+@keyframes gradient-shift {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* Animated grid pattern overlay */
 .homepage-hero::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.12), transparent 55%),
-              radial-gradient(circle at 30% 70%, rgba(255, 255, 255, 0.08), transparent 50%);
-  mix-blend-mode: overlay;
-  opacity: 0.45;
+  background-image: 
+    linear-gradient(rgba(99, 102, 241, 0.03) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1.5px, transparent 1.5px);
+  background-size: 60px 60px;
   z-index: -1;
+  animation: grid-flow 20s linear infinite;
 }
 
-/* Hero content container with glassmorphism effect */
-.homepage-hero .hero-content {
-  position: relative;
-  z-index: 1;
-  max-width: 60ch;
-  backdrop-filter: blur(6px) saturate(1.15);
-  background: linear-gradient(to bottom right, rgba(25, 35, 50, 0.55), rgba(20, 30, 45, 0.45));
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  padding: 2.25rem 2.75rem;
-  border-radius: 1.25rem;
-  box-shadow: 0 8px 32px -8px rgba(0, 0, 0, 0.5);
+@keyframes grid-flow {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 60px 60px;
+  }
 }
 
-/* Heading styles with text shadow for readability */
-.homepage-hero h1 {
-  margin: 0 0 1rem;
-  font-size: clamp(2.2rem, 5.2vw, 3.5rem);
-  line-height: 1.05;
-  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+/* Floating orbs for visual interest */
+.homepage-hero .orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.4;
+  z-index: -1;
+  animation: float 20s ease-in-out infinite;
 }
 
-/* Paragraph text */
-.homepage-hero p {
-  font-size: clamp(1rem, 1.4vw, 1.25rem);
-  margin: 0 0 1.75rem;
-  opacity: 0.92;
+.homepage-hero .orb-1 {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.6), rgba(99, 102, 241, 0) 70%);
+  top: 10%;
+  left: 10%;
+  animation-delay: 0s;
 }
 
-/* Call-to-action button */
-.cta-btn {
-  display: inline-block;
-  background: linear-gradient(135deg, #4f7ccf, #2d5aa2);
-  color: #fff;
-  font-weight: 600;
-  padding: 0.9rem 1.6rem;
-  border-radius: 0.65rem;
-  text-decoration: none;
-  box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.45);
-  transition: background 250ms ease, transform 250ms ease;
+.homepage-hero .orb-2 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.5), rgba(139, 92, 246, 0) 70%);
+  bottom: 10%;
+  right: 10%;
+  animation-delay: -10s;
 }
 
-.cta-btn:hover {
-  background: linear-gradient(135deg, #5f8ee2, #3a6bb4);
-  transform: translateY(-2px);
+.homepage-hero .orb-3 {
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.4), rgba(168, 85, 247, 0) 70%);
+  top: 50%;
+  right: 20%;
+  animation-delay: -5s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+  50% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+  75% {
+    transform: translate(20px, 30px) scale(1.05);
+  }
 }
 
 /* Mobile responsive adjustments */
 @media (max-width: 640px) {
-  .homepage-hero .hero-content {
-    padding: 1.75rem 1.9rem;
+  .homepage-hero {
+    padding: clamp(1.5rem, 5vw, 3rem);
+  }
+  
+  .homepage-hero .orb {
+    display: none; /* Hide orbs on mobile for performance */
   }
 }
 
 /* Accessibility: Reduce motion for users who prefer it */
 @media (prefers-reduced-motion: reduce) {
-  .cta-btn {
-    transition: none;
-  }
-  
-  .cta-btn:hover {
-    transform: none;
+  .homepage-hero::before,
+  .homepage-hero::after,
+  .homepage-hero .orb {
+    animation: none;
   }
 }

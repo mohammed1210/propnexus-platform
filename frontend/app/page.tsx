@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { FiSearch, FiTrendingUp, FiZap, FiMapPin, FiDollarSign } from 'react-icons/fi';
+import { FiSearch, FiTrendingUp, FiZap, FiMapPin, FiDollarSign, FiBarChart2 } from 'react-icons/fi';
 import '../styles/homepage-hero.css';
 
 export const dynamic = 'force-dynamic';
@@ -12,82 +12,9 @@ export default function HomePage() {
   const router = useRouter();
   const [q, setQ] = useState('');
   const [mounted, setMounted] = useState(false);
-  const [heatmapDarkMode, setHeatmapDarkMode] = useState(true);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  // Preload hero image for better LCP
-  useEffect(() => {
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.as = 'image';
-    link.href = '/images/home-cart-house.webp';
-    link.type = 'image/webp';
-    document.head.appendChild(link);
-    
-    return () => {
-      document.head.removeChild(link);
-    };
-  }, []);
 
   // Avoid hydration mismatch
   useEffect(() => setMounted(true), []);
-
-  // Draw animated heatmap on hero canvas
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const parent = canvas.parentElement;
-    if (!parent) return;
-
-    canvas.width = parent.offsetWidth;
-    canvas.height = parent.offsetHeight;
-
-    let animationId: number;
-    let offset = 0;
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Generate some decorative heatmap spots
-      const spots = [
-        { x: canvas.width * 0.3, y: canvas.height * 0.4, r: 120 },
-        { x: canvas.width * 0.7, y: canvas.height * 0.6, r: 100 },
-        { x: canvas.width * 0.5, y: canvas.height * 0.3, r: 80 },
-      ];
-
-      spots.forEach((spot) => {
-        const gradient = ctx.createRadialGradient(spot.x, spot.y, 0, spot.x, spot.y, spot.r);
-
-        if (heatmapDarkMode) {
-          // Dark palette
-          gradient.addColorStop(0, 'rgba(139, 92, 246, 0.4)');
-          gradient.addColorStop(0.5, 'rgba(139, 92, 246, 0.2)');
-          gradient.addColorStop(1, 'rgba(139, 92, 246, 0)');
-        } else {
-          // Warm palette
-          gradient.addColorStop(0, 'rgba(251, 146, 60, 0.4)');
-          gradient.addColorStop(0.5, 'rgba(251, 146, 60, 0.2)');
-          gradient.addColorStop(1, 'rgba(251, 146, 60, 0)');
-        }
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      });
-
-      offset += 0.5;
-      animationId = requestAnimationFrame(draw);
-    };
-
-    draw();
-
-    return () => {
-      if (animationId) cancelAnimationFrame(animationId);
-    };
-  }, [heatmapDarkMode]);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -98,6 +25,15 @@ export default function HomePage() {
 
   return (
     <div className="homepage-hero">
+      {/* Floating animated orbs for visual interest */}
+      {mounted && (
+        <>
+          <div className="orb orb-1" aria-hidden="true" />
+          <div className="orb orb-2" aria-hidden="true" />
+          <div className="orb orb-3" aria-hidden="true" />
+        </>
+      )}
+      
       <main className="relative z-10 w-full">
         <div className="mx-auto max-w-7xl px-4 py-14 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
           {/* Left: Headline + Search */}
