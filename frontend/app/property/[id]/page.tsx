@@ -11,7 +11,7 @@ import PropertySummaryCard from '@/components/property_details/PropertySummaryCa
 import QuickStatsCard from '@/components/property_details/QuickStatsCard';
 import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
-import MortgageCalculator from '@/components/property_details/MortgageCalculator';
+import InvestmentCalculator from '@/components/property_details/InvestmentCalculator';
 import StampDutyCalculator from '@/components/property_details/StampDutyCalculator';
 import NotesFields from '@/components/property_details/NotesFields';
 import AIChatbot from '@/components/property_details/AIChatbot';
@@ -20,6 +20,8 @@ import AreaIntelPanel from '@/components/property_details/AreaIntelPanel';
 import CompsPanel from '@/components/property_details/CompsPanel';
 import MapSingle from '@/components/property_details/MapSingle';
 import QuickActions from '@/components/property_details/QuickActions';
+import PlanBadge from '@/components/PlanBadge';
+import GatedPanel from '@/components/property_details/GatedPanel';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
@@ -178,8 +180,10 @@ export default function PropertyDetailsPage() {
             )}
 
             {/* Exit Strategies */}
-            <div className="card">
-              <h2 className="font-semibold text-lg mb-2">Exit Strategies</h2>
+            <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
+              <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
+                Exit Strategies
+              </h2>
               <ExitStrategyGenerator
                 title={String(property.title ?? '')}
                 location={String(property.location ?? '')}
@@ -248,6 +252,16 @@ export default function PropertyDetailsPage() {
               scrollWheelZoom={false}
             />
           </div>
+        </div>
+
+        {/* Mobile Quick Actions (fixed bottom bar) */}
+        <div className="lg:hidden">
+          <QuickActions
+            propertyId={String(property.id ?? id)}
+            price={property.price ?? undefined}
+            yieldPercent={property.yield_percent ?? undefined}
+            roiPercent={property.roi_percent ?? undefined}
+          />
         </div>
 
         {/* Floating local chatbot */}
