@@ -75,111 +75,61 @@ export default function QuickActions({
 
   return (
     <>
-      {/* Desktop floating sidebar */}
-      <div className="hidden lg:block fixed right-6 top-40 w-64 space-y-4 z-10">
-        {/* Stats card */}
-        <div className="panel space-y-3">
-          <h3 className="font-semibold text-sm text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-            Quick Stats
-          </h3>
-          
-          {price !== undefined && (
-            <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Price</div>
-              <div className="text-lg font-bold">
-                £{price.toLocaleString()}
-              </div>
-            </div>
+      {/* Desktop version (inline in sidebar) */}
+      <div className="hidden lg:block space-y-2">
+        <button
+          onClick={handleSave}
+          disabled={saving || saved}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all disabled:opacity-70"
+        >
+          {saved ? (
+            <>
+              <FiCheck className="w-4 h-4" />
+              <span>Saved</span>
+            </>
+          ) : (
+            <>
+              <FiHeart className="w-4 h-4" />
+              <span>{saving ? 'Saving...' : 'Save Deal'}</span>
+            </>
           )}
+        </button>
 
-          {yieldPercent !== undefined && (
-            <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Yield</div>
-              <div className="text-lg font-bold text-green-600 dark:text-green-400">
-                {yieldPercent.toFixed(1)}%
-              </div>
-            </div>
+        <button
+          onClick={handleShare}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+        >
+          <FiShare2 className="w-4 h-4" />
+          <span>Share</span>
+        </button>
+
+        <button
+          onClick={handleExportPDF}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+        >
+          <FiDownload className="w-4 h-4" />
+          <span>Export PDF</span>
+        </button>
+
+        <button
+          onClick={handleCopyJSON}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+        >
+          {copied ? (
+            <>
+              <FiCheck className="w-4 h-4" />
+              <span>Copied!</span>
+            </>
+          ) : (
+            <>
+              <FiCopy className="w-4 h-4" />
+              <span>Copy JSON</span>
+            </>
           )}
-
-          {roiPercent !== undefined && (
-            <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">ROI</div>
-              <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
-                {roiPercent.toFixed(1)}%
-              </div>
-            </div>
-          )}
-
-          {aiScore !== undefined && (
-            <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">AI Score</div>
-              <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
-                {aiScore.toFixed(1)}/10
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Actions card */}
-        <div className="panel space-y-2">
-          <h3 className="font-semibold text-sm text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-3">
-            Quick Actions
-          </h3>
-
-          <button
-            onClick={handleSave}
-            disabled={saving || saved}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all disabled:opacity-70"
-          >
-            {saved ? (
-              <>
-                <FiCheck className="w-4 h-4" />
-                <span>Saved</span>
-              </>
-            ) : (
-              <>
-                <FiHeart className="w-4 h-4" />
-                <span>{saving ? 'Saving...' : 'Save Deal'}</span>
-              </>
-            )}
-          </button>
-
-          <button
-            onClick={handleShare}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-          >
-            <FiShare2 className="w-4 h-4" />
-            <span>Share</span>
-          </button>
-
-          <button
-            onClick={handleExportPDF}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-          >
-            <FiDownload className="w-4 h-4" />
-            <span>Export PDF</span>
-          </button>
-
-          <button
-            onClick={handleCopyJSON}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-          >
-            {copied ? (
-              <>
-                <FiCheck className="w-4 h-4" />
-                <span>Copied!</span>
-              </>
-            ) : (
-              <>
-                <FiCopy className="w-4 h-4" />
-                <span>Copy JSON</span>
-              </>
-            )}
-          </button>
-        </div>
+        </button>
       </div>
 
-      {/* Mobile compact actions row */}
+      {/* Mobile compact actions row (fixed bottom bar) */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-gray-200 dark:border-zinc-800 p-3 z-20">
         <div className="flex gap-2 max-w-7xl mx-auto">
           <button
