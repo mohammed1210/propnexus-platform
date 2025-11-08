@@ -73,8 +73,8 @@ body,
 
 body {
   margin: 0;
-  background: var(--page-bg);
-  color: var(--text);
+  background: var(--bg-primary); /* Use theme background */
+  color: var(--text-primary); /* Use theme text color */
   /* Prefer Inter and fall back to system sans-serif fonts */
   font-family:
     'Inter',
