@@ -107,15 +107,16 @@ export default function MortgageCalculator({ price }: Props) {
   const pct = (n: number) => `${n.toFixed(1)}%`;
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-4">
-      <h3 className="text-lg font-semibold mb-3">🏦 Mortgage & BRRR Calculator</h3>
+    <div className="card">
+      <h3 className="text-lg font-semibold mb-3">Mortgage & BRRR Calculator</h3>
 
       <div className="grid xl:grid-cols-2 gap-6">
         {/* Inputs */}
         <div className="space-y-4">
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
-            <div className="font-medium mb-2">Purchase</div>
-            <div className="grid grid-cols-2 gap-3 items-end">
+          <div className="rows">
+            <div className="row">
+              <div className="font-medium mb-2">Purchase</div>
+              <div className="grid grid-cols-2 gap-3 items-end">
               <label className="text-sm">
                 <span className="block text-slate-600 mb-1">Deposit (%)</span>
                 <input
@@ -160,7 +161,7 @@ export default function MortgageCalculator({ price }: Props) {
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
+          <div className="row">
             <div className="font-medium mb-2">Costs</div>
             <div className="grid grid-cols-2 gap-3">
               <label className="text-sm">
@@ -197,7 +198,7 @@ export default function MortgageCalculator({ price }: Props) {
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
+          <div className="row">
             <div className="font-medium mb-2">Works</div>
             <div className="grid grid-cols-3 gap-3">
               <label className="text-sm col-span-1">
@@ -230,7 +231,7 @@ export default function MortgageCalculator({ price }: Props) {
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
+          <div className="row">
             <div className="font-medium mb-2">Stress & Rent</div>
             <div className="grid grid-cols-2 gap-3">
               <label className="text-sm">
@@ -255,7 +256,7 @@ export default function MortgageCalculator({ price }: Props) {
             </div>
           </div>
 
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
+          <div className="row">
             <div className="font-medium mb-2">Refinance (BRRR)</div>
             <div className="grid grid-cols-3 gap-3">
               <label className="text-sm col-span-1">
@@ -307,13 +308,15 @@ export default function MortgageCalculator({ price }: Props) {
               </label>
             </div>
           </div>
+          </div>
         </div>
 
         {/* Outputs */}
         <div className="space-y-4">
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
-            <div className="font-medium mb-2">Loan Snapshot</div>
-            <p>
+          <div className="rows">
+            <div className="row">
+              <div className="font-medium mb-2">Loan Snapshot</div>
+              <p>
               LTV: <strong>{pct(ltvPct)}</strong>
             </p>
             <p>
@@ -324,7 +327,7 @@ export default function MortgageCalculator({ price }: Props) {
             </p>
           </div>
 
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
+          <div className="row">
             <div className="font-medium mb-2">Costs & Cash Needed</div>
             <p>
               Stamp Duty (auto): <strong>{fmt(duty)}</strong>
@@ -340,7 +343,7 @@ export default function MortgageCalculator({ price }: Props) {
             </p>
           </div>
 
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
+          <div className="row">
             <div className="font-medium mb-2">Sale Exit (GDV)</div>
             <p>
               GDV Profit (ARV − project cost): <strong>{fmt(gdvProfit)}</strong>
@@ -350,7 +353,7 @@ export default function MortgageCalculator({ price }: Props) {
             </p>
           </div>
 
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
+          <div className="row">
             <div className="font-medium mb-2">Refinance Exit (BRRR)</div>
             <p>
               Refi Loan (LTV × ARV): <strong>{fmt(refiLoan)}</strong>
@@ -369,7 +372,7 @@ export default function MortgageCalculator({ price }: Props) {
             </p>
           </div>
 
-          <div className="rounded-md border border-slate-200 dark:border-slate-800 p-3">
+          <div className="row">
             <div className="font-medium mb-2">Cash Flow (Current)</div>
             <p>
               Monthly Rent: <strong>{fmt(rentPre)}</strong>
@@ -378,8 +381,9 @@ export default function MortgageCalculator({ price }: Props) {
               Cash Flow (pre-refurb): <strong>{fmt(cashflowPre)}</strong>
             </p>
           </div>
+          </div>
 
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-500 mt-4">
             This is an illustrative model; stress tests, bridging interest accruals and fees are
             approximated.
           </p>
