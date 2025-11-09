@@ -1,0 +1,299 @@
+/* Print Stylesheet - Deal Pack Generation */
+/* Optimizes property details and analytics for printing */
+
+@media print {
+  /* Reset page margins and setup */
+  @page {
+    margin: 1.5cm;
+    size: A4 portrait;
+  }
+
+  /* Hide navigation and non-essential UI elements */
+  header,
+  nav,
+  .no-print,
+  [data-no-print],
+  button:not(.print-keep),
+  .back-to-top,
+  .ai-chatbot,
+  .toast-container,
+  .modal-overlay,
+  .fixed,
+  .sticky {
+    display: none !important;
+  }
+
+  /* Ensure main content is visible */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: auto !important;
+  }
+
+  /* Body and typography */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 10pt;
+    line-height: 1.4;
+  }
+
+  /* Headings */
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+    color: black !important;
+  }
+
+  h1 {
+    font-size: 18pt;
+    margin-bottom: 12pt;
+  }
+
+  h2 {
+    font-size: 14pt;
+    margin-top: 12pt;
+    margin-bottom: 8pt;
+  }
+
+  h3 {
+    font-size: 12pt;
+    margin-top: 8pt;
+    margin-bottom: 6pt;
+  }
+
+  /* Cards and panels - flatten for print */
+  .card,
+  .panel,
+  [class*="card"],
+  [class*="panel"] {
+    border: 1px solid #e5e7eb !important;
+    border-radius: 4px !important;
+    padding: 12pt !important;
+    margin-bottom: 12pt !important;
+    background: white !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  /* Property cards */
+  .property-card,
+  article {
+    page-break-inside: avoid;
+    margin-bottom: 16pt;
+  }
+
+  /* Images */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+    border: 1px solid #e5e7eb;
+  }
+
+  /* Property images should be reasonable size */
+  .property-image,
+  [class*="property"]  img {
+    max-height: 200pt;
+    object-fit: contain;
+  }
+
+  /* Tables - make them more readable */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    page-break-inside: avoid;
+    font-size: 9pt;
+  }
+
+  th, td {
+    padding: 6pt;
+    border: 1px solid #e5e7eb;
+    text-align: left;
+  }
+
+  th {
+    background: #f9fafb !important;
+    font-weight: bold;
+  }
+
+  /* Badges and labels - flatten colors for B&W printing */
+  .badge,
+  [class*="badge"] {
+    border: 1px solid #6b7280 !important;
+    background: white !important;
+    color: black !important;
+    padding: 2pt 6pt;
+    border-radius: 2pt;
+    font-weight: 600;
+  }
+
+  /* Metrics and statistics - ensure legibility */
+  .metric,
+  .stat,
+  [class*="metric"],
+  [class*="stat"] {
+    page-break-inside: avoid;
+  }
+
+  .metric-value,
+  .stat-value {
+    font-size: 14pt;
+    font-weight: bold;
+    color: black !important;
+  }
+
+  .metric-label,
+  .stat-label {
+    font-size: 9pt;
+    color: #6b7280 !important;
+  }
+
+  /* Charts - ensure they print */
+  canvas,
+  .chart-container {
+    max-width: 100% !important;
+    height: auto !important;
+    page-break-inside: avoid;
+  }
+
+  /* Links - show URLs for reference */
+  a[href^="http"]:after {
+    content: " (" attr(href) ")";
+    font-size: 8pt;
+    color: #6b7280;
+  }
+
+  /* Don't show URLs for internal links */
+  a[href^="/"]:after,
+  a[href^="#"]:after {
+    content: "";
+  }
+
+  /* Grid layouts - convert to single column for print */
+  .grid,
+  [class*="grid"] {
+    display: block !important;
+  }
+
+  .grid > *,
+  [class*="grid"] > * {
+    margin-bottom: 8pt;
+  }
+
+  /* Flex layouts - stack vertically */
+  .flex:not(.print-keep-flex),
+  [class*="flex"]:not(.print-keep-flex) {
+    display: block !important;
+  }
+
+  /* Hide gradients and background images */
+  * {
+    background-image: none !important;
+  }
+
+  /* Dark mode colors - convert to print-friendly */
+  [class*="dark:"] {
+    color: black !important;
+  }
+
+  /* Force backgrounds to white */
+  div, section, article, aside {
+    background: white !important;
+  }
+
+  /* Property details specific styles */
+  .property-summary {
+    border: 2px solid black;
+    padding: 16pt;
+    margin-bottom: 16pt;
+    page-break-inside: avoid;
+  }
+
+  .property-title {
+    font-size: 16pt;
+    font-weight: bold;
+    margin-bottom: 8pt;
+  }
+
+  .property-price {
+    font-size: 18pt;
+    font-weight: bold;
+    margin-bottom: 8pt;
+  }
+
+  /* Financial metrics */
+  .financial-metrics {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8pt;
+    page-break-inside: avoid;
+  }
+
+  /* AI insights and analysis */
+  .ai-score,
+  .ai-analysis {
+    border: 2px solid #4f46e5;
+    padding: 12pt;
+    margin-bottom: 12pt;
+    page-break-inside: avoid;
+  }
+
+  /* Map views - hide or simplify */
+  .map-container,
+  .leaflet-container {
+    height: 150pt !important;
+    page-break-inside: avoid;
+  }
+
+  /* Ensure important content doesn't break across pages */
+  .keep-together,
+  .no-break {
+    page-break-inside: avoid;
+  }
+
+  /* Page break helpers */
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  /* Footer for each page */
+  .print-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 8pt;
+    color: #6b7280;
+    padding: 8pt;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  /* Print-specific utilities */
+  .print-only {
+    display: block !important;
+  }
+
+  .screen-only {
+    display: none !important;
+  }
+
+  /* Optimize colors for grayscale printing */
+  .text-blue-600,
+  .text-indigo-600,
+  .text-purple-600 {
+    color: black !important;
+    font-weight: 600;
+  }
+
+  .bg-blue-600,
+  .bg-indigo-600,
+  .bg-purple-600 {
+    background: #e5e7eb !important;
+    color: black !important;
+  }
+}
