@@ -105,8 +105,8 @@ export default function ListingsFilters() {
         >
           {/* Primary filters: Search + Budget + Beds + Baths - always visible */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2 input-field">
-              <FiSearch className="opacity-60" aria-hidden />
+            <div className="flex items-center gap-2 rounded-xl px-3 input-field h-[44px]">
+              <FiSearch className="opacity-60 flex-shrink-0" aria-hidden />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
@@ -117,8 +117,8 @@ export default function ListingsFilters() {
               />
             </div>
 
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2 input-field">
-              <LuPoundSterling className="opacity-60" aria-hidden />
+            <div className="flex items-center gap-2 rounded-xl px-3 input-field h-[44px]">
+              <LuPoundSterling className="opacity-60 flex-shrink-0" aria-hidden />
               <input
                 value={min}
                 onChange={(e) => setMin(e.target.value)}
@@ -130,8 +130,8 @@ export default function ListingsFilters() {
               />
             </div>
 
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2 input-field">
-              <LuPoundSterling className="opacity-60" aria-hidden />
+            <div className="flex items-center gap-2 rounded-xl px-3 input-field h-[44px]">
+              <LuPoundSterling className="opacity-60 flex-shrink-0" aria-hidden />
               <input
                 value={max}
                 onChange={(e) => setMax(e.target.value)}
@@ -143,8 +143,8 @@ export default function ListingsFilters() {
               />
             </div>
 
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2 input-field">
-              <LuBedDouble className="opacity-60" aria-hidden />
+            <div className="flex items-center gap-2 rounded-xl px-3 input-field h-[44px]">
+              <LuBedDouble className="opacity-60 flex-shrink-0" aria-hidden />
               <input
                 value={beds}
                 onChange={(e) => setBeds(e.target.value)}
@@ -156,8 +156,8 @@ export default function ListingsFilters() {
               />
             </div>
 
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2 input-field">
-              <LuBath className="opacity-60" aria-hidden />
+            <div className="flex items-center gap-2 rounded-xl px-3 input-field h-[44px]">
+              <LuBath className="opacity-60 flex-shrink-0" aria-hidden />
               <input
                 value={baths}
                 onChange={(e) => setBaths(e.target.value)}
@@ -186,13 +186,13 @@ export default function ListingsFilters() {
             <div className="flex gap-2">
               <button
                 onClick={apply}
-                className="px-4 py-2 rounded-xl btn-primary"
+                className="px-4 rounded-xl btn-primary h-[44px] font-semibold"
               >
                 Apply
               </button>
               <button
                 onClick={reset}
-                className="px-4 py-2 rounded-xl surface-panel transition-colors focus:outline-none"
+                className="px-4 rounded-xl surface-panel transition-colors focus:outline-none h-[44px] font-medium"
                 aria-label="Reset all filters"
               >
                 Reset
@@ -203,9 +203,9 @@ export default function ListingsFilters() {
           {/* Secondary filters - collapsible */}
           {moreFiltersOpen && (
             <div id="more-filters-section" className="space-y-3 pt-2" style={{ borderTop: '1px solid var(--border-secondary)' }}>
-              {/* Investment Types */}
+              {/* Investment Types - Pill/Tag Style */}
               <div>
-                <label className="block text-sm font-medium mb-2" id="investment-types-label" style={{ color: 'var(--text-secondary)' }}>
+                <label className="block text-sm font-medium mb-3" id="investment-types-label" style={{ color: 'var(--text-secondary)' }}>
                   Investment Type
                 </label>
                 <div
@@ -220,17 +220,20 @@ export default function ListingsFilters() {
                         key={type}
                         onClick={() => toggleType(type)}
                         className={`
-                          px-4 py-2 rounded-full border text-sm font-medium
-                          transition-all duration-200 transform
-                          focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400
+                          px-4 py-2 h-[44px] rounded-full text-sm font-semibold
+                          transition-all duration-200 ease-out
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
                           ${
                             isSelected
-                              ? 'bg-indigo-600 text-white border-indigo-600 scale-105 shadow-md'
-                              : 'bg-white dark:bg-zinc-900 border-gray-300 dark:border-zinc-700 hover:border-indigo-400 hover:scale-105'
+                              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg scale-105 focus-visible:ring-indigo-400'
+                              : 'bg-white dark:bg-zinc-900 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-zinc-700 hover:border-indigo-400 dark:hover:border-indigo-500 hover:shadow-md hover:scale-102 focus-visible:ring-gray-400'
                           }
                         `}
+                        style={{
+                          transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                        }}
                         aria-pressed={isSelected}
-                        aria-label={`${type} investment type`}
+                        aria-label={`${type} investment type${isSelected ? ', selected' : ''}`}
                       >
                         {type}
                       </button>
@@ -240,16 +243,16 @@ export default function ListingsFilters() {
               </div>
 
               {/* Sort + Direction + Heatmap */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-center">
                 <div className="col-span-2">
-                  <label htmlFor="sort-field" className="block text-sm font-medium mb-1">
+                  <label htmlFor="sort-field" className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                     Sort by
                   </label>
                   <select
                     id="sort-field"
                     value={sort}
                     onChange={(e) => setSort((e.target.value as SortKey) || 'created_at')}
-                    className="w-full border rounded-xl px-3 py-2 bg-white dark:bg-zinc-900 outline-none focus:ring-2 focus:ring-indigo-400"
+                    className="w-full border rounded-xl px-3 bg-white dark:bg-zinc-900 outline-none focus:ring-2 focus:ring-indigo-400 h-[44px] font-medium"
                   >
                     <option value="created_at">Newest</option>
                     <option value="price">Price</option>
@@ -261,24 +264,22 @@ export default function ListingsFilters() {
 
                 <button
                   onClick={toggleDir}
-                  className="px-4 py-2 rounded-xl border bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                  className="px-4 rounded-xl border bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 h-[44px] font-semibold"
                   aria-label={`Sort direction: ${dir === 'asc' ? 'Ascending' : 'Descending'}`}
                 >
                   {dir === 'asc' ? '↑ Asc' : '↓ Desc'}
                 </button>
 
-                <div>
-                  <label className="flex items-center gap-2 px-4 py-2 rounded-xl border bg-white dark:bg-zinc-900 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={heatmap}
-                      onChange={(e) => setHeatmap(e.target.checked)}
-                      className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-400"
-                      aria-label="Enable heatmap overlay"
-                    />
-                    <span className="text-sm font-medium">Heatmap</span>
-                  </label>
-                </div>
+                <label className="flex items-center gap-2 px-4 rounded-xl border bg-white dark:bg-zinc-900 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors h-[44px]">
+                  <input
+                    type="checkbox"
+                    checked={heatmap}
+                    onChange={(e) => setHeatmap(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-400"
+                    aria-label="Enable heatmap overlay"
+                  />
+                  <span className="text-sm font-medium">Heatmap</span>
+                </label>
               </div>
             </div>
           )}

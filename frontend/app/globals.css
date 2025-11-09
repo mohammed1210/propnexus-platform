@@ -120,14 +120,15 @@ p {
 .content-layout {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 1rem;
+  gap: 1.5rem;
+  align-items: start;
 }
 
 /* Desktop: list + map */
 @media (min-width: 1024px) {
   .content-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
-    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 480px);
+    gap: 2rem;
   }
 }
 
@@ -135,20 +136,20 @@ p {
 .map-sticky {
   position: sticky;
   top: calc(var(--header-h) + 56px); /* header + filter bar */
-  height: calc(100vh - (var(--header-h) + 56px) - 16px);
+  height: calc(100vh - (var(--header-h) + 56px) - 24px);
   z-index: 10;
 }
 .leaflet-panel {
   height: 100%;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 16px;
 }
 .leaflet-panel .leaflet-container {
   width: 100% !important;
   height: 100% !important;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: var(--shadow);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-md);
   background: var(--card-bg);
 }
 /* Improve Leaflet tile rendering */

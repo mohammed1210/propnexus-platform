@@ -465,13 +465,80 @@ function ListingsInner() {
 
         <ListingsFilters />
 
+        {/* Result Summary */}
+        <div className="mt-4 mb-3 px-4 md:px-0">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 rounded-xl border" style={{
+            background: 'var(--card-bg)',
+            borderColor: 'var(--border-secondary)',
+          }}>
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {loading ? '...' : `${rows.length} ${rows.length === 1 ? 'property' : 'properties'}`}
+              </span>
+              {!loading && rows.length > 0 && (
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>found</span>
+              )}
+            </div>
+            
+            {/* Active Filters Display */}
+            <div className="flex flex-wrap gap-2 items-center">
+              {q && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-300">
+                  Search: {q}
+                </span>
+              )}
+              {minP !== undefined && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                  Min: £{minP.toLocaleString()}
+                </span>
+              )}
+              {maxP !== undefined && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                  Max: £{maxP.toLocaleString()}
+                </span>
+              )}
+              {beds !== undefined && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                  {beds}+ beds
+                </span>
+              )}
+              {baths !== undefined && (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
+                  {baths}+ baths
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="content-layout pt-4">
           {/* left: list */}
           <div className="space-y-3">
             {loading ? (
-              <div className="p-4 card">Loading…</div>
+              <>
+                {/* Skeleton loaders */}
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="card p-0 overflow-hidden animate-pulse">
+                    <div className="w-full bg-gray-200 dark:bg-gray-700" style={{ aspectRatio: '16 / 9' }} />
+                    <div className="p-5 space-y-3">
+                      <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-zinc-700">
+                        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-24" />
+                        <div className="flex gap-3">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12" />
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </>
             ) : rows.length === 0 ? (
-              <div className="p-4 card">No results.</div>
+              <div className="p-6 card text-center">
+                <p className="text-lg font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>No properties found</p>
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Try adjusting your filters to see more results</p>
+              </div>
             ) : (
               rows.map((r) => (
                 <Link key={r.id ?? Math.random()} href={`/property/${r.id}`} className="block">

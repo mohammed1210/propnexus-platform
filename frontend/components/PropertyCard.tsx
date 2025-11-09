@@ -5,6 +5,7 @@ import { fetchWithRetry } from '@/lib/api';
 import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiHeart } from 'react-icons/fi';
+import { LuBedDouble, LuBath } from 'react-icons/lu';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -158,10 +159,11 @@ export default function PropertyCard({ p }: { p: Property }) {
   }, [p.id]);
 
   return (
-    <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30">
+    <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30 hover:-translate-y-1">
       <Link
         href={href}
-        className="block relative w-full h-48 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
+        className="block relative w-full overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
+        style={{ aspectRatio: '16 / 9' }}
         aria-label={`Open ${p.title ?? 'property'}`}
       >
         <Image
@@ -184,11 +186,11 @@ export default function PropertyCard({ p }: { p: Property }) {
           }}
           disabled={saving || saveSuccess}
           className={cx(
-            'absolute top-2 left-2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+            'absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
             saveSuccess
               ? 'bg-green-600 text-white border-2 border-white shadow-lg save-animation'
-              : 'bg-white/90 backdrop-blur-sm text-slate-900 border-2 border-white/50 hover:bg-white hover:border-white shadow-md',
+              : 'bg-white/95 backdrop-blur-sm text-slate-900 border-2 border-white/80 hover:bg-white hover:border-white shadow-md hover:shadow-xl',
             (saving || saveSuccess) && 'cursor-not-allowed',
           )}
           aria-label={
@@ -200,7 +202,7 @@ export default function PropertyCard({ p }: { p: Property }) {
           {saveSuccess ? (
             <>
               <FiHeart className="w-4 h-4 fill-current" />
-              <span className="text-xs font-semibold">Saved</span>
+              <span className="text-xs">Saved</span>
             </>
           ) : saving ? (
             <>
@@ -229,17 +231,17 @@ export default function PropertyCard({ p }: { p: Property }) {
           ) : (
             <>
               <FiHeart className="w-4 h-4" />
-              <span className="text-xs font-semibold">Save</span>
+              <span className="text-xs">Save</span>
             </>
           )}
         </button>
         
         {/* Badges for yield and ROI - moved to top-right */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+        <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end">
           {typeof p.yield_percent === 'number' && (
             <span
               className={cx(
-                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
+                'text-xs font-bold px-2.5 py-1.5 rounded-lg backdrop-blur-md shadow-md',
                 getBadgeColor('yield', p.yield_percent),
               )}
               aria-label={`Yield percentage: ${p.yield_percent.toFixed(1)}%`}
@@ -250,7 +252,7 @@ export default function PropertyCard({ p }: { p: Property }) {
           {typeof p.roi_percent === 'number' && (
             <span
               className={cx(
-                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
+                'text-xs font-bold px-2.5 py-1.5 rounded-lg backdrop-blur-md shadow-md',
                 getBadgeColor('roi', p.roi_percent),
               )}
               aria-label={`ROI percentage: ${p.roi_percent.toFixed(1)}%`}
@@ -261,20 +263,29 @@ export default function PropertyCard({ p }: { p: Property }) {
         </div>
       </Link>
 
-      <div className="p-4 space-y-2">
+      <div className="p-5 space-y-3">
         <Link href={href} className="block group">
-          <h3 className="font-semibold leading-snug line-clamp-2 group-hover:underline">
+          <h3 className="font-bold text-lg leading-tight line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
             {p.title || 'Untitled property'}
           </h3>
         </Link>
 
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">{p.location || '—'}</p>
+        <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400 line-clamp-1">
+          {p.location || '—'}
+        </p>
 
-        <div className="flex items-center justify-between pt-2">
-          <div className="text-sm">
-            <span className="font-medium">{priceText}</span>
-            <span className="opacity-60 ml-2">
-              {p.bedrooms ?? '—'} bd · {p.bathrooms ?? '—'} ba
+        <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-zinc-700">
+          <div className="text-base">
+            <span className="font-bold text-lg" style={{ color: 'var(--accent-primary)' }}>{priceText}</span>
+          </div>
+          <div className="flex items-center gap-3 text-sm font-medium text-gray-600 dark:text-gray-400">
+            <span className="flex items-center gap-1">
+              <LuBedDouble className="w-4 h-4" />
+              {p.bedrooms ?? '—'}
+            </span>
+            <span className="flex items-center gap-1">
+              <LuBath className="w-4 h-4" />
+              {p.bathrooms ?? '—'}
             </span>
           </div>
         </div>
