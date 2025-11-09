@@ -2,6 +2,7 @@
  * Gradient-based design with animated elements
  * Supports light and dark modes
  * AI-focused property investment theme
+ * Enhanced with improved contrast and animations
  */
 
 .homepage-hero {
@@ -16,14 +17,17 @@
   overflow: hidden;
 }
 
-/* Animated gradient background - adapts to theme */
+/* Animated gradient background - adapts to theme with enhanced contrast */
 .homepage-hero::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--bg-hero);
+  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(88, 86, 214, 0.25), transparent),
+              radial-gradient(ellipse 60% 50% at 0% 50%, rgba(99, 102, 241, 0.2), transparent),
+              radial-gradient(ellipse 60% 50% at 100% 50%, rgba(139, 92, 246, 0.2), transparent),
+              linear-gradient(180deg, #0a0e1a 0%, #0f1629 50%, #0a0e1a 100%);
   z-index: -2;
-  animation: gradient-shift 15s ease-in-out infinite;
+  animation: gradient-shift 20s ease-in-out infinite;
 }
 
 @keyframes gradient-shift {
@@ -31,20 +35,21 @@
     opacity: 1;
   }
   50% {
-    opacity: 0.9;
+    opacity: 0.95;
   }
 }
 
-/* Animated grid pattern overlay */
+/* Animated grid pattern overlay with better visibility */
 .homepage-hero::after {
   content: "";
   position: absolute;
   inset: 0;
   background-image: 
-    linear-gradient(var(--border-primary) 1.5px, transparent 1.5px),
-    linear-gradient(90deg, var(--border-primary) 1.5px, transparent 1.5px);
+    linear-gradient(rgba(99, 102, 241, 0.15) 1.5px, transparent 1.5px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.15) 1.5px, transparent 1.5px);
   background-size: 60px 60px;
   z-index: -1;
+  opacity: 0.4;
   animation: grid-flow 20s linear infinite;
 }
 
@@ -62,7 +67,7 @@
   position: absolute;
   border-radius: 50%;
   filter: blur(60px);
-  opacity: 0.4;
+  opacity: 0.5;
   z-index: -1;
   animation: float 20s ease-in-out infinite;
 }
@@ -70,7 +75,7 @@
 .homepage-hero .orb-1 {
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.6), rgba(99, 102, 241, 0) 70%);
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.7), rgba(99, 102, 241, 0) 70%);
   top: 10%;
   left: 10%;
   animation-delay: 0s;
@@ -79,7 +84,7 @@
 .homepage-hero .orb-2 {
   width: 300px;
   height: 300px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.5), rgba(139, 92, 246, 0) 70%);
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.6), rgba(139, 92, 246, 0) 70%);
   bottom: 10%;
   right: 10%;
   animation-delay: -10s;
@@ -88,7 +93,7 @@
 .homepage-hero .orb-3 {
   width: 250px;
   height: 250px;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.4), rgba(168, 85, 247, 0) 70%);
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.5), rgba(168, 85, 247, 0) 70%);
   top: 50%;
   right: 20%;
   animation-delay: -5s;
@@ -107,6 +112,37 @@
   75% {
     transform: translate(20px, 30px) scale(1.05);
   }
+}
+
+/* Fade-in-up animation for entrance effects */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+  opacity: 0;
+}
+
+/* Pulse animation for subtle breathing effect */
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
 }
 
 /* Mobile responsive adjustments */
@@ -134,7 +170,14 @@
 @media (prefers-reduced-motion: reduce) {
   .homepage-hero::before,
   .homepage-hero::after,
-  .homepage-hero .orb {
+  .homepage-hero .orb,
+  .animate-fade-in-up,
+  .animate-pulse-slow {
     animation: none !important;
+  }
+  
+  .animate-fade-in-up {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
