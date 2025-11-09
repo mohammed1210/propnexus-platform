@@ -9,7 +9,6 @@ import PageWrapper from '@/components/PageWrapper';
 
 import PropertySummaryCard from '@/components/property_details/PropertySummaryCard';
 import QuickStatsCard from '@/components/property_details/QuickStatsCard';
-import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
 import DealScore from '@/components/property_details/DealScore';
 import AreaIntelPanel from '@/components/property_details/AreaIntelPanel';
@@ -206,10 +205,7 @@ export default function PropertyDetailsPage() {
             </div>
 
             {/* Investor Notes */}
-            <div className="card">
-              <h2 className="font-semibold text-lg mb-2">Investor Notes</h2>
-              {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
-            </div>
+            {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
 
             {/* Mortgage & BRRR Calculator */}
             <MortgageCalculator price={price} />
