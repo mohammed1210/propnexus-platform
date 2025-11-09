@@ -64,22 +64,22 @@ export default function HomePage() {
               <div className="relative group">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl blur opacity-30 group-hover:opacity-50 transition duration-300"></div>
                 <div className="relative flex w-full max-w-xl overflow-hidden rounded-xl border border-white/20 bg-white shadow-2xl focus-within:ring-2 focus-within:ring-indigo-400">
-                  <div className="flex items-center pl-4">
+                  <div className="flex items-center pl-3 md:pl-4">
                     <FiSearch className="text-slate-400 w-5 h-5" />
                   </div>
                   <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     placeholder="Enter location, city, or postcode…"
-                    className="flex-1 h-14 px-3 text-slate-900 placeholder-slate-500 outline-none bg-transparent"
+                    className="flex-1 h-12 md:h-14 px-2 md:px-3 text-sm md:text-base text-slate-900 placeholder-slate-500 outline-none bg-transparent"
                     aria-label="Search by location or postcode"
                   />
                   <button
                     type="submit"
-                    className="h-14 px-6 font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 transition-all duration-300 flex items-center gap-2"
+                    className="h-12 md:h-14 px-4 md:px-6 font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 transition-all duration-300 flex items-center gap-2 text-sm md:text-base"
                   >
                     <FiZap className="w-4 h-4" />
-                    Search
+                    <span className="hidden sm:inline">Search</span>
                   </button>
                 </div>
               </div>

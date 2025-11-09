@@ -93,7 +93,7 @@ export default function QuickActions({
             <button
               onClick={handleSave}
               disabled={saving || saved}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all disabled:opacity-70"
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all duration-200 disabled:opacity-70 hover:shadow-lg"
               aria-label="Save deal"
             >
               {saved ? (
@@ -111,7 +111,7 @@ export default function QuickActions({
 
             <button
               onClick={handleShare}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-all duration-200"
               aria-label="Share property"
             >
               <FiShare2 className="w-4 h-4" />
@@ -120,7 +120,7 @@ export default function QuickActions({
 
             <button
               onClick={handleExportPDF}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-all duration-200"
               aria-label="Export as PDF"
             >
               <FiDownload className="w-4 h-4" />
@@ -129,7 +129,7 @@ export default function QuickActions({
 
             <button
               onClick={handleCopyJSON}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-all duration-200"
               aria-label="Copy property data as JSON"
             >
               {copied ? (
@@ -149,30 +149,30 @@ export default function QuickActions({
       </div>
 
       {/* Mobile compact actions row */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-3 z-20 no-print">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-700 p-3 z-20 no-print backdrop-blur-lg bg-opacity-95 dark:bg-opacity-95 shadow-lg">
         <div className="flex gap-2 max-w-7xl mx-auto">
           <button
             onClick={handleSave}
             disabled={saving || saved}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium disabled:opacity-70"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium disabled:opacity-70 transition-all duration-200 hover:shadow-lg min-h-[44px]"
             aria-label="Save deal"
           >
-            <FiHeart className="w-4 h-4" />
-            <span className="text-sm">{saved ? 'Saved' : 'Save'}</span>
+            <FiHeart className="w-5 h-5" />
+            <span className="text-sm font-semibold">{saved ? 'Saved' : 'Save'}</span>
           </button>
           <button
             onClick={handleShare}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-slate-300 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors duration-200 min-w-[44px] min-h-[44px]"
             aria-label="Share property"
           >
-            <FiShare2 className="w-4 h-4" />
+            <FiShare2 className="w-5 h-5" />
           </button>
           <button
             onClick={handleExportPDF}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-slate-300 dark:border-zinc-700 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors duration-200 min-w-[44px] min-h-[44px]"
             aria-label="Export as PDF"
           >
-            <FiDownload className="w-4 h-4" />
+            <FiDownload className="w-5 h-5" />
           </button>
         </div>
       </div>

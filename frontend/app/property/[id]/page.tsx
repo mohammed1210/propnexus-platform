@@ -130,7 +130,7 @@ export default function PropertyDetailsPage() {
 
   return (
     <PageWrapper showOrbs={false} className="bg-white/50 dark:bg-slate-900/30">
-      <Section>
+      <Section className="pb-24 lg:pb-6">
         {/* Quick Actions Sidebar (Desktop: right fixed, Mobile: bottom fixed) */}
         <QuickActions
           propertyId={String(property.id ?? id)}
