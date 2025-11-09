@@ -57,7 +57,7 @@ export default function StampDutyCalculator({ price, className }: StampDutyCalcu
       </div>
 
       {/* Summary */}
-      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-slate-800/40 mb-4">
+      <div className="flex items-center justify-between p-4 rounded-lg bg-slate-50 dark:bg-zinc-800/60 mb-4">
         <div>
           <p className="text-sm text-slate-600 dark:text-slate-400">Estimated SDLT</p>
           <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">

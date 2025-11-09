@@ -16,22 +16,22 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors ' +
+  'inline-flex items-center justify-center gap-2 rounded-md font-medium transition-all duration-200 ' +
   'focus:outline-none focus:ring-2 focus:ring-offset-1 ' +
   'disabled:opacity-60 disabled:cursor-not-allowed ' +
-  'dark:focus:ring-offset-neutral-900';
+  'dark:focus:ring-offset-zinc-900';
 
 const byVariant: Record<Variant, string> = {
-  primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-600',
+  primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-600 dark:bg-blue-500 dark:hover:bg-blue-600',
   secondary:
-    'border border-neutral-300 text-neutral-800 hover:bg-neutral-50 ' +
-    'dark:border-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-800 ' +
-    'focus:ring-neutral-400 dark:focus:ring-neutral-600',
+    'border border-zinc-300 text-zinc-800 hover:bg-zinc-50 ' +
+    'dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800 ' +
+    'focus:ring-zinc-400 dark:focus:ring-zinc-600',
   ghost:
-    'text-neutral-700 hover:bg-neutral-100 ' +
-    'dark:text-neutral-200 dark:hover:bg-neutral-800 ' +
-    'focus:ring-neutral-400 dark:focus:ring-neutral-600',
-  danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-600',
+    'text-zinc-700 hover:bg-zinc-100 ' +
+    'dark:text-zinc-200 dark:hover:bg-zinc-800 ' +
+    'focus:ring-zinc-400 dark:focus:ring-zinc-600',
+  danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-600 dark:bg-red-500 dark:hover:bg-red-600',
 };
 
 const bySize: Record<Size, string> = {
