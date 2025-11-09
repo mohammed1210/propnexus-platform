@@ -16,13 +16,14 @@
   /* Panel variant for sidebar cards */
   .panel {
     @apply relative flex flex-col rounded-xl border shadow-sm p-4;
-    background: var(--panel-bg, rgba(255, 255, 255, 0.5));
-    border-color: var(--panel-border, rgba(0, 0, 0, 0.1));
+    background: var(--panel-bg, rgba(255, 255, 255, 0.6));
+    border-color: var(--panel-border, rgba(99, 102, 241, 0.1));
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .dark .panel {
-    background: var(--panel-bg, rgba(255, 255, 255, 0.03));
-    border-color: var(--panel-border, rgba(255, 255, 255, 0.08));
+    background: var(--panel-bg, rgba(30, 40, 71, 0.6));
+    border-color: var(--panel-border, rgba(99, 102, 241, 0.2));
   }
 
   /* --- Row utilities for internal card structure --- */

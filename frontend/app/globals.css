@@ -48,12 +48,12 @@
 
 /* Dark theme (class-based: <html class="dark"> … ) */
 .dark {
-  --page-bg: #0e1a2b;
-  --text: #f1f5f9;
-  --card-bg: #162037;
-  --text-muted: #8ca1b8;
-  --border: #25345c;
-  --shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+  --page-bg: #162037;
+  --text: #f8fafc;
+  --card-bg: #1e2847;
+  --text-muted: #94a3b8;
+  --border: #2d3f5f;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 /* ========================================
@@ -183,14 +183,14 @@ p {
 ======================================== */
 input.input,
 select.input {
-  @apply border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800;
+  @apply border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800 transition-colors duration-200;
 }
 
 button.btn {
-  @apply rounded-xl px-3 py-2 font-medium;
+  @apply rounded-xl px-3 py-2 font-medium transition-all duration-200;
 }
 button.btn-primary {
-  @apply bg-indigo-600 text-white hover:bg-indigo-500;
+  @apply bg-indigo-600 text-white hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400;
 }
 button.btn-outline {
   @apply border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50/70 dark:hover:bg-zinc-800/50;

@@ -62,31 +62,31 @@
    2) DARK MODE
    ======================================== */
 .dark {
-  /* AI-focused gradient backgrounds - dark */
+  /* AI-focused gradient backgrounds - dark (using deep slate/indigo, avoiding pure black) */
   --bg-primary: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.15), transparent),
                 radial-gradient(ellipse 60% 50% at 0% 50%, rgba(88, 86, 214, 0.1), transparent),
                 radial-gradient(ellipse 60% 50% at 100% 50%, rgba(139, 92, 246, 0.1), transparent),
-                linear-gradient(180deg, #0a0e1a 0%, #0f1629 50%, #0a0e1a 100%);
-  --bg-secondary: linear-gradient(135deg, #0f1629 0%, #1a1f3a 100%);
+                linear-gradient(180deg, #0e1626 0%, #162037 50%, #0e1626 100%);
+  --bg-secondary: linear-gradient(135deg, #162037 0%, #1e2847 100%);
   --bg-hero: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.3), transparent),
              radial-gradient(ellipse 60% 50% at 0% 50%, rgba(88, 86, 214, 0.2), transparent),
              radial-gradient(ellipse 60% 50% at 100% 50%, rgba(139, 92, 246, 0.2), transparent),
-             linear-gradient(180deg, #0a0e1a 0%, #0f1629 50%, #0a0e1a 100%);
+             linear-gradient(180deg, #0e1626 0%, #162037 50%, #0e1626 100%);
   
-  /* Text colors */
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
+  /* Text colors - improved readability */
+  --text-primary: #f8fafc;
+  --text-secondary: #e2e8f0;
   --text-muted: #94a3b8;
-  --text-inverse: #0a0e1a;
+  --text-inverse: #f8fafc;
   
-  /* Surface colors */
-  --surface: rgba(15, 22, 41, 0.8);
-  --surface-elevated: rgba(26, 31, 58, 0.9);
-  --surface-subtle: rgba(15, 22, 41, 0.4);
+  /* Surface colors - using deep slate tones */
+  --surface: rgba(22, 32, 55, 0.8);
+  --surface-elevated: rgba(30, 40, 71, 0.9);
+  --surface-subtle: rgba(22, 32, 55, 0.4);
   
-  /* Border colors */
-  --border-primary: rgba(99, 102, 241, 0.2);
-  --border-secondary: rgba(148, 163, 184, 0.1);
+  /* Border colors - more visible in dark mode */
+  --border-primary: rgba(99, 102, 241, 0.25);
+  --border-secondary: rgba(148, 163, 184, 0.15);
   
   /* Accent colors - AI theme (brighter in dark mode) */
   --accent-primary: #818cf8;
@@ -100,14 +100,14 @@
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
   
-  /* Card backgrounds */
-  --card-bg: rgba(26, 31, 58, 0.6);
-  --card-bg-hover: rgba(26, 31, 58, 0.8);
-  --card-border: rgba(99, 102, 241, 0.2);
+  /* Card backgrounds - improved contrast */
+  --card-bg: rgba(30, 40, 71, 0.7);
+  --card-bg-hover: rgba(30, 40, 71, 0.9);
+  --card-border: rgba(99, 102, 241, 0.25);
   
-  /* Input colors */
-  --input-bg: rgba(15, 22, 41, 0.6);
-  --input-border: rgba(148, 163, 184, 0.2);
+  /* Input colors - better visibility */
+  --input-bg: rgba(22, 32, 55, 0.7);
+  --input-border: rgba(148, 163, 184, 0.25);
   --input-focus: #818cf8;
   
   /* Status colors - adjusted for dark mode */
@@ -123,7 +123,8 @@
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1), 
+              color 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ========================================
@@ -179,7 +180,7 @@ body {
   border-radius: 1rem;
   box-shadow: var(--shadow-md);
   backdrop-filter: blur(12px);
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card:hover {
@@ -197,7 +198,7 @@ body {
   border-radius: 0.5rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--shadow-md);
 }
 
@@ -222,7 +223,7 @@ body {
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
   color: var(--text-primary);
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .input-field:focus {

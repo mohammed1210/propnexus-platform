@@ -95,7 +95,7 @@ export default function Header() {
               </span>
               <button
                 onClick={handleSignOut}
-                className="rounded-md bg-black px-3 py-2 text-white hover:bg-zinc-800 text-sm"
+                className="rounded-md bg-zinc-900 dark:bg-zinc-800 px-3 py-2 text-white hover:bg-zinc-800 dark:hover:bg-zinc-700 text-sm transition-colors duration-200"
               >
                 Sign out
               </button>
@@ -103,7 +103,7 @@ export default function Header() {
           ) : (
             <Link
               href="/magic-login"
-              className="ml-3 rounded-md bg-black px-3 py-2 text-white hover:bg-zinc-800 text-sm font-semibold"
+              className="ml-3 rounded-md bg-zinc-900 dark:bg-zinc-800 px-3 py-2 text-white hover:bg-zinc-800 dark:hover:bg-zinc-700 text-sm font-semibold transition-colors duration-200"
             >
               Sign in
             </Link>

@@ -62,12 +62,12 @@ export default function AIScoreInfo({
           role="dialog"
           aria-modal="true"
           aria-labelledby="ai-score-info-title"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/60 dark:bg-zinc-950/80 backdrop-blur-sm p-4 transition-all duration-200"
           onClick={() => setOpen(false)}
         >
           <div
             ref={dialogRef}
-            className="w-full max-w-md rounded-lg bg-white dark:bg-neutral-900 shadow-xl border border-neutral-200 dark:border-neutral-800 p-4"
+            className="w-full max-w-md rounded-lg bg-white dark:bg-zinc-900 shadow-xl border border-neutral-200 dark:border-zinc-700 p-4"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 id="ai-score-info-title" className="text-lg font-semibold mb-2">
