@@ -4,6 +4,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Include design tokens foundation */
+@import '../styles/design-tokens.css';
+
 /* Include your component aliases */
 @import '../styles/components.css';
 @import '../styles/ux-tokens.css';
