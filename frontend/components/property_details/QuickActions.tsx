@@ -93,17 +93,18 @@ export default function QuickActions({
             <button
               onClick={handleSave}
               disabled={saving || saved}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all disabled:opacity-70"
-              aria-label="Save deal"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all disabled:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+              aria-label={saved ? 'Deal saved' : saving ? 'Saving deal' : 'Save this deal'}
+              aria-pressed={saved}
             >
               {saved ? (
                 <>
-                  <FiCheck className="w-4 h-4" />
+                  <FiCheck className="w-4 h-4" aria-hidden="true" />
                   <span>Saved</span>
                 </>
               ) : (
                 <>
-                  <FiHeart className="w-4 h-4" />
+                  <FiHeart className="w-4 h-4" aria-hidden="true" />
                   <span>{saving ? 'Saving...' : 'Save Deal'}</span>
                 </>
               )}
@@ -111,35 +112,35 @@ export default function QuickActions({
 
             <button
               onClick={handleShare}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              aria-label="Share property"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+              aria-label="Share this property"
             >
-              <FiShare2 className="w-4 h-4" />
+              <FiShare2 className="w-4 h-4" aria-hidden="true" />
               <span>Share</span>
             </button>
 
             <button
               onClick={handleExportPDF}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              aria-label="Export as PDF"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+              aria-label="Export property details as PDF"
             >
-              <FiDownload className="w-4 h-4" />
+              <FiDownload className="w-4 h-4" aria-hidden="true" />
               <span>Export PDF</span>
             </button>
 
             <button
               onClick={handleCopyJSON}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-              aria-label="Copy property data as JSON"
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+              aria-label={copied ? 'Property data copied' : 'Copy property data as JSON'}
             >
               {copied ? (
                 <>
-                  <FiCheck className="w-4 h-4" />
+                  <FiCheck className="w-4 h-4" aria-hidden="true" />
                   <span>Copied!</span>
                 </>
               ) : (
                 <>
-                  <FiCopy className="w-4 h-4" />
+                  <FiCopy className="w-4 h-4" aria-hidden="true" />
                   <span>Copy JSON</span>
                 </>
               )}
@@ -150,29 +151,30 @@ export default function QuickActions({
 
       {/* Mobile compact actions row */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-3 z-20 no-print">
-        <div className="flex gap-2 max-w-7xl mx-auto">
+        <div className="flex gap-2 max-w-7xl mx-auto" role="group" aria-label="Quick actions">
           <button
             onClick={handleSave}
             disabled={saving || saved}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium disabled:opacity-70"
-            aria-label="Save deal"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium disabled:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            aria-label={saved ? 'Deal saved' : 'Save this deal'}
+            aria-pressed={saved}
           >
-            <FiHeart className="w-4 h-4" />
+            <FiHeart className="w-4 h-4" aria-hidden="true" />
             <span className="text-sm">{saved ? 'Saved' : 'Save'}</span>
           </button>
           <button
             onClick={handleShare}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700"
-            aria-label="Share property"
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            aria-label="Share this property"
           >
-            <FiShare2 className="w-4 h-4" />
+            <FiShare2 className="w-4 h-4" aria-hidden="true" />
           </button>
           <button
             onClick={handleExportPDF}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700"
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
             aria-label="Export as PDF"
           >
-            <FiDownload className="w-4 h-4" />
+            <FiDownload className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       </div>

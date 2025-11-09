@@ -55,9 +55,11 @@ export default function StripeCheckoutButton({
     <button
       onClick={startCheckout}
       disabled={loading}
-      className={`inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition
+      className={`inline-flex items-center justify-center px-4 py-2 rounded-md font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500
         ${loading ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary/90'}
         bg-primary text-white`}
+      aria-busy={loading}
+      aria-label={loading ? 'Redirecting to checkout' : `${label} plan - proceed to checkout`}
     >
       {loading ? 'Redirecting…' : label}
     </button>
