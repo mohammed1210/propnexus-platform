@@ -85,7 +85,7 @@ export default function QuickActions({
       {/* Desktop floating sidebar */}
       <div className="hidden lg:block fixed right-6 top-40 w-64 space-y-4 z-10 no-print">
         {/* Actions card */}
-        <div className="panel">
+        <div className="card p-4">
           <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
             Quick Actions
           </h3>
@@ -93,7 +93,7 @@ export default function QuickActions({
             <button
               onClick={handleSave}
               disabled={saving || saved}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all disabled:opacity-70"
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all disabled:opacity-70 shadow-sm hover:shadow-md"
               aria-label="Save deal"
             >
               {saved ? (
@@ -111,7 +111,7 @@ export default function QuickActions({
 
             <button
               onClick={handleShare}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
               aria-label="Share property"
             >
               <FiShare2 className="w-4 h-4" />
@@ -120,7 +120,7 @@ export default function QuickActions({
 
             <button
               onClick={handleExportPDF}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
               aria-label="Export as PDF"
             >
               <FiDownload className="w-4 h-4" />
@@ -129,7 +129,7 @@ export default function QuickActions({
 
             <button
               onClick={handleCopyJSON}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
               aria-label="Copy property data as JSON"
             >
               {copied ? (
@@ -149,12 +149,12 @@ export default function QuickActions({
       </div>
 
       {/* Mobile compact actions row */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-3 z-20 no-print">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-3 z-20 no-print shadow-lg">
         <div className="flex gap-2 max-w-7xl mx-auto">
           <button
             onClick={handleSave}
             disabled={saving || saved}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium disabled:opacity-70"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium disabled:opacity-70 shadow-sm"
             aria-label="Save deal"
           >
             <FiHeart className="w-4 h-4" />
@@ -162,14 +162,14 @@ export default function QuickActions({
           </button>
           <button
             onClick={handleShare}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
             aria-label="Share property"
           >
             <FiShare2 className="w-4 h-4" />
           </button>
           <button
             onClick={handleExportPDF}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
             aria-label="Export as PDF"
           >
             <FiDownload className="w-4 h-4" />

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import InvestmentSummary from './InvestmentSummary';
 
 interface PropertySummaryCardProps {
   property: {
@@ -11,6 +12,7 @@ interface PropertySummaryCardProps {
     bathrooms?: number | null;
     propertyType?: string | null;
     investmentType?: string | null;
+    description?: string | null;
   };
   metrics?: {
     ltv?: number;
@@ -41,7 +43,7 @@ const formatValue = (value: number | null | undefined, format: 'currency' | 'per
 };
 
 export default function PropertySummaryCard({ property, metrics }: PropertySummaryCardProps) {
-  const { title, location, price, bedrooms, bathrooms, propertyType, investmentType } = property;
+  const { title, location, price, bedrooms, bathrooms, propertyType, investmentType, description } = property;
   
   return (
     <div className="card">
@@ -86,66 +88,45 @@ export default function PropertySummaryCard({ property, metrics }: PropertySumma
           )}
         </div>
 
-        {/* Investment Metrics */}
-        {metrics && (
-          <>
-            <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
-              <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-3 uppercase tracking-wide">
-                Investment Metrics
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                {metrics.ltv !== undefined && (
-                  <div className="text-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">LTV</p>
-                    <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                      {formatValue(metrics.ltv, 'percent')}
-                    </p>
-                  </div>
-                )}
-                
-                {metrics.monthlyPayment !== undefined && (
-                  <div className="text-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Monthly Payment</p>
-                    <p className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                      {formatValue(metrics.monthlyPayment, 'currency')}
-                    </p>
-                  </div>
-                )}
-                
-                {metrics.netCashflow !== undefined && (
-                  <div className="text-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Net Cashflow</p>
-                    <p className={`text-xl font-bold ${
-                      metrics.netCashflow >= 0 
-                        ? 'text-green-600 dark:text-green-400' 
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>
-                      {formatValue(metrics.netCashflow, 'currency')}
-                    </p>
-                  </div>
-                )}
-                
-                {metrics.yield !== undefined && (
-                  <div className="text-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Yield</p>
-                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-                      {formatValue(metrics.yield, 'percent')}
-                    </p>
-                  </div>
-                )}
-                
-                {metrics.roi !== undefined && (
-                  <div className="text-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">ROI</p>
-                    <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
-                      {formatValue(metrics.roi, 'percent')}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
+        {/* Investment Metrics as Badges */}
+        {(metrics?.yield !== undefined || metrics?.roi !== undefined) && (
+          <div className="flex flex-wrap gap-2">
+            {metrics.yield !== undefined && (
+              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                <span className="mr-1">📈</span>
+                Yield: {formatValue(metrics.yield, 'percent')}
+              </span>
+            )}
+            
+            {metrics.roi !== undefined && (
+              <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                <span className="mr-1">💰</span>
+                ROI: {formatValue(metrics.roi, 'percent')}
+              </span>
+            )}
+          </div>
         )}
+
+        {/* Investment Summary */}
+        <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
+          <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-400 mb-3 uppercase tracking-wide">
+            Investment Summary
+          </h3>
+          <InvestmentSummary 
+            property={{
+              title: title || '',
+              location: location || '',
+              price: price,
+              bedrooms: bedrooms,
+              bathrooms: bathrooms,
+              yield_percent: metrics?.yield,
+              roi_percent: metrics?.roi,
+              propertyType: propertyType,
+              investmentType: investmentType,
+              description: description,
+            }} 
+          />
+        </div>
 
         {investmentType && (
           <div className="pt-2">

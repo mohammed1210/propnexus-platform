@@ -151,6 +151,7 @@ export default function PropertyDetailsPage() {
                 bathrooms: property.bathrooms,
                 propertyType: (property as any).propertyType,
                 investmentType: (property as any).investmentType,
+                description: (property as any).description,
               }}
               metrics={{
                 yield: property.yield_percent,
@@ -165,12 +166,6 @@ export default function PropertyDetailsPage() {
                 <DealScore property={property} />
               </div>
             )}
-
-            {/* Investment Summary (AI-generated text) */}
-            <div className="card">
-              <h2 className="font-semibold text-lg mb-2">Investment Summary</h2>
-              <InvestmentSummary property={property as any} />
-            </div>
 
             {/* Area Intelligence & Comps */}
             {property.location && (
@@ -192,10 +187,8 @@ export default function PropertyDetailsPage() {
             )}
 
             {/* Exit Strategies */}
-            <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
-              <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
-                Exit Strategies
-              </h2>
+            <div className="card">
+              <h2 className="font-semibold text-lg mb-4">Exit Strategies</h2>
               <ExitStrategyGenerator
                 title={String(property.title ?? '')}
                 location={String(property.location ?? '')}
@@ -235,7 +228,7 @@ export default function PropertyDetailsPage() {
               />
 
               {/* Location Map */}
-              <div className="panel">
+              <div className="card p-4">
                 <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
                   Location
                 </h3>
@@ -247,7 +240,7 @@ export default function PropertyDetailsPage() {
 
         {/* Mobile: Show map in main content */}
         <div className="lg:hidden mt-6">
-          <div className="panel">
+          <div className="card p-4">
             <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
               Location
             </h3>

@@ -32,7 +32,7 @@ const formatValue = (value: number | undefined, format: 'currency' | 'percent' |
 
 export default function QuickStatsCard({ price, yieldPercent, roiPercent, aiScore }: QuickStatsCardProps) {
   return (
-    <div className="panel space-y-4">
+    <div className="card p-4 space-y-4">
       <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide">
         Quick Stats
       </h3>
