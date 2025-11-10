@@ -12,9 +12,14 @@ export default function Header() {
   const [sessionEmail, setSessionEmail] = useState<string | null>(null);
 
   useEffect(() => {
+    // Skip Supabase initialization if env vars are not set (e.g., in preview mode)
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return;
+    }
+
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     );
 
     const loadSession = async () => {
@@ -32,9 +37,14 @@ export default function Header() {
   }, []);
 
   const handleSignOut = async () => {
+    // Skip if Supabase is not configured
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return;
+    }
+
     const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     );
     await supabase.auth.signOut();
     setSessionEmail(null);
