@@ -20,6 +20,7 @@ SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 SR_MAX_PAGES = int(os.getenv("SR_MAX_PAGES", "1"))
 SR_DELAY_MS = int(os.getenv("SR_DELAY_MS", "900"))  # delay between pages (ms)
 
+
 def _looks_blocked(html: str, status: int) -> bool:
     """Check if response indicates blocking or captcha."""
     if status in (403, 503):
@@ -27,10 +28,11 @@ def _looks_blocked(html: str, status: int) -> bool:
     lowered = html.lower()
     return any(k in lowered for k in CAPTCHA_KEYWORDS)
 
+
 def _build_search_url(location: str, page: int = 0) -> str:
     """
     Build SpareRoom search URL for property listings.
-    
+
     URL pattern: https://www.spareroom.co.uk/roommate/search.pl?location={encoded_location}&page={page+1}
     Focus on property listing cards with attributes; fall back to generic selectors.
     """
@@ -39,6 +41,7 @@ def _build_search_url(location: str, page: int = 0) -> str:
     if page > 0:
         return f"{base}?search_id=&location={encoded}&page={page+1}"
     return f"{base}?search_id=&location={encoded}"
+
 
 async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]:
     """
@@ -51,7 +54,9 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
             text = await resp.text()
             if _looks_blocked(text, resp.status) and SCRAPER_MODE == "direct" and SCRAPERAPI_KEY:
                 # Fallback to ScraperAPI
-                proxy_url = f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+                proxy_url = (
+                    f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+                )
                 async with session.get(proxy_url, headers=headers, timeout=45) as p_resp:
                     p_text = await p_resp.text()
                     if _looks_blocked(p_text, p_resp.status):
@@ -60,7 +65,9 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
             return text
     except Exception:
         if SCRAPER_MODE == "scraperapi" and SCRAPERAPI_KEY:
-            proxy_url = f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+            proxy_url = (
+                f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+            )
             try:
                 async with session.get(proxy_url, headers=headers, timeout=45) as p_resp:
                     p_text = await p_resp.text()
@@ -70,6 +77,7 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
             except Exception:
                 return None
         return None
+
 
 def _parse_price(raw: str) -> Optional[int]:
     """Extract numeric price from string."""
@@ -86,12 +94,14 @@ def _parse_price(raw: str) -> Optional[int]:
     except ValueError:
         return None
 
+
 def _extract_int(text: str) -> Optional[int]:
     """Extract first integer from text."""
     if not text:
         return None
     m = re.search(r"\d+", text)
     return int(m.group(0)) if m else None
+
 
 def _collect_cards(soup: BeautifulSoup) -> List[BeautifulSoup]:
     """
@@ -120,6 +130,7 @@ def _collect_cards(soup: BeautifulSoup) -> List[BeautifulSoup]:
             unique.append(c)
     return unique
 
+
 async def _enrich_coordinates(location: str) -> Dict[str, float]:
     """Get coordinates from postcode, best-effort."""
     try:
@@ -133,6 +144,7 @@ async def _enrich_coordinates(location: str) -> Dict[str, float]:
     except Exception:
         return {"latitude": 0.0, "longitude": 0.0}
 
+
 def _extract_external_id(card: BeautifulSoup, title: str, location: str) -> str:
     """
     Extract external ID from card. If not parseable, generate hash-based ID.
@@ -141,22 +153,23 @@ def _extract_external_id(card: BeautifulSoup, title: str, location: str) -> str:
     data_id = card.get("data-id")
     if data_id:
         return f"sr-{data_id}"
-    
+
     link = card.select_one("a[href*='/flatshare/flatshare_detail.pl']")
     if link and link.get("href"):
         m = re.search(r"flatshare_id=(\d+)", link.get("href"))
         if m:
             return f"sr-{m.group(1)}"
-    
+
     # Fallback: hash of title + location
     return f"sr-{hash(title + location) & 0xffffffff}"
+
 
 async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Dict[str, Any]]:
     """
     Scrape SpareRoom properties for a given location.
-    
+
     Returns list of dicts with keys:
-    - external_id, title, location, price, bedrooms, bathrooms, 
+    - external_id, title, location, price, bedrooms, bathrooms,
       image_url, latitude, longitude, source ("spareroom"), raw_url
     """
     print(f"🔍 Scraping SpareRoom for location='{location}' (mode={SCRAPER_MODE})")
@@ -170,10 +183,10 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
             if not html:
                 print(f"⚠️ SpareRoom: Skipping page {page} (blocked or empty)")
                 continue
-            
+
             soup = BeautifulSoup(html, "html.parser")
             cards = _collect_cards(soup)
-            
+
             if not cards:
                 print(f"ℹ️ SpareRoom: No cards found on page {page}; stopping pagination.")
                 break
@@ -181,19 +194,19 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
             for card in cards:
                 if len(results) >= limit:
                     break
-                
+
                 try:
                     # Extract title
                     title_el = (
-                        card.select_one(".listing-title") 
-                        or card.select_one("h3") 
+                        card.select_one(".listing-title")
+                        or card.select_one("h3")
                         or card.select_one("h2")
                     )
                     title = title_el.get_text(strip=True) if title_el else "Untitled"
 
                     # Extract price
                     price_el = (
-                        card.select_one(".listingPrice") 
+                        card.select_one(".listingPrice")
                         or card.select_one(".listing-price")
                         or card.select_one(".price")
                     )
@@ -201,16 +214,18 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
 
                     # Extract location/address
                     loc_el = (
-                        card.select_one(".listing-location") 
-                        or card.select_one(".location") 
+                        card.select_one(".listing-location")
+                        or card.select_one(".location")
                         or card.select_one("address")
                     )
                     location_text = loc_el.get_text(" ", strip=True) if loc_el else location
 
                     # Extract bedrooms and bathrooms from description/attributes
-                    desc_el = card.select_one(".listing-description") or card.select_one(".description")
+                    desc_el = card.select_one(".listing-description") or card.select_one(
+                        ".description"
+                    )
                     desc_text = desc_el.get_text() if desc_el else card.get_text()
-                    
+
                     # Look for bedroom info (e.g., "3 bedroom" or "3 bed")
                     bed_match = re.search(r"(\d+)\s*bed(?:room)?s?", desc_text, re.IGNORECASE)
                     bedrooms = int(bed_match.group(1)) if bed_match else 0
@@ -223,11 +238,13 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                     img_el = card.select_one("img")
                     image_url = None
                     if img_el:
-                        image_url = img_el.get("data-src") or img_el.get("data-lazy") or img_el.get("src")
+                        image_url = (
+                            img_el.get("data-src") or img_el.get("data-lazy") or img_el.get("src")
+                        )
 
                     # Generate external ID
                     external_id = _extract_external_id(card, title, location_text)
-                    
+
                     # Deduplicate by external_id
                     if external_id in seen_ids:
                         continue
@@ -254,10 +271,10 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                 except Exception as e:
                     # Defensive: ignore parse exceptions
                     print(f"❌ SpareRoom: Error parsing card: {e}")
-            
+
             if len(results) >= limit:
                 break
-            
+
             # Polite delay between pages
             time.sleep(SR_DELAY_MS / 1000.0)
 
