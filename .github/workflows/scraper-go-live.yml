@@ -1,0 +1,111 @@
+name: Scraper Go-Live
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_base:
+        description: 'API base URL (defaults to secrets.API_BASE)'
+        required: false
+        type: string
+      admin_key:
+        description: 'Admin API key (defaults to secrets.OFF_MARKET_ADMIN_TOKEN)'
+        required: false
+        type: string
+      locations_csv:
+        description: 'Comma-separated locations to scrape'
+        required: false
+        type: string
+        default: 'Ilford,Romford,East London'
+  schedule:
+    - cron: '35 6 * * *'
+
+jobs:
+  scraper-go-live:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Secrets sanity check
+        run: |
+          if [ -z "${{ secrets.API_BASE }}" ]; then
+            echo "❌ ERROR: secrets.API_BASE is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.OFF_MARKET_ADMIN_TOKEN }}" ]; then
+            echo "❌ ERROR: secrets.OFF_MARKET_ADMIN_TOKEN is not set"
+            exit 1
+          fi
+          echo "✅ Required secrets are configured"
+
+      - name: Set runtime variables
+        id: vars
+        run: |
+          API_BASE="${{ inputs.api_base }}"
+          if [ -z "$API_BASE" ]; then
+            API_BASE="${{ secrets.API_BASE }}"
+          fi
+
+          ADMIN_KEY="${{ inputs.admin_key }}"
+          if [ -z "$ADMIN_KEY" ]; then
+            ADMIN_KEY="${{ secrets.OFF_MARKET_ADMIN_TOKEN }}"
+          fi
+
+          LOCATIONS="${{ inputs.locations_csv }}"
+          if [ -z "$LOCATIONS" ]; then
+            LOCATIONS="Ilford,Romford,East London"
+          fi
+
+          echo "api_base=$API_BASE" >> $GITHUB_OUTPUT
+          echo "admin_key=$ADMIN_KEY" >> $GITHUB_OUTPUT
+          echo "locations=$LOCATIONS" >> $GITHUB_OUTPUT
+
+      - name: Health check
+        run: |
+          echo "🔍 Checking health of ${{ steps.vars.outputs.api_base }}/health"
+          HEALTH_RESPONSE=$(curl -s -f "${{ steps.vars.outputs.api_base }}/health" || echo "FAILED")
+
+          if [ "$HEALTH_RESPONSE" = "FAILED" ]; then
+            echo "❌ Health check failed"
+            exit 1
+          fi
+
+          echo "✅ Health check passed: $HEALTH_RESPONSE"
+
+      - name: Import all locations
+        run: |
+          IFS=',' read -ra LOCATIONS <<< "${{ steps.vars.outputs.locations }}"
+          TOTAL_COUNT=0
+
+          echo "📥 Starting imports for locations..."
+
+          for LOCATION in "${LOCATIONS[@]}"; do
+            LOCATION=$(echo "$LOCATION" | xargs)  # trim whitespace
+            echo ""
+            echo "🔄 Importing: $LOCATION"
+
+            RESPONSE=$(curl -s -X POST \
+              "${{ steps.vars.outputs.api_base }}/import/all" \
+              -H "Content-Type: application/json" \
+              -H "x-api-key: ${{ steps.vars.outputs.admin_key }}" \
+              -d "{\"location\": \"$LOCATION\"}")
+
+            echo "Response: $RESPONSE"
+
+            COUNT=$(echo "$RESPONSE" | jq -r '.count // 0')
+            TOTAL_COUNT=$((TOTAL_COUNT + COUNT))
+
+            echo "✅ Imported $COUNT properties from $LOCATION"
+          done
+
+          echo ""
+          echo "================================================"
+          echo "📊 TOTAL IMPORTED: $TOTAL_COUNT properties"
+          echo "================================================"
+
+          if [ "$TOTAL_COUNT" -eq 0 ]; then
+            echo "❌ ERROR: Total import count is 0"
+            exit 1
+          fi
+
+          echo "✅ Import successful!"
