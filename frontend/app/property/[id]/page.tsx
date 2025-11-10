@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-
-import Section from '@/components/ui/Section';
-import PageWrapper from '@/components/PageWrapper';
+import { FiMapPin, FiHome, FiDroplet, FiTrendingUp, FiDollarSign } from 'react-icons/fi';
 
 import PropertySummaryCard from '@/components/property_details/PropertySummaryCard';
 import QuickStatsCard from '@/components/property_details/QuickStatsCard';
@@ -100,75 +98,116 @@ export default function PropertyDetailsPage() {
 
   if (loading) {
     return (
-      <PageWrapper showOrbs={false}>
-        <Section>
-          <p className="card p-4">Loading property details…</p>
-        </Section>
-      </PageWrapper>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="card p-8 text-center">
+            <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="text-slate-600 dark:text-slate-400">Loading property details…</p>
+          </div>
+        </div>
+      </div>
     );
   }
   if (error) {
     return (
-      <PageWrapper showOrbs={false}>
-        <Section>
-          <p className="text-red-600 card p-4">{error}</p>
-        </Section>
-      </PageWrapper>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="card p-8">
+            <p className="text-red-600 dark:text-red-400">{error}</p>
+          </div>
+        </div>
+      </div>
     );
   }
   if (!property) {
     return (
-      <PageWrapper showOrbs={false}>
-        <Section>
-          <p className="card p-4">No property found.</p>
-        </Section>
-      </PageWrapper>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="card p-8">
+            <p className="text-slate-600 dark:text-slate-400">No property found.</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
   const price = typeof property.price === 'number' ? property.price : 0;
 
   return (
-    <PageWrapper showOrbs={false} className="bg-white/50 dark:bg-slate-900/30">
-      <Section>
-        {/* Quick Actions Sidebar (Desktop: right fixed, Mobile: bottom fixed) */}
-        <QuickActions
-          propertyId={String(property.id ?? id)}
-          price={property.price ?? undefined}
-          yieldPercent={property.yield_percent ?? undefined}
-          roiPercent={property.roi_percent ?? undefined}
-        />
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* Quick Actions Sidebar (Desktop: right fixed, Mobile: bottom fixed) */}
+      <QuickActions
+        propertyId={String(property.id ?? id)}
+        price={property.price ?? undefined}
+        yieldPercent={property.yield_percent ?? undefined}
+        roiPercent={property.roi_percent ?? undefined}
+      />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Property Header Card */}
+        <div className="card mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+                {property.title || 'Property Details'}
+              </h1>
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 mb-4">
+                <FiMapPin className="w-5 h-5" />
+                <span>{property.location || 'Location not specified'}</span>
+              </div>
+              <div className="flex flex-wrap gap-4">
+                {property.bedrooms !== undefined && (
+                  <div className="flex items-center gap-2">
+                    <FiHome className="w-5 h-5 text-brand-500" />
+                    <span className="text-slate-700 dark:text-slate-300">{property.bedrooms} beds</span>
+                  </div>
+                )}
+                {property.bathrooms !== undefined && (
+                  <div className="flex items-center gap-2">
+                    <FiDroplet className="w-5 h-5 text-brand-500" />
+                    <span className="text-slate-700 dark:text-slate-300">{property.bathrooms} baths</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              <div className="text-right">
+                <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Price</div>
+                <div className="text-3xl font-bold text-brand-600 dark:text-brand-400">
+                  £{(property.price ?? 0).toLocaleString()}
+                </div>
+              </div>
+              {property.yield_percent !== undefined && (
+                <div className="flex items-center gap-2 justify-end">
+                  <FiTrendingUp className="w-5 h-5 text-emerald-500" />
+                  <span className="badge-metric bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    {property.yield_percent.toFixed(1)}% yield
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
           {/* Left column - Main content */}
           <div className="space-y-6">
-            <PropertySummaryCard
-              property={{
-                title: property.title,
-                location: property.location,
-                price: property.price,
-                bedrooms: property.bedrooms,
-                bathrooms: property.bathrooms,
-                propertyType: (property as any).propertyType,
-                investmentType: (property as any).investmentType,
-              }}
-              metrics={{
-                yield: property.yield_percent,
-                roi: property.roi_percent,
-              }}
-            />
-
             {/* AI Deal Score */}
             {FF.DEAL_SCORE && (
               <div className="card">
-                <h2 className="font-semibold text-lg mb-4">AI Deal Score</h2>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                    <FiDollarSign className="w-5 h-5 text-white" />
+                  </div>
+                  AI Deal Score
+                </h2>
                 <DealScore property={property} />
               </div>
             )}
 
             {/* Investment Summary (AI-generated text) */}
             <div className="card">
-              <h2 className="font-semibold text-lg mb-2">Investment Summary</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Investment Summary</h2>
               <InvestmentSummary property={property as any} />
             </div>
 
@@ -177,14 +216,14 @@ export default function PropertyDetailsPage() {
               <>
                 {FF.AREA_INTEL && (
                   <div className="card">
-                    <h2 className="font-semibold text-lg mb-4">Area Intelligence</h2>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Area Intelligence</h2>
                     <AreaIntelPanel areaKey={property.location} />
                   </div>
                 )}
 
                 {FF.COMPS && (
                   <div className="card">
-                    <h2 className="font-semibold text-lg mb-4">Comparable Sales</h2>
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Comparable Sales</h2>
                     <CompsPanel postcode={property.location} />
                   </div>
                 )}
@@ -192,8 +231,8 @@ export default function PropertyDetailsPage() {
             )}
 
             {/* Exit Strategies */}
-            <div className="rounded-xl border border-slate-200/15 dark:border-slate-700/30 bg-white dark:bg-zinc-900 shadow-sm p-4 md:p-6">
-              <h2 className="text-lg font-semibold tracking-tight mb-3 text-gray-900 dark:text-gray-100">
+            <div className="card">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
                 Exit Strategies
               </h2>
               <ExitStrategyGenerator
@@ -214,7 +253,7 @@ export default function PropertyDetailsPage() {
 
             {/* Investor Notes */}
             <div className="card">
-              <h2 className="font-semibold text-lg mb-2">Investor Notes</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Investor Notes</h2>
               {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
             </div>
 
@@ -226,8 +265,8 @@ export default function PropertyDetailsPage() {
           </div>
 
           {/* Right column - Sticky sidebar (Desktop only) */}
-          <div className="hidden lg:block space-y-6">
-            <div className="sticky top-6 space-y-6">
+          <div className="hidden lg:block">
+            <div className="sticky top-24 space-y-6">
               <QuickStatsCard
                 price={property.price ?? undefined}
                 yieldPercent={property.yield_percent ?? undefined}
@@ -235,11 +274,13 @@ export default function PropertyDetailsPage() {
               />
 
               {/* Location Map */}
-              <div className="panel">
-                <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
+              <div className="card">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
                   Location
                 </h3>
-                <MapSingle property={property} height={250} zoom={14} scrollWheelZoom={false} />
+                <div className="rounded-lg overflow-hidden">
+                  <MapSingle property={property} height={300} zoom={14} scrollWheelZoom={false} />
+                </div>
               </div>
             </div>
           </div>
@@ -247,27 +288,19 @@ export default function PropertyDetailsPage() {
 
         {/* Mobile: Show map in main content */}
         <div className="lg:hidden mt-6">
-          <div className="panel">
-            <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
+          <div className="card">
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
               Location
             </h3>
-            <MapSingle property={property} height={250} zoom={14} scrollWheelZoom={false} />
+            <div className="rounded-lg overflow-hidden">
+              <MapSingle property={property} height={250} zoom={14} scrollWheelZoom={false} />
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Mobile Quick Actions (fixed bottom bar) */}
-        <div className="lg:hidden">
-          <QuickActions
-            propertyId={String(property.id ?? id)}
-            price={property.price ?? undefined}
-            yieldPercent={property.yield_percent ?? undefined}
-            roiPercent={property.roi_percent ?? undefined}
-          />
-        </div>
-
-        {/* Floating local chatbot */}
-        {FF.AI_CHAT && <AIChatbot property={property as any} />}
-      </Section>
-    </PageWrapper>
+      {/* Floating local chatbot */}
+      {FF.AI_CHAT && <AIChatbot property={property as any} />}
+    </div>
   );
 }
