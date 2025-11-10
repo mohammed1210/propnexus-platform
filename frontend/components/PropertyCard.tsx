@@ -159,137 +159,135 @@ export default function PropertyCard({ p }: { p: Property }) {
   }, [p.id]);
 
   return (
-    <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30 hover:-translate-y-1">
-      <Link
-        href={href}
-        className="block relative w-full overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
-        style={{ aspectRatio: '16 / 9' }}
-        aria-label={`Open ${p.title ?? 'property'}`}
-      >
-        <Image
-          src={p.imageurl || '/placeholder.jpg'}
-          alt={p.title || 'Property image'}
-          fill
-          sizes="(max-width: 768px) 100vw, 33vw"
-          style={{ objectFit: 'cover' }}
-          className="transition-transform duration-300 group-hover:scale-110"
-          priority={false}
-        />
-        
-        {/* Sprint 11.3: Prominent Save button in top-left */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleSaveDeal();
-          }}
-          disabled={saving || saveSuccess}
-          className={cx(
-            'absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
-            saveSuccess
-              ? 'bg-green-600 text-white border-2 border-white shadow-lg save-animation'
-              : 'bg-white/95 backdrop-blur-sm text-slate-900 border-2 border-white/80 hover:bg-white hover:border-white shadow-md hover:shadow-xl',
-            (saving || saveSuccess) && 'cursor-not-allowed',
-          )}
-          aria-label={
-            saveSuccess ? 'Deal saved successfully' : saving ? 'Saving deal' : 'Save this property'
-          }
-          aria-pressed={saveSuccess}
-          title={saveSuccess ? 'Saved' : 'Save this property'}
+    <Link href={href} className="block">
+      <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30 hover:-translate-y-1">
+        <div
+          className="block relative w-full overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
+          style={{ aspectRatio: '16 / 9' }}
         >
-          {saveSuccess ? (
-            <>
-              <FiHeart className="w-4 h-4 fill-current" />
-              <span className="text-xs">Saved</span>
-            </>
-          ) : saving ? (
-            <>
-              <svg
-                className="animate-spin h-4 w-4"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
+          <Image
+            src={p.imageurl || '/placeholder.jpg'}
+            alt={p.title || 'Property image'}
+            fill
+            sizes="(max-width: 768px) 100vw, 33vw"
+            style={{ objectFit: 'cover' }}
+            className="transition-transform duration-300 group-hover:scale-110"
+            priority={false}
+          />
+          
+          {/* Sprint 11.3: Prominent Save button in top-left */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleSaveDeal();
+            }}
+            disabled={saving || saveSuccess}
+            className={cx(
+              'absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold transition-all',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
+              saveSuccess
+                ? 'bg-green-600 text-white border-2 border-white shadow-lg save-animation'
+                : 'bg-white/95 backdrop-blur-sm text-slate-900 border-2 border-white/80 hover:bg-white hover:border-white shadow-md hover:shadow-xl',
+              (saving || saveSuccess) && 'cursor-not-allowed',
+            )}
+            aria-label={
+              saveSuccess ? 'Deal saved successfully' : saving ? 'Saving deal' : 'Save this property'
+            }
+            aria-pressed={saveSuccess}
+            title={saveSuccess ? 'Saved' : 'Save this property'}
+          >
+            {saveSuccess ? (
+              <>
+                <FiHeart className="w-4 h-4 fill-current" />
+                <span className="text-xs">Saved</span>
+              </>
+            ) : saving ? (
+              <>
+                <svg
+                  className="animate-spin h-4 w-4"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  ></circle>
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                <span className="text-xs">Saving…</span>
+              </>
+            ) : (
+              <>
+                <FiHeart className="w-4 h-4" />
+                <span className="text-xs">Save</span>
+              </>
+            )}
+          </button>
+          
+          {/* Badges for yield and ROI - moved to top-right */}
+          <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end">
+            {typeof p.yield_percent === 'number' && (
+              <span
+                className={cx(
+                  'text-xs font-bold px-2.5 py-1.5 rounded-lg backdrop-blur-md shadow-md',
+                  getBadgeColor('yield', p.yield_percent),
+                )}
+                aria-label={`Yield percentage: ${p.yield_percent.toFixed(1)}%`}
               >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              <span className="text-xs">Saving…</span>
-            </>
-          ) : (
-            <>
-              <FiHeart className="w-4 h-4" />
-              <span className="text-xs">Save</span>
-            </>
-          )}
-        </button>
-        
-        {/* Badges for yield and ROI - moved to top-right */}
-        <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end">
-          {typeof p.yield_percent === 'number' && (
-            <span
-              className={cx(
-                'text-xs font-bold px-2.5 py-1.5 rounded-lg backdrop-blur-md shadow-md',
-                getBadgeColor('yield', p.yield_percent),
-              )}
-              aria-label={`Yield percentage: ${p.yield_percent.toFixed(1)}%`}
-            >
-              {p.yield_percent.toFixed(1)}% Yield
-            </span>
-          )}
-          {typeof p.roi_percent === 'number' && (
-            <span
-              className={cx(
-                'text-xs font-bold px-2.5 py-1.5 rounded-lg backdrop-blur-md shadow-md',
-                getBadgeColor('roi', p.roi_percent),
-              )}
-              aria-label={`ROI percentage: ${p.roi_percent.toFixed(1)}%`}
-            >
-              {p.roi_percent.toFixed(1)}% ROI
-            </span>
-          )}
+                {p.yield_percent.toFixed(1)}% Yield
+              </span>
+            )}
+            {typeof p.roi_percent === 'number' && (
+              <span
+                className={cx(
+                  'text-xs font-bold px-2.5 py-1.5 rounded-lg backdrop-blur-md shadow-md',
+                  getBadgeColor('roi', p.roi_percent),
+                )}
+                aria-label={`ROI percentage: ${p.roi_percent.toFixed(1)}%`}
+              >
+                {p.roi_percent.toFixed(1)}% ROI
+              </span>
+            )}
+          </div>
         </div>
-      </Link>
 
-      <div className="p-5 space-y-3">
-        <Link href={href} className="block group">
-          <h3 className="font-bold text-lg leading-tight line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+        <div className="p-5 space-y-3">
+          <h3 className="font-bold text-lg leading-tight line-clamp-2 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
             {p.title || 'Untitled property'}
           </h3>
-        </Link>
 
-        <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400 line-clamp-1">
-          {p.location || '—'}
-        </p>
+          <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400 line-clamp-1">
+            {p.location || '—'}
+          </p>
 
-        <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-zinc-700">
-          <div className="text-base">
-            <span className="font-bold text-lg" style={{ color: 'var(--accent-primary)' }}>{priceText}</span>
-          </div>
-          <div className="flex items-center gap-3 text-sm font-medium text-gray-600 dark:text-gray-400">
-            <span className="flex items-center gap-1">
-              <LuBedDouble className="w-4 h-4" />
-              {p.bedrooms ?? '—'}
-            </span>
-            <span className="flex items-center gap-1">
-              <LuBath className="w-4 h-4" />
-              {p.bathrooms ?? '—'}
-            </span>
+          <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-zinc-700">
+            <div className="text-base">
+              <span className="font-bold text-lg" style={{ color: 'var(--accent-primary)' }}>{priceText}</span>
+            </div>
+            <div className="flex items-center gap-3 text-sm font-medium text-gray-600 dark:text-gray-400">
+              <span className="flex items-center gap-1">
+                <LuBedDouble className="w-4 h-4" />
+                {p.bedrooms ?? '—'}
+              </span>
+              <span className="flex items-center gap-1">
+                <LuBath className="w-4 h-4" />
+                {p.bathrooms ?? '—'}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
-    </article>
+      </article>
+    </Link>
   );
 }
