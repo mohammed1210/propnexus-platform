@@ -30,6 +30,7 @@ export default function ListingsFilters({ filters, onFilterChange }: ListingsFil
       investmentTypes: [],
       sort: 'created_at',
       sortDirection: 'desc',
+      heatmap: false,
     };
     setLocalFilters(reset);
     onFilterChange(reset);
@@ -51,7 +52,7 @@ export default function ListingsFilters({ filters, onFilterChange }: ListingsFil
     filters.investmentTypes.length > 0;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 sticky top-0 z-30">
       {/* Primary Filters */}
       <div className="space-y-4">
         {/* Search */}
@@ -194,8 +195,8 @@ export default function ListingsFilters({ filters, onFilterChange }: ListingsFil
               </div>
             </div>
 
-            {/* Sort */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Sort & Heatmap */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   Sort by
@@ -230,6 +231,22 @@ export default function ListingsFilters({ filters, onFilterChange }: ListingsFil
                   <option value="asc">Ascending</option>
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Map
+                </label>
+                <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors h-[42px]">
+                  <input
+                    type="checkbox"
+                    checked={localFilters.heatmap || false}
+                    onChange={(e) => setLocalFilters({ ...localFilters, heatmap: e.target.checked })}
+                    className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-400"
+                    aria-label="Enable heatmap overlay"
+                  />
+                  <span className="text-sm font-medium">Heatmap</span>
+                </label>
+              </div>
             </div>
           </div>
         )}
@@ -238,17 +255,17 @@ export default function ListingsFilters({ filters, onFilterChange }: ListingsFil
         <div className="flex gap-3 pt-2">
           <button
             onClick={handleApply}
-            className="flex-1 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl
+            className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl
                      hover:from-indigo-700 hover:to-purple-700 focus:ring-4 focus:ring-indigo-200 dark:focus:ring-indigo-900
-                     transition-all duration-200 shadow-lg hover:shadow-xl"
+                     transition-all duration-200 shadow-lg hover:shadow-xl text-sm"
           >
             Apply Filters
           </button>
           {hasActiveFilters && (
             <button
               onClick={handleReset}
-              className="px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl
-                       hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200"
+              className="px-5 py-2.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl
+                       hover:bg-gray-200 dark:hover:bg-gray-600 transition-all duration-200 text-sm"
             >
               Reset
             </button>

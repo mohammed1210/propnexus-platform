@@ -6,9 +6,10 @@ import { MapPoint } from '@/types/listings';
 interface PropertyMapProps {
   points: MapPoint[];
   loading: boolean;
+  heatmapEnabled?: boolean;
 }
 
-export default function PropertyMap({ points, loading }: PropertyMapProps) {
+export default function PropertyMap({ points, loading, heatmapEnabled }: PropertyMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function PropertyMap({ points, loading }: PropertyMapProps) {
     };
 
     loadLeaflet();
-  }, [points]);
+  }, [points, heatmapEnabled]);
 
   if (loading) {
     return (

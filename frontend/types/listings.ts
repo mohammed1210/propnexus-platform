@@ -26,6 +26,7 @@ export interface FilterParams {
   investmentTypes: string[];
   sort: 'created_at' | 'price' | 'bedrooms' | 'roi_percent' | 'yield_percent';
   sortDirection: 'asc' | 'desc';
+  heatmap?: boolean;
 }
 
 export interface MapPoint {

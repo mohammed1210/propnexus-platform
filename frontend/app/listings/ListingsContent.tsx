@@ -122,6 +122,7 @@ export default function ListingsContent() {
     investmentTypes: searchParams?.get('types')?.split(',').filter(Boolean) || [],
     sort: (searchParams?.get('sort') as any) || 'created_at',
     sortDirection: (searchParams?.get('dir') as any) || 'desc',
+    heatmap: searchParams?.get('heatmap') === '1',
   }), [searchParams]);
 
   // Fetch properties
@@ -208,6 +209,7 @@ export default function ListingsContent() {
     if (merged.investmentTypes.length) params.set('types', merged.investmentTypes.join(','));
     if (merged.sort) params.set('sort', merged.sort);
     if (merged.sortDirection) params.set('dir', merged.sortDirection);
+    if (merged.heatmap) params.set('heatmap', '1');
 
     router.push(`/listings?${params.toString()}`);
   }, [filters, router]);
@@ -270,10 +272,11 @@ export default function ListingsContent() {
 
           {/* Map */}
           <div className="hidden lg:block">
-            <div className="sticky top-6">
+            <div className="sticky top-24">
               <PropertyMap 
                 points={mapPoints}
                 loading={loading}
+                heatmapEnabled={filters.heatmap}
               />
             </div>
           </div>
