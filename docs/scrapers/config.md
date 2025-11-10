@@ -1,32 +1,56 @@
-# Scraper Provider Configuration
+# Scraper Configuration (Python + Proxy Providers)
 
-This project supports multiple scraping modes to fetch property search pages. Choose a provider by setting the `SCRAPER_MODE` environment variable:
+## Modes
 
-- `direct` (default) – Fetch pages directly via `fetch`. May trigger bot walls.
-- `scraperapi` – Proxy requests through [ScraperAPI](https://www.scraperapi.com/). Requires `SCRAPERAPI_KEY`.
-- `nojs` – Use a simple HTTP request without JavaScript (for static pages).
+`SCRAPER_MODE` controls the first fetch attempt:
+- `direct` (default): try the site with a realistic `User-Agent`. If blocked (403/503 or captcha keywords), automatically falls back to proxy (ScraperAPI) when `SCRAPERAPI_KEY` is set.
+- `scraperapi`: use ScraperAPI from the start; if that fails the request is skipped.
 
-## Environment variables
+## Environment Variables
 
-- `SCRAPER_MODE`: Selects the default provider (`direct` | `scraperapi` | `nojs`).
-- `SCRAPERAPI_KEY`: API key for ScraperAPI (required for `scraperapi` mode or fallback).
-- `SCRAPER_MAX_RETRIES`: Maximum attempts before giving up (default: `4`).
-- `SCRAPER_BACKOFF_BASE_MS`: Base delay in milliseconds for exponential backoff (default: `500`).
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `SCRAPER_MODE` | `direct` or `scraperapi` | `direct` |
+| `SCRAPERAPI_KEY` | API key for ScraperAPI fallback | (empty) |
+| `RM_MAX_PAGES` | Max Rightmove pages (24 listings per page) | `1` |
+| `RM_DELAY_MS` | Delay between Rightmove page fetches (ms) | `800` |
+| `ZP_MAX_PAGES` | Max Zoopla pages | `1` |
+| `ZP_DELAY_MS` | Delay between Zoopla pages (ms) | `900` |
 
-## Bot wall detection
+## Output Schema
 
-The provider detects bot walls when:
+Each scraper returns a list of dictionaries keyed for Supabase upsert:
+```json
+{
+  "external_id": "provider-specific ID",
+  "title": "string",
+  "location": "string",
+  "price": 325000,
+  "bedrooms": 3,
+  "bathrooms": 1,
+  "image_url": "https://...",
+  "latitude": 51.5033,
+  "longitude": -0.1195,
+  "source": "rightmove|zoopla",
+  "raw_url": "search URL used"
+}
+```
 
-- HTTP status is 403 or 503 AND
-- The HTML contains keywords like “robot”, “captcha”, “verify”, or “access denied”.
+## Geocoding
 
-If a bot wall is detected in `direct` mode and `SCRAPERAPI_KEY` is set, the fetch automatically retries using `scraperapi`.
+Coordinates are appended via `get_lat_lng_from_postcode(location_text)`. If lookup fails, latitude/longitude default to `0.0`.
 
-## Examples
+## Bot Wall Detection
 
-```bash
-# Use direct mode with default retries
-SCRAPER_MODE=direct node scripts/ingest-live.ts "https://example.com/search?q=properties"
+A response is considered blocked when:
+- HTTP status is `403` or `503`
+- Body contains any of: `captcha`, `access denied`, `unusual traffic`
 
-# Use scraperapi mode explicitly
-SCRAPER_MODE=scraperapi SCRAPERAPI_KEY=your-key node scripts/ingest-live.ts "https://example.com/search"
+In `direct` mode and with a valid `SCRAPERAPI_KEY`, the scraper retries through ScraperAPI.
+
+## Extending Providers
+
+To add more proxy providers (ZenRows, ScrapingBee), replicate `_fetch_html` logic with additional conditionals and environment variables:
+- `ZENROWS_API_KEY`
+- `SCRAPINGBEE_KEY`
+- A generic `SCRAPER_PROVIDER` selector (e.g., `zenrows|scraperapi|bee|direct`).
