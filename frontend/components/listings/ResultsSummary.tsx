@@ -1,7 +1,7 @@
 'use client';
 
 import { FilterParams } from '@/types/listings';
-import { LuGrid, LuList, LuX } from 'react-icons/lu';
+import { LuLayoutGrid, LuList, LuX } from 'react-icons/lu';
 
 interface ResultsSummaryProps {
   totalCount: number;
@@ -53,7 +53,7 @@ export default function ResultsSummary({
                 }`}
                 aria-label="Grid view"
               >
-                <LuGrid className="w-4 h-4" />
+                <LuLayoutGrid className="w-4 h-4" />
               </button>
               <button
                 onClick={() => onViewModeChange('list')}
