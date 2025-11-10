@@ -75,6 +75,18 @@ export default function Header() {
         </Link>
 
         {/* Nav */}
+        {/*
+          NOTE: Keep primary navigation visible on small screens.
+          A recent change used `className="hidden md:flex ..."` which hid the
+          entire link list on mobile without rendering an alternative (e.g.
+          hamburger/disclosure) menu. That made core routes (Listings, Pricing,
+          Account) unreachable on phones. If you need to hide the links on
+          mobile, add a replacement mobile menu before switching to `hidden md:flex`.
+
+          TODO: Replace this inline nav with a responsive menu (Disclosure or
+          a separate mobile nav component) so links remain accessible on all
+          breakpoints.
+        */}
         <nav className="flex items-center gap-2" aria-label="Primary">
           {links.map(({ href, label }) => {
             const active = pathname === href || pathname?.startsWith(href + '/');
@@ -97,7 +109,22 @@ export default function Header() {
           {/* Theme Toggle */}
           <ThemeToggle />
 
-          {/* Auth actions */}
+          {/*
+            Auth actions
+
+            NOTE: Do NOT hide authenticated user controls behind a `hidden md:flex`
+            container without providing an alternative for small screens. A recent
+            change placed the sign-out UI inside `hidden md:flex`, which meant
+            authenticated users on mobile had no way to sign out from the header.
+
+            Keep the sign-out (and other essential account controls) available
+            at all breakpoints, or add a dedicated small-screen menu (hamburger
+            / disclosure) that exposes these actions on mobile.
+
+            TODO: If you change this to `hidden md:flex`, implement a mobile
+            menu component that renders the same account actions for narrow
+            viewports before removing the always-visible controls.
+          */}
           {sessionEmail ? (
             <div className="flex items-center gap-3 ml-3 text-sm">
               <span className="text-zinc-600 dark:text-zinc-300">
