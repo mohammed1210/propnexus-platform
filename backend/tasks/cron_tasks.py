@@ -32,7 +32,7 @@ def daily_scrape() -> None:
     """Example daily scrape job.
 
     Iterate over a list of target locations, run all scrapers
-    (Zoopla, Rightmove, OnTheMarket, SpareRoom) and upsert 
+    (Zoopla, Rightmove, OnTheMarket, SpareRoom) and upsert
     deduplicated results into Supabase.
     Modify the `locations` list or derive it from user saved searches
     to meet your requirements.
