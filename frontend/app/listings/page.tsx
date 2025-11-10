@@ -227,8 +227,18 @@ function ListingsInner() {
   const router = useRouter();
 
   // View mode state
-  const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'split' | 'map'>('split');
   const [showFilters, setShowFilters] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Scroll detection for header minimization
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Parse URL params
   const qRaw = searchParams?.get('q') ?? '';
@@ -348,11 +358,11 @@ function ListingsInner() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-[68px] z-40">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Property Listings</h1>
+      {/* Header - becomes more compact when scrolled */}
+      <div className={`bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-[68px] z-40 transition-all duration-300 ${isScrolled ? 'shadow-md' : ''}`}>
+        <div className="max-w-7xl mx-auto px-4 transition-all duration-300" style={{ paddingTop: isScrolled ? '0.75rem' : '1rem', paddingBottom: isScrolled ? '0.75rem' : '1rem' }}>
+          <div className={`flex items-center justify-between transition-all duration-300 ${isScrolled ? 'mb-2' : 'mb-4'}`}>
+            <h1 className={`font-bold text-slate-900 dark:text-white transition-all duration-300 ${isScrolled ? 'text-xl' : 'text-2xl'}`}>Property Listings</h1>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode('grid')}
@@ -364,6 +374,17 @@ function ListingsInner() {
               >
                 <FiGrid className="inline mr-1" />
                 Grid
+              </button>
+              <button
+                onClick={() => setViewMode('split')}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
+                  viewMode === 'split'
+                    ? 'bg-brand-500 text-white'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                <FiGrid className="inline mr-1" />
+                <FiMap className="inline" />
               </button>
               <button
                 onClick={() => setViewMode('map')}
@@ -474,30 +495,32 @@ function ListingsInner() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {viewMode === 'grid' ? (
-          <>
-            {/* Results Count and Sort */}
-            <div className="mb-6 flex items-center justify-between">
-              <p className="text-slate-600 dark:text-slate-400">
-                <span className="font-semibold text-slate-900 dark:text-white">{rows.length}</span> properties found
-              </p>
-              <select
-                value={sort}
-                onChange={(e) => {
-                  const p = new URLSearchParams(searchParams?.toString());
-                  p.set('sort', e.target.value);
-                  router.push(`/listings?${p.toString()}`);
-                }}
-                className="input-field h-11 px-4 w-auto"
-              >
-                <option value="created_at">Most Recent</option>
-                <option value="yield_percent">Highest Yield</option>
-                <option value="price">Price: Low to High</option>
-                <option value="bedrooms">Most Bedrooms</option>
-              </select>
-            </div>
+        {/* Results Count and Sort - shown for grid and split views */}
+        {(viewMode === 'grid' || viewMode === 'split') && (
+          <div className="mb-6 flex items-center justify-between">
+            <p className="text-slate-600 dark:text-slate-400">
+              <span className="font-semibold text-slate-900 dark:text-white">{rows.length}</span> properties found
+            </p>
+            <select
+              value={sort}
+              onChange={(e) => {
+                const p = new URLSearchParams(searchParams?.toString());
+                p.set('sort', e.target.value);
+                router.push(`/listings?${p.toString()}`);
+              }}
+              className="input-field h-11 px-4 w-auto"
+            >
+              <option value="created_at">Most Recent</option>
+              <option value="yield_percent">Highest Yield</option>
+              <option value="price">Price: Low to High</option>
+              <option value="bedrooms">Most Bedrooms</option>
+            </select>
+          </div>
+        )}
 
-            {/* Property Cards Grid */}
+        {/* Grid Only View */}
+        {viewMode === 'grid' && (
+          <>
             {loading ? (
               <div className="text-center py-12">
                 <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
@@ -520,8 +543,49 @@ function ListingsInner() {
               </div>
             )}
           </>
-        ) : (
-          /* Map View */
+        )}
+
+        {/* Split View - Grid on Left, Sticky Map on Right */}
+        {viewMode === 'split' && (
+          <div className="flex gap-6">
+            {/* Left: Property Cards - Scrollable */}
+            <div className="flex-1 min-w-0">
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="mt-4 text-slate-600 dark:text-slate-400">Loading properties...</p>
+                </div>
+              ) : rows.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-xl text-slate-600 dark:text-slate-400">No properties found</p>
+                  <button onClick={resetFilters} className="btn-primary mt-4">
+                    Clear Filters
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {rows.map((property) => (
+                    <Link key={property.id ?? Math.random()} href={`/property/${property.id}`}>
+                      <PropertyCard p={property as any} />
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right: Sticky Map */}
+            <div className="hidden lg:block w-[45%] relative">
+              <div className="sticky top-[180px]">
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden" style={{ height: 'calc(100vh - 220px)' }}>
+                  <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Map Only View */}
+        {viewMode === 'map' && (
           <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden" style={{ height: 'calc(100vh - 300px)' }}>
             <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
           </div>
