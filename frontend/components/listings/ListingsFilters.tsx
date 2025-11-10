@@ -186,14 +186,14 @@ export default function ListingsFilters() {
             <div className="flex gap-2">
               <button
                 onClick={apply}
-                className="px-4 py-2 rounded-xl btn-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                className="btn-primary"
                 aria-label="Apply selected filters"
               >
                 Apply
               </button>
               <button
                 onClick={reset}
-                className="px-4 py-2 rounded-xl surface-panel transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+                className="btn-secondary"
                 aria-label="Reset all filters to default"
               >
                 Reset
@@ -223,11 +223,11 @@ export default function ListingsFilters() {
                         className={`
                           px-4 py-2 rounded-full border text-sm font-medium
                           transition-all duration-200 transform
-                          focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400
+                          focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500
                           ${
                             isSelected
-                              ? 'bg-indigo-600 text-white border-indigo-600 scale-105 shadow-md'
-                              : 'bg-white dark:bg-zinc-900 border-gray-300 dark:border-zinc-700 hover:border-indigo-400 hover:scale-105'
+                              ? 'bg-brand-500 text-white border-brand-500 scale-105 shadow-md'
+                              : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:border-brand-400 hover:scale-105'
                           }
                         `}
                         aria-pressed={isSelected}

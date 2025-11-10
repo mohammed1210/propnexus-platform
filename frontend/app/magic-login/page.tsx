@@ -47,27 +47,39 @@ export default function MagicLoginPage() {
 
   return (
     <main className="mx-auto max-w-md px-6 py-12">
-      <h1 className="text-2xl font-semibold mb-4">Magic Link Login</h1>
-      <form onSubmit={sendLink} className="space-y-4">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-          required
-          className="w-full rounded-md border border-zinc-300 dark:border-zinc-700 px-3 py-2"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-md bg-zinc-900 text-white py-2 font-medium hover:bg-zinc-800 disabled:opacity-60"
-        >
-          {loading ? 'Sending link…' : 'Send Magic Link'}
-        </button>
-      </form>
+      <div className="card">
+        <h1 className="text-2xl font-semibold mb-2 text-slate-900 dark:text-white">Magic Link Login</h1>
+        <p className="text-slate-600 dark:text-slate-400 mb-6">Enter your email to receive a secure login link</p>
+        
+        <form onSubmit={sendLink} className="space-y-4">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            required
+            className="input-field"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn-primary w-full"
+          >
+            {loading ? 'Sending link…' : 'Send Magic Link'}
+          </button>
+        </form>
 
-      {sent && <p className="mt-4 text-green-600">✅ Email sent — check your inbox!</p>}
-      {error && <p className="mt-4 text-red-600">⚠️ {error}</p>}
+        {sent && (
+          <div className="mt-4 p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+            <p className="text-green-700 dark:text-green-300 text-sm">✅ Email sent — check your inbox!</p>
+          </div>
+        )}
+        {error && (
+          <div className="mt-4 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+            <p className="text-red-700 dark:text-red-300 text-sm">⚠️ {error}</p>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
