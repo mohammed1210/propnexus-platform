@@ -1,0 +1,49 @@
+name: Scraper Monitor
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Health check
+        run: |
+          echo "🔍 Checking API health..."
+          HEALTH_RESPONSE=$(curl -s -f "${{ secrets.API_BASE }}/health" || echo "FAILED")
+
+          if [ "$HEALTH_RESPONSE" = "FAILED" ]; then
+            echo "⚠️ WARNING: Health check failed"
+            exit 0  # Don't fail the workflow, just warn
+          fi
+
+          echo "✅ Health check passed: $HEALTH_RESPONSE"
+
+      - name: Test import with Ilford
+        run: |
+          echo "🔄 Testing import with Ilford..."
+
+          RESPONSE=$(curl -s -X POST \
+            "${{ secrets.API_BASE }}/import/all" \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: ${{ secrets.OFF_MARKET_ADMIN_TOKEN }}" \
+            -d '{"location": "Ilford"}')
+
+          echo "Response: $RESPONSE"
+
+          COUNT=$(echo "$RESPONSE" | jq -r '.count // 0')
+
+          echo "📊 Import count: $COUNT"
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "⚠️ WARNING: Import returned 0 results for Ilford"
+            echo "This may indicate scraper issues - please investigate"
+            exit 0  # Don't fail the workflow, just warn
+          fi
+
+          echo "✅ Monitor check passed with $COUNT properties"
