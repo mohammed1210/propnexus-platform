@@ -1,6 +1,7 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import '../styles/design-tokens.css';
 import UiOverlaysClient from '@components/ui/UiOverlaysClient';
 import BackToTop from '@components/BackToTop';
 import Header from '@components/Header';

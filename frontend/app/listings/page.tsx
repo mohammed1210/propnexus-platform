@@ -6,15 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import nextDynamic from 'next/dynamic';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
-import { FiSearch } from 'react-icons/fi';
+import { FiSearch, FiSliders, FiMapPin, FiMap, FiGrid, FiX } from 'react-icons/fi';
 import { LuPoundSterling, LuBedDouble, LuBath } from 'react-icons/lu';
 
-import Section from '@/components/ui/Section';
-import SectionTitle from '@/components/ui/SectionTitle';
 import PropertyCard from '@/components/PropertyCard';
 import { getSupabase } from '@/lib/supabaseClient';
-import ListingsFilters from '@/components/listings/ListingsFilters';
-import PageWrapper from '@/components/PageWrapper';
 
 /* ---------------- Helper Functions ---------------- */
 /**
@@ -225,162 +221,26 @@ function ClientMap({
   );
 }
 
-/* ---------------- Filters (with Sort) ---------------- */
-// FIX: duplicate SORTABLE removed
-// const SORTABLE = ['created_at', 'price', 'bedrooms', 'roi_percent', 'yield_percent'] as const;
-// FIX: duplicate SortKey removed
-// type SortKey = (typeof SORTABLE)[number];
-
-function FiltersBar() {
-  const sp = useSearchParams();
-  const router = useRouter();
-
-  const qInit = sp?.get('q') ?? '';
-  const minInit = sp?.get('min') ?? '';
-  const maxInit = sp?.get('max') ?? '';
-  const bedsInit = sp?.get('beds') ?? '';
-  const bathsInit = sp?.get('baths') ?? '';
-  const sortInit = (sp?.get('sort') as SortKey) || 'created_at';
-  const dirInit = sp?.get('dir') === 'asc' ? 'asc' : 'desc';
-
-  const [q, setQ] = useState(qInit);
-  const [min, setMin] = useState(minInit);
-  const [max, setMax] = useState(maxInit);
-  const [beds, setBeds] = useState(bedsInit);
-  const [baths, setBaths] = useState(bathsInit);
-  const [sort, setSort] = useState<SortKey>(sortInit);
-  const [dir, setDir] = useState<'asc' | 'desc'>(dirInit);
-
-  const apply = () => {
-    const p = new URLSearchParams();
-    if (q) p.set('q', q);
-    if (min) p.set('min', min);
-    if (max) p.set('max', max);
-    if (beds) p.set('beds', beds);
-    if (baths) p.set('baths', baths);
-    if (sort) p.set('sort', sort);
-    if (dir) p.set('dir', dir);
-    router.push(`/listings?${p.toString()}`);
-  };
-
-  const reset = () => {
-    setQ('');
-    setMin('');
-    setMax('');
-    setBeds('');
-    setBaths('');
-    setSort('created_at');
-    setDir('desc');
-    router.push('/listings');
-  };
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-10 gap-2" role="search" aria-label="Property filters">
-      <div className="col-span-2 md:col-span-2 flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <FiSearch className="opacity-60" />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search area, title, or postcode"
-          className="w-full bg-transparent outline-none"
-          aria-label="Search properties"
-        />
-      </div>
-
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <LuPoundSterling className="opacity-60" />
-        <input
-          value={min}
-          onChange={(e) => setMin(e.target.value)}
-          placeholder="Min"
-          inputMode="numeric"
-          className="w-full bg-transparent outline-none"
-          aria-label="Minimum price"
-        />
-      </div>
-
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <LuPoundSterling className="opacity-60" />
-        <input
-          value={max}
-          onChange={(e) => setMax(e.target.value)}
-          placeholder="Max"
-          inputMode="numeric"
-          className="w-full bg-transparent outline-none"
-          aria-label="Maximum price"
-        />
-      </div>
-
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <LuBedDouble className="opacity-60" />
-        <input
-          value={beds}
-          onChange={(e) => setBeds(e.target.value)}
-          placeholder="Beds"
-          inputMode="numeric"
-          className="w-full bg-transparent outline-none"
-          aria-label="Minimum bedrooms"
-        />
-      </div>
-
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <LuBath className="opacity-60" />
-        <input
-          value={baths}
-          onChange={(e) => setBaths(e.target.value)}
-          placeholder="Baths"
-          inputMode="numeric"
-          className="w-full bg-transparent outline-none"
-          aria-label="Minimum bathrooms"
-        />
-      </div>
-
-      {/* Sort */}
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <select
-          value={sort}
-          onChange={(e) => setSort((e.target.value as SortKey) || 'created_at')}
-          className="w-full bg-transparent outline-none"
-          aria-label="Sort field"
-        >
-          <option value="created_at">Newest</option>
-          <option value="price">Price</option>
-          <option value="bedrooms">Bedrooms</option>
-          <option value="roi_percent">ROI %</option>
-          <option value="yield_percent">Yield %</option>
-        </select>
-      </div>
-
-      <div className="flex items-center gap-2 border rounded-xl px-3 py-2 bg-white/90 dark:bg-zinc-900/90">
-        <select
-          value={dir}
-          onChange={(e) => setDir(e.target.value === 'asc' ? 'asc' : 'desc')}
-          className="w-full bg-transparent outline-none"
-          aria-label="Sort direction"
-        >
-          <option value="desc">Desc</option>
-          <option value="asc">Asc</option>
-        </select>
-      </div>
-
-      <div className="col-span-2 flex gap-2">
-        <button onClick={apply} className="btn btn-primary flex-1">
-          Apply
-        </button>
-        <button onClick={reset} className="pnx-pnx-btn pnx-pnx-pnx-btn-outline">
-          Reset
-        </button>
-      </div>
-    </div>
-  );
-}
-
 /* ---------------- Data + Layout ---------------- */
 function ListingsInner() {
-  // Default toggle for heatmap (feature flag controlled)
-  const heatmapEnabled = process.env.NEXT_PUBLIC_FEATURE_HEATMAP === "true";
   const searchParams = useSearchParams();
+  const router = useRouter();
 
+  // View mode state
+  const [viewMode, setViewMode] = useState<'grid' | 'split' | 'map'>('split');
+  const [showFilters, setShowFilters] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  // Scroll detection for header minimization
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Parse URL params
   const qRaw = searchParams?.get('q') ?? '';
   const q = sanitizeSearch(qRaw);
   const minP = parsePositiveInt(searchParams?.get('min') ?? '');
@@ -395,18 +255,22 @@ function ListingsInner() {
 
   const dir: 'asc' | 'desc' = searchParams?.get('dir') === 'asc' ? 'asc' : 'desc';
 
+  // Filter state for quick search
+  const [searchInput, setSearchInput] = useState(qRaw);
+  const [minInput, setMinInput] = useState(searchParams?.get('min') ?? '');
+  const [maxInput, setMaxInput] = useState(searchParams?.get('max') ?? '');
+  const [bedsInput, setBedsInput] = useState(searchParams?.get('beds') ?? '');
+  const [bathsInput, setBathsInput] = useState(searchParams?.get('baths') ?? '');
+
   const [rows, setRows] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch data
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       const supabase = getSupabase();
-      
-      // Parse selectedTypes from searchParams only
-      const selectedTypesParam = searchParams?.get("selectedTypes") ?? "";
-      const selectedTypes = selectedTypesParam ? selectedTypesParam.split(",").filter(Boolean) : [];
 
       let query = supabase
         .from('properties')
@@ -415,14 +279,13 @@ function ListingsInner() {
         )
         .limit(200);
 
-      // order first to allow index use; fallback to created_at desc
+      // Order
       query = query.order(sort, { ascending: dir === 'asc', nullsFirst: false });
       if (sort !== 'created_at') {
-        // secondary order for deterministic results
         query = query.order('created_at', { ascending: false });
       }
 
-      // filters - only apply when defined
+      // Filters
       if (q) query = query.or(`title.ilike.%${q}%,location.ilike.%${q}%`);
       if (minP !== undefined) query = query.gte('price', minP);
       if (maxP !== undefined) query = query.lte('price', maxP);
@@ -444,7 +307,7 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, baths, sort, dir, searchParams]);
+  }, [q, minP, maxP, beds, baths, sort, dir]);
 
   const points = useMemo(() => {
     return rows
@@ -458,37 +321,279 @@ function ListingsInner() {
       }));
   }, [rows]);
 
+  const applyFilters = () => {
+    const p = new URLSearchParams();
+    if (searchInput) p.set('q', searchInput);
+    if (minInput) p.set('min', minInput);
+    if (maxInput) p.set('max', maxInput);
+    if (bedsInput) p.set('beds', bedsInput);
+    if (bathsInput) p.set('baths', bathsInput);
+    if (sort) p.set('sort', sort);
+    if (dir) p.set('dir', dir);
+    router.push(`/listings?${p.toString()}`);
+  };
+
+  const resetFilters = () => {
+    setSearchInput('');
+    setMinInput('');
+    setMaxInput('');
+    setBedsInput('');
+    setBathsInput('');
+    router.push('/listings');
+  };
+
+  const removeFilter = (key: string) => {
+    const p = new URLSearchParams(searchParams?.toString());
+    p.delete(key);
+    router.push(`/listings?${p.toString()}`);
+  };
+
+  // Active filters for pills
+  const activeFilters: Array<{ key: string; label: string; value: string }> = [];
+  if (qRaw) activeFilters.push({ key: 'q', label: qRaw, value: qRaw });
+  if (minP) activeFilters.push({ key: 'min', label: `Min £${minP.toLocaleString()}`, value: String(minP) });
+  if (maxP) activeFilters.push({ key: 'max', label: `Max £${maxP.toLocaleString()}`, value: String(maxP) });
+  if (beds) activeFilters.push({ key: 'beds', label: `${beds}+ beds`, value: String(beds) });
+  if (baths) activeFilters.push({ key: 'baths', label: `${baths}+ baths`, value: String(baths) });
+
   return (
-    <PageWrapper showOrbs={true}>
-      <Section>
-        <SectionTitle>PropNexus Listings</SectionTitle>
-
-        <ListingsFilters />
-
-        <div className="content-layout pt-4">
-          {/* left: list */}
-          <div className="space-y-3">
-            {loading ? (
-              <div className="p-4 card">Loading…</div>
-            ) : rows.length === 0 ? (
-              <div className="p-4 card">No results.</div>
-            ) : (
-              rows.map((r) => (
-                <Link key={r.id ?? Math.random()} href={`/property/${r.id}`} className="block">
-                  <PropertyCard p={r as any} />
-                </Link>
-              ))
-            )}
-          </div>
-
-          {/* right: sticky map */}
-          <div className="map-sticky">
-            <div className="leaflet-panel card">
-              <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={heatmapEnabled} />
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      {/* Header - becomes more compact when scrolled */}
+      <div className={`bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky z-40 transition-all duration-300 ${isScrolled ? 'top-[68px] shadow-md' : 'top-[68px]'}`}>
+        <div className="max-w-7xl mx-auto px-4 transition-all duration-300" style={{ paddingTop: isScrolled ? '0.5rem' : '1rem', paddingBottom: isScrolled ? '0.5rem' : '1rem' }}>
+          <div className={`flex items-center justify-between transition-all duration-300 ${isScrolled ? 'mb-2' : 'mb-4'}`}>
+            <h1 className={`font-bold text-slate-900 dark:text-white transition-all duration-300 ${isScrolled ? 'text-lg' : 'text-2xl'}`}>
+              {!isScrolled && 'Property Listings'}
+              {isScrolled && 'Listings'}
+            </h1>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
+                  viewMode === 'grid'
+                    ? 'bg-brand-500 text-white'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                <FiGrid className="inline mr-1" />
+                {!isScrolled && 'Grid'}
+              </button>
+              <button
+                onClick={() => setViewMode('split')}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
+                  viewMode === 'split'
+                    ? 'bg-brand-500 text-white'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                <FiGrid className="inline mr-1" />
+                <FiMap className="inline" />
+              </button>
+              <button
+                onClick={() => setViewMode('map')}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
+                  viewMode === 'map'
+                    ? 'bg-brand-500 text-white'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}
+              >
+                <FiMap className="inline mr-1" />
+                {!isScrolled && 'Map'}
+              </button>
             </div>
           </div>
+
+          {/* Search and Filters */}
+          <div className="flex flex-col lg:flex-row gap-3">
+            {/* Search Input */}
+            <div className="flex-1">
+              <div className="relative">
+                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                  placeholder="Search by location, postcode, or property type..."
+                  className="input-field w-full h-11 pl-12 pr-4"
+                />
+              </div>
+            </div>
+
+            {/* Filter Button */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="h-11 px-6 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-300"
+            >
+              <FiSliders className="w-5 h-5" />
+              Filters
+            </button>
+          </div>
+
+          {/* Expanded Filters */}
+          {showFilters && (
+            <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                <input
+                  type="text"
+                  value={minInput}
+                  onChange={(e) => setMinInput(e.target.value)}
+                  placeholder="Min price"
+                  className="input-field h-10"
+                />
+                <input
+                  type="text"
+                  value={maxInput}
+                  onChange={(e) => setMaxInput(e.target.value)}
+                  placeholder="Max price"
+                  className="input-field h-10"
+                />
+                <input
+                  type="text"
+                  value={bedsInput}
+                  onChange={(e) => setBedsInput(e.target.value)}
+                  placeholder="Min beds"
+                  className="input-field h-10"
+                />
+                <input
+                  type="text"
+                  value={bathsInput}
+                  onChange={(e) => setBathsInput(e.target.value)}
+                  placeholder="Min baths"
+                  className="input-field h-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={applyFilters} className="btn-primary px-6 py-2">
+                  Apply Filters
+                </button>
+                <button onClick={resetFilters} className="btn-secondary px-6 py-2">
+                  Reset
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Active Filters Pills */}
+          {activeFilters.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {activeFilters.map((filter, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 text-sm font-medium border border-brand-200 dark:border-brand-700"
+                >
+                  {filter.label}
+                  <button
+                    onClick={() => removeFilter(filter.key)}
+                    className="hover:text-brand-900 dark:hover:text-brand-100 transition-colors"
+                  >
+                    <FiX className="w-4 h-4" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
-      </Section>
-    </PageWrapper>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Results Count and Sort - shown for grid and split views */}
+        {(viewMode === 'grid' || viewMode === 'split') && (
+          <div className="mb-6 flex items-center justify-between">
+            <p className="text-slate-600 dark:text-slate-400">
+              <span className="font-semibold text-slate-900 dark:text-white">{rows.length}</span> properties found
+            </p>
+            <select
+              value={sort}
+              onChange={(e) => {
+                const p = new URLSearchParams(searchParams?.toString());
+                p.set('sort', e.target.value);
+                router.push(`/listings?${p.toString()}`);
+              }}
+              className="input-field h-11 px-4 w-auto"
+            >
+              <option value="created_at">Most Recent</option>
+              <option value="yield_percent">Highest Yield</option>
+              <option value="price">Price: Low to High</option>
+              <option value="bedrooms">Most Bedrooms</option>
+            </select>
+          </div>
+        )}
+
+        {/* Grid Only View */}
+        {viewMode === 'grid' && (
+          <>
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-4 text-slate-600 dark:text-slate-400">Loading properties...</p>
+              </div>
+            ) : rows.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-xl text-slate-600 dark:text-slate-400">No properties found</p>
+                <button onClick={resetFilters} className="btn-primary mt-4">
+                  Clear Filters
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {rows.map((property) => (
+                  <Link key={property.id ?? Math.random()} href={`/property/${property.id}`}>
+                    <PropertyCard p={property as any} />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Split View - Grid on Left, Sticky Map on Right */}
+        {viewMode === 'split' && (
+          <div className="flex gap-6">
+            {/* Left: Property Cards - Scrollable */}
+            <div className="flex-1 min-w-0">
+              {loading ? (
+                <div className="text-center py-12">
+                  <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="mt-4 text-slate-600 dark:text-slate-400">Loading properties...</p>
+                </div>
+              ) : rows.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-xl text-slate-600 dark:text-slate-400">No properties found</p>
+                  <button onClick={resetFilters} className="btn-primary mt-4">
+                    Clear Filters
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {rows.map((property) => (
+                    <Link key={property.id ?? Math.random()} href={`/property/${property.id}`}>
+                      <PropertyCard p={property as any} />
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Right: Sticky Map */}
+            <div className="hidden lg:block w-[45%] relative">
+              <div className="sticky top-[180px]">
+                <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden" style={{ height: 'calc(100vh - 220px)' }}>
+                  <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Map Only View */}
+        {viewMode === 'map' && (
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden" style={{ height: 'calc(100vh - 300px)' }}>
+            <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

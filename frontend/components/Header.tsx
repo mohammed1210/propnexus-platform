@@ -54,8 +54,6 @@ export default function Header() {
   const links = [
     { href: '/', label: 'Home' },
     { href: '/listings', label: 'Listings' },
-    { href: '/off-market', label: 'Off-Market' },
-    { href: '/analytics', label: 'Analytics' },
     { href: '/pricing', label: 'Pricing' },
     ...(sessionEmail ? [{ href: '/account', label: 'Account' }] : []),
   ];
@@ -63,15 +61,18 @@ export default function Header() {
   return (
     <header
       className={clsx(
-        'sticky top-0 z-50 w-full border-b border-zinc-200 bg-white backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900',
+        'sticky top-0 z-50 w-full border-b bg-white backdrop-blur-md shadow-sm',
+        'border-slate-200 dark:border-slate-700 dark:bg-slate-900',
       )}
       role="banner"
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
+      <div className="mx-auto flex h-[68px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand */}
-        <Link href="/" className="text-2xl font-semibold tracking-tight flex items-end gap-1">
-          <span className="text-blue-600 dark:text-blue-400">Prop</span>
-          <span className="text-zinc-900 dark:text-zinc-100">Nexus</span>
+        <Link href="/" className="flex items-center gap-2 group">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-brand-sm">
+            <span className="text-white font-bold text-sm">PN</span>
+          </div>
+          <span className="text-xl font-bold text-slate-900 dark:text-white">PropNexus</span>
         </Link>
 
         {/* Nav */}
@@ -89,23 +90,25 @@ export default function Header() {
         */}
         <nav className="flex items-center gap-2" aria-label="Primary">
           {links.map(({ href, label }) => {
-            const active = pathname === href || pathname?.startsWith(href + '/');
+            const active = pathname === href || (href !== '/' && pathname?.startsWith(href));
             return (
               <Link
                 key={href}
                 href={href}
                 className={clsx(
-                  'rounded-md px-3 py-2 text-sm font-medium transition',
+                  'text-sm font-medium transition-colors duration-300',
                   active
-                    ? 'bg-blue-50 text-blue-700 dark:bg-zinc-800 dark:text-blue-300'
-                    : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800',
+                    ? 'text-brand-600 dark:text-brand-400'
+                    : 'text-slate-600 hover:text-brand-600 dark:text-slate-300 dark:hover:text-brand-400',
                 )}
               >
                 {label}
               </Link>
             );
           })}
+        </nav>
 
+        <div className="flex items-center gap-3">
           {/* Theme Toggle */}
           <ThemeToggle />
 
@@ -126,26 +129,34 @@ export default function Header() {
             viewports before removing the always-visible controls.
           */}
           {sessionEmail ? (
-            <div className="flex items-center gap-3 ml-3 text-sm">
-              <span className="text-zinc-600 dark:text-zinc-300">
-                Signed in as <strong>{sessionEmail}</strong>
+            <div className="hidden md:flex items-center gap-3 text-sm">
+              <span className="text-slate-600 dark:text-slate-300">
+                <strong>{sessionEmail}</strong>
               </span>
               <button
                 onClick={handleSignOut}
-                className="rounded-md bg-black px-3 py-2 text-white hover:bg-zinc-800 text-sm"
+                className="btn-ghost text-sm px-4 py-2"
               >
                 Sign out
               </button>
             </div>
           ) : (
-            <Link
-              href="/magic-login"
-              className="ml-3 rounded-md bg-black px-3 py-2 text-white hover:bg-zinc-800 text-sm font-semibold"
-            >
-              Sign in
-            </Link>
+            <>
+              <Link
+                href="/magic-login"
+                className="hidden md:inline-flex text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition-colors duration-300"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/magic-login"
+                className="btn-primary text-sm px-5 py-2"
+              >
+                Get Started
+              </Link>
+            </>
           )}
-        </nav>
+        </div>
       </div>
     </header>
   );

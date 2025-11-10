@@ -81,9 +81,7 @@ export default function UpgradeButton({ priceId, children = 'Upgrade', className
       onClick={handleClick}
       disabled={loading}
       className={
-        className ??
-        `inline-flex items-center justify-center rounded-md bg-zinc-900 text-white px-4 py-2
-         hover:bg-zinc-800 disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500`
+        className ?? 'btn-primary w-full'
       }
       aria-busy={loading}
       aria-label={email ? 'Upgrade subscription plan' : 'Sign in to upgrade'}
