@@ -186,14 +186,15 @@ export default function ListingsFilters() {
             <div className="flex gap-2">
               <button
                 onClick={apply}
-                className="px-4 py-2 rounded-xl btn-primary"
+                className="px-4 py-2 rounded-xl btn-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                aria-label="Apply selected filters"
               >
                 Apply
               </button>
               <button
                 onClick={reset}
-                className="px-4 py-2 rounded-xl surface-panel transition-colors focus:outline-none"
-                aria-label="Reset all filters"
+                className="px-4 py-2 rounded-xl surface-panel transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-500"
+                aria-label="Reset all filters to default"
               >
                 Reset
               </button>

@@ -164,15 +164,15 @@ export default function AIChatbot({ property }: AIChatbotProps) {
         <div
           className="w-80 h-[420px] bg-white dark:bg-neutral-900 rounded-xl shadow-lg border border-gray-200 dark:border-neutral-800 flex flex-col overflow-hidden"
           role="dialog"
-          aria-modal="false"
-          aria-label="AI Assistant"
+          aria-modal="true"
+          aria-labelledby="ai-assistant-title"
         >
           <div className="bg-gray-800 text-white px-4 py-2 flex justify-between items-center text-sm font-semibold">
-            AI Assistant
+            <span id="ai-assistant-title">AI Assistant</span>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-white text-xl leading-none"
-              aria-label="Close"
+              className="text-white text-xl leading-none focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded"
+              aria-label="Close AI Assistant"
             >
               ×
             </button>
@@ -207,12 +207,13 @@ export default function AIChatbot({ property }: AIChatbotProps) {
             <div ref={bottomRef} />
           </div>
 
-          <div className="bg-slate-100 dark:bg-neutral-900 px-2 py-1 flex flex-wrap gap-2 justify-center">
+          <div className="bg-slate-100 dark:bg-neutral-900 px-2 py-1 flex flex-wrap gap-2 justify-center" role="group" aria-label="Quick prompt suggestions">
             {['Is this a good investment?', 'Suggest exit strategies', 'Risk factors?'].map((t) => (
               <button
                 key={t}
                 onClick={() => handleQuickPrompt(t)}
-                className="bg-blue-100 text-blue-800 dark:bg-neutral-800 dark:text-neutral-200 text-xs rounded-full px-3 py-1 hover:bg-blue-200 dark:hover:bg-neutral-700 transition"
+                className="bg-blue-100 text-blue-800 dark:bg-neutral-800 dark:text-neutral-200 text-xs rounded-full px-3 py-1 hover:bg-blue-200 dark:hover:bg-neutral-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                aria-label={`Quick prompt: ${t}`}
               >
                 {t}
               </button>
@@ -235,7 +236,8 @@ export default function AIChatbot({ property }: AIChatbotProps) {
             <button
               onClick={handleSend}
               disabled={isLoading}
-              className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              aria-label="Send message"
             >
               {isLoading ? '...' : 'Send'}
             </button>

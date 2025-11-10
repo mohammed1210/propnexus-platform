@@ -168,9 +168,10 @@ export default function PropertyCard({ p }: { p: Property }) {
           src={p.imageurl || '/placeholder.jpg'}
           alt={p.title || 'Property image'}
           fill
-          sizes="(max-width: 768px) 100vw, 33vw"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           style={{ objectFit: 'cover' }}
           className="transition-transform duration-300 group-hover:scale-110"
+          loading="lazy"
           priority={false}
         />
         

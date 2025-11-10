@@ -9,6 +9,9 @@
 /* Import AI-focused theme system */
 @import '../styles/theme.css';
 
+/* Import print stylesheet for deal pack generation */
+@import '../styles/print.css';
+
 /* ========================================
    CUSTOM ANIMATIONS
    ======================================== */

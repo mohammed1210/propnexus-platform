@@ -76,9 +76,10 @@ export default function HomePage() {
                   />
                   <button
                     type="submit"
-                    className="h-14 px-6 font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 transition-all duration-300 flex items-center gap-2"
+                    className="h-14 px-6 font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 transition-all duration-300 flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                    aria-label="Search for properties"
                   >
-                    <FiZap className="w-4 h-4" />
+                    <FiZap className="w-4 h-4" aria-hidden="true" />
                     Search
                   </button>
                 </div>
@@ -90,16 +91,18 @@ export default function HomePage() {
                 Try:{' '}
                 <button
                   type="button"
-                  className="underline hover:text-indigo-300 transition-colors"
+                  className="underline hover:text-indigo-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded"
                   onClick={() => router.push('/listings?q=SW1A')}
+                  aria-label="Search for properties in SW1A postcode area"
                 >
                   SW1A
                 </button>{' '}
                 or{' '}
                 <button
                   type="button"
-                  className="underline hover:text-indigo-300 transition-colors"
+                  className="underline hover:text-indigo-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 rounded"
                   onClick={() => router.push('/listings?q=Manchester')}
+                  aria-label="Search for properties in Manchester"
                 >
                   Manchester
                 </button>
@@ -153,19 +156,22 @@ export default function HomePage() {
             <div className="mt-8 flex flex-wrap items-center gap-3 text-sm">
               <Link
                 href="/listings"
-                className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600/30 to-purple-600/30 text-indigo-200 hover:from-indigo-600/50 hover:to-purple-600/50 border border-indigo-400/30 transition-all duration-300 font-medium"
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600/30 to-purple-600/30 text-indigo-200 hover:from-indigo-600/50 hover:to-purple-600/50 border border-indigo-400/30 transition-all duration-300 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                aria-label="Browse all property listings"
               >
                 Browse listings
               </Link>
               <Link
                 href="/analytics"
-                className="px-4 py-2 rounded-lg bg-white/10 text-slate-200 hover:bg-white/20 border border-white/20 transition-all duration-300"
+                className="px-4 py-2 rounded-lg bg-white/10 text-slate-200 hover:bg-white/20 border border-white/20 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                aria-label="View property analytics and insights"
               >
                 Analytics
               </Link>
               <Link
                 href="/deals"
-                className="px-4 py-2 rounded-lg bg-white/10 text-slate-200 hover:bg-white/20 border border-white/20 transition-all duration-300"
+                className="px-4 py-2 rounded-lg bg-white/10 text-slate-200 hover:bg-white/20 border border-white/20 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                aria-label="View your saved property deals"
               >
                 Saved deals
               </Link>
@@ -312,10 +318,11 @@ export default function HomePage() {
               </div>
               <Link
                 href="/listings"
-                className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-all duration-300 shadow-lg hover:shadow-xl"
+                className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition-all duration-300 shadow-lg hover:shadow-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                aria-label="View all property listings"
               >
                 View Listings
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
               </Link>
