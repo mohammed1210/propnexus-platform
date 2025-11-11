@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = Number(process.env.PORT || 3000);
 const BASE = process.env.E2E_BASE_URL || `http://localhost:${PORT}`;
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+const USE_DEV = process.env.PW_USE_DEV === '1' || !process.env.CI;
 
 export default defineConfig({
   testDir: './e2e',
@@ -13,7 +14,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: `NEXT_PUBLIC_API_BASE="${API_BASE}" npx next start -p ${PORT}`,
+    command: `NEXT_PUBLIC_API_BASE="${API_BASE}" npx next ${USE_DEV ? 'dev' : 'start'} -p ${PORT}`,
     url: BASE,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
