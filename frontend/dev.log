@@ -59,3 +59,6 @@
   digest: '1691354187'
 }
  GET /property/demo-id 200 in 7886ms
+ ✓ Compiled in 8s (1264 modules)
+ ✓ Compiled in 1565ms (1264 modules)
+ ✓ Compiled in 2.3s (1264 modules)

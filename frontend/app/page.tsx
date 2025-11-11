@@ -128,7 +128,7 @@ export default function HomePage() {
                 href="/listings"
                 className="btn-primary text-lg px-8 py-4"
               >
-                Browse Properties
+                Browse listings
               </Link>
               <Link
                 href="/pricing"
