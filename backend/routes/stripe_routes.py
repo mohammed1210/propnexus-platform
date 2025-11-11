@@ -9,7 +9,11 @@ router = APIRouter(prefix="/stripe", tags=["stripe"])
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-SITE_URL = os.getenv("SITE_URL") or os.getenv("NEXT_PUBLIC_SITE_URL") or "https://propnexus-platform.vercel.app"
+SITE_URL = (
+    os.getenv("SITE_URL")
+    or os.getenv("NEXT_PUBLIC_SITE_URL")
+    or "https://propnexus-platform.vercel.app"
+)
 PORTAL_RETURN_URL = os.getenv("PORTAL_RETURN_URL") or SITE_URL
 
 stripe.api_key = STRIPE_SECRET_KEY
@@ -43,6 +47,7 @@ USERS_TABLE = os.getenv("USERS_TABLE", "users")
 EMAIL_COL = os.getenv("USERS_EMAIL_COL", "email")
 CUST_COL = os.getenv("USERS_STRIPE_COL", "stripe_customer_id")
 
+
 def get_or_create_customer(email: str) -> str:
     customer_id = None
     if sb:
@@ -74,10 +79,13 @@ def get_or_create_customer(email: str) -> str:
         customer_id = created.id
     if sb:
         try:
-            sb.table(USERS_TABLE).upsert({EMAIL_COL: email, CUST_COL: customer_id}, on_conflict=EMAIL_COL).execute()
+            sb.table(USERS_TABLE).upsert(
+                {EMAIL_COL: email, CUST_COL: customer_id}, on_conflict=EMAIL_COL
+            ).execute()
         except Exception:
             pass
     return customer_id
+
 
 @router.post("/create-portal-session")
 async def create_portal_session(req: Request):
@@ -92,13 +100,16 @@ async def create_portal_session(req: Request):
         raise HTTPException(status_code=500, detail="Stripe not configured")
     try:
         customer_id = get_or_create_customer(email)
-        session = stripe.billing_portal.Session.create(customer=customer_id, return_url=PORTAL_RETURN_URL)
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id, return_url=PORTAL_RETURN_URL
+        )
         return JSONResponse({"url": session.url})
     except StripeLibError as e:
         msg = getattr(e, "user_message", None) or str(e)
         raise HTTPException(status_code=502, detail=f"Stripe error: {msg}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/create-checkout-session")
 async def create_checkout_session(req: Request):

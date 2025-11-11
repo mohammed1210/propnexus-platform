@@ -1,6 +1,7 @@
 """
 Tests for Sprint 11 AI scoring endpoints.
 """
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -10,9 +11,9 @@ from fastapi.testclient import TestClient
 def test_ai_score_basic():
     """Test basic scoring endpoint with minimal data."""
     from backend.main import app
-    
+
     client = TestClient(app)
-    
+
     response = client.post(
         "/gpt/score",
         json={
@@ -22,7 +23,7 @@ def test_ai_score_basic():
             "rent": 1200,
         },
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["ok"] is True
@@ -38,11 +39,11 @@ def test_ai_score_basic():
 def test_ai_score_empty_data():
     """Test scoring with empty/missing data."""
     from backend.main import app
-    
+
     client = TestClient(app)
-    
+
     response = client.post("/gpt/score", json={})
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["ok"] is True
@@ -54,9 +55,9 @@ def test_ai_score_empty_data():
 def test_ai_score_full_data():
     """Test scoring with complete property data."""
     from backend.main import app
-    
+
     client = TestClient(app)
-    
+
     response = client.post(
         "/gpt/score",
         json={
@@ -68,12 +69,12 @@ def test_ai_score_full_data():
             "schools_rating": 4.2,
         },
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["ok"] is True
     assert data["score"] > 0
-    
+
     # Check all categories are present
     categories = data["categories"]
     assert "yield" in categories
@@ -87,9 +88,9 @@ def test_ai_score_full_data():
 def test_ai_score_categories_sum():
     """Test that category scores are within expected ranges."""
     from backend.main import app
-    
+
     client = TestClient(app)
-    
+
     response = client.post(
         "/gpt/score",
         json={
@@ -101,10 +102,10 @@ def test_ai_score_categories_sum():
             "schools_rating": 4.5,
         },
     )
-    
+
     assert response.status_code == 200
     data = response.json()
-    
+
     # Each category should be within its max range
     categories = data["categories"]
     assert 0 <= categories["yield"] <= 20
@@ -120,10 +121,12 @@ def mock_openai_client_explain():
     """Mock OpenAI client for explanation endpoint."""
     with patch("backend.routes.gpt_routes.get_client") as mock_get_client:
         mock_client = MagicMock()
-        
+
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = """SUMMARY: This is a solid investment with good fundamentals.
+        mock_response.choices[
+            0
+        ].message.content = """SUMMARY: This is a solid investment with good fundamentals.
 
 BULLETS:
 - Strong rental yield indicates good cash flow
@@ -131,19 +134,19 @@ BULLETS:
 - Good school access nearby
 - Property priced competitively
 - ROI projections are positive"""
-        
+
         mock_client.chat.completions.create.return_value = mock_response
         mock_get_client.return_value = mock_client
-        
+
         yield mock_client
 
 
 def test_ai_score_explain_success(mock_openai_client_explain):
     """Test score explanation endpoint."""
     from backend.main import app
-    
+
     client = TestClient(app)
-    
+
     response = client.post(
         "/gpt/score/explain",
         json={
@@ -157,7 +160,7 @@ def test_ai_score_explain_success(mock_openai_client_explain):
             },
         },
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["ok"] is True
@@ -170,14 +173,14 @@ def test_ai_score_explain_success(mock_openai_client_explain):
 def test_ai_score_explain_minimal(mock_openai_client_explain):
     """Test explanation with minimal data."""
     from backend.main import app
-    
+
     client = TestClient(app)
-    
+
     response = client.post(
         "/gpt/score/explain",
         json={"score": 50, "property": {}},
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["ok"] is True

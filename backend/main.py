@@ -32,6 +32,7 @@ from .routes.stripe_routes import (
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except Exception:
     pass
@@ -63,16 +64,17 @@ app.include_router(notes_router)
 app.include_router(off_market_router)
 app.include_router(save_deal_router)
 app.include_router(scrape_router)
-app.include_router(properties_router)   # GET /properties
+app.include_router(properties_router)  # GET /properties
 app.include_router(import_routes.router)
 app.include_router(admin_schedule.router)
 
 # ✅ Stripe (include exactly once each)
-app.include_router(stripe_webhook_router)   # POST /stripe/webhook
-app.include_router(stripe_routes_router)    # POST /stripe/create-portal-session
+app.include_router(stripe_webhook_router)  # POST /stripe/webhook
+app.include_router(stripe_routes_router)  # POST /stripe/create-portal-session
 
 # ✅ Users router
-app.include_router(users_router)            # GET /users/plan
+app.include_router(users_router)  # GET /users/plan
+
 
 # ======================
 # 🏠 Root Route

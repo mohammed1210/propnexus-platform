@@ -22,7 +22,9 @@ except Exception:  # pragma: no cover
             # Mimic decorator behavior but return the function unchanged.
             def decorator(func):
                 return func
+
             return decorator
+
 
 from pydantic import BaseModel
 

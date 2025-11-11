@@ -3,18 +3,12 @@
 from __future__ import annotations
 
 import os
-import jwt  # PyJWT
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
-<<<<<<< HEAD
 from fastapi import APIRouter, HTTPException, Header, Request, status
 from jose import jwt, JWTError
-
-=======
-from fastapi import APIRouter, HTTPException, Request, status
->>>>>>> e27c09d9 (save_deal)
 from supabase import Client, create_client
 
 load_dotenv()
@@ -43,15 +37,14 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-<<<<<<< HEAD
 def _extract_user_id_from_token(authorization: Optional[str]) -> Optional[str]:
     """
     Extract user_id from JWT token in Authorization header.
     Expected format: "Bearer <token>"
     Returns None if token is invalid or missing.
-    
+
     SECURITY NOTE: This function extracts the 'sub' claim from JWT tokens without full verification.
-    
+
     This is acceptable because:
     1. The user_id is used ONLY to filter queries on the saved_deals table
     2. Supabase RLS policies on saved_deals enforce that auth.uid() = user_id
@@ -59,34 +52,32 @@ def _extract_user_id_from_token(authorization: Optional[str]) -> Optional[str]:
        user_id filter + RLS double-check prevents data leakage
     4. Even if a token is forged, RLS will block access to rows where user_id != auth.uid()
     5. Supabase validates the JWT signature when RLS policies check auth.uid()
-    
+
     For additional security:
     - We return empty results if no user_id is present
     - RLS policies provide defense-in-depth
     - The worst case is someone queries their own data
-    
+
     For security-critical operations beyond filtering, full JWT verification with
     Supabase's JWT secret would be required.
     """
     if not authorization:
         return None
-    
+
     # Extract token from "Bearer <token>" format
     parts = authorization.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
         return None
-    
+
     token = parts[1]
-    
+
     try:
         # Decode JWT without verification to extract claims
         # Supabase tokens have user_id in the 'sub' field
         payload = jwt.decode(
-            token,
-            options={"verify_signature": False, "verify_aud": False},
-            algorithms=["HS256"]
+            token, options={"verify_signature": False, "verify_aud": False}, algorithms=["HS256"]
         )
-        
+
         # Extract user_id from 'sub' field (Supabase standard)
         return payload.get("sub")
     except JWTError:
@@ -94,54 +85,31 @@ def _extract_user_id_from_token(authorization: Optional[str]) -> Optional[str]:
         return None
     except Exception:
         # Unexpected error during token processing
-=======
-def _extract_user_id(request: Request) -> Optional[str]:
-    """Extract user ID from JWT token (unverified decode is fine for filtering)."""
-    try:
-        auth_header = request.headers.get("authorization")
-        if not auth_header or not auth_header.lower().startswith("bearer "):
-            return None
-        token = auth_header.split(" ")[1]
-        decoded = jwt.decode(token, options={"verify_signature": False})
-        return decoded.get("sub") or decoded.get("user_id") or decoded.get("email")
-    except Exception:
->>>>>>> e27c09d9 (save_deal)
         return None
 
 
 @router.post("/save-deal")
 async def save_deal(
-    request: Request,
-    authorization: Optional[str] = Header(None)
+    request: Request, authorization: Optional[str] = Header(None)
 ) -> Dict[str, Any]:
     """
-<<<<<<< HEAD
     Insert one saved deal.
     Frontend can post minimal payload like {"property_id": "..."} or a richer record.
     Attaches user_id from Authorization: Bearer JWT (sub claim) on insert.
-=======
-    Save a property deal for the authenticated user.
-    Payload: { "property_id": "...", "notes": "...", ... }
->>>>>>> e27c09d9 (save_deal)
     """
     sb = _require_supabase()
-    
+
     # Extract user_id from JWT token
     user_id = _extract_user_id_from_token(authorization)
-    
+
     try:
         payload = await request.json()
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="Body must be a JSON object")
 
-        # Attach user_id from JWT if available
-        user_id = _extract_user_id(request)
-        if user_id:
-            payload["user_id"] = user_id
-
         # Timestamp
         payload.setdefault("saved_at", _now_iso())
-        
+
         # Attach user_id if we have one from the token
         if user_id:
             payload["user_id"] = user_id
@@ -151,11 +119,7 @@ async def save_deal(
             raise HTTPException(status_code=400, detail="Missing property_id")
 
         # Insert with conflict tolerance (skip duplicate saves)
-        res = (
-            sb.table("saved_deals")
-            .insert(payload, upsert=True)
-            .execute()
-        )
+        res = sb.table("saved_deals").insert(payload, upsert=True).execute()
 
         return {"ok": True, "data": res.data}
 
@@ -167,60 +131,44 @@ async def save_deal(
 
 
 @router.get("/saved-deals")
-<<<<<<< HEAD
-async def list_saved_deals(
-    authorization: Optional[str] = Header(None)
-) -> Dict[str, Any]:
+async def list_saved_deals(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
     """
     Return saved deals for the current user (newest first).
     Filters by user_id from Authorization token if provided.
     RLS policies enforce per-user access.
-    
+
     Returns empty list if no valid token is provided (for security).
     """
-=======
-async def list_saved_deals(request: Request) -> Dict[str, Any]:
-    """Return saved deals for current user (or empty if unauthenticated)."""
->>>>>>> e27c09d9 (save_deal)
     sb = _require_supabase()
-    
+
     # Extract user_id from JWT token
     user_id = _extract_user_id_from_token(authorization)
-    
+
     # If no user_id, return empty list (don't expose all data)
     if not user_id:
         return {"data": []}
-    
+
     try:
-<<<<<<< HEAD
         query = sb.table("saved_deals").select("*").order("saved_at", desc=True)
-        
+
         # Filter by user_id (RLS will also enforce this)
         query = query.eq("user_id", user_id)
-        
+
         res = query.execute()
         return {"data": res.data or []}
-=======
-        user_id = _extract_user_id(request)
-        query = sb.table("saved_deals").select("*").order("saved_at", desc=True)
-        if user_id:
-            query = query.eq("user_id", user_id)
-
-        res = query.execute()
-        return {"ok": True, "data": res.data or []}
-
->>>>>>> e27c09d9 (save_deal)
     except Exception as e:
         print(f"[list-saved-deals-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
 
 
 @router.get("/saved-deals/{deal_id}")
-async def get_saved_deal(deal_id: str, request: Request) -> Dict[str, Any]:
+async def get_saved_deal(
+    deal_id: str, request: Request, authorization: Optional[str] = Header(None)
+) -> Dict[str, Any]:
     """Retrieve a specific saved deal."""
     sb = _require_supabase()
     try:
-        user_id = _extract_user_id(request)
+        user_id = _extract_user_id_from_token(authorization)
         query = sb.table("saved_deals").select("*").eq("id", deal_id)
         if user_id:
             query = query.eq("user_id", user_id)
@@ -239,11 +187,13 @@ async def get_saved_deal(deal_id: str, request: Request) -> Dict[str, Any]:
 
 
 @router.delete("/saved-deals/{deal_id}")
-async def delete_saved_deal(deal_id: str, request: Request) -> Dict[str, Any]:
+async def delete_saved_deal(
+    deal_id: str, request: Request, authorization: Optional[str] = Header(None)
+) -> Dict[str, Any]:
     """Delete a saved deal belonging to the user."""
     sb = _require_supabase()
     try:
-        user_id = _extract_user_id(request)
+        user_id = _extract_user_id_from_token(authorization)
         query = sb.table("saved_deals").delete().eq("id", deal_id)
         if user_id:
             query = query.eq("user_id", user_id)
@@ -254,4 +204,3 @@ async def delete_saved_deal(deal_id: str, request: Request) -> Dict[str, Any]:
     except Exception as e:
         print(f"[delete-saved-deal-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
-    
