@@ -2,8 +2,6 @@
 from __future__ import annotations
 import os
 
-import os
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -20,6 +18,7 @@ from .routes.save_deal import router as save_deal_router
 from .routes.scrape_routes import router as scrape_router
 from .routes.properties_routes import router as properties_router
 from .routes.users_routes import router as users_router
+from routes import import_routes, admin_schedule
 
 # ✅ Stripe routers (named distinctly to avoid duplicate includes)
 from .routes.stripe_webhook import router as stripe_webhook_router  # POST /stripe/webhook
@@ -65,6 +64,8 @@ app.include_router(off_market_router)
 app.include_router(save_deal_router)
 app.include_router(scrape_router)
 app.include_router(properties_router)   # GET /properties
+app.include_router(import_routes.router)
+app.include_router(admin_schedule.router)
 
 # ✅ Stripe (include exactly once each)
 app.include_router(stripe_webhook_router)   # POST /stripe/webhook

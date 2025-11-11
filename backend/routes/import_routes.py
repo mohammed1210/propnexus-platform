@@ -3,7 +3,27 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
-from fastapi import APIRouter, HTTPException
+try:
+    from fastapi import APIRouter, HTTPException  # type: ignore
+except Exception:  # pragma: no cover
+    # Minimal local shims so the module can be imported when fastapi isn't installed.
+    class HTTPException(Exception):
+        def __init__(self, status_code: int = 500, detail: str | None = None):
+            super().__init__(detail)
+            self.status_code = status_code
+            self.detail = detail
+
+    class APIRouter:
+        def __init__(self, *args, **kwargs):
+            # Accepts the same constructor signature used in this module.
+            pass
+
+        def post(self, *args, **kwargs):
+            # Mimic decorator behavior but return the function unchanged.
+            def decorator(func):
+                return func
+            return decorator
+
 from pydantic import BaseModel
 
 # Scrapers (existing)
