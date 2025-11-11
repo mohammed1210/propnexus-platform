@@ -20,11 +20,13 @@ ZP_DELAY_MS = int(os.getenv("ZP_DELAY_MS", "900"))
 
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
 
+
 def _looks_blocked(html: str, status: int) -> bool:
     if status in (403, 503):
         return True
     lowered = html.lower()
     return any(k in lowered for k in CAPTCHA_KEYWORDS)
+
 
 def _build_search_url(location: str, page: int = 0) -> str:
     # Zoopla pagination uses ?page=2 etc.
@@ -34,13 +36,16 @@ def _build_search_url(location: str, page: int = 0) -> str:
         return f"{base}?page={page+1}"
     return base
 
+
 async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]:
     headers = {"User-Agent": USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
     try:
         async with session.get(url, headers=headers, timeout=30) as resp:
             text = await resp.text()
             if _looks_blocked(text, resp.status) and SCRAPER_MODE == "direct" and SCRAPERAPI_KEY:
-                proxy_url = f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+                proxy_url = (
+                    f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+                )
                 async with session.get(proxy_url, headers=headers, timeout=45) as p_resp:
                     p_text = await p_resp.text()
                     if _looks_blocked(p_text, p_resp.status):
@@ -49,7 +54,9 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
             return text
     except Exception:
         if SCRAPER_MODE == "scraperapi" and SCRAPERAPI_KEY:
-            proxy_url = f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+            proxy_url = (
+                f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+            )
             try:
                 async with session.get(proxy_url, headers=headers, timeout=45) as p_resp:
                     p_text = await p_resp.text()
@@ -59,6 +66,7 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
             except Exception:
                 return None
         return None
+
 
 def _parse_price(raw: str) -> Optional[int]:
     if not raw:
@@ -72,11 +80,13 @@ def _parse_price(raw: str) -> Optional[int]:
     except ValueError:
         return None
 
+
 def _extract_int(text: str) -> Optional[int]:
     if not text:
         return None
     m = re.search(r"\d+", text)
     return int(m.group(0)) if m else None
+
 
 def _collect_cards(soup: BeautifulSoup) -> List[BeautifulSoup]:
     selectors = [
@@ -100,6 +110,7 @@ def _collect_cards(soup: BeautifulSoup) -> List[BeautifulSoup]:
             uniq.append(c)
     return uniq
 
+
 async def _enrich_coordinates(location: str) -> Dict[str, float]:
     try:
         coords = await get_lat_lng_from_postcode(location)
@@ -110,6 +121,7 @@ async def _enrich_coordinates(location: str) -> Dict[str, float]:
     except Exception:
         return {"latitude": 0.0, "longitude": 0.0}
 
+
 def _extract_external_id(card: BeautifulSoup) -> str:
     link = card.select_one("a[href*='/for-sale/details/']")
     if link and link.get("href"):
@@ -118,7 +130,10 @@ def _extract_external_id(card: BeautifulSoup) -> str:
             return m.group(1)
     return f"zp-{abs(hash(card.get_text()) % (10**9))}"
 
-async def scrape_zoopla_properties(location: str, limit: int = 40, background_tasks: BackgroundTasks | None = None) -> List[Dict[str, Any]]:
+
+async def scrape_zoopla_properties(
+    location: str, limit: int = 40, background_tasks: BackgroundTasks | None = None
+) -> List[Dict[str, Any]]:
     print(f"🔍 Scraping Zoopla for '{location}' (mode={SCRAPER_MODE})")
     results: List[Dict[str, Any]] = []
 
@@ -139,19 +154,35 @@ async def scrape_zoopla_properties(location: str, limit: int = 40, background_ta
                 if len(results) >= limit:
                     break
                 try:
-                    title_el = card.select_one("h2") or card.select_one("[data-testid='listing-title']")
+                    title_el = card.select_one("h2") or card.select_one(
+                        "[data-testid='listing-title']"
+                    )
                     title = title_el.get_text(strip=True) if title_el else "Untitled"
 
-                    price_el = card.select_one("[data-testid='listing-price']") or card.select_one(".css-1w7b0tk-Price") or card.select_one(".listing-price")
+                    price_el = (
+                        card.select_one("[data-testid='listing-price']")
+                        or card.select_one(".css-1w7b0tk-Price")
+                        or card.select_one(".listing-price")
+                    )
                     price = _parse_price(price_el.get_text(strip=True) if price_el else "")
 
-                    loc_el = card.select_one("[data-testid='listing-description']") or card.select_one(".listing-description") or card.select_one("address")
+                    loc_el = (
+                        card.select_one("[data-testid='listing-description']")
+                        or card.select_one(".listing-description")
+                        or card.select_one("address")
+                    )
                     location_text = loc_el.get_text(" ", strip=True) if loc_el else location
 
-                    bed_el = card.select_one("[data-testid='bed']") or card.select_one(".css-1rzse3v-Bedrooms") or card.select_one(".listing-bedrooms")
+                    bed_el = (
+                        card.select_one("[data-testid='bed']")
+                        or card.select_one(".css-1rzse3v-Bedrooms")
+                        or card.select_one(".listing-bedrooms")
+                    )
                     bedrooms = _extract_int(bed_el.get_text() if bed_el else "") or 0
 
-                    bath_el = card.select_one("[data-testid='bath']") or card.select_one(".listing-bathrooms")
+                    bath_el = card.select_one("[data-testid='bath']") or card.select_one(
+                        ".listing-bathrooms"
+                    )
                     bathrooms = _extract_int(bath_el.get_text() if bath_el else "") or 0
 
                     img_el = card.select_one("img")
@@ -183,6 +214,7 @@ async def scrape_zoopla_properties(location: str, limit: int = 40, background_ta
 
     print(f"✅ Scraped {len(results)} Zoopla properties for '{location}'")
     return results
+
 
 # Backward-compatible stub signature
 async def scrape_zoopla_properties_default(background_tasks: BackgroundTasks | None = None):

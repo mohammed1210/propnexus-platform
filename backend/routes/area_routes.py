@@ -12,6 +12,7 @@ And we provide a thin `get_area_intel()` that behaves like the old route:
   - cache miss -> call provider and return {"source": "provider", ...}
   - cache hit  -> return {"source": "cache", ...}
 """
+
 from __future__ import annotations
 from typing import Any, Dict, Optional
 
@@ -26,6 +27,7 @@ except Exception:
 
 sb = _real_sb
 _fallback_storage: Dict[str, Dict[str, Any]] = {}
+
 
 def _cache_get(key: str) -> Optional[Dict[str, Any]]:
     """Fetch from whatever cache impl the tests monkeypatch in, else fallback."""
@@ -44,6 +46,7 @@ def _cache_get(key: str) -> Optional[Dict[str, Any]]:
                         pass
     return _fallback_storage.get(key)
 
+
 def _cache_set(key: str, value: Dict[str, Any], ttl: int = 900) -> None:
     """Store into the cache impl the tests monkeypatch in, else fallback."""
     global sb, _fallback_storage
@@ -61,6 +64,7 @@ def _cache_set(key: str, value: Dict[str, Any], ttl: int = 900) -> None:
                     except Exception:
                         pass
     _fallback_storage[key] = value
+
 
 def get_area_intel(key: str, request: Any = None) -> Dict[str, Any]:
     """
@@ -82,5 +86,6 @@ def get_area_intel(key: str, request: Any = None) -> Dict[str, Any]:
     out = dict(payload)
     out["source"] = "provider"
     return out
+
 
 __all__ = ["router", "sb", "get_area_intel_from_provider", "get_area_intel"]

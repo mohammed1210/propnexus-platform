@@ -133,11 +133,11 @@ async def ai_score(data: dict):
     roi_pct = data.get("roi_percent") or 0
     price = data.get("price") or 0
     rent = data.get("rent") or data.get("avg_rent") or 0
-    
+
     # Use explicit None checks to preserve 0 values
     crime = data.get("crime_index")
     crime = 50 if crime is None else float(crime)
-    
+
     schools = data.get("schools_rating")
     schools = 3.0 if schools is None else float(schools)
 

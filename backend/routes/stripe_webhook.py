@@ -22,22 +22,22 @@ def map_price_to_plan(price_id: str) -> Optional[str]:
     """
     Map Stripe price ID to plan name.
     Returns None for unknown price IDs to prevent downgrading users to 'free'.
-    
+
     Sprint 11.2: Limited to three tiers - free, pro, investor.
     """
     if not price_id:
         return None
-    
+
     # Build mapping at runtime to support test environment variable injection
     # Sprint 11.2: Only pro and investor tiers (free is default)
     price_to_plan = {
         os.getenv("STRIPE_PRICE_PRO", ""): "pro",
         os.getenv("STRIPE_PRICE_INVESTOR", ""): "investor",
     }
-    
+
     # Remove empty keys from mapping
     price_to_plan = {k: v for k, v in price_to_plan.items() if k}
-    
+
     return price_to_plan.get(price_id)
 
 
@@ -49,21 +49,22 @@ def get_supabase_client():
     """
     # Use global reference to the module-level supabase
     global supabase
-    
+
     # If tests have explicitly set the module-level supabase to something other than None, use it
     # This includes when tests monkeypatch it to a Mock object
     if supabase is not None:
         return supabase
-    
+
     # Attempt to create a client if credentials are present
     url = os.getenv("SUPABASE_URL")
     key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    
+
     if not url or not key:
         return None
-    
+
     try:
         from supabase import create_client
+
         client = create_client(url, key)
         return client
     except Exception as e:
@@ -75,6 +76,7 @@ def get_supabase_client():
 def get_webhook_secret() -> Optional[str]:
     """Get Stripe webhook secret from environment on each request."""
     return os.getenv("STRIPE_WEBHOOK_SECRET")
+
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request):
@@ -92,7 +94,9 @@ async def stripe_webhook(request: Request):
     webhook_secret = get_webhook_secret()
 
     try:
-        event = stripe.Webhook.construct_event(payload=payload, sig_header=sig_header, secret=webhook_secret)
+        event = stripe.Webhook.construct_event(
+            payload=payload, sig_header=sig_header, secret=webhook_secret
+        )
     except Exception as e:
         return JSONResponse({"ok": False, "error": f"bad_signature:{e}"}, status_code=400)
 
@@ -106,31 +110,35 @@ async def stripe_webhook(request: Request):
             customer_email = (data_obj.get("customer_details") or {}).get("email")
 
             # In tests, these calls are patched
-            sub = stripe.Subscription.retrieve(sub_id) if sub_id else {"status": "active", "items": {"data": []}}
+            sub = (
+                stripe.Subscription.retrieve(sub_id)
+                if sub_id
+                else {"status": "active", "items": {"data": []}}
+            )
             price_id = ((sub.get("items") or {}).get("data") or [{}])[0].get("price", {}).get("id")
             status = sub.get("status", "active")
             current_period_end = sub.get("current_period_end")
-            
+
             # Map price_id to plan - returns None for unknown IDs
             plan = map_price_to_plan(price_id)
             plan_status = status if status in ["active", "past_due", "canceled"] else "active"
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
-            
+
             if sb_client:
                 # Build upsert data - only include plan if we have a known mapping
                 upsert_data = {
-                    "stripe_customer_id": customer_id, 
-                    "email": customer_email, 
+                    "stripe_customer_id": customer_id,
+                    "email": customer_email,
                     "plan_status": plan_status,
-                    "current_period_end": current_period_end
+                    "current_period_end": current_period_end,
                 }
-                
+
                 # Only include plan if we have a known mapping (don't downgrade to 'free')
                 if plan is not None:
                     upsert_data["plan"] = plan
-                
+
                 try:
                     sb_client.table("users").upsert(upsert_data).execute()
                 except Exception as e:
@@ -142,10 +150,12 @@ async def stripe_webhook(request: Request):
 
         if etype == "customer.subscription.updated":
             customer_id = data_obj.get("customer")
-            price_id = ((data_obj.get("items") or {}).get("data") or [{}])[0].get("price", {}).get("id")
+            price_id = (
+                ((data_obj.get("items") or {}).get("data") or [{}])[0].get("price", {}).get("id")
+            )
             status = data_obj.get("status", "active")
             current_period_end = data_obj.get("current_period_end")
-            
+
             # Retrieve customer email - handle potential failures gracefully
             email = None
             try:
@@ -156,27 +166,27 @@ async def stripe_webhook(request: Request):
                 # If we can't retrieve customer email, continue without it
                 logger.debug(f"Failed to retrieve customer email for {customer_id}: {e}")
                 pass
-            
+
             # Map price_id to plan - returns None for unknown IDs
             plan = map_price_to_plan(price_id)
             plan_status = status if status in ["active", "past_due", "canceled"] else "active"
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
-            
+
             if sb_client:
                 # Build upsert data - only include plan if we have a known mapping
                 upsert_data = {
-                    "stripe_customer_id": customer_id, 
-                    "email": email, 
+                    "stripe_customer_id": customer_id,
+                    "email": email,
                     "plan_status": plan_status,
-                    "current_period_end": current_period_end
+                    "current_period_end": current_period_end,
                 }
-                
+
                 # Only include plan if we have a known mapping (don't downgrade to 'free')
                 if plan is not None:
                     upsert_data["plan"] = plan
-                
+
                 try:
                     sb_client.table("users").upsert(upsert_data).execute()
                 except Exception as e:
