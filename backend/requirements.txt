@@ -7,6 +7,7 @@ asyncpg
 sqlalchemy
 pydantic
 beautifulsoup4
+aiohttp
 playwright
 python-dotenv>=1.0.0
 python-jose==3.5.0

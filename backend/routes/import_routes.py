@@ -9,6 +9,8 @@ from pydantic import BaseModel
 # Scrapers (existing)
 from ..scraper.rightmove_scraper import scrape_rightmove_properties
 from ..scraper.zoopla_scraper import scrape_zoopla_properties
+from ..scraper.onthemarket_scraper import scrape_onthemarket_properties
+from ..scraper.spare_room_scraper import scrape_spareroom_properties
 
 # Shared Supabase client
 try:
@@ -31,7 +33,7 @@ def _unique_key(p: Dict[str, Any]) -> Tuple[Any, Any, Any]:
 @router.post("/all")
 async def import_all(req: ImportRequest):
     """
-    Scrape Zoopla + Rightmove for `location`, dedupe, upsert to Supabase.
+    Scrape Zoopla + Rightmove + OnTheMarket + SpareRoom for `location`, dedupe, upsert to Supabase.
     Returns { count } and the first few items (preview).
     """
     loc = (req.location or "").strip()
@@ -41,8 +43,10 @@ async def import_all(req: ImportRequest):
     try:
         zoopla: List[Dict[str, Any]] = scrape_zoopla_properties(loc) or []
         rightmove: List[Dict[str, Any]] = scrape_rightmove_properties(loc) or []
+        onthemarket: List[Dict[str, Any]] = scrape_onthemarket_properties(loc) or []
+        spareroom: List[Dict[str, Any]] = scrape_spareroom_properties(loc) or []
 
-        combined = zoopla + rightmove
+        combined = zoopla + rightmove + onthemarket + spareroom
         seen, unique_props = set(), []
         for p in combined:
             k = _unique_key(p)
@@ -86,6 +90,36 @@ async def import_rightmove(req: ImportRequest):
         raise HTTPException(status_code=400, detail="Location is required")
 
     items = scrape_rightmove_properties(loc) or []
+    if sb and items:
+        try:
+            sb.table("properties").upsert(items).execute()
+        except Exception:
+            pass
+    return {"count": len(items)}
+
+
+@router.post("/onthemarket")
+async def import_onthemarket(req: ImportRequest):
+    loc = (req.location or "").strip()
+    if not loc:
+        raise HTTPException(status_code=400, detail="Location is required")
+
+    items = scrape_onthemarket_properties(loc) or []
+    if sb and items:
+        try:
+            sb.table("properties").upsert(items).execute()
+        except Exception:
+            pass
+    return {"count": len(items)}
+
+
+@router.post("/spareroom")
+async def import_spareroom(req: ImportRequest):
+    loc = (req.location or "").strip()
+    if not loc:
+        raise HTTPException(status_code=400, detail="Location is required")
+
+    items = scrape_spareroom_properties(loc) or []
     if sb and items:
         try:
             sb.table("properties").upsert(items).execute()

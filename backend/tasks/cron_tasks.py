@@ -31,14 +31,17 @@ if SUPABASE_URL and SUPABASE_KEY:
 def daily_scrape() -> None:
     """Example daily scrape job.
 
-    Iterate over a list of target locations, run both Zoopla and
-    Rightmove scrapers and upsert deduplicated results into Supabase.
+    Iterate over a list of target locations, run all scrapers
+    (Zoopla, Rightmove, OnTheMarket, SpareRoom) and upsert
+    deduplicated results into Supabase.
     Modify the `locations` list or derive it from user saved searches
     to meet your requirements.
     """
     # Avoid circular imports by importing inside the function
     from scraper.rightmove_scraper import scrape_rightmove_properties
     from scraper.zoopla_scraper import scrape_zoopla_properties
+    from scraper.onthemarket_scraper import scrape_onthemarket_properties
+    from scraper.spare_room_scraper import scrape_spareroom_properties
 
     # Define the locations you want to scrape daily. You may replace
     # these with user-defined favourites or the most active markets.
@@ -47,7 +50,9 @@ def daily_scrape() -> None:
     for location in locations:
         zoopla_results = scrape_zoopla_properties(location) or []
         rightmove_results = scrape_rightmove_properties(location) or []
-        combined = zoopla_results + rightmove_results
+        onthemarket_results = scrape_onthemarket_properties(location) or []
+        spareroom_results = scrape_spareroom_properties(location) or []
+        combined = zoopla_results + rightmove_results + onthemarket_results + spareroom_results
         # De-duplicate results by a simple key (title, price, location)
         seen: set[tuple[str, float, str]] = set()
         unique: list[dict] = []
