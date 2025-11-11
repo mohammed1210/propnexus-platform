@@ -1,0 +1,16 @@
+   ▲ Next.js 15.5.6
+   - Local:        http://127.0.0.1:3000
+   - Network:      http://127.0.0.1:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+   Disabled SWC as replacement for Babel because of custom Babel configuration "babel.config.js" https://nextjs.org/docs/messages/swc-disabled
+   `compiler` options in `next.config.js` will be ignored while using Babel https://nextjs.org/docs/messages/ignored-compiler-options
+ ✓ Ready in 2.7s
+   Using external babel configuration from /workspaces/propnexus-platform/frontend/babel.config.js
+ ⚠ It looks like there is a custom Babel configuration that can be removed.
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 3.6s (159 modules)
+ ○ Compiling / ...
+[BABEL] Note: The code generator has deoptimised the styling of /workspaces/propnexus-platform/frontend/node_modules/next/dist/compiled/next-devtools/index.js as it exceeds the max of 500KB.
+[BABEL] Note: The code generator has deoptimised the styling of /workspaces/propnexus-platform/frontend/node_modules/next/dist/compiled/next-devtools/index.js as it exceeds the max of 500KB.

@@ -1,7 +1,6 @@
 // frontend/next.config.mjs
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
-import { withSentryConfig } from '@sentry/nextjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -33,4 +32,4 @@ const nextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, { silent: true }, { widenClientFileUpload: true });
+export default nextConfig;
