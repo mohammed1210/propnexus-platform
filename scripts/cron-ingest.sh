@@ -1,22 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-#!/usr/bin/env bash
-set -euo pipefail
+echo "[Cron] Starting Python ingestion runner…"
 
-echo "[Cron] Starting ingestion…"
+# Ensure we are at repo root (script lives in scripts/)
+cd "$(dirname "$0")/.."
 
-# If Node isn’t present (Railway Python image), don’t crash the container.
-if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-  echo "[Cron] node/npm not found — skipping ingestion loop."
-  # Keep the worker alive without doing anything
-  sleep infinity
+# Optional: create virtualenv if not already (Railway Nixpacks may handle deps)
+if [ ! -d ".venv" ]; then
+  python3 -m venv .venv || true
+fi
+source .venv/bin/activate || true
+
+# Install backend deps if not present (idempotent; can be skipped in build stage)
+if [ -f backend/requirements.txt ]; then
+  pip install --disable-pip-version-check --no-cache-dir -r backend/requirements.txt >/dev/null 2>&1 || true
 fi
 
-# … your real ingestion steps go here …
-# npm ci --omit=dev
-# npm run scrape
-if ! command -v node >/dev/null 2>&1 || ! command -v npm >/dev/null 2>&1; then
-  echo "[Cron] node/npm not found — skipping ingestion loop."
-  sleep infinity
+# Run one cycle or continuous loop depending on INGEST_RUN_ONCE
+python -m backend.tasks.ingestion_runner
+
+# If the runner exits (e.g. RUN_ONCE), keep container alive for cron semantics
+if [ "${INGEST_RUN_ONCE:-0}" = "1" ]; then
+  echo "[Cron] Single ingestion cycle complete. Exiting.";
+else
+  echo "[Cron] Ingestion runner terminated unexpectedly; sleeping to prevent rapid restarts.";
+  sleep 600
 fi

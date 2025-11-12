@@ -1,22 +1,50 @@
+from __future__ import annotations
 import logging
 import os
+from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+try:
+    from fastapi import APIRouter, HTTPException  # type: ignore
+except Exception:  # pragma: no cover
+    class HTTPException(Exception):
+        def __init__(self, status_code: int = 500, detail: str | None = None):
+            super().__init__(detail)
+            self.status_code = status_code
+            self.detail = detail
 
-from supabase import Client, create_client  # type: ignore
+    class APIRouter:  # minimal shim
+        def __init__(self, *_, **__):
+            pass
+        def post(self, *_a, **_kw):
+            def deco(func):
+                return func
+            return deco
 
-from ..scraper.rightmove_scraper import scrape_rightmove_properties
-from ..scraper.zoopla_scraper import scrape_zoopla_properties
+try:
+    from pydantic import BaseModel  # type: ignore
+except Exception:  # pragma: no cover
+    class BaseModel:  # minimal stub
+        def __init__(self, **data):
+            for k, v in data.items():
+                setattr(self, k, v)
+
+try:  # Supabase optional on local dev
+    from supabase import Client, create_client  # type: ignore
+except Exception:  # pragma: no cover
+    Client = object  # type: ignore
+    def create_client(*_a: object, **_kw: object) -> object:  # type: ignore
+        raise RuntimeError("Supabase SDK not available")
+
+from ..utils.ingest import scrape_all_sources
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
-supabase: Client | None = None
+supabase = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)  # type: ignore
+    except Exception as e:  # pragma: no cover
         logging.warning("Supabase init failed: %s", e)
 
 router = APIRouter()
@@ -26,33 +54,38 @@ class ScrapeRequest(BaseModel):
     location: str
 
 
+def _chunk(items: List[Dict[str, Any]], size: int = 100) -> List[List[Dict[str, Any]]]:
+    return [items[i : i + size] for i in range(0, len(items), size)]
+
+
 @router.post("/scrape")
-async def scrape_all_sources(req: ScrapeRequest):
+async def scrape_endpoint(req: ScrapeRequest):
+    """Aggregate scrape of all sources -> normalized -> upsert -> return preview.
+
+    Returns JSON: { count, preview }
+    """
     location = (req.location or "").strip()
     if not location:
         raise HTTPException(status_code=400, detail="Location is required")
 
     try:
-        zoopla_results = scrape_zoopla_properties(location) or []
-        rightmove_results = scrape_rightmove_properties(location) or []
+        normalized = await scrape_all_sources(location)
+        count = len(normalized)
 
-        combined = zoopla_results + rightmove_results
-        seen, unique_props = set(), []
-        for p in combined:
-            key = (p.get("title"), p.get("price"), p.get("location"))
-            if key not in seen:
-                seen.add(key)
-                unique_props.append(p)
+        # Upsert in chunks (if Supabase configured)
+        if supabase and normalized:
+            for batch in _chunk(normalized):
+                try:
+                    # Rely on unique constraint on external_id
+                    supabase.table("properties").upsert(batch).execute()
+                except Exception as db_err:  # pragma: no cover
+                    logging.warning("properties upsert failed: %s", db_err)
+                    # Continue other batches rather than failing entirely
 
-        if supabase and unique_props:
-            try:
-                supabase.table("properties").upsert(unique_props).execute()
-            except Exception as db_err:  # pragma: no cover
-                logging.warning("DB insert skipped: %s", db_err)
-
-        return {"count": len(unique_props), "properties": unique_props}
+        preview = normalized[:10]
+        return {"count": count, "preview": preview}
     except HTTPException:
         raise
     except Exception as e:  # pragma: no cover
-        logging.exception("Scrape failed: %s", type(e).__name__)
+        logging.exception("Unified scrape failed: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Scraping failed")
