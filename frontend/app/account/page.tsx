@@ -183,7 +183,7 @@ export default function AccountPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <p>You're not signed in.</p>
+          <p>You&apos;re not signed in.</p>
           <Link
             href="/magic-login"
             className="inline-flex items-center rounded-md bg-zinc-900 text-white px-4 py-2 font-medium hover:bg-zinc-800"
@@ -191,7 +191,7 @@ export default function AccountPage() {
             Sign in with Magic Link
           </Link>
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            After signing in you'll return here to manage your subscription.
+            After signing in you&apos;ll return here to manage your subscription.
           </div>
         </div>
       )}
