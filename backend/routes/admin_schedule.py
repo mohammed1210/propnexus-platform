@@ -1,6 +1,6 @@
 import os
 from fastapi import APIRouter, Header, HTTPException
-from ..tasks.cron_tasks import daily_scrape  # your stubbed job
+from tasks.cron_tasks import daily_scrape  # your stubbed job
 
 router = APIRouter(prefix="/admin/schedule", tags=["admin"])
 

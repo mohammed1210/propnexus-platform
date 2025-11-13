@@ -6,11 +6,11 @@ from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
 from fastapi import BackgroundTasks
 
-from ..utils.postcode import get_lat_lng_from_postcode
-from ..utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html
-from ..utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
-from ..utils.retry import retry_async
-from ..utils.validation import validate_property_data, should_insert_property, clean_property_data
+from utils.postcode import get_lat_lng_from_postcode
+from utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html
+from utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
+from utils.retry import retry_async
+from utils.validation import validate_property_data, should_insert_property, clean_property_data
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "

@@ -15,8 +15,8 @@ from ..schemas.ai import (
     SummaryRequest,
     SummaryResponse,
 )
-from ..utils.openai_client import openai_client
-from ..utils.rate_limit import rate_limiter
+from utils.openai_client import openai_client
+from utils.rate_limit import rate_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])

@@ -30,7 +30,7 @@ except Exception:  # pragma: no cover
                 setattr(self, k, v)
 
 # Scrapers (existing)
-from ..utils.ingest import scrape_all_sources
+from utils.ingest import scrape_all_sources
 
 # Shared Supabase client
 try:
