@@ -7,7 +7,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
 
 from ..utils.postcode import get_lat_lng_from_postcode
-from ..utils.render import render_page, PLAYWRIGHT_ENABLE
+from ..utils.render import render_page, PLAYWRIGHT_ENABLE, render_page_capture
+from ..utils.render import capture_debug_html, capture_debug_json
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -188,12 +189,32 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
 
             if not cards:
                 if PLAYWRIGHT_ENABLE:
-                    rendered = await render_page(url)
+                    # Attempt network capture to extract JSON listing payloads
+                    rendered, payloads = await render_page_capture(
+                        url,
+                        selectors=[".property-card", "[data-testid='property-card']", ".listing-result"],
+                        click_selectors=["#ccc-recommended-settings", "#ccc-accept-settings"],
+                        response_url_substrings=["/api/", "/search"],
+                        max_json=10,
+                    )
                     if rendered:
                         soup = BeautifulSoup(rendered, "html.parser")
                         cards = _collect_cards(soup)
-                if not cards:
-                    print(f"ℹ️ OnTheMarket: No cards found on page {page}; stopping pagination.")
+                    if not cards and payloads:
+                        # Heuristic parse of JSON payloads
+                        extracted = _extract_from_otm_json(payloads, limit - len(results), location)
+                        for item in extracted:
+                            if item["external_id"] in seen_ids:
+                                continue
+                            seen_ids.add(item["external_id"])
+                            results.append(item)
+                        if extracted:
+                            print(f"✅ OnTheMarket JSON extracted {len(extracted)} properties")
+                    if not cards and not payloads:
+                        if rendered:
+                            capture_debug_html(f"onthemarket_empty_{page}", rendered)
+                if not cards and len(results) == 0:
+                    print(f"ℹ️ OnTheMarket: No cards/json found on page {page}; stopping pagination.")
                     break
 
             for card in cards:
@@ -279,3 +300,73 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
 
     print(f"✅ Scraped {len(results)} OnTheMarket properties for '{location}'")
     return results
+
+
+def _extract_from_otm_json(payloads: List[Dict[str, Any]], limit: int, default_location: str) -> List[Dict[str, Any]]:
+    """Attempt to find listing arrays inside captured JSON payloads.
+    Heuristic: look for arrays with objects containing price/address/id fields.
+    """
+    out: List[Dict[str, Any]] = []
+    keys_candidates = ["listings", "properties", "results", "data"]
+    for payload in payloads:
+        data = payload.get("data") if isinstance(payload, dict) else None
+        if not isinstance(data, dict):
+            continue
+        # Search nested dict for candidate arrays
+        stack = [data]
+        while stack and len(out) < limit:
+            current = stack.pop()
+            if isinstance(current, dict):
+                for k, v in current.items():
+                    if isinstance(v, list) and k.lower() in keys_candidates:
+                        for entry in v:
+                            if len(out) >= limit:
+                                break
+                            if not isinstance(entry, dict):
+                                continue
+                            # Basic fields
+                            pid = entry.get("id") or entry.get("propertyId") or entry.get("listingId")
+                            addr = entry.get("address") or entry.get("displayAddress") or default_location
+                            price_obj = entry.get("price") or {}
+                            price = price_obj.get("amount") or price_obj.get("price") or entry.get("price")
+                            if not pid or price is None:
+                                continue
+                            beds = entry.get("bedrooms") or entry.get("numBedrooms") or 0
+                            baths = entry.get("bathrooms") or entry.get("numBathrooms") or 0
+                            img = None
+                            media = entry.get("media") or []
+                            if isinstance(media, list):
+                                for m in media:
+                                    if isinstance(m, dict):
+                                        img = m.get("url") or m.get("mediaUrl") or img
+                                        if img:
+                                            break
+                            loc_lat = None
+                            loc_lng = None
+                            loc = entry.get("location") or {}
+                            if isinstance(loc, dict):
+                                loc_lat = loc.get("latitude")
+                                loc_lng = loc.get("longitude")
+                            out.append(
+                                {
+                                    "external_id": f"ot-{pid}",
+                                    "title": addr,
+                                    "location": addr,
+                                    "price": price,
+                                    "bedrooms": beds,
+                                    "bathrooms": baths,
+                                    "image_url": img,
+                                    "latitude": loc_lat or 0.0,
+                                    "longitude": loc_lng or 0.0,
+                                    "source": "onthemarket",
+                                    "raw_url": f"https://www.onthemarket.com/details/{pid}",
+                                }
+                            )
+                    elif isinstance(v, dict):
+                        stack.append(v)
+            # Ignore other types
+        if len(out) >= limit:
+            break
+    if out:
+        capture_debug_json("otm_json_summary", {"count": len(out)})
+    return out

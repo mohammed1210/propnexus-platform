@@ -1,12 +1,13 @@
 import os
 import re
 import time
+import asyncio
 import aiohttp
 from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
 
 from ..utils.postcode import get_lat_lng_from_postcode
-from ..utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html
+from ..utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html, capture_debug_json
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -19,6 +20,11 @@ SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 RM_MAX_PAGES = int(os.getenv("RM_MAX_PAGES", "1"))
 RM_DELAY_MS = int(os.getenv("RM_DELAY_MS", "800"))  # delay between pages (ms)
+_LOCATION_IDENTIFIER = {
+    # Common region codes; extend as needed (URL-encoded caret)
+    "london": "REGION%5E87490",
+}
+RIGHTMOVE_API_BASE = "https://www.rightmove.co.uk/api/_search"
 
 
 def _looks_blocked(html: str, status: int) -> bool:
@@ -35,9 +41,11 @@ def _build_search_url(location: str, page: int = 0) -> str:
     NOTE: For higher accuracy you may resolve locationIdentifier separately.
     """
     encoded = location.strip()
+    loc_key = encoded.lower()
     base = "https://www.rightmove.co.uk/property-for-sale/find.html"
     params = [
-        f"searchLocation={encoded}",
+        # Prefer region identifier when known; improves reliability
+        f"locationIdentifier={_LOCATION_IDENTIFIER.get(loc_key, '')}" if loc_key in _LOCATION_IDENTIFIER else f"searchLocation={encoded}",
         "sortType=2",
         "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
         "furnishTypes=&keywords=",
@@ -156,6 +164,20 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
     results: List[Dict[str, Any]] = []
 
     async with aiohttp.ClientSession() as session:
+        # 1. Attempt JSON API first for efficiency & reliability
+        loc_key = location.lower()
+        region_id = _LOCATION_IDENTIFIER.get(loc_key)
+        api_results: List[Dict[str, Any]] = []
+        if region_id:
+            try:
+                api_results = await _fetch_api_properties(session, region_id, limit)
+                if api_results:
+                    print(f"✅ Rightmove API returned {len(api_results)} properties for '{location}'")
+                    return api_results[:limit]
+                else:
+                    print("ℹ️ Rightmove API returned zero properties; falling back to HTML scraping.")
+            except Exception as e:
+                print(f"⚠️ Rightmove API fetch error: {e}; falling back to HTML scraping.")
         for page in range(RM_MAX_PAGES):
             url = _build_search_url(location, page)
             html = await _fetch_html(session, url)
@@ -250,3 +272,96 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
 # Convenience wrapper matching previous signature (kept for backward compatibility)
 async def scrape_rightmove_properties_default():
     return await scrape_rightmove_properties(location="London")
+
+
+async def _fetch_api_properties(session: aiohttp.ClientSession, region_id: str, limit: int) -> List[Dict[str, Any]]:
+    """Fetch properties via the undocumented Rightmove JSON search API.
+
+    Endpoint example:
+    https://www.rightmove.co.uk/api/_search?locationIdentifier=REGION%5E87490&numberOfPropertiesPerPage=24&sortType=2&index=0&channel=BUY
+    We paginate by incrementing index in steps of 24 until limit reached or empty batch.
+    """
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://www.rightmove.co.uk/",
+    }
+    out: List[Dict[str, Any]] = []
+    page_size = 24
+    index = 0
+    while len(out) < limit:
+        params = [
+            f"locationIdentifier={region_id}",
+            f"numberOfPropertiesPerPage={page_size}",
+            "sortType=2",
+            f"index={index}",
+            "channel=BUY",
+        ]
+        url = f"{RIGHTMOVE_API_BASE}?{'&'.join(params)}"
+        try:
+            async with session.get(url, headers=headers, timeout=35) as resp:
+                if resp.status != 200:
+                    break
+                data = await resp.json(content_type=None)
+        except Exception:
+            break
+        if not data or "properties" not in data:
+            capture_debug_json(f"rightmove_api_empty_{index}", data if isinstance(data, dict) else {"raw": str(data)})
+            break
+        props = data.get("properties", [])
+        if not props:
+            break
+        for p in props:
+            if len(out) >= limit:
+                break
+            try:
+                property_id = str(p.get("id") or p.get("propertyId") or p.get("identifier") or p.get("listingId") or "")
+                if not property_id:
+                    continue
+                title = p.get("displayAddress") or p.get("address") or p.get("summary") or "Untitled"
+                price_obj = p.get("price") or {}
+                price = price_obj.get("amount") or price_obj.get("price") or None
+                bedrooms = p.get("bedrooms") or p.get("numBedrooms") or 0
+                bathrooms = p.get("bathrooms") or p.get("numBathrooms") or 0
+                img = None
+                media = p.get("media") or []
+                if isinstance(media, list) and media:
+                    for m in media:
+                        if isinstance(m, dict):
+                            img = m.get("url") or m.get("mediaUrl") or img
+                            if img:
+                                break
+                loc_text = title
+                loc_lat = None
+                loc_lng = None
+                geo = p.get("location") or {}
+                if isinstance(geo, dict):
+                    loc_lat = geo.get("latitude")
+                    loc_lng = geo.get("longitude")
+                coords = {"latitude": loc_lat or 0.0, "longitude": loc_lng or 0.0}
+                out.append(
+                    {
+                        "external_id": property_id,
+                        "title": str(title).strip(),
+                        "location": loc_text,
+                        "price": price,
+                        "bedrooms": bedrooms,
+                        "bathrooms": bathrooms,
+                        "image_url": img,
+                        "latitude": coords["latitude"],
+                        "longitude": coords["longitude"],
+                        "source": "rightmove",
+                        "raw_url": f"https://www.rightmove.co.uk/properties/{property_id}",
+                    }
+                )
+            except Exception:
+                continue
+        # If fewer than page_size returned, stop early
+        if len(props) < page_size:
+            break
+        index += page_size
+        # Polite pacing
+        await asyncio.sleep(0.5)
+    if out:
+        capture_debug_json("rightmove_api_batch", {"count": len(out)})
+    return out
