@@ -1,4 +1,6 @@
 // scripts/sources/zoopla.ts
+// Zoopla scraper with enhanced data capture features.
+// Enhanced with property_type extraction, image quality ranking, and detail page scraping.
 import * as cheerio from 'cheerio';
 import { request } from 'undici';
 
