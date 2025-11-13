@@ -162,7 +162,7 @@ export default function OffMarketPage() {
       const { data, error } = await sb.from('off_market_deals').insert(toInsert).select('*');
       if (error) throw error;
 
-      setRows((prev) => [...(data as OffMarket[]), ...prev]);
+      setRows((prev) => [...(data as DBRow[]), ...prev]);
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'Failed to generate / save deals.');

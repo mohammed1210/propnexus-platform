@@ -1,5 +1,9 @@
 'use client';
 
+// Note: This file intentionally uses a minimal props type
+// so that it remains compatible with Next's generated PageProps
+// check in .next/types without depending on local helpers.
+
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Section from '@/components/ui/Section';
@@ -9,13 +13,33 @@ import { getSupabase } from '@/lib/supabaseClient';
 import type { OffMarketDeal } from '@/lib/offmarket/types';
 import { ensureDerivedFields, formatCurrency, formatDate } from '@/lib/offmarket/utils';
 
-export default function DealDetail({ params }: { params: { id: string } }) {
-  const { id } = params;
+// Match Next's generated PageProps exactly: params/searchParams as Promises.
+type PageProps = {
+  params?: Promise<{ id: string }>;
+  searchParams?: Promise<Record<string, unknown>>;
+};
+
+export default function DealDetail({ params }: PageProps) {
+  const [id, setId] = useState<string | null>(null);
   const sb = useMemo(() => getSupabase(), []);
   const [row, setRow] = useState<OffMarketDeal | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!params) return;
+      const resolved = await params;
+      if (cancelled) return;
+      setId(resolved.id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params]);
+
+  useEffect(() => {
+    if (!id) return;
     let ignore = false;
     (async () => {
       setLoading(true);
