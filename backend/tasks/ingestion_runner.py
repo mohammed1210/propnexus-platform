@@ -51,7 +51,7 @@ else:  # pragma: no cover
 
 def _load_locations() -> List[str]:
     raw = os.getenv("INGEST_LOCATIONS", "London,Manchester,Liverpool,Birmingham")
-    return [l.strip() for l in raw.split(",") if l.strip()]
+    return [part.strip() for part in raw.split(",") if part.strip()]
 
 
 def _chunk(items, size=100):
