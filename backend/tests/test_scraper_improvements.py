@@ -63,6 +63,45 @@ def test_scraper_functions_exist():
     return all_ok
 
 
+def test_property_type_extraction():
+    """Test property type extraction and normalization."""
+    from backend.scraper.rightmove_scraper import _normalize_property_type
+    from backend.scraper.zoopla_scraper import _normalize_property_type as zp_normalize
+    
+    # Test Rightmove property type normalization
+    test_cases = [
+        ("2 bedroom flat for sale", "flat"),
+        ("3 bed detached house", "detached"),
+        ("Semi-detached property", "semi-detached"),
+        ("Terraced house with garden", "terraced"),
+        ("Studio apartment", "studio"),
+        ("Beautiful bungalow", "bungalow"),
+        ("Modern maisonette", "maisonette"),
+        ("Charming cottage", "cottage"),
+        ("", None),
+        (None, None),
+    ]
+    
+    all_ok = True
+    for text, expected in test_cases:
+        result = _normalize_property_type(text)
+        if result == expected:
+            print(f"✓ _normalize_property_type('{text}') = {result}")
+        else:
+            print(f"✗ _normalize_property_type('{text}') = {result}, expected {expected}")
+            all_ok = False
+    
+    # Test Zoopla property type normalization (should work the same way)
+    result = zp_normalize("Luxury flat in London")
+    if result == "flat":
+        print(f"✓ Zoopla _normalize_property_type works")
+    else:
+        print(f"✗ Zoopla _normalize_property_type failed")
+        all_ok = False
+    
+    return all_ok
+
+
 def test_validation_functions():
     """Test validation utility functions."""
     from backend.utils.validation import (
@@ -151,6 +190,7 @@ def main():
         ("Import scrapers", test_scraper_imports),
         ("Import utilities", test_utility_imports),
         ("Scraper functions exist", test_scraper_functions_exist),
+        ("Property type extraction", test_property_type_extraction),
         ("Validation functions", test_validation_functions),
         ("Retry logic", test_retry_logic),
         ("Logger statistics", test_logger_stats),

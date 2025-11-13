@@ -154,7 +154,9 @@ def _normalize_property_type(text: str) -> Optional[str]:
     
     lower = text.lower()
     
-    # Check for common property types
+    # Check for common property types (order matters - check studio before flat!)
+    if 'studio' in lower:
+        return 'studio'
     if 'flat' in lower or 'apartment' in lower:
         return 'flat'
     if 'detached' in lower and 'semi' not in lower:
@@ -167,8 +169,6 @@ def _normalize_property_type(text: str) -> Optional[str]:
         return 'bungalow'
     if 'house' in lower:
         return 'house'
-    if 'studio' in lower:
-        return 'studio'
     if 'maisonette' in lower:
         return 'maisonette'
     if 'cottage' in lower:
