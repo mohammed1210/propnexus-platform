@@ -67,7 +67,7 @@ def _normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(image_url, str) and image_url:
         image_urls = [image_url]
 
-    return {
+    out = {
         "external_id": external_id,
         "title": title,
         "description": None,
@@ -84,6 +84,14 @@ def _normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
         "image_urls": image_urls,
         "data": {"raw": item},
     }
+    # Remove keys not present in schema to avoid PostgREST errors
+    # (Schema currently excludes 'address' if the error is due to cache mismatch, fallback.)
+    # Validate against known columns list
+    allowed = {
+        "external_id","title","description","price","bedrooms","bathrooms","property_type",
+        "address","postcode","latitude","longitude","source","url","image_urls","data"
+    }
+    return {k: v for k, v in out.items() if k in allowed}
 
 
 def _dedupe(items: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -114,4 +122,20 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
         merged_raw.extend(list(chunk))
 
     normalized = [_normalize_item(i) for i in merged_raw]
-    return _dedupe(normalized)
+
+    # Basic validation: ensure price is a positive int and we have a url or external_id
+    def _valid(p: Dict[str, Any]) -> bool:
+        price = p.get("price")
+        has_identity = bool(p.get("url") or (p.get("source") and p.get("external_id")))
+        # Accept if we can identify the listing; require price > 0 only when present
+        if not has_identity:
+            return False
+        if price is None:
+            return True
+        try:
+            return isinstance(price, (int, float)) and int(price) > 0
+        except Exception:
+            return False
+
+    filtered = [p for p in normalized if _valid(p)]
+    return _dedupe(filtered)

@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from fastapi import BackgroundTasks
 
 from ..utils.postcode import get_lat_lng_from_postcode
+from ..utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -147,8 +148,16 @@ async def scrape_zoopla_properties(
             soup = BeautifulSoup(html, "html.parser")
             cards = _collect_cards(soup)
             if not cards:
-                print("ℹ️ No Zoopla cards found; stopping.")
-                break
+                if PLAYWRIGHT_ENABLE:
+                    rendered = await render_page(url, ["[data-testid='search-result']", ".c-propertyCard", ".l-searchResult"])
+                    if rendered:
+                        soup = BeautifulSoup(rendered, "html.parser")
+                        cards = _collect_cards(soup)
+                        if not cards:
+                            capture_debug_html(f"zoopla_empty_{page}", rendered)
+                if not cards:
+                    print("ℹ️ No Zoopla cards found; stopping.")
+                    break
 
             for card in cards:
                 if len(results) >= limit:

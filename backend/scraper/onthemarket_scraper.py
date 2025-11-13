@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
 
 from ..utils.postcode import get_lat_lng_from_postcode
+from ..utils.render import render_page, PLAYWRIGHT_ENABLE
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -186,8 +187,14 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
             cards = _collect_cards(soup)
 
             if not cards:
-                print(f"ℹ️ OnTheMarket: No cards found on page {page}; stopping pagination.")
-                break
+                if PLAYWRIGHT_ENABLE:
+                    rendered = await render_page(url)
+                    if rendered:
+                        soup = BeautifulSoup(rendered, "html.parser")
+                        cards = _collect_cards(soup)
+                if not cards:
+                    print(f"ℹ️ OnTheMarket: No cards found on page {page}; stopping pagination.")
+                    break
 
             for card in cards:
                 if len(results) >= limit:

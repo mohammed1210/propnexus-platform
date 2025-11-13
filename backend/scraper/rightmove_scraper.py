@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
 
 from ..utils.postcode import get_lat_lng_from_postcode
+from ..utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -158,14 +159,23 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
         for page in range(RM_MAX_PAGES):
             url = _build_search_url(location, page)
             html = await _fetch_html(session, url)
+            # Playwright fallback if enabled and static HTML yielded no cards later
             if not html:
                 print(f"⚠️ Skipping page {page} (blocked or empty)")
                 continue
             soup = BeautifulSoup(html, "html.parser")
             cards = _collect_selectors(soup)
             if not cards:
-                print("ℹ️ No cards found; stopping pagination.")
-                break
+                if PLAYWRIGHT_ENABLE:
+                    rendered = await render_page(url, ["[data-testid='propertyCard']", "article.propertyCard", ".propertyCard"])
+                    if rendered:
+                        soup = BeautifulSoup(rendered, "html.parser")
+                        cards = _collect_selectors(soup)
+                        if not cards:
+                            capture_debug_html(f"rightmove_empty_{page}", rendered)
+                if not cards:
+                    print("ℹ️ No cards found; stopping pagination.")
+                    break
 
             for card in cards:
                 if len(results) >= limit:

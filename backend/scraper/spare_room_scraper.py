@@ -3,6 +3,7 @@ import re
 import time
 import aiohttp
 from typing import List, Dict, Any, Optional
+import hashlib
 from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
 
@@ -145,23 +146,31 @@ async def _enrich_coordinates(location: str) -> Dict[str, float]:
         return {"latitude": 0.0, "longitude": 0.0}
 
 
-def _extract_external_id(card: BeautifulSoup, title: str, location: str) -> str:
+def _extract_external_id(card: BeautifulSoup, title: str, location: str, search_url: str) -> str:
     """
     Extract external ID from card. If not parseable, generate hash-based ID.
     """
     # Try data-id or href pattern
-    data_id = card.get("data-id")
+    # Common id attributes
+    data_id = card.get("data-advert-id") or card.get("data-listing-id") or card.get("data-id")
     if data_id:
         return f"sr-{data_id}"
 
-    link = card.select_one("a[href*='/flatshare/flatshare_detail.pl']")
+    # Try to extract from any link href
+    link = card.select_one("a[href]")
     if link and link.get("href"):
-        m = re.search(r"flatshare_id=(\d+)", link.get("href"))
+        href = link.get("href")
+        m = re.search(r"flatshare_id=(\d+)", href)
         if m:
             return f"sr-{m.group(1)}"
+        m2 = re.search(r"(\d{6,})", href)
+        if m2:
+            return f"sr-{m2.group(1)}"
 
-    # Fallback: hash of title + location
-    return f"sr-{hash(title + location) & 0xffffffff}"
+    # Fallback: stable hash of title+location+search_url+first_link
+    basis = f"{title}|{location}|{search_url}|{link.get('href') if link else ''}"
+    digest = hashlib.sha1(basis.encode("utf-8", errors="ignore")).hexdigest()[:10]
+    return f"sr-{digest}"
 
 
 async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Dict[str, Any]]:
@@ -243,7 +252,7 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                         )
 
                     # Generate external ID
-                    external_id = _extract_external_id(card, title, location_text)
+                    external_id = _extract_external_id(card, title, location_text, url)
 
                     # Deduplicate by external_id
                     if external_id in seen_ids:

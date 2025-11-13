@@ -22,6 +22,14 @@ import logging
 from typing import List
 
 try:
+    # Load environment variables from .env and .env.local at repo root if present
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()  # .env
+    load_dotenv('.env.local', override=True)  # .env.local
+except Exception:
+    pass
+
+try:
     from supabase import create_client  # type: ignore
 except Exception:  # pragma: no cover
     create_client = None  # type: ignore
@@ -59,7 +67,8 @@ async def _ingest_location(location: str) -> int:
         if sb and normalized:
             for batch in _chunk(normalized):
                 try:
-                    sb.table("properties").upsert(batch).execute()  # type: ignore
+                    # Ensure upsert resolves on (source,external_id) as a single param value
+                    sb.table("properties").upsert(batch, on_conflict="source,external_id").execute()  # type: ignore
                 except Exception as e:  # pragma: no cover
                     logging.warning("Upsert failed for batch (%s): %s", location, e)
         dur = (time.time() - start) * 1000
