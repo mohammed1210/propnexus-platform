@@ -9,6 +9,9 @@ from urllib.parse import quote_plus
 from ..utils.postcode import get_lat_lng_from_postcode
 from ..utils.render import render_page, PLAYWRIGHT_ENABLE, render_page_capture
 from ..utils.render import capture_debug_html, capture_debug_json
+from ..utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
+from ..utils.retry import retry_async
+from ..utils.validation import validate_property_data, should_insert_property, clean_property_data
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -45,10 +48,8 @@ def _build_search_url(location: str, page: int = 0) -> str:
     return f"{base}?view=grid"
 
 
-async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]:
-    """
-    Fetch HTML with direct mode first, fallback to ScraperAPI if blocked.
-    """
+async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Optional[str]:
+    """Internal fetch function with retry logic."""
     headers = {"User-Agent": USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
     # Direct fetch
     try:
@@ -56,10 +57,12 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
             text = await resp.text()
             if _looks_blocked(text, resp.status) and SCRAPER_MODE == "direct" and SCRAPERAPI_KEY:
                 # Fallback to ScraperAPI
+                log_scraperapi_fallback("onthemarket", url)
                 proxy_url = (
-                    f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+                    f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}"
+                    f"&country_code=gb&render=true&device_type=desktop"
                 )
-                async with session.get(proxy_url, headers=headers, timeout=45) as p_resp:
+                async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
                     p_text = await p_resp.text()
                     if _looks_blocked(p_text, p_resp.status):
                         return None
@@ -68,10 +71,11 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
     except Exception:
         if SCRAPER_MODE == "scraperapi" and SCRAPERAPI_KEY:
             proxy_url = (
-                f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+                f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}"
+                f"&country_code=gb&render=true&device_type=desktop"
             )
             try:
-                async with session.get(proxy_url, headers=headers, timeout=45) as p_resp:
+                async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
                     p_text = await p_resp.text()
                     if _looks_blocked(p_text, p_resp.status):
                         return None
@@ -79,6 +83,18 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
             except Exception:
                 return None
         return None
+
+
+async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]:
+    """Fetch HTML with retry logic and exponential backoff."""
+    return await retry_async(
+        _fetch_html_internal,
+        session,
+        url,
+        max_retries=3,
+        base_delay=2.0,
+        exceptions=(aiohttp.ClientError,)
+    )
 
 
 def _parse_price(raw: str) -> Optional[int]:
@@ -101,6 +117,70 @@ def _extract_int(text: str) -> Optional[int]:
         return None
     m = re.search(r"\d+", text)
     return int(m.group(0)) if m else None
+
+
+def _extract_images(card: BeautifulSoup) -> List[str]:
+    """Extract all image URLs from a property card."""
+    images = []
+    
+    for img in card.select("img"):
+        url = (
+            img.get("data-src") or 
+            img.get("src") or 
+            img.get("data-lazy-src") or
+            img.get("data-original")
+        )
+        
+        if url and isinstance(url, str):
+            url = url.strip()
+            if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1', 'pixel']):
+                if url.startswith('//'):
+                    url = 'https:' + url
+                elif url.startswith('/'):
+                    url = 'https://www.onthemarket.com' + url
+                images.append(url)
+    
+    # Check srcset
+    for img in card.select("img[srcset]"):
+        srcset = img.get("srcset", "")
+        if srcset:
+            for item in srcset.split(','):
+                parts = item.strip().split()
+                if parts:
+                    url = parts[0].strip()
+                    if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1']):
+                        if url.startswith('//'):
+                            url = 'https:' + url
+                        elif url.startswith('/'):
+                            url = 'https://www.onthemarket.com' + url
+                        images.append(url)
+    
+    # De-duplicate
+    seen = set()
+    unique_images = []
+    for img in images:
+        if img not in seen:
+            seen.add(img)
+            unique_images.append(img)
+    
+    return unique_images
+
+
+def _extract_description(card: BeautifulSoup) -> Optional[str]:
+    """Extract property description from a card."""
+    desc_el = (
+        card.select_one(".property-description") or
+        card.select_one("[data-testid='description']") or
+        card.select_one(".description") or
+        card.select_one(".otm-Description")
+    )
+    
+    if desc_el:
+        desc = desc_el.get_text(" ", strip=True)
+        if desc and len(desc) > 20:
+            return desc
+    
+    return None
 
 
 def _collect_cards(soup: BeautifulSoup) -> List[BeautifulSoup]:
@@ -169,10 +249,11 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
     Scrape OnTheMarket properties for a given location.
 
     Returns list of dicts with keys:
-    - external_id, title, location, price, bedrooms, bathrooms,
-      image_url, latitude, longitude, source ("onthemarket"), raw_url
+    - external_id, title, description, location, price, bedrooms, bathrooms,
+      image_url, image_urls, latitude, longitude, source ("onthemarket"), raw_url
     """
-    print(f"🔍 Scraping OnTheMarket for location='{location}' (mode={SCRAPER_MODE})")
+    log_scrape_start("onthemarket", location, SCRAPER_MODE)
+    stats = ScraperStats("onthemarket", location)
     results: List[Dict[str, Any]] = []
     seen_ids = set()
 
@@ -181,7 +262,7 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
             url = _build_search_url(location, page)
             html = await _fetch_html(session, url)
             if not html:
-                print(f"⚠️ OnTheMarket: Skipping page {page} (blocked or empty)")
+                log_page_fetch_error("onthemarket", page, "blocked or empty")
                 continue
 
             soup = BeautifulSoup(html, "html.parser")
@@ -205,9 +286,15 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                         extracted = _extract_from_otm_json(payloads, limit - len(results), location)
                         for item in extracted:
                             if item["external_id"] in seen_ids:
+                                stats.log_duplicate_id(item["external_id"])
                                 continue
                             seen_ids.add(item["external_id"])
-                            results.append(item)
+                            should_insert, reason = should_insert_property(item)
+                            if should_insert:
+                                results.append(clean_property_data(item))
+                                stats.log_parse_success()
+                            else:
+                                stats.log_validation_failure(reason or "Unknown")
                         if extracted:
                             print(f"✅ OnTheMarket JSON extracted {len(extracted)} properties")
                     if not cards and not payloads:
@@ -218,6 +305,7 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                     break
 
             for card in cards:
+                stats.log_card_found()
                 if len(results) >= limit:
                     break
 
@@ -258,39 +346,61 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                     bath_match = re.search(r"(\d+)\s*bath", summary_text, re.IGNORECASE)
                     bathrooms = int(bath_match.group(1)) if bath_match else 0
 
-                    # Extract image
-                    img_el = card.select_one("img")
-                    image_url = img_el.get("data-src") or img_el.get("src") if img_el else None
+                    # Extract all images
+                    image_urls = _extract_images(card)
+                    image_url = image_urls[0] if image_urls else None
+                    log_image_extraction("onthemarket", title, len(image_urls))
+                    
+                    # Extract description
+                    description = _extract_description(card)
 
                     # Generate external ID
                     external_id = _extract_external_id(card, title, location_text)
 
                     # Deduplicate by external_id
                     if external_id in seen_ids:
+                        stats.log_duplicate_id(external_id)
                         continue
                     seen_ids.add(external_id)
 
                     # Enrich with coordinates
                     coords = await _enrich_coordinates(location_text)
 
-                    results.append(
-                        {
-                            "external_id": external_id,
-                            "title": title,
-                            "location": location_text,
-                            "price": price,
-                            "bedrooms": bedrooms,
-                            "bathrooms": bathrooms,
-                            "image_url": image_url,
-                            "latitude": coords["latitude"],
-                            "longitude": coords["longitude"],
-                            "source": "onthemarket",
-                            "raw_url": url,
-                        }
-                    )
+                    property_data = {
+                        "external_id": external_id,
+                        "title": title,
+                        "description": description,
+                        "location": location_text,
+                        "price": price,
+                        "bedrooms": bedrooms,
+                        "bathrooms": bathrooms,
+                        "image_url": image_url,
+                        "image_urls": image_urls,
+                        "latitude": coords["latitude"],
+                        "longitude": coords["longitude"],
+                        "source": "onthemarket",
+                        "raw_url": url,
+                    }
+                    
+                    # Track missing fields
+                    if not image_url:
+                        stats.log_missing_field("image_url", external_id)
+                    if not description:
+                        stats.log_missing_field("description", external_id)
+                    if not price:
+                        stats.log_missing_field("price", external_id)
+                    
+                    # Validate before adding
+                    should_insert, reason = should_insert_property(property_data)
+                    if should_insert:
+                        results.append(clean_property_data(property_data))
+                        stats.log_parse_success()
+                    else:
+                        stats.log_validation_failure(reason or "Unknown")
+                        
                 except Exception as e:
                     # Defensive: ignore parse exceptions
-                    print(f"❌ OnTheMarket: Error parsing card: {e}")
+                    stats.log_parse_failure(str(e))
 
             if len(results) >= limit:
                 break
@@ -298,6 +408,7 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
             # Polite delay between pages
             time.sleep(OT_DELAY_MS / 1000.0)
 
+    stats.log_summary()
     print(f"✅ Scraped {len(results)} OnTheMarket properties for '{location}'")
     return results
 
@@ -327,20 +438,33 @@ def _extract_from_otm_json(payloads: List[Dict[str, Any]], limit: int, default_l
                             # Basic fields
                             pid = entry.get("id") or entry.get("propertyId") or entry.get("listingId")
                             addr = entry.get("address") or entry.get("displayAddress") or default_location
+                            
+                            # Extract description
+                            description = entry.get("description") or entry.get("summary") or None
+                            if description and isinstance(description, str) and len(description) > 20:
+                                description = description.strip()
+                            else:
+                                description = None
+                            
                             price_obj = entry.get("price") or {}
                             price = price_obj.get("amount") or price_obj.get("price") or entry.get("price")
                             if not pid or price is None:
                                 continue
                             beds = entry.get("bedrooms") or entry.get("numBedrooms") or 0
                             baths = entry.get("bathrooms") or entry.get("numBathrooms") or 0
-                            img = None
+                            
+                            # Extract all images
+                            image_urls = []
                             media = entry.get("media") or []
                             if isinstance(media, list):
                                 for m in media:
                                     if isinstance(m, dict):
-                                        img = m.get("url") or m.get("mediaUrl") or img
-                                        if img:
-                                            break
+                                        img = m.get("url") or m.get("mediaUrl")
+                                        if img and isinstance(img, str):
+                                            image_urls.append(img)
+                            
+                            img = image_urls[0] if image_urls else None
+                            
                             loc_lat = None
                             loc_lng = None
                             loc = entry.get("location") or {}
@@ -351,11 +475,13 @@ def _extract_from_otm_json(payloads: List[Dict[str, Any]], limit: int, default_l
                                 {
                                     "external_id": f"ot-{pid}",
                                     "title": addr,
+                                    "description": description,
                                     "location": addr,
                                     "price": price,
                                     "bedrooms": beds,
                                     "bathrooms": baths,
                                     "image_url": img,
+                                    "image_urls": image_urls,
                                     "latitude": loc_lat or 0.0,
                                     "longitude": loc_lng or 0.0,
                                     "source": "onthemarket",
