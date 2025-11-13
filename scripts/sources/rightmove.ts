@@ -1,5 +1,6 @@
 // scripts/sources/rightmove.ts
 // Rightmove scraper with gateway selection, JS-render toggle and retries.
+// Enhanced with property_type extraction, image quality ranking, and detail page scraping.
 
 import fs from 'node:fs';
 import path from 'node:path';
