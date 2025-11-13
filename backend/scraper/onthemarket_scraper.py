@@ -7,11 +7,11 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
 
 from utils.postcode import get_lat_lng_from_postcode
-from utils.render import render_page, PLAYWRIGHT_ENABLE, render_page_capture
+from utils.render import PLAYWRIGHT_ENABLE, render_page_capture
 from utils.render import capture_debug_html, capture_debug_json
 from utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
 from utils.retry import retry_async
-from utils.validation import validate_property_data, should_insert_property, clean_property_data
+from utils.validation import should_insert_property, clean_property_data
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -122,15 +122,15 @@ def _extract_int(text: str) -> Optional[int]:
 def _extract_images(card: BeautifulSoup) -> List[str]:
     """Extract all image URLs from a property card."""
     images = []
-    
+
     for img in card.select("img"):
         url = (
-            img.get("data-src") or 
-            img.get("src") or 
+            img.get("data-src") or
+            img.get("src") or
             img.get("data-lazy-src") or
             img.get("data-original")
         )
-        
+
         if url and isinstance(url, str):
             url = url.strip()
             if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1', 'pixel']):
@@ -139,7 +139,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
                 elif url.startswith('/'):
                     url = 'https://www.onthemarket.com' + url
                 images.append(url)
-    
+
     # Check srcset
     for img in card.select("img[srcset]"):
         srcset = img.get("srcset", "")
@@ -154,7 +154,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
                         elif url.startswith('/'):
                             url = 'https://www.onthemarket.com' + url
                         images.append(url)
-    
+
     # De-duplicate
     seen = set()
     unique_images = []
@@ -162,7 +162,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
         if img not in seen:
             seen.add(img)
             unique_images.append(img)
-    
+
     return unique_images
 
 
@@ -174,12 +174,12 @@ def _extract_description(card: BeautifulSoup) -> Optional[str]:
         card.select_one(".description") or
         card.select_one(".otm-Description")
     )
-    
+
     if desc_el:
         desc = desc_el.get_text(" ", strip=True)
         if desc and len(desc) > 20:
             return desc
-    
+
     return None
 
 
@@ -350,7 +350,7 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                     image_urls = _extract_images(card)
                     image_url = image_urls[0] if image_urls else None
                     log_image_extraction("onthemarket", title, len(image_urls))
-                    
+
                     # Extract description
                     description = _extract_description(card)
 
@@ -381,7 +381,7 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                         "source": "onthemarket",
                         "raw_url": url,
                     }
-                    
+
                     # Track missing fields
                     if not image_url:
                         stats.log_missing_field("image_url", external_id)
@@ -389,7 +389,7 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                         stats.log_missing_field("description", external_id)
                     if not price:
                         stats.log_missing_field("price", external_id)
-                    
+
                     # Validate before adding
                     should_insert, reason = should_insert_property(property_data)
                     if should_insert:
@@ -397,7 +397,7 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                         stats.log_parse_success()
                     else:
                         stats.log_validation_failure(reason or "Unknown")
-                        
+
                 except Exception as e:
                     # Defensive: ignore parse exceptions
                     stats.log_parse_failure(str(e))
@@ -438,21 +438,21 @@ def _extract_from_otm_json(payloads: List[Dict[str, Any]], limit: int, default_l
                             # Basic fields
                             pid = entry.get("id") or entry.get("propertyId") or entry.get("listingId")
                             addr = entry.get("address") or entry.get("displayAddress") or default_location
-                            
+
                             # Extract description
                             description = entry.get("description") or entry.get("summary") or None
                             if description and isinstance(description, str) and len(description) > 20:
                                 description = description.strip()
                             else:
                                 description = None
-                            
+
                             price_obj = entry.get("price") or {}
                             price = price_obj.get("amount") or price_obj.get("price") or entry.get("price")
                             if not pid or price is None:
                                 continue
                             beds = entry.get("bedrooms") or entry.get("numBedrooms") or 0
                             baths = entry.get("bathrooms") or entry.get("numBathrooms") or 0
-                            
+
                             # Extract all images
                             image_urls = []
                             media = entry.get("media") or []
@@ -462,9 +462,9 @@ def _extract_from_otm_json(payloads: List[Dict[str, Any]], limit: int, default_l
                                         img = m.get("url") or m.get("mediaUrl")
                                         if img and isinstance(img, str):
                                             image_urls.append(img)
-                            
+
                             img = image_urls[0] if image_urls else None
-                            
+
                             loc_lat = None
                             loc_lng = None
                             loc = entry.get("location") or {}

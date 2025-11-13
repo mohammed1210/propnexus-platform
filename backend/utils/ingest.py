@@ -66,13 +66,13 @@ def _normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
 
     # Handle image_urls array - combine from both sources
     image_urls: List[str] = []
-    
+
     # Add images from image_urls array if present
     if "image_urls" in item and isinstance(item["image_urls"], list):
         for img in item["image_urls"]:
             if img and isinstance(img, str):
                 image_urls.append(img)
-    
+
     # Add single image_url if present and not already in list
     if isinstance(image_url, str) and image_url:
         if image_url not in image_urls:

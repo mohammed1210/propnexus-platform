@@ -58,31 +58,31 @@ async def retry_async(
         Last exception if all retries exhausted
     """
     last_exception = None
-    
+
     for attempt in range(max_retries + 1):
         try:
             return await func(*args, **kwargs)
         except exceptions as e:
             last_exception = e
-            
+
             if attempt >= max_retries:
                 logger.error(
                     f"All {max_retries} retries exhausted for {func.__name__}: {e}"
                 )
                 raise
-            
+
             delay = calculate_delay(attempt, base_delay)
-            
+
             if on_retry:
                 on_retry(attempt + 1, e)
-            
+
             logger.warning(
                 f"Retry {attempt + 1}/{max_retries} for {func.__name__} "
                 f"after {delay:.1f}s delay (error: {e})"
             )
-            
+
             await asyncio.sleep(delay)
-    
+
     # Should not reach here, but for type safety
     if last_exception:
         raise last_exception

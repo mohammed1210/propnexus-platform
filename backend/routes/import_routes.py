@@ -1,7 +1,7 @@
 # backend/routes/import_routes.py
 from __future__ import annotations
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
 try:
     from fastapi import APIRouter, HTTPException  # type: ignore

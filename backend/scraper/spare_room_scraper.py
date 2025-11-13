@@ -10,7 +10,7 @@ from urllib.parse import quote_plus
 from utils.postcode import get_lat_lng_from_postcode
 from utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
 from utils.retry import retry_async
-from utils.validation import validate_property_data, should_insert_property, clean_property_data
+from utils.validation import should_insert_property, clean_property_data
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -121,15 +121,15 @@ def _extract_int(text: str) -> Optional[int]:
 def _extract_images(card: BeautifulSoup) -> List[str]:
     """Extract all image URLs from a property card."""
     images = []
-    
+
     for img in card.select("img"):
         url = (
-            img.get("data-src") or 
+            img.get("data-src") or
             img.get("data-lazy") or
-            img.get("src") or 
+            img.get("src") or
             img.get("data-original")
         )
-        
+
         if url and isinstance(url, str):
             url = url.strip()
             if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1', 'pixel']):
@@ -138,7 +138,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
                 elif url.startswith('/'):
                     url = 'https://www.spareroom.co.uk' + url
                 images.append(url)
-    
+
     # De-duplicate
     seen = set()
     unique_images = []
@@ -146,7 +146,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
         if img not in seen:
             seen.add(img)
             unique_images.append(img)
-    
+
     return unique_images
 
 
@@ -157,12 +157,12 @@ def _extract_description(card: BeautifulSoup) -> Optional[str]:
         card.select_one(".description") or
         card.select_one("[data-testid='description']")
     )
-    
+
     if desc_el:
         desc = desc_el.get_text(" ", strip=True)
         if desc and len(desc) > 20:
             return desc
-    
+
     return None
 
 
@@ -311,7 +311,7 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                     image_urls = _extract_images(card)
                     image_url = image_urls[0] if image_urls else None
                     log_image_extraction("spareroom", title, len(image_urls))
-                    
+
                     # Extract description
                     description = _extract_description(card)
 
@@ -342,7 +342,7 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                         "source": "spareroom",
                         "raw_url": url,
                     }
-                    
+
                     # Track missing fields
                     if not image_url:
                         stats.log_missing_field("image_url", external_id)
@@ -350,7 +350,7 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                         stats.log_missing_field("description", external_id)
                     if not price:
                         stats.log_missing_field("price", external_id)
-                    
+
                     # Validate before adding
                     should_insert, reason = should_insert_property(property_data)
                     if should_insert:
@@ -358,7 +358,7 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                         stats.log_parse_success()
                     else:
                         stats.log_validation_failure(reason or "Unknown")
-                        
+
                 except Exception as e:
                     # Defensive: ignore parse exceptions
                     stats.log_parse_failure(str(e))

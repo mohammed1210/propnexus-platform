@@ -21,7 +21,7 @@ logger = logging.getLogger("scraper")
 
 class ScraperStats:
     """Track statistics for scraper runs."""
-    
+
     def __init__(self, source: str, location: str):
         self.source = source
         self.location = location
@@ -31,36 +31,36 @@ class ScraperStats:
         self.missing_fields: Dict[str, int] = defaultdict(int)
         self.validation_failures = 0
         self.duplicate_ids = 0
-    
+
     def log_card_found(self):
         """Record a card was found on the page."""
         self.total_cards_found += 1
-    
+
     def log_parse_success(self):
         """Record successful parse of a card."""
         self.successful_parses += 1
-    
+
     def log_parse_failure(self, error: str):
         """Record parse failure with error details."""
         self.parse_failures += 1
         logger.warning(f"[{self.source}] Parse failure for {self.location}: {error}")
-    
+
     def log_missing_field(self, field: str, context: Optional[str] = None):
         """Record a missing or null field."""
         self.missing_fields[field] += 1
         if context:
             logger.debug(f"[{self.source}] Missing {field} in {self.location}: {context}")
-    
+
     def log_validation_failure(self, reason: str):
         """Record validation failure."""
         self.validation_failures += 1
         logger.debug(f"[{self.source}] Validation failed for {self.location}: {reason}")
-    
+
     def log_duplicate_id(self, external_id: str):
         """Record duplicate ID."""
         self.duplicate_ids += 1
         logger.debug(f"[{self.source}] Duplicate ID skipped: {external_id}")
-    
+
     def log_summary(self):
         """Log final statistics."""
         logger.info(
@@ -71,7 +71,7 @@ class ScraperStats:
             f"validation_failed={self.validation_failures}, "
             f"duplicates={self.duplicate_ids}"
         )
-        
+
         if self.missing_fields:
             missing_summary = ", ".join(
                 f"{field}={count}" for field, count in sorted(self.missing_fields.items())
@@ -102,8 +102,8 @@ def log_scraperapi_fallback(source: str, url: str):
 
 
 def log_property_validation(
-    source: str, 
-    external_id: str, 
+    source: str,
+    external_id: str,
     issues: Dict[str, Any]
 ):
     """Log property validation issues."""

@@ -10,7 +10,7 @@ from utils.postcode import get_lat_lng_from_postcode
 from utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html
 from utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
 from utils.retry import retry_async
-from utils.validation import validate_property_data, should_insert_property, clean_property_data
+from utils.validation import should_insert_property, clean_property_data
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -124,11 +124,11 @@ def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
         card.select_one(".property-type") or
         card.select_one(".property-information")
     )
-    
+
     if type_el:
         type_text = type_el.get_text(" ", strip=True)
         return _normalize_property_type(type_text)
-    
+
     # Try to extract from title
     title = card.select_one("h2, [data-testid='listing-title']")
     if title:
@@ -136,7 +136,7 @@ def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
         prop_type = _normalize_property_type(title_text)
         if prop_type:
             return prop_type
-    
+
     return None
 
 
@@ -151,9 +151,9 @@ def _normalize_property_type(text: str) -> Optional[str]:
     """
     if not text:
         return None
-    
+
     lower = text.lower()
-    
+
     # Check for common property types (order matters - check studio before flat!)
     if 'studio' in lower:
         return 'studio'
@@ -173,22 +173,22 @@ def _normalize_property_type(text: str) -> Optional[str]:
         return 'maisonette'
     if 'cottage' in lower:
         return 'cottage'
-    
+
     return None
 
 
 def _extract_images(card: BeautifulSoup) -> List[str]:
     """Extract all image URLs from a property card."""
     images = []
-    
+
     for img in card.select("img"):
         url = (
-            img.get("data-src") or 
-            img.get("src") or 
+            img.get("data-src") or
+            img.get("src") or
             img.get("data-lazy-src") or
             img.get("data-original")
         )
-        
+
         if url and isinstance(url, str):
             url = url.strip()
             if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1', 'pixel']):
@@ -197,7 +197,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
                 elif url.startswith('/'):
                     url = 'https://www.zoopla.co.uk' + url
                 images.append(url)
-    
+
     # Check srcset
     for img in card.select("img[srcset]"):
         srcset = img.get("srcset", "")
@@ -212,7 +212,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
                         elif url.startswith('/'):
                             url = 'https://www.zoopla.co.uk' + url
                         images.append(url)
-    
+
     # De-duplicate
     seen = set()
     unique_images = []
@@ -220,7 +220,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
         if img not in seen:
             seen.add(img)
             unique_images.append(img)
-    
+
     return unique_images
 
 
@@ -232,12 +232,12 @@ def _extract_description(card: BeautifulSoup) -> Optional[str]:
         card.select_one(".property-description") or
         card.select_one("[itemprop='description']")
     )
-    
+
     if desc_el:
         desc = desc_el.get_text(" ", strip=True)
         if desc and len(desc) > 20:
             return desc
-    
+
     return None
 
 
@@ -352,10 +352,10 @@ async def scrape_zoopla_properties(
                     image_urls = _extract_images(card)
                     image_url = image_urls[0] if image_urls else None
                     log_image_extraction("zoopla", title, len(image_urls))
-                    
+
                     # Extract description
                     description = _extract_description(card)
-                    
+
                     # Extract property type
                     property_type = _extract_property_type(card)
 
@@ -378,7 +378,7 @@ async def scrape_zoopla_properties(
                         "source": "zoopla",
                         "raw_url": url,
                     }
-                    
+
                     # Track missing fields
                     if not image_url:
                         stats.log_missing_field("image_url", external_id)
@@ -388,7 +388,7 @@ async def scrape_zoopla_properties(
                         stats.log_missing_field("price", external_id)
                     if not property_type:
                         stats.log_missing_field("property_type", external_id)
-                    
+
                     # Validate before adding
                     should_insert, reason = should_insert_property(property_data)
                     if should_insert:
@@ -396,7 +396,7 @@ async def scrape_zoopla_properties(
                         stats.log_parse_success()
                     else:
                         stats.log_validation_failure(reason or "Unknown")
-                        
+
                 except Exception as e:
                     stats.log_parse_failure(str(e))
             if len(results) >= limit:

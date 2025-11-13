@@ -10,7 +10,7 @@ from utils.postcode import get_lat_lng_from_postcode
 from utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html, capture_debug_json
 from utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
 from utils.retry import retry_async
-from utils.validation import validate_property_data, should_insert_property, clean_property_data
+from utils.validation import should_insert_property, clean_property_data
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -129,17 +129,17 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
         List of valid image URLs
     """
     images = []
-    
+
     # Try to find all images in the card
     for img in card.select("img"):
         # Try multiple attributes where images might be stored
         url = (
-            img.get("data-src") or 
-            img.get("src") or 
+            img.get("data-src") or
+            img.get("src") or
             img.get("data-lazy-src") or
             img.get("data-original")
         )
-        
+
         if url and isinstance(url, str):
             url = url.strip()
             # Skip placeholder/tracking pixels
@@ -150,7 +150,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
                 elif url.startswith('/'):
                     url = 'https://www.rightmove.co.uk' + url
                 images.append(url)
-    
+
     # Also check for srcset attribute which may have higher resolution images
     for img in card.select("img[srcset]"):
         srcset = img.get("srcset", "")
@@ -166,7 +166,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
                         elif url.startswith('/'):
                             url = 'https://www.rightmove.co.uk' + url
                         images.append(url)
-    
+
     # De-duplicate while preserving order
     seen = set()
     unique_images = []
@@ -174,7 +174,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
         if img not in seen:
             seen.add(img)
             unique_images.append(img)
-    
+
     return unique_images
 
 
@@ -194,13 +194,13 @@ def _extract_description(card: BeautifulSoup) -> Optional[str]:
         card.select_one(".property-description") or
         card.select_one("[itemprop='description']")
     )
-    
+
     if desc_el:
         desc = desc_el.get_text(" ", strip=True)
         # Return description if it's meaningful (more than just bedrooms/location)
         if desc and len(desc) > 20:
             return desc
-    
+
     return None
 
 
@@ -227,11 +227,11 @@ def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
         card.select_one(".property-information") or
         card.select_one(".propertyType")
     )
-    
+
     if type_el:
         type_text = type_el.get_text(" ", strip=True)
         return _normalize_property_type(type_text)
-    
+
     # Try to extract from title or summary text
     title = card.select_one(".propertyCard-title, h2")
     if title:
@@ -239,7 +239,7 @@ def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
         prop_type = _normalize_property_type(title_text)
         if prop_type:
             return prop_type
-    
+
     return None
 
 
@@ -254,9 +254,9 @@ def _normalize_property_type(text: str) -> Optional[str]:
     """
     if not text:
         return None
-    
+
     lower = text.lower()
-    
+
     # Check for common property types (order matters - check studio before flat!)
     if 'studio' in lower:
         return 'studio'
@@ -276,7 +276,7 @@ def _normalize_property_type(text: str) -> Optional[str]:
         return 'maisonette'
     if 'cottage' in lower:
         return 'cottage'
-    
+
     return None
 
 
@@ -423,10 +423,10 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                     image_urls = _extract_images(card)
                     image_url = image_urls[0] if image_urls else None
                     log_image_extraction("rightmove", title, len(image_urls))
-                    
+
                     # Extract description
                     description = _extract_description(card)
-                    
+
                     # Extract property type
                     property_type = _extract_property_type(card)
 
@@ -452,7 +452,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         "source": "rightmove",
                         "raw_url": url,
                     }
-                    
+
                     # Track missing fields
                     if not image_url:
                         stats.log_missing_field("image_url", external_id)
@@ -462,7 +462,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         stats.log_missing_field("price", external_id)
                     if not property_type:
                         stats.log_missing_field("property_type", external_id)
-                    
+
                     # Validate before adding
                     should_insert, reason = should_insert_property(property_data)
                     if should_insert:
@@ -470,7 +470,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         stats.log_parse_success()
                     else:
                         stats.log_validation_failure(reason or "Unknown")
-                        
+
                 except Exception as e:
                     stats.log_parse_failure(str(e))
             if len(results) >= limit:
@@ -533,23 +533,23 @@ async def _fetch_api_properties(session: aiohttp.ClientSession, region_id: str, 
                 if not property_id:
                     continue
                 title = p.get("displayAddress") or p.get("address") or p.get("summary") or "Untitled"
-                
+
                 # Extract description from summary or propertySubType
                 description = p.get("summary") or p.get("propertySubType") or None
                 if description and isinstance(description, str) and len(description) > 20:
                     description = description.strip()
                 else:
                     description = None
-                
+
                 # Extract property type from API data
                 property_type_raw = p.get("propertySubType") or p.get("propertyType") or ""
                 property_type = _normalize_property_type(property_type_raw) if property_type_raw else None
-                
+
                 price_obj = p.get("price") or {}
                 price = price_obj.get("amount") or price_obj.get("price") or None
                 bedrooms = p.get("bedrooms") or p.get("numBedrooms") or 0
                 bathrooms = p.get("bathrooms") or p.get("numBathrooms") or 0
-                
+
                 # Extract all images from media array
                 image_urls = []
                 media = p.get("media") or []
@@ -559,10 +559,10 @@ async def _fetch_api_properties(session: aiohttp.ClientSession, region_id: str, 
                             img = m.get("url") or m.get("mediaUrl")
                             if img and isinstance(img, str):
                                 image_urls.append(img)
-                
+
                 # Get primary image
                 img = image_urls[0] if image_urls else None
-                
+
                 loc_text = title
                 loc_lat = None
                 loc_lng = None
