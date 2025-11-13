@@ -60,6 +60,7 @@ export default function Header() {
   const links = [
     { href: '/', label: 'Home' },
     { href: '/listings', label: 'Listings' },
+    { href: '/off-market', label: 'Off-Market' },
     { href: '/pricing', label: 'Pricing' },
     ...(sessionEmail ? [{ href: '/account', label: 'Account' }] : []),
   ];
