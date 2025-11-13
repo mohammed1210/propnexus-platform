@@ -13,9 +13,13 @@ export type RMItem = {
   price: number;
   bedrooms?: number | null;
   bathrooms?: number | null;
+  property_type?: string | null;
+  description?: string | null;
   imageurl?: string | null;
+  image_urls?: string[];
   latitude?: number | null;
   longitude?: number | null;
+  detail_url?: string | null;
 };
 
 const DEBUG     = process.env.RM_DEBUG === '1' || process.env.RM_DEBUG === 'true';
@@ -23,6 +27,7 @@ const MAX_PAGES = Number(process.env.RM_MAX_PAGES ?? '1');
 const DELAY_MS  = Number(process.env.RM_DELAY_MS  ?? '1200');
 const RENDER    = (process.env.RM_RENDER ?? '1') === '1'; // allow disabling JS rendering
 const PROVIDER  = (process.env.SCRAPER_PROVIDER ?? 'auto').toLowerCase(); // auto|zenrows|scraperapi|scrapingbee
+const SCRAPE_DETAILS = (process.env.RM_SCRAPE_DETAILS ?? '0') === '1'; // scrape detail pages for full descriptions
 
 // ---------- helpers ----------
 function sleep(ms: number) { return new Promise(res => setTimeout(res, ms)); }
@@ -145,6 +150,165 @@ function parseIntFromText(s: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+// Extract and rank images, preferring higher resolution
+function extractImages(root: cheerio.Cheerio<cheerio.Element>): string[] {
+  const images: string[] = [];
+  const seen = new Set<string>();
+
+  // Extract from img tags
+  root.find('img').each((_, el) => {
+    const $el = cheerio.load(el)('img');
+    const src = $el.attr('src') || $el.attr('data-src') || $el.attr('data-lazy-src') || '';
+    if (src && !seen.has(src)) {
+      if (!isPlaceholderImage(src)) {
+        seen.add(src);
+        images.push(src);
+      }
+    }
+
+    // Check srcset for higher resolution images
+    const srcset = $el.attr('srcset') || '';
+    if (srcset) {
+      const srcsetUrls = parseSrcSet(srcset);
+      srcsetUrls.forEach(url => {
+        if (!seen.has(url) && !isPlaceholderImage(url)) {
+          seen.add(url);
+          images.push(url);
+        }
+      });
+    }
+  });
+
+  // Rank images by quality (prefer larger images)
+  return rankImagesByQuality(images);
+}
+
+function parseSrcSet(srcset: string): string[] {
+  const urls: string[] = [];
+  const entries = srcset.split(',');
+  for (const entry of entries) {
+    const parts = entry.trim().split(/\s+/);
+    if (parts.length > 0) {
+      urls.push(parts[0]);
+    }
+  }
+  return urls;
+}
+
+function isPlaceholderImage(url: string): boolean {
+  const lower = url.toLowerCase();
+  return (
+    lower.includes('placeholder') ||
+    lower.includes('blank') ||
+    lower.includes('1x1') ||
+    lower.includes('pixel') ||
+    lower.match(/\d+x\d+/) && parseInt(lower.match(/(\d+)x/)?.[1] || '0') < 100
+  );
+}
+
+function rankImagesByQuality(urls: string[]): string[] {
+  // Extract dimensions from URLs when possible and sort by size
+  return urls.sort((a, b) => {
+    const sizeA = extractImageSize(a);
+    const sizeB = extractImageSize(b);
+    return sizeB - sizeA;
+  });
+}
+
+function extractImageSize(url: string): number {
+  // Try to extract size from URL patterns like _max_300x200 or 640x480
+  const match = url.match(/(\d+)x(\d+)/);
+  if (match) {
+    const width = parseInt(match[1]);
+    const height = parseInt(match[2]);
+    return width * height;
+  }
+  // Default size if no dimensions found
+  return 0;
+}
+
+function extractPropertyType(root: cheerio.Cheerio<cheerio.Element>): string | null {
+  // Try to find property type from various selectors
+  const typeText = 
+    root.find('[data-testid="property-type"]').first().text().trim() ||
+    root.find('.propertyCard-propertyType').first().text().trim() ||
+    root.find('.property-information').first().text().trim() ||
+    '';
+
+  if (!typeText) return null;
+
+  // Common property types to match
+  const lower = typeText.toLowerCase();
+  if (lower.includes('flat') || lower.includes('apartment')) return 'flat';
+  if (lower.includes('detached')) return 'detached';
+  if (lower.includes('semi-detached')) return 'semi-detached';
+  if (lower.includes('terraced')) return 'terraced';
+  if (lower.includes('bungalow')) return 'bungalow';
+  if (lower.includes('house')) return 'house';
+  if (lower.includes('studio')) return 'studio';
+
+  return typeText;
+}
+
+async function scrapeDetailPage(detailUrl: string): Promise<{ description?: string; property_type?: string; images?: string[] }> {
+  try {
+    const { html, status } = await fetchHtmlChain(detailUrl);
+    if (status >= 400 || looksLikeCookieWall(html)) {
+      return {};
+    }
+
+    const $ = cheerio.load(html);
+    
+    // Extract full description from detail page
+    const description =
+      $('[data-testid="property-description"], .property-description, #description, [itemprop="description"]')
+        .first()
+        .text()
+        .trim() || undefined;
+
+    // Extract property type from detail page
+    const propertyTypeEl = 
+      $('[data-testid="property-type"], .propertySubType, .property-information')
+        .first()
+        .text()
+        .trim();
+    const property_type = propertyTypeEl ? extractPropertyTypeFromText(propertyTypeEl) : undefined;
+
+    // Extract all images from detail page
+    const images: string[] = [];
+    const seen = new Set<string>();
+    $('img').each((_, el) => {
+      const $el = $(el);
+      const src = $el.attr('src') || $el.attr('data-src') || '';
+      if (src && !seen.has(src) && !isPlaceholderImage(src)) {
+        seen.add(src);
+        images.push(src);
+      }
+    });
+
+    return {
+      description: description && description.length > 20 ? description : undefined,
+      property_type,
+      images: images.length > 0 ? rankImagesByQuality(images) : undefined,
+    };
+  } catch (err) {
+    if (DEBUG) console.warn(`  ⚠ Failed to scrape detail page: ${err}`);
+    return {};
+  }
+}
+
+function extractPropertyTypeFromText(text: string): string | null {
+  const lower = text.toLowerCase();
+  if (lower.includes('flat') || lower.includes('apartment')) return 'flat';
+  if (lower.includes('detached') && !lower.includes('semi')) return 'detached';
+  if (lower.includes('semi-detached')) return 'semi-detached';
+  if (lower.includes('terraced')) return 'terraced';
+  if (lower.includes('bungalow')) return 'bungalow';
+  if (lower.includes('house')) return 'house';
+  if (lower.includes('studio')) return 'studio';
+  return null;
+}
+
 function parseCards(html: string): RMItem[] {
   const $ = cheerio.load(html);
   const out: RMItem[] = [];
@@ -156,6 +320,15 @@ function parseCards(html: string): RMItem[] {
     const href = root.find('a').attr('href') || '';
     const idMatch = href.match(/properties\/(\d+)/i);
     const source_id = idMatch?.[1] ?? `u_${i}`;
+    
+    // Build detail URL
+    const detail_url = href.startsWith('http') 
+      ? href 
+      : href.startsWith('/') 
+        ? `https://www.rightmove.co.uk${href}` 
+        : href 
+          ? `https://www.rightmove.co.uk/${href}`
+          : null;
 
     const title =
       root.find('h2, [data-testid=title]').first().text().trim() ||
@@ -180,9 +353,16 @@ function parseCards(html: string): RMItem[] {
       root.find('[data-testid=baths], [data-testid=bathrooms]').first().text().trim() || '';
     const bathrooms = parseIntFromText(bathText);
 
-    const img =
-      root.find('img').attr('src') ||
-      root.find('img').attr('data-src') || null;
+    // Extract property type
+    const property_type = extractPropertyType(root);
+
+    // Extract description
+    const description =
+      root.find('[data-testid=description], .propertyCard-description').first().text().trim() || null;
+
+    // Extract and rank images
+    const image_urls = extractImages(root);
+    const imageurl = image_urls.length > 0 ? image_urls[0] : null;
 
     out.push({
       source: 'rightmove',
@@ -192,9 +372,13 @@ function parseCards(html: string): RMItem[] {
       price,
       bedrooms: Number.isFinite(bedrooms) ? bedrooms : null,
       bathrooms: Number.isFinite(bathrooms) ? bathrooms : null,
-      imageurl: img,
+      property_type,
+      description,
+      imageurl,
+      image_urls,
       latitude: null,
       longitude: null,
+      detail_url,
     });
   });
 
@@ -224,6 +408,35 @@ export async function scrapeRightmove(searchUrl: string): Promise<RMItem[]> {
 
     const items = parseCards(html);
     if (DEBUG) console.log(`  · parsed ${items.length} items on page ${p}`);
+
+    // Optionally scrape detail pages for enhanced data
+    if (SCRAPE_DETAILS) {
+      for (const item of items) {
+        if (item.detail_url) {
+          if (DEBUG) console.log(`  · fetching detail page for ${item.source_id}`);
+          const details = await scrapeDetailPage(item.detail_url);
+          
+          // Enhance with detail page data
+          if (details.description && (!item.description || details.description.length > item.description.length)) {
+            item.description = details.description;
+          }
+          if (details.property_type && !item.property_type) {
+            item.property_type = details.property_type;
+          }
+          if (details.images && details.images.length > 0) {
+            // Merge and re-rank images
+            const allImages = [...(item.image_urls || []), ...details.images];
+            const uniqueImages = Array.from(new Set(allImages));
+            item.image_urls = rankImagesByQuality(uniqueImages);
+            item.imageurl = item.image_urls[0] || item.imageurl;
+          }
+          
+          // Add delay between detail page requests
+          await sleep(DELAY_MS);
+        }
+      }
+    }
+
     all.push(...items);
 
     if (items.length === 0) break;

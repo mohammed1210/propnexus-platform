@@ -108,6 +108,75 @@ def _extract_int(text: str) -> Optional[int]:
     return int(m.group(0)) if m else None
 
 
+def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
+    """Extract property type from card element.
+    
+    Args:
+        card: BeautifulSoup element representing a property card
+        
+    Returns:
+        Property type string or None
+    """
+    # Try various selectors for property type
+    type_el = (
+        card.select_one("[data-testid='property-type']") or
+        card.select_one(".listing-property-type") or
+        card.select_one(".property-type") or
+        card.select_one(".property-information")
+    )
+    
+    if type_el:
+        type_text = type_el.get_text(" ", strip=True)
+        return _normalize_property_type(type_text)
+    
+    # Try to extract from title
+    title = card.select_one("h2, [data-testid='listing-title']")
+    if title:
+        title_text = title.get_text(" ", strip=True)
+        prop_type = _normalize_property_type(title_text)
+        if prop_type:
+            return prop_type
+    
+    return None
+
+
+def _normalize_property_type(text: str) -> Optional[str]:
+    """Normalize property type text to standard values.
+    
+    Args:
+        text: Raw property type text
+        
+    Returns:
+        Normalized property type or None
+    """
+    if not text:
+        return None
+    
+    lower = text.lower()
+    
+    # Check for common property types
+    if 'flat' in lower or 'apartment' in lower:
+        return 'flat'
+    if 'detached' in lower and 'semi' not in lower:
+        return 'detached'
+    if 'semi-detached' in lower or 'semi detached' in lower:
+        return 'semi-detached'
+    if 'terraced' in lower:
+        return 'terraced'
+    if 'bungalow' in lower:
+        return 'bungalow'
+    if 'house' in lower:
+        return 'house'
+    if 'studio' in lower:
+        return 'studio'
+    if 'maisonette' in lower:
+        return 'maisonette'
+    if 'cottage' in lower:
+        return 'cottage'
+    
+    return None
+
+
 def _extract_images(card: BeautifulSoup) -> List[str]:
     """Extract all image URLs from a property card."""
     images = []
@@ -286,6 +355,9 @@ async def scrape_zoopla_properties(
                     
                     # Extract description
                     description = _extract_description(card)
+                    
+                    # Extract property type
+                    property_type = _extract_property_type(card)
 
                     external_id = _extract_external_id(card)
                     coords = await _enrich_coordinates(location_text)
@@ -298,6 +370,7 @@ async def scrape_zoopla_properties(
                         "price": price,
                         "bedrooms": bedrooms,
                         "bathrooms": bathrooms,
+                        "property_type": property_type,
                         "image_url": image_url,
                         "image_urls": image_urls,
                         "latitude": coords["latitude"],
@@ -313,6 +386,8 @@ async def scrape_zoopla_properties(
                         stats.log_missing_field("description", external_id)
                     if not price:
                         stats.log_missing_field("price", external_id)
+                    if not property_type:
+                        stats.log_missing_field("property_type", external_id)
                     
                     # Validate before adding
                     should_insert, reason = should_insert_property(property_data)
