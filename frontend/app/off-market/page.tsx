@@ -7,10 +7,14 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import { getSupabase } from '@/lib/supabaseClient';
 import { apiPost } from '@/lib/api';
 import AddDealForm from '@/components/offMarket/AddDealForm';
-import Image from 'next/image';
+import OffMarketFilters from '@/components/offMarket/OffMarketFilters';
+import OffMarketCard from '@/components/offMarket/OffMarketCard';
+import OffMarketTable from '@/components/offMarket/OffMarketTable';
+import type { DealFilters, OffMarketDeal, ViewMode } from '@/lib/offmarket/types';
+import { ensureDerivedFields } from '@/lib/offmarket/utils';
 import PageWrapper from '@/components/PageWrapper';
 
-type OffMarket = {
+type DBRow = {
   id: string;
   title?: string | null;
   location?: string | null;
@@ -28,8 +32,11 @@ type OffMarket = {
 export const dynamic = 'force-dynamic';
 
 export default function OffMarketPage() {
-  const [rows, setRows] = useState<OffMarket[]>([]);
+  const [rows, setRows] = useState<DBRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<DealFilters>({});
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [filtered, setFiltered] = useState<OffMarketDeal[]>([]);
 
   // generator form state
   const [loc, setLoc] = useState('Liverpool');
@@ -51,7 +58,7 @@ export default function OffMarketPage() {
 
       if (!ignore) {
         if (error) console.error('off_market_deals', error);
-        setRows((data as OffMarket[]) ?? []);
+        setRows((data as DBRow[]) ?? []);
         setLoading(false);
       }
     })();
@@ -65,8 +72,46 @@ export default function OffMarketPage() {
       .from('off_market_deals')
       .select('*')
       .order('created_at', { ascending: false });
-    setRows((data as OffMarket[]) ?? []);
+    setRows((data as DBRow[]) ?? []);
   };
+
+  // map db rows to UI model and apply filters
+  useEffect(() => {
+    const mapped: OffMarketDeal[] = (rows || []).map((r) => ({
+      id: r.id,
+      title: r.title || 'Untitled',
+      location: r.location,
+      price: r.price ?? null,
+      bedrooms: r.bedrooms ?? null,
+      bathrooms: r.bathrooms ?? null,
+      notes: r.notes ?? null,
+      source: r.source ?? null,
+      created_at: r.created_at ?? null,
+      image_url: r.image_url ?? null,
+    }));
+
+    let list = mapped.map(ensureDerivedFields);
+    // filters
+    if (filters.postcode) {
+      const q = filters.postcode.toUpperCase().replace(/\s/g, '');
+      list = list.filter((d) => (d.postcode || '').replace(/\s/g, '').includes(q));
+    }
+    if (Number.isFinite(filters.minPrice as number)) {
+      list = list.filter((d) => (d.price ?? 0) >= (filters.minPrice as number));
+    }
+    if (Number.isFinite(filters.maxPrice as number)) {
+      list = list.filter((d) => (d.price ?? 0) <= (filters.maxPrice as number));
+    }
+    if (Number.isFinite(filters.minDiscount as number)) {
+      list = list.filter(
+        (d) => (d.discount_percent ?? 0) >= (filters.minDiscount as number),
+      );
+    }
+    if (Number.isFinite(filters.minScore as number)) {
+      list = list.filter((d) => (d.investment_score ?? 0) >= (filters.minScore as number));
+    }
+    setFiltered(list);
+  }, [rows, filters]);
 
   // generate via backend
   const generateDeals = async () => {
@@ -172,73 +217,49 @@ export default function OffMarketPage() {
           </div>
         </details>
 
-        {loading ? (
-          <div className="p-4 card">Loading…</div>
-        ) : rows.length === 0 ? (
-          <div className="p-4 card">No off-market deals yet.</div>
-        ) : (
-          <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-            {rows.map((d) => (
-              <li
-                key={d.id}
-                className="card overflow-hidden"
-              >
-                {/* Photo */}
-                {d.image_url ? (
-                  <div className="aspect-[16/10] w-full bg-zinc-100 dark:bg-zinc-800">
-                    <Image
-                      src={d.image_url}
-                      alt={d.title || 'Off-market property image'}
-                      fill
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="aspect-[16/10] w-full grid place-items-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-sm">
-                    No photo
-                  </div>
-                )}
+        {/* Filters + View toggle */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-1">
+            <OffMarketFilters filters={filters} onFiltersChange={setFilters} />
+          </div>
+          <div className="lg:col-span-3 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm opacity-70">
+                Showing {filtered.length} of {rows.length}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className={`px-3 py-1 rounded border ${viewMode === 'cards' ? 'bg-black text-white' : ''}`}
+                  onClick={() => setViewMode('cards')}
+                >
+                  Cards
+                </button>
+                <button
+                  className={`px-3 py-1 rounded border ${viewMode === 'table' ? 'bg-black text-white' : ''}`}
+                  onClick={() => setViewMode('table')}
+                >
+                  Table
+                </button>
+              </div>
+            </div>
 
-                {/* Body */}
-                <div className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div className="font-medium">{d.title ?? '—'}</div>
-                    <span className="text-xs px-2 py-1 rounded bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
-                      {d.investment_type ?? '—'}
-                    </span>
-                  </div>
-
-                  <div className="text-sm opacity-70">{d.location ?? '—'}</div>
-
-                  <div className="mt-2 flex items-center justify-between">
-                    <div className="font-semibold">£{Number(d.price ?? 0).toLocaleString()}</div>
-                    <div className="text-xs opacity-70">
-                      {d.bedrooms ?? 0} beds • {d.bathrooms ?? 0} baths
-                    </div>
-                  </div>
-
-                  {d.notes ? <p className="mt-2 text-sm">{d.notes}</p> : null}
-
-                  <div className="mt-3 flex items-center justify-between text-sm">
-                    <span className="opacity-70">{d.source ?? '—'}</span>
-                    {d.contact ? (
-                      <a className="underline" href={`mailto:${d.contact}`}>
-                        Contact
-                      </a>
-                    ) : (
-                      <span className="opacity-50">No contact</span>
-                    )}
-                  </div>
-
-                  <div className="mt-2 text-xs opacity-60">
-                    Added {d.created_at ? new Date(d.created_at).toLocaleDateString() : '—'}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+            {loading ? (
+              <div className="p-4 card">Loading…</div>
+            ) : filtered.length === 0 ? (
+              <div className="p-4 card">No off-market deals yet.</div>
+            ) : viewMode === 'cards' ? (
+              <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {filtered.map((d) => (
+                  <li key={d.id}>
+                    <OffMarketCard deal={d} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <OffMarketTable deals={filtered} />
+            )}
+          </div>
+        </div>
       </Section>
     </PageWrapper>
   );
