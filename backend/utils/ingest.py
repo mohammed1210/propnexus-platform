@@ -42,7 +42,7 @@ def _normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     """Map scraper output to properties table schema.
 
     Expected input keys (best-effort):
-      external_id, title, location, price, bedrooms, bathrooms, image_url, latitude, longitude, source, raw_url
+      external_id, title, location, price, bedrooms, bathrooms, description, image_url, image_urls, latitude, longitude, source, raw_url
 
     Output keys:
       external_id, title, description, price, bedrooms, bathrooms, property_type, address, postcode,
@@ -52,6 +52,7 @@ def _normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     external_id = item.get("external_id") or item.get("source_id")
     title = item.get("title") or "Property"
     location = item.get("location") or ""
+    description = item.get("description")
     price = item.get("price")
     bedrooms = item.get("bedrooms")
     bathrooms = item.get("bathrooms")
@@ -63,14 +64,24 @@ def _normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     url = _canonical_url(str(source) if source else None, str(external_id) if external_id else None, raw_url)
     postcode = _extract_postcode(location)
 
+    # Handle image_urls array - combine from both sources
     image_urls: List[str] = []
+    
+    # Add images from image_urls array if present
+    if "image_urls" in item and isinstance(item["image_urls"], list):
+        for img in item["image_urls"]:
+            if img and isinstance(img, str):
+                image_urls.append(img)
+    
+    # Add single image_url if present and not already in list
     if isinstance(image_url, str) and image_url:
-        image_urls = [image_url]
+        if image_url not in image_urls:
+            image_urls.insert(0, image_url)  # Put as first image
 
     out = {
         "external_id": external_id,
         "title": title,
-        "description": None,
+        "description": description,
         "price": price,
         "bedrooms": bedrooms,
         "bathrooms": bathrooms,
@@ -81,7 +92,7 @@ def _normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
         "longitude": lng,
         "source": source,
         "url": url,
-        "image_urls": image_urls,
+        "image_urls": image_urls if image_urls else None,
         "data": {"raw": item},
     }
     # Remove keys not present in schema to avoid PostgREST errors
