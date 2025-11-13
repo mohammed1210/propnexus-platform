@@ -3,6 +3,7 @@
 
 import { ReactNode } from 'react';
 import { useUserPlan } from '@/lib/useUserPlan';
+import { hasAccess } from '@/lib/planPermissions';
 import LockedFeature from '@/components/LockedFeature';
 
 interface GatedPanelProps {
@@ -40,14 +41,10 @@ export default function GatedPanel({
     );
   }
 
-  // Check if user has access
-  const hasAccess = (() => {
-    if (plan === 'investor') return true;
-    if (requiredPlan === 'pro' && plan === 'pro') return true;
-    return false;
-  })();
+  // Check if user has access using shared utility
+  const userHasAccess = hasAccess(plan, requiredPlan);
 
-  if (!hasAccess) {
+  if (!userHasAccess) {
     return (
       <LockedFeature
         title={title}
