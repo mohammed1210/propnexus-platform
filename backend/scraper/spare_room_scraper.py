@@ -8,7 +8,13 @@ from bs4 import BeautifulSoup
 from urllib.parse import quote_plus
 
 from utils.postcode import get_lat_lng_from_postcode
-from utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
+from utils.scraper_logger import (
+    ScraperStats,
+    log_scrape_start,
+    log_page_fetch_error,
+    log_scraperapi_fallback,
+    log_image_extraction,
+)
 from utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
 
@@ -90,7 +96,7 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
         url,
         max_retries=3,
         base_delay=2.0,
-        exceptions=(aiohttp.ClientError,)
+        exceptions=(aiohttp.ClientError,),
     )
 
 
@@ -124,19 +130,19 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
 
     for img in card.select("img"):
         url = (
-            img.get("data-src") or
-            img.get("data-lazy") or
-            img.get("src") or
-            img.get("data-original")
+            img.get("data-src")
+            or img.get("data-lazy")
+            or img.get("src")
+            or img.get("data-original")
         )
 
         if url and isinstance(url, str):
             url = url.strip()
-            if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1', 'pixel']):
-                if url.startswith('//'):
-                    url = 'https:' + url
-                elif url.startswith('/'):
-                    url = 'https://www.spareroom.co.uk' + url
+            if url and not any(x in url.lower() for x in ["placeholder", "blank", "1x1", "pixel"]):
+                if url.startswith("//"):
+                    url = "https:" + url
+                elif url.startswith("/"):
+                    url = "https://www.spareroom.co.uk" + url
                 images.append(url)
 
     # De-duplicate
@@ -153,9 +159,9 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
 def _extract_description(card: BeautifulSoup) -> Optional[str]:
     """Extract property description from a card."""
     desc_el = (
-        card.select_one(".listing-description") or
-        card.select_one(".description") or
-        card.select_one("[data-testid='description']")
+        card.select_one(".listing-description")
+        or card.select_one(".description")
+        or card.select_one("[data-testid='description']")
     )
 
     if desc_el:

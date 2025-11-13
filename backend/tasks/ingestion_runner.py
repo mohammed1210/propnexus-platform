@@ -24,8 +24,9 @@ from typing import List
 try:
     # Load environment variables from .env and .env.local at repo root if present
     from dotenv import load_dotenv  # type: ignore
+
     load_dotenv()  # .env
-    load_dotenv('.env.local', override=True)  # .env.local
+    load_dotenv(".env.local", override=True)  # .env.local
 except Exception:
     pass
 

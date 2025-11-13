@@ -13,7 +13,7 @@ from collections import defaultdict
 LOG_LEVEL = os.getenv("SCRAPER_LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
 logger = logging.getLogger("scraper")
@@ -91,9 +91,7 @@ def log_page_fetch_error(source: str, page: int, reason: str):
 
 def log_retry_attempt(source: str, attempt: int, max_attempts: int, delay: float):
     """Log retry attempt."""
-    logger.info(
-        f"[{source}] Retry attempt {attempt}/{max_attempts} after {delay:.1f}s delay"
-    )
+    logger.info(f"[{source}] Retry attempt {attempt}/{max_attempts} after {delay:.1f}s delay")
 
 
 def log_scraperapi_fallback(source: str, url: str):
@@ -101,16 +99,10 @@ def log_scraperapi_fallback(source: str, url: str):
     logger.info(f"[{source}] Falling back to ScraperAPI for {url}")
 
 
-def log_property_validation(
-    source: str,
-    external_id: str,
-    issues: Dict[str, Any]
-):
+def log_property_validation(source: str, external_id: str, issues: Dict[str, Any]):
     """Log property validation issues."""
     issues_str = ", ".join(f"{k}={v}" for k, v in issues.items())
-    logger.warning(
-        f"[{source}] Property {external_id} validation issues: {issues_str}"
-    )
+    logger.warning(f"[{source}] Property {external_id} validation issues: {issues_str}")
 
 
 def log_image_extraction(source: str, external_id: str, image_count: int):

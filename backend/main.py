@@ -82,5 +82,3 @@ app.include_router(users_router)  # GET /users/plan
 @app.get("/")
 def root():
     return {"ok": True}
-
-

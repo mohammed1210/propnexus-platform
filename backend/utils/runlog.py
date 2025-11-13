@@ -31,9 +31,7 @@ class RunLog:
             "items_ingested": 0,
             "meta": self.meta,
         }
-        self.run_id = (
-            _sb.table("scrape_runs").insert(row).execute().data[0]["id"]
-        )
+        self.run_id = _sb.table("scrape_runs").insert(row).execute().data[0]["id"]
 
     def finish(
         self, status: str, items: int, err: str = "", extra: Optional[Dict[str, Any]] = None

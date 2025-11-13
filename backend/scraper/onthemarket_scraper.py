@@ -9,7 +9,13 @@ from urllib.parse import quote_plus
 from utils.postcode import get_lat_lng_from_postcode
 from utils.render import PLAYWRIGHT_ENABLE, render_page_capture
 from utils.render import capture_debug_html, capture_debug_json
-from utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
+from utils.scraper_logger import (
+    ScraperStats,
+    log_scrape_start,
+    log_page_fetch_error,
+    log_scraperapi_fallback,
+    log_image_extraction,
+)
 from utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
 
@@ -93,7 +99,7 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
         url,
         max_retries=3,
         base_delay=2.0,
-        exceptions=(aiohttp.ClientError,)
+        exceptions=(aiohttp.ClientError,),
     )
 
 
@@ -125,34 +131,34 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
 
     for img in card.select("img"):
         url = (
-            img.get("data-src") or
-            img.get("src") or
-            img.get("data-lazy-src") or
-            img.get("data-original")
+            img.get("data-src")
+            or img.get("src")
+            or img.get("data-lazy-src")
+            or img.get("data-original")
         )
 
         if url and isinstance(url, str):
             url = url.strip()
-            if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1', 'pixel']):
-                if url.startswith('//'):
-                    url = 'https:' + url
-                elif url.startswith('/'):
-                    url = 'https://www.onthemarket.com' + url
+            if url and not any(x in url.lower() for x in ["placeholder", "blank", "1x1", "pixel"]):
+                if url.startswith("//"):
+                    url = "https:" + url
+                elif url.startswith("/"):
+                    url = "https://www.onthemarket.com" + url
                 images.append(url)
 
     # Check srcset
     for img in card.select("img[srcset]"):
         srcset = img.get("srcset", "")
         if srcset:
-            for item in srcset.split(','):
+            for item in srcset.split(","):
                 parts = item.strip().split()
                 if parts:
                     url = parts[0].strip()
-                    if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1']):
-                        if url.startswith('//'):
-                            url = 'https:' + url
-                        elif url.startswith('/'):
-                            url = 'https://www.onthemarket.com' + url
+                    if url and not any(x in url.lower() for x in ["placeholder", "blank", "1x1"]):
+                        if url.startswith("//"):
+                            url = "https:" + url
+                        elif url.startswith("/"):
+                            url = "https://www.onthemarket.com" + url
                         images.append(url)
 
     # De-duplicate
@@ -169,10 +175,10 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
 def _extract_description(card: BeautifulSoup) -> Optional[str]:
     """Extract property description from a card."""
     desc_el = (
-        card.select_one(".property-description") or
-        card.select_one("[data-testid='description']") or
-        card.select_one(".description") or
-        card.select_one(".otm-Description")
+        card.select_one(".property-description")
+        or card.select_one("[data-testid='description']")
+        or card.select_one(".description")
+        or card.select_one(".otm-Description")
     )
 
     if desc_el:
@@ -273,7 +279,11 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                     # Attempt network capture to extract JSON listing payloads
                     rendered, payloads = await render_page_capture(
                         url,
-                        selectors=[".property-card", "[data-testid='property-card']", ".listing-result"],
+                        selectors=[
+                            ".property-card",
+                            "[data-testid='property-card']",
+                            ".listing-result",
+                        ],
                         click_selectors=["#ccc-recommended-settings", "#ccc-accept-settings"],
                         response_url_substrings=["/api/", "/search"],
                         max_json=10,
@@ -301,7 +311,9 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                         if rendered:
                             capture_debug_html(f"onthemarket_empty_{page}", rendered)
                 if not cards and len(results) == 0:
-                    print(f"ℹ️ OnTheMarket: No cards/json found on page {page}; stopping pagination.")
+                    print(
+                        f"ℹ️ OnTheMarket: No cards/json found on page {page}; stopping pagination."
+                    )
                     break
 
             for card in cards:
@@ -413,7 +425,9 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
     return results
 
 
-def _extract_from_otm_json(payloads: List[Dict[str, Any]], limit: int, default_location: str) -> List[Dict[str, Any]]:
+def _extract_from_otm_json(
+    payloads: List[Dict[str, Any]], limit: int, default_location: str
+) -> List[Dict[str, Any]]:
     """Attempt to find listing arrays inside captured JSON payloads.
     Heuristic: look for arrays with objects containing price/address/id fields.
     """
@@ -436,18 +450,32 @@ def _extract_from_otm_json(payloads: List[Dict[str, Any]], limit: int, default_l
                             if not isinstance(entry, dict):
                                 continue
                             # Basic fields
-                            pid = entry.get("id") or entry.get("propertyId") or entry.get("listingId")
-                            addr = entry.get("address") or entry.get("displayAddress") or default_location
+                            pid = (
+                                entry.get("id") or entry.get("propertyId") or entry.get("listingId")
+                            )
+                            addr = (
+                                entry.get("address")
+                                or entry.get("displayAddress")
+                                or default_location
+                            )
 
                             # Extract description
                             description = entry.get("description") or entry.get("summary") or None
-                            if description and isinstance(description, str) and len(description) > 20:
+                            if (
+                                description
+                                and isinstance(description, str)
+                                and len(description) > 20
+                            ):
                                 description = description.strip()
                             else:
                                 description = None
 
                             price_obj = entry.get("price") or {}
-                            price = price_obj.get("amount") or price_obj.get("price") or entry.get("price")
+                            price = (
+                                price_obj.get("amount")
+                                or price_obj.get("price")
+                                or entry.get("price")
+                            )
                             if not pid or price is None:
                                 continue
                             beds = entry.get("bedrooms") or entry.get("numBedrooms") or 0

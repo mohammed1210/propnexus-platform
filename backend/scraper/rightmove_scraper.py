@@ -8,7 +8,13 @@ from bs4 import BeautifulSoup
 
 from utils.postcode import get_lat_lng_from_postcode
 from utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html, capture_debug_json
-from utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
+from utils.scraper_logger import (
+    ScraperStats,
+    log_scrape_start,
+    log_page_fetch_error,
+    log_scraperapi_fallback,
+    log_image_extraction,
+)
 from utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
 
@@ -48,7 +54,11 @@ def _build_search_url(location: str, page: int = 0) -> str:
     base = "https://www.rightmove.co.uk/property-for-sale/find.html"
     params = [
         # Prefer region identifier when known; improves reliability
-        f"locationIdentifier={_LOCATION_IDENTIFIER.get(loc_key, '')}" if loc_key in _LOCATION_IDENTIFIER else f"searchLocation={encoded}",
+        (
+            f"locationIdentifier={_LOCATION_IDENTIFIER.get(loc_key, '')}"
+            if loc_key in _LOCATION_IDENTIFIER
+            else f"searchLocation={encoded}"
+        ),
         "sortType=2",
         "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
         "furnishTypes=&keywords=",
@@ -102,7 +112,7 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
         url,
         max_retries=3,
         base_delay=2.0,
-        exceptions=(aiohttp.ClientError, asyncio.TimeoutError)
+        exceptions=(aiohttp.ClientError, asyncio.TimeoutError),
     )
 
 
@@ -121,10 +131,10 @@ def _parse_price(raw: str) -> Optional[int]:
 
 def _extract_images(card: BeautifulSoup) -> List[str]:
     """Extract all image URLs from a property card.
-    
+
     Args:
         card: BeautifulSoup element representing a property card
-        
+
     Returns:
         List of valid image URLs
     """
@@ -134,21 +144,21 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
     for img in card.select("img"):
         # Try multiple attributes where images might be stored
         url = (
-            img.get("data-src") or
-            img.get("src") or
-            img.get("data-lazy-src") or
-            img.get("data-original")
+            img.get("data-src")
+            or img.get("src")
+            or img.get("data-lazy-src")
+            or img.get("data-original")
         )
 
         if url and isinstance(url, str):
             url = url.strip()
             # Skip placeholder/tracking pixels
-            if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1', 'pixel']):
+            if url and not any(x in url.lower() for x in ["placeholder", "blank", "1x1", "pixel"]):
                 # Make relative URLs absolute
-                if url.startswith('//'):
-                    url = 'https:' + url
-                elif url.startswith('/'):
-                    url = 'https://www.rightmove.co.uk' + url
+                if url.startswith("//"):
+                    url = "https:" + url
+                elif url.startswith("/"):
+                    url = "https://www.rightmove.co.uk" + url
                 images.append(url)
 
     # Also check for srcset attribute which may have higher resolution images
@@ -156,15 +166,15 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
         srcset = img.get("srcset", "")
         if srcset:
             # Parse srcset format: "url1 width1, url2 width2, ..."
-            for item in srcset.split(','):
+            for item in srcset.split(","):
                 parts = item.strip().split()
                 if parts:
                     url = parts[0].strip()
-                    if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1']):
-                        if url.startswith('//'):
-                            url = 'https:' + url
-                        elif url.startswith('/'):
-                            url = 'https://www.rightmove.co.uk' + url
+                    if url and not any(x in url.lower() for x in ["placeholder", "blank", "1x1"]):
+                        if url.startswith("//"):
+                            url = "https:" + url
+                        elif url.startswith("/"):
+                            url = "https://www.rightmove.co.uk" + url
                         images.append(url)
 
     # De-duplicate while preserving order
@@ -180,19 +190,19 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
 
 def _extract_description(card: BeautifulSoup) -> Optional[str]:
     """Extract property description from a card.
-    
+
     Args:
         card: BeautifulSoup element representing a property card
-        
+
     Returns:
         Description text or None
     """
     # Try various selectors for description
     desc_el = (
-        card.select_one(".propertyCard-description") or
-        card.select_one("[data-testid='description']") or
-        card.select_one(".property-description") or
-        card.select_one("[itemprop='description']")
+        card.select_one(".propertyCard-description")
+        or card.select_one("[data-testid='description']")
+        or card.select_one(".property-description")
+        or card.select_one("[itemprop='description']")
     )
 
     if desc_el:
@@ -213,19 +223,19 @@ def _extract_int(text: str) -> Optional[int]:
 
 def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
     """Extract property type from card element.
-    
+
     Args:
         card: BeautifulSoup element representing a property card
-        
+
     Returns:
         Property type string or None
     """
     # Try various selectors for property type
     type_el = (
-        card.select_one("[data-testid='property-type']") or
-        card.select_one(".propertyCard-propertyType") or
-        card.select_one(".property-information") or
-        card.select_one(".propertyType")
+        card.select_one("[data-testid='property-type']")
+        or card.select_one(".propertyCard-propertyType")
+        or card.select_one(".property-information")
+        or card.select_one(".propertyType")
     )
 
     if type_el:
@@ -245,10 +255,10 @@ def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
 
 def _normalize_property_type(text: str) -> Optional[str]:
     """Normalize property type text to standard values.
-    
+
     Args:
         text: Raw property type text
-        
+
     Returns:
         Normalized property type or None
     """
@@ -258,24 +268,24 @@ def _normalize_property_type(text: str) -> Optional[str]:
     lower = text.lower()
 
     # Check for common property types (order matters - check studio before flat!)
-    if 'studio' in lower:
-        return 'studio'
-    if 'flat' in lower or 'apartment' in lower:
-        return 'flat'
-    if 'detached' in lower and 'semi' not in lower:
-        return 'detached'
-    if 'semi-detached' in lower or 'semi detached' in lower:
-        return 'semi-detached'
-    if 'terraced' in lower:
-        return 'terraced'
-    if 'bungalow' in lower:
-        return 'bungalow'
-    if 'house' in lower:
-        return 'house'
-    if 'maisonette' in lower:
-        return 'maisonette'
-    if 'cottage' in lower:
-        return 'cottage'
+    if "studio" in lower:
+        return "studio"
+    if "flat" in lower or "apartment" in lower:
+        return "flat"
+    if "detached" in lower and "semi" not in lower:
+        return "detached"
+    if "semi-detached" in lower or "semi detached" in lower:
+        return "semi-detached"
+    if "terraced" in lower:
+        return "terraced"
+    if "bungalow" in lower:
+        return "bungalow"
+    if "house" in lower:
+        return "house"
+    if "maisonette" in lower:
+        return "maisonette"
+    if "cottage" in lower:
+        return "cottage"
 
     return None
 
@@ -346,7 +356,9 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
             try:
                 api_results = await _fetch_api_properties(session, region_id, limit)
                 if api_results:
-                    print(f"✅ Rightmove API returned {len(api_results)} properties for '{location}'")
+                    print(
+                        f"✅ Rightmove API returned {len(api_results)} properties for '{location}'"
+                    )
                     # Validate and clean API results
                     validated_results = []
                     for prop in api_results:
@@ -359,7 +371,9 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                     stats.log_summary()
                     return validated_results[:limit]
                 else:
-                    print("ℹ️ Rightmove API returned zero properties; falling back to HTML scraping.")
+                    print(
+                        "ℹ️ Rightmove API returned zero properties; falling back to HTML scraping."
+                    )
             except Exception as e:
                 print(f"⚠️ Rightmove API fetch error: {e}; falling back to HTML scraping.")
         for page in range(RM_MAX_PAGES):
@@ -373,7 +387,10 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
             cards = _collect_selectors(soup)
             if not cards:
                 if PLAYWRIGHT_ENABLE:
-                    rendered = await render_page(url, ["[data-testid='propertyCard']", "article.propertyCard", ".propertyCard"])
+                    rendered = await render_page(
+                        url,
+                        ["[data-testid='propertyCard']", "article.propertyCard", ".propertyCard"],
+                    )
                     if rendered:
                         soup = BeautifulSoup(rendered, "html.parser")
                         cards = _collect_selectors(soup)
@@ -488,7 +505,9 @@ async def scrape_rightmove_properties_default():
     return await scrape_rightmove_properties(location="London")
 
 
-async def _fetch_api_properties(session: aiohttp.ClientSession, region_id: str, limit: int) -> List[Dict[str, Any]]:
+async def _fetch_api_properties(
+    session: aiohttp.ClientSession, region_id: str, limit: int
+) -> List[Dict[str, Any]]:
     """Fetch properties via the undocumented Rightmove JSON search API.
 
     Endpoint example:
@@ -520,7 +539,10 @@ async def _fetch_api_properties(session: aiohttp.ClientSession, region_id: str, 
         except Exception:
             break
         if not data or "properties" not in data:
-            capture_debug_json(f"rightmove_api_empty_{index}", data if isinstance(data, dict) else {"raw": str(data)})
+            capture_debug_json(
+                f"rightmove_api_empty_{index}",
+                data if isinstance(data, dict) else {"raw": str(data)},
+            )
             break
         props = data.get("properties", [])
         if not props:
@@ -529,10 +551,18 @@ async def _fetch_api_properties(session: aiohttp.ClientSession, region_id: str, 
             if len(out) >= limit:
                 break
             try:
-                property_id = str(p.get("id") or p.get("propertyId") or p.get("identifier") or p.get("listingId") or "")
+                property_id = str(
+                    p.get("id")
+                    or p.get("propertyId")
+                    or p.get("identifier")
+                    or p.get("listingId")
+                    or ""
+                )
                 if not property_id:
                     continue
-                title = p.get("displayAddress") or p.get("address") or p.get("summary") or "Untitled"
+                title = (
+                    p.get("displayAddress") or p.get("address") or p.get("summary") or "Untitled"
+                )
 
                 # Extract description from summary or propertySubType
                 description = p.get("summary") or p.get("propertySubType") or None
@@ -543,7 +573,9 @@ async def _fetch_api_properties(session: aiohttp.ClientSession, region_id: str, 
 
                 # Extract property type from API data
                 property_type_raw = p.get("propertySubType") or p.get("propertyType") or ""
-                property_type = _normalize_property_type(property_type_raw) if property_type_raw else None
+                property_type = (
+                    _normalize_property_type(property_type_raw) if property_type_raw else None
+                )
 
                 price_obj = p.get("price") or {}
                 price = price_obj.get("amount") or price_obj.get("price") or None

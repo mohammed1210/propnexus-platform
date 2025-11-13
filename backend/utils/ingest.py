@@ -34,7 +34,9 @@ def _canonical_url(source: str | None, external_id: str | None, raw_url: str | N
         # External id typically already includes numeric id; pattern can vary
         return f"https://www.onthemarket.com/details/{external_id}".rstrip("/")
     if s == "spareroom":
-        return f"https://www.spareroom.co.uk/flatshare/flatshare_detail.pl?flatshare_id={external_id}"
+        return (
+            f"https://www.spareroom.co.uk/flatshare/flatshare_detail.pl?flatshare_id={external_id}"
+        )
     return None
 
 
@@ -61,7 +63,9 @@ def _normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     lng = item.get("longitude")
     raw_url = item.get("raw_url") or item.get("url")
 
-    url = _canonical_url(str(source) if source else None, str(external_id) if external_id else None, raw_url)
+    url = _canonical_url(
+        str(source) if source else None, str(external_id) if external_id else None, raw_url
+    )
     postcode = _extract_postcode(location)
 
     # Handle image_urls array - combine from both sources
@@ -99,8 +103,21 @@ def _normalize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     # (Schema currently excludes 'address' if the error is due to cache mismatch, fallback.)
     # Validate against known columns list
     allowed = {
-        "external_id","title","description","price","bedrooms","bathrooms","property_type",
-        "address","postcode","latitude","longitude","source","url","image_urls","data"
+        "external_id",
+        "title",
+        "description",
+        "price",
+        "bedrooms",
+        "bathrooms",
+        "property_type",
+        "address",
+        "postcode",
+        "latitude",
+        "longitude",
+        "source",
+        "url",
+        "image_urls",
+        "data",
     }
     return {k: v for k, v in out.items() if k in allowed}
 

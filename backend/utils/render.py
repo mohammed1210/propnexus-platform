@@ -12,6 +12,7 @@ PLAYWRIGHT_WAIT_SELECTOR_TIMEOUT_MS = int(os.getenv("PLAYWRIGHT_WAIT_SELECTOR_TI
 PLAYWRIGHT_DEBUG_CAPTURE = os.getenv("PLAYWRIGHT_DEBUG_CAPTURE", "0") == "1"
 _DEBUG_DIR = Path("backend/debug")
 
+
 async def render_page(
     url: str,
     selectors: Sequence[str] | None = None,
@@ -93,6 +94,7 @@ async def render_page(
     except Exception:
         return None
 
+
 async def ensure_shutdown() -> None:
     """Gracefully close Playwright browser if it was started."""
     loop = asyncio.get_event_loop()
@@ -104,6 +106,7 @@ async def ensure_shutdown() -> None:
             await pw.stop()
         except Exception:
             pass
+
 
 def capture_debug_html(name: str, html: str) -> None:
     if not PLAYWRIGHT_DEBUG_CAPTURE:
@@ -117,15 +120,17 @@ def capture_debug_html(name: str, html: str) -> None:
     except Exception:
         pass
 
+
 def capture_debug_json(name: str, obj: dict) -> None:
     if not PLAYWRIGHT_DEBUG_CAPTURE:
         return
     try:
         _DEBUG_DIR.mkdir(parents=True, exist_ok=True)
-        safe = name.replace('/', '_')
+        safe = name.replace("/", "_")
         path = _DEBUG_DIR / f"{safe}.json"
         import json
-        path.write_text(json.dumps(obj, ensure_ascii=False, indent=2)[:150000], encoding='utf-8')
+
+        path.write_text(json.dumps(obj, ensure_ascii=False, indent=2)[:150000], encoding="utf-8")
     except Exception:
         pass
 
@@ -166,9 +171,11 @@ async def render_page_capture(
 
         if response_url_substrings:
             substrings = list(response_url_substrings)
+
             def _match(u: str) -> bool:
                 ul = u.lower()
                 return any(s.lower() in ul for s in substrings)
+
             async def handle_response(resp):  # type: ignore
                 try:
                     if len(captured) >= max_json:
@@ -185,6 +192,7 @@ async def render_page_capture(
                         capture_debug_json(f"capture_{hash(url_r) & 0xffffffff}", data)
                 except Exception:
                     pass
+
             page.on("response", handle_response)  # type: ignore
 
         await page.goto(url, timeout=PLAYWRIGHT_TIMEOUT_MS, wait_until="domcontentloaded")

@@ -6,6 +6,7 @@ from typing import Any, Dict, Tuple
 try:
     from fastapi import APIRouter, HTTPException  # type: ignore
 except Exception:  # pragma: no cover
+
     class HTTPException(Exception):
         def __init__(self, status_code: int = 500, detail: str | None = None):
             super().__init__(detail)
@@ -15,19 +16,23 @@ except Exception:  # pragma: no cover
     class APIRouter:  # minimal shim
         def __init__(self, *_a, **_kw):
             pass
+
         def post(self, *_a, **_kw):
             def deco(func):
                 return func
+
             return deco
 
 
 try:
     from pydantic import BaseModel  # type: ignore
 except Exception:  # pragma: no cover
+
     class BaseModel:  # minimal stub
         def __init__(self, **data):
             for k, v in data.items():
                 setattr(self, k, v)
+
 
 # Scrapers (existing)
 from utils.ingest import scrape_all_sources

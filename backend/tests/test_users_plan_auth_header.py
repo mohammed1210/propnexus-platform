@@ -34,7 +34,9 @@ def test_users_plan_with_authorization_header():
                 mock_sb.table.return_value = mock_table
 
                 # Request with Authorization header
-                response = client.get("/users/plan", headers={"Authorization": "Bearer fake_token_123"})
+                response = client.get(
+                    "/users/plan", headers={"Authorization": "Bearer fake_token_123"}
+                )
 
                 assert response.status_code == 200
                 data = response.json()
@@ -80,7 +82,9 @@ def test_users_plan_email_param_takes_precedence():
                 assert data["plan"] == "investor"
 
                 # Verify the query used the query email
-                mock_table.select.return_value.eq.assert_called_with("email", "query-user@example.com")
+                mock_table.select.return_value.eq.assert_called_with(
+                    "email", "query-user@example.com"
+                )
 
 
 def test_users_plan_fallback_to_query_param():
@@ -203,7 +207,10 @@ def test_users_plan_supabase_jwt():
     with patch("backend.routes.users_routes.extract_bearer_token") as mock_extract:
         with patch("backend.routes.users_routes.verify_supabase_token") as mock_verify:
             mock_extract.return_value = "supabase_token_123"
-            mock_verify.return_value = {"email": "supabase-user@example.com", "aud": "authenticated"}
+            mock_verify.return_value = {
+                "email": "supabase-user@example.com",
+                "aud": "authenticated",
+            }
 
             with patch("backend.routes.users_routes.sb") as mock_sb:
                 mock_result = MagicMock()

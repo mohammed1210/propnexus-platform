@@ -9,26 +9,25 @@ import sys
 import os
 
 # Add backend to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
 
 def test_scraper_imports():
     """Test that all scrapers can be imported."""
     try:
         print("✓ All scrapers imported successfully")
-        return True
     except Exception as e:
         print(f"✗ Import error: {e}")
-        return False
+        assert False, f"Import error: {e}"
 
 
 def test_utility_imports():
     """Test that utility modules can be imported."""
     try:
         print("✓ All utility modules imported successfully")
-        return True
     except Exception as e:
         print(f"✗ Utility import error: {e}")
-        return False
+        assert False, f"Utility import error: {e}"
 
 
 def test_scraper_functions_exist():
@@ -39,10 +38,10 @@ def test_scraper_functions_exist():
     from backend.scraper import spare_room_scraper
 
     scrapers = [
-        (rightmove_scraper, 'scrape_rightmove_properties'),
-        (zoopla_scraper, 'scrape_zoopla_properties'),
-        (onthemarket_scraper, 'scrape_onthemarket_properties'),
-        (spare_room_scraper, 'scrape_spareroom_properties'),
+        (rightmove_scraper, "scrape_rightmove_properties"),
+        (zoopla_scraper, "scrape_zoopla_properties"),
+        (onthemarket_scraper, "scrape_onthemarket_properties"),
+        (spare_room_scraper, "scrape_spareroom_properties"),
     ]
 
     all_ok = True
@@ -53,7 +52,7 @@ def test_scraper_functions_exist():
             print(f"✗ {module.__name__}.{func_name} missing")
             all_ok = False
 
-    return all_ok
+    assert all_ok, "Some scraper functions are missing"
 
 
 def test_property_type_extraction():
@@ -92,16 +91,12 @@ def test_property_type_extraction():
         print("✗ Zoopla _normalize_property_type failed")
         all_ok = False
 
-    return all_ok
+    assert all_ok, "Property type extraction failed"
 
 
 def test_validation_functions():
     """Test validation utility functions."""
-    from backend.utils.validation import (
-        is_valid_url,
-        is_valid_image_url,
-        should_insert_property
-    )
+    from backend.utils.validation import is_valid_url, is_valid_image_url, should_insert_property
 
     # Test URL validation
     assert is_valid_url("https://example.com")
@@ -120,23 +115,18 @@ def test_validation_functions():
         "title": "Test Property",
         "source": "test",
         "price": 100000,
-        "location": "London"
+        "location": "London",
     }
     should_insert, reason = should_insert_property(valid_prop)
     assert should_insert
     print("✓ Property validation works for valid property")
 
     # Test invalid property (missing external_id)
-    invalid_prop = {
-        "title": "Test Property",
-        "source": "test"
-    }
+    invalid_prop = {"title": "Test Property", "source": "test"}
     should_insert, reason = should_insert_property(invalid_prop)
     assert not should_insert
     assert reason is not None
     print("✓ Property validation rejects invalid property")
-
-    return True
 
 
 def test_retry_logic():
@@ -153,8 +143,6 @@ def test_retry_logic():
     assert delay2 == 4.0
     print("✓ Exponential backoff calculation works")
 
-    return True
-
 
 def test_logger_stats():
     """Test scraper logger statistics."""
@@ -169,8 +157,6 @@ def test_logger_stats():
     assert stats.successful_parses == 1
     assert stats.missing_fields["image_url"] == 1
     print("✓ ScraperStats tracking works")
-
-    return True
 
 
 def main():
@@ -196,6 +182,7 @@ def main():
         except Exception as e:
             print(f"✗ Test failed with exception: {e}")
             import traceback
+
             traceback.print_exc()
             results.append((name, False))
 

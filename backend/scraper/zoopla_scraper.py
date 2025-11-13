@@ -8,7 +8,13 @@ from fastapi import BackgroundTasks
 
 from utils.postcode import get_lat_lng_from_postcode
 from utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html
-from utils.scraper_logger import ScraperStats, log_scrape_start, log_page_fetch_error, log_scraperapi_fallback, log_image_extraction
+from utils.scraper_logger import (
+    ScraperStats,
+    log_scrape_start,
+    log_page_fetch_error,
+    log_scraperapi_fallback,
+    log_image_extraction,
+)
 from utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
 
@@ -84,7 +90,7 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
         url,
         max_retries=3,
         base_delay=2.0,
-        exceptions=(aiohttp.ClientError,)
+        exceptions=(aiohttp.ClientError,),
     )
 
 
@@ -110,19 +116,19 @@ def _extract_int(text: str) -> Optional[int]:
 
 def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
     """Extract property type from card element.
-    
+
     Args:
         card: BeautifulSoup element representing a property card
-        
+
     Returns:
         Property type string or None
     """
     # Try various selectors for property type
     type_el = (
-        card.select_one("[data-testid='property-type']") or
-        card.select_one(".listing-property-type") or
-        card.select_one(".property-type") or
-        card.select_one(".property-information")
+        card.select_one("[data-testid='property-type']")
+        or card.select_one(".listing-property-type")
+        or card.select_one(".property-type")
+        or card.select_one(".property-information")
     )
 
     if type_el:
@@ -142,10 +148,10 @@ def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
 
 def _normalize_property_type(text: str) -> Optional[str]:
     """Normalize property type text to standard values.
-    
+
     Args:
         text: Raw property type text
-        
+
     Returns:
         Normalized property type or None
     """
@@ -155,24 +161,24 @@ def _normalize_property_type(text: str) -> Optional[str]:
     lower = text.lower()
 
     # Check for common property types (order matters - check studio before flat!)
-    if 'studio' in lower:
-        return 'studio'
-    if 'flat' in lower or 'apartment' in lower:
-        return 'flat'
-    if 'detached' in lower and 'semi' not in lower:
-        return 'detached'
-    if 'semi-detached' in lower or 'semi detached' in lower:
-        return 'semi-detached'
-    if 'terraced' in lower:
-        return 'terraced'
-    if 'bungalow' in lower:
-        return 'bungalow'
-    if 'house' in lower:
-        return 'house'
-    if 'maisonette' in lower:
-        return 'maisonette'
-    if 'cottage' in lower:
-        return 'cottage'
+    if "studio" in lower:
+        return "studio"
+    if "flat" in lower or "apartment" in lower:
+        return "flat"
+    if "detached" in lower and "semi" not in lower:
+        return "detached"
+    if "semi-detached" in lower or "semi detached" in lower:
+        return "semi-detached"
+    if "terraced" in lower:
+        return "terraced"
+    if "bungalow" in lower:
+        return "bungalow"
+    if "house" in lower:
+        return "house"
+    if "maisonette" in lower:
+        return "maisonette"
+    if "cottage" in lower:
+        return "cottage"
 
     return None
 
@@ -183,34 +189,34 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
 
     for img in card.select("img"):
         url = (
-            img.get("data-src") or
-            img.get("src") or
-            img.get("data-lazy-src") or
-            img.get("data-original")
+            img.get("data-src")
+            or img.get("src")
+            or img.get("data-lazy-src")
+            or img.get("data-original")
         )
 
         if url and isinstance(url, str):
             url = url.strip()
-            if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1', 'pixel']):
-                if url.startswith('//'):
-                    url = 'https:' + url
-                elif url.startswith('/'):
-                    url = 'https://www.zoopla.co.uk' + url
+            if url and not any(x in url.lower() for x in ["placeholder", "blank", "1x1", "pixel"]):
+                if url.startswith("//"):
+                    url = "https:" + url
+                elif url.startswith("/"):
+                    url = "https://www.zoopla.co.uk" + url
                 images.append(url)
 
     # Check srcset
     for img in card.select("img[srcset]"):
         srcset = img.get("srcset", "")
         if srcset:
-            for item in srcset.split(','):
+            for item in srcset.split(","):
                 parts = item.strip().split()
                 if parts:
                     url = parts[0].strip()
-                    if url and not any(x in url.lower() for x in ['placeholder', 'blank', '1x1']):
-                        if url.startswith('//'):
-                            url = 'https:' + url
-                        elif url.startswith('/'):
-                            url = 'https://www.zoopla.co.uk' + url
+                    if url and not any(x in url.lower() for x in ["placeholder", "blank", "1x1"]):
+                        if url.startswith("//"):
+                            url = "https:" + url
+                        elif url.startswith("/"):
+                            url = "https://www.zoopla.co.uk" + url
                         images.append(url)
 
     # De-duplicate
@@ -227,10 +233,10 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
 def _extract_description(card: BeautifulSoup) -> Optional[str]:
     """Extract property description from a card."""
     desc_el = (
-        card.select_one("[data-testid='listing-description']") or
-        card.select_one(".listing-description") or
-        card.select_one(".property-description") or
-        card.select_one("[itemprop='description']")
+        card.select_one("[data-testid='listing-description']")
+        or card.select_one(".listing-description")
+        or card.select_one(".property-description")
+        or card.select_one("[itemprop='description']")
     )
 
     if desc_el:
@@ -302,7 +308,9 @@ async def scrape_zoopla_properties(
             cards = _collect_cards(soup)
             if not cards:
                 if PLAYWRIGHT_ENABLE:
-                    rendered = await render_page(url, ["[data-testid='search-result']", ".c-propertyCard", ".l-searchResult"])
+                    rendered = await render_page(
+                        url, ["[data-testid='search-result']", ".c-propertyCard", ".l-searchResult"]
+                    )
                     if rendered:
                         soup = BeautifulSoup(rendered, "html.parser")
                         cards = _collect_cards(soup)
