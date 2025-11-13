@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import StripePortalButton from '@/components/StripePortalButton';
 import PlanBadge from '@/components/PlanBadge';
+import { useUserPlan } from '@/lib/useUserPlan';
+import { toast } from 'sonner';
 
 /** Lazy, client-only Supabase helpers (safe for CI/preview) */
 async function getSupabase() {
@@ -30,21 +33,45 @@ async function signOut(): Promise<void> {
   if (supabase) await supabase.auth.signOut();
 }
 
-/** Force dynamic so we don’t cache auth state */
+/** Force dynamic so we don't cache auth state */
 export const dynamic = 'force-dynamic';
 
-export default function AccountPage() {
+function AccountPageContent() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { refetch: refetchPlan } = useUserPlan();
 
   useEffect(() => {
     (async () => {
       setEmail(await getUserEmail());
       setHydrated(true);
+
+      // Check if returning from Stripe checkout success
+      if (searchParams) {
+        const success = searchParams.get('success');
+        const sessionId = searchParams.get('session_id');
+        
+        if (success === 'true' && sessionId) {
+          // Show success message
+          toast.success('Subscription updated successfully!');
+          
+          // Refresh plan data to reflect the change
+          // Use a small delay to allow webhook processing
+          setTimeout(async () => {
+            try {
+              await refetchPlan();
+              toast.success('Your plan has been updated!');
+            } catch (err) {
+              console.error('Failed to refresh plan:', err);
+            }
+          }, 2000);
+        }
+      }
     })();
-  }, []);
+  }, [searchParams, refetchPlan]);
 
   /** Manual/fallback Customer Portal opener (kept visible for redundancy) */
   async function openPortalManually() {
@@ -156,7 +183,7 @@ export default function AccountPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <p>You’re not signed in.</p>
+          <p>You&apos;re not signed in.</p>
           <Link
             href="/magic-login"
             className="inline-flex items-center rounded-md bg-zinc-900 text-white px-4 py-2 font-medium hover:bg-zinc-800"
@@ -164,10 +191,28 @@ export default function AccountPage() {
             Sign in with Magic Link
           </Link>
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            After signing in you’ll return here to manage your subscription.
+            After signing in you&apos;ll return here to manage your subscription.
           </div>
         </div>
       )}
     </main>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense fallback={
+      <main className="mx-auto max-w-3xl px-6 py-10">
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-2xl font-bold tracking-tight">Manage Subscription</h1>
+        </div>
+        <p className="text-zinc-600 dark:text-zinc-300 mb-6">
+          Update your plan, billing details, or cancel anytime.
+        </p>
+        <p>Loading…</p>
+      </main>
+    }>
+      <AccountPageContent />
+    </Suspense>
   );
 }
