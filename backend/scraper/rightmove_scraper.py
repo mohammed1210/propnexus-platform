@@ -211,6 +211,75 @@ def _extract_int(text: str) -> Optional[int]:
     return int(m.group(0)) if m else None
 
 
+def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
+    """Extract property type from card element.
+    
+    Args:
+        card: BeautifulSoup element representing a property card
+        
+    Returns:
+        Property type string or None
+    """
+    # Try various selectors for property type
+    type_el = (
+        card.select_one("[data-testid='property-type']") or
+        card.select_one(".propertyCard-propertyType") or
+        card.select_one(".property-information") or
+        card.select_one(".propertyType")
+    )
+    
+    if type_el:
+        type_text = type_el.get_text(" ", strip=True)
+        return _normalize_property_type(type_text)
+    
+    # Try to extract from title or summary text
+    title = card.select_one(".propertyCard-title, h2")
+    if title:
+        title_text = title.get_text(" ", strip=True)
+        prop_type = _normalize_property_type(title_text)
+        if prop_type:
+            return prop_type
+    
+    return None
+
+
+def _normalize_property_type(text: str) -> Optional[str]:
+    """Normalize property type text to standard values.
+    
+    Args:
+        text: Raw property type text
+        
+    Returns:
+        Normalized property type or None
+    """
+    if not text:
+        return None
+    
+    lower = text.lower()
+    
+    # Check for common property types
+    if 'flat' in lower or 'apartment' in lower:
+        return 'flat'
+    if 'detached' in lower and 'semi' not in lower:
+        return 'detached'
+    if 'semi-detached' in lower or 'semi detached' in lower:
+        return 'semi-detached'
+    if 'terraced' in lower:
+        return 'terraced'
+    if 'bungalow' in lower:
+        return 'bungalow'
+    if 'house' in lower:
+        return 'house'
+    if 'studio' in lower:
+        return 'studio'
+    if 'maisonette' in lower:
+        return 'maisonette'
+    if 'cottage' in lower:
+        return 'cottage'
+    
+    return None
+
+
 def _extract_property_id(card: BeautifulSoup) -> Optional[str]:
     # Try data-id or an href containing property ID
     data_id = card.get("data-id")
@@ -357,6 +426,9 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                     
                     # Extract description
                     description = _extract_description(card)
+                    
+                    # Extract property type
+                    property_type = _extract_property_type(card)
 
                     external_id = (
                         _extract_property_id(card) or f"rm-{hash(title+location_text) & 0xffffffff}"
@@ -372,6 +444,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         "price": price,
                         "bedrooms": bedrooms,
                         "bathrooms": bathrooms,
+                        "property_type": property_type,
                         "image_url": image_url,
                         "image_urls": image_urls,
                         "latitude": coords["latitude"],
@@ -387,6 +460,8 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         stats.log_missing_field("description", external_id)
                     if not price:
                         stats.log_missing_field("price", external_id)
+                    if not property_type:
+                        stats.log_missing_field("property_type", external_id)
                     
                     # Validate before adding
                     should_insert, reason = should_insert_property(property_data)
@@ -466,6 +541,10 @@ async def _fetch_api_properties(session: aiohttp.ClientSession, region_id: str, 
                 else:
                     description = None
                 
+                # Extract property type from API data
+                property_type_raw = p.get("propertySubType") or p.get("propertyType") or ""
+                property_type = _normalize_property_type(property_type_raw) if property_type_raw else None
+                
                 price_obj = p.get("price") or {}
                 price = price_obj.get("amount") or price_obj.get("price") or None
                 bedrooms = p.get("bedrooms") or p.get("numBedrooms") or 0
@@ -501,6 +580,7 @@ async def _fetch_api_properties(session: aiohttp.ClientSession, region_id: str, 
                         "price": price,
                         "bedrooms": bedrooms,
                         "bathrooms": bathrooms,
+                        "property_type": property_type,
                         "image_url": img,
                         "image_urls": image_urls,
                         "latitude": coords["latitude"],
