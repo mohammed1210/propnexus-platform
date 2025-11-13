@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import StripePortalButton from '@/components/StripePortalButton';
@@ -36,7 +36,7 @@ async function signOut(): Promise<void> {
 /** Force dynamic so we don't cache auth state */
 export const dynamic = 'force-dynamic';
 
-export default function AccountPage() {
+function AccountPageContent() {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -196,5 +196,23 @@ export default function AccountPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <Suspense fallback={
+      <main className="mx-auto max-w-3xl px-6 py-10">
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-2xl font-bold tracking-tight">Manage Subscription</h1>
+        </div>
+        <p className="text-zinc-600 dark:text-zinc-300 mb-6">
+          Update your plan, billing details, or cancel anytime.
+        </p>
+        <p>Loading…</p>
+      </main>
+    }>
+      <AccountPageContent />
+    </Suspense>
   );
 }
