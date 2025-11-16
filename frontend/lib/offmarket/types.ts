@@ -31,6 +31,8 @@ export interface DealFilters {
   maxPrice?: number;
   minDiscount?: number;
   minScore?: number;
+  minBedrooms?: number;
+  minBathrooms?: number;
 }
 
 export type ViewMode = 'cards' | 'table';
