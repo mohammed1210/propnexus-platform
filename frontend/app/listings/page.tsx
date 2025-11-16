@@ -55,6 +55,8 @@ const Popup = nextDynamic(() => import('react-leaflet').then((m) => m.Popup), { 
 const SORTABLE = ['created_at', 'price', 'bedrooms', 'roi_percent', 'yield_percent'] as const;
 type SortKey = (typeof SORTABLE)[number];
 
+const INVESTMENT_TYPES = ['HMO', 'BTL', 'SA', 'BRR', 'Flip', 'Commercial'] as const;
+
 type RawProperty = {
   id: string | null;
   title: string | null;
@@ -247,6 +249,10 @@ function ListingsInner() {
   const maxP = parsePositiveInt(searchParams?.get('max') ?? '');
   const beds = parsePositiveInt(searchParams?.get('beds') ?? '');
   const baths = parsePositiveInt(searchParams?.get('baths') ?? '');
+  const typesRaw = searchParams?.get('types') ?? '';
+  const types = useMemo(() => {
+    return typesRaw ? typesRaw.split(',').filter(Boolean) : [];
+  }, [typesRaw]);
 
   const sort = ((): SortKey => {
     const s = (searchParams?.get('sort') || '').toLowerCase();
@@ -261,6 +267,7 @@ function ListingsInner() {
   const [maxInput, setMaxInput] = useState(searchParams?.get('max') ?? '');
   const [bedsInput, setBedsInput] = useState(searchParams?.get('beds') ?? '');
   const [bathsInput, setBathsInput] = useState(searchParams?.get('baths') ?? '');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>(types);
 
   const [rows, setRows] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
@@ -291,6 +298,9 @@ function ListingsInner() {
       if (maxP !== undefined) query = query.lte('price', maxP);
       if (beds !== undefined) query = query.gte('bedrooms', beds);
       if (baths !== undefined) query = query.gte('bathrooms', baths);
+      if (types.length > 0) {
+        query = query.in('investmentType', types);
+      }
 
       const { data, error } = await query;
       if (cancelled) return;
@@ -307,7 +317,7 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, baths, sort, dir]);
+  }, [q, minP, maxP, beds, baths, types, sort, dir]);
 
   const points = useMemo(() => {
     return rows
@@ -328,6 +338,7 @@ function ListingsInner() {
     if (maxInput) p.set('max', maxInput);
     if (bedsInput) p.set('beds', bedsInput);
     if (bathsInput) p.set('baths', bathsInput);
+    if (selectedTypes.length > 0) p.set('types', selectedTypes.join(','));
     if (sort) p.set('sort', sort);
     if (dir) p.set('dir', dir);
     router.push(`/listings?${p.toString()}`);
@@ -339,12 +350,24 @@ function ListingsInner() {
     setMaxInput('');
     setBedsInput('');
     setBathsInput('');
+    setSelectedTypes([]);
     router.push('/listings');
   };
 
-  const removeFilter = (key: string) => {
+  const removeFilter = (key: string, value?: string) => {
     const p = new URLSearchParams(searchParams?.toString());
-    p.delete(key);
+    if (key === 'types' && value) {
+      // Remove specific type from comma-separated list
+      const currentTypes = p.get('types')?.split(',').filter(Boolean) || [];
+      const newTypes = currentTypes.filter(t => t !== value);
+      if (newTypes.length > 0) {
+        p.set('types', newTypes.join(','));
+      } else {
+        p.delete('types');
+      }
+    } else {
+      p.delete(key);
+    }
     router.push(`/listings?${p.toString()}`);
   };
 
@@ -355,6 +378,9 @@ function ListingsInner() {
   if (maxP) activeFilters.push({ key: 'max', label: `Max £${maxP.toLocaleString()}`, value: String(maxP) });
   if (beds) activeFilters.push({ key: 'beds', label: `${beds}+ beds`, value: String(beds) });
   if (baths) activeFilters.push({ key: 'baths', label: `${baths}+ baths`, value: String(baths) });
+  types.forEach((type) => {
+    activeFilters.push({ key: 'types', label: type, value: type });
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
@@ -427,6 +453,11 @@ function ListingsInner() {
             >
               <FiSliders className="w-5 h-5" />
               Filters
+              {activeFilters.length > 0 && (
+                <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-brand-500 text-white text-xs font-medium">
+                  {activeFilters.length}
+                </span>
+              )}
             </button>
           </div>
 
@@ -463,6 +494,40 @@ function ListingsInner() {
                   className="input-field h-10"
                 />
               </div>
+
+              {/* Investment Types */}
+              <div className="mb-3">
+                <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
+                  Investment Type
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {INVESTMENT_TYPES.map((type) => {
+                    const isSelected = selectedTypes.includes(type);
+                    return (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedTypes(selectedTypes.filter(t => t !== type));
+                          } else {
+                            setSelectedTypes([...selectedTypes, type]);
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all duration-200 transform ${
+                          isSelected
+                            ? 'bg-brand-500 text-white border-brand-500 scale-105 shadow-md'
+                            : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:border-brand-400 hover:scale-105'
+                        }`}
+                        aria-pressed={isSelected}
+                        aria-label={`${type} investment type`}
+                      >
+                        {type}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <button onClick={applyFilters} className="btn-primary px-6 py-2">
                   Apply Filters
@@ -479,12 +544,12 @@ function ListingsInner() {
             <div className="flex flex-wrap gap-2 mt-3">
               {activeFilters.map((filter, idx) => (
                 <span
-                  key={idx}
+                  key={`${filter.key}-${filter.value}-${idx}`}
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 text-sm font-medium border border-brand-200 dark:border-brand-700"
                 >
                   {filter.label}
                   <button
-                    onClick={() => removeFilter(filter.key)}
+                    onClick={() => removeFilter(filter.key, filter.value)}
                     className="hover:text-brand-900 dark:hover:text-brand-100 transition-colors"
                   >
                     <FiX className="w-4 h-4" />

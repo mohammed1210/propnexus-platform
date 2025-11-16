@@ -102,12 +102,18 @@ export default function OffMarketPage() {
     if (Number.isFinite(filters.maxPrice as number)) {
       list = list.filter((d) => (d.price ?? 0) <= (filters.maxPrice as number));
     }
-    if (Number.isFinite(filters.minDiscount as number)) {
+    if (Number.isFinite(filters.minBedrooms as number) && (filters.minBedrooms as number) > 0) {
+      list = list.filter((d) => (d.bedrooms ?? 0) >= (filters.minBedrooms as number));
+    }
+    if (Number.isFinite(filters.minBathrooms as number) && (filters.minBathrooms as number) > 0) {
+      list = list.filter((d) => (d.bathrooms ?? 0) >= (filters.minBathrooms as number));
+    }
+    if (Number.isFinite(filters.minDiscount as number) && (filters.minDiscount as number) > 0) {
       list = list.filter(
         (d) => (d.discount_percent ?? 0) >= (filters.minDiscount as number),
       );
     }
-    if (Number.isFinite(filters.minScore as number)) {
+    if (Number.isFinite(filters.minScore as number) && (filters.minScore as number) > 0) {
       list = list.filter((d) => (d.investment_score ?? 0) >= (filters.minScore as number));
     }
     setFiltered(list);
