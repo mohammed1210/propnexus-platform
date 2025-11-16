@@ -21,17 +21,17 @@ def init_sentry():
     if not SENTRY_DSN:
         logger.info("Sentry DSN not configured, skipping Sentry initialization")
         return False
-    
+
     if not IS_PRODUCTION:
         logger.info(f"Sentry disabled in {ENVIRONMENT} environment")
         return False
-    
+
     try:
         import sentry_sdk
         from sentry_sdk.integrations.fastapi import FastApiIntegration
         from sentry_sdk.integrations.starlette import StarletteIntegration
         from sentry_sdk.integrations.logging import LoggingIntegration
-        
+
         # Configure Sentry
         sentry_sdk.init(
             dsn=SENTRY_DSN,
@@ -61,10 +61,10 @@ def init_sentry():
             # Filter out sensitive paths
             before_send=_before_send,
         )
-        
+
         logger.info(f"Sentry initialized successfully for {ENVIRONMENT} environment")
         return True
-        
+
     except ImportError:
         logger.warning("sentry-sdk not installed, skipping Sentry initialization")
         return False
@@ -75,7 +75,7 @@ def init_sentry():
 
 def _before_send(event, hint):
     """Filter or modify events before sending to Sentry.
-    
+
     This hook allows us to:
     - Strip sensitive data from error contexts
     - Filter out specific error types
@@ -90,22 +90,21 @@ def _before_send(event, hint):
             if param in query.lower():
                 event["request"]["query_string"] = "[FILTERED]"
                 break
-    
+
     # Strip email addresses from error messages
     if "message" in event:
         import re
+
         event["message"] = re.sub(
-            r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b',
-            '[EMAIL]',
-            event["message"]
+            r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[EMAIL]", event["message"]
         )
-    
+
     return event
 
 
 def capture_exception(error: Exception, **context):
     """Capture an exception and send to Sentry with additional context.
-    
+
     Args:
         error: The exception to capture
         **context: Additional context to attach (e.g., user_id, request_id)
@@ -113,14 +112,15 @@ def capture_exception(error: Exception, **context):
     if not IS_PRODUCTION or not SENTRY_DSN:
         logger.debug(f"Skipping Sentry capture (not production): {error}")
         return
-    
+
     try:
         import sentry_sdk
+
         with sentry_sdk.push_scope() as scope:
             # Add custom context
             for key, value in context.items():
                 scope.set_context(key, {"value": value})
-            
+
             sentry_sdk.capture_exception(error)
     except Exception as e:
         logger.error(f"Failed to capture exception in Sentry: {e}")
@@ -128,7 +128,7 @@ def capture_exception(error: Exception, **context):
 
 def capture_message(message: str, level: str = "info", **context):
     """Capture a message and send to Sentry.
-    
+
     Args:
         message: Message to capture
         level: Severity level (debug, info, warning, error, fatal)
@@ -136,13 +136,14 @@ def capture_message(message: str, level: str = "info", **context):
     """
     if not IS_PRODUCTION or not SENTRY_DSN:
         return
-    
+
     try:
         import sentry_sdk
+
         with sentry_sdk.push_scope() as scope:
             for key, value in context.items():
                 scope.set_context(key, {"value": value})
-            
+
             sentry_sdk.capture_message(message, level=level)
     except Exception as e:
         logger.error(f"Failed to capture message in Sentry: {e}")

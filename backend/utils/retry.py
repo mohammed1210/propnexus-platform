@@ -20,7 +20,9 @@ JITTER_ENABLED = os.getenv("SCRAPER_RETRY_JITTER", "true").lower() in ("true", "
 T = TypeVar("T")
 
 
-def calculate_delay(attempt: int, base_delay: float = BASE_DELAY, jitter: bool = JITTER_ENABLED) -> float:
+def calculate_delay(
+    attempt: int, base_delay: float = BASE_DELAY, jitter: bool = JITTER_ENABLED
+) -> float:
     """Calculate exponential backoff delay for retry attempt.
 
     Args:
@@ -33,11 +35,11 @@ def calculate_delay(attempt: int, base_delay: float = BASE_DELAY, jitter: bool =
     """
     delay = base_delay * (BACKOFF_FACTOR**attempt)
     delay = min(delay, MAX_DELAY)
-    
+
     # Add random jitter to prevent thundering herd
     if jitter:
-        delay *= (0.5 + random.random())
-    
+        delay *= 0.5 + random.random()
+
     return delay
 
 
@@ -144,16 +146,16 @@ async def fetch_with_retry(
     timeout: int = 30,
 ) -> aiohttp.ClientResponse:
     """Fetch URL with exponential backoff retry logic.
-    
+
     Retries on:
     - Network errors (ConnectionError, TimeoutError)
     - HTTP 5xx errors (server errors)
     - HTTP 429 (rate limit)
-    
+
     Does NOT retry on:
     - HTTP 4xx errors (except 429)
     - Successful responses (2xx, 3xx)
-    
+
     Args:
         session: aiohttp ClientSession
         url: URL to fetch
@@ -165,15 +167,15 @@ async def fetch_with_retry(
         max_retries: Maximum number of retry attempts
         base_delay: Base delay for exponential backoff
         timeout: Request timeout in seconds
-    
+
     Returns:
         aiohttp ClientResponse object
-        
+
     Raises:
         aiohttp.ClientError: After all retries exhausted
     """
     last_exception = None
-    
+
     for attempt in range(max_retries + 1):
         try:
             async with session.request(
@@ -189,13 +191,13 @@ async def fetch_with_retry(
                 if 400 <= response.status < 500 and response.status != 429:
                     logger.warning(f"Client error {response.status} for {url}, not retrying")
                     response.raise_for_status()
-                    
+
                 # Retry on 429 or 5xx
                 if response.status == 429 or response.status >= 500:
                     if attempt >= max_retries:
                         logger.error(f"Max retries reached for {url}, status {response.status}")
                         response.raise_for_status()
-                    
+
                     delay = calculate_delay(attempt, base_delay)
                     logger.warning(
                         f"HTTP {response.status} for {url}, retrying {attempt + 1}/{max_retries} "
@@ -203,24 +205,24 @@ async def fetch_with_retry(
                     )
                     await asyncio.sleep(delay)
                     continue
-                
+
                 # Success case
                 return response
-                
+
         except (aiohttp.ClientError, asyncio.TimeoutError) as e:
             last_exception = e
-            
+
             if attempt >= max_retries:
                 logger.error(f"All retries exhausted for {url}: {e}")
                 raise
-            
+
             delay = calculate_delay(attempt, base_delay)
             logger.warning(
                 f"Network error for {url}, retrying {attempt + 1}/{max_retries} "
                 f"after {delay:.1f}s: {e}"
             )
             await asyncio.sleep(delay)
-    
+
     # Should not reach here, but for safety
     if last_exception:
         raise last_exception

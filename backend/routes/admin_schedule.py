@@ -12,11 +12,11 @@ def trigger_daily(x_api_key: str = Header(None, alias="x-api-key")):
     """Trigger the daily scrape job and log the run."""
     if not x_api_key or x_api_key != os.getenv("OFF_MARKET_ADMIN_TOKEN"):
         raise HTTPException(status_code=401, detail="Unauthorized")
-    
+
     # Log the run
     log = RunLog(provider="daily_scrape", location="multi", source="admin_endpoint")
     log.start_run()
-    
+
     try:
         daily_scrape()
         # Note: In a real implementation, we'd get actual property counts from daily_scrape()
