@@ -84,20 +84,24 @@ Current automation (GitHub Actions):
 
 Runtime entry points:
 
-- Ad hoc unified import: `POST /import/all` (Rightmove, Zoopla, OnTheMarket, SpareRoom) — dedupes then optional Supabase upsert.
+- **Primary unified import**: `POST /import/all` (Rightmove, Zoopla, OnTheMarket, SpareRoom) — dedupes then optional Supabase upsert. **Use this endpoint for all new integrations.**
 - Individual source endpoints: `POST /import/{provider}` for targeted fetches.
-- Legacy endpoint: `POST /scrape` (currently only Rightmove + Zoopla) — can be deprecated in favour of `/import/all`.
-- Stub batch jobs (not yet wired): `backend/tasks/cron_tasks.py` (`daily_scrape`, `send_daily_digest`).
+- ~~Legacy endpoint: `POST /scrape`~~ — **DEPRECATED**. This endpoint is maintained for backwards compatibility only and will be removed in a future version. Use `/import/all` instead.
+- Scheduled job: `POST /admin/schedule/daily` triggers `daily_scrape()` and logs run to `scrape_runs` table.
 
-Not yet implemented / gaps:
+Improvements completed:
 
-1. The `daily_scrape()` stub (multi-location loop) is not invoked by any scheduler — only the API endpoints + Actions flows run.
-2. No backoff / retry or per-source error metrics in scheduled workflows (a zero count fails one workflow and warns in the other, but individual source failures are not surfaced).
-3. No alerting/notifications (email/Slack) when counts unexpectedly drop for specific locations or sources.
-4. No persistent run log table (e.g. `scrape_runs`) to audit frequency, duration, result counts, error flags.
-5. Proxy/provider rotation limited to ScraperAPI fallback; optional providers (ZenRows, ScrapingBee) are documented but not added.
-6. Location list hard-coded in Action input or stub; no dynamic discovery (e.g. popular searches or user favourites).
-7. Digest email task `send_daily_digest()` is a placeholder only.
+1. ✅ The `daily_scrape()` job can now be triggered via admin endpoint with proper RunLog tracking.
+2. ✅ Exponential backoff with jitter and configurable retry limits via environment variables.
+3. ✅ RunLog persistent table (`scrape_runs`) to audit frequency, duration, result counts, error flags.
+4. ✅ `/scrape` endpoint deprecated in favor of `/import/all`.
+
+Still to implement:
+
+1. No alerting/notifications (email/Slack) when counts unexpectedly drop for specific locations or sources.
+2. Proxy/provider rotation limited to ScraperAPI fallback; optional providers (ZenRows, ScrapingBee) are documented but not added.
+3. Location list hard-coded in Action input or stub; no dynamic discovery (e.g. popular searches or user favourites).
+4. Digest email task `send_daily_digest()` is a placeholder only.
 
 Recommended enhancements:
 

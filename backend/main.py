@@ -5,6 +5,13 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# Initialize Sentry before other imports
+try:
+    from utils.sentry_init import init_sentry
+    init_sentry()
+except Exception as e:
+    print(f"[WARNING] Sentry initialization failed: {e}")
+
 # Local routers
 from .routes.ai import router as ai_router
 from .routes.area_intel_routes import router as area_intel_router
@@ -15,7 +22,6 @@ from .routes.import_routes import router as import_router
 from .routes.notes import router as notes_router
 from .routes.off_market_routes import router as off_market_router
 from .routes.save_deal import router as save_deal_router
-from .routes.scrape_routes import router as scrape_router
 from .routes.properties_routes import router as properties_router
 from .routes.users_routes import router as users_router
 from routes import import_routes, admin_schedule
@@ -29,6 +35,7 @@ from .routes.stripe_routes import (
 # Note: Additional route files exist but are not yet integrated:
 # - digests_routes.py, email_routes.py, metrics_routes.py, payments_routes.py
 # These may be activated in future releases when the features are ready.
+# - scrape_routes.py is deprecated in favor of import_routes.py
 
 try:
     from dotenv import load_dotenv
@@ -63,7 +70,7 @@ app.include_router(import_router)
 app.include_router(notes_router)
 app.include_router(off_market_router)
 app.include_router(save_deal_router)
-app.include_router(scrape_router)
+# Legacy scrape_router removed - use import_router instead
 app.include_router(properties_router)  # GET /properties
 app.include_router(import_routes.router)
 app.include_router(admin_schedule.router)
