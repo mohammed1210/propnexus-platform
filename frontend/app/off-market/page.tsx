@@ -174,44 +174,66 @@ export default function OffMarketPage() {
   return (
     <PageWrapper showOrbs={true}>
       <Section>
-        <SectionTitle>Off-Market Deals</SectionTitle>
+        <SectionTitle>Off‑Market Deals</SectionTitle>
+        <p className="mt-2 max-w-xl text-sm text-zinc-600 dark:text-zinc-300">
+          Track and experiment with off‑market opportunities you or your agents uncover.
+          Use the AI generator for ideas, then refine with filters to focus on the best deals.
+        </p>
 
-        {/* Sticky generator bar */}
-        <div className="sticky-filter">
-          <div className="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-2 justify-end">
-            <input
-              className="input-field w-[160px]"
-              placeholder="Location"
-              value={loc}
-              onChange={(e) => setLoc(e.target.value)}
-            />
-            <input
-              className="input-field w-[120px]"
-              placeholder="Budget £"
-              inputMode="numeric"
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-            />
-            <input
-              className="input-field w-[90px]"
-              placeholder="Count"
-              inputMode="numeric"
-              value={count}
-              onChange={(e) => setCount(e.target.value)}
-            />
-            <button
-              onClick={generateDeals}
-              disabled={generating}
-              className="rounded-lg btn-primary px-3 py-2 disabled:opacity-60"
-            >
-              {generating ? 'Generating…' : 'Generate Deals'}
-            </button>
+        {/* AI Generator toolbar */}
+        <div className="mt-6 mb-6 rounded-2xl border border-zinc-200/80 bg-white/70 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/60 shadow-sm">
+          <div className="px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                AI Deal Generator
+              </p>
+              <p className="text-xs text-zinc-600 dark:text-zinc-300">
+                Quickly draft new off‑market ideas by location and budget. Results will be added to your list below.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                className="w-40 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900"
+                placeholder="Location"
+                value={loc}
+                onChange={(e) => setLoc(e.target.value)}
+              />
+              <input
+                className="w-32 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900"
+                type="number"
+                min={0}
+                step={10000}
+                placeholder="Budget (£)"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+              />
+              <input
+                className="w-24 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:bg-zinc-900"
+                type="number"
+                min={1}
+                max={10}
+                placeholder="# deals"
+                value={count}
+                onChange={(e) => setCount(e.target.value)}
+              />
+
+              <button
+                onClick={generateDeals}
+                disabled={generating}
+                className="inline-flex items-center gap-1 rounded-lg bg-black px-3.5 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-900 disabled:opacity-60"
+              >
+                {generating ? 'Generating…' : 'Generate deals'}
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Manual add form */}
         <details className="mb-5 card">
-          <summary className="cursor-pointer select-none font-medium">+ Add Off-Market Deal</summary>
+          <summary className="cursor-pointer select-none font-medium">
+            + Add Off‑Market Deal
+          </summary>
           <div className="mt-3">
             <AddDealForm onCreated={refreshRows} />
           </div>
@@ -223,22 +245,34 @@ export default function OffMarketPage() {
             <OffMarketFilters filters={filters} onFiltersChange={setFilters} />
           </div>
           <div className="lg:col-span-3 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm opacity-70">
-                Showing {filtered.length} of {rows.length}
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs text-zinc-500">
+                Showing{' '}
+                <span className="font-medium text-zinc-900 dark:text-zinc-50">
+                  {filtered.length}
+                </span>{' '}
+                of {rows.length} deals
               </div>
-              <div className="flex items-center gap-2">
+              <div className="inline-flex items-center rounded-full border border-zinc-200 bg-zinc-50 p-1 text-xs dark:border-zinc-700 dark:bg-zinc-900/40">
                 <button
-                  className={`px-3 py-1 rounded border ${viewMode === 'cards' ? 'bg-black text-white' : ''}`}
+                  className={`px-3 py-1 rounded-full transition ${
+                    viewMode === 'cards'
+                      ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-50'
+                      : 'text-zinc-500'
+                  }`}
                   onClick={() => setViewMode('cards')}
                 >
-                  Cards
+                  Grid
                 </button>
                 <button
-                  className={`px-3 py-1 rounded border ${viewMode === 'table' ? 'bg-black text-white' : ''}`}
+                  className={`px-3 py-1 rounded-full transition ${
+                    viewMode === 'table'
+                      ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-50'
+                      : 'text-zinc-500'
+                  }`}
                   onClick={() => setViewMode('table')}
                 >
-                  Table
+                  List
                 </button>
               </div>
             </div>
@@ -246,7 +280,7 @@ export default function OffMarketPage() {
             {loading ? (
               <div className="p-4 card">Loading…</div>
             ) : filtered.length === 0 ? (
-              <div className="p-4 card">No off-market deals yet.</div>
+              <div className="p-4 card">No off‑market deals yet.</div>
             ) : viewMode === 'cards' ? (
               <ul className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {filtered.map((d) => (
