@@ -32,4 +32,24 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// Only enable Sentry in production when DSN is configured
+// In dev/test, skip Sentry wrappers to avoid overhead and false events
+const useSentry =
+  process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_SENTRY_DSN;
+
+let exportedConfig = nextConfig;
+
+if (useSentry) {
+  try {
+    const { withSentryConfig } = await import('@sentry/nextjs');
+    exportedConfig = withSentryConfig(nextConfig, {
+      silent: true,
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+    });
+  } catch (err) {
+    console.warn('[next.config] Sentry wrapper skipped:', err?.message ?? err);
+  }
+}
+
+export default exportedConfig;

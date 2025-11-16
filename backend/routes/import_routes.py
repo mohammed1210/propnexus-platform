@@ -1,6 +1,8 @@
 # backend/routes/import_routes.py
 from __future__ import annotations
 
+import asyncio
+import inspect
 from typing import Any, Dict, Tuple
 
 try:
@@ -47,6 +49,17 @@ except Exception:
 router = APIRouter(prefix="/import", tags=["import"])
 
 
+async def _maybe_await(result: Any) -> Any:
+    """
+    Helper to handle both sync and async scraper functions.
+    If the result is an awaitable/coroutine, await it.
+    Otherwise, return it directly.
+    """
+    if inspect.iscoroutine(result) or inspect.isawaitable(result):
+        return await result
+    return result
+
+
 class ImportRequest(BaseModel):
     location: str
 
@@ -66,7 +79,7 @@ async def import_all(req: ImportRequest):
         raise HTTPException(status_code=400, detail="Location is required")
 
     try:
-        normalized = await scrape_all_sources(loc)
+        normalized = await _maybe_await(scrape_all_sources(loc))
         if sb and normalized:
             try:
                 sb.table("properties").upsert(normalized).execute()
@@ -86,7 +99,7 @@ async def import_zoopla(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [p for p in (await scrape_all_sources(loc)) if (p.get("source") == "zoopla")]
+    items = [p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "zoopla")]
     if sb and items:
         try:
             sb.table("properties").upsert(items).execute()
@@ -100,7 +113,7 @@ async def import_rightmove(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [p for p in (await scrape_all_sources(loc)) if (p.get("source") == "rightmove")]
+    items = [p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "rightmove")]
     if sb and items:
         try:
             sb.table("properties").upsert(items).execute()
@@ -114,7 +127,7 @@ async def import_onthemarket(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [p for p in (await scrape_all_sources(loc)) if (p.get("source") == "onthemarket")]
+    items = [p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "onthemarket")]
     if sb and items:
         try:
             sb.table("properties").upsert(items).execute()
@@ -128,7 +141,7 @@ async def import_spareroom(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [p for p in (await scrape_all_sources(loc)) if (p.get("source") == "spareroom")]
+    items = [p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "spareroom")]
     if sb and items:
         try:
             sb.table("properties").upsert(items).execute()
