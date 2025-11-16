@@ -31,29 +31,29 @@ def send_slack_alert(
     metadata: Optional[Dict[str, Any]] = None,
 ) -> bool:
     """Send alert to Slack via webhook.
-    
+
     Args:
         message: Alert message text
         title: Optional title for the alert
         severity: Alert severity (info, warning, error, critical)
         metadata: Additional context data
-        
+
     Returns:
         True if sent successfully, False otherwise
     """
     if not SLACK_WEBHOOK_URL:
         logger.debug("Slack webhook URL not configured, skipping Slack alert")
         return False
-    
+
     # Map severity to color
     color_map = {
-        "info": "#36a64f",      # green
-        "warning": "#ff9900",   # orange
-        "error": "#ff0000",     # red
+        "info": "#36a64f",  # green
+        "warning": "#ff9900",  # orange
+        "error": "#ff0000",  # red
         "critical": "#8b0000",  # dark red
     }
     color = color_map.get(severity, "#808080")
-    
+
     # Build Slack message
     payload = {
         "text": title or "PropNexus Alert",
@@ -69,16 +69,18 @@ def send_slack_alert(
             }
         ],
     }
-    
+
     # Add metadata fields
     if metadata:
         for key, value in metadata.items():
-            payload["attachments"][0]["fields"].append({
-                "title": key.replace("_", " ").title(),
-                "value": str(value),
-                "short": True,
-            })
-    
+            payload["attachments"][0]["fields"].append(
+                {
+                    "title": key.replace("_", " ").title(),
+                    "value": str(value),
+                    "short": True,
+                }
+            )
+
     try:
         response = requests.post(
             SLACK_WEBHOOK_URL,
@@ -100,20 +102,20 @@ def send_email_alert(
     metadata: Optional[Dict[str, Any]] = None,
 ) -> bool:
     """Send alert via email using Resend.
-    
+
     Args:
         subject: Email subject line
         message: Email body (plain text or HTML)
         severity: Alert severity (info, warning, error, critical)
         metadata: Additional context data to include
-        
+
     Returns:
         True if sent successfully, False otherwise
     """
     if not RESEND_API_KEY:
         logger.debug("Resend API key not configured, skipping email alert")
         return False
-    
+
     # Build HTML email body
     metadata_html = ""
     if metadata:
@@ -121,7 +123,7 @@ def send_email_alert(
         for key, value in metadata.items():
             metadata_html += f"<li><strong>{key.replace('_', ' ').title()}:</strong> {value}</li>"
         metadata_html += "</ul>"
-    
+
     html_body = f"""
     <html>
     <body style="font-family: Arial, sans-serif;">
@@ -140,14 +142,14 @@ def send_email_alert(
     </body>
     </html>
     """
-    
+
     payload = {
         "from": ALERT_EMAIL_FROM,
         "to": [ALERT_EMAIL_TO],
         "subject": f"[PropNexus Alert] {subject}",
         "html": html_body,
     }
-    
+
     try:
         response = requests.post(
             "https://api.resend.com/emails",
@@ -175,7 +177,7 @@ def send_alert(
     channels: Optional[list[str]] = None,
 ) -> Dict[str, bool]:
     """Send alert to configured channels.
-    
+
     Args:
         message: Alert message
         title: Optional title (for Slack)
@@ -183,22 +185,22 @@ def send_alert(
         severity: Alert severity level
         metadata: Additional context
         channels: List of channels to use (default: both Slack and email if configured)
-        
+
     Returns:
         Dictionary mapping channel name to success status
     """
     if channels is None:
         channels = ["slack", "email"]
-    
+
     results = {}
-    
+
     if "slack" in channels:
         results["slack"] = send_slack_alert(message, title, severity, metadata)
-    
+
     if "email" in channels:
         email_subject = subject or title or message[:50]
         results["email"] = send_email_alert(email_subject, message, severity, metadata)
-    
+
     return results
 
 
@@ -209,13 +211,13 @@ def check_scrape_anomaly(
     recent_avg: Optional[int] = None,
 ) -> bool:
     """Check if a scrape run shows anomalous behavior and send alerts if so.
-    
+
     Args:
         provider: Scraper provider name
         location: Location being scraped
         properties_count: Number of properties found in this run
         recent_avg: Average count from recent successful runs (optional)
-        
+
     Returns:
         True if anomaly detected and alert sent, False otherwise
     """
@@ -223,7 +225,7 @@ def check_scrape_anomaly(
     if properties_count == 0:
         send_alert(
             message=f"Scrape for {provider} in {location} returned ZERO properties. "
-                   f"This may indicate a scraper failure or data source issue.",
+            f"This may indicate a scraper failure or data source issue.",
             title="Zero Properties Alert",
             severity="error",
             metadata={
@@ -233,12 +235,12 @@ def check_scrape_anomaly(
             },
         )
         return True
-    
+
     # Check for drop below minimum threshold
     if properties_count < MIN_EXPECTED_PROPERTIES:
         send_alert(
             message=f"Scrape for {provider} in {location} returned only {properties_count} properties, "
-                   f"which is below the minimum threshold of {MIN_EXPECTED_PROPERTIES}.",
+            f"which is below the minimum threshold of {MIN_EXPECTED_PROPERTIES}.",
             title="Low Property Count Alert",
             severity="warning",
             metadata={
@@ -249,14 +251,14 @@ def check_scrape_anomaly(
             },
         )
         return True
-    
+
     # Check for significant drop compared to recent average
     if recent_avg and recent_avg > 0:
         pct_change = ((properties_count - recent_avg) / recent_avg) * 100
         if abs(pct_change) > ANOMALY_THRESHOLD_PCT and pct_change < 0:
             send_alert(
                 message=f"Scrape for {provider} in {location} showed a {abs(pct_change):.1f}% DROP "
-                       f"compared to recent average. Found {properties_count} vs avg {recent_avg}.",
+                f"compared to recent average. Found {properties_count} vs avg {recent_avg}.",
                 title="Significant Drop Alert",
                 severity="warning",
                 metadata={
@@ -268,5 +270,5 @@ def check_scrape_anomaly(
                 },
             )
             return True
-    
+
     return False

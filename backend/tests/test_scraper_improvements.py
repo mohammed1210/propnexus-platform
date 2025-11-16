@@ -141,11 +141,11 @@ def test_retry_logic():
     assert delay0 == 1.0
     assert delay1 == 2.0
     assert delay2 == 4.0
-    
+
     # Test with jitter enabled - should be within bounds
     delay_jitter = calculate_delay(0, base_delay=1.0, jitter=True)
     assert 0.5 <= delay_jitter <= 1.5  # Jitter adds 0.5-1.0x multiplier
-    
+
     print("✓ Exponential backoff calculation works")
 
 

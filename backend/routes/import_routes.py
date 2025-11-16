@@ -1,7 +1,6 @@
 # backend/routes/import_routes.py
 from __future__ import annotations
 
-import asyncio
 import inspect
 from typing import Any, Dict, Tuple
 
@@ -99,7 +98,9 @@ async def import_zoopla(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "zoopla")]
+    items = [
+        p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "zoopla")
+    ]
     if sb and items:
         try:
             sb.table("properties").upsert(items).execute()
@@ -113,7 +114,9 @@ async def import_rightmove(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "rightmove")]
+    items = [
+        p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "rightmove")
+    ]
     if sb and items:
         try:
             sb.table("properties").upsert(items).execute()
@@ -127,7 +130,11 @@ async def import_onthemarket(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "onthemarket")]
+    items = [
+        p
+        for p in (await _maybe_await(scrape_all_sources(loc)))
+        if (p.get("source") == "onthemarket")
+    ]
     if sb and items:
         try:
             sb.table("properties").upsert(items).execute()
@@ -141,7 +148,9 @@ async def import_spareroom(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "spareroom")]
+    items = [
+        p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "spareroom")
+    ]
     if sb and items:
         try:
             sb.table("properties").upsert(items).execute()

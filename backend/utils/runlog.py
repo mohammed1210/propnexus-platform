@@ -15,7 +15,7 @@ if os.getenv("SUPABASE_URL") and (
 
 class RunLog:
     """Context-manager style logger for scraper runs.
-    
+
     Usage:
         log = RunLog(provider="rightmove", location="London")
         log.start_run()
@@ -24,14 +24,20 @@ class RunLog:
             log.finish(status="success", items=count)
         except Exception as e:
             log.finish(status="failure", items=0, err=str(e))
-    
+
     Or as context manager:
         with RunLog.start(provider="rightmove", location="London") as log:
             # ... scraping logic ...
             log.set_count(items)
     """
-    
-    def __init__(self, provider: str, location: str, source: Optional[str] = None, meta: Optional[Dict[str, Any]] = None):
+
+    def __init__(
+        self,
+        provider: str,
+        location: str,
+        source: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ):
         self.provider = provider
         self.location = location
         self.source = source
@@ -76,23 +82,29 @@ class RunLog:
             _sb.table("scrape_runs").update(upd).eq("id", self.run_id).execute()
         except Exception as e:
             print(f"[RunLog] Failed to finish run: {e}")
-    
+
     def set_count(self, items: int):
         """Update item count during run"""
         self.item_count = items
-    
+
     def __enter__(self):
         self.start_run()
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
             self.finish(status="failure", items=self.item_count, err=str(exc_val))
         else:
             self.finish(status="success", items=self.item_count)
         return False  # Don't suppress exceptions
-    
+
     @classmethod
-    def start(cls, provider: str, location: str, source: Optional[str] = None, meta: Optional[Dict[str, Any]] = None):
+    def start(
+        cls,
+        provider: str,
+        location: str,
+        source: Optional[str] = None,
+        meta: Optional[Dict[str, Any]] = None,
+    ):
         """Convenience factory for use as context manager"""
         return cls(provider=provider, location=location, source=source, meta=meta)
