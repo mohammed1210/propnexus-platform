@@ -5,6 +5,13 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+# Initialize Sentry before other imports
+try:
+    from utils.sentry_init import init_sentry
+    init_sentry()
+except Exception as e:
+    print(f"[WARNING] Sentry initialization failed: {e}")
+
 # Local routers
 from .routes.ai import router as ai_router
 from .routes.area_intel_routes import router as area_intel_router
