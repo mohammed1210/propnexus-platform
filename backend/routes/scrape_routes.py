@@ -68,10 +68,18 @@ def _chunk(items: List[Dict[str, Any]], size: int = 100) -> List[List[Dict[str, 
 
 @router.post("/scrape")
 async def scrape_endpoint(req: ScrapeRequest):
-    """Aggregate scrape of all sources -> normalized -> upsert -> return preview.
+    """DEPRECATED: Use /import/all instead.
+    
+    This endpoint is maintained for backwards compatibility but will be removed
+    in a future version. Please migrate to /import/all which provides the same
+    functionality with better error handling and logging.
+    
+    Aggregate scrape of all sources -> normalized -> upsert -> return preview.
 
     Returns JSON: { count, preview }
     """
+    logging.warning("DEPRECATED: /scrape endpoint called, use /import/all instead")
+    
     location = (req.location or "").strip()
     if not location:
         raise HTTPException(status_code=400, detail="Location is required")
