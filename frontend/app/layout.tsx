@@ -5,6 +5,7 @@ import '../styles/design-tokens.css';
 import UiOverlaysClient from '@components/ui/UiOverlaysClient';
 import BackToTop from '@components/BackToTop';
 import Header from '@components/Header';
+import Footer from '@components/Footer';
 import { ThemeProvider } from '@components/ThemeProvider';
 import { Toaster } from 'sonner';
 
@@ -83,7 +84,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
+      <body className="flex flex-col min-h-screen">
         {/* Skip link for a11y */}
         <a
           href="#main"
@@ -96,9 +97,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* ✅ App Header (includes conditional Billing link) */}
           <Header />
 
-          <main id="main" className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none">
+          <main id="main" className="flex-1 focus:outline-none">
             {children}
           </main>
+
+          {/* ✅ Footer with legal links */}
+          <Footer />
 
           {/* Client-side helpers */}
           <UiOverlaysClient />
