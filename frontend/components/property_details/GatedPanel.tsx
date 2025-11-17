@@ -25,6 +25,10 @@ export default function GatedPanel({
 }: GatedPanelProps) {
   const { plan, loading } = useUserPlan();
 
+  // Simple local-dev bypass so designers/PMs can preview gated UI
+  const bypassGating =
+    typeof window !== 'undefined' && process.env.NEXT_PUBLIC_BYPASS_GATING === 'true';
+
   // Feature flag check
   if (!featureEnabled) {
     return null;
@@ -42,7 +46,7 @@ export default function GatedPanel({
   }
 
   // Check if user has access using shared utility
-  const userHasAccess = hasAccess(plan, requiredPlan);
+  const userHasAccess = bypassGating || hasAccess(plan, requiredPlan);
 
   if (!userHasAccess) {
     return (

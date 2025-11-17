@@ -168,6 +168,8 @@ function ClientMap({
 
   const setMap = (instance: LeafletMap | null) => {
     if (!instance) return;
+    // Avoid re-initializing an existing map instance (Leaflet warning)
+    if (mapRef.current && mapRef.current === instance) return;
     mapRef.current = instance;
     if (points.length) fit(instance, points);
     else instance.setView(defaultCenter, 6);
@@ -604,9 +606,7 @@ function ListingsInner() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {rows.map((property) => (
-                  <Link key={property.id ?? Math.random()} href={`/property/${property.id}`}>
-                    <PropertyCard p={property as any} />
-                  </Link>
+                  <PropertyCard key={property.id ?? Math.random()} p={property as any} />
                 ))}
               </div>
             )}
@@ -633,9 +633,7 @@ function ListingsInner() {
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {rows.map((property) => (
-                    <Link key={property.id ?? Math.random()} href={`/property/${property.id}`}>
-                      <PropertyCard p={property as any} />
-                    </Link>
+                    <PropertyCard key={property.id ?? Math.random()} p={property as any} />
                   ))}
                 </div>
               )}
