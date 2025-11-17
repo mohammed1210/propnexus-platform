@@ -168,8 +168,6 @@ function ClientMap({
 
   const setMap = (instance: LeafletMap | null) => {
     if (!instance) return;
-    // Avoid re-initializing an existing map instance (Leaflet warning)
-    if (mapRef.current && mapRef.current === instance) return;
     mapRef.current = instance;
     if (points.length) fit(instance, points);
     else instance.setView(defaultCenter, 6);
@@ -180,17 +178,13 @@ function ClientMap({
     if (!m) return;
     if (points.length) fit(m, points);
     else m.setView(defaultCenter, 6);
-    return () => {
-      try {
-        m.remove();
-      } catch {}
-      mapRef.current = null;
-    };
   }, [points, defaultCenter]);
+
+  const mapKey = `map-${points.length}-${defaultCenter[0]}-${defaultCenter[1]}`;
 
   return (
     <MapContainer
-      key="map-root"
+      key={mapKey}
       ref={setMap as any}
       center={defaultCenter}
       zoom={6}
