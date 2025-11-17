@@ -61,6 +61,7 @@ export default function Header() {
     { href: '/', label: 'Home' },
     { href: '/listings', label: 'Listings' },
     { href: '/off-market', label: 'Off-Market' },
+    { href: '/demo', label: 'Demo' },
     { href: '/pricing', label: 'Pricing' },
     ...(sessionEmail ? [{ href: '/account', label: 'Account' }] : []),
   ];
