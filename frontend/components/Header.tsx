@@ -69,12 +69,12 @@ export default function Header() {
   return (
     <header
       className={clsx(
-        'sticky top-0 z-50 w-full border-b bg-white backdrop-blur-md shadow-sm',
-        'border-slate-200 dark:border-slate-700 dark:bg-slate-900',
+        'sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur-md shadow-sm',
+        'border-slate-200 dark:border-slate-700 dark:bg-slate-900/95',
       )}
       role="banner"
     >
-      <div className="mx-auto flex h-[68px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand */}
         <Link href="/" className="flex items-center gap-2 group">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-brand-sm">
