@@ -104,18 +104,18 @@ export default function QuickStatsActions({
   return (
     <>
       {/* Desktop floating sidebar - combined stats and actions */}
-      <div className="hidden lg:block fixed right-6 top-24 w-72 z-10 no-print">
+      <div className="hidden lg:block fixed right-6 top-24 w-80 z-10 no-print">
         <div className="sticky top-24 space-y-4">
           {/* Quick Stats */}
-          <div className="panel backdrop-blur-md bg-white/95 dark:bg-slate-900/95 shadow-lg">
-            <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-4">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xl p-6">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wider mb-5">
               Quick Stats
             </h3>
             
-            <div className="space-y-4">
+            <div className="space-y-5">
               {price !== undefined && (
-                <div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Price</div>
+                <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Price</div>
                   <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                     {formatValue(price, 'currency')}
                   </div>
@@ -123,8 +123,8 @@ export default function QuickStatsActions({
               )}
 
               {yieldPercent !== undefined && (
-                <div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Yield</div>
+                <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Rental Yield</div>
                   <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                     {formatValue(yieldPercent, 'percent')}
                   </div>
@@ -132,8 +132,8 @@ export default function QuickStatsActions({
               )}
 
               {roiPercent !== undefined && (
-                <div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">ROI</div>
+                <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">ROI</div>
                   <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                     {formatValue(roiPercent, 'percent')}
                   </div>
@@ -142,7 +142,7 @@ export default function QuickStatsActions({
 
               {aiScore !== undefined && (
                 <div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">AI Score</div>
+                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">AI Score</div>
                   <div className="text-2xl font-bold text-brand-600 dark:text-brand-400">
                     {formatValue(aiScore, 'score')}
                   </div>
@@ -152,26 +152,26 @@ export default function QuickStatsActions({
           </div>
 
           {/* Quick Actions */}
-          <div className="panel backdrop-blur-md bg-white/95 dark:bg-slate-900/95 shadow-lg">
-            <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide mb-3">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xl p-6">
+            <h3 className="font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wider mb-4">
               Quick Actions
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <button
                 onClick={handleSave}
                 disabled={saving || saved}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-white font-medium hover:from-brand-400 hover:to-brand-500 transition-all disabled:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-white font-semibold hover:from-brand-600 hover:to-brand-700 transition-all disabled:opacity-70 shadow-md hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
                 aria-label={saved ? 'Deal saved' : saving ? 'Saving deal' : 'Save this deal'}
                 aria-pressed={saved}
               >
                 {saved ? (
                   <>
-                    <FiCheck className="w-4 h-4" aria-hidden="true" />
-                    <span>Saved</span>
+                    <FiCheck className="w-5 h-5" aria-hidden="true" />
+                    <span>Saved to Deals</span>
                   </>
                 ) : (
                   <>
-                    <FiHeart className="w-4 h-4" aria-hidden="true" />
+                    <FiHeart className="w-5 h-5" aria-hidden="true" />
                     <span>{saving ? 'Saving...' : 'Save Deal'}</span>
                   </>
                 )}
@@ -179,36 +179,36 @@ export default function QuickStatsActions({
 
               <button
                 onClick={handleShare}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
                 aria-label="Share this property"
               >
-                <FiShare2 className="w-4 h-4" aria-hidden="true" />
-                <span>Share</span>
+                <FiShare2 className="w-5 h-5" aria-hidden="true" />
+                <span>Share Property</span>
               </button>
 
               <button
                 onClick={handleExportPDF}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
                 aria-label="Export property details as PDF"
               >
-                <FiDownload className="w-4 h-4" aria-hidden="true" />
+                <FiDownload className="w-5 h-5" aria-hidden="true" />
                 <span>Export PDF</span>
               </button>
 
               <button
                 onClick={handleCopyJSON}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
                 aria-label={copied ? 'Property data copied' : 'Copy property data as JSON'}
               >
                 {copied ? (
                   <>
-                    <FiCheck className="w-4 h-4" aria-hidden="true" />
-                    <span>Copied!</span>
+                    <FiCheck className="w-5 h-5" aria-hidden="true" />
+                    <span>Data Copied!</span>
                   </>
                 ) : (
                   <>
-                    <FiCopy className="w-4 h-4" aria-hidden="true" />
-                    <span>Copy JSON</span>
+                    <FiCopy className="w-5 h-5" aria-hidden="true" />
+                    <span>Copy Data</span>
                   </>
                 )}
               </button>
@@ -218,31 +218,31 @@ export default function QuickStatsActions({
       </div>
 
       {/* Mobile compact actions row */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-3 z-20 no-print">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-t border-slate-200 dark:border-slate-800 p-4 z-20 no-print shadow-2xl">
         <div className="flex gap-2 max-w-7xl mx-auto" role="group" aria-label="Quick actions">
           <button
             onClick={handleSave}
             disabled={saving || saved}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-white font-medium disabled:opacity-70 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-white font-semibold disabled:opacity-70 shadow-md hover:shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             aria-label={saved ? 'Deal saved' : 'Save this deal'}
             aria-pressed={saved}
           >
-            <FiHeart className="w-4 h-4" aria-hidden="true" />
+            <FiHeart className="w-5 h-5" aria-hidden="true" />
             <span className="text-sm">{saved ? 'Saved' : 'Save'}</span>
           </button>
           <button
             onClick={handleShare}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
             aria-label="Share this property"
           >
-            <FiShare2 className="w-4 h-4" aria-hidden="true" />
+            <FiShare2 className="w-5 h-5" aria-hidden="true" />
           </button>
           <button
             onClick={handleExportPDF}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
             aria-label="Export as PDF"
           >
-            <FiDownload className="w-4 h-4" aria-hidden="true" />
+            <FiDownload className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
       </div>
