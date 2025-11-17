@@ -91,6 +91,14 @@ function ClientMap({
   defaultCenter: [number, number];
   heatmapEnabled?: boolean;
 }) {
+  // Allow disabling the map entirely in dev if Leaflet misbehaves
+  if (process.env.NEXT_PUBLIC_DISABLE_LISTINGS_MAP === 'true') {
+    return (
+      <div className="flex h-full w-full items-center justify-center bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
+        Map disabled (NEXT_PUBLIC_DISABLE_LISTINGS_MAP=true)
+      </div>
+    );
+  }
   const mapRef = useRef<LeafletMap | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
