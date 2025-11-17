@@ -14,6 +14,7 @@ import AreaIntelPanel from '@/components/property_details/AreaIntelPanel';
 import CompsPanel from '@/components/property_details/CompsPanel';
 import MapSingle from '@/components/property_details/MapSingle';
 import QuickActions from '@/components/property_details/QuickActions';
+import GatedPanel from '@/components/property_details/GatedPanel';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
@@ -98,8 +99,8 @@ export default function PropertyDetailsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8">
-        <div className="max-w-7xl mx-auto px-4">
+      <div className="page-wrapper">
+        <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="card p-8 text-center">
             <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin mb-4"></div>
             <p className="text-slate-600 dark:text-slate-400">Loading property details…</p>
@@ -110,8 +111,8 @@ export default function PropertyDetailsPage() {
   }
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8">
-        <div className="max-w-7xl mx-auto px-4">
+      <div className="page-wrapper">
+        <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="card p-8">
             <p className="text-red-600 dark:text-red-400">{error}</p>
           </div>
@@ -121,8 +122,8 @@ export default function PropertyDetailsPage() {
   }
   if (!property) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 py-8">
-        <div className="max-w-7xl mx-auto px-4">
+      <div className="page-wrapper">
+        <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="card p-8">
             <p className="text-slate-600 dark:text-slate-400">No property found.</p>
           </div>
@@ -134,7 +135,7 @@ export default function PropertyDetailsPage() {
   const price = typeof property.price === 'number' ? property.price : 0;
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="page-wrapper">
       {/* Quick Actions Sidebar (Desktop: right fixed, Mobile: bottom fixed) */}
       <QuickActions
         propertyId={String(property.id ?? id)}
@@ -145,7 +146,7 @@ export default function PropertyDetailsPage() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Property Header Card */}
-        <div className="card mb-6">
+        <div className="card mb-6 p-6">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
@@ -180,7 +181,7 @@ export default function PropertyDetailsPage() {
               {property.yield_percent !== undefined && (
                 <div className="flex items-center gap-2 justify-end">
                   <FiTrendingUp className="w-5 h-5 text-emerald-500" />
-                  <span className="badge-metric bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                  <span className="px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
                     {property.yield_percent.toFixed(1)}% yield
                   </span>
                 </div>
@@ -192,18 +193,22 @@ export default function PropertyDetailsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
           {/* Left column - Main content */}
           <div className="space-y-6">
-            {/* AI Deal Score */}
-            {FF.DEAL_SCORE && (
-              <div className="card">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
-                    <FiDollarSign className="w-5 h-5 text-white" />
-                  </div>
-                  AI Deal Score
-                </h2>
+            {/* AI Deal Score - Always visible, gated for non-pro users */}
+            <div className="card">
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                  <FiDollarSign className="w-5 h-5 text-white" />
+                </div>
+                AI Deal Score
+              </h2>
+              <GatedPanel
+                title="AI Deal Score"
+                requiredPlan="pro"
+                featureEnabled={true}
+              >
                 <DealScore property={property} />
-              </div>
-            )}
+              </GatedPanel>
+            </div>
 
             {/* Investment Summary (AI-generated text) */}
             <div className="card">
@@ -211,22 +216,30 @@ export default function PropertyDetailsPage() {
               <InvestmentSummary property={property as any} />
             </div>
 
-            {/* Area Intelligence & Comps */}
+            {/* Area Intelligence & Comps - Always visible, gated for non-pro users */}
             {property.location && (
               <>
-                {FF.AREA_INTEL && (
-                  <div className="card">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Area Intelligence</h2>
+                <div className="card">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Area Intelligence</h2>
+                  <GatedPanel
+                    title="Area Intelligence"
+                    requiredPlan="pro"
+                    featureEnabled={true}
+                  >
                     <AreaIntelPanel areaKey={property.location} />
-                  </div>
-                )}
+                  </GatedPanel>
+                </div>
 
-                {FF.COMPS && (
-                  <div className="card">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Comparable Sales</h2>
+                <div className="card">
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Comparable Sales</h2>
+                  <GatedPanel
+                    title="Comparable Sales"
+                    requiredPlan="pro"
+                    featureEnabled={true}
+                  >
                     <CompsPanel postcode={property.location} />
-                  </div>
-                )}
+                  </GatedPanel>
+                </div>
               </>
             )}
 
@@ -299,8 +312,8 @@ export default function PropertyDetailsPage() {
         </div>
       </div>
 
-      {/* Floating local chatbot */}
-      {FF.AI_CHAT && <AIChatbot property={property as any} />}
+      {/* Floating AI Chatbot - Always visible, gated for non-investor users */}
+      <AIChatbot property={property as any} />
     </div>
   );
 }

@@ -2,9 +2,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { FiLock } from 'react-icons/fi';
 import type { Property } from '@/types';
 import { postAIChat } from '@/lib/api';
 import { FF } from '@/lib/flags';
+import { useUserPlan } from '@/lib/useUserPlan';
+import { hasAccess } from '@/lib/planPermissions';
 
 type LooseProperty = Property & {
   latitude?: number | null;
@@ -24,6 +28,7 @@ const STORAGE_KEY_PREFIX = 'pn_chat_history_';
 
 export default function AIChatbot({ property }: AIChatbotProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +41,10 @@ export default function AIChatbot({ property }: AIChatbotProps) {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const propertyId = property?.id || 'default';
+  const { plan, loading: planLoading } = useUserPlan();
+  
+  // Check if user has access to chatbot (investor plan)
+  const userHasAccess = hasAccess(plan, 'investor');
 
   // Load conversation history from localStorage on mount
   useEffect(() => {
@@ -145,22 +154,38 @@ export default function AIChatbot({ property }: AIChatbotProps) {
   useEffect(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
   useEffect(() => setMessages((p) => (p.length > 60 ? p.slice(-60) : p)), [messages.length]);
 
-  // Feature flag guard - return null if feature is disabled
-  if (!FF.AI_CHAT) {
-    return null;
-  }
+  // Handle click on button - show upgrade modal if no access
+  const handleButtonClick = () => {
+    if (!userHasAccess) {
+      setShowUpgradeModal(true);
+    } else {
+      setIsOpen(true);
+    }
+  };
 
   return (
-    <div className="fixed bottom-5 right-5 z-[9999]">
-      {!isOpen ? (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="bg-blue-600 text-white font-semibold px-5 py-3 rounded-full shadow-md hover:bg-blue-700 transition"
-          aria-label="Open AI assistant"
-        >
-          💬 Ask AI
-        </button>
-      ) : (
+    <>
+      <div className="fixed bottom-5 right-5 z-[9999]">
+        {!isOpen ? (
+          <button
+            onClick={handleButtonClick}
+            className={`font-semibold px-5 py-3 rounded-full shadow-md transition flex items-center gap-2 ${
+              userHasAccess
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500'
+            }`}
+            aria-label={userHasAccess ? 'Open AI assistant' : 'AI assistant requires upgrade'}
+          >
+            {userHasAccess ? (
+              <>💬 Ask AI</>
+            ) : (
+              <>
+                <FiLock className="w-4 h-4" />
+                💬 Ask AI
+              </>
+            )}
+          </button>
+        ) : userHasAccess ? (
         <div
           className="w-80 h-[420px] bg-white dark:bg-neutral-900 rounded-xl shadow-lg border border-gray-200 dark:border-neutral-800 flex flex-col overflow-hidden"
           role="dialog"
@@ -243,7 +268,47 @@ export default function AIChatbot({ property }: AIChatbotProps) {
             </button>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
+    
+    {/* Upgrade Modal */}
+    {showUpgradeModal && (
+      <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-w-md mx-4 p-6 space-y-4">
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white mx-auto">
+            <FiLock className="w-8 h-8" />
+          </div>
+          
+          <h3 className="text-2xl font-bold text-center">AI Chat Assistant</h3>
+          
+          <p className="text-center text-gray-600 dark:text-gray-400">
+            Get instant answers to your property investment questions with our AI-powered chatbot.
+          </p>
+          
+          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-lg p-4 space-y-2">
+            <p className="text-sm font-semibold text-gray-900 dark:text-white">✨ Premium Feature</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Available with Investor plan
+            </p>
+          </div>
+          
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowUpgradeModal(false)}
+              className="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Close
+            </button>
+            <Link
+              href="/pricing"
+              className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all text-center"
+            >
+              View Plans
+            </Link>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
