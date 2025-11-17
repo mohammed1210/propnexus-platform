@@ -6,26 +6,21 @@ import dynamic from 'next/dynamic';
 import { FiMapPin, FiHome, FiDroplet, FiTrendingUp, FiDollarSign } from 'react-icons/fi';
 
 import PropertySummaryCard from '@/components/property_details/PropertySummaryCard';
-import QuickStatsCard from '@/components/property_details/QuickStatsCard';
+import QuickStatsActions from '@/components/property_details/QuickStatsActions';
 import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
 import DealScore from '@/components/property_details/DealScore';
 import AreaIntelPanel from '@/components/property_details/AreaIntelPanel';
 import CompsPanel from '@/components/property_details/CompsPanel';
 import MapSingle from '@/components/property_details/MapSingle';
-import QuickActions from '@/components/property_details/QuickActions';
 import GatedPanel from '@/components/property_details/GatedPanel';
+import InvestmentCalculator from '@/components/property_details/InvestmentCalculator';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
 import { FF } from '@/lib/flags';
 
 /** ---- Client-only widgets (no SSR) ---- */
-const MortgageCalculator = dynamic(
-  () => import('@/components/property_details/MortgageCalculator'),
-  { ssr: false }
-);
-
 const StampDutyCalculator = dynamic(
   () => import('@/components/property_details/StampDutyCalculator'),
   { ssr: false }
@@ -136,15 +131,15 @@ export default function PropertyDetailsPage() {
 
   return (
     <div className="page-wrapper">
-      {/* Quick Actions Sidebar (Desktop: right fixed, Mobile: bottom fixed) */}
-      <QuickActions
+      {/* Floating Stats & Actions Sidebar */}
+      <QuickStatsActions
         propertyId={String(property.id ?? id)}
         price={property.price ?? undefined}
         yieldPercent={property.yield_percent ?? undefined}
         roiPercent={property.roi_percent ?? undefined}
       />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8 lg:pr-80">{/* Add right padding on desktop for floating sidebar */}
         {/* Property Header Card */}
         <div className="card mb-6 p-6">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -190,8 +185,8 @@ export default function PropertyDetailsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
-          {/* Left column - Main content */}
+        <div className="grid grid-cols-1 gap-6">
+          {/* Main content - single column now since sidebar is floating */}
           <div className="space-y-6">
             {/* AI Deal Score - Always visible, gated for non-pro users */}
             <div className="card">
@@ -270,43 +265,23 @@ export default function PropertyDetailsPage() {
               {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
             </div>
 
-            {/* Mortgage & BRRR Calculator */}
-            <MortgageCalculator price={price} />
+            {/* Investment Calculator - Scenario Based */}
+            <InvestmentCalculator 
+              propertyId={String(property.id ?? id)}
+              initialPrice={price}
+            />
 
             {/* Stamp Duty Calculator */}
             <StampDutyCalculator price={price} />
-          </div>
 
-          {/* Right column - Sticky sidebar (Desktop only) */}
-          <div className="hidden lg:block">
-            <div className="sticky top-24 space-y-6">
-              <QuickStatsCard
-                price={property.price ?? undefined}
-                yieldPercent={property.yield_percent ?? undefined}
-                roiPercent={property.roi_percent ?? undefined}
-              />
-
-              {/* Location Map */}
-              <div className="card">
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-                  Location
-                </h3>
-                <div className="rounded-lg overflow-hidden">
-                  <MapSingle property={property} height={300} zoom={14} scrollWheelZoom={false} />
-                </div>
+            {/* Location Map */}
+            <div className="card">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                Location
+              </h3>
+              <div className="rounded-lg overflow-hidden">
+                <MapSingle property={property} height={400} zoom={14} scrollWheelZoom={false} />
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mobile: Show map in main content */}
-        <div className="lg:hidden mt-6">
-          <div className="card">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-              Location
-            </h3>
-            <div className="rounded-lg overflow-hidden">
-              <MapSingle property={property} height={250} zoom={14} scrollWheelZoom={false} />
             </div>
           </div>
         </div>
