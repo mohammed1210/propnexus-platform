@@ -8,6 +8,7 @@ import Header from '@components/Header';
 import Footer from '@components/Footer';
 import { ThemeProvider } from '@components/ThemeProvider';
 import { Toaster } from 'sonner';
+import EnvValidator from '@components/EnvValidator';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
@@ -94,6 +95,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
 
         <ThemeProvider>
+          {/* Environment validation in development */}
+          <EnvValidator />
+          
           {/* ✅ App Header (includes conditional Billing link) */}
           <Header />
 

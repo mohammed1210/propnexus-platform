@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { fetchWithRetry } from '@/lib/api';
-import Image from 'next/image';
+import ImageWithFallback from '@/components/ImageWithFallback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiHeart } from 'react-icons/fi';
 
@@ -164,7 +164,7 @@ export default function PropertyCard({ p }: { p: Property }) {
         className="block relative w-full h-48 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
         aria-label={`Open ${p.title ?? 'property'}`}
       >
-        <Image
+        <ImageWithFallback
           src={p.imageurl || '/placeholder.jpg'}
           alt={p.title || 'Property image'}
           fill
