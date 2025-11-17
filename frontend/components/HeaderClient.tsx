@@ -154,7 +154,7 @@ export default function HeaderClient() {
       {scrolled && (
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="fixed bottom-5 right-5 z-[60] rounded-md bg-blue-600 px-3 py-2 text-white shadow-lg outline-2 outline-offset-2 hover:bg-blue-500 focus:outline dark:bg-blue-500 dark:hover:bg-blue-400"
+          className="fixed bottom-5 right-5 z-[60] rounded-md bg-brand-600 px-3 py-2 text-white shadow-lg outline-2 outline-offset-2 hover:bg-brand-700 focus:outline dark:bg-brand-500 dark:hover:bg-brand-600"
           aria-label="Back to top"
         >
           Back to top

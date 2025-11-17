@@ -104,7 +104,7 @@ export default function QuickStatsActions({
   return (
     <>
       {/* Desktop floating sidebar - combined stats and actions */}
-      <div className="hidden lg:block fixed right-6 top-24 w-80 z-10 no-print">
+      <div className="hidden lg:block fixed right-6 top-24 w-64 z-10 no-print">
         <div className="sticky top-24 space-y-4">
           {/* Quick Stats */}
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xl p-6">

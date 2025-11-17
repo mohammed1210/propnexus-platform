@@ -15,6 +15,7 @@ import CompsPanel from '@/components/property_details/CompsPanel';
 import MapSingle from '@/components/property_details/MapSingle';
 import GatedPanel from '@/components/property_details/GatedPanel';
 import InvestmentCalculator from '@/components/property_details/InvestmentCalculator';
+import CollapsibleCard from '@/components/property_details/CollapsibleCard';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
@@ -139,7 +140,7 @@ export default function PropertyDetailsPage() {
         roiPercent={property.roi_percent ?? undefined}
       />
 
-      <div className="max-w-7xl mx-auto px-4 py-8 lg:pr-80">{/* Add right padding on desktop for floating sidebar */}
+      <div className="max-w-7xl mx-auto px-4 py-8 lg:pr-72">{/* Add right padding on desktop for floating sidebar */}
         {/* Property Header Card */}
         <div className="card mb-6 p-6">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -189,13 +190,15 @@ export default function PropertyDetailsPage() {
           {/* Main content - single column now since sidebar is floating */}
           <div className="space-y-6">
             {/* AI Deal Score - Always visible, gated for non-pro users */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <CollapsibleCard
+              title="AI Deal Score"
+              icon={
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
                   <FiDollarSign className="w-5 h-5 text-white" />
                 </div>
-                AI Deal Score
-              </h2>
+              }
+              defaultExpanded={true}
+            >
               <GatedPanel
                 title="AI Deal Score"
                 requiredPlan="pro"
@@ -203,46 +206,37 @@ export default function PropertyDetailsPage() {
               >
                 <DealScore property={property} />
               </GatedPanel>
-            </div>
+            </CollapsibleCard>
 
             {/* Investment Summary (AI-generated text) */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Investment Summary</h2>
+            <CollapsibleCard title="Investment Summary" defaultExpanded={true}>
               <InvestmentSummary property={property as any} />
-            </div>
+            </CollapsibleCard>
 
-            {/* Area Intelligence & Comps - Always visible, gated for non-pro users */}
-            {property.location && (
-              <>
-                <div className="card">
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Area Intelligence</h2>
-                  <GatedPanel
-                    title="Area Intelligence"
-                    requiredPlan="pro"
-                    featureEnabled={true}
-                  >
-                    <AreaIntelPanel areaKey={property.location} />
-                  </GatedPanel>
-                </div>
+            {/* Area Intelligence - Always visible, gated for non-pro users */}
+            <CollapsibleCard title="Area Intelligence" defaultExpanded={false}>
+              <GatedPanel
+                title="Area Intelligence"
+                requiredPlan="pro"
+                featureEnabled={true}
+              >
+                <AreaIntelPanel areaKey={property.location || ''} />
+              </GatedPanel>
+            </CollapsibleCard>
 
-                <div className="card">
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Comparable Sales</h2>
-                  <GatedPanel
-                    title="Comparable Sales"
-                    requiredPlan="pro"
-                    featureEnabled={true}
-                  >
-                    <CompsPanel postcode={property.location} />
-                  </GatedPanel>
-                </div>
-              </>
-            )}
+            {/* Comparable Sales - Always visible, gated for non-pro users */}
+            <CollapsibleCard title="Comparable Sales" defaultExpanded={false}>
+              <GatedPanel
+                title="Comparable Sales"
+                requiredPlan="pro"
+                featureEnabled={true}
+              >
+                <CompsPanel postcode={property.location || ''} />
+              </GatedPanel>
+            </CollapsibleCard>
 
             {/* Exit Strategies */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">
-                Exit Strategies
-              </h2>
+            <CollapsibleCard title="Exit Strategies" defaultExpanded={false}>
               <ExitStrategyGenerator
                 title={String(property.title ?? '')}
                 location={String(property.location ?? '')}
@@ -257,13 +251,12 @@ export default function PropertyDetailsPage() {
                 investmentType={(property as any).investmentType ?? undefined}
                 description={(property as any).description ?? undefined}
               />
-            </div>
+            </CollapsibleCard>
 
             {/* Investor Notes */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Investor Notes</h2>
+            <CollapsibleCard title="Investor Notes" defaultExpanded={false}>
               {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
-            </div>
+            </CollapsibleCard>
 
             {/* Investment Calculator - Scenario Based */}
             <InvestmentCalculator 
@@ -275,14 +268,11 @@ export default function PropertyDetailsPage() {
             <StampDutyCalculator price={price} />
 
             {/* Location Map */}
-            <div className="card">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-                Location
-              </h3>
+            <CollapsibleCard title="Location" defaultExpanded={false}>
               <div className="rounded-lg overflow-hidden">
                 <MapSingle property={property} height={400} zoom={14} scrollWheelZoom={false} />
               </div>
-            </div>
+            </CollapsibleCard>
           </div>
         </div>
       </div>
