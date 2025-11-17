@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L, { LatLngExpression } from 'leaflet';
+import { useEffect, useMemo, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import L, { LatLngExpression } from "leaflet";
 
 type MinimalProperty = {
   latitude?: number | null;
@@ -35,8 +35,7 @@ export default function MapSingle(props: MapSingleProps) {
   const scrollWheelZoom = props.scrollWheelZoom ?? false;
 
   const hasCoords =
-    typeof lat === 'number' && !Number.isNaN(lat) && typeof lng === 'number' && !Number.isNaN(lng);
-
+    typeof lat === "number" && !Number.isNaN(lat) && typeof lng === "number" && !Number.isNaN(lng);
   const position: LatLngExpression = useMemo(
     () => (hasCoords ? [lat as number, lng as number] : [52.5, -1.5]),
     [hasCoords, lat, lng],
@@ -50,19 +49,19 @@ export default function MapSingle(props: MapSingleProps) {
       delete L.Icon.Default.prototype._getIconUrl;
       L.Icon.Default.mergeOptions({
         iconRetinaUrl:
-          'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+        iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+        shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
       });
     } catch {}
   }, []);
 
   const [darkMode, setDarkMode] = useState(false);
   useEffect(() => {
-    const isDark = () => document.body.classList.contains('dark-mode');
+    const isDark = () => document.body.classList.contains("dark-mode");
     setDarkMode(isDark());
     const obs = new MutationObserver(() => setDarkMode(isDark()));
-    obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    obs.observe(document.body, { attributes: true, attributeFilter: ["class"] });
     return () => obs.disconnect();
   }, []);
 
@@ -78,21 +77,21 @@ export default function MapSingle(props: MapSingleProps) {
     );
   }
 
-  const lightUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const lightAttr = '&copy; OpenStreetMap contributors';
-  const darkUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-  const darkAttr = '&copy; OpenStreetMap contributors, &copy; CARTO';
+  const lightUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+  const lightAttr = "&copy; OpenStreetMap contributors";
+  const darkUrl = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+  const darkAttr = "&copy; OpenStreetMap contributors, &copy; CARTO";
 
   return (
     <div
-      className={`rounded-lg overflow-hidden ${props.className ?? ''}`}
-      style={{ height, width: '100%' }}
+      className={`rounded-lg overflow-hidden ${props.className ?? ""}`}
+      style={{ height, width: "100%" }}
     >
       <MapContainer
         center={position}
         zoom={zoom}
         scrollWheelZoom={scrollWheelZoom}
-        style={{ height: '100%', width: '100%' }}
+        style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
           attribution={darkMode ? darkAttr : lightAttr}

@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-  "start": "next start -H 127.0.0.1",
+    "start": "next start -H 127.0.0.1",
     "lint": "next lint --max-warnings=0",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "test": "jest",
@@ -19,9 +19,9 @@
     "frontend:type-check": "cd frontend && tsc --noEmit",
     "frontend:build": "cd frontend && next build",
     "ingest:csv": "ts-node scripts/ingest-csv.ts data/listings.sample.csv",
-  "e2e": "playwright test",
-  "e2e:prod": "npm run build && PW_USE_DEV=0 playwright test",
-  "e2e:headed": "playwright test --headed",
+    "e2e": "playwright test",
+    "e2e:prod": "npm run build && PW_USE_DEV=0 playwright test",
+    "e2e:headed": "playwright test --headed",
     "smoke:stripe": "node ops/smoke/stripe-check.mjs"
   },
   "dependencies": {
@@ -33,6 +33,7 @@
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.39.4",
+    "@vis.gl/react-google-maps": "^1.7.1",
     "chart.js": "^4.5.0",
     "clsx": "^2.1.1",
     "html2pdf.js": "^0.12.1",
