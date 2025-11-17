@@ -14,6 +14,8 @@ from ..schemas.ai import (
     Strategy,
     SummaryRequest,
     SummaryResponse,
+    TradesmenRecommendRequest,
+    TradesmenRecommendResponse,
 )
 from utils.openai_client import openai_client
 from utils.rate_limit import rate_limiter
@@ -188,3 +190,64 @@ async def ai_strategies(
     except Exception as exc:
         logger.exception("Strategy generation failed: %s", exc)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="AI strategies error")
+
+
+@router.post("/tradesmen/recommend", response_model=TradesmenRecommendResponse)
+async def ai_tradesmen_recommend(
+    req: TradesmenRecommendRequest,
+    request: Request,
+    _api_key: str = Depends(ensure_api_key),
+) -> TradesmenRecommendResponse:
+    """
+    Generate AI recommendation for tradesmen based on property details.
+    
+    Returns a summary of typical work needed and cost estimates for the property type.
+    """
+    ip = request.client.host or "unknown"
+    if not rate_limiter.allow(ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Rate limit exceeded"
+        )
+
+    try:
+        # Build prompt for tradesmen recommendations
+        sys_prompt = (
+            "You are a UK property renovation expert. "
+            "Provide concise, practical advice about typical renovation work and costs. "
+            "Use UK terminology and GBP pricing. Keep responses under 150 words."
+        )
+        
+        property_desc = (
+            f"{req.bedrooms}-bed {req.property_type or 'property'} in {req.location}"
+            if req.bedrooms else f"{req.property_type or 'Property'} in {req.location}"
+        )
+        
+        user_prompt = (
+            f"For a {property_desc}, typical investors need {req.trade_type or 'various trades'}. "
+            f"What are the most common renovation projects and estimated costs (ranges)? "
+            f"Keep it brief and practical."
+        )
+        
+        if req.property_details:
+            user_prompt = f"{req.property_details}\n\n{user_prompt}"
+        
+        messages = [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        
+        raw = await openai_client.chat_completion(messages, temperature=0.4)
+        
+        return TradesmenRecommendResponse(
+            recommendation=raw.strip(),
+            property_summary=property_desc,
+        )
+        
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    except Exception as exc:
+        logger.exception("Tradesmen recommendation failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, 
+            detail="AI tradesmen recommendation error"
+        )

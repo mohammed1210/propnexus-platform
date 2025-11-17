@@ -24,6 +24,7 @@ from .routes.notes import router as notes_router
 from .routes.off_market_routes import router as off_market_router
 from .routes.save_deal import router as save_deal_router
 from .routes.properties_routes import router as properties_router
+from .routes.tradesmen_routes import router as tradesmen_router
 from .routes.users_routes import router as users_router
 from routes import import_routes, admin_schedule
 
@@ -73,6 +74,7 @@ app.include_router(off_market_router)
 app.include_router(save_deal_router)
 # Legacy scrape_router removed - use import_router instead
 app.include_router(properties_router)  # GET /properties
+app.include_router(tradesmen_router)  # GET /tradesmen/nearby, POST /tradesmen/contact
 app.include_router(import_routes.router)
 app.include_router(admin_schedule.router)
 
