@@ -172,7 +172,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
             className={`font-semibold px-5 py-3 rounded-full shadow-md transition flex items-center gap-2 ${
               userHasAccess
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500'
+                : 'bg-gradient-to-r from-brand-500 to-brand-600 text-white hover:from-brand-400 hover:to-brand-500'
             }`}
             aria-label={userHasAccess ? 'Open AI assistant' : 'AI assistant requires upgrade'}
           >
@@ -275,7 +275,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
     {showUpgradeModal && (
       <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl max-w-md mx-4 p-6 space-y-4">
-          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white mx-auto">
+          <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white mx-auto">
             <FiLock className="w-8 h-8" />
           </div>
           
@@ -285,7 +285,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
             Get instant answers to your property investment questions with our AI-powered chatbot.
           </p>
           
-          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-lg p-4 space-y-2">
+          <div className="bg-gradient-to-br from-brand-50 to-emerald-50 dark:from-brand-950/30 dark:to-emerald-950/30 rounded-lg p-4 space-y-2">
             <p className="text-sm font-semibold text-gray-900 dark:text-white">✨ Premium Feature</p>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Available with Investor plan
@@ -301,7 +301,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
             </button>
             <Link
               href="/pricing"
-              className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all text-center"
+              className="flex-1 px-4 py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-white font-medium hover:from-brand-400 hover:to-brand-500 transition-all text-center"
             >
               View Plans
             </Link>

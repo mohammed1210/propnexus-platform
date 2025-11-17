@@ -39,7 +39,7 @@ export default function LockedFeature({
 
       {/* Locked overlay */}
       <div className="relative z-10 flex flex-col items-center justify-center text-center p-6 space-y-4 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm rounded-lg border-2 border-dashed border-gray-300 dark:border-zinc-700">
-        <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg">
+        <div className="flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white shadow-lg">
           <FiLock className="w-6 h-6" />
         </div>
 
@@ -53,7 +53,7 @@ export default function LockedFeature({
         <div className="flex gap-3">
           <Link
             href="/pricing"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:from-indigo-500 hover:to-purple-500 transition-all shadow-md hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-white font-medium hover:from-brand-400 hover:to-brand-500 transition-all shadow-md hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
             aria-label={`View pricing plans to unlock ${title}`}
           >
             View Pricing
