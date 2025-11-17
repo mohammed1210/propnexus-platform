@@ -38,12 +38,14 @@ PropNexus Platform offers three subscription tiers:
    - Limited feature access
 
 2. **Pro** - Professional investor tier ($29/month)
+   - **7-day free trial** for new subscriptions
    - All free features
    - Advanced analytics
    - Priority support
    - Configurable via `STRIPE_PRICE_PRO` environment variable
 
 3. **Investor** - Premium investor tier ($99/month)
+   - **7-day free trial** for new subscriptions
    - All pro features
    - Advanced AI features (when enabled via feature flags)
    - Unlimited saved deals
@@ -497,9 +499,10 @@ If using Clerk instead of Supabase Auth:
 1. **Create Products:**
    - Go to [Stripe Dashboard](https://dashboard.stripe.com)
    - Create two products:
-     - "Pro Plan" - £29/month
-     - "Investor Plan" - £99/month
+     - "Pro Plan" - £29/month (with 7-day trial)
+     - "Investor Plan" - £99/month (with 7-day trial)
    - Note the price IDs
+   - **Note:** Stripe automatically applies the 7-day trial period configured in the checkout session
 
 2. **Configure Webhooks:**
    

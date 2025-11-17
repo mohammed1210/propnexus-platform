@@ -37,26 +37,36 @@ export default function PricingPage() {
             Popular
           </div>
           <h2 className="text-xl font-semibold mb-3 text-brand-600 dark:text-brand-400">Pro</h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
+          <p className="text-slate-600 dark:text-slate-400 mb-4">
             Off-market explorer, AI summaries, and PDF deal packs.
           </p>
-          <div className="text-2xl font-bold mb-6 text-slate-900 dark:text-slate-100">£29/month</div>
-          <UpgradeButton priceId={PRICE_PRO}>Upgrade to Pro</UpgradeButton>
+          <div className="mb-4">
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">£29/month</div>
+            <div className="text-sm text-brand-600 dark:text-brand-400 font-medium mt-1">
+              7-day free trial
+            </div>
+          </div>
+          <UpgradeButton priceId={PRICE_PRO}>Start 7-Day Free Trial</UpgradeButton>
         </section>
 
         {/* ==== Investor Tier ==== */}
         <section className="card hover:shadow-lg transition-shadow">
           <h2 className="text-xl font-semibold mb-3 text-slate-900 dark:text-slate-100">Investor</h2>
-          <p className="text-slate-600 dark:text-slate-400 mb-6">
+          <p className="text-slate-600 dark:text-slate-400 mb-4">
             Everything in Pro + portfolio analytics, ROI breakdowns, and alerts.
           </p>
-          <div className="text-2xl font-bold mb-6 text-slate-900 dark:text-slate-100">£49/month</div>
-          <UpgradeButton priceId={PRICE_INVESTOR}>Upgrade to Investor</UpgradeButton>
+          <div className="mb-4">
+            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">£49/month</div>
+            <div className="text-sm text-brand-600 dark:text-brand-400 font-medium mt-1">
+              7-day free trial
+            </div>
+          </div>
+          <UpgradeButton priceId={PRICE_INVESTOR}>Start 7-Day Free Trial</UpgradeButton>
         </section>
       </div>
 
       <p className="mt-12 text-center text-sm text-slate-500 dark:text-slate-400">
-        You can cancel or change your plan anytime.
+        Start with a 7-day free trial. No payment required during trial. Cancel anytime.
       </p>
     </main>
   );

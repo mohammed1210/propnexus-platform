@@ -130,6 +130,9 @@ async def create_checkout_session(req: Request):
             payment_method_types=["card"],
             customer=customer_id,
             line_items=[{"price": price_id, "quantity": 1}],
+            subscription_data={
+                "trial_period_days": 7,
+            },
             success_url=f"{SITE_URL}/account?success=true",
             cancel_url=f"{SITE_URL}/pricing?canceled=true",
         )

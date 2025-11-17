@@ -121,7 +121,7 @@ async def stripe_webhook(request: Request):
 
             # Map price_id to plan - returns None for unknown IDs
             plan = map_price_to_plan(price_id)
-            plan_status = status if status in ["active", "past_due", "canceled"] else "active"
+            plan_status = status if status in ["active", "past_due", "canceled", "trialing"] else "active"
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
@@ -169,7 +169,7 @@ async def stripe_webhook(request: Request):
 
             # Map price_id to plan - returns None for unknown IDs
             plan = map_price_to_plan(price_id)
-            plan_status = status if status in ["active", "past_due", "canceled"] else "active"
+            plan_status = status if status in ["active", "past_due", "canceled", "trialing"] else "active"
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
