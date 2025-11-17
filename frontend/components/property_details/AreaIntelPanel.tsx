@@ -48,11 +48,6 @@ export default function AreaIntelPanel({ areaKey }: AreaIntelPanelProps) {
     fetchData();
   }, [areaKey]);
 
-  // Feature flag guard - return null if feature is disabled
-  if (!FF.AREA_INTEL) {
-    return null;
-  }
-
   if (loading) {
     return (
       <div className="animate-pulse space-y-3">

@@ -1,9 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 export default function BackToTop() {
   const [visible, setVisible] = useState(false);
+  const pathname = usePathname();
+  
+  // Don't show on property details pages (they have chatbot in same position)
+  const isPropertyPage = pathname?.startsWith('/property/');
 
   useEffect(() => {
     const onScroll = () => setVisible(window.scrollY > 400);
@@ -11,13 +16,13 @@ export default function BackToTop() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  if (!visible) return null;
+  if (!visible || isPropertyPage) return null;
 
   return (
     <button
       onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-      className="fixed bottom-6 right-6 z-[9999] rounded-full bg-blue-600 text-white
-                 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-400
+      className="fixed bottom-6 right-6 z-[9999] rounded-full bg-brand-600 text-white
+                 hover:bg-brand-700 focus:outline-none focus:ring-4 focus:ring-brand-400
                  w-11 h-11 shadow-lg transition-transform hover:-translate-y-[2px]"
       aria-label="Back to top"
     >

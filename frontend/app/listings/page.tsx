@@ -389,8 +389,8 @@ function ListingsInner() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Header - becomes more compact when scrolled */}
-      <div className={`bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky z-40 transition-all duration-300 ${isScrolled ? 'top-[68px] shadow-md' : 'top-[68px]'}`}>
+      {/* Filter bar - sticky at very top when scrolling */}
+      <div className={`bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 sticky top-0 z-40 transition-all duration-300 ${isScrolled ? 'shadow-md' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 transition-all duration-300" style={{ paddingTop: isScrolled ? '0.5rem' : '1rem', paddingBottom: isScrolled ? '0.5rem' : '1rem' }}>
           <div className={`flex items-center justify-between transition-all duration-300 ${isScrolled ? 'mb-2' : 'mb-4'}`}>
             <h1 className={`font-bold text-slate-900 dark:text-white transition-all duration-300 ${isScrolled ? 'text-lg' : 'text-2xl'}`}>

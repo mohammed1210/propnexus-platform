@@ -154,11 +154,6 @@ export default function DealScore({ property }: DealScoreProps) {
     }
   };
 
-  // Feature flag guard - return null if feature is disabled
-  if (!FF.DEAL_SCORE) {
-    return null;
-  }
-
   if (loading) {
     return (
       <div className="animate-pulse">
