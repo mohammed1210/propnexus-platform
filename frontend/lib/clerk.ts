@@ -8,13 +8,14 @@
  */
 
 /**
- * Check if Clerk environment variables are configured
+ * Safely check if Clerk is configured.
+ *
+ * Important: This helper is intentionally safe to call from client bundles.
+ * It only checks for the public publishable key and never reads
+ * `CLERK_SECRET_KEY`, which must remain server-only.
  */
 export function isClerkConfigured(): boolean {
-  return !!(
-    process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
-    process.env.CLERK_SECRET_KEY
-  );
+  return !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 }
 
 /**
@@ -23,11 +24,15 @@ export function isClerkConfigured(): boolean {
  */
 export function getClerkConfig() {
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  const secretKey = process.env.CLERK_SECRET_KEY;
+  // Never read CLERK_SECRET_KEY in a module that can run on the client.
+  // Server-only code should access process.env.CLERK_SECRET_KEY directly.
+  const hasServerSecret = typeof process !== 'undefined' &&
+    typeof window === 'undefined' &&
+    !!process.env.CLERK_SECRET_KEY;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   
   // Only validate if at least one Clerk variable is set
-  if (publishableKey || secretKey) {
+  if (publishableKey || hasServerSecret) {
     if (!publishableKey) {
       console.warn(
         '[Clerk Config] CLERK_SECRET_KEY is set but NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing. ' +
@@ -35,7 +40,7 @@ export function getClerkConfig() {
       );
     }
     
-    if (!secretKey && typeof window === 'undefined') {
+    if (!hasServerSecret && typeof window === 'undefined') {
       console.warn(
         '[Clerk Config] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is set but CLERK_SECRET_KEY is missing. ' +
         'Server-side Clerk operations will not work without the secret key.'
@@ -43,14 +48,15 @@ export function getClerkConfig() {
     }
   }
   
-  if (!publishableKey && !secretKey) {
+  if (!publishableKey && !hasServerSecret) {
     // No Clerk variables set - this is normal if using Supabase Auth
     return null;
   }
   
   return {
     publishableKey,
-    secretKey,
+    // Do NOT expose CLERK_SECRET_KEY to the client bundle.
+    // Server-side callers should read process.env.CLERK_SECRET_KEY directly.
     afterSignInUrl: process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL || '/dashboard',
     afterSignUpUrl: process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL || '/dashboard',
     appUrl,
@@ -78,9 +84,6 @@ export function validateEnvironmentVariables() {
   if (clerkConfig) {
     if (!clerkConfig.publishableKey) {
       errors.push('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required when using Clerk');
-    }
-    if (!clerkConfig.secretKey && typeof window === 'undefined') {
-      errors.push('CLERK_SECRET_KEY is required for server-side Clerk operations');
     }
     
     // Log helpful setup instructions
