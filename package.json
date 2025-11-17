@@ -37,6 +37,7 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
+    "validate-config": "node scripts/check-env.cjs",
     "ingest:csv": "tsx scripts/ingest-csv.ts data/listings.sample.csv --source=rightmove",
     "ingest:live": "tsx scripts/ingest-live.ts",
     "frontend:dev": "npm --prefix frontend run dev",
