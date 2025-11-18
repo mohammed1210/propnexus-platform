@@ -28,7 +28,7 @@ if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
-def daily_scrape() -> None:
+async def daily_scrape() -> None:
     """Example daily scrape job.
 
     Iterate over a list of target locations, run all scrapers
@@ -37,6 +37,8 @@ def daily_scrape() -> None:
     Modify the `locations` list or derive it from user saved searches
     to meet your requirements.
     """
+    import asyncio
+
     # Avoid circular imports by importing inside the function
     from scraper.rightmove_scraper import scrape_rightmove_properties
     from scraper.zoopla_scraper import scrape_zoopla_properties
@@ -48,11 +50,21 @@ def daily_scrape() -> None:
     locations = ["London", "Manchester"]
 
     for location in locations:
-        zoopla_results = scrape_zoopla_properties(location) or []
-        rightmove_results = scrape_rightmove_properties(location) or []
-        onthemarket_results = scrape_onthemarket_properties(location) or []
-        spareroom_results = scrape_spareroom_properties(location) or []
+        # Run provider scrapes concurrently for the same location
+        zoopla_results, rightmove_results, onthemarket_results, spareroom_results = await asyncio.gather(
+            scrape_zoopla_properties(location),
+            scrape_rightmove_properties(location),
+            scrape_onthemarket_properties(location),
+            scrape_spareroom_properties(location),
+        )
+
+        zoopla_results = zoopla_results or []
+        rightmove_results = rightmove_results or []
+        onthemarket_results = onthemarket_results or []
+        spareroom_results = spareroom_results or []
+
         combined = zoopla_results + rightmove_results + onthemarket_results + spareroom_results
+
         # De-duplicate results by a simple key (title, price, location)
         seen: set[tuple[str, float, str]] = set()
         unique: list[dict] = []
@@ -65,9 +77,47 @@ def daily_scrape() -> None:
             if key not in seen:
                 seen.add(key)
                 unique.append(prop)
+
         # Upsert into Supabase
         if unique and supabase:
-            supabase.table("properties").upsert(unique).execute()
+            # Only keep columns that exist on the Supabase properties table
+            allowed_keys = {
+                "external_id",
+                "longitude",
+                "description",
+                "title",
+                "latitude",
+                "price",
+                "bathrooms",
+                "bedrooms",
+                "imageurl",
+                "image_urls",  # keep if your table supports this
+                "property_type",
+                "source",
+                "location",
+            }
+
+            payload: list[dict] = []
+            for prop in unique:
+                mapped = dict(prop)
+
+                # The Supabase table uses 'imageurl', not 'image_url'
+                if "image_url" in mapped:
+                    if mapped.get("image_url") and not mapped.get("imageurl"):
+                        mapped["imageurl"] = mapped["image_url"]
+                    mapped.pop("image_url", None)
+
+                # Drop any fields that are not present in the table schema
+                mapped = {k: v for k, v in mapped.items() if k in allowed_keys}
+
+                payload.append(mapped)
+
+            # Use (source, external_id) as the conflict target so repeated
+            # scrapes update existing rows instead of raising unique errors.
+            supabase.table("properties").upsert(
+                payload,
+                on_conflict=["source", "external_id"],
+            ).execute()
 
 
 def send_daily_digest() -> None:

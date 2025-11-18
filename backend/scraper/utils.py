@@ -3,7 +3,8 @@ import os
 from supabase import Client, create_client
 
 supabase_url = os.getenv("SUPABASE_URL")
-supabase_key = os.getenv("SUPABASE_ANON_KEY")
+# Use the service role key for server-side writes from scrapers
+supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase: Client = create_client(supabase_url, supabase_key)
 
 
