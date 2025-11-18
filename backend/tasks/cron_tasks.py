@@ -78,7 +78,7 @@ async def daily_scrape() -> None:
                 seen.add(key)
                 unique.append(prop)
 
-        # Upsert into Supabase
+        # Insert into Supabase
         if unique and supabase:
             # Only keep columns that exist on the Supabase properties table
             allowed_keys = {
@@ -112,12 +112,12 @@ async def daily_scrape() -> None:
 
                 payload.append(mapped)
 
-            # Use (source, external_id) as the conflict target so repeated
-            # scrapes update existing rows instead of raising unique errors.
-            supabase.table("properties").upsert(
-                payload,
-                on_conflict=["source", "external_id"],
-            ).execute()
+            # Insert new rows; if some conflict with existing unique constraints,
+            # log and continue so scrapes don't fail hard.
+            try:
+                supabase.table("properties").insert(payload).execute()
+            except Exception as exc:  # noqa: BLE001
+                print(f"⚠️ Supabase insert error (likely duplicates, continuing): {exc}")
 
 
 def send_daily_digest() -> None:
