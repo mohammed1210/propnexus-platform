@@ -28,6 +28,7 @@ ALTER TABLE scrape_runs ENABLE ROW LEVEL SECURITY;
 -- Allow service role full access
 CREATE POLICY scrape_runs_service_policy ON scrape_runs
   FOR ALL
+  TO service_role
   USING (true);
 
 COMMENT ON TABLE scrape_runs IS 'Logs scraper execution runs with status and metrics';
