@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import math
-import os
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status
@@ -57,11 +56,11 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     """
     Calculate the great circle distance between two points on Earth.
     Returns distance in kilometers.
-    
+
     Args:
         lat1, lon1: First point coordinates
         lat2, lon2: Second point coordinates
-        
+
     Returns:
         Distance in kilometers
     """
@@ -98,13 +97,13 @@ def get_nearby_tradesmen(
 ):
     """
     Get tradesmen near a specific location.
-    
+
     Query parameters:
     - lat: Latitude of the property/location
     - lng: Longitude of the property/location
     - trade_type: Optional filter by trade type (e.g., "builder", "plumber")
     - radius_km: Search radius in kilometers (default: 20)
-    
+
     Returns:
         List of tradesmen within the radius, ordered by distance ascending
     """
@@ -118,52 +117,54 @@ def get_nearby_tradesmen(
     try:
         # Build query
         query = sb.table("tradesmen").select("*")
-        
+
         # Filter by trade type if provided
         if trade_type:
             query = query.eq("trade_type", trade_type.lower())
-        
+
         # Execute query
         response = query.execute()
-        
+
         if not response.data:
             return []
-        
+
         # Calculate distances and filter by radius
         tradesmen_with_distance = []
         for tradesman in response.data:
             t_lat = tradesman.get("latitude")
             t_lng = tradesman.get("longitude")
-            
+
             # Skip tradesmen without location data
             if t_lat is None or t_lng is None:
                 continue
-            
+
             # Calculate distance
             distance = haversine_distance(lat, lng, float(t_lat), float(t_lng))
-            
+
             # Check if within service radius (use larger of search radius or tradesman's service radius)
             service_radius = tradesman.get("service_radius_km", 20)
             max_radius = max(radius_km, service_radius)
-            
+
             if distance <= max_radius:
-                tradesmen_with_distance.append({
-                    "id": tradesman["id"],
-                    "full_name": tradesman["full_name"],
-                    "trade_type": tradesman["trade_type"],
-                    "email": tradesman.get("email"),
-                    "phone": tradesman.get("phone"),
-                    "website": tradesman.get("website"),
-                    "rating": float(tradesman.get("rating", 0)),
-                    "distance_km": round(distance, 1),
-                    "service_radius_km": service_radius,
-                })
-        
+                tradesmen_with_distance.append(
+                    {
+                        "id": tradesman["id"],
+                        "full_name": tradesman["full_name"],
+                        "trade_type": tradesman["trade_type"],
+                        "email": tradesman.get("email"),
+                        "phone": tradesman.get("phone"),
+                        "website": tradesman.get("website"),
+                        "rating": float(tradesman.get("rating", 0)),
+                        "distance_km": round(distance, 1),
+                        "service_radius_km": service_radius,
+                    }
+                )
+
         # Sort by distance ascending
         tradesmen_with_distance.sort(key=lambda x: x["distance_km"])
-        
+
         return tradesmen_with_distance
-        
+
     except Exception as e:
         logger.error(f"Error fetching nearby tradesmen: {e}")
         raise HTTPException(
@@ -176,13 +177,13 @@ def get_nearby_tradesmen(
 def contact_tradesman(request: ContactTradesmanRequest):
     """
     Send a contact message to a tradesman.
-    
+
     Body:
     - tradesman_id: UUID of the tradesman to contact
     - property_id: Optional UUID of the property being discussed
     - user_email: Email address of the user
     - message: Message content
-    
+
     Returns:
         Success response with lead_id
     """
@@ -192,7 +193,7 @@ def contact_tradesman(request: ContactTradesmanRequest):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database service not available",
         )
-    
+
     try:
         # Verify tradesman exists
         tradesman_response = (
@@ -202,15 +203,15 @@ def contact_tradesman(request: ContactTradesmanRequest):
             .single()
             .execute()
         )
-        
+
         if not tradesman_response.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Tradesman not found",
             )
-        
+
         tradesman = tradesman_response.data
-        
+
         # Create lead record
         lead_data = {
             "tradesman_id": request.tradesman_id,
@@ -219,17 +220,17 @@ def contact_tradesman(request: ContactTradesmanRequest):
             "message": request.message,
             "status": "sent",
         }
-        
+
         lead_response = sb.table("tradesmen_leads").insert(lead_data).execute()
-        
+
         if not lead_response.data:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to create lead record",
             )
-        
+
         lead_id = lead_response.data[0]["id"]
-        
+
         # TODO: Send email notification to tradesman
         # For now, we're just storing the lead. Email integration can be added later
         # using existing email utilities (Resend API, Mailgun, etc.)
@@ -247,13 +248,13 @@ def contact_tradesman(request: ContactTradesmanRequest):
             #     message=request.message,
             #     property_id=request.property_id,
             # )
-        
+
         return ContactTradesmanResponse(
             success=True,
             lead_id=lead_id,
             message="Contact request sent successfully",
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:

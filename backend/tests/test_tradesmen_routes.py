@@ -22,16 +22,16 @@ def test_nearby_tradesmen_endpoint_structure() -> None:
         pytest.skip(f"App unavailable in CI: {_import_error}")
 
     client = TestClient(app)
-    
+
     # Test with missing required parameters
     response = client.get("/tradesmen/nearby")
     assert response.status_code == 422  # Validation error
-    
+
     # Test with valid parameters (may return empty list if no data)
     response = client.get("/tradesmen/nearby?lat=51.5074&lng=-0.1278&radius_km=10")
     # Should return 200 with empty or populated list, 503 if DB not available, or 500 if network issue
     assert response.status_code in [200, 500, 503]
-    
+
     if response.status_code == 200:
         data = response.json()
         assert isinstance(data, list)
@@ -43,15 +43,15 @@ def test_nearby_tradesmen_with_trade_filter() -> None:
         pytest.skip(f"App unavailable in CI: {_import_error}")
 
     client = TestClient(app)
-    
+
     # Test with trade_type filter
     response = client.get(
         "/tradesmen/nearby?lat=51.5074&lng=-0.1278&trade_type=builder&radius_km=20"
     )
-    
+
     # Should return 200 with list, 503 if DB unavailable, or 500 if network issue
     assert response.status_code in [200, 500, 503]
-    
+
     if response.status_code == 200:
         data = response.json()
         assert isinstance(data, list)
@@ -67,11 +67,11 @@ def test_contact_tradesman_endpoint_structure() -> None:
         pytest.skip(f"App unavailable in CI: {_import_error}")
 
     client = TestClient(app)
-    
+
     # Test with missing body
     response = client.post("/tradesmen/contact", json={})
     assert response.status_code == 422  # Validation error
-    
+
     # Test with invalid message (too short)
     response = client.post(
         "/tradesmen/contact",
@@ -82,7 +82,7 @@ def test_contact_tradesman_endpoint_structure() -> None:
         },
     )
     assert response.status_code == 422  # Validation error
-    
+
     # Test with valid structure but fake tradesman ID
     response = client.post(
         "/tradesmen/contact",
@@ -100,18 +100,18 @@ def test_haversine_distance_calculation() -> None:
     """Test the Haversine distance calculation logic."""
     if app is None:  # pragma: no cover
         pytest.skip(f"App unavailable in CI: {_import_error}")
-    
+
     from backend.routes.tradesmen_routes import haversine_distance
-    
+
     # Test known distance: London to Paris (approx 344 km)
     london_lat, london_lng = 51.5074, -0.1278
     paris_lat, paris_lng = 48.8566, 2.3522
-    
+
     distance = haversine_distance(london_lat, london_lng, paris_lat, paris_lng)
-    
+
     # Distance should be approximately 344 km (allow 10% margin)
     assert 300 < distance < 380
-    
+
     # Test zero distance (same location)
     distance_zero = haversine_distance(london_lat, london_lng, london_lat, london_lng)
     assert distance_zero == 0.0
