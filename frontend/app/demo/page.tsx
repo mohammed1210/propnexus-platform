@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Metadata } from 'next';
+import { GalleryImage } from '@/components/GalleryImage';
 
 export const metadata: Metadata = {
   title: 'Demo - PropNexus Platform',
@@ -149,6 +150,46 @@ export default function DemoPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Premium Features Preview Gallery */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-slate-50 dark:bg-slate-900/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">
+              Premium Features Preview
+            </h2>
+            <p className="text-slate-600 dark:text-slate-400">
+              See what&apos;s possible with PropNexus premium features
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Investment Analytics Preview */}
+            <GalleryImage
+              src="/images/demo/screenshots/premium-demo-1.png"
+              alt="Investment Analytics - ROI Calculator, Yield Analysis, and Cashflow Projections"
+              title="Investment Analytics"
+              description="Advanced calculators for yield, ROI, cashflow projections, and investment performance tracking"
+            />
+
+            {/* Local Tradesmen Services Preview */}
+            <GalleryImage
+              src="/images/demo/screenshots/premium-demo-2.png"
+              alt="Local Tradesmen Services - Find verified local contractors and get instant quotes"
+              title="Local Tradesmen Services"
+              description="Connect with verified local contractors, get quotes, and manage property maintenance all in one place"
+            />
+
+            {/* AI Deal Score + Area Intel Preview */}
+            <GalleryImage
+              src="/images/demo/screenshots/premium-demo-3.png"
+              alt="AI Deal Score and Area Intelligence - AI-powered investment scoring with market insights"
+              title="AI Deal Score + Area Intel"
+              description="Get AI-powered investment scores, demographics, crime data, and comprehensive market intelligence"
+            />
           </div>
         </div>
       </section>
