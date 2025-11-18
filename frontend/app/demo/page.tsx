@@ -1,48 +1,26 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Metadata } from 'next';
+import { demoProperties } from '@/data/demo-properties';
 
 export const metadata: Metadata = {
   title: 'Demo - PropNexus Platform',
   description: 'Explore PropNexus features with sample property data and analytics.',
 };
 
-// Sample property data for demo
-const sampleProperties = [
-  {
-    id: 'demo-1',
-    title: '2 Bedroom Apartment in Manchester',
-    location: 'Manchester City Centre, M1',
-    price: 185000,
-    bedrooms: 2,
-    bathrooms: 1,
-    yield_percent: 6.2,
-    roi_percent: 14.5,
-    imageurl: '/placeholder.jpg',
-  },
-  {
-    id: 'demo-2',
-    title: '3 Bedroom House in Birmingham',
-    location: 'Edgbaston, Birmingham, B15',
-    price: 275000,
-    bedrooms: 3,
-    bathrooms: 2,
-    yield_percent: 5.8,
-    roi_percent: 12.3,
-    imageurl: '/placeholder.jpg',
-  },
-  {
-    id: 'demo-3',
-    title: 'Studio Flat in Leeds',
-    location: 'Leeds City Centre, LS1',
-    price: 125000,
-    bedrooms: 1,
-    bathrooms: 1,
-    yield_percent: 7.1,
-    roi_percent: 15.8,
-    imageurl: '/placeholder.jpg',
-  },
-];
+// Map demo properties to the format expected by this page
+const sampleProperties = demoProperties.map((prop) => ({
+  id: prop.id,
+  slug: prop.slug,
+  title: prop.title,
+  location: prop.address,
+  price: prop.price,
+  bedrooms: prop.beds,
+  bathrooms: prop.baths,
+  yield_percent: prop.premium.investmentAnalytics.capRate,
+  roi_percent: prop.premium.investmentAnalytics.cocReturn,
+  imageurl: prop.image,
+}));
 
 export default function DemoPage() {
   return (
@@ -142,9 +120,15 @@ export default function DemoPage() {
                   </div>
 
                   <div className="pt-2">
-                    <div className="text-xs text-slate-500 dark:text-slate-400 italic">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 italic mb-3">
                       ℹ️ Demo data - Sign up to view real properties
                     </div>
+                    <Link
+                      href={`/demo/property/${property.slug}`}
+                      className="block w-full px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-center rounded-lg font-semibold text-sm transition-colors"
+                    >
+                      View Premium Details
+                    </Link>
                   </div>
                 </div>
               </div>
