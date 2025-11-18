@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { FiMapPin, FiHome, FiDroplet, FiTrendingUp, FiDollarSign } from 'react-icons/fi';
+import { FiMapPin, FiHome, FiDroplet, FiTrendingUp, FiDollarSign, FiTool } from 'react-icons/fi';
 
 import PropertySummaryCard from '@/components/property_details/PropertySummaryCard';
 import QuickStatsActions from '@/components/property_details/QuickStatsActions';
@@ -16,6 +16,7 @@ import MapSingle from '@/components/property_details/MapSingle';
 import GatedPanel from '@/components/property_details/GatedPanel';
 import InvestmentCalculator from '@/components/property_details/InvestmentCalculator';
 import CollapsibleCard from '@/components/property_details/CollapsibleCard';
+import TradesmenList from '@/components/tradesmen/TradesmenList';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
@@ -54,6 +55,7 @@ export default function PropertyDetailsPage() {
   const [property, setProperty] = useState<LooseProperty | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedTradeType, setSelectedTradeType] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
@@ -234,6 +236,65 @@ export default function PropertyDetailsPage() {
                 <CompsPanel postcode={property.location || ''} />
               </GatedPanel>
             </CollapsibleCard>
+
+            {/* Local Tradesmen & Services */}
+            {property.latitude && property.longitude && (
+              <CollapsibleCard
+                title="Local Tradesmen & Services"
+                icon={
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                    <FiTool className="w-5 h-5 text-white" />
+                  </div>
+                }
+                defaultExpanded={false}
+              >
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+                      <span className="font-semibold">Renovation · Plumbing · Electrical · Surveyors</span>
+                      <br />
+                      Find qualified local tradespeople for your property project.
+                    </p>
+
+                    {/* Trade Type Filter */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      <button
+                        onClick={() => setSelectedTradeType('')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          selectedTradeType === ''
+                            ? 'bg-brand-500 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        All Trades
+                      </button>
+                      {['Builder', 'Plumber', 'Electrician', 'Roofer', 'Surveyor'].map((trade) => (
+                        <button
+                          key={trade}
+                          onClick={() => setSelectedTradeType(trade)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            selectedTradeType === trade
+                              ? 'bg-brand-500 text-white'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          {trade}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Tradesmen List */}
+                  <TradesmenList
+                    propertyLat={property.latitude}
+                    propertyLng={property.longitude}
+                    propertyId={String(property.id ?? id)}
+                    tradeType={selectedTradeType || undefined}
+                    radius={20}
+                  />
+                </div>
+              </CollapsibleCard>
+            )}
 
             {/* Exit Strategies */}
             <CollapsibleCard title="Exit Strategies" defaultExpanded={false}>
