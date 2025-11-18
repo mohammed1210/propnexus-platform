@@ -21,6 +21,7 @@ type Property = {
   yield_percent?: number | null;
   roi_percent?: number | null;
   imageurl?: string | null;
+  image_urls?: string[] | null;
 };
 
 /** Resolve the FastAPI base URL from public env (trim TRAILING slashes only) */
@@ -157,6 +158,11 @@ export default function PropertyCard({ p }: { p: Property }) {
     }
   }, [p.id]);
 
+  const imageSrc =
+    p.imageurl ||
+    (Array.isArray(p.image_urls) && p.image_urls.length > 0 ? p.image_urls[0] : null) ||
+    '/placeholder.jpg';
+
   return (
     <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30">
       <Link
@@ -165,7 +171,7 @@ export default function PropertyCard({ p }: { p: Property }) {
         aria-label={`Open ${p.title ?? 'property'}`}
       >
         <ImageWithFallback
-          src={p.imageurl || '/placeholder.jpg'}
+          src={imageSrc}
           alt={p.title || 'Property image'}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"

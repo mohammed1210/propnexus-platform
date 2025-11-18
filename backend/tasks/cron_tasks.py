@@ -140,6 +140,16 @@ async def daily_scrape() -> None:
                         mapped["imageurl"] = mapped["image_url"]
                     mapped.pop("image_url", None)
 
+                # If imageurl is still missing but image_urls is present,
+                # default to the first image for card display.
+                if not mapped.get("imageurl") and mapped.get("image_urls"):
+                    try:
+                        urls = mapped["image_urls"] or []
+                        if isinstance(urls, list) and urls:
+                            mapped["imageurl"] = urls[0]
+                    except Exception:
+                        pass
+
                 # Drop any fields that are not present in the table schema
                 mapped = {k: v for k, v in mapped.items() if k in allowed_keys}
 
