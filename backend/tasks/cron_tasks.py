@@ -45,17 +45,51 @@ async def daily_scrape() -> None:
     from scraper.onthemarket_scraper import scrape_onthemarket_properties
     from scraper.spare_room_scraper import scrape_spareroom_properties
 
+    # Feature flags to enable/disable individual scrapers without code changes.
+    ENABLE_ZOOPLA = os.getenv("ENABLE_ZOOPLA_SCRAPER", "true").lower() == "true"
+    ENABLE_OTM = os.getenv("ENABLE_ONTHEMARKET_SCRAPER", "false").lower() == "true"
+    ENABLE_SPAREROOM = os.getenv("ENABLE_SPAREROOM_SCRAPER", "false").lower() == "true"
+
     # Define the locations you want to scrape daily. You may replace
     # these with user-defined favourites or the most active markets.
-    locations = ["London", "Manchester"]
+    locations = [
+        "London",
+        "Manchester",
+        "Birmingham",
+        "Leeds",
+        "Glasgow",
+        "Bristol",
+        "Liverpool",
+        "Edinburgh",
+        "Cardiff",
+        "Nottingham",
+    ]
 
     for location in locations:
+        # Build tasks list with feature-flagged scrapers and per-provider limits
+        tasks: list[asyncio.Future] = []
+
+        if ENABLE_ZOOPLA:
+            tasks.append(scrape_zoopla_properties(location, limit=25))
+        else:
+            tasks.append(asyncio.sleep(0, result=[]))
+
+        # Rightmove is currently the most reliable source, keep at higher limit
+        tasks.append(scrape_rightmove_properties(location, limit=100))
+
+        if ENABLE_OTM:
+            tasks.append(scrape_onthemarket_properties(location, limit=25))
+        else:
+            tasks.append(asyncio.sleep(0, result=[]))
+
+        if ENABLE_SPAREROOM:
+            tasks.append(scrape_spareroom_properties(location, limit=25))
+        else:
+            tasks.append(asyncio.sleep(0, result=[]))
+
         # Run provider scrapes concurrently for the same location
         zoopla_results, rightmove_results, onthemarket_results, spareroom_results = await asyncio.gather(
-            scrape_zoopla_properties(location),
-            scrape_rightmove_properties(location),
-            scrape_onthemarket_properties(location),
-            scrape_spareroom_properties(location),
+            *tasks
         )
 
         zoopla_results = zoopla_results or []
@@ -65,14 +99,13 @@ async def daily_scrape() -> None:
 
         combined = zoopla_results + rightmove_results + onthemarket_results + spareroom_results
 
-        # De-duplicate results by a simple key (title, price, location)
-        seen: set[tuple[str, float, str]] = set()
+        # De-duplicate results by a more stable key (source, external_id)
+        seen: set[tuple[str | None, str | None]] = set()
         unique: list[dict] = []
         for prop in combined:
             key = (
-                prop.get("title"),
-                prop.get("price"),
-                prop.get("location"),
+                prop.get("source"),
+                prop.get("external_id"),
             )
             if key not in seen:
                 seen.add(key)
