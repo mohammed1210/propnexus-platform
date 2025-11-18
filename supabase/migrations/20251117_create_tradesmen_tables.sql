@@ -35,6 +35,7 @@ CREATE POLICY tradesmen_public_read ON tradesmen
 -- Allow service role full access for admin operations
 CREATE POLICY tradesmen_service_policy ON tradesmen
   FOR ALL
+  TO service_role
   USING (true);
 
 COMMENT ON TABLE tradesmen IS 'Directory of tradespeople (builders, plumbers, electricians, etc.) available for property work';
@@ -75,6 +76,7 @@ CREATE POLICY reviews_user_insert ON tradesmen_reviews
 -- Allow service role full access
 CREATE POLICY reviews_service_policy ON tradesmen_reviews
   FOR ALL
+  TO service_role
   USING (true);
 
 COMMENT ON TABLE tradesmen_reviews IS 'User reviews and ratings for tradespeople';
@@ -117,6 +119,7 @@ CREATE POLICY leads_user_insert ON tradesmen_leads
 -- Allow service role full access
 CREATE POLICY leads_service_policy ON tradesmen_leads
   FOR ALL
+  TO service_role
   USING (true);
 
 COMMENT ON TABLE tradesmen_leads IS 'Tracks contact attempts from investors to tradespeople';
