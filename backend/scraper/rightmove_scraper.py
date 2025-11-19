@@ -17,6 +17,7 @@ from utils.scraper_logger import (
 )
 from utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
+from utils.runlog import RunLog
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -347,157 +348,167 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
     stats = ScraperStats("rightmove", location)
     results: List[Dict[str, Any]] = []
 
-    async with aiohttp.ClientSession() as session:
-        # 1. Attempt JSON API first for efficiency & reliability
-        loc_key = location.lower()
-        region_id = _LOCATION_IDENTIFIER.get(loc_key)
-        api_results: List[Dict[str, Any]] = []
-        if region_id:
-            try:
-                api_results = await _fetch_api_properties(session, region_id, limit)
-                if api_results:
-                    print(
-                        f"✅ Rightmove API returned {len(api_results)} properties for '{location}'"
-                    )
-                    # Validate and clean API results
-                    validated_results = []
-                    for prop in api_results:
-                        should_insert, reason = should_insert_property(prop)
-                        if should_insert:
-                            validated_results.append(clean_property_data(prop))
+    # Start audit logging
+    with RunLog.start(source="rightmove", mode=SCRAPER_MODE, location=location) as run_log:
+        try:
+            async with aiohttp.ClientSession() as session:
+                # 1. Attempt JSON API first for efficiency & reliability
+                loc_key = location.lower()
+                region_id = _LOCATION_IDENTIFIER.get(loc_key)
+                api_results: List[Dict[str, Any]] = []
+                if region_id:
+                    try:
+                        api_results = await _fetch_api_properties(session, region_id, limit)
+                        if api_results:
+                            print(
+                                f"✅ Rightmove API returned {len(api_results)} properties for '{location}'"
+                            )
+                            # Validate and clean API results
+                            validated_results = []
+                            for prop in api_results:
+                                should_insert, reason = should_insert_property(prop)
+                                if should_insert:
+                                    validated_results.append(clean_property_data(prop))
+                                else:
+                                    stats.log_validation_failure(reason or "Unknown")
+                            stats.successful_parses = len(validated_results)
+                            stats.log_summary()
+                            results = validated_results[:limit]
+                            run_log.set_count(len(results))
+                            return results
                         else:
-                            stats.log_validation_failure(reason or "Unknown")
-                    stats.successful_parses = len(validated_results)
-                    stats.log_summary()
-                    return validated_results[:limit]
-                else:
-                    print(
-                        "ℹ️ Rightmove API returned zero properties; falling back to HTML scraping."
-                    )
-            except Exception as e:
-                print(f"⚠️ Rightmove API fetch error: {e}; falling back to HTML scraping.")
-        for page in range(RM_MAX_PAGES):
-            url = _build_search_url(location, page)
-            html = await _fetch_html(session, url)
-            # Playwright fallback if enabled and static HTML yielded no cards later
-            if not html:
-                log_page_fetch_error("rightmove", page, "blocked or empty")
-                continue
-            soup = BeautifulSoup(html, "html.parser")
-            cards = _collect_selectors(soup)
-            if not cards:
-                if PLAYWRIGHT_ENABLE:
-                    rendered = await render_page(
-                        url,
-                        ["[data-testid='propertyCard']", "article.propertyCard", ".propertyCard"],
-                    )
-                    if rendered:
-                        soup = BeautifulSoup(rendered, "html.parser")
-                        cards = _collect_selectors(soup)
+                            print(
+                                "ℹ️ Rightmove API returned zero properties; falling back to HTML scraping."
+                            )
+                    except Exception as e:
+                        print(f"⚠️ Rightmove API fetch error: {e}; falling back to HTML scraping.")
+                for page in range(RM_MAX_PAGES):
+                    url = _build_search_url(location, page)
+                    html = await _fetch_html(session, url)
+                    # Playwright fallback if enabled and static HTML yielded no cards later
+                    if not html:
+                        log_page_fetch_error("rightmove", page, "blocked or empty")
+                        continue
+                    soup = BeautifulSoup(html, "html.parser")
+                    cards = _collect_selectors(soup)
+                    if not cards:
+                        if PLAYWRIGHT_ENABLE:
+                            rendered = await render_page(
+                                url,
+                                ["[data-testid='propertyCard']", "article.propertyCard", ".propertyCard"],
+                            )
+                            if rendered:
+                                soup = BeautifulSoup(rendered, "html.parser")
+                                cards = _collect_selectors(soup)
+                                if not cards:
+                                    capture_debug_html(f"rightmove_empty_{page}", rendered)
                         if not cards:
-                            capture_debug_html(f"rightmove_empty_{page}", rendered)
-                if not cards:
-                    print("ℹ️ No cards found; stopping pagination.")
-                    break
+                            print("ℹ️ No cards found; stopping pagination.")
+                            break
 
-            for card in cards:
-                stats.log_card_found()
-                if len(results) >= limit:
-                    break
-                try:
-                    title_el = (
-                        card.select_one(".propertyCard-title")
-                        or card.select_one("[data-testid='title']")
-                        or card.select_one("h2")
-                    )
-                    title = title_el.get_text(strip=True) if title_el else "Untitled"
+                    for card in cards:
+                        stats.log_card_found()
+                        if len(results) >= limit:
+                            break
+                        try:
+                            title_el = (
+                                card.select_one(".propertyCard-title")
+                                or card.select_one("[data-testid='title']")
+                                or card.select_one("h2")
+                            )
+                            title = title_el.get_text(strip=True) if title_el else "Untitled"
 
-                    price_el = card.select_one(".propertyCard-priceValue") or card.select_one(
-                        "[data-testid='price']"
-                    )
-                    price = _parse_price(price_el.get_text(strip=True) if price_el else "")
+                            price_el = card.select_one(".propertyCard-priceValue") or card.select_one(
+                                "[data-testid='price']"
+                            )
+                            price = _parse_price(price_el.get_text(strip=True) if price_el else "")
 
-                    loc_el = (
-                        card.select_one(".propertyCard-address")
-                        or card.select_one("[data-testid='address']")
-                        or card.select_one(".address")
-                    )
-                    location_text = loc_el.get_text(" ", strip=True) if loc_el else location
+                            loc_el = (
+                                card.select_one(".propertyCard-address")
+                                or card.select_one("[data-testid='address']")
+                                or card.select_one(".address")
+                            )
+                            location_text = loc_el.get_text(" ", strip=True) if loc_el else location
 
-                    beds_el = (
-                        card.select_one("[data-testid='bedrooms']")
-                        or card.select_one(".beds")
-                        or card.select_one(".propertyCard-description")
-                    )
-                    bedrooms = _extract_int(beds_el.get_text() if beds_el else "") or 0
+                            beds_el = (
+                                card.select_one("[data-testid='bedrooms']")
+                                or card.select_one(".beds")
+                                or card.select_one(".propertyCard-description")
+                            )
+                            bedrooms = _extract_int(beds_el.get_text() if beds_el else "") or 0
 
-                    baths_el = card.select_one("[data-testid='bathrooms']") or card.select_one(
-                        ".baths"
-                    )
-                    bathrooms = _extract_int(baths_el.get_text() if baths_el else "") or 0
+                            baths_el = card.select_one("[data-testid='bathrooms']") or card.select_one(
+                                ".baths"
+                            )
+                            bathrooms = _extract_int(baths_el.get_text() if baths_el else "") or 0
 
-                    # Extract all images
-                    image_urls = _extract_images(card)
-                    image_url = image_urls[0] if image_urls else None
-                    log_image_extraction("rightmove", title, len(image_urls))
+                            # Extract all images
+                            image_urls = _extract_images(card)
+                            image_url = image_urls[0] if image_urls else None
+                            log_image_extraction("rightmove", title, len(image_urls))
 
-                    # Extract description
-                    description = _extract_description(card)
+                            # Extract description
+                            description = _extract_description(card)
 
-                    # Extract property type
-                    property_type = _extract_property_type(card)
+                            # Extract property type
+                            property_type = _extract_property_type(card)
 
-                    external_id = (
-                        _extract_property_id(card) or f"rm-{hash(title+location_text) & 0xffffffff}"
-                    )
+                            external_id = (
+                                _extract_property_id(card) or f"rm-{hash(title+location_text) & 0xffffffff}"
+                            )
 
-                    coords = await _enrich_coordinates(location_text)
+                            coords = await _enrich_coordinates(location_text)
 
-                    property_data = {
-                        "external_id": external_id,
-                        "title": title,
-                        "description": description,
-                        "location": location_text,
-                        "price": price,
-                        "bedrooms": bedrooms,
-                        "bathrooms": bathrooms,
-                        "property_type": property_type,
-                        "image_url": image_url,
-                        "image_urls": image_urls,
-                        "latitude": coords["latitude"],
-                        "longitude": coords["longitude"],
-                        "source": "rightmove",
-                        "raw_url": url,
-                    }
+                            property_data = {
+                                "external_id": external_id,
+                                "title": title,
+                                "description": description,
+                                "location": location_text,
+                                "price": price,
+                                "bedrooms": bedrooms,
+                                "bathrooms": bathrooms,
+                                "property_type": property_type,
+                                "image_url": image_url,
+                                "image_urls": image_urls,
+                                "latitude": coords["latitude"],
+                                "longitude": coords["longitude"],
+                                "source": "rightmove",
+                                "raw_url": url,
+                            }
 
-                    # Track missing fields
-                    if not image_url:
-                        stats.log_missing_field("image_url", external_id)
-                    if not description:
-                        stats.log_missing_field("description", external_id)
-                    if not price:
-                        stats.log_missing_field("price", external_id)
-                    if not property_type:
-                        stats.log_missing_field("property_type", external_id)
+                            # Track missing fields
+                            if not image_url:
+                                stats.log_missing_field("image_url", external_id)
+                            if not description:
+                                stats.log_missing_field("description", external_id)
+                            if not price:
+                                stats.log_missing_field("price", external_id)
+                            if not property_type:
+                                stats.log_missing_field("property_type", external_id)
 
-                    # Validate before adding
-                    should_insert, reason = should_insert_property(property_data)
-                    if should_insert:
-                        results.append(clean_property_data(property_data))
-                        stats.log_parse_success()
-                    else:
-                        stats.log_validation_failure(reason or "Unknown")
+                            # Validate before adding
+                            should_insert, reason = should_insert_property(property_data)
+                            if should_insert:
+                                results.append(clean_property_data(property_data))
+                                stats.log_parse_success()
+                            else:
+                                stats.log_validation_failure(reason or "Unknown")
 
-                except Exception as e:
-                    stats.log_parse_failure(str(e))
-            if len(results) >= limit:
-                break
-            # polite delay
-            time.sleep(RM_DELAY_MS / 1000.0)
+                        except Exception as e:
+                            stats.log_parse_failure(str(e))
+                    if len(results) >= limit:
+                        break
+                    # polite delay
+                    time.sleep(RM_DELAY_MS / 1000.0)
 
-    stats.log_summary()
-    print(f"✅ Scraped {len(results)} Rightmove properties for '{location}'")
-    return results
+            stats.log_summary()
+            print(f"✅ Scraped {len(results)} Rightmove properties for '{location}'")
+            run_log.set_count(len(results))
+            return results
+        except Exception as e:
+            # Let RunLog handle the error in __exit__
+            print(f"❌ Rightmove scraper error: {e}")
+            raise
 
 
 # Convenience wrapper matching previous signature (kept for backward compatibility)

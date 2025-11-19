@@ -17,6 +17,7 @@ from utils.scraper_logger import (
 )
 from utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
+from utils.runlog import RunLog
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "

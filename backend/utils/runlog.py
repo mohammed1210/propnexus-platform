@@ -17,30 +17,30 @@ class RunLog:
     """Context-manager style logger for scraper runs.
 
     Usage:
-        log = RunLog(provider="rightmove", location="London")
+        log = RunLog(source="rightmove", mode="direct", location="London")
         log.start_run()
         try:
             # ... scraping logic ...
-            log.finish(status="success", items=count)
+            log.finish(status="success", properties_found=count)
         except Exception as e:
-            log.finish(status="failure", items=0, err=str(e))
+            log.finish(status="failed", properties_found=0, error_summary=str(e))
 
     Or as context manager:
-        with RunLog.start(provider="rightmove", location="London") as log:
+        with RunLog.start(source="rightmove", mode="direct", location="London") as log:
             # ... scraping logic ...
             log.set_count(items)
     """
 
     def __init__(
         self,
-        provider: str,
-        location: str,
-        source: Optional[str] = None,
+        source: str,
+        mode: str,
+        location: Optional[str] = None,
         meta: Optional[Dict[str, Any]] = None,
     ):
-        self.provider = provider
+        self.source = source  # 'rightmove', 'zoopla', 'otm', 'spareroom'
+        self.mode = mode  # 'direct', 'scraperapi', 'smart'
         self.location = location
-        self.source = source
         self.meta = meta or {}
         self.start = time.time()
         self.run_id = None
@@ -50,9 +50,9 @@ class RunLog:
         if not _sb:
             return
         row = {
-            "provider": self.provider,
+            "provider": self.source,  # Map to provider column (backward compat)
+            "mode": self.mode,
             "location": self.location,
-            "source": self.source,
             "status": "running",
             "properties_imported": 0,
             "meta": self.meta,
@@ -65,7 +65,11 @@ class RunLog:
             print(f"[RunLog] Failed to start run: {e}")
 
     def finish(
-        self, status: str, items: int = 0, err: str = "", extra: Optional[Dict[str, Any]] = None
+        self,
+        status: str,
+        properties_found: int = 0,
+        error_summary: str = "",
+        extra: Optional[Dict[str, Any]] = None,
     ):
         if not _sb or not self.run_id:
             return
@@ -73,9 +77,9 @@ class RunLog:
         upd = {
             "finished_at": "now()",
             "status": status,
-            "properties_imported": items,
+            "properties_imported": properties_found,
             "duration_ms": ms,
-            "error_summary": err or None,
+            "error_summary": error_summary or None,
             "meta": {**self.meta, **(extra or {})},
         }
         try:
@@ -93,18 +97,18 @@ class RunLog:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
-            self.finish(status="failure", items=self.item_count, err=str(exc_val))
+            self.finish(status="failed", properties_found=self.item_count, error_summary=str(exc_val))
         else:
-            self.finish(status="success", items=self.item_count)
+            self.finish(status="success", properties_found=self.item_count)
         return False  # Don't suppress exceptions
 
     @classmethod
     def start(
         cls,
-        provider: str,
-        location: str,
-        source: Optional[str] = None,
+        source: str,
+        mode: str,
+        location: Optional[str] = None,
         meta: Optional[Dict[str, Any]] = None,
     ):
         """Convenience factory for use as context manager"""
-        return cls(provider=provider, location=location, source=source, meta=meta)
+        return cls(source=source, mode=mode, location=location, meta=meta)

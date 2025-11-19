@@ -18,6 +18,7 @@ from utils.scraper_logger import (
 )
 from utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
+from utils.runlog import RunLog
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

@@ -17,6 +17,7 @@ from utils.scraper_logger import (
 )
 from utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
+from utils.runlog import RunLog
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -297,123 +298,131 @@ async def scrape_zoopla_properties(
     stats = ScraperStats("zoopla", location)
     results: List[Dict[str, Any]] = []
 
-    async with aiohttp.ClientSession() as session:
-        for page in range(ZP_MAX_PAGES):
-            url = _build_search_url(location, page)
-            html = await _fetch_html(session, url)
-            if not html:
-                log_page_fetch_error("zoopla", page, "blocked or empty")
-                continue
-            soup = BeautifulSoup(html, "html.parser")
-            cards = _collect_cards(soup)
-            if not cards:
-                if PLAYWRIGHT_ENABLE:
-                    rendered = await render_page(
-                        url, ["[data-testid='search-result']", ".c-propertyCard", ".l-searchResult"]
-                    )
-                    if rendered:
-                        soup = BeautifulSoup(rendered, "html.parser")
-                        cards = _collect_cards(soup)
+    # Start audit logging
+    with RunLog.start(source="zoopla", mode=SCRAPER_MODE, location=location) as run_log:
+        try:
+            async with aiohttp.ClientSession() as session:
+                for page in range(ZP_MAX_PAGES):
+                    url = _build_search_url(location, page)
+                    html = await _fetch_html(session, url)
+                    if not html:
+                        log_page_fetch_error("zoopla", page, "blocked or empty")
+                        continue
+                    soup = BeautifulSoup(html, "html.parser")
+                    cards = _collect_cards(soup)
+                    if not cards:
+                        if PLAYWRIGHT_ENABLE:
+                            rendered = await render_page(
+                                url, ["[data-testid='search-result']", ".c-propertyCard", ".l-searchResult"]
+                            )
+                            if rendered:
+                                soup = BeautifulSoup(rendered, "html.parser")
+                                cards = _collect_cards(soup)
+                                if not cards:
+                                    capture_debug_html(f"zoopla_empty_{page}", rendered)
                         if not cards:
-                            capture_debug_html(f"zoopla_empty_{page}", rendered)
-                if not cards:
-                    print("ℹ️ No Zoopla cards found; stopping.")
-                    break
+                            print("ℹ️ No Zoopla cards found; stopping.")
+                            break
 
-            for card in cards:
-                stats.log_card_found()
-                if len(results) >= limit:
-                    break
-                try:
-                    title_el = card.select_one("h2") or card.select_one(
-                        "[data-testid='listing-title']"
-                    )
-                    title = title_el.get_text(strip=True) if title_el else "Untitled"
+                    for card in cards:
+                        stats.log_card_found()
+                        if len(results) >= limit:
+                            break
+                        try:
+                            title_el = card.select_one("h2") or card.select_one(
+                                "[data-testid='listing-title']"
+                            )
+                            title = title_el.get_text(strip=True) if title_el else "Untitled"
 
-                    price_el = (
-                        card.select_one("[data-testid='listing-price']")
-                        or card.select_one(".css-1w7b0tk-Price")
-                        or card.select_one(".listing-price")
-                    )
-                    price = _parse_price(price_el.get_text(strip=True) if price_el else "")
+                            price_el = (
+                                card.select_one("[data-testid='listing-price']")
+                                or card.select_one(".css-1w7b0tk-Price")
+                                or card.select_one(".listing-price")
+                            )
+                            price = _parse_price(price_el.get_text(strip=True) if price_el else "")
 
-                    loc_el = (
-                        card.select_one("[data-testid='listing-description']")
-                        or card.select_one(".listing-description")
-                        or card.select_one("address")
-                    )
-                    location_text = loc_el.get_text(" ", strip=True) if loc_el else location
+                            loc_el = (
+                                card.select_one("[data-testid='listing-description']")
+                                or card.select_one(".listing-description")
+                                or card.select_one("address")
+                            )
+                            location_text = loc_el.get_text(" ", strip=True) if loc_el else location
 
-                    bed_el = (
-                        card.select_one("[data-testid='bed']")
-                        or card.select_one(".css-1rzse3v-Bedrooms")
-                        or card.select_one(".listing-bedrooms")
-                    )
-                    bedrooms = _extract_int(bed_el.get_text() if bed_el else "") or 0
+                            bed_el = (
+                                card.select_one("[data-testid='bed']")
+                                or card.select_one(".css-1rzse3v-Bedrooms")
+                                or card.select_one(".listing-bedrooms")
+                            )
+                            bedrooms = _extract_int(bed_el.get_text() if bed_el else "") or 0
 
-                    bath_el = card.select_one("[data-testid='bath']") or card.select_one(
-                        ".listing-bathrooms"
-                    )
-                    bathrooms = _extract_int(bath_el.get_text() if bath_el else "") or 0
+                            bath_el = card.select_one("[data-testid='bath']") or card.select_one(
+                                ".listing-bathrooms"
+                            )
+                            bathrooms = _extract_int(bath_el.get_text() if bath_el else "") or 0
 
-                    # Extract all images
-                    image_urls = _extract_images(card)
-                    image_url = image_urls[0] if image_urls else None
-                    log_image_extraction("zoopla", title, len(image_urls))
+                            # Extract all images
+                            image_urls = _extract_images(card)
+                            image_url = image_urls[0] if image_urls else None
+                            log_image_extraction("zoopla", title, len(image_urls))
 
-                    # Extract description
-                    description = _extract_description(card)
+                            # Extract description
+                            description = _extract_description(card)
 
-                    # Extract property type
-                    property_type = _extract_property_type(card)
+                            # Extract property type
+                            property_type = _extract_property_type(card)
 
-                    external_id = _extract_external_id(card)
-                    coords = await _enrich_coordinates(location_text)
+                            external_id = _extract_external_id(card)
+                            coords = await _enrich_coordinates(location_text)
 
-                    property_data = {
-                        "external_id": external_id,
-                        "title": title,
-                        "description": description,
-                        "location": location_text,
-                        "price": price,
-                        "bedrooms": bedrooms,
-                        "bathrooms": bathrooms,
-                        "property_type": property_type,
-                        "image_url": image_url,
-                        "image_urls": image_urls,
-                        "latitude": coords["latitude"],
-                        "longitude": coords["longitude"],
-                        "source": "zoopla",
-                        "raw_url": url,
-                    }
+                            property_data = {
+                                "external_id": external_id,
+                                "title": title,
+                                "description": description,
+                                "location": location_text,
+                                "price": price,
+                                "bedrooms": bedrooms,
+                                "bathrooms": bathrooms,
+                                "property_type": property_type,
+                                "image_url": image_url,
+                                "image_urls": image_urls,
+                                "latitude": coords["latitude"],
+                                "longitude": coords["longitude"],
+                                "source": "zoopla",
+                                "raw_url": url,
+                            }
 
-                    # Track missing fields
-                    if not image_url:
-                        stats.log_missing_field("image_url", external_id)
-                    if not description:
-                        stats.log_missing_field("description", external_id)
-                    if not price:
-                        stats.log_missing_field("price", external_id)
-                    if not property_type:
-                        stats.log_missing_field("property_type", external_id)
+                            # Track missing fields
+                            if not image_url:
+                                stats.log_missing_field("image_url", external_id)
+                            if not description:
+                                stats.log_missing_field("description", external_id)
+                            if not price:
+                                stats.log_missing_field("price", external_id)
+                            if not property_type:
+                                stats.log_missing_field("property_type", external_id)
 
-                    # Validate before adding
-                    should_insert, reason = should_insert_property(property_data)
-                    if should_insert:
-                        results.append(clean_property_data(property_data))
-                        stats.log_parse_success()
-                    else:
-                        stats.log_validation_failure(reason or "Unknown")
+                            # Validate before adding
+                            should_insert, reason = should_insert_property(property_data)
+                            if should_insert:
+                                results.append(clean_property_data(property_data))
+                                stats.log_parse_success()
+                            else:
+                                stats.log_validation_failure(reason or "Unknown")
 
-                except Exception as e:
-                    stats.log_parse_failure(str(e))
-            if len(results) >= limit:
-                break
-            time.sleep(ZP_DELAY_MS / 1000.0)
+                        except Exception as e:
+                            stats.log_parse_failure(str(e))
+                    if len(results) >= limit:
+                        break
+                    time.sleep(ZP_DELAY_MS / 1000.0)
 
-    stats.log_summary()
-    print(f"✅ Scraped {len(results)} Zoopla properties for '{location}'")
-    return results
+            stats.log_summary()
+            print(f"✅ Scraped {len(results)} Zoopla properties for '{location}'")
+            run_log.set_count(len(results))
+            return results
+        except Exception as e:
+            # Let RunLog handle the error in __exit__
+            print(f"❌ Zoopla scraper error: {e}")
+            raise
 
 
 # Backward-compatible stub signature
