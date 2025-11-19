@@ -97,7 +97,9 @@ class RunLog:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type:
-            self.finish(status="failed", properties_found=self.item_count, error_summary=str(exc_val))
+            self.finish(
+                status="failed", properties_found=self.item_count, error_summary=str(exc_val)
+            )
         else:
             self.finish(status="success", properties_found=self.item_count)
         return False  # Don't suppress exceptions

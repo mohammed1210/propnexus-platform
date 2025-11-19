@@ -6,8 +6,10 @@ try:
     from supabase import Client, create_client
 except ImportError:
     Client = object
+
     def create_client(*args, **kwargs):
         return None
+
 
 supabase_url = os.getenv("SUPABASE_URL")
 # Use the service role key for server-side writes from scrapers
@@ -80,7 +82,7 @@ async def smart_fetch_html(
 ) -> Optional[str]:
     """
     Smart fetch with progressive fallback strategy.
-    
+
     Behavior based on SCRAPER_MODE:
     - 'direct': Try direct fetch only (current behavior)
     - 'scraperapi': Use ScraperAPI with render only (current behavior)
@@ -88,25 +90,25 @@ async def smart_fetch_html(
         1. Try direct fetch first
         2. If blocked/invalid, try ScraperAPI without render (cheap)
         3. If still blocked, try ScraperAPI with render (expensive)
-    
+
     Args:
         session: aiohttp ClientSession
         url: URL to fetch
         headers: Request headers
         timeout: Request timeout in seconds
-        
+
     Returns:
         HTML content or None if all methods fail
     """
-    
+
     # Read mode at call time for testing
     scraper_mode = _get_scraper_mode()
     scraperapi_key = _get_scraperapi_key()
-    
+
     # Mode: scraperapi-only (current behavior)
     if scraper_mode == "scraperapi":
         if not scraperapi_key:
-            print(f"⚠️ SCRAPER_MODE=scraperapi but SCRAPERAPI_KEY not set")
+            print("⚠️ SCRAPER_MODE=scraperapi but SCRAPERAPI_KEY not set")
             return None
         proxy_url = (
             f"http://api.scraperapi.com/?api_key={scraperapi_key}&url={url}"
@@ -121,7 +123,7 @@ async def smart_fetch_html(
         except Exception as e:
             print(f"⚠️ ScraperAPI fetch failed: {e}")
             return None
-    
+
     # Mode: smart fallback
     elif scraper_mode == "smart":
         # Step 1: Try direct fetch first
@@ -130,23 +132,25 @@ async def smart_fetch_html(
                 text = await resp.text()
                 if not _looks_blocked(text, resp.status) and _is_valid_html(text):
                     return text
-                print(f"ℹ️ Direct fetch blocked or invalid, trying ScraperAPI...")
+                print("ℹ️ Direct fetch blocked or invalid, trying ScraperAPI...")
         except Exception as e:
             print(f"ℹ️ Direct fetch failed ({e}), trying ScraperAPI...")
-        
+
         # Step 2: Try ScraperAPI without render (cheap)
         if scraperapi_key:
-            proxy_url = f"http://api.scraperapi.com/?api_key={scraperapi_key}&url={url}&country_code=gb"
+            proxy_url = (
+                f"http://api.scraperapi.com/?api_key={scraperapi_key}&url={url}&country_code=gb"
+            )
             try:
                 async with session.get(proxy_url, headers=headers, timeout=45) as resp:
                     text = await resp.text()
                     if not _looks_blocked(text, resp.status) and _is_valid_html(text):
-                        print(f"✅ ScraperAPI (no-render) successful")
+                        print("✅ ScraperAPI (no-render) successful")
                         return text
-                    print(f"ℹ️ ScraperAPI (no-render) blocked, trying with render...")
+                    print("ℹ️ ScraperAPI (no-render) blocked, trying with render...")
             except Exception as e:
                 print(f"ℹ️ ScraperAPI (no-render) failed ({e}), trying with render...")
-            
+
             # Step 3: Try ScraperAPI with render (expensive)
             proxy_url_render = (
                 f"http://api.scraperapi.com/?api_key={scraperapi_key}&url={url}"
@@ -156,17 +160,17 @@ async def smart_fetch_html(
                 async with session.get(proxy_url_render, headers=headers, timeout=60) as resp:
                     text = await resp.text()
                     if _looks_blocked(text, resp.status):
-                        print(f"⚠️ ScraperAPI (with render) still blocked")
+                        print("⚠️ ScraperAPI (with render) still blocked")
                         return None
-                    print(f"✅ ScraperAPI (with render) successful")
+                    print("✅ ScraperAPI (with render) successful")
                     return text
             except Exception as e:
                 print(f"⚠️ ScraperAPI (with render) failed: {e}")
                 return None
         else:
-            print(f"⚠️ ScraperAPI key not configured, cannot fallback")
+            print("⚠️ ScraperAPI key not configured, cannot fallback")
             return None
-    
+
     # Mode: direct (default, current behavior)
     else:
         try:
@@ -174,7 +178,7 @@ async def smart_fetch_html(
                 text = await resp.text()
                 # Backward compatibility: fallback to ScraperAPI if blocked in direct mode
                 if _looks_blocked(text, resp.status) and scraperapi_key:
-                    print(f"ℹ️ Direct mode blocked, falling back to ScraperAPI...")
+                    print("ℹ️ Direct mode blocked, falling back to ScraperAPI...")
                     proxy_url = (
                         f"http://api.scraperapi.com/?api_key={scraperapi_key}&url={url}"
                         f"&country_code=gb&render=true&device_type=desktop"
@@ -202,4 +206,3 @@ async def smart_fetch_html(
                 except Exception:
                     return None
             return None
-

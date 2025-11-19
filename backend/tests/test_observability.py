@@ -35,10 +35,10 @@ class TestRunLog:
         # Verify insert was called with correct data
         assert mock_sb.table.call_count == 1
         assert mock_sb.table.call_args[0][0] == "scrape_runs"
-        
+
         insert_call = mock_sb.table.return_value.insert.call_args
         data = insert_call[0][0]
-        
+
         assert data["provider"] == "rightmove"
         assert data["mode"] == "direct"
         assert data["location"] == "London"
@@ -57,14 +57,14 @@ class TestRunLog:
         # Create and start a run
         log = RunLog(source="zoopla", mode="scraperapi", location="Manchester")
         log.start_run()
-        
+
         # Finish the run
         log.finish(status="success", properties_found=42)
 
         # Verify update was called
         update_call = mock_sb.table.return_value.update.call_args
         data = update_call[0][0]
-        
+
         assert data["status"] == "success"
         assert data["properties_imported"] == 42
         assert data["error_summary"] is None
@@ -81,14 +81,14 @@ class TestRunLog:
         # Create and start a run
         log = RunLog(source="onthemarket", mode="smart", location="Birmingham")
         log.start_run()
-        
+
         # Finish with failure
         log.finish(status="failed", properties_found=0, error_summary="Network timeout")
 
         # Verify update was called
         update_call = mock_sb.table.return_value.update.call_args
         data = update_call[0][0]
-        
+
         assert data["status"] == "failed"
         assert data["properties_imported"] == 0
         assert data["error_summary"] == "Network timeout"
@@ -108,7 +108,7 @@ class TestRunLog:
         # Verify it finished with success
         update_call = mock_sb.table.return_value.update.call_args
         data = update_call[0][0]
-        
+
         assert data["status"] == "success"
         assert data["properties_imported"] == 15
 
@@ -131,7 +131,7 @@ class TestRunLog:
         # Verify it finished with failure
         update_call = mock_sb.table.return_value.update.call_args
         data = update_call[0][0]
-        
+
         assert data["status"] == "failed"
         assert data["properties_imported"] == 5
         assert "Test error" in data["error_summary"]
@@ -143,7 +143,7 @@ class TestRunLog:
         log = RunLog(source="rightmove", mode="direct", location="London")
         log.start_run()
         log.finish(status="success", properties_found=10)
-        
+
         # Verify no run_id was set
         assert log.run_id is None
 
@@ -171,7 +171,7 @@ class TestSmartFetchHTML:
         assert _is_valid_html("<div>Content</div>") is True
         assert _is_valid_html("<!DOCTYPE html><html><body>Content</body></html>") is True
         assert _is_valid_html("<HTML><BODY>Content</BODY></HTML>") is True  # Case insensitive
-        
+
         # Invalid HTML
         assert _is_valid_html("") is False
         assert _is_valid_html("x" * 50) is False  # Too short, no tags
@@ -188,10 +188,7 @@ class TestSmartFetchHTML:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         result = await smart_fetch_html(
-            mock_session,
-            "https://example.com",
-            {"User-Agent": "test"},
-            timeout=30
+            mock_session, "https://example.com", {"User-Agent": "test"}, timeout=30
         )
 
         assert result == "<html><body>Valid content</body></html>"
@@ -209,10 +206,7 @@ class TestSmartFetchHTML:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         result = await smart_fetch_html(
-            mock_session,
-            "https://example.com",
-            {"User-Agent": "test"},
-            timeout=30
+            mock_session, "https://example.com", {"User-Agent": "test"}, timeout=30
         )
 
         assert result == "<html><body>Via ScraperAPI</body></html>"
@@ -233,10 +227,7 @@ class TestSmartFetchHTML:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         result = await smart_fetch_html(
-            mock_session,
-            "https://example.com",
-            {"User-Agent": "test"},
-            timeout=30
+            mock_session, "https://example.com", {"User-Agent": "test"}, timeout=30
         )
 
         assert result == "<html><body>Direct success</body></html>"
@@ -248,33 +239,32 @@ class TestSmartFetchHTML:
     async def test_smart_fetch_smart_mode_fallback_no_render(self):
         """Test smart mode: direct fails, ScraperAPI no-render succeeds"""
         mock_session = AsyncMock()
-        
+
         # First call: direct fetch - blocked
         direct_response = AsyncMock()
         direct_response.text = AsyncMock(return_value="Access denied - captcha required")
         direct_response.status = 403
-        
+
         # Second call: ScraperAPI no-render - success
         scraperapi_response = AsyncMock()
-        scraperapi_response.text = AsyncMock(return_value="<html><body>Via ScraperAPI no-render</body></html>")
+        scraperapi_response.text = AsyncMock(
+            return_value="<html><body>Via ScraperAPI no-render</body></html>"
+        )
         scraperapi_response.status = 200
-        
+
         mock_session.get.return_value.__aenter__.side_effect = [
             direct_response,
-            scraperapi_response
+            scraperapi_response,
         ]
 
         result = await smart_fetch_html(
-            mock_session,
-            "https://example.com",
-            {"User-Agent": "test"},
-            timeout=30
+            mock_session, "https://example.com", {"User-Agent": "test"}, timeout=30
         )
 
         assert result == "<html><body>Via ScraperAPI no-render</body></html>"
         # Should try direct, then ScraperAPI no-render
         assert mock_session.get.call_count == 2
-        
+
         # Check second call was ScraperAPI without render
         second_call_url = mock_session.get.call_args_list[1][0][0]
         assert "scraperapi.com" in second_call_url
@@ -285,39 +275,38 @@ class TestSmartFetchHTML:
     async def test_smart_fetch_smart_mode_fallback_with_render(self):
         """Test smart mode: both direct and no-render fail, with-render succeeds"""
         mock_session = AsyncMock()
-        
+
         # First call: direct fetch - blocked
         direct_response = AsyncMock()
         direct_response.text = AsyncMock(return_value="Access denied")
         direct_response.status = 403
-        
+
         # Second call: ScraperAPI no-render - blocked
         scraperapi_no_render = AsyncMock()
         scraperapi_no_render.text = AsyncMock(return_value="Still blocked")
         scraperapi_no_render.status = 403
-        
+
         # Third call: ScraperAPI with render - success
         scraperapi_render = AsyncMock()
-        scraperapi_render.text = AsyncMock(return_value="<html><body>Via ScraperAPI with render</body></html>")
+        scraperapi_render.text = AsyncMock(
+            return_value="<html><body>Via ScraperAPI with render</body></html>"
+        )
         scraperapi_render.status = 200
-        
+
         mock_session.get.return_value.__aenter__.side_effect = [
             direct_response,
             scraperapi_no_render,
-            scraperapi_render
+            scraperapi_render,
         ]
 
         result = await smart_fetch_html(
-            mock_session,
-            "https://example.com",
-            {"User-Agent": "test"},
-            timeout=30
+            mock_session, "https://example.com", {"User-Agent": "test"}, timeout=30
         )
 
         assert result == "<html><body>Via ScraperAPI with render</body></html>"
         # Should try all three methods
         assert mock_session.get.call_count == 3
-        
+
         # Check third call was ScraperAPI with render
         third_call_url = mock_session.get.call_args_list[2][0][0]
         assert "scraperapi.com" in third_call_url
@@ -328,19 +317,16 @@ class TestSmartFetchHTML:
     async def test_smart_fetch_smart_mode_all_fail(self):
         """Test smart mode: all methods fail"""
         mock_session = AsyncMock()
-        
+
         # All calls: blocked
         blocked_response = AsyncMock()
         blocked_response.text = AsyncMock(return_value="Access denied")
         blocked_response.status = 403
-        
+
         mock_session.get.return_value.__aenter__.return_value = blocked_response
 
         result = await smart_fetch_html(
-            mock_session,
-            "https://example.com",
-            {"User-Agent": "test"},
-            timeout=30
+            mock_session, "https://example.com", {"User-Agent": "test"}, timeout=30
         )
 
         assert result is None
@@ -352,7 +338,7 @@ class TestSmartFetchHTML:
     async def test_smart_fetch_smart_mode_no_key(self):
         """Test smart mode without API key falls back gracefully"""
         mock_session = AsyncMock()
-        
+
         # Direct call fails
         mock_response = AsyncMock()
         mock_response.text = AsyncMock(return_value="Access denied")
@@ -360,10 +346,7 @@ class TestSmartFetchHTML:
         mock_session.get.return_value.__aenter__.return_value = mock_response
 
         result = await smart_fetch_html(
-            mock_session,
-            "https://example.com",
-            {"User-Agent": "test"},
-            timeout=30
+            mock_session, "https://example.com", {"User-Agent": "test"}, timeout=30
         )
 
         assert result is None
@@ -380,6 +363,7 @@ def test_imports():
         from backend.scraper import spare_room_scraper
         from backend.utils import runlog
         from backend.scraper import utils
+
         print("✓ All modules imported successfully")
     except Exception as e:
         pytest.fail(f"Import failed: {e}")

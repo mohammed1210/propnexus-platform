@@ -222,6 +222,229 @@ Potential enhancements for future iterations:
 5. Add parallel processing for detail page fetching
 6. Extract neighborhood/transport information
 
+## Scraper Observability & Orchestration
+
+### Overview
+
+The scrapers now include comprehensive observability features for monitoring and auditing scrape runs.
+
+### Scrape Runs Audit Table
+
+All scraper executions are logged to the `scrape_runs` table in Supabase with the following schema:
+
+```sql
+CREATE TABLE scrape_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  started_at TIMESTAMPTZ DEFAULT NOW(),
+  finished_at TIMESTAMPTZ,
+  provider TEXT NOT NULL,           -- 'rightmove', 'zoopla', 'onthemarket', 'spareroom'
+  mode TEXT,                        -- 'direct', 'scraperapi', 'smart'
+  location TEXT,                    -- Location being scraped
+  status TEXT NOT NULL DEFAULT 'running',  -- 'running', 'success', 'failed'
+  properties_imported INTEGER DEFAULT 0,   -- Number of properties found
+  error_summary TEXT,               -- Error message if failed
+  duration_ms INTEGER,              -- Run duration in milliseconds
+  meta JSONB DEFAULT '{}'::jsonb,   -- Additional metadata
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Inspecting Scrape Runs
+
+Query recent scrape runs:
+
+```sql
+-- Get last 10 scrape runs
+SELECT 
+  provider,
+  mode,
+  location,
+  status,
+  properties_imported,
+  duration_ms,
+  started_at,
+  error_summary
+FROM scrape_runs
+ORDER BY started_at DESC
+LIMIT 10;
+
+-- Get success rate by provider
+SELECT 
+  provider,
+  COUNT(*) as total_runs,
+  SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful,
+  AVG(properties_imported) as avg_properties,
+  AVG(duration_ms) / 1000.0 as avg_duration_seconds
+FROM scrape_runs
+GROUP BY provider;
+
+-- Find failed runs
+SELECT * FROM scrape_runs
+WHERE status = 'failed'
+ORDER BY started_at DESC;
+```
+
+### RunLog Usage
+
+Scrapers automatically wrap execution with `RunLog` for audit logging:
+
+```python
+from utils.runlog import RunLog
+
+# As context manager (recommended)
+with RunLog.start(source="rightmove", mode="direct", location="London") as log:
+    # Scraping logic here
+    properties = scrape_properties()
+    log.set_count(len(properties))
+    # Automatically logs success/failure on exit
+
+# Manual usage
+log = RunLog(source="zoopla", mode="smart", location="Manchester")
+log.start_run()
+try:
+    properties = scrape_properties()
+    log.finish(status="success", properties_found=len(properties))
+except Exception as e:
+    log.finish(status="failed", properties_found=0, error_summary=str(e))
+    raise
+```
+
+### Smart ScraperAPI Mode
+
+The scraper now supports three modes via the `SCRAPER_MODE` environment variable:
+
+#### Mode Options
+
+1. **`direct` (default)**: Direct HTTP requests with ScraperAPI fallback on blocking
+   - Fast and cost-effective
+   - Falls back to ScraperAPI if captcha/blocking detected
+   - Best for: Development, testing, low-traffic scenarios
+
+2. **`scraperapi`**: Always use ScraperAPI with rendering
+   - Most reliable, bypasses all blocking
+   - Highest cost (every request uses ScraperAPI credits)
+   - Best for: Production with high blocking rate
+
+3. **`smart`**: Progressive fallback strategy (NEW)
+   - Step 1: Try direct fetch first
+   - Step 2: If blocked, try ScraperAPI without render (cheaper)
+   - Step 3: If still blocked, try ScraperAPI with render (expensive)
+   - Best for: Optimizing cost vs reliability
+
+#### Smart Mode Fallback Order
+
+```
+Request → Direct Fetch
+            ↓ (blocked/invalid)
+          ScraperAPI (no render, ~$0.001/request)
+            ↓ (blocked)
+          ScraperAPI (with render, ~$0.005/request)
+            ↓
+          Result or None
+```
+
+#### Configuration
+
+```bash
+# In backend/.env or environment
+SCRAPER_MODE=smart  # or 'direct', 'scraperapi'
+SCRAPERAPI_KEY=your-key-here
+```
+
+#### Example Log Output
+
+**Successful Direct Fetch:**
+```
+🔍 Starting scrape: rightmove | location=London | mode=direct
+✅ Scraped 45 Rightmove properties for 'London'
+```
+
+**Smart Mode Fallback:**
+```
+🔍 Starting scrape: zoopla | location=Manchester | mode=smart
+ℹ️ Direct fetch blocked or invalid, trying ScraperAPI...
+✅ ScraperAPI (no-render) successful
+✅ Scraped 38 Zoopla properties for 'Manchester'
+```
+
+**Full Fallback Chain:**
+```
+🔍 Starting scrape: onthemarket | location=Birmingham | mode=smart
+ℹ️ Direct fetch blocked or invalid, trying ScraperAPI...
+ℹ️ ScraperAPI (no-render) blocked, trying with render...
+✅ ScraperAPI (with render) successful
+✅ Scraped 52 OnTheMarket properties for 'Birmingham'
+```
+
+**Failure:**
+```
+🔍 Starting scrape: spareroom | location=Leeds | mode=smart
+ℹ️ Direct fetch failed (Connection timeout), trying ScraperAPI...
+ℹ️ ScraperAPI (no-render) failed (403), trying with render...
+⚠️ ScraperAPI (with render) still blocked
+❌ SpareRoom scraper error: All fetch methods exhausted
+```
+
+### Cost Optimization
+
+ScraperAPI pricing tiers:
+- No render: ~$0.001 per request (100x cheaper)
+- With render: ~$0.005 per request (required for JavaScript-heavy sites)
+
+**Smart mode** can reduce costs by 70-90% compared to `scraperapi` mode by:
+1. Using free direct requests when possible
+2. Trying cheaper no-render ScraperAPI before expensive render
+3. Only using render as last resort
+
+**Recommendation:**
+- Development: Use `direct` mode
+- Production (low blocking): Use `smart` mode
+- Production (high blocking): Use `scraperapi` mode
+
+### Error Handling
+
+All scrapers now include comprehensive error handling:
+
+```python
+try:
+    with RunLog.start(source="rightmove", mode=SCRAPER_MODE, location=location) as log:
+        properties = await scrape_rightmove_properties(location, limit)
+        log.set_count(len(properties))
+        return properties
+except Exception as e:
+    # RunLog automatically records failure with error message
+    logger.error(f"Scrape failed: {e}")
+    raise
+```
+
+### Monitoring & Alerts
+
+Set up monitoring queries:
+
+```sql
+-- Alert on high failure rate (> 20%)
+SELECT 
+  provider,
+  COUNT(*) FILTER (WHERE status = 'failed') * 100.0 / COUNT(*) as failure_rate
+FROM scrape_runs
+WHERE started_at > NOW() - INTERVAL '1 hour'
+GROUP BY provider
+HAVING COUNT(*) FILTER (WHERE status = 'failed') * 100.0 / COUNT(*) > 20;
+
+-- Alert on low yield (< 10 properties per run)
+SELECT * FROM scrape_runs
+WHERE status = 'success' 
+  AND properties_imported < 10
+  AND started_at > NOW() - INTERVAL '1 day'
+ORDER BY started_at DESC;
+
+-- Performance degradation (> 30s runs)
+SELECT * FROM scrape_runs
+WHERE duration_ms > 30000
+  AND started_at > NOW() - INTERVAL '1 day'
+ORDER BY duration_ms DESC;
+```
+
 ## Support
 
 For issues or questions:
@@ -229,3 +452,4 @@ For issues or questions:
 2. Enable DEBUG mode to see detailed logs
 3. Review the .scrape_debug directory for HTML snapshots
 4. Check stats output for missing field tracking
+5. Query `scrape_runs` table to inspect audit logs and diagnose failures

@@ -395,7 +395,11 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         if PLAYWRIGHT_ENABLE:
                             rendered = await render_page(
                                 url,
-                                ["[data-testid='propertyCard']", "article.propertyCard", ".propertyCard"],
+                                [
+                                    "[data-testid='propertyCard']",
+                                    "article.propertyCard",
+                                    ".propertyCard",
+                                ],
                             )
                             if rendered:
                                 soup = BeautifulSoup(rendered, "html.parser")
@@ -418,9 +422,9 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             )
                             title = title_el.get_text(strip=True) if title_el else "Untitled"
 
-                            price_el = card.select_one(".propertyCard-priceValue") or card.select_one(
-                                "[data-testid='price']"
-                            )
+                            price_el = card.select_one(
+                                ".propertyCard-priceValue"
+                            ) or card.select_one("[data-testid='price']")
                             price = _parse_price(price_el.get_text(strip=True) if price_el else "")
 
                             loc_el = (
@@ -437,9 +441,9 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             )
                             bedrooms = _extract_int(beds_el.get_text() if beds_el else "") or 0
 
-                            baths_el = card.select_one("[data-testid='bathrooms']") or card.select_one(
-                                ".baths"
-                            )
+                            baths_el = card.select_one(
+                                "[data-testid='bathrooms']"
+                            ) or card.select_one(".baths")
                             bathrooms = _extract_int(baths_el.get_text() if baths_el else "") or 0
 
                             # Extract all images
@@ -454,7 +458,8 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             property_type = _extract_property_type(card)
 
                             external_id = (
-                                _extract_property_id(card) or f"rm-{hash(title+location_text) & 0xffffffff}"
+                                _extract_property_id(card)
+                                or f"rm-{hash(title+location_text) & 0xffffffff}"
                             )
 
                             coords = await _enrich_coordinates(location_text)

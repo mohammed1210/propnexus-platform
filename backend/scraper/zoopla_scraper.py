@@ -313,7 +313,12 @@ async def scrape_zoopla_properties(
                     if not cards:
                         if PLAYWRIGHT_ENABLE:
                             rendered = await render_page(
-                                url, ["[data-testid='search-result']", ".c-propertyCard", ".l-searchResult"]
+                                url,
+                                [
+                                    "[data-testid='search-result']",
+                                    ".c-propertyCard",
+                                    ".l-searchResult",
+                                ],
                             )
                             if rendered:
                                 soup = BeautifulSoup(rendered, "html.parser")
