@@ -64,6 +64,7 @@ type RawProperty = {
   price: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
+  description?: string | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
   imageurl?: string | null;
@@ -287,7 +288,7 @@ function ListingsInner() {
       let query = supabase
         .from('properties')
         .select(
-          'id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,latitude,longitude,created_at,investment_type:investmentType',
+          'id,title,location,price,bedrooms,bathrooms,description,yield_percent,roi_percent,imageurl,latitude,longitude,created_at,investment_type:investmentType',
         )
         .limit(200);
 
