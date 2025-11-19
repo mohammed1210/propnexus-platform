@@ -1,6 +1,7 @@
 # Frontend Environment Variables (Clerk)
 
-This app currently uses Supabase Auth in production, with optional support for Clerk. If you enable Clerk, set the following environment variables.
+The app uses Clerk as the primary authentication provider. Supabase is used for
+data and billing; it no longer handles user-facing auth flows.
 
 ## Required (Clerk)
 
@@ -39,4 +40,5 @@ Restart the dev server after changes: `npm run dev`.
 
 ## Notes
 
-- If you are not migrating to Clerk yet, you can leave these unset; the app will continue to use Supabase Auth.
+- If Clerk env vars are missing, authentication will not work. Configure them
+  for local dev, Vercel environments, and CI before relying on protected pages.

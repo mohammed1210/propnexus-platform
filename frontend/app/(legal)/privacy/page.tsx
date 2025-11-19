@@ -105,7 +105,7 @@ export default function PrivacyPage() {
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
             <li>
-              <strong>Authentication:</strong> We use Supabase Auth for secure user authentication
+              <strong>Authentication:</strong> We use Clerk for secure user authentication
             </li>
             <li>
               <strong>Payments:</strong> Stripe processes all payment transactions

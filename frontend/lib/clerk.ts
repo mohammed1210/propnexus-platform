@@ -2,9 +2,9 @@
  * Clerk Authentication Configuration
  * 
  * This file provides helper functions and runtime checks for Clerk authentication.
- * Note: This project currently uses Supabase Auth, not Clerk. This file is included
- * for future migration support and to provide helpful error messages if Clerk
- * environment variables are detected.
+ * The app now uses Clerk as the primary auth system; Supabase is used for data
+ * and billing only. These helpers keep env validation and configuration logic
+ * in one place.
  */
 
 /**
@@ -49,7 +49,7 @@ export function getClerkConfig() {
   }
   
   if (!publishableKey && !hasServerSecret) {
-    // No Clerk variables set - this is normal if using Supabase Auth
+    // No Clerk variables set - authentication will not work
     return null;
   }
   
@@ -95,13 +95,7 @@ export function validateEnvironmentVariables() {
     );
   }
   
-  // Check Supabase configuration (current auth system)
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL && !clerkConfig) {
-    warnings.push(
-      'NEXT_PUBLIC_SUPABASE_URL is not set and Clerk is not configured. ' +
-      'Authentication will not work without one of these systems configured.'
-    );
-  }
+  // Supabase is now used for data/billing only; auth is handled by Clerk.
   
   // Log all warnings and errors
   warnings.forEach(warning => console.warn(`[Env Config Warning] ${warning}`));
