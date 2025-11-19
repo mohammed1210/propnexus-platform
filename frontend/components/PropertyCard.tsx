@@ -18,6 +18,7 @@ type Property = {
   price?: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
+  description?: string | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
   imageurl?: string | null;
@@ -163,6 +164,13 @@ export default function PropertyCard({ p }: { p: Property }) {
     (Array.isArray(p.image_urls) && p.image_urls.length > 0 ? p.image_urls[0] : null) ||
     '/placeholder.jpg';
 
+  const descriptionSnippet = useMemo(() => {
+    if (!p.description) return '';
+    const trimmed = p.description.trim();
+    if (trimmed.length <= 180) return trimmed;
+    return trimmed.slice(0, 177) + '...';
+  }, [p.description]);
+
   return (
     <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30">
       <Link
@@ -267,6 +275,12 @@ export default function PropertyCard({ p }: { p: Property }) {
           )}
         </div>
       </Link>
+
+      {descriptionSnippet && (
+        <div className="px-4 pt-3 text-sm text-slate-700 dark:text-slate-300 line-clamp-3">
+          {descriptionSnippet}
+        </div>
+      )}
 
       <div className="p-4 space-y-2">
         <Link href={href} className="block group">

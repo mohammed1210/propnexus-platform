@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@clerk/nextjs": "^6.35.2",
     "@supabase/supabase-js": "^2.57.4",
     "@types/leaflet": "^1.9.21",
     "chart.js": "^4.5.1",
