@@ -22,7 +22,8 @@
     "e2e": "playwright test",
     "e2e:prod": "npm run build && PW_USE_DEV=0 playwright test",
     "e2e:headed": "playwright test --headed",
-    "smoke:stripe": "node ops/smoke/stripe-check.mjs"
+    "smoke:stripe": "node ops/smoke/stripe-check.mjs",
+    "screenshots": "SCREENSHOT_TEST=true playwright test tests/screenshots.spec.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.35.2",
