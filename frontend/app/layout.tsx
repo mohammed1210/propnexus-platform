@@ -93,7 +93,21 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      appearance={{
+        layout: {
+          logoPlacement: 'outside',
+          helpPageUrl: '/help',
+        },
+        variables: {
+          colorPrimary: '#148898',
+          colorText: '#020617',
+          colorBackground: 'white',
+          borderRadius: '12px',
+          fontFamily: 'Inter, system-ui, sans-serif',
+        },
+      }}
+    >
       <html lang="en" suppressHydrationWarning>
         <body className="flex flex-col min-h-screen">
         {/* Skip link for a11y */}

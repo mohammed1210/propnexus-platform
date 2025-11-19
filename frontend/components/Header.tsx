@@ -1,70 +1,31 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import clsx from 'clsx';
-import { useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { Disclosure, Transition } from '@headlessui/react';
-import { Bars3Icon, XMarkIcon, ChevronDownIcon } from '@heroicons/react/24/outline';
-import ThemeToggle from './ThemeToggle';
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import clsx from "clsx";
+import { useState } from "react";
+import { Disclosure, Transition } from "@headlessui/react";
+import { Bars3Icon, XMarkIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
+import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Header() {
   const pathname = usePathname();
-  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
-  const [mobileMenuKey, setMobileMenuKey] = useState(0);
-
-  // Close the mobile menu by remounting Disclosure when a link is tapped
-  const handleMobileNavigate = () => setMobileMenuKey((k) => k + 1);
-
-  useEffect(() => {
-    // Skip Supabase initialization if env vars are not set (e.g., in preview mode)
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      return;
-    }
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    );
-
-    const loadSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setSessionEmail(data.session?.user?.email ?? null);
-    };
-
-    loadSession();
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSessionEmail(session?.user?.email ?? null);
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
-
-  const handleSignOut = async () => {
-    // Skip if Supabase is not configured
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-      return;
-    }
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    );
-    await supabase.auth.signOut();
-    setSessionEmail(null);
-    window.location.href = '/';
-  };
-
   const links = [
     { href: '/', label: 'Home' },
     { href: '/listings', label: 'Listings' },
     { href: '/off-market', label: 'Off-Market' },
     { href: '/demo', label: 'Demo' },
     { href: '/pricing', label: 'Pricing' },
-    ...(sessionEmail ? [{ href: '/account', label: 'Account' }] : []),
   ];
+  const accountLinks = [
+    { href: '/account', label: 'Account' },
+  ];
+
+  const [mobileMenuKey, setMobileMenuKey] = useState(0);
+
+  // Close the mobile menu by remounting Disclosure when a link is tapped
+  const handleMobileNavigate = () => setMobileMenuKey((k) => k + 1);
 
   return (
     <header
@@ -121,50 +82,41 @@ export default function Header() {
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
 
-          {/*
-            Auth actions
+          <SignedIn>
+            <nav className="flex items-center gap-2" aria-label="Account">
+              {accountLinks.map(({ href, label }) => {
+                const active = pathname === href || (href !== '/' && pathname?.startsWith(href));
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={clsx(
+                      'text-sm font-medium transition-colors duration-300',
+                      active
+                        ? 'text-brand-600 dark:text-brand-400'
+                        : 'text-slate-600 hover:text-brand-600 dark:text-slate-300 dark:hover:text-brand-400',
+                    )}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+              <UserButton afterSignOutUrl="/" />
+            </nav>
+          </SignedIn>
 
-            NOTE: Do NOT hide authenticated user controls behind a `hidden md:flex`
-            container without providing an alternative for small screens. A recent
-            change placed the sign-out UI inside `hidden md:flex`, which meant
-            authenticated users on mobile had no way to sign out from the header.
-
-            Keep the sign-out (and other essential account controls) available
-            at all breakpoints, or add a dedicated small-screen menu (hamburger
-            / disclosure) that exposes these actions on mobile.
-
-            TODO: If you change this to `hidden md:flex`, implement a mobile
-            menu component that renders the same account actions for narrow
-            viewports before removing the always-visible controls.
-          */}
-          {sessionEmail ? (
-            <div className="hidden md:flex items-center gap-3 text-sm">
-              <span className="text-slate-600 dark:text-slate-300">
-                <strong>{sessionEmail}</strong>
-              </span>
-              <button
-                onClick={handleSignOut}
-                className="btn-ghost text-sm px-4 py-2"
-              >
-                Sign out
-              </button>
-            </div>
-          ) : (
-            <>
-              <Link
-                href="/magic-login"
-                className="hidden md:inline-flex text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition-colors duration-300"
-              >
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="hidden md:inline-flex text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition-colors duration-300">
                 Sign in
-              </Link>
-              <Link
-                href="/magic-login"
-                className="btn-primary text-sm px-5 py-2"
-              >
+              </button>
+            </SignInButton>
+            <SignUpButton mode="modal">
+              <button className="btn-primary text-sm px-5 py-2">
                 Get Started
-              </Link>
-            </>
-          )}
+              </button>
+            </SignUpButton>
+          </SignedOut>
         </div>
 
         {/* Mobile right side: Theme + Hamburger */}
@@ -232,20 +184,8 @@ export default function Header() {
 
                       {/* Account / Auth */}
                       <div className="pt-2">
-                        {sessionEmail ? (
+                        <SignedIn>
                           <div className="flex flex-col gap-3 text-sm">
-                            <span className="text-slate-600 dark:text-slate-300">
-                              Signed in as <strong>{sessionEmail}</strong>
-                            </span>
-                            <button
-                              onClick={() => {
-                                handleMobileNavigate();
-                                handleSignOut();
-                              }}
-                              className="rounded-md bg-black px-3 py-2 text-white hover:bg-slate-800 text-sm transition-colors"
-                            >
-                              Sign out
-                            </button>
                             <Link
                               href="/account"
                               onClick={handleMobileNavigate}
@@ -253,16 +193,36 @@ export default function Header() {
                             >
                               Account Settings
                             </Link>
+                            <UserButton
+                              afterSignOutUrl="/"
+                              appearance={{
+                                elements: {
+                                  userButtonOuterIdentifier: 'text-sm',
+                                },
+                              }}
+                            />
                           </div>
-                        ) : (
-                          <Link
-                            href="/magic-login"
-                            onClick={handleMobileNavigate}
-                            className="block rounded-md bg-black px-3 py-2 text-white hover:bg-slate-800 text-sm font-semibold transition-colors"
-                          >
-                            Sign in
-                          </Link>
-                        )}
+                        </SignedIn>
+                        <SignedOut>
+                          <div className="flex flex-col gap-2">
+                            <SignInButton mode="modal">
+                              <button
+                                onClick={handleMobileNavigate}
+                                className="block rounded-md bg-black px-3 py-2 text-white hover:bg-slate-800 text-sm font-semibold transition-colors"
+                              >
+                                Sign in
+                              </button>
+                            </SignInButton>
+                            <SignUpButton mode="modal">
+                              <button
+                                onClick={handleMobileNavigate}
+                                className="block rounded-md border border-slate-300 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              >
+                                Get Started
+                              </button>
+                            </SignUpButton>
+                          </div>
+                        </SignedOut>
                       </div>
                     </div>
                   </Disclosure.Panel>
