@@ -25,6 +25,7 @@
     "smoke:stripe": "node ops/smoke/stripe-check.mjs"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.35.2",
     "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.2.0",
     "@pdf-lib/standard-fonts": "^1.0.0",
