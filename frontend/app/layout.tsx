@@ -9,6 +9,15 @@ import Footer from '@components/Footer';
 import { ThemeProvider } from '@components/ThemeProvider';
 import { Toaster } from 'sonner';
 import EnvValidator from '@components/EnvValidator';
+// Clerk App Router integration (guardrails-compliant):
+import {
+  ClerkProvider,
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from '@clerk/nextjs';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
@@ -84,8 +93,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="flex flex-col min-h-screen">
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <body className="flex flex-col min-h-screen">
         {/* Skip link for a11y */}
         <a
           href="#main"
@@ -97,6 +107,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           {/* Environment validation in development */}
           <EnvValidator />
+
+          {/* Clerk auth header controls (minimal example) */}
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 text-sm">
+            <SignedOut>
+              <SignInButton mode="modal" />
+              <SignUpButton mode="modal" />
+            </SignedOut>
+            <SignedIn>
+              <UserButton afterSignOutUrl="/" />
+            </SignedIn>
+          </div>
           
           {/* ✅ App Header (includes conditional Billing link) */}
           <Header />
@@ -113,7 +134,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <BackToTop />
           <Toaster position="top-right" richColors />
         </ThemeProvider>
-      </body>
-    </html>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
