@@ -8,14 +8,7 @@ import Footer from '@components/Footer';
 import { ThemeProvider } from '@components/ThemeProvider';
 import { Toaster } from 'sonner';
 import EnvValidator from '@components/EnvValidator';
-import {
-  ClerkProvider,
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  SignUpButton,
-  UserButton,
-} from '@clerk/nextjs';
+import { ClerkProvider } from '@clerk/nextjs';
 
 export default function RootShell({ children }: { children: React.ReactNode }) {
   return (
@@ -48,18 +41,7 @@ export default function RootShell({ children }: { children: React.ReactNode }) {
             {/* Environment validation in development */}
             <EnvValidator />
 
-            {/* Clerk auth header controls (minimal example) */}
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 text-sm">
-              <SignedOut>
-                <SignInButton mode="modal" />
-                <SignUpButton mode="modal" />
-              </SignedOut>
-              <SignedIn>
-                <UserButton afterSignOutUrl="/" />
-              </SignedIn>
-            </div>
-
-            {/* App Header (includes conditional Billing link) */}
+            {/* App Header (includes auth controls) */}
             <Header />
 
             <main id="main" className="flex-1 focus:outline-none">

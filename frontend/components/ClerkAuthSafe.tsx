@@ -2,6 +2,7 @@
 'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
+import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from '@clerk/nextjs';
 
 /**
  * Safe wrappers for Clerk components that won't break if Clerk isn't configured.
@@ -29,8 +30,7 @@ export function SafeSignedIn({ children }: { children: ReactNode }) {
   if (!isChecked) return null;
   if (!isAvailable) return null;
 
-  // Dynamically import Clerk component only if available
-  const { SignedIn } = require('@clerk/nextjs');
+  // Use static import - this maintains the React context from ClerkProvider
   return <SignedIn>{children}</SignedIn>;
 }
 
@@ -44,7 +44,6 @@ export function SafeSignedOut({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  const { SignedOut } = require('@clerk/nextjs');
   return <SignedOut>{children}</SignedOut>;
 }
 
@@ -54,7 +53,6 @@ export function SafeUserButton(props: any) {
   if (!isChecked) return null;
   if (!isAvailable) return null;
 
-  const { UserButton } = require('@clerk/nextjs');
   return <UserButton {...props} />;
 }
 
@@ -68,7 +66,6 @@ export function SafeSignInButton({ children, ...props }: any) {
     return <>{children}</>;
   }
 
-  const { SignInButton } = require('@clerk/nextjs');
   return <SignInButton {...props}>{children}</SignInButton>;
 }
 
@@ -82,6 +79,5 @@ export function SafeSignUpButton({ children, ...props }: any) {
     return <>{children}</>;
   }
 
-  const { SignUpButton } = require('@clerk/nextjs');
   return <SignUpButton {...props}>{children}</SignUpButton>;
 }
