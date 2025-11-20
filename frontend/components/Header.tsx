@@ -6,7 +6,7 @@ import clsx from "clsx";
 import { useState } from "react";
 import { Disclosure, Transition } from "@headlessui/react";
 import { Bars3Icon, XMarkIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
-import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from "@clerk/nextjs";
+import { SafeSignedIn, SafeSignedOut, SafeUserButton, SafeSignInButton, SafeSignUpButton } from "./ClerkAuthSafe";
 import ThemeToggle from "./ThemeToggle";
 
 export default function Header() {
@@ -82,7 +82,7 @@ export default function Header() {
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
 
-          <SignedIn>
+          <SafeSignedIn>
             <nav className="flex items-center gap-2" aria-label="Account">
               {accountLinks.map(({ href, label }) => {
                 const active = pathname === href || (href !== '/' && pathname?.startsWith(href));
@@ -101,22 +101,22 @@ export default function Header() {
                   </Link>
                 );
               })}
-              <UserButton afterSignOutUrl="/" />
+              <SafeUserButton afterSignOutUrl="/" />
             </nav>
-          </SignedIn>
+          </SafeSignedIn>
 
-          <SignedOut>
-            <SignInButton mode="modal">
+          <SafeSignedOut>
+            <SafeSignInButton mode="modal">
               <button className="hidden md:inline-flex text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition-colors duration-300">
                 Sign in
               </button>
-            </SignInButton>
-            <SignUpButton mode="modal">
+            </SafeSignInButton>
+            <SafeSignUpButton mode="modal">
               <button className="btn-primary text-sm px-5 py-2">
                 Get Started
               </button>
-            </SignUpButton>
-          </SignedOut>
+            </SafeSignUpButton>
+          </SafeSignedOut>
         </div>
 
         {/* Mobile right side: Theme + Hamburger */}
@@ -184,7 +184,7 @@ export default function Header() {
 
                       {/* Account / Auth */}
                       <div className="pt-2">
-                        <SignedIn>
+                        <SafeSignedIn>
                           <div className="flex flex-col gap-3 text-sm">
                             <Link
                               href="/account"
@@ -193,7 +193,7 @@ export default function Header() {
                             >
                               Account Settings
                             </Link>
-                            <UserButton
+                            <SafeUserButton
                               afterSignOutUrl="/"
                               appearance={{
                                 elements: {
@@ -202,27 +202,27 @@ export default function Header() {
                               }}
                             />
                           </div>
-                        </SignedIn>
-                        <SignedOut>
+                        </SafeSignedIn>
+                        <SafeSignedOut>
                           <div className="flex flex-col gap-2">
-                            <SignInButton mode="modal">
+                            <SafeSignInButton mode="modal">
                               <button
                                 onClick={handleMobileNavigate}
                                 className="block rounded-md bg-black px-3 py-2 text-white hover:bg-slate-800 text-sm font-semibold transition-colors"
                               >
                                 Sign in
                               </button>
-                            </SignInButton>
-                            <SignUpButton mode="modal">
+                            </SafeSignInButton>
+                            <SafeSignUpButton mode="modal">
                               <button
                                 onClick={handleMobileNavigate}
                                 className="block rounded-md border border-slate-300 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                               >
                                 Get Started
                               </button>
-                            </SignUpButton>
+                            </SafeSignUpButton>
                           </div>
-                        </SignedOut>
+                        </SafeSignedOut>
                       </div>
                     </div>
                   </Disclosure.Panel>

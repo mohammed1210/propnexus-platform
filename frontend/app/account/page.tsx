@@ -2,53 +2,37 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import StripePortalButton from '@/components/StripePortalButton';
 import PlanBadge from '@/components/PlanBadge';
 import { useUserPlan } from '@/lib/useUserPlan';
 import { toast } from 'sonner';
 
-/** Lazy, client-only Supabase helpers (safe for CI/preview) */
-async function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
-  if (!url || !key) return null;
-  const { createClient } = await import('@supabase/supabase-js');
-  return createClient(url, key);
-}
-
-async function getUserEmail(): Promise<string | null> {
-  try {
-    const supabase = await getSupabase();
-    if (!supabase) return null;
-    const { data } = await supabase.auth.getUser();
-    return data.user?.email ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function signOut(): Promise<void> {
-  const supabase = await getSupabase();
-  if (supabase) await supabase.auth.signOut();
-}
-
 /** Force dynamic so we don't cache auth state */
 export const dynamic = 'force-dynamic';
 
 function AccountPageContent() {
   const searchParams = useSearchParams();
-  const [email, setEmail] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false);
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { refetch: refetchPlan } = useUserPlan();
+  
+  // Try to use Clerk, fallback if not available
+  let user: any = null;
+  let isLoaded = true;
+  
+  try {
+    const clerkHook = useUser();
+    user = clerkHook.user;
+    isLoaded = clerkHook.isLoaded;
+  } catch (error) {
+    console.warn('[AccountPage] Clerk not available:', error);
+    isLoaded = true; // Treat as loaded but without user
+  }
 
   useEffect(() => {
     (async () => {
-      setEmail(await getUserEmail());
-      setHydrated(true);
-
       // Check if returning from Stripe checkout success
       if (searchParams) {
         const success = searchParams.get('success');
@@ -75,6 +59,7 @@ function AccountPageContent() {
 
   /** Manual/fallback Customer Portal opener (kept visible for redundancy) */
   async function openPortalManually() {
+    const email = user?.primaryEmailAddress?.emailAddress;
     if (!email) return;
     setErrorMsg(null);
     setLoadingPortal(true);
@@ -109,11 +94,6 @@ function AccountPageContent() {
     }
   }
 
-  async function handleSignOut() {
-    await signOut();
-    setEmail(null);
-  }
-
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
       <div className="flex items-center gap-3 mb-2">
@@ -124,28 +104,22 @@ function AccountPageContent() {
         Update your plan, billing details, or cancel anytime.
       </p>
 
-      {!hydrated ? (
+      {!isLoaded ? (
         <p>Loading…</p>
-      ) : email ? (
+      ) : user ? (
         <div className="space-y-6">
           <div className="flex items-center justify-between rounded-md border border-zinc-200 dark:border-zinc-800 p-4">
             <div>
               <div className="text-sm text-zinc-500">Signed in as</div>
-              <div className="font-semibold">{email}</div>
+              <div className="font-semibold">{user.primaryEmailAddress?.emailAddress}</div>
               <div className="mt-2">
                 <PlanBadge />
               </div>
             </div>
-            <button
-              onClick={handleSignOut}
-              className="rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800"
-            >
-              Sign out
-            </button>
           </div>
 
           {/* Primary shadcn-styled portal button */}
-          <StripePortalButton email={email} />
+          <StripePortalButton email={user.primaryEmailAddress?.emailAddress || ''} />
 
           {/* Optional fallback */}
           <button
@@ -185,10 +159,10 @@ function AccountPageContent() {
         <div className="space-y-4">
           <p>You&apos;re not signed in.</p>
           <Link
-            href="/magic-login"
+            href="/sign-in"
             className="inline-flex items-center rounded-md bg-zinc-900 text-white px-4 py-2 font-medium hover:bg-zinc-800"
           >
-            Sign in with Magic Link
+            Sign in
           </Link>
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             After signing in you&apos;ll return here to manage your subscription.
