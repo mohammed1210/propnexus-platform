@@ -1,23 +1,8 @@
-// app/layout.tsx
+// app/layout.tsx (server component)
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import '../styles/design-tokens.css';
-import UiOverlaysClient from '@components/ui/UiOverlaysClient';
-import BackToTop from '@components/BackToTop';
-import Header from '@components/Header';
-import Footer from '@components/Footer';
-import { ThemeProvider } from '@components/ThemeProvider';
-import { Toaster } from 'sonner';
-import EnvValidator from '@components/EnvValidator';
-// Clerk App Router integration (guardrails-compliant):
-import {
-  ClerkProvider,
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  SignUpButton,
-  UserButton,
-} from '@clerk/nextjs';
+import RootShell from '@components/RootShell';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
