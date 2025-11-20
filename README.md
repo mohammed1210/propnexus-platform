@@ -610,6 +610,9 @@ The frontend is configured to deploy automatically from the `frontend` directory
 
 **Key Configuration:**
 - The `rootDirectory` setting in `vercel.json` points to `frontend/`
+- When `rootDirectory` is set, Vercel changes to that directory before building
+- All paths in `vercel.json` (like `outputDirectory: ".next"`) are relative to the `rootDirectory`
+- Therefore, `outputDirectory: ".next"` refers to `frontend/.next` from the repo root
 - Vercel builds from the `frontend` directory automatically
 - All commits to `main` branch trigger a production deployment
 - Pull requests create preview deployments
@@ -625,10 +628,10 @@ If recent commits aren't showing up on Vercel:
 
 When developing in Codespaces or locally:
 ```bash
-# From repository root - runs frontend dev server
-npm run dev
+# Recommended: Use the frontend:dev script from repository root
+npm run frontend:dev
 
-# Or explicitly from frontend directory
+# Or navigate to frontend directory first
 cd frontend && npm run dev
 ```
 
