@@ -9,8 +9,12 @@ create table if not exists public.users (
   id uuid primary key default uuid_generate_v4(),
   email text unique not null,
   stripe_customer_id text unique,
+  plan text default 'free',
+  plan_status text default 'active',
+  current_period_end bigint,
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
+  updated_at timestamp with time zone default now(),
+  constraint users_plan_check check (plan in ('free', 'pro', 'investor'))
 );
 
 -- Subscriptions table - tracks user subscription status
@@ -79,6 +83,7 @@ create table if not exists public.property_notes (
 -- Create indexes for better query performance
 create index if not exists idx_users_email on public.users(email);
 create index if not exists idx_users_stripe_customer on public.users(stripe_customer_id);
+create index if not exists idx_users_plan on public.users(plan);
 create index if not exists idx_subscriptions_user on public.subscriptions(user_id);
 create index if not exists idx_subscriptions_email on public.subscriptions(email);
 create index if not exists idx_subscriptions_customer on public.subscriptions(stripe_customer_id);
@@ -86,6 +91,12 @@ create index if not exists idx_subscriptions_status on public.subscriptions(stat
 create index if not exists idx_properties_postcode on public.properties(postcode);
 create index if not exists idx_properties_source on public.properties(source);
 create index if not exists idx_saved_deals_user on public.saved_deals(user_id);
+
+-- Add column comments for documentation
+comment on column public.users.plan is 'Subscription plan: free, pro, investor';
+comment on column public.users.plan_status is 'Subscription status: active, past_due, canceled, trialing';
+comment on column public.users.current_period_end is 'Unix timestamp of current billing period end';
+comment on column public.users.stripe_customer_id is 'Stripe customer ID for billing';
 
 -- Enable Row Level Security (RLS)
 alter table public.saved_deals enable row level security;
