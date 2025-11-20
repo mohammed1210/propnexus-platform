@@ -17,8 +17,8 @@ from ..schemas.ai import (
     TradesmenRecommendRequest,
     TradesmenRecommendResponse,
 )
-from utils.openai_client import openai_client
-from utils.rate_limit import rate_limiter
+from backend.utils.openai_client import openai_client
+from backend.utils.rate_limit import rate_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])

@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Initialize Sentry before other imports
 try:
-    from utils.sentry_init import init_sentry
+    from backend.utils.sentry_init import init_sentry
 
     init_sentry()
 except Exception as e:
