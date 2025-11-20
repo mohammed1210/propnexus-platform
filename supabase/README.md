@@ -59,16 +59,22 @@ Stores user account information and links to Stripe customers.
 - `id` (uuid) - Primary key
 - `email` (text) - Unique user email
 - `stripe_customer_id` (text) - Stripe customer ID
+- `plan` (text) - Subscription plan: 'free', 'pro', 'investor' (default: 'free')
+- `plan_status` (text) - Subscription status: 'active', 'trialing', 'past_due', 'canceled' (default: 'active')
+- `current_period_end` (bigint) - Unix timestamp of current billing period end
 - `created_at`, `updated_at` (timestamp)
 
 ### subscriptions
 Tracks user subscription status and details.
 
+**Note**: This table exists for legacy/future use. The primary billing logic uses the `users` table directly with embedded plan columns.
+
 **Columns**:
 - `id` (uuid) - Primary key
-- `email` (text) - User email (foreign key to users)
+- `user_id` (uuid) - Foreign key to users(id) with ON DELETE CASCADE
+- `email` (text) - User email (unique)
 - `stripe_customer_id` (text) - Stripe customer ID
-- `subscription_id` (text) - Stripe subscription ID
+- `subscription_id` (text) - Stripe subscription ID (unique)
 - `status` (text) - Subscription status (active, canceled, etc.)
 - `price_id` (text) - Stripe price ID
 - `created_at`, `updated_at` (timestamp)
