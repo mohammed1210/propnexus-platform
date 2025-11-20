@@ -9,6 +9,94 @@ The scrapers have been enhanced with the following key features:
 2. Image quality ranking and filtering
 3. Optional detail page scraping for complete descriptions
 4. Enhanced data structures with additional fields
+5. **ScraperAPI integration** for production HTML scraping (Python backend)
+
+## ScraperAPI Integration (Python Backend)
+
+The Python Rightmove scraper now supports ScraperAPI for reliable HTML scraping in production environments.
+
+### Configuration
+
+Two environment variables control ScraperAPI usage:
+
+- `SCRAPER_MODE`: Controls scraping behavior
+  - `direct` (default): Fetch HTML directly from Rightmove
+  - `scraperapi`: Use ScraperAPI proxy for all HTML fetches
+  
+- `SCRAPERAPI_KEY`: Your ScraperAPI API key (get from https://www.scraperapi.com/)
+
+### Request Flow
+
+The scraper uses a **JSON API first** approach with optional ScraperAPI for HTML fallback:
+
+1. **JSON API** (always first):
+   - Try Rightmove's JSON API endpoint (`/api/_search`)
+   - If successful and sufficient results → return immediately
+   - No ScraperAPI involvement at this stage
+
+2. **HTML Fallback** (only if JSON API fails or returns no results):
+   - **`SCRAPER_MODE=direct`** (default):
+     - Fetch HTML directly from Rightmove
+     - If blocked (403, captcha, etc.) → fallback to ScraperAPI (if key available)
+   
+   - **`SCRAPER_MODE=scraperapi`**:
+     - Use ScraperAPI for all HTML fetches
+     - Gracefully falls back to direct if SCRAPERAPI_KEY not set
+
+### Example: Enable ScraperAPI in Production
+
+```bash
+# In your .env or environment variables
+SCRAPER_MODE=scraperapi
+SCRAPERAPI_KEY=your-actual-key-here
+```
+
+### Example: `/import/rightmove` Flow with ScraperAPI
+
+```
+1. POST /import/rightmove with location="London"
+   ↓
+2. scrape_rightmove_properties("London") called
+   ↓
+3. Try JSON API first (REGION^87490 for London)
+   ↓
+4. If JSON returns properties → validate, clean, return
+   ↓
+5. If JSON fails → HTML scraping begins
+   ↓
+6. With SCRAPER_MODE=scraperapi:
+   - Build URL: https://api.scraperapi.com/?api_key=XXX&url=<rightmove-url>&country_code=gb&render=true&device_type=desktop
+   - Fetch via ScraperAPI (with rendering)
+   - Parse HTML cards
+   ↓
+7. Return normalized properties to import route
+   ↓
+8. Upsert to Supabase properties table
+```
+
+### Logging
+
+The scraper logs ScraperAPI usage:
+
+- `ℹ️ Using ScraperAPI for Rightmove HTML fetch: <url>` - When scraperapi mode is active
+- `⚠️ SCRAPER_MODE=scraperapi but SCRAPERAPI_KEY not set, falling back to direct fetch` - Config warning
+- `ℹ️ Fallback to ScraperAPI for blocked URL: <url>` - When direct fetch is blocked
+
+### Implementation Details
+
+**New Function: `make_scraperapi_url()`**
+
+```python
+def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
+    """
+    Build a ScraperAPI URL for the given target URL.
+    Returns original URL if SCRAPERAPI_KEY not set.
+    """
+    # Builds: https://api.scraperapi.com/?api_key=XXX&url=<target>&country_code=gb
+    # Adds &render=true&device_type=desktop when render=True
+```
+
+This mirrors the TypeScript implementation in `scripts/sources/rightmove.ts`.
 
 ## Changes by File
 

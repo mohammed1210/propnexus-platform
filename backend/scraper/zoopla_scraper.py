@@ -4,6 +4,7 @@ import time
 import aiohttp
 from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
+from urllib.parse import urlencode
 from fastapi import BackgroundTasks
 
 from utils.postcode import get_lat_lng_from_postcode
@@ -28,8 +29,39 @@ SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 ZP_MAX_PAGES = int(os.getenv("ZP_MAX_PAGES", "1"))
 ZP_DELAY_MS = int(os.getenv("ZP_DELAY_MS", "900"))
+SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
+
+
+def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
+    """
+    Build a ScraperAPI URL for the given target URL.
+
+    If SCRAPERAPI_KEY is not set, returns the original target_url unchanged
+    so the caller can fall back to direct requests.
+
+    Args:
+        target_url: The URL to scrape
+        render: Whether to enable JavaScript rendering (default: False)
+
+    Returns:
+        ScraperAPI proxy URL if key is set, otherwise the original target_url
+    """
+    api_key = os.getenv("SCRAPERAPI_KEY", "").strip()
+    if not api_key:
+        return target_url
+
+    params = {
+        "api_key": api_key,
+        "country_code": "gb",
+        "url": target_url,
+    }
+    if render:
+        params["render"] = "true"
+        params["device_type"] = "desktop"
+
+    return f"{SCRAPERAPI_BASE}?{urlencode(params)}"
 
 
 def _looks_blocked(html: str, status: int) -> bool:
@@ -51,28 +83,63 @@ def _build_search_url(location: str, page: int = 0) -> str:
 async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Optional[str]:
     """Internal fetch function with retry logic."""
     headers = {"User-Agent": USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
-    try:
-        async with session.get(url, headers=headers, timeout=30) as resp:
-            text = await resp.text()
-            if _looks_blocked(text, resp.status) and SCRAPER_MODE == "direct" and SCRAPERAPI_KEY:
-                log_scraperapi_fallback("zoopla", url)
-                proxy_url = (
-                    f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}"
-                    f"&country_code=gb&render=true&device_type=desktop"
-                )
-                async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
-                    p_text = await p_resp.text()
-                    if _looks_blocked(p_text, p_resp.status):
-                        return None
-                    return p_text
-            return text
-    except Exception:
-        if SCRAPER_MODE == "scraperapi" and SCRAPERAPI_KEY:
-            proxy_url = (
-                f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}"
-                f"&country_code=gb&render=true&device_type=desktop"
+
+    # Determine which URL to fetch based on SCRAPER_MODE
+    mode = os.getenv("SCRAPER_MODE", "direct").lower()
+
+    if mode == "scraperapi":
+        # Use ScraperAPI mode - wrap the URL with ScraperAPI
+        if not SCRAPERAPI_KEY:
+            # No API key configured, fall back to direct with warning
+            print(
+                "⚠️ SCRAPER_MODE=scraperapi but SCRAPERAPI_KEY not set, falling back to direct fetch"
             )
+            url_to_fetch = url
+        else:
+            # Use ScraperAPI with rendering for HTML fallback
+            url_to_fetch = make_scraperapi_url(url, render=True)
+            print(f"ℹ️ Using ScraperAPI for Zoopla HTML fetch: {url}")
+    else:
+        # Direct mode - use original URL
+        url_to_fetch = url
+
+    # Fetch the URL (either direct or via ScraperAPI)
+    try:
+        async with session.get(
+            url_to_fetch, headers=headers, timeout=60 if mode == "scraperapi" else 30
+        ) as resp:
+            text = await resp.text()
+
+            # If direct mode and we detect blocking, try ScraperAPI as fallback
+            if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
+                log_scraperapi_fallback("zoopla", url)
+                proxy_url = make_scraperapi_url(url, render=True)
+                print(f"ℹ️ Fallback to ScraperAPI for blocked URL: {url}")
+                try:
+                    async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
+                        p_text = await p_resp.text()
+                        if _looks_blocked(p_text, p_resp.status):
+                            return None
+                        return p_text
+                except Exception:
+                    return None
+
+            # If still looks blocked, return None
+            if _looks_blocked(text, resp.status):
+                return None
+
+            return text
+    except Exception as e:
+        # On exception in scraperapi mode, we already tried ScraperAPI, so just fail
+        if mode == "scraperapi":
+            print(f"⚠️ ScraperAPI fetch failed: {e}")
+            return None
+
+        # On exception in direct mode, try ScraperAPI as fallback if available
+        if SCRAPERAPI_KEY:
+            print(f"⚠️ Direct fetch failed, trying ScraperAPI fallback: {e}")
             try:
+                proxy_url = make_scraperapi_url(url, render=True)
                 async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
                     p_text = await p_resp.text()
                     if _looks_blocked(p_text, p_resp.status):
