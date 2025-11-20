@@ -14,10 +14,22 @@ export const dynamic = 'force-dynamic';
 
 function AccountPageContent() {
   const searchParams = useSearchParams();
-  const { user, isLoaded } = useUser();
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { refetch: refetchPlan } = useUserPlan();
+  
+  // Try to use Clerk, fallback if not available
+  let user: any = null;
+  let isLoaded = true;
+  
+  try {
+    const clerkHook = useUser();
+    user = clerkHook.user;
+    isLoaded = clerkHook.isLoaded;
+  } catch (error) {
+    console.warn('[AccountPage] Clerk not available:', error);
+    isLoaded = true; // Treat as loaded but without user
+  }
 
   useEffect(() => {
     (async () => {

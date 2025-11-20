@@ -13,8 +13,20 @@ type Props = {
 
 export default function UpgradeButton({ priceId, children = 'Upgrade', className }: Props) {
   const router = useRouter();
-  const { user, isLoaded } = useUser();
   const [loading, setLoading] = useState(false);
+  
+  // Try to use Clerk, fallback if not available
+  let user: any = null;
+  let isLoaded = true;
+  
+  try {
+    const clerkHook = useUser();
+    user = clerkHook.user;
+    isLoaded = clerkHook.isLoaded;
+  } catch (error) {
+    console.warn('[UpgradeButton] Clerk not available:', error);
+    isLoaded = true; // Treat as loaded but without user
+  }
 
   const handleClick = async () => {
     // Wait for Clerk to load

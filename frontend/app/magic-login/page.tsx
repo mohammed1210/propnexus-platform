@@ -12,16 +12,23 @@ function getSiteUrl(): string {
   return env.startsWith('http') ? env : `https://${env}`;
 }
 
+// Safe Supabase client creation
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!url || !key) {
+    throw new Error('Supabase credentials not configured');
+  }
+  
+  return createClient(url, key);
+}
+
 export default function MagicLoginPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
-  );
 
   async function sendLink(e: React.FormEvent) {
     e.preventDefault();
@@ -29,6 +36,7 @@ export default function MagicLoginPage() {
     setLoading(true);
 
     try {
+      const supabase = getSupabaseClient();
       const site = getSiteUrl();
       const { error } = await supabase.auth.signInWithOtp({
         email,

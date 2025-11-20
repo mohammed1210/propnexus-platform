@@ -29,7 +29,20 @@ export interface UserPlanData {
  *   await refetch(); // Manually refresh plan data
  */
 export function useUserPlan(): UserPlanData {
-  const { user, isLoaded: clerkLoaded } = useUser();
+  // Check if Clerk is available
+  let user: any = null;
+  let clerkLoaded = true;
+  
+  try {
+    const clerkHook = useUser();
+    user = clerkHook.user;
+    clerkLoaded = clerkHook.isLoaded;
+  } catch (error) {
+    // Clerk not available (e.g., missing ClerkProvider)
+    console.warn('[useUserPlan] Clerk not available:', error);
+    clerkLoaded = true; // Treat as loaded but without user
+  }
+  
   const [plan, setPlan] = useState<UserPlan>('free');
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
