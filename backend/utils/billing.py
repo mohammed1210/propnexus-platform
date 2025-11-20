@@ -1,3 +1,15 @@
+"""
+LEGACY CODE - NOT CURRENTLY USED
+
+This module contains legacy billing code that expects a different database schema
+with separate 'customers' and 'subscriptions' tables. The current active billing
+implementation uses the 'users' table directly (see stripe_webhook.py, stripe_routes.py,
+and users_routes.py).
+
+Keeping this file for reference in case the schema needs to be migrated to this pattern
+in the future, but it is NOT imported or used by the current application.
+"""
+
 import os
 from datetime import datetime, timezone
 
