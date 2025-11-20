@@ -17,6 +17,7 @@ from utils.scraper_logger import (
 )
 from utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
+from utils.runlog import RunLog
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -320,127 +321,139 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
     results: List[Dict[str, Any]] = []
     seen_ids = set()
 
-    async with aiohttp.ClientSession() as session:
-        for page in range(SR_MAX_PAGES):
-            url = _build_search_url(location, page)
-            html = await _fetch_html(session, url)
-            if not html:
-                log_page_fetch_error("spareroom", page, "blocked or empty")
-                continue
-
-            soup = BeautifulSoup(html, "html.parser")
-            cards = _collect_cards(soup)
-
-            if not cards:
-                print(f"ℹ️ SpareRoom: No cards found on page {page}; stopping pagination.")
-                break
-
-            for card in cards:
-                stats.log_card_found()
-                if len(results) >= limit:
-                    break
-
-                try:
-                    # Extract title
-                    title_el = (
-                        card.select_one(".listing-title")
-                        or card.select_one("h3")
-                        or card.select_one("h2")
-                    )
-                    title = title_el.get_text(strip=True) if title_el else "Untitled"
-
-                    # Extract price
-                    price_el = (
-                        card.select_one(".listingPrice")
-                        or card.select_one(".listing-price")
-                        or card.select_one(".price")
-                    )
-                    price = _parse_price(price_el.get_text(strip=True) if price_el else "")
-
-                    # Extract location/address
-                    loc_el = (
-                        card.select_one(".listing-location")
-                        or card.select_one(".location")
-                        or card.select_one("address")
-                    )
-                    location_text = loc_el.get_text(" ", strip=True) if loc_el else location
-
-                    # Extract bedrooms and bathrooms from description/attributes
-                    desc_el = card.select_one(".listing-description") or card.select_one(
-                        ".description"
-                    )
-                    desc_text = desc_el.get_text() if desc_el else card.get_text()
-
-                    # Look for bedroom info (e.g., "3 bedroom" or "3 bed")
-                    bed_match = re.search(r"(\d+)\s*bed(?:room)?s?", desc_text, re.IGNORECASE)
-                    bedrooms = int(bed_match.group(1)) if bed_match else 0
-
-                    # Look for bathroom info (e.g., "2 bathroom" or "2 bath")
-                    bath_match = re.search(r"(\d+)\s*bath(?:room)?s?", desc_text, re.IGNORECASE)
-                    bathrooms = int(bath_match.group(1)) if bath_match else 0
-
-                    # Extract all images
-                    image_urls = _extract_images(card)
-                    image_url = image_urls[0] if image_urls else None
-                    log_image_extraction("spareroom", title, len(image_urls))
-
-                    # Extract description
-                    description = _extract_description(card)
-
-                    # Generate external ID
-                    external_id = _extract_external_id(card, title, location_text, url)
-
-                    # Deduplicate by external_id
-                    if external_id in seen_ids:
-                        stats.log_duplicate_id(external_id)
+    # Start audit logging
+    with RunLog.start(source="spareroom", mode=SCRAPER_MODE, location=location) as run_log:
+        try:
+            async with aiohttp.ClientSession() as session:
+                for page in range(SR_MAX_PAGES):
+                    url = _build_search_url(location, page)
+                    html = await _fetch_html(session, url)
+                    if not html:
+                        log_page_fetch_error("spareroom", page, "blocked or empty")
                         continue
-                    seen_ids.add(external_id)
 
-                    # Enrich with coordinates
-                    coords = await _enrich_coordinates(location_text)
+                    soup = BeautifulSoup(html, "html.parser")
+                    cards = _collect_cards(soup)
 
-                    property_data = {
-                        "external_id": external_id,
-                        "title": title,
-                        "description": description,
-                        "location": location_text,
-                        "price": price,
-                        "bedrooms": bedrooms,
-                        "bathrooms": bathrooms,
-                        "image_url": image_url,
-                        "image_urls": image_urls,
-                        "latitude": coords["latitude"],
-                        "longitude": coords["longitude"],
-                        "source": "spareroom",
-                        "raw_url": url,
-                    }
+                    if not cards:
+                        print(f"ℹ️ SpareRoom: No cards found on page {page}; stopping pagination.")
+                        break
 
-                    # Track missing fields
-                    if not image_url:
-                        stats.log_missing_field("image_url", external_id)
-                    if not description:
-                        stats.log_missing_field("description", external_id)
-                    if not price:
-                        stats.log_missing_field("price", external_id)
+                    for card in cards:
+                        stats.log_card_found()
+                        if len(results) >= limit:
+                            break
 
-                    # Validate before adding
-                    should_insert, reason = should_insert_property(property_data)
-                    if should_insert:
-                        results.append(clean_property_data(property_data))
-                        stats.log_parse_success()
-                    else:
-                        stats.log_validation_failure(reason or "Unknown")
+                        try:
+                            # Extract title
+                            title_el = (
+                                card.select_one(".listing-title")
+                                or card.select_one("h3")
+                                or card.select_one("h2")
+                            )
+                            title = title_el.get_text(strip=True) if title_el else "Untitled"
 
-                except Exception as e:
-                    # Defensive: ignore parse exceptions
-                    stats.log_parse_failure(str(e))
+                            # Extract price
+                            price_el = (
+                                card.select_one(".listingPrice")
+                                or card.select_one(".listing-price")
+                                or card.select_one(".price")
+                            )
+                            price = _parse_price(price_el.get_text(strip=True) if price_el else "")
 
-            if len(results) >= limit:
-                break
+                            # Extract location/address
+                            loc_el = (
+                                card.select_one(".listing-location")
+                                or card.select_one(".location")
+                                or card.select_one("address")
+                            )
+                            location_text = loc_el.get_text(" ", strip=True) if loc_el else location
 
-            # Polite delay between pages
-            time.sleep(SR_DELAY_MS / 1000.0)
+                            # Extract bedrooms and bathrooms from description/attributes
+                            desc_el = card.select_one(".listing-description") or card.select_one(
+                                ".description"
+                            )
+                            desc_text = desc_el.get_text() if desc_el else card.get_text()
 
-    stats.log_summary()
-    print(f"✅ Scraped {len(results)} SpareRoom properties for '{location}'")
-    return results
+                            # Look for bedroom info (e.g., "3 bedroom" or "3 bed")
+                            bed_match = re.search(
+                                r"(\d+)\s*bed(?:room)?s?", desc_text, re.IGNORECASE
+                            )
+                            bedrooms = int(bed_match.group(1)) if bed_match else 0
+
+                            # Look for bathroom info (e.g., "2 bathroom" or "2 bath")
+                            bath_match = re.search(
+                                r"(\d+)\s*bath(?:room)?s?", desc_text, re.IGNORECASE
+                            )
+                            bathrooms = int(bath_match.group(1)) if bath_match else 0
+
+                            # Extract all images
+                            image_urls = _extract_images(card)
+                            image_url = image_urls[0] if image_urls else None
+                            log_image_extraction("spareroom", title, len(image_urls))
+
+                            # Extract description
+                            description = _extract_description(card)
+
+                            # Generate external ID
+                            external_id = _extract_external_id(card, title, location_text, url)
+
+                            # Deduplicate by external_id
+                            if external_id in seen_ids:
+                                stats.log_duplicate_id(external_id)
+                                continue
+                            seen_ids.add(external_id)
+
+                            # Enrich with coordinates
+                            coords = await _enrich_coordinates(location_text)
+
+                            property_data = {
+                                "external_id": external_id,
+                                "title": title,
+                                "description": description,
+                                "location": location_text,
+                                "price": price,
+                                "bedrooms": bedrooms,
+                                "bathrooms": bathrooms,
+                                "image_url": image_url,
+                                "image_urls": image_urls,
+                                "latitude": coords["latitude"],
+                                "longitude": coords["longitude"],
+                                "source": "spareroom",
+                                "raw_url": url,
+                            }
+
+                            # Track missing fields
+                            if not image_url:
+                                stats.log_missing_field("image_url", external_id)
+                            if not description:
+                                stats.log_missing_field("description", external_id)
+                            if not price:
+                                stats.log_missing_field("price", external_id)
+
+                            # Validate before adding
+                            should_insert, reason = should_insert_property(property_data)
+                            if should_insert:
+                                results.append(clean_property_data(property_data))
+                                stats.log_parse_success()
+                            else:
+                                stats.log_validation_failure(reason or "Unknown")
+
+                        except Exception as e:
+                            # Defensive: ignore parse exceptions
+                            stats.log_parse_failure(str(e))
+
+                    if len(results) >= limit:
+                        break
+
+                    # Polite delay between pages
+                    time.sleep(SR_DELAY_MS / 1000.0)
+
+            stats.log_summary()
+            print(f"✅ Scraped {len(results)} SpareRoom properties for '{location}'")
+            return results
+            run_log.set_count(len(results))
+        except Exception as e:
+            # Let RunLog handle the error in __exit__
+            print(f"❌ SpareRoom scraper error: {e}")
+            raise

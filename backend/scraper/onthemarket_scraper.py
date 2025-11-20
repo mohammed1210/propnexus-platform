@@ -18,6 +18,7 @@ from utils.scraper_logger import (
 )
 from utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
+from utils.runlog import RunLog
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -327,166 +328,181 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
     results: List[Dict[str, Any]] = []
     seen_ids = set()
 
-    async with aiohttp.ClientSession() as session:
-        for page in range(OT_MAX_PAGES):
-            url = _build_search_url(location, page)
-            html = await _fetch_html(session, url)
-            if not html:
-                log_page_fetch_error("onthemarket", page, "blocked or empty")
-                continue
+    # Start audit logging
+    with RunLog.start(source="onthemarket", mode=SCRAPER_MODE, location=location) as run_log:
+        try:
+            async with aiohttp.ClientSession() as session:
+                for page in range(OT_MAX_PAGES):
+                    url = _build_search_url(location, page)
+                    html = await _fetch_html(session, url)
+                    if not html:
+                        log_page_fetch_error("onthemarket", page, "blocked or empty")
+                        continue
 
-            soup = BeautifulSoup(html, "html.parser")
-            cards = _collect_cards(soup)
+                    soup = BeautifulSoup(html, "html.parser")
+                    cards = _collect_cards(soup)
 
-            if not cards:
-                if PLAYWRIGHT_ENABLE:
-                    # Attempt network capture to extract JSON listing payloads
-                    rendered, payloads = await render_page_capture(
-                        url,
-                        selectors=[
-                            ".property-card",
-                            "[data-testid='property-card']",
-                            ".listing-result",
-                        ],
-                        click_selectors=["#ccc-recommended-settings", "#ccc-accept-settings"],
-                        response_url_substrings=["/api/", "/search"],
-                        max_json=10,
-                    )
-                    if rendered:
-                        soup = BeautifulSoup(rendered, "html.parser")
-                        cards = _collect_cards(soup)
-                    if not cards and payloads:
-                        # Heuristic parse of JSON payloads
-                        extracted = _extract_from_otm_json(payloads, limit - len(results), location)
-                        for item in extracted:
-                            if item["external_id"] in seen_ids:
-                                stats.log_duplicate_id(item["external_id"])
+                    if not cards:
+                        if PLAYWRIGHT_ENABLE:
+                            # Attempt network capture to extract JSON listing payloads
+                            rendered, payloads = await render_page_capture(
+                                url,
+                                selectors=[
+                                    ".property-card",
+                                    "[data-testid='property-card']",
+                                    ".listing-result",
+                                ],
+                                click_selectors=[
+                                    "#ccc-recommended-settings",
+                                    "#ccc-accept-settings",
+                                ],
+                                response_url_substrings=["/api/", "/search"],
+                                max_json=10,
+                            )
+                            if rendered:
+                                soup = BeautifulSoup(rendered, "html.parser")
+                                cards = _collect_cards(soup)
+                            if not cards and payloads:
+                                # Heuristic parse of JSON payloads
+                                extracted = _extract_from_otm_json(
+                                    payloads, limit - len(results), location
+                                )
+                                for item in extracted:
+                                    if item["external_id"] in seen_ids:
+                                        stats.log_duplicate_id(item["external_id"])
+                                        continue
+                                    seen_ids.add(item["external_id"])
+                                    should_insert, reason = should_insert_property(item)
+                                    if should_insert:
+                                        results.append(clean_property_data(item))
+                                        stats.log_parse_success()
+                                    else:
+                                        stats.log_validation_failure(reason or "Unknown")
+                                if extracted:
+                                    print(
+                                        f"✅ OnTheMarket JSON extracted {len(extracted)} properties"
+                                    )
+                            if not cards and not payloads:
+                                if rendered:
+                                    capture_debug_html(f"onthemarket_empty_{page}", rendered)
+                        if not cards and len(results) == 0:
+                            print(
+                                f"ℹ️ OnTheMarket: No cards/json found on page {page}; stopping pagination."
+                            )
+                            break
+
+                    for card in cards:
+                        stats.log_card_found()
+                        if len(results) >= limit:
+                            break
+
+                        try:
+                            # Extract title
+                            title_el = (
+                                card.select_one("[data-testid='title']")
+                                or card.select_one("h2")
+                                or card.select_one(".title")
+                            )
+                            title = title_el.get_text(strip=True) if title_el else "Untitled"
+
+                            # Extract price
+                            price_el = (
+                                card.select_one("[data-testid='price']")
+                                or card.select_one(".price")
+                                or card.select_one(".otm-Price")
+                            )
+                            price = _parse_price(price_el.get_text(strip=True) if price_el else "")
+
+                            # Extract location/address
+                            loc_el = (
+                                card.select_one("[data-testid='address']")
+                                or card.select_one(".address")
+                                or card.select_one(".otm-Address")
+                            )
+                            location_text = loc_el.get_text(" ", strip=True) if loc_el else location
+
+                            # Extract bedrooms from summary text (e.g., "3 bed")
+                            summary_el = card.select_one(
+                                ".property-description"
+                            ) or card.select_one(".summary")
+                            summary_text = summary_el.get_text() if summary_el else ""
+                            bed_match = re.search(r"(\d+)\s*bed", summary_text, re.IGNORECASE)
+                            bedrooms = int(bed_match.group(1)) if bed_match else 0
+
+                            # Extract bathrooms from summary text (e.g., "2 bath")
+                            bath_match = re.search(r"(\d+)\s*bath", summary_text, re.IGNORECASE)
+                            bathrooms = int(bath_match.group(1)) if bath_match else 0
+
+                            # Extract all images
+                            image_urls = _extract_images(card)
+                            image_url = image_urls[0] if image_urls else None
+                            log_image_extraction("onthemarket", title, len(image_urls))
+
+                            # Extract description
+                            description = _extract_description(card)
+
+                            # Generate external ID
+                            external_id = _extract_external_id(card, title, location_text)
+
+                            # Deduplicate by external_id
+                            if external_id in seen_ids:
+                                stats.log_duplicate_id(external_id)
                                 continue
-                            seen_ids.add(item["external_id"])
-                            should_insert, reason = should_insert_property(item)
+                            seen_ids.add(external_id)
+
+                            # Enrich with coordinates
+                            coords = await _enrich_coordinates(location_text)
+
+                            property_data = {
+                                "external_id": external_id,
+                                "title": title,
+                                "description": description,
+                                "location": location_text,
+                                "price": price,
+                                "bedrooms": bedrooms,
+                                "bathrooms": bathrooms,
+                                "image_url": image_url,
+                                "image_urls": image_urls,
+                                "latitude": coords["latitude"],
+                                "longitude": coords["longitude"],
+                                "source": "onthemarket",
+                                "raw_url": url,
+                            }
+
+                            # Track missing fields
+                            if not image_url:
+                                stats.log_missing_field("image_url", external_id)
+                            if not description:
+                                stats.log_missing_field("description", external_id)
+                            if not price:
+                                stats.log_missing_field("price", external_id)
+
+                            # Validate before adding
+                            should_insert, reason = should_insert_property(property_data)
                             if should_insert:
-                                results.append(clean_property_data(item))
+                                results.append(clean_property_data(property_data))
                                 stats.log_parse_success()
                             else:
                                 stats.log_validation_failure(reason or "Unknown")
-                        if extracted:
-                            print(f"✅ OnTheMarket JSON extracted {len(extracted)} properties")
-                    if not cards and not payloads:
-                        if rendered:
-                            capture_debug_html(f"onthemarket_empty_{page}", rendered)
-                if not cards and len(results) == 0:
-                    print(
-                        f"ℹ️ OnTheMarket: No cards/json found on page {page}; stopping pagination."
-                    )
-                    break
 
-            for card in cards:
-                stats.log_card_found()
-                if len(results) >= limit:
-                    break
+                        except Exception as e:
+                            # Defensive: ignore parse exceptions
+                            stats.log_parse_failure(str(e))
 
-                try:
-                    # Extract title
-                    title_el = (
-                        card.select_one("[data-testid='title']")
-                        or card.select_one("h2")
-                        or card.select_one(".title")
-                    )
-                    title = title_el.get_text(strip=True) if title_el else "Untitled"
+                    if len(results) >= limit:
+                        break
 
-                    # Extract price
-                    price_el = (
-                        card.select_one("[data-testid='price']")
-                        or card.select_one(".price")
-                        or card.select_one(".otm-Price")
-                    )
-                    price = _parse_price(price_el.get_text(strip=True) if price_el else "")
+                    # Polite delay between pages
+                    time.sleep(OT_DELAY_MS / 1000.0)
 
-                    # Extract location/address
-                    loc_el = (
-                        card.select_one("[data-testid='address']")
-                        or card.select_one(".address")
-                        or card.select_one(".otm-Address")
-                    )
-                    location_text = loc_el.get_text(" ", strip=True) if loc_el else location
-
-                    # Extract bedrooms from summary text (e.g., "3 bed")
-                    summary_el = card.select_one(".property-description") or card.select_one(
-                        ".summary"
-                    )
-                    summary_text = summary_el.get_text() if summary_el else ""
-                    bed_match = re.search(r"(\d+)\s*bed", summary_text, re.IGNORECASE)
-                    bedrooms = int(bed_match.group(1)) if bed_match else 0
-
-                    # Extract bathrooms from summary text (e.g., "2 bath")
-                    bath_match = re.search(r"(\d+)\s*bath", summary_text, re.IGNORECASE)
-                    bathrooms = int(bath_match.group(1)) if bath_match else 0
-
-                    # Extract all images
-                    image_urls = _extract_images(card)
-                    image_url = image_urls[0] if image_urls else None
-                    log_image_extraction("onthemarket", title, len(image_urls))
-
-                    # Extract description
-                    description = _extract_description(card)
-
-                    # Generate external ID
-                    external_id = _extract_external_id(card, title, location_text)
-
-                    # Deduplicate by external_id
-                    if external_id in seen_ids:
-                        stats.log_duplicate_id(external_id)
-                        continue
-                    seen_ids.add(external_id)
-
-                    # Enrich with coordinates
-                    coords = await _enrich_coordinates(location_text)
-
-                    property_data = {
-                        "external_id": external_id,
-                        "title": title,
-                        "description": description,
-                        "location": location_text,
-                        "price": price,
-                        "bedrooms": bedrooms,
-                        "bathrooms": bathrooms,
-                        "image_url": image_url,
-                        "image_urls": image_urls,
-                        "latitude": coords["latitude"],
-                        "longitude": coords["longitude"],
-                        "source": "onthemarket",
-                        "raw_url": url,
-                    }
-
-                    # Track missing fields
-                    if not image_url:
-                        stats.log_missing_field("image_url", external_id)
-                    if not description:
-                        stats.log_missing_field("description", external_id)
-                    if not price:
-                        stats.log_missing_field("price", external_id)
-
-                    # Validate before adding
-                    should_insert, reason = should_insert_property(property_data)
-                    if should_insert:
-                        results.append(clean_property_data(property_data))
-                        stats.log_parse_success()
-                    else:
-                        stats.log_validation_failure(reason or "Unknown")
-
-                except Exception as e:
-                    # Defensive: ignore parse exceptions
-                    stats.log_parse_failure(str(e))
-
-            if len(results) >= limit:
-                break
-
-            # Polite delay between pages
-            time.sleep(OT_DELAY_MS / 1000.0)
-
-    stats.log_summary()
-    print(f"✅ Scraped {len(results)} OnTheMarket properties for '{location}'")
-    return results
+            stats.log_summary()
+            print(f"✅ Scraped {len(results)} OnTheMarket properties for '{location}'")
+            return results
+            run_log.set_count(len(results))
+        except Exception as e:
+            # Let RunLog handle the error in __exit__
+            print(f"❌ OnTheMarket scraper error: {e}")
+            raise
 
 
 def _extract_from_otm_json(

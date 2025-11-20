@@ -39,6 +39,7 @@ from utils.ingest import scrape_all_sources
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 
 if create_client and SUPABASE_URL and SUPABASE_KEY:
     try:
