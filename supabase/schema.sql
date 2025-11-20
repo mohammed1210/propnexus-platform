@@ -30,6 +30,42 @@ create table if not exists public.subscriptions (
   updated_at timestamp with time zone default now()
 );
 
+-- Prices table - Stripe price metadata (added to satisfy relationship for admin stats)
+-- Using stripe_price_id as the primary key to align with existing subscriptions.price_id text values.
+create table if not exists public.prices (
+  stripe_price_id text primary key,
+  product_id text,
+  nickname text,
+  unit_amount integer, -- stored in smallest currency unit (e.g. cents)
+  currency text,
+  billing_interval text, -- e.g. month, year
+  created_at timestamp with time zone default now()
+);
+
+-- Idempotent foreign key from subscriptions.price_id -> prices.stripe_price_id
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.subscriptions'::regclass
+      AND contype = 'f'
+      AND conname = 'subscriptions_price_id_fkey'
+  ) THEN
+    ALTER TABLE public.subscriptions
+      ADD CONSTRAINT subscriptions_price_id_fkey
+      FOREIGN KEY (price_id)
+      REFERENCES public.prices (stripe_price_id)
+      ON UPDATE CASCADE
+      ON DELETE SET NULL;
+  END IF;
+END$$;
+
+-- Index to speed up lookups/join on subscriptions.price_id
+create index if not exists idx_subscriptions_price_id on public.subscriptions(price_id);
+
+comment on table public.prices is 'Stripe prices referenced by subscriptions.price_id';
+comment on column public.subscriptions.price_id is 'References public.prices.stripe_price_id';
+
 -- Saved deals table - user-saved property deals
 create table if not exists public.saved_deals (
   id uuid primary key default uuid_generate_v4(),
