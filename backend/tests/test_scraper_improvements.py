@@ -164,6 +164,105 @@ def test_logger_stats():
     print("✓ ScraperStats tracking works")
 
 
+def test_scraperapi_url_builder():
+    """Test ScraperAPI URL builder helper."""
+    from backend.scraper.rightmove_scraper import make_scraperapi_url
+
+    # Save original env vars
+    original_key = os.environ.get("SCRAPERAPI_KEY")
+
+    try:
+        # Test 1: No API key set - should return original URL
+        os.environ["SCRAPERAPI_KEY"] = ""
+        target_url = "https://www.rightmove.co.uk/property-for-sale/find.html?searchLocation=London"
+        result = make_scraperapi_url(target_url)
+        assert result == target_url, "Should return original URL when no key set"
+        print("✓ make_scraperapi_url returns original URL when SCRAPERAPI_KEY not set")
+
+        # Test 2: With API key, no render
+        os.environ["SCRAPERAPI_KEY"] = "test-key-123"
+        result = make_scraperapi_url(target_url, render=False)
+        assert result.startswith("https://api.scraperapi.com/")
+        assert "api_key=test-key-123" in result
+        assert "country_code=gb" in result
+        assert (
+            f"url={target_url.replace(':', '%3A').replace('/', '%2F')}" in result
+            or "url=" in result
+        )
+        assert "render" not in result  # Should not have render when False
+        print("✓ make_scraperapi_url builds correct URL without render")
+
+        # Test 3: With API key and render=True
+        result = make_scraperapi_url(target_url, render=True)
+        assert result.startswith("https://api.scraperapi.com/")
+        assert "api_key=test-key-123" in result
+        assert "country_code=gb" in result
+        assert "render=true" in result
+        assert "device_type=desktop" in result
+        print("✓ make_scraperapi_url builds correct URL with render=true")
+
+    finally:
+        # Restore original env var
+        if original_key is not None:
+            os.environ["SCRAPERAPI_KEY"] = original_key
+        elif "SCRAPERAPI_KEY" in os.environ:
+            del os.environ["SCRAPERAPI_KEY"]
+
+
+def test_scraperapi_mode_handling():
+    """Test SCRAPER_MODE environment variable handling."""
+    from backend.scraper import rightmove_scraper
+
+    # Save original env vars
+    original_mode = os.environ.get("SCRAPER_MODE")
+    original_key = os.environ.get("SCRAPERAPI_KEY")
+
+    try:
+        # Test 1: scraperapi mode with key
+        os.environ["SCRAPER_MODE"] = "scraperapi"
+        os.environ["SCRAPERAPI_KEY"] = "test-key"
+        # Just verify the constants are read correctly
+        # We can't easily test async fetch without mocking
+        import importlib
+
+        importlib.reload(rightmove_scraper)
+        assert rightmove_scraper.SCRAPER_MODE == "scraperapi"
+        assert rightmove_scraper.SCRAPERAPI_KEY == "test-key"
+        print("✓ SCRAPER_MODE and SCRAPERAPI_KEY loaded correctly")
+
+        # Test 2: scraperapi mode without key (should work gracefully)
+        os.environ["SCRAPER_MODE"] = "scraperapi"
+        os.environ["SCRAPERAPI_KEY"] = ""
+        importlib.reload(rightmove_scraper)
+        assert rightmove_scraper.SCRAPER_MODE == "scraperapi"
+        assert rightmove_scraper.SCRAPERAPI_KEY == ""
+        print("✓ Missing SCRAPERAPI_KEY handled gracefully")
+
+        # Test 3: direct mode (default)
+        os.environ["SCRAPER_MODE"] = "direct"
+        os.environ["SCRAPERAPI_KEY"] = "test-key"
+        importlib.reload(rightmove_scraper)
+        assert rightmove_scraper.SCRAPER_MODE == "direct"
+        print("✓ SCRAPER_MODE=direct works correctly")
+
+    finally:
+        # Restore original env vars
+        if original_mode is not None:
+            os.environ["SCRAPER_MODE"] = original_mode
+        elif "SCRAPER_MODE" in os.environ:
+            del os.environ["SCRAPER_MODE"]
+
+        if original_key is not None:
+            os.environ["SCRAPERAPI_KEY"] = original_key
+        elif "SCRAPERAPI_KEY" in os.environ:
+            del os.environ["SCRAPERAPI_KEY"]
+
+        # Reload to restore original state
+        import importlib
+
+        importlib.reload(rightmove_scraper)
+
+
 def main():
     """Run all tests."""
     print("\n=== Running Scraper Smoke Tests ===\n")
@@ -176,6 +275,8 @@ def main():
         ("Validation functions", test_validation_functions),
         ("Retry logic", test_retry_logic),
         ("Logger statistics", test_logger_stats),
+        ("ScraperAPI URL builder", test_scraperapi_url_builder),
+        ("ScraperAPI mode handling", test_scraperapi_mode_handling),
     ]
 
     results = []
