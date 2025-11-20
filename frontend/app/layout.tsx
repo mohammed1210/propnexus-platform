@@ -92,8 +92,51 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Clerk publishable key from environment
+  // If not set, the app will show sign-in buttons but they won't work until configured
+  const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  
+  // If Clerk is not configured, still render the layout but without ClerkProvider
+  if (!clerkPublishableKey) {
+    console.warn('[Layout] Clerk publishable key not configured. Authentication features will not work.');
+    
+    return (
+      <html lang="en" suppressHydrationWarning>
+        <body className="flex flex-col min-h-screen">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 bg-zinc-900 text-white px-3 py-2 rounded"
+        >
+          Skip to content
+        </a>
+
+        <ThemeProvider>
+          <EnvValidator />
+          
+          {/* Show placeholder when Clerk isn't configured */}
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-zinc-200 dark:border-zinc-800 text-sm">
+            <span className="text-amber-600">⚠️ Authentication not configured</span>
+          </div>
+          
+          <Header />
+
+          <main id="main" className="flex-1 focus:outline-none">
+            {children}
+          </main>
+
+          <Footer />
+          <UiOverlaysClient />
+          <BackToTop />
+          <Toaster position="top-right" richColors />
+        </ThemeProvider>
+        </body>
+      </html>
+    );
+  }
+  
   return (
     <ClerkProvider
+      publishableKey={clerkPublishableKey}
       appearance={{
         layout: {
           logoPlacement: 'outside',

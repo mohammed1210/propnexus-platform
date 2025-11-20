@@ -1,6 +1,6 @@
 // frontend/lib/useUserPlan.ts
 import { useEffect, useState, useCallback } from 'react';
-import { getSupabase } from './supabaseClient';
+import { useUser } from '@clerk/nextjs';
 
 export type UserPlan = 'free' | 'pro' | 'investor';
 
@@ -15,8 +15,9 @@ export interface UserPlanData {
 /**
  * Custom hook to fetch and track the current user's subscription plan.
  * 
- * 1. Gets the authenticated user session from Supabase auth
- * 2. Fetches plan details from backend /users/plan endpoint using JWT token
+ * Now uses Clerk for authentication:
+ * 1. Gets the authenticated user from Clerk
+ * 2. Fetches plan details from backend /users/plan endpoint using user email
  * 3. Returns plan, stripe_customer_id, loading state, error, and refetch function
  * 
  * Usage:
@@ -28,6 +29,7 @@ export interface UserPlanData {
  *   await refetch(); // Manually refresh plan data
  */
 export function useUserPlan(): UserPlanData {
+  const { user, isLoaded: clerkLoaded } = useUser();
   const [plan, setPlan] = useState<UserPlan>('free');
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -39,32 +41,37 @@ export function useUserPlan(): UserPlanData {
       setLoading(true);
       setError(null);
 
-      // Get authenticated user session from Supabase
-      const sb = getSupabase();
-      const { data: sessionData, error: authError } = await sb.auth.getSession();
-
-      if (authError) {
-        throw new Error(`Auth error: ${authError.message}`);
+      // Wait for Clerk to load
+      if (!clerkLoaded) {
+        return;
       }
 
-      const session = sessionData?.session;
-      if (!session || !session.access_token) {
-        // User not logged in - default to free
+      // If no user, default to free plan
+      if (!user) {
         setPlan('free');
         setStripeCustomerId(null);
         setLoading(false);
         return;
       }
 
-      // Fetch plan from backend using token-based authentication
+      // Get user email from Clerk
+      const email = user.primaryEmailAddress?.emailAddress;
+      if (!email) {
+        console.warn('[useUserPlan] No email found for user');
+        setPlan('free');
+        setStripeCustomerId(null);
+        setLoading(false);
+        return;
+      }
+
+      // Fetch plan from backend using email query parameter
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
       const response = await fetch(
-        `${backendUrl}/users/plan`,
+        `${backendUrl}/users/plan?email=${encodeURIComponent(email)}`,
         {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
           },
           // Bypass cache to ensure fresh data
           cache: 'no-store',
@@ -86,7 +93,7 @@ export function useUserPlan(): UserPlanData {
       setPlan('free'); // Fallback to free on error
       setLoading(false);
     }
-  }, []);
+  }, [user, clerkLoaded]);
 
   const refetch = useCallback(async () => {
     setRefreshTrigger((prev) => prev + 1);

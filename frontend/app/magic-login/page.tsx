@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+
 function getSiteUrl(): string {
   if (typeof window !== 'undefined') return window.location.origin;
   const env = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_VERCEL_URL; // e.g. my-app.vercel.app
