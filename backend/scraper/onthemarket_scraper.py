@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
 from urllib.parse import quote_plus, urlencode
 
-from utils.postcode import get_lat_lng_from_postcode
+from backend.utils.postcode import get_lat_lng_from_postcode
 from utils.render import PLAYWRIGHT_ENABLE, render_page_capture
 from utils.render import capture_debug_html, capture_debug_json
 from utils.scraper_logger import (
