@@ -16,7 +16,7 @@ from backend.utils.scraper_logger import (
     log_scraperapi_fallback,
     log_image_extraction,
 )
-from utils.retry import retry_async
+from backend.utils.retry import retry_async
 from utils.validation import should_insert_property, clean_property_data
 from utils.runlog import RunLog
 
