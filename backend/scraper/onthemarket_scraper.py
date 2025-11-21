@@ -9,7 +9,7 @@ from urllib.parse import quote_plus, urlencode
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.render import PLAYWRIGHT_ENABLE, render_page_capture
 from backend.utils.render import capture_debug_html, capture_debug_json
-from utils.scraper_logger import (
+from backend.utils.scraper_logger import (
     ScraperStats,
     log_scrape_start,
     log_page_fetch_error,
