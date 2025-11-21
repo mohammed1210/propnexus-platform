@@ -92,3 +92,10 @@ app.include_router(users_router)  # GET /users/plan
 @app.get("/")
 def root():
     return {"ok": True}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=port)
