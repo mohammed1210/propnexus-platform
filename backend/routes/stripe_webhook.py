@@ -120,11 +120,13 @@ async def stripe_webhook(request: Request):
             status = sub.get("status", "active")
             current_period_end = sub.get("current_period_end")
 
+            # Only treat certain statuses as eligible for a paid plan
+            eligible_for_plan = status in ["active", "trialing", "past_due"]
+
             # Map price_id to plan - returns None for unknown IDs
-            plan = map_price_to_plan(price_id)
-            plan_status = (
-                status if status in ["active", "past_due", "canceled", "trialing"] else "active"
-            )
+            plan = map_price_to_plan(price_id) if eligible_for_plan else None
+            # Always preserve the real Stripe status
+            plan_status = status
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
@@ -170,11 +172,13 @@ async def stripe_webhook(request: Request):
                 logger.debug(f"Failed to retrieve customer email for {customer_id}: {e}")
                 pass
 
+            # Only treat certain statuses as eligible for a paid plan
+            eligible_for_plan = status in ["active", "trialing", "past_due"]
+
             # Map price_id to plan - returns None for unknown IDs
-            plan = map_price_to_plan(price_id)
-            plan_status = (
-                status if status in ["active", "past_due", "canceled", "trialing"] else "active"
-            )
+            plan = map_price_to_plan(price_id) if eligible_for_plan else None
+            # Always preserve the real Stripe status
+            plan_status = status
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
