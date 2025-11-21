@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import os
 from supabase import create_client, Client
 from typing import Optional
-from utils.supabase_jwt import verify_supabase_token, extract_bearer_token
+from backend.utils.supabase_jwt import verify_supabase_token, extract_bearer_token
 
 router = APIRouter(prefix="/users", tags=["users"])
 

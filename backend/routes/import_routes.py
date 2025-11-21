@@ -36,7 +36,7 @@ except Exception:  # pragma: no cover
 
 
 # Scrapers (existing)
-from utils.ingest import scrape_all_sources
+from backend.utils.ingest import scrape_all_sources
 
 # Shared Supabase client
 try:

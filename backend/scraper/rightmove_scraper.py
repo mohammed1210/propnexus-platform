@@ -7,18 +7,18 @@ from typing import List, Dict, Any, Optional
 from urllib.parse import urlencode
 from bs4 import BeautifulSoup
 
-from utils.postcode import get_lat_lng_from_postcode
-from utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html, capture_debug_json
-from utils.scraper_logger import (
+from backend.utils.postcode import get_lat_lng_from_postcode
+from backend.utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html, capture_debug_json
+from backend.utils.scraper_logger import (
     ScraperStats,
     log_scrape_start,
     log_page_fetch_error,
     log_scraperapi_fallback,
     log_image_extraction,
 )
-from utils.retry import retry_async
-from utils.validation import should_insert_property, clean_property_data
-from utils.runlog import RunLog
+from backend.utils.retry import retry_async
+from backend.utils.validation import should_insert_property, clean_property_data
+from backend.utils.runlog import RunLog
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

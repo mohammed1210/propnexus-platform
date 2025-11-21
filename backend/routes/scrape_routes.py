@@ -43,7 +43,7 @@ except Exception:  # pragma: no cover
         raise RuntimeError("Supabase SDK not available")
 
 
-from utils.ingest import scrape_all_sources
+from backend.utils.ingest import scrape_all_sources
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
