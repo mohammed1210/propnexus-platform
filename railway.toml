@@ -9,7 +9,7 @@ buildCommand = "pip3 install -r backend/requirements.txt && cd frontend && npm c
 
 [deploy]
 # Run FastAPI (backend.main:app) on the provided PORT
-startCommand = "uvicorn main:app --host 0.0.0.0 --port 8000"
+startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port 8000"
 # FastAPI health route
 healthcheckPath = "/health"
 

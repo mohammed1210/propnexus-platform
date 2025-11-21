@@ -26,6 +26,6 @@ RUN python3 -m pip install --upgrade pip && \
 RUN cd frontend && npm ci
 
 # Default to running the FastAPI backend via uvicorn
-WORKDIR /app/backend
+WORKDIR /app
 EXPOSE 8000
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
