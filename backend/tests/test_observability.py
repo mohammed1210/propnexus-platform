@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch, AsyncMock
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from utils.runlog import RunLog
+from backend.utils.runlog import RunLog
 from scraper.utils import smart_fetch_html, _looks_blocked, _is_valid_html
 
 

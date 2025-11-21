@@ -18,7 +18,7 @@ from backend.utils.scraper_logger import (
 )
 from backend.utils.retry import retry_async
 from backend.utils.validation import should_insert_property, clean_property_data
-from utils.runlog import RunLog
+from backend.utils.runlog import RunLog
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

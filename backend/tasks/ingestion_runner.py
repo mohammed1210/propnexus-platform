@@ -35,7 +35,7 @@ try:
 except Exception:  # pragma: no cover
     create_client = None  # type: ignore
 
-from utils.ingest import scrape_all_sources
+from backend.utils.ingest import scrape_all_sources
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
