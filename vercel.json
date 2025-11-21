@@ -1,9 +1,8 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "next build",
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "npm install",
-  "rootDirectory": "frontend",
   "routes": [
     {
       "src": "/(.*)",
