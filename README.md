@@ -602,38 +602,6 @@ After successful deployment:
 - Update dependencies monthly
 - Review and rotate API keys quarterly
 
-## Deployment
-
-### Vercel (Frontend)
-
-The frontend is configured to deploy automatically from the `frontend` directory via the `vercel.json` configuration at the repository root. 
-
-**Key Configuration:**
-- The `rootDirectory` setting in `vercel.json` points to `frontend/`
-- Vercel builds from the `frontend` directory automatically
-- All commits to `main` branch trigger a production deployment
-- Pull requests create preview deployments
-
-**Troubleshooting Vercel Deployments:**
-If recent commits aren't showing up on Vercel:
-1. Check that `vercel.json` has `"rootDirectory": "frontend"` set
-2. Verify environment variables are configured in Vercel dashboard
-3. Check Vercel deployment logs for build errors
-4. Ensure the GitHub integration is properly connected
-
-### Codespaces / Local Development
-
-When developing in Codespaces or locally:
-```bash
-# From repository root - runs frontend dev server
-npm run dev
-
-# Or explicitly from frontend directory
-cd frontend && npm run dev
-```
-
-The development server will start on `http://localhost:3000` by default.
-
 ## Contributing
 
 See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for contribution guidelines.
