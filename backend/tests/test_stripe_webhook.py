@@ -289,3 +289,216 @@ def test_subscription_updated_email_retrieval_failure(mock_stripe, mock_supabase
     assert mock_supabase.table.return_value.upsert.called
     upsert_data = mock_supabase.table.return_value.upsert.call_args[0][0]
     assert upsert_data["email"] is None
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_subscription_created_pro(mock_stripe, mock_supabase, client):
+    """Test handling of subscription.created event for Pro tier"""
+    # Set Pro price ID
+    os.environ["STRIPE_PRICE_PRO"] = "price_pro_test_123"
+
+    mock_event = {
+        "type": "customer.subscription.created",
+        "data": {
+            "object": {
+                "id": "sub_test",
+                "customer": "cus_test_pro",
+                "status": "trialing",
+                "items": {"data": [{"price": {"id": "price_pro_test_123"}}]},
+                "current_period_end": 1234567890,
+            }
+        },
+    }
+
+    mock_stripe.Webhook.construct_event.return_value = mock_event
+    mock_stripe.Customer.retrieve.return_value = {"email": "pro@example.com"}
+
+    # Mock Supabase upsert
+    mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
+
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+
+    response = client.post(
+        "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+    # Verify upsert was called with Pro plan
+    assert mock_supabase.table.return_value.upsert.called
+    upsert_data = mock_supabase.table.return_value.upsert.call_args[0][0]
+    assert upsert_data["plan"] == "pro"
+    assert upsert_data["plan_status"] == "trialing"
+    assert upsert_data["stripe_customer_id"] == "cus_test_pro"
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_subscription_created_investor(mock_stripe, mock_supabase, client):
+    """Test handling of subscription.created event for Investor tier"""
+    # Set Investor price ID
+    os.environ["STRIPE_PRICE_INVESTOR"] = "price_investor_test_456"
+
+    mock_event = {
+        "type": "customer.subscription.created",
+        "data": {
+            "object": {
+                "id": "sub_test",
+                "customer": "cus_test_investor",
+                "status": "active",
+                "items": {"data": [{"price": {"id": "price_investor_test_456"}}]},
+                "current_period_end": 1234567890,
+            }
+        },
+    }
+
+    mock_stripe.Webhook.construct_event.return_value = mock_event
+    mock_stripe.Customer.retrieve.return_value = {"email": "investor@example.com"}
+
+    # Mock Supabase upsert
+    mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
+
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+
+    response = client.post(
+        "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+    # Verify upsert was called with Investor plan
+    assert mock_supabase.table.return_value.upsert.called
+    upsert_data = mock_supabase.table.return_value.upsert.call_args[0][0]
+    assert upsert_data["plan"] == "investor"
+    assert upsert_data["plan_status"] == "active"
+    assert upsert_data["stripe_customer_id"] == "cus_test_investor"
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_subscription_deleted_downgrades_to_free(mock_stripe, mock_supabase, client):
+    """Test that subscription.deleted event downgrades user to free plan"""
+    mock_event = {
+        "type": "customer.subscription.deleted",
+        "data": {
+            "object": {
+                "id": "sub_test",
+                "customer": "cus_test_delete",
+                "status": "canceled",
+            }
+        },
+    }
+
+    mock_stripe.Webhook.construct_event.return_value = mock_event
+    mock_stripe.Customer.retrieve.return_value = {"email": "downgrade@example.com"}
+
+    # Mock Supabase upsert
+    mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
+
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+
+    response = client.post(
+        "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+    # Verify upsert was called with free plan
+    assert mock_supabase.table.return_value.upsert.called
+    upsert_data = mock_supabase.table.return_value.upsert.call_args[0][0]
+    assert upsert_data["plan"] == "free"
+    assert upsert_data["plan_status"] == "canceled"
+    assert upsert_data["current_period_end"] is None
+    assert upsert_data["stripe_customer_id"] == "cus_test_delete"
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_checkout_completed_with_pro_price(mock_stripe, mock_supabase, client):
+    """Test checkout.session.completed maps Pro price to pro plan"""
+    # Set Pro price ID
+    os.environ["STRIPE_PRICE_PRO"] = "price_pro_checkout_789"
+
+    mock_event = {
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "customer": "cus_checkout_pro",
+                "customer_details": {"email": "checkout_pro@example.com"},
+                "subscription": "sub_checkout_test",
+            }
+        },
+    }
+
+    mock_stripe.Webhook.construct_event.return_value = mock_event
+    mock_stripe.Subscription.retrieve.return_value = {
+        "status": "trialing",
+        "items": {"data": [{"price": {"id": "price_pro_checkout_789"}}]},
+        "current_period_end": 1234567890,
+    }
+
+    # Mock Supabase upsert
+    mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
+
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+
+    response = client.post(
+        "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+    # Verify upsert was called with Pro plan
+    assert mock_supabase.table.return_value.upsert.called
+    upsert_data = mock_supabase.table.return_value.upsert.call_args[0][0]
+    assert upsert_data["plan"] == "pro"
+    assert upsert_data["plan_status"] == "trialing"
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_checkout_completed_with_investor_price(mock_stripe, mock_supabase, client):
+    """Test checkout.session.completed maps Investor price to investor plan"""
+    # Set Investor price ID
+    os.environ["STRIPE_PRICE_INVESTOR"] = "price_investor_checkout_abc"
+
+    mock_event = {
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "customer": "cus_checkout_investor",
+                "customer_details": {"email": "checkout_investor@example.com"},
+                "subscription": "sub_checkout_investor_test",
+            }
+        },
+    }
+
+    mock_stripe.Webhook.construct_event.return_value = mock_event
+    mock_stripe.Subscription.retrieve.return_value = {
+        "status": "active",
+        "items": {"data": [{"price": {"id": "price_investor_checkout_abc"}}]},
+        "current_period_end": 1234567890,
+    }
+
+    # Mock Supabase upsert
+    mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
+
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+
+    response = client.post(
+        "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+
+    # Verify upsert was called with Investor plan
+    assert mock_supabase.table.return_value.upsert.called
+    upsert_data = mock_supabase.table.return_value.upsert.call_args[0][0]
+    assert upsert_data["plan"] == "investor"
+    assert upsert_data["plan_status"] == "active"
