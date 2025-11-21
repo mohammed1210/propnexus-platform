@@ -26,7 +26,7 @@ from .routes.save_deal import router as save_deal_router
 from .routes.properties_routes import router as properties_router
 from .routes.tradesmen_routes import router as tradesmen_router
 from .routes.users_routes import router as users_router
-from routes import import_routes, admin_schedule
+from backend.routes import import_routes, admin_schedule
 
 # ✅ Stripe routers (named distinctly to avoid duplicate includes)
 from .routes.stripe_webhook import router as stripe_webhook_router  # POST /stripe/webhook
