@@ -1,6 +1,6 @@
 import asyncio
 
-from tasks.cron_tasks import daily_scrape
+from backend.tasks.cron_tasks import daily_scrape
 
 
 def main() -> None:
