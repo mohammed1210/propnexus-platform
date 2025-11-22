@@ -142,6 +142,8 @@ All tables have RLS enabled to ensure data security.
 
 **properties**:
 - Read-only for all authenticated and anonymous users
+- **Note**: Frontend should use backend API (`/properties`) instead of direct Supabase queries
+- Backend uses service role key for secure data access
 - Writes managed by service role only
 
 **users & subscriptions**:
@@ -193,8 +195,11 @@ Ensure these are set in your application:
 
 **Frontend**:
 - `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Anonymous key for client operations
-- `SUPABASE_SERVICE_ROLE_KEY` - Service role key for server components
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Anonymous key for client operations (rarely used)
+- `SUPABASE_SERVICE_ROLE_KEY` - Service role key for server components (Next.js API routes)
+- `NEXT_PUBLIC_BACKEND_URL` - Backend API URL (e.g., https://api.propnexus.com)
+
+**Note**: Frontend should fetch properties via backend API (`/properties`) instead of direct Supabase queries for better security and rate limiting.
 
 ## Troubleshooting
 
