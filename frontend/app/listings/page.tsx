@@ -10,7 +10,6 @@ import { FiSearch, FiSliders, FiMapPin, FiMap, FiGrid, FiX } from 'react-icons/f
 import { LuPoundSterling, LuBedDouble, LuBath } from 'react-icons/lu';
 
 import PropertyCard from '@/components/PropertyCard';
-import { getSupabase } from '@/lib/supabaseClient';
 
 /* ---------------- Helper Functions ---------------- */
 /**
@@ -278,46 +277,69 @@ function ListingsInner() {
   const [rows, setRows] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch data
+  // Fetch data from backend
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const supabase = getSupabase();
+      
+      try {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+        
+        // Build query params
+        const params = new URLSearchParams();
+        if (q) params.set('q', q);
+        if (minP !== undefined) params.set('min', String(minP));
+        if (maxP !== undefined) params.set('max', String(maxP));
+        if (beds !== undefined) params.set('beds', String(beds));
+        if (baths !== undefined) params.set('baths', String(baths));
+        if (types.length > 0) params.set('types', types.join(','));
+        params.set('sort', sort);
+        params.set('dir', dir);
+        params.set('limit', '200');
 
-      let query = supabase
-        .from('properties')
-        .select(
-          'id,title,location,price,bedrooms,bathrooms,description,yield_percent,roi_percent,imageurl,latitude,longitude,created_at,investment_type:investmentType',
-        )
-        .limit(200);
+        const response = await fetch(`${backendUrl}/properties?${params.toString()}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // Bypass cache to ensure fresh data
+          cache: 'no-store',
+        });
 
-      // Order
-      query = query.order(sort, { ascending: dir === 'asc', nullsFirst: false });
-      if (sort !== 'created_at') {
-        query = query.order('created_at', { ascending: false });
-      }
+        if (cancelled) return;
 
-      // Filters
-      if (q) query = query.or(`title.ilike.%${q}%,location.ilike.%${q}%`);
-      if (minP !== undefined) query = query.gte('price', minP);
-      if (maxP !== undefined) query = query.lte('price', maxP);
-      if (beds !== undefined) query = query.gte('bedrooms', beds);
-      if (baths !== undefined) query = query.gte('bathrooms', baths);
-      if (types.length > 0) {
-        query = query.in('investmentType', types);
-      }
+        if (!response.ok) {
+          throw new Error(`Failed to fetch properties: ${response.status}`);
+        }
 
-      const { data, error } = await query;
-      if (cancelled) return;
+        const data = await response.json();
+        
+        // Map backend response to expected format
+        const mappedData = (data || []).map((prop: any) => ({
+          id: prop.id,
+          title: prop.title,
+          location: prop.location,
+          price: prop.price,
+          bedrooms: prop.bedrooms,
+          bathrooms: prop.bathrooms,
+          description: prop.description,
+          yield_percent: prop.yield_percent,
+          roi_percent: prop.roi_percent,
+          imageurl: prop.imageurl,
+          latitude: prop.latitude,
+          longitude: prop.longitude,
+          created_at: prop.created_at,
+          investment_type: prop.investmentType,
+        }));
 
-      if (error) {
-        console.error('[listings] supabase error', error);
+        setRows(mappedData);
+      } catch (error) {
+        console.error('[listings] fetch error', error);
         setRows([]);
-      } else {
-        setRows(data || []);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     })();
 
     return () => {
