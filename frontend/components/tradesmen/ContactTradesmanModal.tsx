@@ -37,8 +37,10 @@ export default function ContactTradesmanModal({
     setError(null);
 
     try {
+      // Resolve backend URL using standard env var priority (consistent with lib/api.ts)
       const apiBase =
         process.env.NEXT_PUBLIC_BACKEND_URL ||
+        process.env.NEXT_PUBLIC_API_BASE ||
         process.env.NEXT_PUBLIC_API_URL ||
         'https://propnexus-backend-production.up.railway.app';
 

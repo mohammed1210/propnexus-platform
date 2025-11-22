@@ -1,8 +1,11 @@
 // frontend/lib/api.ts
 'use client';
 
+// Resolve backend URL using standard env var priority
+// Order: NEXT_PUBLIC_BACKEND_URL -> NEXT_PUBLIC_API_BASE -> NEXT_PUBLIC_API_URL -> Railway default
 export const API_BASE =
   process.env.NEXT_PUBLIC_BACKEND_URL ||
+  process.env.NEXT_PUBLIC_API_BASE ||
   process.env.NEXT_PUBLIC_API_URL ||
   'https://propnexus-backend-production.up.railway.app';
 

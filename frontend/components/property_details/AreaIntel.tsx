@@ -29,7 +29,8 @@ export default function AreaIntel({
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    const backend = (process.env.NEXT_PUBLIC_BACKEND_URL || '').trim();
+    // Resolve backend URL using standard env var priority (consistent with lib/api.ts)
+    const backend = (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || '').trim();
     const pc = (postcode ?? '').trim().toUpperCase();
     const validPostcode = pc.length >= 3;
 

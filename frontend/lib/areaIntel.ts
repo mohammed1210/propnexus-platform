@@ -11,10 +11,11 @@ export type AreaIntel = {
   schoolsScore?: number; // 0–100 derived
 };
 
-const API = process.env.NEXT_PUBLIC_BACKEND_URL;
+// Resolve backend URL using standard env var priority (consistent with lib/api.ts)
+const API = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL;
 
 export async function fetchAreaIntel(postcode: string): Promise<AreaIntel> {
-  if (!API) throw new Error('Missing NEXT_PUBLIC_BACKEND_URL');
+  if (!API) throw new Error('Missing backend URL configuration (NEXT_PUBLIC_BACKEND_URL/API_BASE/API_URL)');
   const pc = postcode.replace(/\s+/g, '');
   const res = await fetch(`${API}/area-intel/${encodeURIComponent(pc)}`, {
     next: { revalidate: 300 },

@@ -5,8 +5,9 @@ import { NextResponse } from 'next/server';
  * Keeps Preview/Production working without cross-origin CORS issues.
  */
 
+// Resolve backend URL using standard env var priority (consistent with lib/api.ts)
 const BACKEND_BASE =
-  (process.env.NEXT_PUBLIC_BACKEND_URL || '').replace(/\/$/, '') || 'http://localhost:8000';
+  (process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '') || 'http://localhost:8000';
 
 export const runtime = 'nodejs'; // or 'edge' if your backend allows it
 

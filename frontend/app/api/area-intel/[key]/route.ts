@@ -5,7 +5,8 @@ import { fetchWithRetry, BASE as API_BASE } from '@/lib/api';
 // Use `any` and narrow inside to keep validation happy.
 export async function GET(request: Request, ctx: any) {
   const key = String(ctx?.params?.key ?? '');
-  const base = process.env.NEXT_PUBLIC_BACKEND_URL || API_BASE;
+  // Resolve backend URL using standard env var priority (consistent with lib/api.ts)
+  const base = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || API_BASE;
   const url = `${base}/area-intel/${encodeURIComponent(key)}`;
 
   try {

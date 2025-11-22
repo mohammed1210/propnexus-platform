@@ -3,7 +3,9 @@ import { useEffect } from 'react';
 const SubscribePage = () => {
   const handleSubscribe = async () => {
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/create-checkout-session`, {
+      // Resolve backend URL using standard env var priority (consistent with lib/api.ts)
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${backendUrl}/create-checkout-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

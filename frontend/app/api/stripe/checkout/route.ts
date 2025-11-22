@@ -9,9 +9,10 @@ import { NextRequest } from 'next/server';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const backend = process.env.NEXT_PUBLIC_BACKEND_URL;
+    // Resolve backend URL using standard env var priority (consistent with lib/api.ts)
+    const backend = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL;
     if (!backend) {
-      return new Response(JSON.stringify({ error: 'NEXT_PUBLIC_BACKEND_URL not set' }), {
+      return new Response(JSON.stringify({ error: 'Backend URL not configured (NEXT_PUBLIC_BACKEND_URL/API_BASE/API_URL)' }), {
         status: 500,
         headers: { 'content-type': 'application/json' },
       });

@@ -78,7 +78,8 @@ export function useUserPlan(): UserPlanData {
       }
 
       // Fetch plan from backend using email query parameter
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+      // Resolve backend URL using standard env var priority (consistent with lib/api.ts)
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const response = await fetch(
         `${backendUrl}/users/plan?email=${encodeURIComponent(email)}`,
         {
