@@ -12,6 +12,10 @@ router = APIRouter(prefix="/properties", tags=["properties"])
 
 # --- Supabase setup (server-side) ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
+# Try multiple environment variable names for service role key:
+# 1. SUPABASE_SERVICE_ROLE_KEY (preferred, standard naming)
+# 2. SUPABASE_SERVICE_ROLE (legacy, used in some deployments)
+# 3. SUPABASE_KEY (fallback, may be anon key in some setups)
 SUPABASE_SERVICE_ROLE_KEY = (
     os.getenv("SUPABASE_SERVICE_ROLE_KEY") 
     or os.getenv("SUPABASE_SERVICE_ROLE") 
