@@ -30,6 +30,7 @@ This ensures the backend can connect to Supabase regardless of which variable na
 Created migration `supabase/migrations/20251122_fix_properties_rls_remove_published.sql` that:
 - Drops the old RLS policies that reference the non-existent `published` column
 - Creates new RLS policies that allow all users (authenticated and anonymous) to read all properties
+- **Note**: For production, consider adding a `published` column if you need draft/published workflow in the future
 
 ## How to Apply the Fix
 
@@ -155,11 +156,11 @@ If you want to support a "published/draft" workflow in the future:
    ```
    If you don't see `properties_read_auth` and `properties_read_anon` policies, re-run the migration.
 
-2. **Check backend environment variables**
-   Ensure one of these is set in `backend/.env`:
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `SUPABASE_SERVICE_ROLE`
-   - `SUPABASE_KEY`
+### 2. Check Backend Environment Variables
+Ensure one of these is set in `backend/.env` (checked in this order):
+1. `SUPABASE_SERVICE_ROLE_KEY` (preferred, standard naming)
+2. `SUPABASE_SERVICE_ROLE` (legacy, used in some deployments)
+3. `SUPABASE_KEY` (fallback, ensure this is a service role key, not anon key)
    
    And:
    - `SUPABASE_URL`
