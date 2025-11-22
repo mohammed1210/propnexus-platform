@@ -2,7 +2,7 @@ name: Deploy Backend (Railway)
 
 on:
   push:
-    branches: [ main, sprint-*, po* ]
+    branches: [ main, sprint-*, po*, copilot/* ]
   workflow_dispatch:
 
 jobs:
