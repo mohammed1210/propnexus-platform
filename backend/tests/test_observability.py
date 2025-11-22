@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch, AsyncMock
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from backend.utils.runlog import RunLog
+from utils.runlog import RunLog
 from scraper.utils import smart_fetch_html, _looks_blocked, _is_valid_html
 
 
@@ -375,7 +375,7 @@ class TestScraperRunLogIntegration:
     @patch("scraper.onthemarket_scraper.aiohttp.ClientSession")
     async def test_onthemarket_creates_runlog(self, mock_session_class, mock_sb):
         """Test that OnTheMarket scraper creates RunLog entry"""
-        from backend.scraper.onthemarket_scraper import scrape_onthemarket_properties
+        from scraper.onthemarket_scraper import scrape_onthemarket_properties
 
         # Setup mock for RunLog
         mock_result = Mock()
@@ -409,7 +409,7 @@ class TestScraperRunLogIntegration:
     @patch("scraper.spare_room_scraper.aiohttp.ClientSession")
     async def test_spareroom_creates_runlog(self, mock_session_class, mock_sb):
         """Test that SpareRoom scraper creates RunLog entry"""
-        from backend.scraper.spare_room_scraper import scrape_spareroom_properties
+        from scraper.spare_room_scraper import scrape_spareroom_properties
 
         # Setup mock for RunLog
         mock_result = Mock()
@@ -441,7 +441,7 @@ class TestScraperRunLogIntegration:
     @patch("utils.runlog._sb")
     async def test_scrape_all_sources_integration(self, mock_sb):
         """Test that scrape_all_sources calls all scrapers (integration test)"""
-        from backend.utils.ingest import scrape_all_sources
+        from utils.ingest import scrape_all_sources
 
         # Setup RunLog mock
         mock_result = Mock()
