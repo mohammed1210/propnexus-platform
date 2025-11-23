@@ -24,12 +24,17 @@ type Deal = {
 
 export const dynamic = 'force-dynamic';
 
-/** Resolve the FastAPI base URL from public env, with safe fallbacks. */
+/** 
+ * Resolve the FastAPI base URL from public env, with safe fallbacks.
+ * Uses consistent priority order: BACKEND_URL -> API_BASE -> API_URL -> localhost
+ */
 function getBackendBase(): string {
-  const raw = (process.env.NEXT_PUBLIC_API_BASE ||
-    process.env.NEXT_PUBLIC_API_URL ||
+  const raw = (
     process.env.NEXT_PUBLIC_BACKEND_URL ||
-    '') as string;
+    process.env.NEXT_PUBLIC_API_BASE ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    ''
+  ) as string;
 
   // In the browser, fall back to same-origin if nothing is set
   if (!raw && typeof window !== 'undefined') {

@@ -25,15 +25,19 @@ type Property = {
   image_urls?: string[] | null;
 };
 
-/** Resolve the FastAPI base URL from public env (trim TRAILING slashes only) */
+/** 
+ * Resolve the FastAPI base URL from public env (trim TRAILING slashes only)
+ * Uses consistent priority order with listings page:
+ * NEXT_PUBLIC_BACKEND_URL -> NEXT_PUBLIC_API_BASE -> NEXT_PUBLIC_API_URL -> localhost fallback
+ */
 function getBackendBase(): string {
-  const raw = (process.env.NEXT_PUBLIC_API_URL ||
+  const raw = (
     process.env.NEXT_PUBLIC_BACKEND_URL ||
-    '') as string;
+    process.env.NEXT_PUBLIC_API_BASE ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    'http://localhost:8000'
+  ) as string;
 
-  if (!raw) {
-    throw new Error('NEXT_PUBLIC_API_URL (or NEXT_PUBLIC_BACKEND_URL) is not set');
-  }
   // Keep https:// and path segments intact; only strip trailing slashes.
   return raw.replace(/\/+$/, '');
 }
