@@ -93,6 +93,14 @@ create table if not exists public.properties (
   url text,
   image_urls text[],
   data jsonb,
+  -- Investment calculation fields
+  yield_percent numeric,
+  roi_percent numeric,
+  bmv numeric,
+  -- Legacy compatibility fields
+  imageurl text, -- Single image URL (use image_urls array for new data)
+  location text, -- Property location (use address for new data)
+  "investmentType" text, -- Investment strategy: HMO, BTL, SA, BRR, Flip, Commercial
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
@@ -126,6 +134,10 @@ create index if not exists idx_subscriptions_customer on public.subscriptions(st
 create index if not exists idx_subscriptions_status on public.subscriptions(status);
 create index if not exists idx_properties_postcode on public.properties(postcode);
 create index if not exists idx_properties_source on public.properties(source);
+create index if not exists idx_properties_investment_type on public.properties("investmentType");
+create index if not exists idx_properties_yield on public.properties(yield_percent);
+create index if not exists idx_properties_roi on public.properties(roi_percent);
+create index if not exists idx_properties_location on public.properties(location);
 create index if not exists idx_saved_deals_user on public.saved_deals(user_id);
 
 -- Add column comments for documentation
@@ -133,6 +145,12 @@ comment on column public.users.plan is 'Subscription plan: free, pro, investor';
 comment on column public.users.plan_status is 'Subscription status: active, past_due, canceled, trialing';
 comment on column public.users.current_period_end is 'Unix timestamp of current billing period end';
 comment on column public.users.stripe_customer_id is 'Stripe customer ID for billing';
+comment on column public.properties.yield_percent is 'Investment yield percentage';
+comment on column public.properties.roi_percent is 'Return on investment percentage';
+comment on column public.properties.bmv is 'Below market value discount';
+comment on column public.properties.imageurl is 'Legacy single image URL (use image_urls array for new data)';
+comment on column public.properties.location is 'Property location (use address for new data)';
+comment on column public.properties."investmentType" is 'Investment strategy type: HMO, BTL, SA, BRR, Flip, Commercial';
 
 -- Enable Row Level Security (RLS)
 alter table public.saved_deals enable row level security;
