@@ -65,7 +65,7 @@ def test_list_properties_with_filters(mock_create_client, client):
             "price": 250000,
             "bedrooms": 3,
             "bathrooms": 2,
-            "investmentType": "BTL",
+            "investment_type": "BTL",
             "latitude": 51.5074,
             "longitude": -0.1278,
         }

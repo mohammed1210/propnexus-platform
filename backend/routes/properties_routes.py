@@ -39,7 +39,7 @@ ALLOWED_SORT = {"price", "created_at", "bedrooms", "yield_percent", "roi_percent
 
 SELECT_COLS = (
     "id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,"
-    "imageurl,latitude,longitude,created_at,description,investmentType"
+    "imageurl,latitude,longitude,created_at,description,investment_type"
 )
 
 
@@ -80,7 +80,7 @@ def list_properties(
             # Split comma-separated types and filter
             type_list = [t.strip() for t in types.split(",") if t.strip()]
             if type_list:
-                query = query.in_("investmentType", type_list)
+                query = query.in_("investment_type", type_list)
 
         # Order
         query = query.order(sort_col, desc=desc, nulls_first=not desc)
