@@ -8,7 +8,7 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 
   transform: {
-    '^.+\\.(ts|tsx|js|jsx)$': ['babel-jest', { rootMode: 'upward' }],
+    '^.+\\.(ts|tsx|js|jsx)$': ['babel-jest'],
   },
 
   moduleNameMapper: {
