@@ -112,8 +112,8 @@ describe('Listings Schema Validation', () => {
     expect(mappedProperty.roi_percent).toBeNull();
     expect(mappedProperty.investment_type).toBeNull();
     
-    // No undefined values
-    expect(mappedProperty).not.toHaveProperty('undefined');
+    // No undefined values - all properties should be defined (even if null)
+    expect(Object.values(mappedProperty).some(value => value === undefined)).toBe(false);
   });
 
   it('does not use camelCase investmentType from backend', () => {
