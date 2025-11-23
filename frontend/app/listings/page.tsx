@@ -10,6 +10,7 @@ import { FiSearch, FiSliders, FiMapPin, FiMap, FiGrid, FiX } from 'react-icons/f
 import { LuPoundSterling, LuBedDouble, LuBath } from 'react-icons/lu';
 
 import PropertyCard from '@/components/PropertyCard';
+import { resolveApiBase } from '@/lib/api';
 
 /* ---------------- Helper Functions ---------------- */
 /**
@@ -284,9 +285,8 @@ function ListingsInner() {
       setLoading(true);
       
       try {
-        // Resolve backend URL using standard env var priority (consistent with lib/api.ts and PropertyCard.tsx)
-        // Order: NEXT_PUBLIC_BACKEND_URL -> NEXT_PUBLIC_API_BASE -> NEXT_PUBLIC_API_URL -> localhost fallback
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        // Resolve backend URL using shared helper so builds without env vars still hit production backend
+        const backendUrl = resolveApiBase();
         
         // Build query params
         const params = new URLSearchParams();

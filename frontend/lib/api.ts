@@ -9,6 +9,15 @@ export const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ||
   'https://propnexus-backend-production.up.railway.app';
 
+/**
+ * Resolve the backend base URL using the shared env var priority.
+ * Always falls back to the production Railway backend instead of localhost
+ * to avoid silent failures when env vars are missing in production builds.
+ */
+export function resolveApiBase(): string {
+  return (API_BASE || 'https://propnexus-backend-production.up.railway.app').replace(/\/+$/, '');
+}
+
 /* ---------------------------------------------------
    Generic Helpers (new + legacy compatibility)
 --------------------------------------------------- */

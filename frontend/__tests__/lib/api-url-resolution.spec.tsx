@@ -1,6 +1,6 @@
 /**
  * Test API URL resolution logic across the frontend
- * Ensures consistent fallback chain: BACKEND_URL -> API_BASE -> API_URL -> localhost
+ * Ensures consistent fallback chain: BACKEND_URL -> API_BASE -> API_URL -> production default
  */
 
 describe('API URL Resolution', () => {
@@ -60,19 +60,18 @@ describe('API URL Resolution', () => {
     });
   });
 
-  describe('Inline URL resolution (simulating listings page pattern)', () => {
+  describe('resolveApiBase helper (used by listings + client fetchers)', () => {
+    const railwayDefault = 'https://propnexus-backend-production.up.railway.app';
+
     it('should resolve BACKEND_URL first', () => {
       process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend.example.com';
       process.env.NEXT_PUBLIC_API_BASE = 'https://base.example.com';
       process.env.NEXT_PUBLIC_API_URL = 'https://api.example.com';
 
-      const backendUrl = 
-        process.env.NEXT_PUBLIC_BACKEND_URL || 
-        process.env.NEXT_PUBLIC_API_BASE || 
-        process.env.NEXT_PUBLIC_API_URL || 
-        'http://localhost:8000';
-
-      expect(backendUrl).toBe('https://backend.example.com');
+      jest.isolateModules(() => {
+        const { resolveApiBase } = require('@/lib/api');
+        expect(resolveApiBase()).toBe('https://backend.example.com');
+      });
     });
 
     it('should fallback to API_BASE when BACKEND_URL not set', () => {
@@ -80,13 +79,10 @@ describe('API URL Resolution', () => {
       process.env.NEXT_PUBLIC_API_BASE = 'https://base.example.com';
       process.env.NEXT_PUBLIC_API_URL = 'https://api.example.com';
 
-      const backendUrl = 
-        process.env.NEXT_PUBLIC_BACKEND_URL || 
-        process.env.NEXT_PUBLIC_API_BASE || 
-        process.env.NEXT_PUBLIC_API_URL || 
-        'http://localhost:8000';
-
-      expect(backendUrl).toBe('https://base.example.com');
+      jest.isolateModules(() => {
+        const { resolveApiBase } = require('@/lib/api');
+        expect(resolveApiBase()).toBe('https://base.example.com');
+      });
     });
 
     it('should fallback to API_URL when only API_URL is set (Railway fix)', () => {
@@ -94,43 +90,32 @@ describe('API URL Resolution', () => {
       delete process.env.NEXT_PUBLIC_API_BASE;
       process.env.NEXT_PUBLIC_API_URL = 'https://api.example.com';
 
-      const backendUrl = 
-        process.env.NEXT_PUBLIC_BACKEND_URL || 
-        process.env.NEXT_PUBLIC_API_BASE || 
-        process.env.NEXT_PUBLIC_API_URL || 
-        'http://localhost:8000';
-
-      expect(backendUrl).toBe('https://api.example.com');
+      jest.isolateModules(() => {
+        const { resolveApiBase } = require('@/lib/api');
+        expect(resolveApiBase()).toBe('https://api.example.com');
+      });
     });
 
-    it('should fallback to localhost when no env vars are set', () => {
+    it('should fallback to production default when no env vars are set', () => {
       delete process.env.NEXT_PUBLIC_BACKEND_URL;
       delete process.env.NEXT_PUBLIC_API_BASE;
       delete process.env.NEXT_PUBLIC_API_URL;
 
-      const backendUrl = 
-        process.env.NEXT_PUBLIC_BACKEND_URL || 
-        process.env.NEXT_PUBLIC_API_BASE || 
-        process.env.NEXT_PUBLIC_API_URL || 
-        'http://localhost:8000';
-
-      expect(backendUrl).toBe('http://localhost:8000');
+      jest.isolateModules(() => {
+        const { resolveApiBase } = require('@/lib/api');
+        expect(resolveApiBase()).toBe(railwayDefault);
+      });
     });
 
-    it('should not fallback to localhost when API_URL is set (the bug we fixed)', () => {
+    it('should strip trailing slashes', () => {
       delete process.env.NEXT_PUBLIC_BACKEND_URL;
-      delete process.env.NEXT_PUBLIC_API_BASE;
-      process.env.NEXT_PUBLIC_API_URL = 'https://production.railway.app';
+      process.env.NEXT_PUBLIC_API_BASE = 'https://base.example.com///';
+      delete process.env.NEXT_PUBLIC_API_URL;
 
-      const backendUrl = 
-        process.env.NEXT_PUBLIC_BACKEND_URL || 
-        process.env.NEXT_PUBLIC_API_BASE || 
-        process.env.NEXT_PUBLIC_API_URL || 
-        'http://localhost:8000';
-
-      // This is the fix: should NOT be localhost when API_URL is set
-      expect(backendUrl).not.toBe('http://localhost:8000');
-      expect(backendUrl).toBe('https://production.railway.app');
+      jest.isolateModules(() => {
+        const { resolveApiBase } = require('@/lib/api');
+        expect(resolveApiBase()).toBe('https://base.example.com');
+      });
     });
   });
 });
