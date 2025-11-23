@@ -78,6 +78,8 @@ export default function PropertyDetailsPage() {
               roi_percent: toNum((data as any).roi_percent),
               latitude: toNum((data as any).latitude) ?? null,
               longitude: toNum((data as any).longitude) ?? null,
+              // Map snake_case DB field to camelCase for frontend components
+              investmentType: (data as any).investment_type,
             }
           : null;
 
