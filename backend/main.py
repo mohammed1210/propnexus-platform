@@ -56,7 +56,7 @@ ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()]
 
 # Allow all Vercel preview deployments with regex pattern
 # This matches https://*.vercel.app including git branch previews
-VERCEL_ORIGIN_REGEX = r"^https://[a-zA-Z0-9-]+\.vercel\.app$"
+VERCEL_ORIGIN_REGEX = r"^https://[a-zA-Z0-9_-]+\.vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,
