@@ -58,7 +58,7 @@ ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()]
 # Matches https://[subdomain].vercel.app where subdomain follows RFC 1035:
 # - Must start and end with alphanumeric characters
 # - May contain hyphens in the middle
-# - Maximum 63 characters per DNS label
+# - Maximum 63 characters per DNS label (1 start + 0-61 middle + 0-1 end)
 VERCEL_ORIGIN_REGEX = r"^https://[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.vercel\.app$"
 
 app.add_middleware(
