@@ -330,7 +330,7 @@ function ListingsInner() {
           latitude: prop.latitude,
           longitude: prop.longitude,
           created_at: prop.created_at,
-          investment_type: prop.investmentType,
+          investment_type: prop.investment_type,
         }));
 
         setRows(mappedData);

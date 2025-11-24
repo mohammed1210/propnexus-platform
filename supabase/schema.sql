@@ -93,6 +93,14 @@ create table if not exists public.properties (
   url text,
   image_urls text[],
   data jsonb,
+  -- Investment analytics columns (snake_case)
+  yield_percent numeric,
+  roi_percent numeric,
+  investment_type text,
+  bmv numeric,
+  -- Additional display fields
+  location text,
+  imageurl text,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
@@ -126,6 +134,10 @@ create index if not exists idx_subscriptions_customer on public.subscriptions(st
 create index if not exists idx_subscriptions_status on public.subscriptions(status);
 create index if not exists idx_properties_postcode on public.properties(postcode);
 create index if not exists idx_properties_source on public.properties(source);
+create index if not exists idx_properties_investment_type on public.properties(investment_type);
+create index if not exists idx_properties_yield_percent on public.properties(yield_percent);
+create index if not exists idx_properties_roi_percent on public.properties(roi_percent);
+create index if not exists idx_properties_location on public.properties(location);
 create index if not exists idx_saved_deals_user on public.saved_deals(user_id);
 
 -- Add column comments for documentation
