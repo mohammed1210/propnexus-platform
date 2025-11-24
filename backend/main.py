@@ -50,13 +50,18 @@ app = FastAPI()
 
 _ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,https://propnexus-platform.vercel.app,https://*.vercel.app",
+    "http://localhost:3000,https://propnexus-platform.vercel.app",
 )
 ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()]
+
+# Allow all Vercel preview deployments with regex pattern
+# This matches https://*.vercel.app including git branch previews
+VERCEL_ORIGIN_REGEX = r"^https://[a-zA-Z0-9-]+\.vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=VERCEL_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
