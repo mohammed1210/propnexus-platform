@@ -1,12 +1,8 @@
-// app/layout.tsx
+// app/layout.tsx (server component)
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import '../styles/design-tokens.css';
-import UiOverlaysClient from '@components/ui/UiOverlaysClient';
-import BackToTop from '@components/BackToTop';
-import Header from '@components/Header';
-import { ThemeProvider } from '@components/ThemeProvider';
-import { Toaster } from 'sonner';
+import RootShell from '@components/RootShell';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
@@ -81,31 +77,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        {/* Skip link for a11y */}
-        <a
-          href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 bg-zinc-900 text-white px-3 py-2 rounded"
-        >
-          Skip to content
-        </a>
-
-        <ThemeProvider>
-          {/* ✅ App Header (includes conditional Billing link) */}
-          <Header />
-
-          <main id="main" className="min-h-[calc(100dvh-var(--header-h,56px))] focus:outline-none">
-            {children}
-          </main>
-
-          {/* Client-side helpers */}
-          <UiOverlaysClient />
-          <BackToTop />
-          <Toaster position="top-right" richColors />
-        </ThemeProvider>
-      </body>
-    </html>
-  );
+  return <RootShell>{children}</RootShell>;
 }

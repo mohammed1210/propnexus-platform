@@ -9,8 +9,12 @@ create table if not exists public.users (
   id uuid primary key default uuid_generate_v4(),
   email text unique not null,
   stripe_customer_id text unique,
+  plan text default 'free',
+  plan_status text default 'active',
+  current_period_end bigint,
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
+  updated_at timestamp with time zone default now(),
+  constraint users_plan_check check (plan in ('free', 'pro', 'investor'))
 );
 
 -- Subscriptions table - tracks user subscription status
@@ -25,6 +29,42 @@ create table if not exists public.subscriptions (
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
+
+-- Prices table - Stripe price metadata (added to satisfy relationship for admin stats)
+-- Using stripe_price_id as the primary key to align with existing subscriptions.price_id text values.
+create table if not exists public.prices (
+  stripe_price_id text primary key,
+  product_id text,
+  nickname text,
+  unit_amount integer, -- stored in smallest currency unit (e.g. cents)
+  currency text,
+  billing_interval text, -- e.g. month, year
+  created_at timestamp with time zone default now()
+);
+
+-- Idempotent foreign key from subscriptions.price_id -> prices.stripe_price_id
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.subscriptions'::regclass
+      AND contype = 'f'
+      AND conname = 'subscriptions_price_id_fkey'
+  ) THEN
+    ALTER TABLE public.subscriptions
+      ADD CONSTRAINT subscriptions_price_id_fkey
+      FOREIGN KEY (price_id)
+      REFERENCES public.prices (stripe_price_id)
+      ON UPDATE CASCADE
+      ON DELETE SET NULL;
+  END IF;
+END$$;
+
+-- Index to speed up lookups/join on subscriptions.price_id
+create index if not exists idx_subscriptions_price_id on public.subscriptions(price_id);
+
+comment on table public.prices is 'Stripe prices referenced by subscriptions.price_id';
+comment on column public.subscriptions.price_id is 'References public.prices.stripe_price_id';
 
 -- Saved deals table - user-saved property deals
 create table if not exists public.saved_deals (
@@ -79,6 +119,7 @@ create table if not exists public.property_notes (
 -- Create indexes for better query performance
 create index if not exists idx_users_email on public.users(email);
 create index if not exists idx_users_stripe_customer on public.users(stripe_customer_id);
+create index if not exists idx_users_plan on public.users(plan);
 create index if not exists idx_subscriptions_user on public.subscriptions(user_id);
 create index if not exists idx_subscriptions_email on public.subscriptions(email);
 create index if not exists idx_subscriptions_customer on public.subscriptions(stripe_customer_id);
@@ -86,6 +127,12 @@ create index if not exists idx_subscriptions_status on public.subscriptions(stat
 create index if not exists idx_properties_postcode on public.properties(postcode);
 create index if not exists idx_properties_source on public.properties(source);
 create index if not exists idx_saved_deals_user on public.saved_deals(user_id);
+
+-- Add column comments for documentation
+comment on column public.users.plan is 'Subscription plan: free, pro, investor';
+comment on column public.users.plan_status is 'Subscription status: active, past_due, canceled, trialing';
+comment on column public.users.current_period_end is 'Unix timestamp of current billing period end';
+comment on column public.users.stripe_customer_id is 'Stripe customer ID for billing';
 
 -- Enable Row Level Security (RLS)
 alter table public.saved_deals enable row level security;

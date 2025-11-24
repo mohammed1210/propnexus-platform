@@ -7,3 +7,4 @@ node_modules
 !frontend/.env.example
 test-results/
 .playwright/
+demo-page-preview.png

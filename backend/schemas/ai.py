@@ -41,3 +41,20 @@ class StrategiesResponse(BaseModel):
     """Response payload containing a list of strategies."""
 
     strategies: List[Strategy]
+
+
+class TradesmenRecommendRequest(BaseModel):
+    """Request payload for AI tradesmen recommendations."""
+
+    property_details: Optional[str] = None
+    location: str
+    property_type: Optional[str] = None
+    bedrooms: Optional[int] = None
+    trade_type: Optional[str] = None
+
+
+class TradesmenRecommendResponse(BaseModel):
+    """Response payload containing AI recommendation for tradesmen."""
+
+    recommendation: str
+    property_summary: str

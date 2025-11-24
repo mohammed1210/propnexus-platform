@@ -4,6 +4,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useUserPlan, UserPlan } from '@/lib/useUserPlan';
+import { hasAccess, getUpgradeMessage, getPlanLabel } from '@/lib/planPermissions';
 
 interface PlanGateProps {
   /**
@@ -27,13 +28,6 @@ interface PlanGateProps {
    */
   deniedComponent?: React.ReactNode;
 }
-
-// Plan hierarchy: free < pro < investor
-const PLAN_LEVELS: Record<UserPlan, number> = {
-  free: 0,
-  pro: 1,
-  investor: 2,
-};
 
 /**
  * PlanGate - A component that restricts content based on user subscription plan.
@@ -75,12 +69,10 @@ export default function PlanGate({
     return <>{children}</>;
   }
 
-  // Check if user has required plan or higher
-  const userLevel = PLAN_LEVELS[plan] || 0;
-  const requiredLevel = PLAN_LEVELS[require] || 0;
-  const hasAccess = userLevel >= requiredLevel;
+  // Check if user has required plan or higher using shared utility
+  const userHasAccess = hasAccess(plan, require);
 
-  if (hasAccess) {
+  if (userHasAccess) {
     return <>{children}</>;
   }
 
@@ -89,9 +81,7 @@ export default function PlanGate({
     return <>{deniedComponent}</>;
   }
 
-  const defaultMessage =
-    deniedMessage ||
-    `This feature requires ${require === 'investor' ? 'an' : 'a'} ${require.toUpperCase()} plan.`;
+  const defaultMessage = deniedMessage || getUpgradeMessage(require);
 
   return (
     <div className="flex items-center justify-center min-h-[400px] px-4">
@@ -136,7 +126,7 @@ export default function PlanGate({
         </div>
 
         <p className="text-sm text-gray-500">
-          Current plan: <span className="font-semibold capitalize">{plan}</span>
+          Current plan: <span className="font-semibold">{getPlanLabel(plan)}</span>
         </p>
       </div>
     </div>

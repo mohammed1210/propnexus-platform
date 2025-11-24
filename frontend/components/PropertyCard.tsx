@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { fetchWithRetry } from '@/lib/api';
-import Image from 'next/image';
+import ImageWithFallback from '@/components/ImageWithFallback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiHeart } from 'react-icons/fi';
 
@@ -18,9 +18,11 @@ type Property = {
   price?: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
+  description?: string | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
   imageurl?: string | null;
+  image_urls?: string[] | null;
 };
 
 /** Resolve the FastAPI base URL from public env (trim TRAILING slashes only) */
@@ -157,6 +159,18 @@ export default function PropertyCard({ p }: { p: Property }) {
     }
   }, [p.id]);
 
+  const imageSrc =
+    p.imageurl ||
+    (Array.isArray(p.image_urls) && p.image_urls.length > 0 ? p.image_urls[0] : null) ||
+    '/placeholder.jpg';
+
+  const descriptionSnippet = useMemo(() => {
+    if (!p.description) return '';
+    const trimmed = p.description.trim();
+    if (trimmed.length <= 180) return trimmed;
+    return trimmed.slice(0, 177) + '...';
+  }, [p.description]);
+
   return (
     <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30">
       <Link
@@ -164,8 +178,8 @@ export default function PropertyCard({ p }: { p: Property }) {
         className="block relative w-full h-48 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
         aria-label={`Open ${p.title ?? 'property'}`}
       >
-        <Image
-          src={p.imageurl || '/placeholder.jpg'}
+        <ImageWithFallback
+          src={imageSrc}
           alt={p.title || 'Property image'}
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -261,6 +275,12 @@ export default function PropertyCard({ p }: { p: Property }) {
           )}
         </div>
       </Link>
+
+      {descriptionSnippet && (
+        <div className="px-4 pt-3 text-sm text-slate-700 dark:text-slate-300 line-clamp-3">
+          {descriptionSnippet}
+        </div>
+      )}
 
       <div className="p-4 space-y-2">
         <Link href={href} className="block group">

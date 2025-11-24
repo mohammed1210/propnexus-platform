@@ -1,28 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useUser } from '@clerk/nextjs';
 import { toast } from 'sonner';
-
-/** Lazy Supabase (safe for CI/preview) */
-async function getSupabase() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL as string | undefined;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
-  if (!url || !key) return null;
-  const { createClient } = await import('@supabase/supabase-js');
-  return createClient(url, key);
-}
-
-async function getUserEmail(): Promise<string | null> {
-  try {
-    const sb = await getSupabase();
-    if (!sb) return null;
-    const { data } = await sb.auth.getUser();
-    return data.user?.email ?? null;
-  } catch {
-    return null;
-  }
-}
 
 type Props = {
   priceId: string;
@@ -32,17 +13,37 @@ type Props = {
 
 export default function UpgradeButton({ priceId, children = 'Upgrade', className }: Props) {
   const router = useRouter();
-  const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    (async () => setEmail(await getUserEmail()))();
-  }, []);
+  
+  // Try to use Clerk, fallback if not available
+  let user: any = null;
+  let isLoaded = true;
+  
+  try {
+    const clerkHook = useUser();
+    user = clerkHook.user;
+    isLoaded = clerkHook.isLoaded;
+  } catch (error) {
+    console.warn('[UpgradeButton] Clerk not available:', error);
+    isLoaded = true; // Treat as loaded but without user
+  }
 
   const handleClick = async () => {
-    // If not signed in, send them to magic login and back to pricing
+    // Wait for Clerk to load
+    if (!isLoaded) {
+      return;
+    }
+
+    // If not signed in, send them to sign-in page
+    if (!user) {
+      router.push('/sign-in?redirect_url=/pricing');
+      return;
+    }
+
+    // Get user email from Clerk
+    const email = user.primaryEmailAddress?.emailAddress;
     if (!email) {
-      router.push('/magic-login?returnTo=/pricing');
+      toast.error('No email address found. Please update your account.');
       return;
     }
 
@@ -79,12 +80,12 @@ export default function UpgradeButton({ priceId, children = 'Upgrade', className
   return (
     <button
       onClick={handleClick}
-      disabled={loading}
+      disabled={loading || !isLoaded}
       className={
         className ?? 'btn-primary w-full'
       }
       aria-busy={loading}
-      aria-label={email ? 'Upgrade subscription plan' : 'Sign in to upgrade'}
+      aria-label={user ? 'Upgrade subscription plan' : 'Sign in to upgrade'}
     >
       {loading ? 'Redirecting…' : children}
     </button>

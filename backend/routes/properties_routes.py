@@ -12,7 +12,15 @@ router = APIRouter(prefix="/properties", tags=["properties"])
 
 # --- Supabase setup (server-side) ---
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+# Try multiple environment variable names for service role key:
+# 1. SUPABASE_SERVICE_ROLE_KEY (preferred, standard naming)
+# 2. SUPABASE_SERVICE_ROLE (legacy, used in some deployments)
+# 3. SUPABASE_KEY (fallback, may be anon key in some setups)
+SUPABASE_SERVICE_ROLE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY") 
+    or os.getenv("SUPABASE_SERVICE_ROLE") 
+    or os.getenv("SUPABASE_KEY")
+)
 
 
 def get_sb() -> Client:
@@ -31,7 +39,7 @@ ALLOWED_SORT = {"price", "created_at", "bedrooms", "yield_percent", "roi_percent
 
 SELECT_COLS = (
     "id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,"
-    "imageurl,latitude,longitude,created_at"
+    "imageurl,latitude,longitude,created_at,description,investmentType"
 )
 
 
@@ -41,6 +49,8 @@ def list_properties(
     min: Optional[int] = Query(default=None, ge=0, description="Minimum price"),
     max: Optional[int] = Query(default=None, ge=0, description="Maximum price"),
     beds: Optional[int] = Query(default=None, ge=0, description="Minimum bedrooms"),
+    baths: Optional[int] = Query(default=None, ge=0, description="Minimum bathrooms"),
+    types: Optional[str] = Query(default=None, description="Comma-separated investment types"),
     sort: str = Query(default="created_at", description="Sort column"),
     dir: str = Query(default="desc", pattern="^(asc|desc)$", description="Sort direction"),
     limit: int = Query(default=200, ge=1, le=500),
@@ -64,6 +74,13 @@ def list_properties(
             query = query.lte("price", max)
         if beds is not None and beds > 0:
             query = query.gte("bedrooms", beds)
+        if baths is not None and baths > 0:
+            query = query.gte("bathrooms", baths)
+        if types:
+            # Split comma-separated types and filter
+            type_list = [t.strip() for t in types.split(",") if t.strip()]
+            if type_list:
+                query = query.in_("investmentType", type_list)
 
         # Order
         query = query.order(sort_col, desc=desc, nulls_first=not desc)

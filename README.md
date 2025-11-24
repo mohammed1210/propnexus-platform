@@ -38,12 +38,14 @@ PropNexus Platform offers three subscription tiers:
    - Limited feature access
 
 2. **Pro** - Professional investor tier ($29/month)
+   - **7-day free trial** for new subscriptions
    - All free features
    - Advanced analytics
    - Priority support
    - Configurable via `STRIPE_PRICE_PRO` environment variable
 
 3. **Investor** - Premium investor tier ($99/month)
+   - **7-day free trial** for new subscriptions
    - All pro features
    - Advanced AI features (when enabled via feature flags)
    - Unlimited saved deals
@@ -343,20 +345,262 @@ cd frontend && npm run lint
 
 ## Deployment
 
-### Frontend (Vercel)
-1. Connect GitHub repository to Vercel
-2. Set environment variables in Vercel dashboard
-3. Deploy automatically on push to main
+### Overview
 
-### Backend (Railway)
-1. Connect GitHub repository to Railway
-2. Set environment variables in Railway dashboard
-3. Deploy automatically on push to main
+PropNexus requires configuration of several services for production deployment. Follow these steps carefully to ensure all components work correctly.
 
-### Database (Supabase)
-1. Run `supabase/schema.sql` in SQL Editor
-2. Configure RLS policies
-3. Set up backups and monitoring
+### Prerequisites
+
+Before deploying, ensure you have:
+- Supabase project created and configured
+- Stripe account (if using subscriptions)
+- Vercel account (for frontend)
+- Railway account (for backend)
+- Optional: Clerk account (if migrating from Supabase Auth)
+
+### Required Environment Variables
+
+#### Frontend (Vercel)
+
+**Critical Production Variables:**
+```env
+# App Configuration
+NEXT_PUBLIC_APP_URL=https://propnexus-platform.vercel.app
+
+# Supabase (Current Auth System)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# API Backend
+NEXT_PUBLIC_API_BASE=https://your-backend.railway.app
+
+# Stripe
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_xxx
+STRIPE_SECRET_KEY=sk_live_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+NEXT_PUBLIC_STRIPE_PRICE_PRO=price_xxx
+NEXT_PUBLIC_STRIPE_PRICE_INVESTOR=price_xxx
+```
+
+**Optional - Clerk Authentication (Future Migration):**
+```env
+# Only needed if migrating from Supabase to Clerk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxx
+CLERK_SECRET_KEY=sk_live_xxx
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/dashboard
+```
+
+#### Backend (Railway)
+
+```env
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# API Keys
+OPENAI_API_KEY=sk-xxx
+RESEND_API_KEY=re_xxx
+
+# Stripe
+STRIPE_SECRET_KEY=sk_live_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_PRO=price_xxx
+STRIPE_PRICE_INVESTOR=price_xxx
+
+# CORS
+ALLOWED_ORIGINS=https://propnexus-platform.vercel.app
+```
+
+### Deployment Steps
+
+#### 1. Frontend Deployment (Vercel)
+
+1. **Connect Repository:**
+   - Go to [Vercel Dashboard](https://vercel.com/dashboard)
+   - Click "Add New Project"
+   - Import your GitHub repository
+   - Select `frontend` as the root directory
+
+2. **Configure Build Settings:**
+   - Framework Preset: Next.js
+   - Build Command: `npm run build`
+   - Output Directory: `.next`
+   - Install Command: `npm install`
+
+3. **Set Environment Variables:**
+   - In Vercel project settings → Environment Variables
+   - Add all variables listed in "Frontend (Vercel)" section above
+   - Set for Production, Preview, and Development environments
+
+4. **Deploy:**
+   - Click "Deploy"
+   - Wait for build to complete
+
+#### 2. Backend Deployment (Railway)
+
+1. **Connect Repository:**
+   - Go to [Railway Dashboard](https://railway.app/dashboard)
+   - Click "New Project" → "Deploy from GitHub repo"
+   - Select your repository
+
+2. **Configure Service:**
+   - Set root directory to `backend`
+   - Railway should auto-detect Python/FastAPI
+
+3. **Set Environment Variables:**
+   - In Railway project → Variables tab
+   - Add all variables listed in "Backend (Railway)" section above
+
+4. **Deploy:**
+   - Railway will automatically deploy on push to main
+
+#### 3. Database Setup (Supabase)
+
+1. **Run Schema:**
+   ```bash
+   # In Supabase SQL Editor
+   -- Copy and paste contents of supabase/schema.sql
+   ```
+
+2. **Configure RLS Policies:**
+   - Navigate to Authentication → Policies
+   - Review and enable Row Level Security
+   - Apply policies from `supabase/policies/`
+
+3. **Enable Auth Providers:**
+   - Go to Authentication → Providers
+   - Enable Email (Magic Link)
+   - Configure email templates if needed
+
+#### 4. Clerk Configuration (Optional - Future Migration)
+
+If using Clerk instead of Supabase Auth:
+
+1. **Create Clerk Application:**
+   - Go to [Clerk Dashboard](https://dashboard.clerk.com)
+   - Create new application
+   - Note your publishable and secret keys
+
+2. **Configure Redirect URLs:**
+   - In Clerk Dashboard → Paths
+   - Add these redirect URLs:
+     - `https://propnexus-platform.vercel.app/dashboard`
+     - `https://propnexus-platform.vercel.app/api/auth/callback`
+   - Add callback URLs for sign-in/sign-up
+
+3. **Set Environment Variables:**
+   - Add Clerk variables to Vercel as shown above
+   - Redeploy frontend after adding variables
+
+#### 5. Stripe Configuration
+
+1. **Create Products:**
+   - Go to [Stripe Dashboard](https://dashboard.stripe.com)
+   - Create two products:
+     - "Pro Plan" - £29/month (with 7-day trial)
+     - "Investor Plan" - £99/month (with 7-day trial)
+   - Note the price IDs
+   - **Note:** Stripe automatically applies the 7-day trial period configured in the checkout session
+
+2. **Configure Webhooks:**
+   
+   **Frontend Webhook (Vercel):**
+   - Endpoint: `https://propnexus-platform.vercel.app/api/stripe/webhook`
+   - Events:
+     - `checkout.session.completed`
+     - `customer.subscription.created`
+     - `customer.subscription.updated`
+     - `customer.subscription.deleted`
+   
+   **Backend Webhook (Railway):**
+   - Endpoint: `https://your-backend.railway.app/stripe/webhook`
+   - Same events as frontend
+   - This webhook handles database updates
+
+3. **Update Environment Variables:**
+   - Add price IDs to both Vercel and Railway
+   - Add webhook secrets to both platforms
+
+#### 6. Verification
+
+After deployment, verify everything works:
+
+1. **Run Configuration Check:**
+   ```bash
+   npm run validate-config
+   ```
+
+2. **Test Critical Paths:**
+   - [ ] Homepage loads
+   - [ ] Authentication works (sign in/sign up)
+   - [ ] Property listings display
+   - [ ] Demo page accessible at `/demo`
+   - [ ] 404 page shows correctly
+   - [ ] Stripe checkout flow
+   - [ ] Webhook processing
+
+3. **Check Logs:**
+   - Vercel: Functions logs
+   - Railway: Application logs
+   - Supabase: Database logs
+   - Stripe: Webhook delivery logs
+
+### Troubleshooting
+
+**Common Issues:**
+
+1. **404 on Vercel after authentication:**
+   - Verify `NEXT_PUBLIC_APP_URL` is set correctly
+   - Check Clerk/Supabase redirect URLs match deployed URL
+   - Ensure `/dashboard` route exists or redirects properly
+
+2. **Images not loading:**
+   - Verify image domains in `next.config.mjs`
+   - Check image URLs are accessible
+   - Fallback images in `public/images/` exist
+
+3. **Stripe webhooks failing:**
+   - Verify webhook signing secrets match
+   - Check endpoint URLs are correct
+   - Ensure backend is running and accessible
+
+4. **Authentication loops:**
+   - Clear browser cookies
+   - Verify environment variables are set
+   - Check redirect URL configuration
+
+### Post-Deployment Checklist
+
+After successful deployment:
+
+- [ ] Update DNS records (if using custom domain)
+- [ ] Configure Clerk redirect URLs in dashboard
+- [ ] Set up Stripe webhooks for production
+- [ ] Test all authentication flows
+- [ ] Verify payment processing works
+- [ ] Enable monitoring and error tracking
+- [ ] Set up database backups
+- [ ] Configure CDN/caching if needed
+- [ ] Update documentation with live URLs
+- [ ] Test mobile responsiveness
+
+### Monitoring and Maintenance
+
+**Recommended Tools:**
+- Vercel Analytics for frontend performance
+- Railway metrics for backend monitoring
+- Supabase logs for database activity
+- Stripe Dashboard for payment tracking
+- Sentry for error tracking (optional)
+
+**Regular Tasks:**
+- Monitor webhook delivery in Stripe
+- Review Supabase database size
+- Check for failed authentication attempts
+- Update dependencies monthly
+- Review and rotate API keys quarterly
 
 ## Contributing
 

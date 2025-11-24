@@ -1,10 +1,12 @@
 {
   "dependencies": {
+    "@clerk/nextjs": "^6.35.2",
     "@supabase/supabase-js": "^2.57.4",
     "@types/leaflet": "^1.9.21",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "csv-parse": "^6.1.0",
+    "jose": "^6.1.2",
     "leaflet": "^1.9.4",
     "next": "^15.5.5",
     "pdf-lib": "^1.17.1",
@@ -37,6 +39,7 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write .",
+    "validate-config": "node scripts/check-env.cjs",
     "ingest:csv": "tsx scripts/ingest-csv.ts data/listings.sample.csv --source=rightmove",
     "ingest:live": "tsx scripts/ingest-live.ts",
     "frontend:dev": "npm --prefix frontend run dev",

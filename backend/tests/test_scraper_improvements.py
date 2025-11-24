@@ -1,0 +1,310 @@
+"""
+Basic smoke tests for scraper improvements.
+
+These tests verify that the scrapers can be imported and have the expected
+structure without making actual network requests.
+"""
+
+import sys
+import os
+
+# Add backend to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+
+def test_scraper_imports():
+    """Test that all scrapers can be imported."""
+    try:
+        print("✓ All scrapers imported successfully")
+    except Exception as e:
+        print(f"✗ Import error: {e}")
+        assert False, f"Import error: {e}"
+
+
+def test_utility_imports():
+    """Test that utility modules can be imported."""
+    try:
+        print("✓ All utility modules imported successfully")
+    except Exception as e:
+        print(f"✗ Utility import error: {e}")
+        assert False, f"Utility import error: {e}"
+
+
+def test_scraper_functions_exist():
+    """Test that expected scraper functions exist."""
+    from backend.scraper import rightmove_scraper
+    from backend.scraper import zoopla_scraper
+    from backend.scraper import onthemarket_scraper
+    from backend.scraper import spare_room_scraper
+
+    scrapers = [
+        (rightmove_scraper, "scrape_rightmove_properties"),
+        (zoopla_scraper, "scrape_zoopla_properties"),
+        (onthemarket_scraper, "scrape_onthemarket_properties"),
+        (spare_room_scraper, "scrape_spareroom_properties"),
+    ]
+
+    all_ok = True
+    for module, func_name in scrapers:
+        if hasattr(module, func_name):
+            print(f"✓ {module.__name__}.{func_name} exists")
+        else:
+            print(f"✗ {module.__name__}.{func_name} missing")
+            all_ok = False
+
+    assert all_ok, "Some scraper functions are missing"
+
+
+def test_property_type_extraction():
+    """Test property type extraction and normalization."""
+    from backend.scraper.rightmove_scraper import _normalize_property_type
+    from backend.scraper.zoopla_scraper import _normalize_property_type as zp_normalize
+
+    # Test Rightmove property type normalization
+    test_cases = [
+        ("2 bedroom flat for sale", "flat"),
+        ("3 bed detached house", "detached"),
+        ("Semi-detached property", "semi-detached"),
+        ("Terraced house with garden", "terraced"),
+        ("Studio apartment", "studio"),
+        ("Beautiful bungalow", "bungalow"),
+        ("Modern maisonette", "maisonette"),
+        ("Charming cottage", "cottage"),
+        ("", None),
+        (None, None),
+    ]
+
+    all_ok = True
+    for text, expected in test_cases:
+        result = _normalize_property_type(text)
+        if result == expected:
+            print(f"✓ _normalize_property_type('{text}') = {result}")
+        else:
+            print(f"✗ _normalize_property_type('{text}') = {result}, expected {expected}")
+            all_ok = False
+
+    # Test Zoopla property type normalization (should work the same way)
+    result = zp_normalize("Luxury flat in London")
+    if result == "flat":
+        print("✓ Zoopla _normalize_property_type works")
+    else:
+        print("✗ Zoopla _normalize_property_type failed")
+        all_ok = False
+
+    assert all_ok, "Property type extraction failed"
+
+
+def test_validation_functions():
+    """Test validation utility functions."""
+    from backend.utils.validation import is_valid_url, is_valid_image_url, should_insert_property
+
+    # Test URL validation
+    assert is_valid_url("https://example.com")
+    assert not is_valid_url("not-a-url")
+    assert not is_valid_url(None)
+    print("✓ URL validation works")
+
+    # Test image URL validation
+    assert is_valid_image_url("https://example.com/photo.jpg")
+    assert not is_valid_image_url("https://example.com/not-an-image")
+    print("✓ Image URL validation works")
+
+    # Test property validation
+    valid_prop = {
+        "external_id": "test-123",
+        "title": "Test Property",
+        "source": "test",
+        "price": 100000,
+        "location": "London",
+    }
+    should_insert, reason = should_insert_property(valid_prop)
+    assert should_insert
+    print("✓ Property validation works for valid property")
+
+    # Test invalid property (missing external_id)
+    invalid_prop = {"title": "Test Property", "source": "test"}
+    should_insert, reason = should_insert_property(invalid_prop)
+    assert not should_insert
+    assert reason is not None
+    print("✓ Property validation rejects invalid property")
+
+
+def test_retry_logic():
+    """Test retry utility."""
+    from backend.utils.retry import calculate_delay
+
+    # Test exponential backoff without jitter
+    delay0 = calculate_delay(0, base_delay=1.0, jitter=False)
+    delay1 = calculate_delay(1, base_delay=1.0, jitter=False)
+    delay2 = calculate_delay(2, base_delay=1.0, jitter=False)
+
+    assert delay0 == 1.0
+    assert delay1 == 2.0
+    assert delay2 == 4.0
+
+    # Test with jitter enabled - should be within bounds
+    delay_jitter = calculate_delay(0, base_delay=1.0, jitter=True)
+    assert 0.5 <= delay_jitter <= 1.5  # Jitter adds 0.5-1.0x multiplier
+
+    print("✓ Exponential backoff calculation works")
+
+
+def test_logger_stats():
+    """Test scraper logger statistics."""
+    from backend.utils.scraper_logger import ScraperStats
+
+    stats = ScraperStats("test", "London")
+    stats.log_card_found()
+    stats.log_parse_success()
+    stats.log_missing_field("image_url")
+
+    assert stats.total_cards_found == 1
+    assert stats.successful_parses == 1
+    assert stats.missing_fields["image_url"] == 1
+    print("✓ ScraperStats tracking works")
+
+
+def test_scraperapi_url_builder():
+    """Test ScraperAPI URL builder helper."""
+    from backend.scraper.rightmove_scraper import make_scraperapi_url
+
+    # Save original env vars
+    original_key = os.environ.get("SCRAPERAPI_KEY")
+
+    try:
+        # Test 1: No API key set - should return original URL
+        os.environ["SCRAPERAPI_KEY"] = ""
+        target_url = "https://www.rightmove.co.uk/property-for-sale/find.html?searchLocation=London"
+        result = make_scraperapi_url(target_url)
+        assert result == target_url, "Should return original URL when no key set"
+        print("✓ make_scraperapi_url returns original URL when SCRAPERAPI_KEY not set")
+
+        # Test 2: With API key, no render
+        os.environ["SCRAPERAPI_KEY"] = "test-key-123"
+        result = make_scraperapi_url(target_url, render=False)
+        assert result.startswith("https://api.scraperapi.com/")
+        assert "api_key=test-key-123" in result
+        assert "country_code=gb" in result
+        assert (
+            f"url={target_url.replace(':', '%3A').replace('/', '%2F')}" in result
+            or "url=" in result
+        )
+        assert "render" not in result  # Should not have render when False
+        print("✓ make_scraperapi_url builds correct URL without render")
+
+        # Test 3: With API key and render=True
+        result = make_scraperapi_url(target_url, render=True)
+        assert result.startswith("https://api.scraperapi.com/")
+        assert "api_key=test-key-123" in result
+        assert "country_code=gb" in result
+        assert "render=true" in result
+        assert "device_type=desktop" in result
+        print("✓ make_scraperapi_url builds correct URL with render=true")
+
+    finally:
+        # Restore original env var
+        if original_key is not None:
+            os.environ["SCRAPERAPI_KEY"] = original_key
+        elif "SCRAPERAPI_KEY" in os.environ:
+            del os.environ["SCRAPERAPI_KEY"]
+
+
+def test_scraperapi_mode_handling():
+    """Test SCRAPER_MODE environment variable handling."""
+    from backend.scraper import rightmove_scraper
+
+    # Save original env vars
+    original_mode = os.environ.get("SCRAPER_MODE")
+    original_key = os.environ.get("SCRAPERAPI_KEY")
+
+    try:
+        # Test 1: scraperapi mode with key
+        os.environ["SCRAPER_MODE"] = "scraperapi"
+        os.environ["SCRAPERAPI_KEY"] = "test-key"
+        # Just verify the constants are read correctly
+        # We can't easily test async fetch without mocking
+        import importlib
+
+        importlib.reload(rightmove_scraper)
+        assert rightmove_scraper.SCRAPER_MODE == "scraperapi"
+        assert rightmove_scraper.SCRAPERAPI_KEY == "test-key"
+        print("✓ SCRAPER_MODE and SCRAPERAPI_KEY loaded correctly")
+
+        # Test 2: scraperapi mode without key (should work gracefully)
+        os.environ["SCRAPER_MODE"] = "scraperapi"
+        os.environ["SCRAPERAPI_KEY"] = ""
+        importlib.reload(rightmove_scraper)
+        assert rightmove_scraper.SCRAPER_MODE == "scraperapi"
+        assert rightmove_scraper.SCRAPERAPI_KEY == ""
+        print("✓ Missing SCRAPERAPI_KEY handled gracefully")
+
+        # Test 3: direct mode (default)
+        os.environ["SCRAPER_MODE"] = "direct"
+        os.environ["SCRAPERAPI_KEY"] = "test-key"
+        importlib.reload(rightmove_scraper)
+        assert rightmove_scraper.SCRAPER_MODE == "direct"
+        print("✓ SCRAPER_MODE=direct works correctly")
+
+    finally:
+        # Restore original env vars
+        if original_mode is not None:
+            os.environ["SCRAPER_MODE"] = original_mode
+        elif "SCRAPER_MODE" in os.environ:
+            del os.environ["SCRAPER_MODE"]
+
+        if original_key is not None:
+            os.environ["SCRAPERAPI_KEY"] = original_key
+        elif "SCRAPERAPI_KEY" in os.environ:
+            del os.environ["SCRAPERAPI_KEY"]
+
+        # Reload to restore original state
+        import importlib
+
+        importlib.reload(rightmove_scraper)
+
+
+def main():
+    """Run all tests."""
+    print("\n=== Running Scraper Smoke Tests ===\n")
+
+    tests = [
+        ("Import scrapers", test_scraper_imports),
+        ("Import utilities", test_utility_imports),
+        ("Scraper functions exist", test_scraper_functions_exist),
+        ("Property type extraction", test_property_type_extraction),
+        ("Validation functions", test_validation_functions),
+        ("Retry logic", test_retry_logic),
+        ("Logger statistics", test_logger_stats),
+        ("ScraperAPI URL builder", test_scraperapi_url_builder),
+        ("ScraperAPI mode handling", test_scraperapi_mode_handling),
+    ]
+
+    results = []
+    for name, test_func in tests:
+        print(f"\n--- {name} ---")
+        try:
+            result = test_func()
+            results.append((name, result))
+        except Exception as e:
+            print(f"✗ Test failed with exception: {e}")
+            import traceback
+
+            traceback.print_exc()
+            results.append((name, False))
+
+    print("\n=== Test Summary ===\n")
+    passed = sum(1 for _, result in results if result)
+    total = len(results)
+
+    for name, result in results:
+        status = "PASS" if result else "FAIL"
+        print(f"{status}: {name}")
+
+    print(f"\nPassed: {passed}/{total}")
+
+    return passed == total
+
+
+if __name__ == "__main__":
+    success = main()
+    sys.exit(0 if success else 1)

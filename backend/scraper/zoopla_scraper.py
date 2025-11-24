@@ -4,9 +4,21 @@ import time
 import aiohttp
 from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
+from urllib.parse import urlencode
 from fastapi import BackgroundTasks
 
-from ..utils.postcode import get_lat_lng_from_postcode
+from backend.utils.postcode import get_lat_lng_from_postcode
+from backend.utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html
+from backend.utils.scraper_logger import (
+    ScraperStats,
+    log_scrape_start,
+    log_page_fetch_error,
+    log_scraperapi_fallback,
+    log_image_extraction,
+)
+from backend.utils.retry import retry_async
+from backend.utils.validation import should_insert_property, clean_property_data
+from backend.utils.runlog import RunLog
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -17,14 +29,47 @@ SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 ZP_MAX_PAGES = int(os.getenv("ZP_MAX_PAGES", "1"))
 ZP_DELAY_MS = int(os.getenv("ZP_DELAY_MS", "900"))
+SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
+
+
+def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
+    """
+    Build a ScraperAPI URL for the given target URL.
+
+    If SCRAPERAPI_KEY is not set, returns the original target_url unchanged
+    so the caller can fall back to direct requests.
+
+    Args:
+        target_url: The URL to scrape
+        render: Whether to enable JavaScript rendering (default: False)
+
+    Returns:
+        ScraperAPI proxy URL if key is set, otherwise the original target_url
+    """
+    api_key = os.getenv("SCRAPERAPI_KEY", "").strip()
+    if not api_key:
+        return target_url
+
+    params = {
+        "api_key": api_key,
+        "country_code": "gb",
+        "url": target_url,
+    }
+    if render:
+        params["render"] = "true"
+        params["device_type"] = "desktop"
+
+    return f"{SCRAPERAPI_BASE}?{urlencode(params)}"
+
 
 def _looks_blocked(html: str, status: int) -> bool:
     if status in (403, 503):
         return True
     lowered = html.lower()
     return any(k in lowered for k in CAPTCHA_KEYWORDS)
+
 
 def _build_search_url(location: str, page: int = 0) -> str:
     # Zoopla pagination uses ?page=2 etc.
@@ -34,24 +79,68 @@ def _build_search_url(location: str, page: int = 0) -> str:
         return f"{base}?page={page+1}"
     return base
 
-async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]:
+
+async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Optional[str]:
+    """Internal fetch function with retry logic."""
     headers = {"User-Agent": USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
+
+    # Determine which URL to fetch based on SCRAPER_MODE
+    mode = os.getenv("SCRAPER_MODE", "direct").lower()
+
+    if mode == "scraperapi":
+        # Use ScraperAPI mode - wrap the URL with ScraperAPI
+        if not SCRAPERAPI_KEY:
+            # No API key configured, fall back to direct with warning
+            print(
+                "⚠️ SCRAPER_MODE=scraperapi but SCRAPERAPI_KEY not set, falling back to direct fetch"
+            )
+            url_to_fetch = url
+        else:
+            # Use ScraperAPI with rendering for HTML fallback
+            url_to_fetch = make_scraperapi_url(url, render=True)
+            print(f"ℹ️ Using ScraperAPI for Zoopla HTML fetch: {url}")
+    else:
+        # Direct mode - use original URL
+        url_to_fetch = url
+
+    # Fetch the URL (either direct or via ScraperAPI)
     try:
-        async with session.get(url, headers=headers, timeout=30) as resp:
+        async with session.get(
+            url_to_fetch, headers=headers, timeout=60 if mode == "scraperapi" else 30
+        ) as resp:
             text = await resp.text()
-            if _looks_blocked(text, resp.status) and SCRAPER_MODE == "direct" and SCRAPERAPI_KEY:
-                proxy_url = f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
-                async with session.get(proxy_url, headers=headers, timeout=45) as p_resp:
-                    p_text = await p_resp.text()
-                    if _looks_blocked(p_text, p_resp.status):
-                        return None
-                    return p_text
+
+            # If direct mode and we detect blocking, try ScraperAPI as fallback
+            if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
+                log_scraperapi_fallback("zoopla", url)
+                proxy_url = make_scraperapi_url(url, render=True)
+                print(f"ℹ️ Fallback to ScraperAPI for blocked URL: {url}")
+                try:
+                    async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
+                        p_text = await p_resp.text()
+                        if _looks_blocked(p_text, p_resp.status):
+                            return None
+                        return p_text
+                except Exception:
+                    return None
+
+            # If still looks blocked, return None
+            if _looks_blocked(text, resp.status):
+                return None
+
             return text
-    except Exception:
-        if SCRAPER_MODE == "scraperapi" and SCRAPERAPI_KEY:
-            proxy_url = f"http://api.scraperapi.com/?api_key={SCRAPERAPI_KEY}&url={url}&country_code=gb"
+    except Exception as e:
+        # On exception in scraperapi mode, we already tried ScraperAPI, so just fail
+        if mode == "scraperapi":
+            print(f"⚠️ ScraperAPI fetch failed: {e}")
+            return None
+
+        # On exception in direct mode, try ScraperAPI as fallback if available
+        if SCRAPERAPI_KEY:
+            print(f"⚠️ Direct fetch failed, trying ScraperAPI fallback: {e}")
             try:
-                async with session.get(proxy_url, headers=headers, timeout=45) as p_resp:
+                proxy_url = make_scraperapi_url(url, render=True)
+                async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
                     p_text = await p_resp.text()
                     if _looks_blocked(p_text, p_resp.status):
                         return None
@@ -59,6 +148,19 @@ async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]
             except Exception:
                 return None
         return None
+
+
+async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]:
+    """Fetch HTML with retry logic and exponential backoff."""
+    return await retry_async(
+        _fetch_html_internal,
+        session,
+        url,
+        max_retries=3,
+        base_delay=2.0,
+        exceptions=(aiohttp.ClientError,),
+    )
+
 
 def _parse_price(raw: str) -> Optional[int]:
     if not raw:
@@ -72,11 +174,146 @@ def _parse_price(raw: str) -> Optional[int]:
     except ValueError:
         return None
 
+
 def _extract_int(text: str) -> Optional[int]:
     if not text:
         return None
     m = re.search(r"\d+", text)
     return int(m.group(0)) if m else None
+
+
+def _extract_property_type(card: BeautifulSoup) -> Optional[str]:
+    """Extract property type from card element.
+
+    Args:
+        card: BeautifulSoup element representing a property card
+
+    Returns:
+        Property type string or None
+    """
+    # Try various selectors for property type
+    type_el = (
+        card.select_one("[data-testid='property-type']")
+        or card.select_one(".listing-property-type")
+        or card.select_one(".property-type")
+        or card.select_one(".property-information")
+    )
+
+    if type_el:
+        type_text = type_el.get_text(" ", strip=True)
+        return _normalize_property_type(type_text)
+
+    # Try to extract from title
+    title = card.select_one("h2, [data-testid='listing-title']")
+    if title:
+        title_text = title.get_text(" ", strip=True)
+        prop_type = _normalize_property_type(title_text)
+        if prop_type:
+            return prop_type
+
+    return None
+
+
+def _normalize_property_type(text: str) -> Optional[str]:
+    """Normalize property type text to standard values.
+
+    Args:
+        text: Raw property type text
+
+    Returns:
+        Normalized property type or None
+    """
+    if not text:
+        return None
+
+    lower = text.lower()
+
+    # Check for common property types (order matters - check studio before flat!)
+    if "studio" in lower:
+        return "studio"
+    if "flat" in lower or "apartment" in lower:
+        return "flat"
+    if "detached" in lower and "semi" not in lower:
+        return "detached"
+    if "semi-detached" in lower or "semi detached" in lower:
+        return "semi-detached"
+    if "terraced" in lower:
+        return "terraced"
+    if "bungalow" in lower:
+        return "bungalow"
+    if "house" in lower:
+        return "house"
+    if "maisonette" in lower:
+        return "maisonette"
+    if "cottage" in lower:
+        return "cottage"
+
+    return None
+
+
+def _extract_images(card: BeautifulSoup) -> List[str]:
+    """Extract all image URLs from a property card."""
+    images = []
+
+    for img in card.select("img"):
+        url = (
+            img.get("data-src")
+            or img.get("src")
+            or img.get("data-lazy-src")
+            or img.get("data-original")
+        )
+
+        if url and isinstance(url, str):
+            url = url.strip()
+            if url and not any(x in url.lower() for x in ["placeholder", "blank", "1x1", "pixel"]):
+                if url.startswith("//"):
+                    url = "https:" + url
+                elif url.startswith("/"):
+                    url = "https://www.zoopla.co.uk" + url
+                images.append(url)
+
+    # Check srcset
+    for img in card.select("img[srcset]"):
+        srcset = img.get("srcset", "")
+        if srcset:
+            for item in srcset.split(","):
+                parts = item.strip().split()
+                if parts:
+                    url = parts[0].strip()
+                    if url and not any(x in url.lower() for x in ["placeholder", "blank", "1x1"]):
+                        if url.startswith("//"):
+                            url = "https:" + url
+                        elif url.startswith("/"):
+                            url = "https://www.zoopla.co.uk" + url
+                        images.append(url)
+
+    # De-duplicate
+    seen = set()
+    unique_images = []
+    for img in images:
+        if img not in seen:
+            seen.add(img)
+            unique_images.append(img)
+
+    return unique_images
+
+
+def _extract_description(card: BeautifulSoup) -> Optional[str]:
+    """Extract property description from a card."""
+    desc_el = (
+        card.select_one("[data-testid='listing-description']")
+        or card.select_one(".listing-description")
+        or card.select_one(".property-description")
+        or card.select_one("[itemprop='description']")
+    )
+
+    if desc_el:
+        desc = desc_el.get_text(" ", strip=True)
+        if desc and len(desc) > 20:
+            return desc
+
+    return None
+
 
 def _collect_cards(soup: BeautifulSoup) -> List[BeautifulSoup]:
     selectors = [
@@ -100,6 +337,7 @@ def _collect_cards(soup: BeautifulSoup) -> List[BeautifulSoup]:
             uniq.append(c)
     return uniq
 
+
 async def _enrich_coordinates(location: str) -> Dict[str, float]:
     try:
         coords = await get_lat_lng_from_postcode(location)
@@ -110,6 +348,7 @@ async def _enrich_coordinates(location: str) -> Dict[str, float]:
     except Exception:
         return {"latitude": 0.0, "longitude": 0.0}
 
+
 def _extract_external_id(card: BeautifulSoup) -> str:
     link = card.select_one("a[href*='/for-sale/details/']")
     if link and link.get("href"):
@@ -118,71 +357,145 @@ def _extract_external_id(card: BeautifulSoup) -> str:
             return m.group(1)
     return f"zp-{abs(hash(card.get_text()) % (10**9))}"
 
-async def scrape_zoopla_properties(location: str, limit: int = 40, background_tasks: BackgroundTasks | None = None) -> List[Dict[str, Any]]:
-    print(f"🔍 Scraping Zoopla for '{location}' (mode={SCRAPER_MODE})")
+
+async def scrape_zoopla_properties(
+    location: str, limit: int = 40, background_tasks: BackgroundTasks | None = None
+) -> List[Dict[str, Any]]:
+    log_scrape_start("zoopla", location, SCRAPER_MODE)
+    stats = ScraperStats("zoopla", location)
     results: List[Dict[str, Any]] = []
 
-    async with aiohttp.ClientSession() as session:
-        for page in range(ZP_MAX_PAGES):
-            url = _build_search_url(location, page)
-            html = await _fetch_html(session, url)
-            if not html:
-                print(f"⚠️ Page {page} blocked or empty.")
-                continue
-            soup = BeautifulSoup(html, "html.parser")
-            cards = _collect_cards(soup)
-            if not cards:
-                print("ℹ️ No Zoopla cards found; stopping.")
-                break
+    # Start audit logging
+    with RunLog.start(source="zoopla", mode=SCRAPER_MODE, location=location) as run_log:
+        try:
+            async with aiohttp.ClientSession() as session:
+                for page in range(ZP_MAX_PAGES):
+                    url = _build_search_url(location, page)
+                    html = await _fetch_html(session, url)
+                    if not html:
+                        log_page_fetch_error("zoopla", page, "blocked or empty")
+                        continue
+                    soup = BeautifulSoup(html, "html.parser")
+                    cards = _collect_cards(soup)
+                    if not cards:
+                        if PLAYWRIGHT_ENABLE:
+                            rendered = await render_page(
+                                url,
+                                [
+                                    "[data-testid='search-result']",
+                                    ".c-propertyCard",
+                                    ".l-searchResult",
+                                ],
+                            )
+                            if rendered:
+                                soup = BeautifulSoup(rendered, "html.parser")
+                                cards = _collect_cards(soup)
+                                if not cards:
+                                    capture_debug_html(f"zoopla_empty_{page}", rendered)
+                        if not cards:
+                            print("ℹ️ No Zoopla cards found; stopping.")
+                            break
 
-            for card in cards:
-                if len(results) >= limit:
-                    break
-                try:
-                    title_el = card.select_one("h2") or card.select_one("[data-testid='listing-title']")
-                    title = title_el.get_text(strip=True) if title_el else "Untitled"
+                    for card in cards:
+                        stats.log_card_found()
+                        if len(results) >= limit:
+                            break
+                        try:
+                            title_el = card.select_one("h2") or card.select_one(
+                                "[data-testid='listing-title']"
+                            )
+                            title = title_el.get_text(strip=True) if title_el else "Untitled"
 
-                    price_el = card.select_one("[data-testid='listing-price']") or card.select_one(".css-1w7b0tk-Price") or card.select_one(".listing-price")
-                    price = _parse_price(price_el.get_text(strip=True) if price_el else "")
+                            price_el = (
+                                card.select_one("[data-testid='listing-price']")
+                                or card.select_one(".css-1w7b0tk-Price")
+                                or card.select_one(".listing-price")
+                            )
+                            price = _parse_price(price_el.get_text(strip=True) if price_el else "")
 
-                    loc_el = card.select_one("[data-testid='listing-description']") or card.select_one(".listing-description") or card.select_one("address")
-                    location_text = loc_el.get_text(" ", strip=True) if loc_el else location
+                            loc_el = (
+                                card.select_one("[data-testid='listing-description']")
+                                or card.select_one(".listing-description")
+                                or card.select_one("address")
+                            )
+                            location_text = loc_el.get_text(" ", strip=True) if loc_el else location
 
-                    bed_el = card.select_one("[data-testid='bed']") or card.select_one(".css-1rzse3v-Bedrooms") or card.select_one(".listing-bedrooms")
-                    bedrooms = _extract_int(bed_el.get_text() if bed_el else "") or 0
+                            bed_el = (
+                                card.select_one("[data-testid='bed']")
+                                or card.select_one(".css-1rzse3v-Bedrooms")
+                                or card.select_one(".listing-bedrooms")
+                            )
+                            bedrooms = _extract_int(bed_el.get_text() if bed_el else "") or 0
 
-                    bath_el = card.select_one("[data-testid='bath']") or card.select_one(".listing-bathrooms")
-                    bathrooms = _extract_int(bath_el.get_text() if bath_el else "") or 0
+                            bath_el = card.select_one("[data-testid='bath']") or card.select_one(
+                                ".listing-bathrooms"
+                            )
+                            bathrooms = _extract_int(bath_el.get_text() if bath_el else "") or 0
 
-                    img_el = card.select_one("img")
-                    image_url = img_el.get("data-src") or img_el.get("src") if img_el else None
+                            # Extract all images
+                            image_urls = _extract_images(card)
+                            image_url = image_urls[0] if image_urls else None
+                            log_image_extraction("zoopla", title, len(image_urls))
 
-                    external_id = _extract_external_id(card)
-                    coords = await _enrich_coordinates(location_text)
+                            # Extract description
+                            description = _extract_description(card)
 
-                    results.append(
-                        {
-                            "external_id": external_id,
-                            "title": title,
-                            "location": location_text,
-                            "price": price,
-                            "bedrooms": bedrooms,
-                            "bathrooms": bathrooms,
-                            "image_url": image_url,
-                            "latitude": coords["latitude"],
-                            "longitude": coords["longitude"],
-                            "source": "zoopla",
-                            "raw_url": url,
-                        }
-                    )
-                except Exception as e:
-                    print(f"❌ Error parsing Zoopla card: {e}")
-            if len(results) >= limit:
-                break
-            time.sleep(ZP_DELAY_MS / 1000.0)
+                            # Extract property type
+                            property_type = _extract_property_type(card)
 
-    print(f"✅ Scraped {len(results)} Zoopla properties for '{location}'")
-    return results
+                            external_id = _extract_external_id(card)
+                            coords = await _enrich_coordinates(location_text)
+
+                            property_data = {
+                                "external_id": external_id,
+                                "title": title,
+                                "description": description,
+                                "location": location_text,
+                                "price": price,
+                                "bedrooms": bedrooms,
+                                "bathrooms": bathrooms,
+                                "property_type": property_type,
+                                "image_url": image_url,
+                                "image_urls": image_urls,
+                                "latitude": coords["latitude"],
+                                "longitude": coords["longitude"],
+                                "source": "zoopla",
+                                "raw_url": url,
+                            }
+
+                            # Track missing fields
+                            if not image_url:
+                                stats.log_missing_field("image_url", external_id)
+                            if not description:
+                                stats.log_missing_field("description", external_id)
+                            if not price:
+                                stats.log_missing_field("price", external_id)
+                            if not property_type:
+                                stats.log_missing_field("property_type", external_id)
+
+                            # Validate before adding
+                            should_insert, reason = should_insert_property(property_data)
+                            if should_insert:
+                                results.append(clean_property_data(property_data))
+                                stats.log_parse_success()
+                            else:
+                                stats.log_validation_failure(reason or "Unknown")
+
+                        except Exception as e:
+                            stats.log_parse_failure(str(e))
+                    if len(results) >= limit:
+                        break
+                    time.sleep(ZP_DELAY_MS / 1000.0)
+
+            stats.log_summary()
+            print(f"✅ Scraped {len(results)} Zoopla properties for '{location}'")
+            run_log.set_count(len(results))
+            return results
+        except Exception as e:
+            # Let RunLog handle the error in __exit__
+            print(f"❌ Zoopla scraper error: {e}")
+            raise
+
 
 # Backward-compatible stub signature
 async def scrape_zoopla_properties_default(background_tasks: BackgroundTasks | None = None):

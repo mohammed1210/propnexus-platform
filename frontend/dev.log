@@ -1,0 +1,64 @@
+   ▲ Next.js 15.5.6
+   - Local:        http://127.0.0.1:3000
+   - Network:      http://127.0.0.1:3000
+   - Environments: .env.local
+
+ ✓ Starting...
+   Disabled SWC as replacement for Babel because of custom Babel configuration "babel.config.js" https://nextjs.org/docs/messages/swc-disabled
+   `compiler` options in `next.config.js` will be ignored while using Babel https://nextjs.org/docs/messages/ignored-compiler-options
+ ✓ Ready in 2.7s
+   Using external babel configuration from /workspaces/propnexus-platform/frontend/babel.config.js
+ ⚠ It looks like there is a custom Babel configuration that can be removed.
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 3.6s (159 modules)
+ ○ Compiling / ...
+[BABEL] Note: The code generator has deoptimised the styling of /workspaces/propnexus-platform/frontend/node_modules/next/dist/compiled/next-devtools/index.js as it exceeds the max of 500KB.
+[BABEL] Note: The code generator has deoptimised the styling of /workspaces/propnexus-platform/frontend/node_modules/next/dist/compiled/next-devtools/index.js as it exceeds the max of 500KB.
+ ✓ Compiled / in 35.9s (1141 modules)
+ GET / 200 in 37303ms
+ ✓ Compiled in 1813ms (506 modules)
+ GET / 200 in 221ms
+ GET / 200 in 113ms
+ GET / 200 in 155ms
+ GET / 200 in 259ms
+ ○ Compiling /listings ...
+ ✓ Compiled /listings in 8.8s (1218 modules)
+ GET / 200 in 693ms
+ GET /listings 200 in 115ms
+ GET /listings 200 in 151ms
+ GET /listings 200 in 98ms
+ GET /listings 200 in 90ms
+ GET /listings 200 in 116ms
+ GET /listings 200 in 149ms
+ GET / 200 in 85ms
+ GET / 200 in 78ms
+ GET / 200 in 69ms
+ GET /listings 200 in 80ms
+ GET /listings 200 in 80ms
+ GET / 200 in 75ms
+ GET / 200 in 116ms
+ GET / 200 in 95ms
+ GET / 200 in 114ms
+ GET / 200 in 109ms
+ GET / 200 in 126ms
+ ○ Compiling /off-market ...
+ ✓ Compiled /off-market in 2.6s (1233 modules)
+ GET /off-market 200 in 3117ms
+ ○ Compiling /saved-deals ...
+ ✓ Compiled /saved-deals in 927ms (1240 modules)
+ GET /saved-deals 200 in 1380ms
+ ○ Compiling /property/[id] ...
+ ✓ Compiled /property/[id] in 5.2s (1326 modules)
+ ⨯ ReferenceError: window is not defined
+    at (ssr)/./node_modules/leaflet/dist/leaflet-src.js (.next/server/vendor-chunks/leaflet.js:19:1)
+    at (ssr)/./node_modules/react-leaflet/lib/MapContainer.js (.next/server/vendor-chunks/react-leaflet.js:20:1)
+    at eval (webpack-internal:///(ssr)/./components/property_details/MapSingle.tsx:7:71)
+    at (ssr)/./components/property_details/MapSingle.tsx (.next/server/app/property/[id]/page.js:346:1)
+    at eval (webpack-internal:///(ssr)/./app/property/[id]/page.tsx:16:96)
+    at (ssr)/./app/property/[id]/page.tsx (.next/server/app/property/[id]/page.js:236:1) {
+  digest: '1691354187'
+}
+ GET /property/demo-id 200 in 7886ms
+ ✓ Compiled in 8s (1264 modules)
+ ✓ Compiled in 1565ms (1264 modules)
+ ✓ Compiled in 2.3s (1264 modules)

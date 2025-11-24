@@ -58,11 +58,6 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
     fetchData();
   }, [postcode]);
 
-  // Feature flag guard - return null if feature is disabled
-  if (!FF.COMPS) {
-    return null;
-  }
-
   if (loading) {
     return (
       <div className="animate-pulse space-y-3">

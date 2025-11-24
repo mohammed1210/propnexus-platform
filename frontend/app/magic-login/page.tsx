@@ -3,11 +3,25 @@
 import { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
+export const dynamic = 'force-dynamic';
+
 function getSiteUrl(): string {
   if (typeof window !== 'undefined') return window.location.origin;
   const env = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_VERCEL_URL; // e.g. my-app.vercel.app
   if (!env) return 'https://propnexus-platform.vercel.app';
   return env.startsWith('http') ? env : `https://${env}`;
+}
+
+// Safe Supabase client creation
+function getSupabaseClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  
+  if (!url || !key) {
+    throw new Error('Supabase credentials not configured');
+  }
+  
+  return createClient(url, key);
 }
 
 export default function MagicLoginPage() {
@@ -16,17 +30,13 @@ export default function MagicLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL as string,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string,
-  );
-
   async function sendLink(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
 
     try {
+      const supabase = getSupabaseClient();
       const site = getSiteUrl();
       const { error } = await supabase.auth.signInWithOtp({
         email,
