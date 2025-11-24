@@ -55,8 +55,9 @@ _ALLOWED_ORIGINS = os.getenv(
 ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()]
 
 # Allow all Vercel preview deployments with regex pattern
-# This matches https://*.vercel.app including git branch previews
-VERCEL_ORIGIN_REGEX = r"^https://[a-zA-Z0-9_-]+\.vercel\.app$"
+# Matches https://[subdomain].vercel.app where subdomain contains alphanumeric
+# characters, underscores, hyphens (up to 255 chars for subdomain)
+VERCEL_ORIGIN_REGEX = r"^https://[a-zA-Z0-9_-]{1,255}\.vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,
