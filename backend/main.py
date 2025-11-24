@@ -55,9 +55,11 @@ _ALLOWED_ORIGINS = os.getenv(
 ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()]
 
 # Allow all Vercel preview deployments with regex pattern
-# Matches https://[subdomain].vercel.app where subdomain contains alphanumeric
-# characters and hyphens (RFC 1035 compliant, max 63 chars per DNS label)
-VERCEL_ORIGIN_REGEX = r"^https://[a-zA-Z0-9-]{1,63}\.vercel\.app$"
+# Matches https://[subdomain].vercel.app where subdomain follows RFC 1035:
+# - Must start and end with alphanumeric characters
+# - May contain hyphens in the middle
+# - Maximum 63 characters per DNS label
+VERCEL_ORIGIN_REGEX = r"^https://[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.vercel\.app$"
 
 app.add_middleware(
     CORSMiddleware,
