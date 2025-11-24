@@ -83,7 +83,7 @@ def list_properties(
                 query = query.in_("investment_type", type_list)
 
         # Order
-        query = query.order(sort_col, desc=desc, nulls_first=not desc)
+        query = query.order(sort_col, desc=desc)
 
         res = query.execute()
         data = getattr(res, "data", None) or []
