@@ -28,8 +28,8 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy_key
           NEXT_PUBLIC_BACKEND_URL: http://localhost:8000
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY != '' && secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY != '' && secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_dummy_for_ci
+          CLERK_SECRET_KEY: sk_test_dummy_for_ci
         run: |
           npm run typecheck --if-present
           npm run lint --if-present
