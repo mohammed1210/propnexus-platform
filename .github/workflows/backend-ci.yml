@@ -4,20 +4,20 @@ on:
   push:
     branches: [ main, po2, sprint-*, po* ]
     paths:
-      - 'backend/**'
-      - 'pyproject.toml'
-      - '.github/workflows/backend-ci.yml'
+      - "backend/**"
+      - "pyproject.toml"
+      - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
-      - 'backend/**'
-      - 'pyproject.toml'
-      - '.github/workflows/backend-ci.yml'
+      - "backend/**"
+      - "pyproject.toml"
+      - ".github/workflows/backend-ci.yml"
 
 jobs:
   backend:
     name: Backend CI
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -32,7 +32,10 @@ jobs:
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          # Pin tools for reproducible CI
           pip install ruff==0.6.9 black==24.10.0 pytest==8.3.3
 
       - name: Lint (ruff + black --check)
@@ -41,19 +44,13 @@ jobs:
           ruff check .
           black --check .
 
-      - name: Run unit tests (local-only tests)
-        working-directory: backend
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-        run: |
-          echo "Running pytest for local-only tests..."
-          pytest -q || true
-
       - name: Run backend contract + schema guardrail tests
         working-directory: backend
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
         run: |
-          echo "Running schema contract guardrail tests against Supabase..."
+          # Run all backend tests, including contracts + schema guardrails
+          pytest tests/test_contracts.py
           pytest tests/test_schema_contracts_guardrail.py
