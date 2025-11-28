@@ -10,30 +10,42 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    if: ${{ secrets.NEXT_PUBLIC_BACKEND_URL != '' || secrets.API_BASE != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Health check
+        env:
+          BACKEND_BASE: ${{ secrets.API_BASE != '' && secrets.API_BASE || secrets.NEXT_PUBLIC_BACKEND_URL }}
         run: |
-          echo "🔍 Checking API health..."
-          HEALTH_RESPONSE=$(curl -s -f "${{ secrets.API_BASE }}/health" || echo "FAILED")
-
-          if [ "$HEALTH_RESPONSE" = "FAILED" ]; then
-            echo "⚠️ WARNING: Health check failed"
-            exit 0  # Don't fail the workflow, just warn
+          if [ -z "${BACKEND_BASE}" ]; then
+            echo "⚠️ BACKEND_BASE not configured – skipping monitor run (soft pass)."
+            exit 0
           fi
 
+          echo "🔍 Checking API health at $BACKEND_BASE/health..."
+          set -e
+          HEALTH_RESPONSE=$(curl -s -f "${BACKEND_BASE}/health")
           echo "✅ Health check passed: $HEALTH_RESPONSE"
 
       - name: Test import with Ilford
+        env:
+          BACKEND_BASE: ${{ secrets.API_BASE != '' && secrets.API_BASE || secrets.NEXT_PUBLIC_BACKEND_URL }}
+          OFF_MARKET_ADMIN_TOKEN: ${{ secrets.OFF_MARKET_ADMIN_TOKEN }}
         run: |
-          echo "🔄 Testing import with Ilford..."
+          if [ -z "${BACKEND_BASE}" ]; then
+            echo "⚠️ BACKEND_BASE not configured – skipping import test (soft pass)."
+            exit 0
+          fi
 
-          RESPONSE=$(curl -s -X POST \
-            "${{ secrets.API_BASE }}/import/all" \
+          echo "🔄 Testing import with Ilford at $BACKEND_BASE/import/all..."
+
+          set -e
+          RESPONSE=$(curl -s -f -X POST \
+            "${BACKEND_BASE}/import/all" \
             -H "Content-Type: application/json" \
-            -H "x-api-key: ${{ secrets.OFF_MARKET_ADMIN_TOKEN }}" \
+            -H "x-api-key: ${OFF_MARKET_ADMIN_TOKEN}" \
             -d '{"location": "Ilford"}')
 
           echo "Response: $RESPONSE"
@@ -45,7 +57,7 @@ jobs:
           if [ "$COUNT" -eq 0 ]; then
             echo "⚠️ WARNING: Import returned 0 results for Ilford"
             echo "This may indicate scraper issues - please investigate"
-            exit 0  # Don't fail the workflow, just warn
+            exit 1
           fi
 
           echo "✅ Monitor check passed with $COUNT properties"
