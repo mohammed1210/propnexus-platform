@@ -514,3 +514,18 @@ if _CI_SKIP_RUNLOG:
     except NameError:
         # Class name not defined yet; this is safe to ignore.
         pass
+
+# ==== CI helper: optionally skip heavy RunLog integration tests ====
+import os as _os
+import pytest as _pytest
+
+_CI_SKIP_RUNLOG = _os.environ.get("CI", "").lower() == "true"
+
+if _CI_SKIP_RUNLOG:
+    try:
+        TestScraperRunLogIntegration = _pytest.mark.skip(
+            reason="RunLog integration skipped in CI to avoid hitting Supabase"
+        )(TestScraperRunLogIntegration)
+    except NameError:
+        # Class name not defined yet; this is safe to ignore.
+        pass
