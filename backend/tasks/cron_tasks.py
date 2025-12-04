@@ -88,8 +88,8 @@ async def daily_scrape() -> None:
             tasks.append(asyncio.sleep(0, result=[]))
 
         # Run provider scrapes concurrently for the same location
-        zoopla_results, rightmove_results, onthemarket_results, spareroom_results = await asyncio.gather(
-            *tasks
+        zoopla_results, rightmove_results, onthemarket_results, spareroom_results = (
+            await asyncio.gather(*tasks)
         )
 
         zoopla_results = zoopla_results or []

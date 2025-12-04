@@ -8,7 +8,12 @@ from urllib.parse import urlencode
 from bs4 import BeautifulSoup
 
 from backend.utils.postcode import get_lat_lng_from_postcode
-from backend.utils.render import render_page, PLAYWRIGHT_ENABLE, capture_debug_html, capture_debug_json
+from backend.utils.render import (
+    render_page,
+    PLAYWRIGHT_ENABLE,
+    capture_debug_html,
+    capture_debug_json,
+)
 from backend.utils.scraper_logger import (
     ScraperStats,
     log_scrape_start,
