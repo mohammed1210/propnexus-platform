@@ -1,4 +1,4 @@
-import os
+import os  # noqa: E402
 
 from dotenv import load_dotenv
 
@@ -6,8 +6,8 @@ load_dotenv()
 from typing import List
 
 import httpx
-import pytest
-from supabase import Client, create_client
+import pytest  # noqa: E402
+from supabase import Client, create_client  # noqa: E402
 
 
 # --- Supabase helper ---------------------------------------------------------

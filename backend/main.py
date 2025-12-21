@@ -18,7 +18,7 @@ except Exception as e:
     print(f"[WARNING] Sentry initialization failed: {e}")
 
 # Local routers
-from backend.routes.ai import router as ai_router
+from routes.ai import router  # noqa: E402 as ai_router
 from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
 from backend.routes.gpt_routes import router as gpt_router

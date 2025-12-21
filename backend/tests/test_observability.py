@@ -5,8 +5,8 @@ Tests for scraper observability features:
 """
 
 import sys
-import os
-import pytest
+import os  # noqa: E402
+import pytest  # noqa: E402
 
 # NOTE:
 # In CI (GitHub Actions) we skip the heavy observability + scraper/runlog tests
@@ -501,8 +501,8 @@ class TestScraperModeConfiguration:
 
 
 # ==== CI helper: optionally skip heavy RunLog integration tests ====
-import os as _os
-import pytest as _pytest
+import os as _os  # noqa: E402
+import pytest as _pytest  # noqa: E402
 
 _CI_SKIP_RUNLOG = _os.environ.get("CI", "").lower() == "true"
 
@@ -516,8 +516,8 @@ if _CI_SKIP_RUNLOG:
         pass
 
 # ==== CI helper: optionally skip heavy RunLog integration tests ====
-import os as _os
-import pytest as _pytest
+import os as _os  # noqa: E402
+import pytest as _pytest  # noqa: E402
 
 _CI_SKIP_RUNLOG = _os.environ.get("CI", "").lower() == "true"
 
