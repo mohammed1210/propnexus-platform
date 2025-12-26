@@ -1,6 +1,6 @@
 """Health check endpoint for monitoring backend service status."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter
 
@@ -12,5 +12,5 @@ def health():
     return {
         "ok": True,
         "service": "propnexus-backend",
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }

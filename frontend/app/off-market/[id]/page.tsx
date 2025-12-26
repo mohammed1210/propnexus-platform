@@ -122,8 +122,12 @@ export default function DealDetail({ params }: PageProps) {
               <div className="card p-4">
                 <div className="font-medium mb-2">Actions</div>
                 <div className="space-y-2">
-                  <a className="block underline text-sm" href="/off-market">Export JSON (coming soon)</a>
-                  <a className="block underline text-sm" href="/off-market">Download PDF (coming soon)</a>
+                  <Link href="/off-market" className="block underline text-sm">
+                    Export JSON (coming soon)
+                  </Link>
+                  <Link href="/off-market" className="block underline text-sm">
+                    Download PDF (coming soon)
+                  </Link>
                 </div>
               </div>
 
