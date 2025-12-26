@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import inspect
 import aiohttp
 from typing import List, Dict, Any, Optional
 from bs4 import BeautifulSoup
@@ -111,27 +112,39 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
 
     # Fetch the URL (either direct or via ScraperAPI)
     try:
-        async with session.get(
-            url_to_fetch, headers=headers, timeout=60 if mode == "scraperapi" else 30
-        ) as resp:
+        timeout_value = 60 if mode == "scraperapi" else 30
+        req = session.get(url_to_fetch, headers=headers, timeout=timeout_value)
+
+        # If tests mock session.get as AsyncMock, req is awaitable.
+        if inspect.isawaitable(req):
+            req = await req
+
+        async with req as resp:
             text = await resp.text()
+            status = getattr(resp, "status", 0)
 
             # If direct mode and we detect blocking, try ScraperAPI as fallback
-            if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
+            if mode == "direct" and _looks_blocked(text, status) and SCRAPERAPI_KEY:
                 log_scraperapi_fallback("onthemarket", url)
                 proxy_url = make_scraperapi_url(url, render=True)
                 print(f"ℹ️ Fallback to ScraperAPI for blocked URL: {url}")
                 try:
-                    async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
+                    proxy_req = session.get(proxy_url, headers=headers, timeout=60)
+                    if inspect.isawaitable(proxy_req):
+                        proxy_req = await proxy_req
+
+                    async with proxy_req as p_resp:
                         p_text = await p_resp.text()
-                        if _looks_blocked(p_text, p_resp.status):
+                        p_status = getattr(p_resp, "status", 0)
+
+                        if _looks_blocked(p_text, p_status):
                             return None
                         return p_text
                 except Exception:
                     return None
 
             # If still looks blocked, return None
-            if _looks_blocked(text, resp.status):
+            if _looks_blocked(text, status):
                 return None
 
             return text
@@ -146,9 +159,14 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             print(f"⚠️ Direct fetch failed, trying ScraperAPI fallback: {e}")
             try:
                 proxy_url = make_scraperapi_url(url, render=True)
-                async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
+                proxy_req = session.get(proxy_url, headers=headers, timeout=60)
+                if inspect.isawaitable(proxy_req):
+                    proxy_req = await proxy_req
+
+                async with proxy_req as p_resp:
                     p_text = await p_resp.text()
-                    if _looks_blocked(p_text, p_resp.status):
+                    p_status = getattr(p_resp, "status", 0)
+                    if _looks_blocked(p_text, p_status):
                         return None
                     return p_text
             except Exception:
@@ -323,13 +341,19 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
     - external_id, title, description, location, price, bedrooms, bathrooms,
       image_url, image_urls, latitude, longitude, source ("onthemarket"), raw_url
     """
-    log_scrape_start("onthemarket", location, SCRAPER_MODE)
+    mode = os.getenv("SCRAPER_MODE", "direct").lower()
+
+    log_scrape_start("onthemarket", location, mode)
     stats = ScraperStats("onthemarket", location)
     results: List[Dict[str, Any]] = []
     seen_ids = set()
 
-    # Start audit logging
-    with RunLog.start(source="onthemarket", mode=SCRAPER_MODE, location=location) as run_log:
+    with RunLog.start(
+        source="onthemarket",
+        mode=mode,
+        location=location,
+        meta={"max_pages": OT_MAX_PAGES},
+    ) as runlog:
         try:
             async with aiohttp.ClientSession() as session:
                 for page in range(OT_MAX_PAGES):
@@ -497,8 +521,8 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
 
             stats.log_summary()
             print(f"✅ Scraped {len(results)} OnTheMarket properties for '{location}'")
+            runlog.set_count(len(results))
             return results
-            run_log.set_count(len(results))
         except Exception as e:
             # Let RunLog handle the error in __exit__
             print(f"❌ OnTheMarket scraper error: {e}")
