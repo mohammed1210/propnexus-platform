@@ -1,9 +1,13 @@
-import os
+import os  # noqa: E402
+
+from dotenv import load_dotenv
+
+load_dotenv()
 from typing import List
 
 import httpx
-import pytest
-from supabase import Client, create_client
+import pytest  # noqa: E402
+from supabase import Client, create_client  # noqa: E402
 
 
 # --- Supabase helper ---------------------------------------------------------
@@ -44,12 +48,7 @@ async def test_properties_table_schema_contract() -> None:
     This is a guardrail so backend/frontend don't silently drift from the DB.
     """
     sb = get_sb_client()
-    res = (
-        sb.table("properties")
-        .select(",".join(REQUIRED_PROPERTIES_COLS))
-        .limit(1)
-        .execute()
-    )
+    res = sb.table("properties").select(",".join(REQUIRED_PROPERTIES_COLS)).limit(1).execute()
 
     # We only care that the query succeeds and the columns are present
     assert res.data is not None
@@ -114,4 +113,3 @@ async def test_stripe_webhook_endpoint_reachable() -> None:
         r = await client.post(f"{backend}/stripe/webhook", json=fake_event)
 
     assert r.status_code in (200, 204, 400), f"Unexpected status {r.status_code}"
-    

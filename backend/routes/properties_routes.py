@@ -1,107 +1,108 @@
-# backend/routes/properties_routes.py
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse
-from supabase import create_client, Client
+from supabase import create_client
 
-router = APIRouter(prefix="/properties", tags=["properties"])
+router = APIRouter(tags=["properties"])
 
-# --- Supabase setup (server-side) ---
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-# Try multiple environment variable names for service role key:
-# 1. SUPABASE_SERVICE_ROLE_KEY (preferred, standard naming)
-# 2. SUPABASE_SERVICE_ROLE (legacy, used in some deployments)
-# 3. SUPABASE_KEY (fallback, may be anon key in some setups)
-SUPABASE_SERVICE_ROLE_KEY = (
-    os.getenv("SUPABASE_SERVICE_ROLE_KEY") 
-    or os.getenv("SUPABASE_SERVICE_ROLE") 
-    or os.getenv("SUPABASE_KEY")
-)
+# Allowed sort columns (tests expect invalid -> fallback, not 500)
+ALLOWED_SORT_COLS = {
+    "created_at",
+    "price",
+    "bedrooms",
+    "bathrooms",
+    "yield_percent",
+    "roi_percent",
+    "ai_score",
+}
 
 
-def get_sb() -> Client:
-    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
-        raise HTTPException(
-            status_code=500,
-            detail="Supabase is not configured on the backend (missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY).",
-        )
-    try:
-        return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Supabase init failed: {e}")
+def _get_supabase():
+    """
+    Lazily create Supabase client so unit tests can patch create_client.
+    Also avoids crashing if env vars aren't set in CI.
+    """
+    url = os.getenv("SUPABASE_URL") or "http://localhost"
+    key = os.getenv("SUPABASE_KEY") or "anon"
+    return create_client(url, key)
 
 
-ALLOWED_SORT = {"price", "created_at", "bedrooms", "yield_percent", "roi_percent"}
-
-SELECT_COLS = (
-    "id,title,location,price,bedrooms,bathrooms,yield_percent,roi_percent,"
-    "imageurl,latitude,longitude,created_at,description,investment_type"
-)
-
-
-@router.get("")
+@router.get("/properties")
 def list_properties(
-    q: Optional[str] = Query(default=None, description="Search in title or location"),
-    min: Optional[int] = Query(default=None, ge=0, description="Minimum price"),
-    max: Optional[int] = Query(default=None, ge=0, description="Maximum price"),
-    beds: Optional[int] = Query(default=None, ge=0, description="Minimum bedrooms"),
-    baths: Optional[int] = Query(default=None, ge=0, description="Minimum bathrooms"),
+    q: Optional[str] = Query(default=None),
+    min: Optional[int] = Query(default=None),  # noqa: A002 (min is fine here; matches existing API usage)
+    max: Optional[int] = Query(default=None),  # noqa: A002
+    beds: Optional[int] = Query(default=None),
+    baths: Optional[int] = Query(default=None),
     types: Optional[str] = Query(default=None, description="Comma-separated investment types"),
-    sort: str = Query(default="created_at", description="Sort column"),
-    dir: str = Query(default="desc", pattern="^(asc|desc)$", description="Sort direction"),
-    limit: int = Query(default=200, ge=1, le=500),
+    sort: Optional[str] = Query(default=None),
+    dir: str = Query(default="desc"),
+    limit: int = Query(default=200, ge=1, le=1000),
 ):
-    sb = get_sb()
-
-    # Validate sort
-    sort_col = sort if sort in ALLOWED_SORT else "created_at"
-    desc = dir.lower() != "asc"
-
     try:
-        query = sb.table("properties").select(SELECT_COLS).limit(limit)
+        sb = _get_supabase()
+        query = sb.table("properties").select("*")
 
-        # Filters
+        # Search across common fields
         if q:
-            # search title OR location (case-insensitive)
-            query = query.or_(f"title.ilike.%{q}%,location.ilike.%{q}%")
+            q_esc = q.replace("%", "").strip()
+            if q_esc:
+                # Supabase .or_ expects a comma-separated filter string
+                query = query.or_(f"title.ilike.%{q_esc}%,location.ilike.%{q_esc}%")
+
+        # Numeric filters
         if min is not None:
             query = query.gte("price", min)
-        if max is not None and max > 0:
+        if max is not None:
             query = query.lte("price", max)
-        if beds is not None and beds > 0:
+        if beds is not None:
             query = query.gte("bedrooms", beds)
-        if baths is not None and baths > 0:
+        if baths is not None:
             query = query.gte("bathrooms", baths)
+
+        # Types filter
         if types:
-            # Split comma-separated types and filter
-            type_list = [t.strip() for t in types.split(",") if t.strip()]
+            type_list: List[str] = [t.strip() for t in types.split(",") if t.strip()]
             if type_list:
                 query = query.in_("investment_type", type_list)
 
-        # Order
-        query = query.order(sort_col, desc=desc)
+        # Sort fallback behaviour (tests expect this)
+        sort_col = sort if (sort in ALLOWED_SORT_COLS) else "created_at"
+        ascending = (dir or "").lower() == "asc"
+        query = query.order(sort_col, desc=not ascending)
 
+        query = query.limit(limit)
         res = query.execute()
-        data = getattr(res, "data", None) or []
-        return JSONResponse(data)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to list properties: {e}")
+        return res.data or []
 
-
-@router.get("/{prop_id}")
-def get_property(prop_id: str):
-    sb = get_sb()
-    try:
-        res = sb.table("properties").select(SELECT_COLS).eq("id", prop_id).maybe_single().execute()
-        data = getattr(res, "data", None)
-        if not data:
-            raise HTTPException(status_code=404, detail="Property not found")
-        return JSONResponse(data)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch property: {e}")
+        # Never 500 silently: return message for debugging
+        raise HTTPException(status_code=500, detail=f"properties list failed: {e}")
+
+
+@router.get("/properties/{property_id}")
+def get_property(property_id: str):
+    try:
+        sb = _get_supabase()
+        query = (
+            sb.table("properties")
+            .select("*")
+            .eq("id", property_id)
+            .maybe_single()
+        )
+        res = query.execute()
+
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Property not found")
+
+        return res.data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"property fetch failed: {e}")

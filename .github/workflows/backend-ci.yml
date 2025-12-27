@@ -51,6 +51,5 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           BACKEND_URL: ${{ secrets.BACKEND_URL }}
         run: |
-          # Run all backend tests, including contracts + schema guardrails
-          pytest tests/test_contracts.py
-          pytest tests/test_schema_contracts_guardrail.py
+          # Run contract + schema guardrail tests (same as local)
+          pytest tests/test_contracts.py tests/test_schema_contracts_guardrail.py
