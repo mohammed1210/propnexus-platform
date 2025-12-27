@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 import stripe
 from supabase import create_client
@@ -16,11 +16,11 @@ sb = None  # tests patch backend.routes.stripe_routes.sb
 # The stripe module itself is patched by tests
 
 class CheckoutRequest(BaseModel):
-    email: EmailStr
+    email: str
     price_id: str
 
 class PortalRequest(BaseModel):
-    email: EmailStr
+    email: str
 
 def _get_supabase():
     url = os.getenv("SUPABASE_URL") or "http://localhost"
