@@ -11,27 +11,21 @@ from supabase import create_client
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
 
-# IMPORTANT:
-# - Do NOT create Supabase client at import time (tests patch sb)
-# - Do NOT crash at import time if STRIPE_SECRET_KEY missing (tests patch stripe)
+# Do not create Supabase client at import time (tests patch sb)
 sb = None  # tests patch backend.routes.stripe_routes.sb
-# stripe is imported as a module; tests patch backend.routes.stripe_routes.stripe
-
+# The stripe module itself is patched by tests
 
 class CheckoutRequest(BaseModel):
     email: EmailStr
     price_id: str
 
-
 class PortalRequest(BaseModel):
     email: EmailStr
-
 
 def _get_supabase():
     url = os.getenv("SUPABASE_URL") or "http://localhost"
     key = os.getenv("SUPABASE_KEY") or "anon"
     return create_client(url, key)
-
 
 def _frontend_url() -> str:
     return (
@@ -39,7 +33,6 @@ def _frontend_url() -> str:
         or os.getenv("NEXT_PUBLIC_SITE_URL")
         or "http://localhost:3000"
     )
-
 
 @router.post("/create-checkout-session")
 def create_checkout_session(payload: CheckoutRequest):
@@ -69,15 +62,13 @@ def create_checkout_session(payload: CheckoutRequest):
             customer_id = customer.id
 
         # 2) Persist/Upsert customer mapping in Supabase (mocked in tests)
-        # Keep this defensive: sb in CI might be placeholder
         try:
             sb.table("stripe_customers").upsert(
                 {"email": email, "stripe_customer_id": customer_id},
                 on_conflict="email",
             ).execute()
         except Exception:
-            # Don't block checkout if db table isn't present in test env
-            pass
+            pass  # don't block checkout if db table isn't present
 
         base = _frontend_url().rstrip("/")
         success_url = os.getenv("STRIPE_SUCCESS_URL") or f"{base}/success"
@@ -100,7 +91,6 @@ def create_checkout_session(payload: CheckoutRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"create checkout session failed: {e}")
-
 
 @router.post("/create-portal-session")
 def create_portal_session(payload: PortalRequest):
