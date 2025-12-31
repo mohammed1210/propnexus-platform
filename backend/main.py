@@ -1,13 +1,15 @@
 # backend/main.py
 from __future__ import annotations
+
 import os
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-
-load_dotenv()
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Load env (safe if missing)
+load_dotenv()
 
 # Initialize Sentry before other imports
 try:
@@ -34,21 +36,7 @@ from backend.routes import import_routes, admin_schedule
 
 # ✅ Stripe routers (named distinctly to avoid duplicate includes)
 from backend.routes.stripe_webhook import router as stripe_webhook_router  # POST /stripe/webhook
-from backend.routes.stripe_routes import (
-    router as stripe_routes_router,
-)  # POST /stripe/create-portal-session
-
-# Note: Additional route files exist but are not yet integrated:
-# - digests_routes.py, email_routes.py, metrics_routes.py, payments_routes.py
-# These may be activated in future releases when the features are ready.
-# - scrape_routes.py is deprecated in favor of import_routes.py
-
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except Exception:
-    pass
+from backend.routes.stripe_routes import router as stripe_routes_router  # POST /stripe/create-portal-session
 
 app = FastAPI()
 
@@ -66,6 +54,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ======================
+# 🧪 Debug Routes (Safe)
+# ======================
+@app.get("/debug/supabase-env")
+def debug_supabase_env():
+    """
+    Shows what the container is *actually* reading.
+    Does NOT expose full secrets.
+    """
+    url = (os.getenv("SUPABASE_URL") or "").strip()
+
+    # Accept multiple key names so Railway + local env never mismatch
+    key = (
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        or os.getenv("SUPABASE_SERVICE_ROLE")
+        or os.getenv("SUPABASE_KEY")
+        or os.getenv("SUPABASE_ANON_KEY")
+        or ""
+    ).strip()
+
+    host = ""
+    try:
+        host = urlparse(url).netloc or url
+    except Exception:
+        host = url
+
+    return {
+        "SUPABASE_URL_present": bool(url),
+        "SUPABASE_URL_host": host,
+        "key_present": bool(key),
+        "key_len": len(key),
+        "key_prefix": key[:8] if key else "",
+        "checked_vars_order": [
+            "SUPABASE_SERVICE_ROLE_KEY",
+            "SUPABASE_SERVICE_ROLE",
+            "SUPABASE_KEY",
+            "SUPABASE_ANON_KEY",
+        ],
+    }
+
+
+# ======================
+# 🏠 Root Route
+# ======================
+@app.get("/")
+def root():
+    return {"ok": True, "service": "propnexus-backend"}
+
+
 # Core routers
 app.include_router(ai_router)
 app.include_router(area_intel_router)
@@ -76,7 +113,6 @@ app.include_router(import_router)
 app.include_router(notes_router)
 app.include_router(off_market_router)
 app.include_router(save_deal_router)
-# Legacy scrape_router removed - use import_router instead
 app.include_router(properties_router)  # GET /properties
 app.include_router(tradesmen_router)  # GET /tradesmen/nearby, POST /tradesmen/contact
 app.include_router(import_routes.router)
@@ -88,14 +124,6 @@ app.include_router(stripe_routes_router)  # POST /stripe/create-portal-session
 
 # ✅ Users router
 app.include_router(users_router)  # GET /users/plan
-
-
-# ======================
-# 🏠 Root Route
-# ======================
-@app.get("/")
-def root():
-    return {"ok": True}
 
 
 if __name__ == "__main__":
