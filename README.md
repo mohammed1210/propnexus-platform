@@ -505,7 +505,7 @@ If using Clerk instead of Supabase Auth:
    - **Note:** Stripe automatically applies the 7-day trial period configured in the checkout session
 
 2. **Configure Webhooks:**
-   
+
    **Frontend Webhook (Vercel):**
    - Endpoint: `https://propnexus-platform.vercel.app/api/stripe/webhook`
    - Events:
@@ -513,7 +513,7 @@ If using Clerk instead of Supabase Auth:
      - `customer.subscription.created`
      - `customer.subscription.updated`
      - `customer.subscription.deleted`
-   
+
    **Backend Webhook (Railway):**
    - Endpoint: `https://your-backend.railway.app/stripe/webhook`
    - Same events as frontend

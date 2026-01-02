@@ -14,10 +14,11 @@ And we provide a thin `get_area_intel()` that behaves like the old route:
 """
 
 from __future__ import annotations
+
 from typing import Any, Dict, Optional
 
 # Re-export the router and provider function from the new module
-from .area_intel_routes import router, get_area_intel_from_provider  # type: ignore
+from .area_intel_routes import get_area_intel_from_provider, router  # type: ignore
 
 # Try to mirror the module-level `sb` symbol if it exists; otherwise provide a stub.
 try:

@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 export default function BackToTop() {
   const [visible, setVisible] = useState(false);
   const pathname = usePathname();
-  
+
   // Don't show on property details pages (they have chatbot in same position)
   const isPropertyPage = pathname?.startsWith('/property/');
 

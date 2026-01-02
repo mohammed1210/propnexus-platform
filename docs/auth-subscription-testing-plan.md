@@ -9,7 +9,7 @@ Before testing, ensure the following are configured:
 ### Environment Variables (Frontend)
 ```env
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxx
-CLERK_SECRET_KEY=sk_live_xxx  
+CLERK_SECRET_KEY=sk_live_xxx
 CLERK_WEBHOOK_SECRET=whsec_xxx
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
@@ -167,8 +167,8 @@ SELECT * FROM users WHERE email = 'test@example.com';
 **Validation Queries**:
 ```sql
 -- Check plan updated
-SELECT plan, stripe_customer_id, updated_at 
-FROM users 
+SELECT plan, stripe_customer_id, updated_at
+FROM users
 WHERE email = 'test@example.com';
 
 -- Should return: plan = 'pro', stripe_customer_id = 'cus_xxx'
@@ -224,8 +224,8 @@ WHERE email = 'test@example.com';
 **Validation Queries**:
 ```sql
 -- Check plan updated to investor
-SELECT plan, updated_at 
-FROM users 
+SELECT plan, updated_at
+FROM users
 WHERE email = 'test@example.com';
 
 -- Should return: plan = 'investor'
@@ -293,8 +293,8 @@ WHERE email = 'test@example.com';
 **Validation After Cancellation**:
 ```sql
 -- Check plan reverted to free
-SELECT plan, stripe_customer_id 
-FROM users 
+SELECT plan, stripe_customer_id
+FROM users
 WHERE email = 'test@example.com';
 
 -- Should return: plan = 'free', stripe_customer_id still set
@@ -391,13 +391,13 @@ describe('useUserPlan', () => {
     // Mock no Clerk user
     // Assert plan === 'free'
   });
-  
+
   it('fetches plan from backend for logged in user', async () => {
     // Mock Clerk user
     // Mock backend API response
     // Assert plan matches API response
   });
-  
+
   it('handles API errors gracefully', async () => {
     // Mock API error
     // Assert defaults to 'free'
@@ -418,18 +418,18 @@ test.describe('Authentication and Subscription Flow', () => {
     await page.goto('/sign-up');
     await page.fill('input[type="email"]', 'test@example.com');
     // ... complete sign-up
-    
+
     // 2. Verify free tier
     await page.goto('/pricing');
     await expect(page.locator('text=Free')).toBeVisible();
-    
+
     // 3. Click upgrade
     await page.click('text=Start 7-Day Free Trial');
     await page.waitForURL('**/checkout.stripe.com/**');
-    
+
     // 4. Complete Stripe checkout (test mode)
     // ... fill card details
-    
+
     // 5. Verify upgrade
     await page.waitForURL('**/account?success=true');
     await expect(page.locator('text=Pro')).toBeVisible();
@@ -452,7 +452,7 @@ ab -n 100 -c 10 \
   -T 'application/json' \
   https://your-domain.vercel.app/api/webhooks/clerk
 
-# Test Stripe webhook  
+# Test Stripe webhook
 ab -n 100 -c 10 \
   -p stripe-webhook-payload.json \
   -T 'application/json' \

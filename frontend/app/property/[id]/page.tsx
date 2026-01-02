@@ -322,7 +322,7 @@ export default function PropertyDetailsPage() {
             </CollapsibleCard>
 
             {/* Investment Calculator - Scenario Based */}
-            <InvestmentCalculator 
+            <InvestmentCalculator
               propertyId={String(property.id ?? id)}
               initialPrice={price}
             />

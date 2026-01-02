@@ -39,11 +39,12 @@ async def daily_scrape() -> None:
     """
     import asyncio
 
+    from scraper.onthemarket_scraper import scrape_onthemarket_properties
+
     # Avoid circular imports by importing inside the function
     from scraper.rightmove_scraper import scrape_rightmove_properties
-    from scraper.zoopla_scraper import scrape_zoopla_properties
-    from scraper.onthemarket_scraper import scrape_onthemarket_properties
     from scraper.spare_room_scraper import scrape_spareroom_properties
+    from scraper.zoopla_scraper import scrape_zoopla_properties
 
     # Feature flags to enable/disable individual scrapers without code changes.
     ENABLE_ZOOPLA = os.getenv("ENABLE_ZOOPLA_SCRAPER", "true").lower() == "true"

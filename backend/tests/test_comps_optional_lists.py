@@ -28,7 +28,9 @@ def test_comps_missing_sales_array():
         with patch("backend.routes.comps_routes.sb") as mock_sb:
             # Mock empty cache
             mock_table = MagicMock()
-            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = []
+            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = (
+                []
+            )
             mock_sb.table.return_value = mock_table
 
             from backend.routes.comps_routes import get_comps
@@ -63,7 +65,9 @@ def test_comps_missing_rents_array():
         with patch("backend.routes.comps_routes.sb") as mock_sb:
             # Mock empty cache
             mock_table = MagicMock()
-            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = []
+            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = (
+                []
+            )
             mock_sb.table.return_value = mock_table
 
             from backend.routes.comps_routes import get_comps
@@ -87,7 +91,9 @@ def test_comps_both_arrays_missing():
         with patch("backend.routes.comps_routes.sb") as mock_sb:
             # Mock empty cache
             mock_table = MagicMock()
-            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = []
+            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = (
+                []
+            )
             mock_sb.table.return_value = mock_table
 
             from backend.routes.comps_routes import get_comps
@@ -112,7 +118,9 @@ def test_comps_empty_arrays():
         with patch("backend.routes.comps_routes.sb") as mock_sb:
             # Mock empty cache
             mock_table = MagicMock()
-            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = []
+            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = (
+                []
+            )
             mock_sb.table.return_value = mock_table
 
             from backend.routes.comps_routes import get_comps

@@ -1,15 +1,15 @@
 # Contributing Guidelines for AI Tools (Copilot, ChatGPT, and Automated Agents)
 
-This repository relies heavily on AI-assisted development.  
-To prevent schema drift, routing mismatches, and subscription errors,  
+This repository relies heavily on AI-assisted development.
+To prevent schema drift, routing mismatches, and subscription errors,
 **all contributors and AI agents must follow these rules**.
 
 ---
 
 # 1. DATABASE & SCHEMA RULES
 
-### ✔ Migrations are the source of truth  
-- **Do NOT modify `schema.sql` directly** unless it is to sync with the live DB.  
+### ✔ Migrations are the source of truth
+- **Do NOT modify `schema.sql` directly** unless it is to sync with the live DB.
 - All schema changes **must** be implemented as an additive migration in:
 ```
 
@@ -23,7 +23,7 @@ supabase/migrations/YYYYMMDD_description.sql
 
 ### ✔ Keep naming consistent (snake_case only)
 - Never create camelCase DB columns.
-- Correct naming for property fields:  
+- Correct naming for property fields:
 ```
 
 investment_type
@@ -43,7 +43,7 @@ bmv
 
 # 2. BACKEND ROUTING RULES
 
-### ✔ Listings page must use the backend API  
+### ✔ Listings page must use the backend API
 The frontend **must not** query Supabase directly for properties.
 
 Always use:
@@ -53,10 +53,10 @@ GET /properties
 
 ```
 
-### ✔ Keep field naming consistent  
+### ✔ Keep field naming consistent
 The backend must return snake_case keys to the frontend.
 
-### ✔ Do not silently filter out rows  
+### ✔ Do not silently filter out rows
 Property routes must not require non-null `yield_percent` or `roi_percent` unless explicitly requested.
 
 ---
@@ -98,7 +98,7 @@ For any change touching schema, routing, ingestion, or subscriptions:
 - Contract tests for `/properties` return shape
 - Tests for `users.plan` updates from Stripe webhooks
 
-### ✔ Do not break existing tests  
+### ✔ Do not break existing tests
 All changes must keep:
 ```
 
@@ -124,7 +124,7 @@ npm test → 100% pass
 
 # 6. AI-SPECIFIC RULES
 
-### ✔ Agents MUST obey repository invariants  
+### ✔ Agents MUST obey repository invariants
 Before applying changes, Agents should inspect:
 
 - `supabase/schema.sql`
@@ -133,19 +133,19 @@ Before applying changes, Agents should inspect:
 - `/frontend/app`
 - `/frontend/hooks/useUserPlan.ts`
 
-### ✔ If uncertain → STOP and ask  
-Conflicting schema? Conflicting env variables?  
+### ✔ If uncertain → STOP and ask
+Conflicting schema? Conflicting env variables?
 Agents must request clarification instead of guessing.
 
 ---
 
 These rules prevent:
 
-- Schema drift  
-- Broken routing  
-- Subscription mismatches  
-- Missing columns  
-- Zero-data listings  
+- Schema drift
+- Broken routing
+- Subscription mismatches
+- Missing columns
+- Zero-data listings
 - Repeated failures after deploying
 
 Following these ensures PropNexus stays stable, scalable, and production-ready.

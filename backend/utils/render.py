@@ -1,8 +1,8 @@
-import os
 import asyncio
+import os
 import time
-from typing import Optional, Sequence
 from pathlib import Path
+from typing import Optional, Sequence
 
 PLAYWRIGHT_ENABLE = os.getenv("PLAYWRIGHT_ENABLE", "0") == "1"
 PLAYWRIGHT_TIMEOUT_MS = int(os.getenv("PLAYWRIGHT_TIMEOUT_MS", "15000"))

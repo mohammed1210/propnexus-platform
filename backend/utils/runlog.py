@@ -2,7 +2,7 @@
 import os
 import sys
 import time
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 try:
     from supabase import create_client

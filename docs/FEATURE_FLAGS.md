@@ -31,7 +31,7 @@ All frontend feature flags are environment variables prefixed with `NEXT_PUBLIC_
 
 ### NEXT_PUBLIC_FEATURE_AI_CHATBOT
 
-**Default:** `false`  
+**Default:** `false`
 **Description:** Enables the floating AI chatbot assistant on property detail pages.
 
 When enabled:
@@ -54,7 +54,7 @@ NEXT_PUBLIC_FEATURE_AI_CHATBOT=true
 
 ### NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE
 
-**Default:** `false`  
+**Default:** `false`
 **Description:** Enables the AI Deal Score card on property detail pages.
 
 When enabled:
@@ -88,7 +88,7 @@ When disabled or plan insufficient, the AI Deal Score panel shows:
 
 ### NEXT_PUBLIC_FEATURE_AREA_INTEL
 
-**Default:** `false`  
+**Default:** `false`
 **Description:** Enables the Area Intelligence panel on property detail pages.
 
 When enabled:
@@ -123,7 +123,7 @@ When disabled or plan insufficient:
 
 ### NEXT_PUBLIC_FEATURE_COMPS
 
-**Default:** `false`  
+**Default:** `false`
 **Description:** Enables the Comparable Sales & Rentals panel on property detail pages.
 
 When enabled:
@@ -160,7 +160,7 @@ When disabled or plan insufficient:
 
 ### Subscription Plans
 
-**Available Tiers:** `free`, `pro`, `investor`  
+**Available Tiers:** `free`, `pro`, `investor`
 **Location:** `backend/.env` and Stripe configuration
 
 PropNexus Platform supports three subscription tiers:
@@ -189,8 +189,8 @@ PropNexus Platform supports three subscription tiers:
 
 ### OPENAI_API_KEY
 
-**Required for:** AI Chatbot (GPT responses), Deal Score Explanation  
-**Type:** Secret (never expose on client)  
+**Required for:** AI Chatbot (GPT responses), Deal Score Explanation
+**Type:** Secret (never expose on client)
 **Location:** `backend/.env`
 
 ```bash
@@ -203,9 +203,9 @@ OPENAI_API_KEY=sk-...your-key-here...
 
 ### CACHE_TTL_SECONDS
 
-**Default:** `1800` (30 minutes)  
-**Description:** Time-to-live for cached area intelligence and comparable sales data.  
-**Type:** Configuration  
+**Default:** `1800` (30 minutes)
+**Description:** Time-to-live for cached area intelligence and comparable sales data.
+**Type:** Configuration
 **Location:** `backend/.env`
 
 ```bash
@@ -306,11 +306,11 @@ Set environment variables in your backend hosting platform:
 
 ## Version History
 
-- **v11.2.0** (Sprint 11.2): 
+- **v11.2.0** (Sprint 11.2):
   - Limited subscription plans to free, pro, investor (removed enterprise tier)
   - Refined feature flag enforcement for AI panels
   - Updated Stripe webhook to only map pro and investor price IDs
-- **v11.1.0** (Sprint 11 Polish): 
+- **v11.1.0** (Sprint 11 Polish):
   - Centralized feature flag enforcement in `lib/flags.ts`
   - Removed direct `process.env` access from components
   - Added token-based authentication for `/users/plan` endpoint

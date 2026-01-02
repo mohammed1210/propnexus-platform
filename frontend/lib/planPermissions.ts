@@ -11,11 +11,11 @@ const PLAN_LEVELS: Record<UserPlan, number> = {
 /**
  * Check if a user's plan meets or exceeds the required plan level.
  * Uses hierarchical comparison: investor > pro > free
- * 
+ *
  * @param userPlan - The user's current plan
  * @param requiredPlan - The minimum required plan
  * @returns true if user has access, false otherwise
- * 
+ *
  * @example
  * hasAccess('pro', 'free') // true - pro >= free
  * hasAccess('free', 'pro') // false - free < pro
@@ -29,7 +29,7 @@ export function hasAccess(userPlan: UserPlan, requiredPlan: UserPlan): boolean {
 
 /**
  * Get a human-readable label for a plan.
- * 
+ *
  * @param plan - The plan to get a label for
  * @returns Capitalized plan name
  */
@@ -44,7 +44,7 @@ export function getPlanLabel(plan: UserPlan): string {
 
 /**
  * Get the article (a/an) for a plan name.
- * 
+ *
  * @param plan - The plan to get an article for
  * @returns 'an' for 'investor', 'a' for others
  */
@@ -54,7 +54,7 @@ export function getPlanArticle(plan: UserPlan): string {
 
 /**
  * Generate a default upgrade message for a required plan.
- * 
+ *
  * @param requiredPlan - The plan required for access
  * @returns A user-friendly message
  */

@@ -1,24 +1,25 @@
+import hashlib
+import inspect
 import os
 import re
 import time
-import inspect
-import aiohttp
-from typing import List, Dict, Any, Optional
-import hashlib
-from bs4 import BeautifulSoup
+from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlencode
 
+import aiohttp
+from bs4 import BeautifulSoup
+
 from backend.utils.postcode import get_lat_lng_from_postcode
+from backend.utils.retry import retry_async
+from backend.utils.runlog import RunLog
 from backend.utils.scraper_logger import (
     ScraperStats,
-    log_scrape_start,
-    log_page_fetch_error,
-    log_scraperapi_fallback,
     log_image_extraction,
+    log_page_fetch_error,
+    log_scrape_start,
+    log_scraperapi_fallback,
 )
-from backend.utils.retry import retry_async
-from backend.utils.validation import should_insert_property, clean_property_data
-from backend.utils.runlog import RunLog
+from backend.utils.validation import clean_property_data, should_insert_property
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "

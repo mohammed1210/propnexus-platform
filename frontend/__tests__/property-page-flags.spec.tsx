@@ -26,7 +26,7 @@ describe('Property Details Page - Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       // All should default to false
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AREA_INTEL).toBe(false);
@@ -42,7 +42,7 @@ describe('Property Details Page - Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       // Only DEAL_SCORE should be enabled
       expect(FF.DEAL_SCORE).toBe(true);
       expect(FF.AREA_INTEL).toBe(false);
@@ -57,7 +57,7 @@ describe('Property Details Page - Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       // Only AREA_INTEL should be enabled
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AREA_INTEL).toBe(true);
@@ -72,7 +72,7 @@ describe('Property Details Page - Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       // Only COMPS should be enabled
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AREA_INTEL).toBe(false);
@@ -88,7 +88,7 @@ describe('Property Details Page - Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       // All flags should be enabled
       expect(FF.DEAL_SCORE).toBe(true);
       expect(FF.AREA_INTEL).toBe(true);
@@ -105,7 +105,7 @@ describe('Property Details Page - Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       // Only DEAL_SCORE and COMPS should be enabled
       expect(FF.DEAL_SCORE).toBe(true);
       expect(FF.AREA_INTEL).toBe(false);
@@ -123,7 +123,7 @@ describe('Property Details Page - Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       // All should be false when undefined
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AREA_INTEL).toBe(false);

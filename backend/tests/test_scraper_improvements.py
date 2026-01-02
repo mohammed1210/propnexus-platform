@@ -5,8 +5,8 @@ These tests verify that the scrapers can be imported and have the expected
 structure without making actual network requests.
 """
 
-import sys
 import os
+import sys
 
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -32,10 +32,12 @@ def test_utility_imports():
 
 def test_scraper_functions_exist():
     """Test that expected scraper functions exist."""
-    from backend.scraper import rightmove_scraper
-    from backend.scraper import zoopla_scraper
-    from backend.scraper import onthemarket_scraper
-    from backend.scraper import spare_room_scraper
+    from backend.scraper import (
+        onthemarket_scraper,
+        rightmove_scraper,
+        spare_room_scraper,
+        zoopla_scraper,
+    )
 
     scrapers = [
         (rightmove_scraper, "scrape_rightmove_properties"),
@@ -96,7 +98,11 @@ def test_property_type_extraction():
 
 def test_validation_functions():
     """Test validation utility functions."""
-    from backend.utils.validation import is_valid_url, is_valid_image_url, should_insert_property
+    from backend.utils.validation import (
+        is_valid_image_url,
+        is_valid_url,
+        should_insert_property,
+    )
 
     # Test URL validation
     assert is_valid_url("https://example.com")

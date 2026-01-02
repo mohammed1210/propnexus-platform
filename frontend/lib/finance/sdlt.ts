@@ -1,6 +1,6 @@
 /**
  * SDLT (Stamp Duty Land Tax) Calculator for England & Northern Ireland
- * 
+ *
  * Supports:
  * - Standard residential rates
  * - Additional property surcharge (+3%)
@@ -44,7 +44,7 @@ const STANDARD_BANDS: SDLTBand[] = [
 
 /**
  * Calculate SDLT for a given property price and buyer type
- * 
+ *
  * @param price Property price in GBP
  * @param buyerType Type of buyer (determines surcharges)
  * @returns SDLT calculation with band breakdown
@@ -52,7 +52,7 @@ const STANDARD_BANDS: SDLTBand[] = [
 export function calculateSDLT(price: number, buyerType: BuyerType = 'standard'): SDLTCalculation {
   // Ensure price is non-negative
   const safePrice = Math.max(0, price);
-  
+
   // Calculate base duty using bands
   let remaining = safePrice;
   let lastCap = 0;
@@ -63,18 +63,18 @@ export function calculateSDLT(price: number, buyerType: BuyerType = 'standard'):
     const cap = band.upTo ?? Infinity;
     const slice = Math.max(0, Math.min(remaining, cap - lastCap));
     const duty = slice * band.rate;
-    
+
     bands.push({
       label: band.label,
       taxable: slice,
       ratePct: band.rate * 100,
       duty: duty,
     });
-    
+
     baseTotal += duty;
     remaining -= slice;
     lastCap = cap;
-    
+
     if (remaining <= 0) break;
   }
 

@@ -119,13 +119,13 @@ import { useUserPlan } from '@/lib/useUserPlan';
 
 function MyComponent() {
   const { plan, loading } = useUserPlan();
-  
+
   if (loading) return <div>Loading...</div>;
-  
+
   if (plan === 'free') {
     return <UpgradePrompt />;
   }
-  
+
   return <PremiumFeature />;
 }
 ```

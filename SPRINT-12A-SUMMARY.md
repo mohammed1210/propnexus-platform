@@ -8,7 +8,7 @@ All requirements from the problem statement have been successfully implemented, 
 
 ### Database Layer ✅
 - [x] Migration for `tradesmen` table
-- [x] Migration for `tradesmen_reviews` table  
+- [x] Migration for `tradesmen_reviews` table
 - [x] Migration for `tradesmen_leads` table
 - [x] Location indexes (latitude, longitude)
 - [x] Trade type indexes
@@ -69,7 +69,7 @@ Find tradespeople near a location.
 
 **Parameters:**
 - `lat` (required): Latitude
-- `lng` (required): Longitude  
+- `lng` (required): Longitude
 - `trade_type` (optional): Filter by trade
 - `radius_km` (optional): Search radius (default: 20)
 

@@ -22,7 +22,7 @@ Two environment variables control ScraperAPI usage:
 - `SCRAPER_MODE`: Controls scraping behavior
   - `direct` (default): Fetch HTML directly from Rightmove
   - `scraperapi`: Use ScraperAPI proxy for all HTML fetches
-  
+
 - `SCRAPERAPI_KEY`: Your ScraperAPI API key (get from https://www.scraperapi.com/)
 
 ### Request Flow
@@ -38,7 +38,7 @@ The scraper uses a **JSON API first** approach with optional ScraperAPI for HTML
    - **`SCRAPER_MODE=direct`** (default):
      - Fetch HTML directly from Rightmove
      - If blocked (403, captcha, etc.) → fallback to ScraperAPI (if key available)
-   
+
    - **`SCRAPER_MODE=scraperapi`**:
      - Use ScraperAPI for all HTML fetches
      - Gracefully falls back to direct if SCRAPERAPI_KEY not set
@@ -343,7 +343,7 @@ Query recent scrape runs:
 
 ```sql
 -- Get last 10 scrape runs
-SELECT 
+SELECT
   provider,
   mode,
   location,
@@ -357,7 +357,7 @@ ORDER BY started_at DESC
 LIMIT 10;
 
 -- Get success rate by provider
-SELECT 
+SELECT
   provider,
   COUNT(*) as total_runs,
   SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful,
@@ -511,7 +511,7 @@ Set up monitoring queries:
 
 ```sql
 -- Alert on high failure rate (> 20%)
-SELECT 
+SELECT
   provider,
   COUNT(*) FILTER (WHERE status = 'failed') * 100.0 / COUNT(*) as failure_rate
 FROM scrape_runs
@@ -521,7 +521,7 @@ HAVING COUNT(*) FILTER (WHERE status = 'failed') * 100.0 / COUNT(*) > 20;
 
 -- Alert on low yield (< 10 properties per run)
 SELECT * FROM scrape_runs
-WHERE status = 'success' 
+WHERE status = 'success'
   AND properties_imported < 10
   AND started_at > NOW() - INTERVAL '1 day'
 ORDER BY started_at DESC;

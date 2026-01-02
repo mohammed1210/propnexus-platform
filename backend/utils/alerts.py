@@ -6,9 +6,10 @@ Supports:
 - Email notifications via Resend
 """
 
-import os
 import logging
-from typing import Optional, Dict, Any
+import os
+from typing import Any, Dict, Optional
+
 import requests
 
 logger = logging.getLogger(__name__)

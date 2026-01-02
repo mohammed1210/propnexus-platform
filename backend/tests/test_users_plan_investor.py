@@ -4,6 +4,7 @@ Tests the price_id -> plan mapping and database upsert.
 """
 
 from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
 
@@ -185,7 +186,9 @@ def test_users_plan_endpoint_returns_investor():
         }
 
         mock_table = MagicMock()
-        mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_result
+        mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+            mock_result
+        )
         mock_sb.table.return_value = mock_table
 
         response = client.get("/users/plan?email=investor@example.com")

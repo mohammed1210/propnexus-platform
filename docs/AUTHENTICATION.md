@@ -111,7 +111,7 @@ SUPABASE_JWT_SECRET=your-jwt-secret
 
 1. **JWT Secret is Required**: The `SUPABASE_JWT_SECRET` must be explicitly configured. The system will not fallback to using the service role key as they serve different security purposes.
 
-2. **Finding the JWT Secret**: 
+2. **Finding the JWT Secret**:
    - Log into your Supabase project dashboard
    - Go to Settings → API
    - Look for "JWT Secret" under the API settings

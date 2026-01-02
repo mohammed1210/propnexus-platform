@@ -40,6 +40,7 @@ def test_webhook_requires_stripe_config(client):
 
     # Reimport to pick up missing env var
     import importlib
+
     from backend.routes import stripe_webhook
 
     importlib.reload(stripe_webhook)

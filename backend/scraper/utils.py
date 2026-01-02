@@ -1,8 +1,9 @@
+import inspect
 import os
 import re
-import inspect
+from typing import Any, Dict, Optional
+
 import aiohttp
-from typing import Optional, Any, Dict
 
 try:
     from supabase import Client, create_client

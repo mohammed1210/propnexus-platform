@@ -3,10 +3,10 @@ from __future__ import annotations
 import os
 from typing import Optional
 
+import stripe
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-import stripe
 from supabase import create_client
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])

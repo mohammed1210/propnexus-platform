@@ -30,7 +30,7 @@ describe('Feature Flags', () => {
     // Re-import to get fresh values
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       expect(FF.AI_CHAT).toBe(false);
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AREA_INTEL).toBe(false);
@@ -44,7 +44,7 @@ describe('Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       expect(FF.AI_CHAT).toBe(true);
       expect(FF.DEAL_SCORE).toBe(true);
     });
@@ -56,7 +56,7 @@ describe('Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       expect(FF.AREA_INTEL).toBe(true);
       expect(FF.COMPS).toBe(true);
     });
@@ -68,7 +68,7 @@ describe('Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       expect(FF.AI_CHAT).toBe(false);
       expect(FF.DEAL_SCORE).toBe(false);
     });
@@ -81,7 +81,7 @@ describe('Feature Flags', () => {
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
-      
+
       expect(FF.AI_CHAT).toBe(true);
       expect(FF.DEAL_SCORE).toBe(true);
       expect(FF.AREA_INTEL).toBe(true);

@@ -9,15 +9,15 @@ export default function PrivacyPage() {
       <h1 className="text-4xl font-bold mb-8 text-slate-900 dark:text-slate-100">
         Privacy Policy
       </h1>
-      
+
       <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
         <section>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
             Last updated: November 2025
           </p>
-          
+
           <p className="text-slate-700 dark:text-slate-300">
-            At PropNexus, we take your privacy seriously. This Privacy Policy explains how we 
+            At PropNexus, we take your privacy seriously. This Privacy Policy explains how we
             collect, use, disclose, and safeguard your information when you use our platform.
           </p>
         </section>
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
           <h2 className="text-2xl font-semibold mb-4 text-slate-900 dark:text-slate-100">
             1. Information We Collect
           </h2>
-          
+
           <h3 className="text-xl font-semibold mb-3 text-slate-800 dark:text-slate-200 mt-6">
             Personal Information
           </h3>
@@ -83,14 +83,14 @@ export default function PrivacyPage() {
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
             <li>
-              <strong>Service Providers:</strong> Third-party vendors who perform services on our 
+              <strong>Service Providers:</strong> Third-party vendors who perform services on our
               behalf (e.g., payment processing, hosting, analytics)
             </li>
             <li>
               <strong>Legal Requirements:</strong> When required by law or to protect our rights
             </li>
             <li>
-              <strong>Business Transfers:</strong> In connection with a merger, acquisition, or 
+              <strong>Business Transfers:</strong> In connection with a merger, acquisition, or
               sale of assets
             </li>
           </ul>
@@ -127,9 +127,9 @@ export default function PrivacyPage() {
             5. Data Security
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            We implement appropriate technical and organizational measures to protect your personal 
-            information against unauthorized access, alteration, disclosure, or destruction. However, 
-            no method of transmission over the internet is 100% secure, and we cannot guarantee 
+            We implement appropriate technical and organizational measures to protect your personal
+            information against unauthorized access, alteration, disclosure, or destruction. However,
+            no method of transmission over the internet is 100% secure, and we cannot guarantee
             absolute security.
           </p>
         </section>
@@ -162,8 +162,8 @@ export default function PrivacyPage() {
             7. Data Retention
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            We retain your personal information for as long as necessary to provide our services 
-            and fulfill the purposes outlined in this policy, unless a longer retention period 
+            We retain your personal information for as long as necessary to provide our services
+            and fulfill the purposes outlined in this policy, unless a longer retention period
             is required by law.
           </p>
         </section>
@@ -173,8 +173,8 @@ export default function PrivacyPage() {
             8. Children&apos;s Privacy
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            PropNexus is not intended for users under the age of 18. We do not knowingly collect 
-            personal information from children. If we become aware that we have collected information 
+            PropNexus is not intended for users under the age of 18. We do not knowingly collect
+            personal information from children. If we become aware that we have collected information
             from a child, we will take steps to delete it.
           </p>
         </section>
@@ -184,8 +184,8 @@ export default function PrivacyPage() {
             9. Changes to This Policy
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            We may update this Privacy Policy from time to time. We will notify you of significant 
-            changes by email or through a prominent notice on our platform. The &ldquo;Last updated&rdquo; 
+            We may update this Privacy Policy from time to time. We will notify you of significant
+            changes by email or through a prominent notice on our platform. The &ldquo;Last updated&rdquo;
             date at the top indicates when this policy was last revised.
           </p>
         </section>

@@ -25,15 +25,15 @@ If you already have a running Supabase database:
    - Go to your Supabase Dashboard → SQL Editor
    - Copy contents of `supabase/migrations/20251120_consolidate_users_schema.sql`
    - Paste and execute
-   
+
 3. **Verify**:
    ```sql
-   SELECT column_name, data_type, column_default 
-   FROM information_schema.columns 
+   SELECT column_name, data_type, column_default
+   FROM information_schema.columns
    WHERE table_name = 'users' AND table_schema = 'public'
    ORDER BY ordinal_position;
    ```
-   
+
    You should see these columns:
    - id (uuid)
    - email (text)

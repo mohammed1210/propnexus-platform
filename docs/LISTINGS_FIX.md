@@ -134,7 +134,7 @@ SET ROLE anon;
 SELECT COUNT(*) FROM properties;
 RESET ROLE;
 
--- Test as authenticated role  
+-- Test as authenticated role
 SET ROLE authenticated;
 SELECT COUNT(*) FROM properties;
 RESET ROLE;
@@ -161,7 +161,7 @@ Ensure one of these is set in `backend/.env` (checked in this order):
 1. `SUPABASE_SERVICE_ROLE_KEY` (preferred, standard naming)
 2. `SUPABASE_SERVICE_ROLE` (legacy, used in some deployments)
 3. `SUPABASE_KEY` (fallback, ensure this is a service role key, not anon key)
-   
+
    And:
    - `SUPABASE_URL`
 
@@ -180,7 +180,7 @@ Ensure one of these is set in `backend/.env` (checked in this order):
    Look for errors like:
    - "Supabase is not configured"
    - "Failed to list properties"
-   
+
    These indicate environment variables are missing.
 
 6. **Restart services after applying migration**

@@ -12,17 +12,17 @@ interface PlanGateProps {
    * Options: 'free', 'pro', 'investor'
    */
   require: UserPlan;
-  
+
   /**
    * Content to show if user has the required plan or higher
    */
   children: React.ReactNode;
-  
+
   /**
    * Optional custom message for when access is denied
    */
   deniedMessage?: string;
-  
+
   /**
    * Optional custom component to show when access is denied
    */
@@ -31,13 +31,13 @@ interface PlanGateProps {
 
 /**
  * PlanGate - A component that restricts content based on user subscription plan.
- * 
+ *
  * Features:
  * - Shows loading state while checking plan
  * - Shows upgrade message if user doesn't have required plan
  * - Supports plan hierarchy (investor > pro > free)
  * - Customizable denied message and component
- * 
+ *
  * Example usage:
  *   <PlanGate require="investor">
  *     <AdvancedAnalytics />
@@ -102,7 +102,7 @@ export default function PlanGate({
             />
           </svg>
         </div>
-        
+
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             Upgrade Required

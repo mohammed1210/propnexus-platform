@@ -6,8 +6,8 @@ parse failures, and scrape statistics.
 
 import logging
 import os
-from typing import Dict, Any, Optional
 from collections import defaultdict
+from typing import Any, Dict, Optional
 
 # Configure logging level
 LOG_LEVEL = os.getenv("SCRAPER_LOG_LEVEL", "INFO").upper()

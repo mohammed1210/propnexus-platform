@@ -25,10 +25,10 @@ To replace the hero background with your own images:
    ```bash
    # Using cwebp (install: apt-get install webp)
    cwebp -q 85 home-cart-house.jpg -o home-cart-house.webp
-   
+
    # Using ImageMagick
    convert home-cart-house.jpg -quality 85 home-cart-house.webp
-   
+
    # Using Node.js sharp library
    sharp('home-cart-house.jpg').webp({ quality: 85 }).toFile('home-cart-house.webp')
    ```
@@ -47,13 +47,13 @@ The overlay gradient can be adjusted in `/frontend/styles/homepage-hero.css`:
 /* Line 27-29: Adjust the rgba opacity values */
 .homepage-hero::before {
   background: linear-gradient(
-    215deg, 
+    215deg,
     rgba(14, 32, 52, 0.80) 0%,    /* Darker at top-left */
     rgba(14, 32, 52, 0.55) 40%,   /* Medium in middle */
     rgba(0, 0, 0, 0.65) 100%      /* Dark at bottom-right */
   ),
   url("/images/home-cart-house.webp") center / cover no-repeat;
-  
+
   /* Adjust brightness and saturation */
   filter: brightness(0.85) saturate(1.05);
 }

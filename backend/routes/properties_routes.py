@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import os
-from typing import Optional, List
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
+
 from supabase import create_client
 
 router = APIRouter(tags=["properties"])
@@ -33,7 +34,9 @@ def _get_supabase():
 @router.get("/properties")
 def list_properties(
     q: Optional[str] = Query(default=None),
-    min: Optional[int] = Query(default=None),  # noqa: A002 (min is fine here; matches existing API usage)
+    min: Optional[int] = Query(
+        default=None
+    ),  # noqa: A002 (min is fine here; matches existing API usage)
     max: Optional[int] = Query(default=None),  # noqa: A002
     beds: Optional[int] = Query(default=None),
     baths: Optional[int] = Query(default=None),

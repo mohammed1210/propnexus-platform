@@ -1,25 +1,30 @@
+import inspect
 import os
 import re
 import time
-import inspect
-import aiohttp
-from typing import List, Dict, Any, Optional
-from bs4 import BeautifulSoup
+from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlencode
 
+import aiohttp
+from bs4 import BeautifulSoup
+
 from backend.utils.postcode import get_lat_lng_from_postcode
-from backend.utils.render import PLAYWRIGHT_ENABLE, render_page_capture
-from backend.utils.render import capture_debug_html, capture_debug_json
-from backend.utils.scraper_logger import (
-    ScraperStats,
-    log_scrape_start,
-    log_page_fetch_error,
-    log_scraperapi_fallback,
-    log_image_extraction,
+from backend.utils.render import (
+    PLAYWRIGHT_ENABLE,
+    capture_debug_html,
+    capture_debug_json,
+    render_page_capture,
 )
 from backend.utils.retry import retry_async
-from backend.utils.validation import should_insert_property, clean_property_data
 from backend.utils.runlog import RunLog
+from backend.utils.scraper_logger import (
+    ScraperStats,
+    log_image_extraction,
+    log_page_fetch_error,
+    log_scrape_start,
+    log_scraperapi_fallback,
+)
+from backend.utils.validation import clean_property_data, should_insert_property
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "

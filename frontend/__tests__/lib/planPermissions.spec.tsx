@@ -57,7 +57,7 @@ describe('planPermissions', () => {
     it('uses correct article based on plan', () => {
       const proMessage = getUpgradeMessage('pro');
       expect(proMessage).toContain('a Pro');
-      
+
       const investorMessage = getUpgradeMessage('investor');
       expect(investorMessage).toContain('an Investor');
     });
@@ -68,7 +68,7 @@ describe('planPermissions', () => {
       // Test upgrade paths
       expect(hasAccess('free', 'pro')).toBe(false); // Need to upgrade
       expect(hasAccess('pro', 'investor')).toBe(false); // Need to upgrade
-      
+
       // Test downgrade tolerance (higher plans can access lower content)
       expect(hasAccess('pro', 'free')).toBe(true);
       expect(hasAccess('investor', 'pro')).toBe(true);

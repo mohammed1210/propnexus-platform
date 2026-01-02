@@ -3,6 +3,7 @@ Tests for token-based authentication on /users/plan endpoint.
 """
 
 from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
 
@@ -30,7 +31,9 @@ def test_plan_endpoint_with_valid_token():
             }
 
             mock_table = MagicMock()
-            mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_result
+            mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+                mock_result
+            )
             mock_sb.table.return_value = mock_table
 
             with patch("backend.routes.users_routes.sb", mock_sb):
@@ -111,7 +114,9 @@ def test_plan_endpoint_email_param_takes_precedence():
     }
 
     mock_table = MagicMock()
-    mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_result
+    mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+        mock_result
+    )
     mock_sb.table.return_value = mock_table
 
     with patch("backend.routes.users_routes.sb", mock_sb):
@@ -151,7 +156,9 @@ def test_plan_endpoint_token_with_investor_plan():
             }
 
             mock_table = MagicMock()
-            mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_result
+            mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+                mock_result
+            )
             mock_sb.table.return_value = mock_table
 
             with patch("backend.routes.users_routes.sb", mock_sb):

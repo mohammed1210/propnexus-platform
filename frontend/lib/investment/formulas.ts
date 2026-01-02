@@ -255,8 +255,8 @@ export function calculateHMO(input: HMOInput): HMOOutput {
     (otherMonthlyCosts ?? 0);
   const annualCashflow = netCashflow * 12;
   const annualYield = annualCashflow; // Simplified
-  const roi = totalInvestment && totalInvestment > 0 
-    ? (annualCashflow / totalInvestment) * 100 
+  const roi = totalInvestment && totalInvestment > 0
+    ? (annualCashflow / totalInvestment) * 100
     : 0;
 
   return {

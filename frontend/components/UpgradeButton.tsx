@@ -14,11 +14,11 @@ type Props = {
 export default function UpgradeButton({ priceId, children = 'Upgrade', className }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  
+
   // Try to use Clerk, fallback if not available
   let user: any = null;
   let isLoaded = true;
-  
+
   try {
     const clerkHook = useUser();
     user = clerkHook.user;

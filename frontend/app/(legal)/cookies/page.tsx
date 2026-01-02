@@ -9,16 +9,16 @@ export default function CookiesPage() {
       <h1 className="text-4xl font-bold mb-8 text-slate-900 dark:text-slate-100">
         Cookie Policy
       </h1>
-      
+
       <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
         <section>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
             Last updated: November 2025
           </p>
-          
+
           <p className="text-slate-700 dark:text-slate-300">
-            This Cookie Policy explains how PropNexus uses cookies and similar technologies to 
-            recognize you when you visit our platform. It explains what these technologies are 
+            This Cookie Policy explains how PropNexus uses cookies and similar technologies to
+            recognize you when you visit our platform. It explains what these technologies are
             and why we use them, as well as your rights to control our use of them.
           </p>
         </section>
@@ -28,8 +28,8 @@ export default function CookiesPage() {
             1. What Are Cookies?
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            Cookies are small data files that are placed on your computer or mobile device when 
-            you visit a website. Cookies are widely used by website owners to make their websites 
+            Cookies are small data files that are placed on your computer or mobile device when
+            you visit a website. Cookies are widely used by website owners to make their websites
             work, or to work more efficiently, as well as to provide reporting information.
           </p>
         </section>
@@ -118,7 +118,7 @@ export default function CookiesPage() {
             </li>
           </ul>
           <p className="text-slate-700 dark:text-slate-300 mt-4">
-            These third parties may use cookies to collect information about your activity across 
+            These third parties may use cookies to collect information about your activity across
             different websites. Please refer to their respective privacy policies for more information.
           </p>
         </section>
@@ -136,7 +136,7 @@ export default function CookiesPage() {
             <li>Remember your theme preference</li>
           </ul>
           <p className="text-slate-700 dark:text-slate-300 mt-4">
-            Local storage data stays on your device and is not transmitted to our servers unless 
+            Local storage data stays on your device and is not transmitted to our servers unless
             explicitly synchronized.
           </p>
         </section>
@@ -148,7 +148,7 @@ export default function CookiesPage() {
           <p className="text-slate-700 dark:text-slate-300 mb-4">
             You have several options for managing cookies:
           </p>
-          
+
           <h3 className="text-xl font-semibold mb-3 text-slate-800 dark:text-slate-200 mt-6">
             Browser Settings
           </h3>
@@ -162,7 +162,7 @@ export default function CookiesPage() {
             <li>Get notifications when cookies are set</li>
           </ul>
           <p className="text-slate-700 dark:text-slate-300 mt-4">
-            Note that blocking essential cookies may prevent you from using certain features of 
+            Note that blocking essential cookies may prevent you from using certain features of
             PropNexus or may cause the platform not to function properly.
           </p>
 
@@ -170,7 +170,7 @@ export default function CookiesPage() {
             Opt-Out Links
           </h3>
           <p className="text-slate-700 dark:text-slate-300 mb-4">
-            You can opt out of analytics cookies while still using our platform. Specific 
+            You can opt out of analytics cookies while still using our platform. Specific
             opt-out instructions depend on the analytics provider we use.
           </p>
         </section>
@@ -180,8 +180,8 @@ export default function CookiesPage() {
             7. Do Not Track Signals
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            Some browsers include a &quot;Do Not Track&quot; feature that signals websites you visit that 
-            you do not want your online activity tracked. We currently do not respond to Do Not 
+            Some browsers include a &quot;Do Not Track&quot; feature that signals websites you visit that
+            you do not want your online activity tracked. We currently do not respond to Do Not
             Track signals, but we respect your browser cookie preferences.
           </p>
         </section>
@@ -198,7 +198,7 @@ export default function CookiesPage() {
               <strong>Session cookies:</strong> Deleted when you close your browser
             </li>
             <li>
-              <strong>Persistent cookies:</strong> Remain on your device until they expire or 
+              <strong>Persistent cookies:</strong> Remain on your device until they expire or
               you delete them (typically 30-365 days)
             </li>
           </ul>
@@ -209,8 +209,8 @@ export default function CookiesPage() {
             9. Updates to This Policy
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            We may update this Cookie Policy from time to time. Any changes will be posted on 
-            this page with an updated &ldquo;Last updated&rdquo; date. We encourage you to review this policy 
+            We may update this Cookie Policy from time to time. Any changes will be posted on
+            this page with an updated &ldquo;Last updated&rdquo; date. We encourage you to review this policy
             periodically.
           </p>
         </section>

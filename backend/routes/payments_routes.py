@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from backend.utils.emailer import send_magic_email
 from backend.utils.jwt_utils import make_magic_token
+
 from .supabase_client import supabase  # your existing client module
 
 router = APIRouter(prefix="/payments", tags=["payments"])

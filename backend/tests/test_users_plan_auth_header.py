@@ -3,6 +3,7 @@ Test /users/plan endpoint with Authorization header support (Sprint 11).
 """
 
 from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
 
@@ -28,7 +29,9 @@ def test_users_plan_with_authorization_header():
                 }
 
                 mock_table = MagicMock()
-                mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_result
+                mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+                    mock_result
+                )
                 mock_sb.table.return_value = mock_table
 
                 # Request with Authorization header
@@ -63,7 +66,9 @@ def test_users_plan_email_param_takes_precedence():
                 }
 
                 mock_table = MagicMock()
-                mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_result
+                mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+                    mock_result
+                )
                 mock_sb.table.return_value = mock_table
 
                 # Request with both Authorization header and email query param
@@ -98,7 +103,9 @@ def test_users_plan_fallback_to_query_param():
         }
 
         mock_table = MagicMock()
-        mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_result
+        mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+            mock_result
+        )
         mock_sb.table.return_value = mock_table
 
         # Request with only email query param
@@ -124,7 +131,9 @@ def test_users_plan_invalid_token_format():
         }
 
         mock_table = MagicMock()
-        mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_result
+        mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+            mock_result
+        )
         mock_sb.table.return_value = mock_table
 
         # Invalid token format (missing "Bearer")
@@ -173,7 +182,9 @@ def test_users_plan_jwt_decode_failure():
                 }
 
                 mock_table = MagicMock()
-                mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_result
+                mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+                    mock_result
+                )
                 mock_sb.table.return_value = mock_table
 
                 # Should fallback to query param when token decode fails
@@ -211,7 +222,9 @@ def test_users_plan_supabase_jwt():
                 }
 
                 mock_table = MagicMock()
-                mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = mock_result
+                mock_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+                    mock_result
+                )
                 mock_sb.table.return_value = mock_table
 
                 response = client.get(

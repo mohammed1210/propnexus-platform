@@ -5,7 +5,7 @@
 Railway auto-deploys when code is pushed to these branches:
 - `main` - Production deployments
 - `sprint-*` - Sprint feature branches
-- `po*` - Product owner branches  
+- `po*` - Product owner branches
 - `copilot/*` - Copilot/AI assistant branches (temporary for testing)
 
 ## Manual Deployment

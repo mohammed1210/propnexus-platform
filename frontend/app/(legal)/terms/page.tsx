@@ -9,15 +9,15 @@ export default function TermsPage() {
       <h1 className="text-4xl font-bold mb-8 text-slate-900 dark:text-slate-100">
         Terms of Service
       </h1>
-      
+
       <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
         <section>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
             Last updated: November 2025
           </p>
-          
+
           <p className="text-slate-700 dark:text-slate-300">
-            Welcome to PropNexus. By accessing or using our platform, you agree to be bound by 
+            Welcome to PropNexus. By accessing or using our platform, you agree to be bound by
             these Terms of Service. Please read them carefully.
           </p>
         </section>
@@ -27,8 +27,8 @@ export default function TermsPage() {
             1. Acceptance of Terms
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            By creating an account or using PropNexus services, you acknowledge that you have 
-            read, understood, and agree to be bound by these Terms of Service and our Privacy Policy. 
+            By creating an account or using PropNexus services, you acknowledge that you have
+            read, understood, and agree to be bound by these Terms of Service and our Privacy Policy.
             If you do not agree to these terms, please do not use our platform.
           </p>
         </section>
@@ -54,8 +54,8 @@ export default function TermsPage() {
             3. User Accounts
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            You are responsible for maintaining the confidentiality of your account credentials 
-            and for all activities that occur under your account. You agree to notify us immediately 
+            You are responsible for maintaining the confidentiality of your account credentials
+            and for all activities that occur under your account. You agree to notify us immediately
             of any unauthorized use of your account.
           </p>
         </section>
@@ -65,7 +65,7 @@ export default function TermsPage() {
             4. Subscription Plans
           </h2>
           <p className="text-slate-700 dark:text-slate-300 mb-4">
-            We offer multiple subscription tiers (Free, Pro, and Investor) with varying features 
+            We offer multiple subscription tiers (Free, Pro, and Investor) with varying features
             and access levels. Paid subscriptions:
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
@@ -97,10 +97,10 @@ export default function TermsPage() {
             6. Data Accuracy and Investment Decisions
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            PropNexus provides property data and analysis tools for informational purposes only. 
-            We strive for accuracy but cannot guarantee that all information is complete, current, 
-            or error-free. You should conduct your own due diligence and consult with professional 
-            advisors before making any investment decisions. We are not responsible for any 
+            PropNexus provides property data and analysis tools for informational purposes only.
+            We strive for accuracy but cannot guarantee that all information is complete, current,
+            or error-free. You should conduct your own due diligence and consult with professional
+            advisors before making any investment decisions. We are not responsible for any
             investment outcomes based on information or tools provided through our platform.
           </p>
         </section>
@@ -110,8 +110,8 @@ export default function TermsPage() {
             7. Intellectual Property
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            All content, features, and functionality of PropNexus are owned by us or our licensors 
-            and are protected by copyright, trademark, and other intellectual property laws. 
+            All content, features, and functionality of PropNexus are owned by us or our licensors
+            and are protected by copyright, trademark, and other intellectual property laws.
             You may not reproduce, distribute, or create derivative works without our express permission.
           </p>
         </section>
@@ -121,8 +121,8 @@ export default function TermsPage() {
             8. Limitation of Liability
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            To the fullest extent permitted by law, PropNexus shall not be liable for any indirect, 
-            incidental, special, consequential, or punitive damages arising out of or relating to 
+            To the fullest extent permitted by law, PropNexus shall not be liable for any indirect,
+            incidental, special, consequential, or punitive damages arising out of or relating to
             your use of the platform, even if we have been advised of the possibility of such damages.
           </p>
         </section>
@@ -132,8 +132,8 @@ export default function TermsPage() {
             9. Changes to Terms
           </h2>
           <p className="text-slate-700 dark:text-slate-300">
-            We reserve the right to modify these Terms of Service at any time. We will notify 
-            users of material changes via email or platform notification. Your continued use 
+            We reserve the right to modify these Terms of Service at any time. We will notify
+            users of material changes via email or platform notification. Your continued use
             of PropNexus after such changes constitutes acceptance of the new terms.
           </p>
         </section>
