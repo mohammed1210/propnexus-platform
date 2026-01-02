@@ -19,9 +19,7 @@ from backend.routes.notes import router as notes_router
 from backend.routes.off_market_routes import router as off_market_router
 from backend.routes.properties_routes import router as properties_router
 from backend.routes.save_deal import router as save_deal_router
-from backend.routes.stripe_routes import (
-    router as stripe_routes_router,
-)
+from backend.routes.stripe_routes import router as stripe_routes_router
 from backend.routes.stripe_webhook import router as stripe_webhook_router
 from backend.routes.tradesmen_routes import router as tradesmen_router
 from backend.routes.users_routes import router as users_router
