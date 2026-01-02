@@ -8,15 +8,12 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform
 const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app',
-  ),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app'),
   title: {
     default: 'PropNexus',
     template: '%s · PropNexus',
   },
-  description:
-    'AI-powered property sourcing: analyse yield & ROI, score deals, and track your portfolio.',
+  description: 'AI-powered property sourcing: analyse yield & ROI, score deals, and track your portfolio.',
   robots: {
     index: true,
     follow: true,
@@ -77,5 +74,11 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <RootShell>{children}</RootShell>;
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <body className="flex flex-col min-h-screen">
+        <RootShell>{children}</RootShell>
+      </body>
+    </html>
+  );
 }

@@ -3,9 +3,9 @@
 # verify-deploy.sh
 #
 # Verifies that a deployed PropNexus backend is healthy by calling a set of
-# well‑known endpoints. This script expects one argument: the base URL of
+# well-known endpoints. This script expects one argument: the base URL of
 # the API (e.g. https://api.example.com). Alternatively, set the API_BASE
-# environment variable. It exits with a non‑zero status on any failure.
+# environment variable. It exits with a non-zero status on any failure.
 
 set -euo pipefail
 
@@ -17,11 +17,13 @@ if [[ -z "${API_BASE}" ]]; then
   exit 1
 fi
 
-# Helper to perform a request and check the status code.
+# Normalize: remove trailing slash if present
+API_BASE="${API_BASE%/}"
+
 curl_check() {
   local method=$1
   local endpoint=$2
-  local data=$3
+  local data=${3:-""}
   local expected_status=$4
 
   echo ""
@@ -31,10 +33,18 @@ curl_check() {
   if [[ "${method}" == "GET" ]]; then
     response=$(curl -sS -w 'HTTPSTATUS:%{http_code}' "${API_BASE}${endpoint}" || true)
   else
-    response=$(curl -sS -w 'HTTPSTATUS:%{http_code}' -H 'Content-Type: application/json' -d "${data}" -X "${method}" "${API_BASE}${endpoint}" || true)
+    response=$(curl -sS -w 'HTTPSTATUS:%{http_code}' \
+      -H 'Content-Type: application/json' \
+      -d "${data}" \
+      -X "${method}" \
+      "${API_BASE}${endpoint}" || true)
   fi
-  local body=$(echo "$response" | sed -e 's/HTTPSTATUS:.*//g')
-  local status=$(echo "$response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+
+  local body
+  body=$(echo "$response" | sed -e 's/HTTPSTATUS:.*//g')
+  local status
+  status=$(echo "$response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+
   echo "Status: ${status}"
   echo "Body: $(echo "$body" | head -c 300 | tr -d '\n')"
 
@@ -52,7 +62,7 @@ curl_check GET "/health" "" 200
 # Properties endpoint
 curl_check GET "/properties" "" 200
 
-# Off‑market generator
+# Off-market generator (if enabled in this backend)
 payload='{"location":"RG1","budget":200000,"count":1}'
 curl_check POST "/off-market/generate-off-market" "$payload" 200
 
