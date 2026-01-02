@@ -1,6 +1,7 @@
 import os
 import pytest
 
+
 def _has_real_supabase():
     url = os.getenv("SUPABASE_URL", "")
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -8,6 +9,7 @@ def _has_real_supabase():
     if not url or "example.supabase.co" in url:
         return False
     return bool(key)
+
 
 def pytest_collection_modifyitems(config, items):
     if _has_real_supabase():

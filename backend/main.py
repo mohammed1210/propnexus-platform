@@ -36,7 +36,9 @@ from backend.routes import import_routes, admin_schedule
 
 # ✅ Stripe routers (named distinctly to avoid duplicate includes)
 from backend.routes.stripe_webhook import router as stripe_webhook_router  # POST /stripe/webhook
-from backend.routes.stripe_routes import router as stripe_routes_router  # POST /stripe/create-portal-session
+from backend.routes.stripe_routes import (
+    router as stripe_routes_router,
+)  # POST /stripe/create-portal-session
 
 app = FastAPI()
 
@@ -64,6 +66,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ======================
 # 🧪 Debug Routes (Safe)

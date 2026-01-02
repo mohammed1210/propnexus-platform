@@ -122,6 +122,7 @@ def _is_valid_html(html: str) -> bool:
 # Async helpers (important for pytest mocks)
 # ============================================================
 
+
 async def _maybe_await(obj: Any) -> Any:
     """If obj is awaitable (e.g. AsyncMock), await it; otherwise return it."""
     if inspect.isawaitable(obj):
@@ -152,6 +153,7 @@ async def _read_response_text(resp: Any) -> str:
 # ============================================================
 # smart_fetch_html (fixes failing observability tests)
 # ============================================================
+
 
 async def smart_fetch_html(
     session: aiohttp.ClientSession,
@@ -264,7 +266,9 @@ async def smart_fetch_html(
                 return None
             return p_text if is_valid_html(p_text) else None
 
-        return text if is_valid_html(text) else text  # preserve legacy: return raw text if direct works
+        return (
+            text if is_valid_html(text) else text
+        )  # preserve legacy: return raw text if direct works
     except Exception as e:
         if scraperapi_key:
             print(f"ℹ️ Direct mode exception ({e}), falling back to ScraperAPI...")

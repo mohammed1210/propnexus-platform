@@ -33,7 +33,9 @@ def _get_supabase():
 @router.get("/properties")
 def list_properties(
     q: Optional[str] = Query(default=None),
-    min: Optional[int] = Query(default=None),  # noqa: A002 (min is fine here; matches existing API usage)
+    min: Optional[int] = Query(
+        default=None
+    ),  # noqa: A002 (min is fine here; matches existing API usage)
     max: Optional[int] = Query(default=None),  # noqa: A002
     beds: Optional[int] = Query(default=None),
     baths: Optional[int] = Query(default=None),
@@ -89,12 +91,7 @@ def list_properties(
 def get_property(property_id: str):
     try:
         sb = _get_supabase()
-        query = (
-            sb.table("properties")
-            .select("*")
-            .eq("id", property_id)
-            .maybe_single()
-        )
+        query = sb.table("properties").select("*").eq("id", property_id).maybe_single()
         res = query.execute()
 
         if not res.data:

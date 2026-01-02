@@ -43,8 +43,8 @@ jobs:
           pip install pre-commit
 
       - name: Verify backend.main imports
-        working-directory: backend
-        run: python -c "import main"
+        working-directory: .
+        run: python -c "import backend.main"
 
       - name: Run backend tests (schema + contracts + stripe)
         working-directory: backend
