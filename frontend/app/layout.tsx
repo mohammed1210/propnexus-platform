@@ -1,12 +1,11 @@
+// app/layout.tsx (server component)
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import '../styles/design-tokens.css';
 import RootShell from '@components/RootShell';
 
 const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ??
-  'https://propnexus-platform.vercel.app';
-
+  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
 const ABS = (p: string) => new URL(p, SITE_URL);
 
 export const metadata: Metadata = {
@@ -20,17 +19,6 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-snippet': -1,
-      'max-image-preview': 'large',
-      'max-video-preview': -1,
-    },
-  },
-  alternates: {
-    canonical: '/',
-    languages: { 'en-GB': '/en-GB', en: '/' },
   },
   openGraph: {
     type: 'website',
@@ -52,28 +40,15 @@ export const metadata: Metadata = {
     title: 'PropNexus',
     description: 'AI-powered property sourcing platform.',
     images: [ABS('/og/cover.png')],
-    creator: '@propnexus',
-  },
-  icons: {
-    icon: [
-      { url: '/icons/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icons/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
-    ],
-    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180' }],
-    shortcut: ['/favicon.ico'],
-  },
-  manifest: ABS('/site.webmanifest').toString(),
-  verification: {
-    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
   },
 };
 
 export const viewport: Viewport = {
+  width: 'device-width',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
     { media: '(prefers-color-scheme: dark)', color: '#09090b' },
   ],
-  width: 'device-width',
 };
 
 export default function RootLayout({

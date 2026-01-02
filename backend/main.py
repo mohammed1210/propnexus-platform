@@ -39,11 +39,7 @@ app = FastAPI()
 
 @app.get("/health")
 def health():
-    return {
-        "ok": True,
-        "service": "propnexus-backend",
-        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-    }
+    return {"status": "ok"}
 
 
 # ======================

@@ -1,15 +1,29 @@
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+
 # Common lint sets: F (pyflakes), E,W (pycodestyle)
 lint.select = ["F", "E", "W"]
+
 # Ignore long lines plus whitespace-only blank lines & trailing whitespace (W291,W293)
 lint.ignore = ["E501", "W291", "W293"]
+
+# Keep ruff out of build/artifact folders
 exclude = [".git", "node_modules", ".venv", "backend/.venv", "dist", "build"]
-extend-exclude = ["**/*.py.bak", "__pycache__", "frontend/node_modules"]
+
+# Extra excludes (backups + caches)
+extend-exclude = ["**/*.py.bak", "**/*.bak", "**/__pycache__", "frontend/node_modules"]
+
+# ---- Optional but recommended for stability in CI ----
+# If your repo has both /backend and /frontend, avoid scanning frontend TS configs etc.
+[tool.ruff.lint]
+# (kept for forward-compat with newer ruff versions)
+select = ["F", "E", "W"]
+ignore = ["E501", "W291", "W293"]
 
 [tool.isort]
 profile = "black"
+line_length = 100
 
 [tool.black]
 line-length = 100
