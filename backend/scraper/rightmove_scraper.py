@@ -529,7 +529,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
 
                             external_id = (
                                 _extract_property_id(card)
-                                or f"rm-{hash(title+location_text) & 0xffffffff}"
+                                or f"rm-{hash(title + location_text) & 0xFFFFFFFF}"
                             )
 
                             coords = await _enrich_coordinates(location_text)

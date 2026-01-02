@@ -82,7 +82,7 @@ def _build_search_url(location: str, page: int = 0) -> str:
     encoded = quote_plus(location.strip())
     base = "https://www.spareroom.co.uk/flatshare/"
     if page > 0:
-        return f"{base}?search_id=&location={encoded}&page={page+1}"
+        return f"{base}?search_id=&location={encoded}&page={page + 1}"
     return f"{base}?search_id=&location={encoded}"
 
 

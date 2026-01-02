@@ -128,7 +128,7 @@ def send_email_alert(
     <html>
     <body style="font-family: Arial, sans-serif;">
         <div style="background-color: #f5f5f5; padding: 20px;">
-            <h2 style="color: {'#d9534f' if severity in ('error', 'critical') else '#f0ad4e'};">
+            <h2 style="color: {"#d9534f" if severity in ("error", "critical") else "#f0ad4e"};">
                 PropNexus Alert - {severity.upper()}
             </h2>
             <div style="background-color: white; padding: 15px; border-radius: 5px;">

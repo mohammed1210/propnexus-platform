@@ -33,9 +33,7 @@ def _get_supabase():
 @router.get("/properties")
 def list_properties(
     q: Optional[str] = Query(default=None),
-    min: Optional[int] = Query(
-        default=None
-    ),  # noqa: A002 (min is fine here; matches existing API usage)
+    min: Optional[int] = Query(default=None),  # noqa: A002 (min is fine here; matches existing API usage)
     max: Optional[int] = Query(default=None),  # noqa: A002
     beds: Optional[int] = Query(default=None),
     baths: Optional[int] = Query(default=None),

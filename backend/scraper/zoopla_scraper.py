@@ -76,7 +76,7 @@ def _build_search_url(location: str, page: int = 0) -> str:
     encoded = location.strip()
     base = f"https://www.zoopla.co.uk/for-sale/property/{encoded}/"
     if page > 0:
-        return f"{base}?page={page+1}"
+        return f"{base}?page={page + 1}"
     return base
 
 

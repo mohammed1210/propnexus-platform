@@ -189,7 +189,7 @@ async def render_page_capture(
                     data = await resp.json()
                     if isinstance(data, dict):
                         captured.append({"url": url_r, "data": data})
-                        capture_debug_json(f"capture_{hash(url_r) & 0xffffffff}", data)
+                        capture_debug_json(f"capture_{hash(url_r) & 0xFFFFFFFF}", data)
                 except Exception:
                     pass
 

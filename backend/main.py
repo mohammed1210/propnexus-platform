@@ -47,6 +47,7 @@ def health():
         "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
 
+
 # ======================
 # 🌍 CORS (stable for prod + previews)
 # ======================

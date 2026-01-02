@@ -364,7 +364,6 @@ class TestSmartFetchHTML:
 def test_imports():
     """Ensure all required modules can be imported"""
     try:
-
         print("✓ All modules imported successfully")
     except Exception as e:
         pytest.fail(f"Import failed: {e}")

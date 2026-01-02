@@ -96,7 +96,7 @@ async def generate_off_market(payload: GenerateRequest):
     return {
         "deals": [
             {
-                "address": f"Demo address {i+1}, {payload.location}",
+                "address": f"Demo address {i + 1}, {payload.location}",
                 "price": payload.budget / payload.count,
                 "description": "Generated placeholder deal",
             }

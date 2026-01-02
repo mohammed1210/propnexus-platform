@@ -32,9 +32,9 @@ def get_sb_client() -> Client:
     Construct a Supabase client using the service role key.
     Used by the schema contract tests.
     """
-    assert (
-        SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
-    ), "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for schema tests"
+    assert SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY, (
+        "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set for schema tests"
+    )
     return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 

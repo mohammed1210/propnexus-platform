@@ -83,7 +83,7 @@ def _build_search_url(location: str, page: int = 0) -> str:
     encoded = quote_plus(location.strip())
     base = f"https://www.onthemarket.com/for-sale/property/{encoded}/"
     if page > 0:
-        return f"{base}?view=grid&page={page+1}"
+        return f"{base}?view=grid&page={page + 1}"
     return f"{base}?view=grid"
 
 
@@ -330,7 +330,7 @@ def _extract_external_id(card: BeautifulSoup, title: str, location: str) -> str:
             return f"ot-{m.group(1)}"
 
     # Fallback: hash of title + location
-    return f"ot-{hash(title + location) & 0xffffffff}"
+    return f"ot-{hash(title + location) & 0xFFFFFFFF}"
 
 
 async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[Dict[str, Any]]:

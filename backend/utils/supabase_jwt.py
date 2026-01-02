@@ -2,6 +2,7 @@
 """
 Utility functions for verifying Supabase JWT tokens.
 """
+
 import os
 from typing import Optional
 from jose import jwt, JWTError
