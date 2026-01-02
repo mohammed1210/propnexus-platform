@@ -40,22 +40,32 @@ jobs:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
+          pip install aiohttp==3.13.2
+          python - <<'PY'
+          import aiohttp
+          print("✅ aiohttp:", aiohttp.__version__)
+          PY
           pip install pre-commit
 
       - name: Verify backend.main imports
-        working-directory: .
-        run: python -c "import backend.main"
+        run: |
+          python - <<'PY'
+          import backend.main
+          print("✅ backend.main import OK")
+          PY
 
       - name: Run backend tests (schema + contracts + stripe)
         working-directory: backend
         run: |
           pytest tests/test_schema_guard.py
-          pytest tests/test_contracts.py tests/test_properties_routes.py tests/test_stripe_trial.py
+          pytest tests/test_contracts.py
+          pytest tests/test_properties_routes.py
+          pytest tests/test_stripe_trial.py
 
       - name: Run pre-commit (skip offmarket import hook in CI)
         working-directory: backend
         env:
-          SKIP: offmarket-import-all
+          SKIP: offmarket-import-all,offmarket-import
         run: |
           pre-commit run --all-files --show-diff-on-failure
 
@@ -64,8 +74,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: backend
     timeout-minutes: 25
-    env:
-      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
 
     steps:
       - name: Checkout repository
@@ -82,6 +90,13 @@ jobs:
 
       - name: Lint + build
         working-directory: frontend
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon_placeholder_key"
+          NEXT_PUBLIC_BACKEND_URL: "https://example.com"
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder"
+          CLERK_SECRET_KEY: "sk_test_placeholder"
+          NEXT_TELEMETRY_DISABLED: "1"
         run: |
           npm run lint
           npm run build

@@ -60,11 +60,16 @@ jobs:
       - name: Verify jose installed (debug)
         run: node -e "console.log('✅ jose version:', require('jose/package.json').version)"
 
+      # ✅ Step 3 fix: ensure Clerk publishable key exists during CI build/prerender
+      # Plus: provide safe placeholder envs so Next build doesn't crash in PR runs
       - name: Build
         env:
-  NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon_placeholder_key"
-  NEXT_PUBLIC_BACKEND_URL: "https://example.com"
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder"
-  CLERK_SECRET_KEY: "sk_test_placeholder"
-        run: npm run build
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon_placeholder_key"
+          NEXT_PUBLIC_BACKEND_URL: "https://example.com"
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder"
+          CLERK_SECRET_KEY: "sk_test_placeholder"
+        run: |
+          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-pk_test_placeholder}"
+          npm run build

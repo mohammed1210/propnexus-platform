@@ -25,4 +25,5 @@ jobs:
 
       - name: Smoke import
         working-directory: .
-        run: python -c "import backend.main; import backend.routes.health; print('✅ OK: backend imports passed')"
+        run: |
+          python -c "import backend.main; import backend.routes.health; print('✅ OK: backend imports passed')"

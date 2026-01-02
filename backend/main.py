@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -13,7 +14,6 @@ from backend.routes.ai import router as ai_router
 from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
 from backend.routes.gpt_routes import router as gpt_router
-from backend.routes.health import router as health_router
 from backend.routes.import_routes import router as import_router
 from backend.routes.notes import router as notes_router
 from backend.routes.off_market_routes import router as off_market_router
@@ -37,6 +37,15 @@ except Exception as e:
     print(f"[WARNING] Sentry initialization failed: {e}")
 
 app = FastAPI()
+
+
+@app.get("/health")
+def health():
+    return {
+        "ok": True,
+        "service": "propnexus-backend",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
 
 # ======================
 # 🌍 CORS (stable for prod + previews)
@@ -118,7 +127,6 @@ app.include_router(ai_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
 app.include_router(gpt_router)
-app.include_router(health_router)
 app.include_router(import_router)
 app.include_router(notes_router)
 app.include_router(off_market_router)

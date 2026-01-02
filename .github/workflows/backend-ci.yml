@@ -35,6 +35,8 @@ jobs:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
+          pip install "aiohttp==3.13.2"
+          python -c "import aiohttp; print('aiohttp:', aiohttp.__version__)"
           # Pin tools for reproducible CI
           pip install ruff==0.6.9 black==24.10.0 pytest==8.3.3
 
