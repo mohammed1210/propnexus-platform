@@ -8,19 +8,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Load env (safe if missing)
-load_dotenv()
-
-# Initialize Sentry before other imports
-try:
-    from backend.utils.sentry_init import init_sentry
-
-    init_sentry()
-except Exception as e:
-    print(f"[WARNING] Sentry initialization failed: {e}")
-
-# Local routers
-from backend.routes.ai import router as ai_router  # noqa: E402
+from backend.routes import admin_schedule, import_routes
+from backend.routes.ai import router as ai_router
 from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
 from backend.routes.gpt_routes import router as gpt_router
@@ -28,17 +17,24 @@ from backend.routes.health import router as health_router
 from backend.routes.import_routes import router as import_router
 from backend.routes.notes import router as notes_router
 from backend.routes.off_market_routes import router as off_market_router
-from backend.routes.save_deal import router as save_deal_router
 from backend.routes.properties_routes import router as properties_router
-from backend.routes.tradesmen_routes import router as tradesmen_router
-from backend.routes.users_routes import router as users_router
-from backend.routes import import_routes, admin_schedule
-
-# ✅ Stripe routers (named distinctly to avoid duplicate includes)
-from backend.routes.stripe_webhook import router as stripe_webhook_router  # POST /stripe/webhook
+from backend.routes.save_deal import router as save_deal_router
 from backend.routes.stripe_routes import (
     router as stripe_routes_router,
-)  # POST /stripe/create-portal-session
+)
+from backend.routes.stripe_webhook import router as stripe_webhook_router
+from backend.routes.tradesmen_routes import router as tradesmen_router
+from backend.routes.users_routes import router as users_router
+from backend.utils.sentry_init import init_sentry
+
+# Load env (safe if missing)
+load_dotenv()
+
+# Initialize Sentry (only enables in prod + DSN configured)
+try:
+    init_sentry()
+except Exception as e:
+    print(f"[WARNING] Sentry initialization failed: {e}")
 
 app = FastAPI()
 
