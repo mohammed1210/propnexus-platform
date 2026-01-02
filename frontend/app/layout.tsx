@@ -1,19 +1,22 @@
-// app/layout.tsx (server component)
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import '../styles/design-tokens.css';
 import RootShell from '@components/RootShell';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app';
-const ABS = (p: string) => new URL(p, SITE_URL); // helper to build absolute URLs
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  'https://propnexus-platform.vercel.app';
+
+const ABS = (p: string) => new URL(p, SITE_URL);
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? 'https://propnexus-platform.vercel.app'),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: 'PropNexus',
     template: '%s · PropNexus',
   },
-  description: 'AI-powered property sourcing: analyse yield & ROI, score deals, and track your portfolio.',
+  description:
+    'AI-powered property sourcing: analyse yield & ROI, score deals, and track your portfolio.',
   robots: {
     index: true,
     follow: true,
@@ -73,12 +76,10 @@ export const viewport: Viewport = {
   width: 'device-width',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="flex flex-col min-h-screen">
-        <RootShell>{children}</RootShell>
-      </body>
-    </html>
-  );
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return <RootShell>{children}</RootShell>;
 }
