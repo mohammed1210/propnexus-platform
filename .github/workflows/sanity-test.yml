@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
+      # Secrets may be empty on PRs from forks; keep safe defaults so workflow doesn't explode.
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       BACKEND_URL: ${{ secrets.BACKEND_URL }}
@@ -32,6 +33,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
       - name: Install backend deps + pre-commit
         working-directory: backend
@@ -40,30 +45,32 @@ jobs:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
-          pip install aiohttp==3.13.2
-          python - <<'PY'
-          import aiohttp
-          print("✅ aiohttp:", aiohttp.__version__)
-          PY
-          pip install pre-commit
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          fi
+
+          # CI guard for scraper imports (you hit "No module named aiohttp")
+          pip install "aiohttp==3.13.2"
+          python -c "import aiohttp; print('aiohttp:', aiohttp.__version__)"
+
+          pip install pre-commit pytest
 
       - name: Verify backend.main imports
-        run: |
-          python - <<'PY'
-          import backend.main
-          print("✅ backend.main import OK")
-          PY
+        working-directory: .
+        run: python -c "import backend.main; print('✅ imported backend.main')"
 
-      - name: Run backend tests (schema + contracts + stripe)
+      - name: Run backend tests (pytest discovery)
         working-directory: backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
         run: |
-          pytest tests/test_schema_guard.py
-          pytest tests/test_contracts.py
-          pytest tests/test_properties_routes.py
-          pytest tests/test_stripe_trial.py
+          # Avoid hardcoding paths that may move (you hit tests/test_schema_guard.py not found)
+          pytest -q
 
       - name: Run pre-commit (skip offmarket import hook in CI)
-        working-directory: backend
+        working-directory: .
         env:
           SKIP: offmarket-import-all,offmarket-import
         run: |
@@ -72,31 +79,67 @@ jobs:
   frontend:
     name: Frontend sanity
     runs-on: ubuntu-latest
-    needs: backend
     timeout-minutes: 25
+    needs: backend
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Ensure npm compatibility
+        run: |
+          npm i -g npm@9
+          echo "Using Node $(node -v) and npm $(npm -v)"
 
       - name: Install frontend deps
         working-directory: frontend
-        run: npm ci
+        run: |
+          set -e
+          if npm ci --prefer-offline; then
+            echo "npm ci succeeded"
+          else
+            echo "npm ci failed; falling back to npm install"
+            npm install --prefer-offline --no-audit --no-fund
+          fi
 
-      - name: Lint + build
+      - name: Lint
         working-directory: frontend
         env:
-          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon_placeholder_key"
-          NEXT_PUBLIC_BACKEND_URL: "https://example.com"
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder"
-          CLERK_SECRET_KEY: "sk_test_placeholder"
           NEXT_TELEMETRY_DISABLED: "1"
-        run: |
-          npm run lint
-          npm run build
+        run: npm run lint
+
+      - name: Type-check
+        working-directory: frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run type-check
+
+      - name: Build (with CI-safe env)
+        working-directory: frontend
+        env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'anon_placeholder_key' }}
+  NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL || 'https://example.com' }}
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
+  CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
+
+          # Supabase placeholders so Next.js doesn't crash on missing NEXT_PUBLIC vars
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'anon_placeholder_key' }}
+
+          # Backend placeholder for build-time env usage
+          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL || 'https://example.com' }}
+
+          # Clerk: prevent prerender crash on /magic-login by providing a key-shaped value
+          # If you have real secrets, they will override these.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
+        run: npm run build

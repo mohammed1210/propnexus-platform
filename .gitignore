@@ -38,3 +38,9 @@ __pycache__/
 # Build metadata
 *.tsbuildinfo
 tsconfig.tsbuildinfo
+
+# temp / debug artefacts
+frontend/dev.pid
+**/*.bak
+backend/debug/
+*.patch

@@ -47,29 +47,26 @@ jobs:
             npm install --prefer-offline --no-audit --no-fund
           fi
 
-      - name: Typecheck
+      - name: Type-check
         env:
-          NEXT_TELEMETRY_DISABLED: 1
-        run: npm run typecheck || true
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run type-check
 
       - name: Lint
         env:
-          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_TELEMETRY_DISABLED: "1"
         run: npm run lint
 
       - name: Verify jose installed (debug)
         run: node -e "console.log('✅ jose version:', require('jose/package.json').version)"
 
-      # ✅ Step 3 fix: ensure Clerk publishable key exists during CI build/prerender
-      # Plus: provide safe placeholder envs so Next build doesn't crash in PR runs
       - name: Build
         env:
-          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_TELEMETRY_DISABLED: "1"
           NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon_placeholder_key"
           NEXT_PUBLIC_BACKEND_URL: "https://example.com"
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_placeholder"
-          CLERK_SECRET_KEY: "sk_test_placeholder"
-        run: |
-          export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-pk_test_placeholder}"
-          npm run build
+          # ✅ Valid-shaped fallback so Clerk doesn't throw "invalid publishableKey"
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
+        run: npm run build
