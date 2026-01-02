@@ -19,6 +19,7 @@ yarn-debug.log*
 .env
 .env.*
 frontend/.env.local
+frontend.env.production.local
 backend/.env.local
 backend/.env
 frontend/.env
