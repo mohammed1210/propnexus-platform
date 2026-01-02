@@ -41,29 +41,25 @@ from backend.routes.stripe_routes import router as stripe_routes_router  # POST 
 app = FastAPI()
 
 # ======================
-# 🌍 CORS (Vercel-ready)
+# 🌍 CORS (stable for prod + previews)
 # ======================
-# NOTE:
-# - FastAPI CORS does NOT support wildcard domains in allow_origins (e.g. https://*.vercel.app).
-# - For Vercel preview deployments, you MUST use allow_origin_regex.
 _ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,"
-    "https://propnexus-platform.vercel.app",
+    "http://localhost:3000,https://propnexus-platform.vercel.app",
 )
+
 ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()]
 
-# Allow any Vercel preview domain (e.g. https://propnexus-platform-git-xyz.vercel.app)
-# You can override this via env if needed.
-ALLOWED_ORIGIN_REGEX = os.getenv(
-    "ALLOWED_ORIGIN_REGEX",
+# Allow any Vercel preview like https://propnexus-platform-git-xyz.vercel.app
+ALLOW_ORIGIN_REGEX = os.getenv(
+    "ALLOW_ORIGIN_REGEX",
     r"^https:\/\/.*\.vercel\.app$",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
+    allow_origin_regex=ALLOW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
