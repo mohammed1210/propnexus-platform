@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -117,7 +116,9 @@ def root():
     return {"ok": True, "service": "propnexus-backend"}
 
 
-# Core routers
+# ======================
+# 🔌 Routers
+# ======================
 app.include_router(ai_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
@@ -144,6 +145,7 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", "8080"))
     uvicorn.run("backend.main:app", host="0.0.0.0", port=port)
+
 
 # Trigger rebuild
 REBUILD_FLAG = "2025-11-25"
