@@ -36,6 +36,9 @@ except Exception as e:
 app = FastAPI()
 
 
+# ======================
+# ❤️ Health Check (DO NOT MOVE)
+# ======================
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -78,7 +81,6 @@ def debug_supabase_env():
     """
     url = (os.getenv("SUPABASE_URL") or "").strip()
 
-    # Accept multiple key names so Railway + local env never mismatch
     key = (
         os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         or os.getenv("SUPABASE_SERVICE_ROLE")
@@ -87,7 +89,6 @@ def debug_supabase_env():
         or ""
     ).strip()
 
-    host = ""
     try:
         host = urlparse(url).netloc or url
     except Exception:
@@ -127,17 +128,17 @@ app.include_router(import_router)
 app.include_router(notes_router)
 app.include_router(off_market_router)
 app.include_router(save_deal_router)
-app.include_router(properties_router)  # GET /properties
-app.include_router(tradesmen_router)  # GET /tradesmen/nearby, POST /tradesmen/contact
+app.include_router(properties_router)
+app.include_router(tradesmen_router)
 app.include_router(import_routes.router)
 app.include_router(admin_schedule.router)
 
-# ✅ Stripe (include exactly once each)
-app.include_router(stripe_webhook_router)  # POST /stripe/webhook
-app.include_router(stripe_routes_router)  # POST /stripe/create-portal-session
+# Stripe
+app.include_router(stripe_webhook_router)
+app.include_router(stripe_routes_router)
 
-# ✅ Users router
-app.include_router(users_router)  # GET /users/plan
+# Users
+app.include_router(users_router)
 
 
 if __name__ == "__main__":
@@ -147,5 +148,5 @@ if __name__ == "__main__":
     uvicorn.run("backend.main:app", host="0.0.0.0", port=port)
 
 
-# Trigger rebuild
+# Trigger rebuild (DO NOT REMOVE)
 REBUILD_FLAG = "2025-11-25"
