@@ -1,11 +1,36 @@
 "use client";
 
-import { SignUp } from "@clerk/nextjs";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 
-export const dynamic = 'force-dynamic';
+export const runtime = 'edge';
+export const revalidate = 0;
+
+// Dynamically import SignUp component to avoid build errors when Clerk is not configured
+const SignUp = dynamic(() => import("@clerk/nextjs").then(mod => ({ default: mod.SignUp })), {
+  ssr: false,
+});
+
+function isClerkConfigured(): boolean {
+  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  return !!(pk && (pk.startsWith("pk_test_") || pk.startsWith("pk_live_")));
+}
 
 export default function SignUpPage() {
+  if (!isClerkConfigured()) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-slate-900 mb-4">Authentication Not Configured</h1>
+            <p className="text-slate-600">Clerk authentication is not configured for this environment.</p>
+            <p className="text-slate-600 mt-2">Please use <Link href="/magic-login" className="text-brand-600 hover:text-brand-700 font-medium">Magic Link Login</Link> instead.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
