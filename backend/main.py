@@ -57,7 +57,7 @@ ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()]
 # Allow any Vercel preview like https://propnexus-platform-git-xyz.vercel.app
 ALLOW_ORIGIN_REGEX = os.getenv(
     "ALLOW_ORIGIN_REGEX",
-    r"^https:\/\/.*\.vercel\.app$",
+    r"^https:\/\/.*(\.vercel\.app|\.app\.github\.dev|\.github\.dev)$",
 )
 
 app.add_middleware(

@@ -354,7 +354,7 @@ function ListingsInner() {
         const backendUrl =
           process.env.NEXT_PUBLIC_BACKEND_URL ||
           process.env.NEXT_PUBLIC_API_BASE ||
-          'http://localhost:8000';
+          'http://localhost:8080';
 
         const params = new URLSearchParams();
         if (q) params.set('q', q);
