@@ -33,7 +33,7 @@
     "tsx": "^4.20.5",
     "web-streams-polyfill": "^4.2.0"
   },
-  
+
   "scripts": {
     "dev": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
