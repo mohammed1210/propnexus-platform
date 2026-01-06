@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import { isValidClerkKey } from "@/lib/clerk-utils";
 
 export const runtime = 'edge';
 export const revalidate = 0;
@@ -11,13 +12,10 @@ const SignIn = dynamic(() => import("@clerk/nextjs").then(mod => ({ default: mod
   ssr: false,
 });
 
-function isClerkConfigured(): boolean {
-  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  return !!(pk && (pk.startsWith("pk_test_") || pk.startsWith("pk_live_")));
-}
-
 export default function SignInPage() {
-  if (!isClerkConfigured()) {
+  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  
+  if (!isValidClerkKey(pk)) {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md">

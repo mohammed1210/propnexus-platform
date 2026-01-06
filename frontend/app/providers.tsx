@@ -1,10 +1,7 @@
 "use client";
 
 import { ClerkProvider } from "@clerk/nextjs";
-
-function isValidClerkKey(pk?: string): boolean {
-  return !!(pk && (pk.startsWith("pk_test_") || pk.startsWith("pk_live_")));
-}
+import { isValidClerkKey } from "@/lib/clerk-utils";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
