@@ -2,11 +2,7 @@
 
 import { ClerkProvider } from "@clerk/nextjs";
 import { ReactNode } from "react";
-
-function hasValidClerkKey(pk?: string): boolean {
-  // Check if key exists and has valid format (not a dummy key)
-  return Boolean(pk && (pk.startsWith("pk_test_") || pk.startsWith("pk_live_")) && pk.length > 25);
-}
+import { hasValidClerkKey } from "@/lib/clerk-utils";
 
 export default function Providers({ children }: { children: ReactNode }) {
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
