@@ -12,9 +12,12 @@ const MIN_CLERK_KEY_LENGTH = 25;
  * @returns true if the key has a valid format (pk_test_* or pk_live_*) and sufficient length
  */
 export function hasValidClerkKey(pk?: string): boolean {
-  return Boolean(
-    pk &&
+  if (!pk) return false;
+  
+  const normalized = pk.toLowerCase();
+  return (
     (pk.startsWith("pk_test_") || pk.startsWith("pk_live_")) &&
-    pk.length > MIN_CLERK_KEY_LENGTH
+    pk.length > MIN_CLERK_KEY_LENGTH &&
+    !normalized.includes("dummy")
   );
 }
