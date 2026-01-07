@@ -45,3 +45,6 @@ frontend/dev.pid
 **/*.bak
 backend/debug/
 *.patch
+
+# Debug scrape artifacts
+backend/debug/*.html
