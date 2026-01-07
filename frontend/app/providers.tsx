@@ -1,17 +1,8 @@
 "use client";
 
+import { ReactNode } from "react";
 import { ClerkProvider } from "@clerk/nextjs";
-
-function isUsableClerkPublishableKey(pk?: string) {
-  if (!pk) return false;
-
-  const normalized = pk.toLowerCase();
-  return (
-    pk.startsWith("pk_") &&
-    !normalized.includes("dummy") &&
-    pk.length > 30
-  );
-}
+import { hasValidClerkKey } from "@/lib/clerk-utils";
 
 export default function Providers({ children }: { children: ReactNode }) {
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -19,13 +10,12 @@ export default function Providers({ children }: { children: ReactNode }) {
   // ✅ CI-safe Clerk gating:
   // Only mount Clerk if a real publishable key exists.
   // This prevents Next.js prerender/build from crashing in CI.
-  if (!isUsableClerkPublishableKey(pk)) {
+  if (!hasValidClerkKey(pk)) {
     return <>{children}</>;
   }
 
   return (
     <ClerkProvider
-      publishableKey={pk}
       publishableKey={pk}
       appearance={{
         layout: { logoPlacement: "outside", helpPageUrl: "/help" },
