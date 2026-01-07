@@ -9,16 +9,13 @@ import Footer from "@components/Footer";
 import { ThemeProvider } from "@components/ThemeProvider";
 import { Toaster } from "sonner";
 import EnvValidator from "@components/EnvValidator";
-
-function isValidClerkPk(pk?: string) {
-  return !!pk && (pk.startsWith("pk_test_") || pk.startsWith("pk_live_"));
-}
+import { hasValidClerkKey } from "@/lib/clerk-utils";
 
 function MaybeClerkProvider({ children }: { children: React.ReactNode }) {
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   // ✅ CI-safe: do NOT mount Clerk if key is missing or placeholder
-  if (!isValidClerkPk(pk)) {
+  if (!hasValidClerkKey(pk)) {
     return <>{children}</>;
   }
 
