@@ -49,3 +49,4 @@ backend/debug/
 # Debug scrape artifacts
 backend/debug/*.html
 backend/debug/
+*.html
