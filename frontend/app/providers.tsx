@@ -1,5 +1,6 @@
 "use client";
 
+import { ReactNode } from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 
 function isUsableClerkPublishableKey(pk?: string) {
@@ -25,7 +26,6 @@ export default function Providers({ children }: { children: ReactNode }) {
 
   return (
     <ClerkProvider
-      publishableKey={pk}
       publishableKey={pk}
       appearance={{
         layout: { logoPlacement: "outside", helpPageUrl: "/help" },
