@@ -4,7 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { isValidClerkKey } from "@/lib/clerk-utils";
 
-export const runtime = 'edge';
+export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 // Dynamically import SignIn component to avoid build errors when Clerk is not configured
