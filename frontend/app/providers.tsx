@@ -1,19 +1,26 @@
 "use client";
 
 import { ClerkProvider } from "@clerk/nextjs";
+import { ReactNode } from "react";
 
-function safeClerkPk(pk?: string) {
-  // CI-safe fallback so build/prerender doesn't crash if env isn't set in GH Actions
-  if (pk && (pk.startsWith("pk_test_") || pk.startsWith("pk_live_"))) return pk;
-  return "pk_test_ci_dummy_key_1234567890";
+function hasValidClerkKey(pk?: string): boolean {
+  // Check if key exists and has valid format (not a dummy key)
+  return Boolean(pk && (pk.startsWith("pk_test_") || pk.startsWith("pk_live_")) && pk.length > 25);
 }
 
-export default function Providers({ children }: { children: React.ReactNode }) {
+export default function Providers({ children }: { children: ReactNode }) {
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const isValidKey = hasValidClerkKey(pk);
+
+  // If no valid Clerk key is configured, skip ClerkProvider entirely
+  // This allows builds to succeed in CI without Clerk credentials
+  if (!isValidKey) {
+    return <>{children}</>;
+  }
 
   return (
     <ClerkProvider
-      publishableKey={safeClerkPk(pk)}
+      publishableKey={pk}
       appearance={{
         layout: { logoPlacement: "outside", helpPageUrl: "/help" },
         variables: {

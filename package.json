@@ -42,24 +42,16 @@
     "frontend:dev": "npm --prefix frontend run dev",
     "frontend:build": "npm --prefix frontend run build",
     "frontend:lint": "npm --prefix frontend run lint",
-    "fix": "pre-commit run --all-files || true"
-    },
-
-  "format": "prettier --write .",
-  "validate-config": "node scripts/check-env.cjs",
-  "ingest:csv": "tsx scripts/ingest-csv.ts data/listings.sample.csv --source=rightmove",
-  "ingest:live": "tsx scripts/ingest-live.ts",
-
-  "frontend:dev": "npm --prefix frontend run dev",
-  "frontend:build": "npm --prefix frontend run build",
-  "frontend:lint": "npm --prefix frontend run lint",
-
-  "typecheck": "tsc --noEmit",
-  "health:report": "node scripts/system-health-report.mjs",
-  "test": "jest --passWithNoTests --testPathIgnorePatterns='e2e/'",
-  "e2e": "playwright test --reporter=list",
-  "fix": "pre-commit run --all-files || true"
-},
+    "fix": "pre-commit run --all-files || true",
+    "format": "prettier --write .",
+    "validate-config": "node scripts/check-env.cjs",
+    "ingest:csv": "tsx scripts/ingest-csv.ts data/listings.sample.csv --source=rightmove",
+    "ingest:live": "tsx scripts/ingest-live.ts",
+    "typecheck": "tsc --noEmit",
+    "health:report": "node scripts/system-health-report.mjs",
+    "test": "jest --passWithNoTests --testPathIgnorePatterns='e2e/'",
+    "e2e": "playwright test --reporter=list"
+  },
   "jest": {
     "testPathIgnorePatterns": [
       "<rootDir>/frontend/e2e/"

@@ -2,8 +2,16 @@
 // Includes existing redirect logic while delegating auth/session handling to Clerk.
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export default clerkMiddleware((_auth, req) => {
+// Check if Clerk keys are properly configured
+const hasValidClerkKeys = () => {
+  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  return pk && (pk.startsWith('pk_test_') || pk.startsWith('pk_live_')) && pk.length > 25;
+};
+
+// Legacy path redirect handler
+function handleRedirects(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Existing legacy path aliases → canonical routes
@@ -15,7 +23,12 @@ export default clerkMiddleware((_auth, req) => {
   }
   // Default continue
   return NextResponse.next();
-});
+}
+
+// Use Clerk middleware only if keys are configured, otherwise just handle redirects
+export default hasValidClerkKeys()
+  ? clerkMiddleware((_auth, req) => handleRedirects(req))
+  : handleRedirects;
 
 // Official matcher pattern plus explicit legacy aliases to ensure execution.
 export const config = {
