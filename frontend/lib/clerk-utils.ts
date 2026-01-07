@@ -13,8 +13,8 @@ const MIN_CLERK_KEY_LENGTH = 25;
  */
 export function hasValidClerkKey(pk?: string): boolean {
   return Boolean(
-    pk && 
-    (pk.startsWith("pk_test_") || pk.startsWith("pk_live_")) && 
+    pk &&
+    (pk.startsWith("pk_test_") || pk.startsWith("pk_live_")) &&
     pk.length > MIN_CLERK_KEY_LENGTH
   );
 }
