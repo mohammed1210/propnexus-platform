@@ -28,6 +28,7 @@ frontend/.env
 __pycache__/
 *.pyc
 .venv/
+venv/
 
 # OS / Editor
 .DS_Store

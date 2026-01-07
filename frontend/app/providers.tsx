@@ -3,7 +3,7 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { isValidClerkKey } from "@/lib/clerk-utils";
 
-export default function Providers({ children }: { children: React.ReactNode }) {
+export default function Providers({ children }: { children: ReactNode }) {
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   // Only wrap with ClerkProvider if we have a valid key

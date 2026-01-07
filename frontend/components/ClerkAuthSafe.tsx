@@ -15,9 +15,14 @@ function useClerkAvailable() {
   const [isChecked, setIsChecked] = useState(false);
 
   useEffect(() => {
-    // Check if Clerk publishable key is set
-    const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-    setIsAvailable(hasClerkKey);
+    const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    const enableClerk =
+      !!pk &&
+      pk.startsWith('pk_') &&
+      !pk.toLowerCase().includes('dummy') &&
+      pk.length > 30;
+
+    setIsAvailable(enableClerk);
     setIsChecked(true);
   }, []);
 
