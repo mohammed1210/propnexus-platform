@@ -1,6 +1,7 @@
 # backend/main.py
 from __future__ import annotations
 
+import logging
 import os
 from urllib.parse import urlparse
 
@@ -24,6 +25,8 @@ from backend.routes.tradesmen_routes import router as tradesmen_router
 from backend.routes.users_routes import router as users_router
 from backend.utils.sentry_init import init_sentry
 
+logger = logging.getLogger(__name__)
+
 # Load env (safe if missing)
 load_dotenv()
 
@@ -31,7 +34,7 @@ load_dotenv()
 try:
     init_sentry()
 except Exception as e:
-    print(f"[WARNING] Sentry initialization failed: {e}")
+    logger.warning(f"Sentry initialization failed: {e}")
 
 app = FastAPI()
 
