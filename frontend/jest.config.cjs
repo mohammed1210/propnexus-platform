@@ -14,7 +14,7 @@ module.exports = {
   transformIgnorePatterns: [
     '/node_modules/(?!(?:@clerk)/)'
   ],
-  
+
   moduleNameMapper: {
     // ✅ Add support for Next.js alias '@/'
     '^@/(.*)$': '<rootDir>/$1',
