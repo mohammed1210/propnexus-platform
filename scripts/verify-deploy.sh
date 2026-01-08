@@ -8,15 +8,16 @@ if [[ -z "${API_BASE}" ]]; then
   exit 1
 fi
 
-# 🔧 Strip trailing /api if present (CI-safe)
-API_BASE="${API_BASE%/api}"
+echo "Verifying PropNexus API at ${API_BASE}"
+echo "--------------------------------------"
 
 curl_check() {
   local method=$1
   local endpoint=$2
-  local data=$3
-  local expected=$4
+  local expected=$3
+  local data=${4:-}
 
+  echo ""
   echo "=== ${method} ${API_BASE}${endpoint}"
 
   local response
@@ -39,17 +40,29 @@ curl_check() {
   echo "Body: ${body:0:300}"
 
   if [[ "$status" -ne "$expected" ]]; then
-    echo "Expected $expected, got $status"
+    echo "❌ Expected $expected, got $status"
     exit 1
   fi
+
+  echo "✅ OK"
 }
 
-echo "Verifying PropNexus API at ${API_BASE}"
+# -----------------------------
+# Core health check (REQUIRED)
+# -----------------------------
+curl_check GET "/health" 200
 
-curl_check GET "/health" "" 200
-curl_check GET "/properties" "" 200
+# -----------------------------
+# Public read endpoint
+# -----------------------------
+curl_check GET "/properties" 200
 
+# -----------------------------
+# Off-market generator (soft dependency)
+# If this ever becomes optional, CI will tell us clearly
+# -----------------------------
 payload='{"location":"RG1","budget":200000,"count":1}'
-curl_check POST "/off-market/generate-off-market" "$payload" 200
+curl_check POST "/off-market/generate-off-market" 200 "$payload"
 
-echo "All checks passed."
+echo ""
+echo "🎉 All deployment checks passed successfully."
