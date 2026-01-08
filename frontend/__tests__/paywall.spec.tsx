@@ -6,11 +6,11 @@ describe('PricingPage', () => {
   it('renders paywall CTA buttons', () => {
     render(<PricingPage />);
 
-    // What users can see (matches your current markup)
+    // Your buttons are labelled "Start 7-Day Free Trial"
     const ctas = screen.getAllByRole('button', { name: /start 7-day free trial/i });
     expect(ctas.length).toBeGreaterThan(0);
 
-    // Also confirm upgrade intent via aria-label (your buttons include this)
+    // Also validates the accessibility label you set
     const upgradeAria = screen.getAllByRole('button', { name: /sign in to upgrade/i });
     expect(upgradeAria.length).toBeGreaterThan(0);
   });

@@ -1,16 +1,7 @@
-[project]
-name = "propnexus-backend"
-version = "0.1.0"
-requires-python = ">=3.12"
-
-dependencies = [
-  "aiohttp>=3.9.0",
-]
-
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-exclude = [
+extend-exclude = [
   ".git",
   "node_modules",
   ".venv",
@@ -30,6 +21,11 @@ select = ["F", "E", "W"]
 # W291 = trailing whitespace
 # W293 = blank line contains whitespace
 ignore = ["E501", "W291", "W293"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]
+"**/*test*.py" = ["F401"]
+"**/tests/**/*.py" = ["F401"]
 
 [tool.isort]
 profile = "black"

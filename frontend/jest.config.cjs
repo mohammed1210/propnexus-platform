@@ -2,14 +2,13 @@
 module.exports = {
   testEnvironment: 'jsdom',
 
-  // More robust matching (keeps your intent but removes edge-case misses)
-  testMatch: [
-    '<rootDir>/**/__tests__/**/*.(test|spec).[tj]s?(x)',
-    '<rootDir>/**/*.(test|spec).[tj]s?(x)',
-  ],
+  // IMPORTANT: when this config sits in /frontend, <rootDir> is /frontend
+  rootDir: '.',
 
+  testMatch: ['**/__tests__/**/*.(test|spec).tsx?', '**/*.spec.tsx'],
   testPathIgnorePatterns: [
     '<rootDir>/e2e/',
+    '<rootDir>/tests/', // <-- ignore Playwright tests (TransformStream error)
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
   ],
@@ -17,15 +16,14 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
 
   transform: {
-    '^.+\\.(ts|tsx|js|jsx)$': ['babel-jest'],
+    '^.+\\.(ts|tsx|js|jsx)$': ['babel-jest', { presets: ['next/babel'] }],
   },
 
-  // Allow Clerk to be transformed, ignore the rest of node_modules
   transformIgnorePatterns: ['/node_modules/(?!(?:@clerk)/)'],
 
   moduleNameMapper: {
     // ✅ Next.js alias '@/'
-    '^@/(.*)$': '<rootDir>/frontend/$1',
+    '^@/(.*)$': '<rootDir>/$1',
 
     // CSS Modules / global CSS
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
@@ -34,9 +32,8 @@ module.exports = {
     '\\.(jpg|jpeg|png|gif|webp|avif|svg)$': '<rootDir>/__mocks__/fileMock.js',
   },
 
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+
   verbose: false,
   collectCoverage: false,
-
-  // Helps avoid random CI flakiness
-  testTimeout: 30000,
 };
