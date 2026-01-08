@@ -11,3 +11,9 @@ try {
 
 // Testing Library matchers
 import '@testing-library/jest-dom';
+
+// Mock Clerk for Jest/unit tests only (do NOT affect runtime)
+jest.mock('@clerk/nextjs', () => ({
+  useUser: () => ({ user: null, isLoaded: true }),
+  ClerkProvider: ({ children }: any) => children,
+}));
