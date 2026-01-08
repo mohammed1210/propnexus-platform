@@ -13,7 +13,7 @@ const MIN_CLERK_KEY_LENGTH = 25;
  */
 export function hasValidClerkKey(pk?: string): boolean {
   if (!pk) return false;
-  
+
   const normalized = pk.toLowerCase();
   return (
     (pk.startsWith("pk_test_") || pk.startsWith("pk_live_")) &&
