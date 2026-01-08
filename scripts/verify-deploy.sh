@@ -8,6 +8,9 @@ if [[ -z "${API_BASE}" ]]; then
   exit 1
 fi
 
+# 🔧 Strip trailing /api if present (CI-safe)
+API_BASE="${API_BASE%/api}"
+
 curl_check() {
   local method=$1
   local endpoint=$2
@@ -27,8 +30,10 @@ curl_check() {
       "${API_BASE}${endpoint}")
   fi
 
-  local body=$(echo "$response" | sed 's/HTTPSTATUS:.*//')
-  local status=$(echo "$response" | tr -d '\n' | sed 's/.*HTTPSTATUS://')
+  local body
+  body=$(echo "$response" | sed 's/HTTPSTATUS:.*//')
+  local status
+  status=$(echo "$response" | tr -d '\n' | sed 's/.*HTTPSTATUS://')
 
   echo "Status: $status"
   echo "Body: ${body:0:300}"
