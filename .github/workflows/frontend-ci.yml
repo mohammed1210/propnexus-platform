@@ -67,7 +67,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon_placeholder_key"
           NEXT_PUBLIC_BACKEND_URL: "https://example.com"
 
-          # IMPORTANT: these must be real valid Clerk keys OR your build will fail during prerender
+          # 🔥 Key change: disable auth in CI so Clerk never runs at build-time
+          NEXT_PUBLIC_DISABLE_AUTH: "1"
+
+          # Optional: still pass if you want, but not required anymore
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
         run: npm run build
