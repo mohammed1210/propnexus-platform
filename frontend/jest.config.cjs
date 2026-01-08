@@ -8,7 +8,7 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.(test|spec).tsx?', '**/*.spec.tsx'],
   testPathIgnorePatterns: [
     '<rootDir>/e2e/',
-    '<rootDir>/tests/', // <-- ignore Playwright tests (TransformStream error)
+    '<rootDir>/tests/', // ignore Playwright tests (TransformStream error)
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
   ],
@@ -22,13 +22,8 @@ module.exports = {
   transformIgnorePatterns: ['/node_modules/(?!(?:@clerk)/)'],
 
   moduleNameMapper: {
-    // ✅ Next.js alias '@/'
     '^@/(.*)$': '<rootDir>/$1',
-
-    // CSS Modules / global CSS
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
-
-    // Images → file mock
     '\\.(jpg|jpeg|png|gif|webp|avif|svg)$': '<rootDir>/__mocks__/fileMock.js',
   },
 
