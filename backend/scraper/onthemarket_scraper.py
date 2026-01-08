@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import inspect
 import os
 import re
@@ -5,7 +7,10 @@ import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlencode
 
-import aiohttp
+try:
+    import aiohttp
+except ModuleNotFoundError:
+    aiohttp = None
 from bs4 import BeautifulSoup
 
 from backend.utils.postcode import get_lat_lng_from_postcode
@@ -347,6 +352,11 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
       image_url, image_urls, latitude, longitude, source ("onthemarket"), raw_url
     """
     mode = os.getenv("SCRAPER_MODE", "direct").lower()
+
+    if aiohttp is None:
+        raise RuntimeError(
+            "aiohttp is required for OnTheMarket scraping. Add aiohttp to requirements."
+        )
 
     log_scrape_start("onthemarket", location, mode)
     stats = ScraperStats("onthemarket", location)
