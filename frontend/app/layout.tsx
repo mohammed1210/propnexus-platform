@@ -22,7 +22,12 @@ export const metadata: Metadata = {
     siteName: "PropNexus",
     description: "AI-powered property sourcing platform.",
     images: [
-      { url: ABS("/og/cover.png"), width: 1200, height: 630, alt: "PropNexus – AI property sourcing" },
+      {
+        url: ABS("/og/cover.png"),
+        width: 1200,
+        height: 630,
+        alt: "PropNexus – AI property sourcing",
+      },
     ],
   },
   twitter: {
@@ -42,6 +47,10 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // ✅ CI-safe auth gate: if disabled or missing key, Providers should not mount Clerk
+  const disableAuth = process.env.NEXT_PUBLIC_DISABLE_AUTH === "1";
+  const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
@@ -52,9 +61,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
 
-        <Providers>
+        {/* ✅ When auth is disabled (CI) or key missing, skip Providers entirely */}
+        {disableAuth || !clerkKey ? (
           <RootShell>{children}</RootShell>
-        </Providers>
+        ) : (
+          <Providers>
+            <RootShell>{children}</RootShell>
+          </Providers>
+        )}
       </body>
     </html>
   );
