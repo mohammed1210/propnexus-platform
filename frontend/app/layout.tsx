@@ -46,11 +46,11 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  // ✅ CI-safe auth gate: if disabled or missing key, Providers should not mount Clerk
-  const disableAuth = process.env.NEXT_PUBLIC_DISABLE_AUTH === "1";
-  const clerkKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
@@ -61,14 +61,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
 
-        {/* ✅ When auth is disabled (CI) or key missing, skip Providers entirely */}
-        {disableAuth || !clerkKey ? (
+        <Providers>
           <RootShell>{children}</RootShell>
-        ) : (
-          <Providers>
-            <RootShell>{children}</RootShell>
-          </Providers>
-        )}
+        </Providers>
       </body>
     </html>
   );
