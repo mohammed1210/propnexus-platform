@@ -69,4 +69,4 @@ jobs:
           # ✅ Valid-shaped fallback so Clerk doesn't throw "invalid publishableKey"
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
-        run: npm run build
+          run: npm run build
