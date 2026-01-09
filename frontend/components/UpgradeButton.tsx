@@ -85,7 +85,6 @@ export default function UpgradeButton({ priceId, children = 'Upgrade', className
         className ?? 'btn-primary w-full'
       }
       aria-busy={loading}
-      aria-label={user ? 'Upgrade subscription plan' : 'Sign in to upgrade'}
     >
       {loading ? 'Redirecting…' : children}
     </button>

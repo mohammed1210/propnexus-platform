@@ -98,11 +98,7 @@ def test_property_type_extraction():
 
 def test_validation_functions():
     """Test validation utility functions."""
-    from backend.utils.validation import (
-        is_valid_image_url,
-        is_valid_url,
-        should_insert_property,
-    )
+    from backend.utils.validation import is_valid_image_url, is_valid_url, should_insert_property
 
     # Test URL validation
     assert is_valid_url("https://example.com")

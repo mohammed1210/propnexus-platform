@@ -1,4 +1,4 @@
-// app/layout.tsx (server component)
+// frontend/app/layout.tsx (server component)
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "../styles/design-tokens.css";
@@ -46,11 +46,7 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
