@@ -99,7 +99,7 @@ function extractImageSize(url: string): number {
 }
 
 function extractPropertyType(root: cheerio.Cheerio<cheerio.Element>): string | null {
-  const typeText = 
+  const typeText =
     root.find('[data-testid="property-type"]').first().text().trim() ||
     root.find('.propertyCard-propertyType').first().text().trim() ||
     root.find('.listing-property-type').first().text().trim() ||
@@ -127,7 +127,7 @@ async function scrapeDetailPage(detailUrl: string): Promise<{ description?: stri
     const { body } = await request(detailUrl, { method: 'GET' });
     const html = await body.text();
     const $ = cheerio.load(html);
-    
+
     // Extract full description from detail page
     const description =
       $('[data-testid="listing-description"], .listing-description, [itemprop="description"]')
@@ -136,7 +136,7 @@ async function scrapeDetailPage(detailUrl: string): Promise<{ description?: stri
         .trim() || undefined;
 
     // Extract property type from detail page
-    const propertyTypeEl = 
+    const propertyTypeEl =
       $('[data-testid="property-type"], .property-type, .listing-property-type')
         .first()
         .text()
@@ -241,7 +241,7 @@ export async function scrapezoopla(searchUrl: string): Promise<ScrapedItem[]> {
       if (item.detail_url) {
         if (DEBUG) console.log(`  · fetching detail page for ${item.source_id}`);
         const details = await scrapeDetailPage(item.detail_url);
-        
+
         // Enhance with detail page data
         if (details.description && (!item.description || details.description.length > item.description.length)) {
           item.description = details.description;
@@ -255,7 +255,7 @@ export async function scrapezoopla(searchUrl: string): Promise<ScrapedItem[]> {
           item.image_urls = rankImagesByQuality(uniqueImages);
           item.imageurl = item.image_urls[0] || item.imageurl;
         }
-        
+
         await sleep(DELAY_MS);
       }
     }

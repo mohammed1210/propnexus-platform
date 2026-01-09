@@ -1,7 +1,9 @@
 # backend/tests/test_schema_guard.py
 
 import os
+
 import pytest
+
 from supabase import create_client
 
 REQUIRED_COLUMNS = {

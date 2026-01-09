@@ -106,7 +106,7 @@ export default function DetailsPreview() {
             {/* Mortgage Calculator Card */}
             <div className="bg-white rounded-brand-xl border border-slate-200 p-6">
               <h2 className="text-xl font-bold text-slate-900 mb-6">Mortgage Calculator</h2>
-              
+
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">

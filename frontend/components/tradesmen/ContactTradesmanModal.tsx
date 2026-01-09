@@ -27,7 +27,7 @@ export default function ContactTradesmanModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !message || message.length < 10) {
       setError('Please provide a valid email and message (at least 10 characters)');
       return;

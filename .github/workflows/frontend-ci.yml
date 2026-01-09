@@ -47,14 +47,14 @@ jobs:
             npm install --prefer-offline --no-audit --no-fund
           fi
 
-      - name: Typecheck
+      - name: Type-check
         env:
-          NEXT_TELEMETRY_DISABLED: 1
-        run: npm run typecheck || true
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run type-check
 
       - name: Lint
         env:
-          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_TELEMETRY_DISABLED: "1"
         run: npm run lint
 
       - name: Verify jose installed (debug)
@@ -62,11 +62,15 @@ jobs:
 
       - name: Build
         env:
-          NEXT_TELEMETRY_DISABLED: 1
-          # Safe placeholders so the build never fails on missing env in CI
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'anon_placeholder_key' }}
-          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL != '' && secrets.NEXT_PUBLIC_BACKEND_URL || 'https://example.com' }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY != '' && secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY != '' && secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_SUPABASE_URL: "https://placeholder.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon_placeholder_key"
+          NEXT_PUBLIC_BACKEND_URL: "https://example.com"
+
+          # 🔥 Key change: disable auth in CI so Clerk never runs at build-time
+          NEXT_PUBLIC_DISABLE_AUTH: "1"
+
+          # Optional: still pass if you want, but not required anymore
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
         run: npm run build

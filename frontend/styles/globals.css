@@ -18,13 +18,13 @@
   --pnx-surface-2: #f8fafc;
   --pnx-border: var(--pnx-input-border); /* reuse your token */
   --pnx-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 4px 16px rgba(0, 0, 0, 0.06);
-  
+
   /* Sprint 11.3: Panel tokens */
   --panel-border: rgba(0, 0, 0, 0.1);
   --panel-bg: rgba(255, 255, 255, 0.5);
   --accent: #6ae0ff;
   --accent-2: #7c6cff;
-  
+
   /* Sprint 11.3: Hero gradient - lighter purple */
   --hero-gradient: radial-gradient(1200px 500px at 70% -10%, rgba(120, 80, 255, 0.12), transparent 60%),
                    radial-gradient(800px 400px at 10% 10%, rgba(0, 150, 255, 0.10), transparent 60%),
@@ -37,7 +37,7 @@
   --pnx-surface-2: #0f1116;
   --pnx-border: var(--pnx-input-border);
   --pnx-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 24px rgba(0, 0, 0, 0.35);
-  
+
   /* Sprint 11.3: Panel tokens - dark mode */
   --panel-border: rgba(255, 255, 255, 0.08);
   --panel-bg: rgba(255, 255, 255, 0.03);

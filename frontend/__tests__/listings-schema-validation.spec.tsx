@@ -1,6 +1,6 @@
 /**
  * Test: Listings schema validation
- * 
+ *
  * Ensures that backend property objects with snake_case keys
  * are correctly mapped for the frontend PropertyCard component.
  */
@@ -59,7 +59,7 @@ describe('Listings Schema Validation', () => {
     expect(mappedProperty.investment_type).toBe('BTL');
     expect(mappedProperty.latitude).toBe(51.5074);
     expect(mappedProperty.longitude).toBe(-0.1278);
-    
+
     // Ensure no undefined values
     expect(mappedProperty.investment_type).toBeDefined();
     expect(mappedProperty.yield_percent).toBeDefined();
@@ -111,7 +111,7 @@ describe('Listings Schema Validation', () => {
     expect(mappedProperty.yield_percent).toBeNull();
     expect(mappedProperty.roi_percent).toBeNull();
     expect(mappedProperty.investment_type).toBeNull();
-    
+
     // No undefined values - all properties should be defined (even if null)
     expect(Object.values(mappedProperty).some(value => value === undefined)).toBe(false);
   });

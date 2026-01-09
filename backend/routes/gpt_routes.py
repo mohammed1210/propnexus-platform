@@ -202,11 +202,11 @@ async def ai_score_explain(data: dict):
     prompt = f"""You are an AI investment analyst for UK property. A property has received a deal score of {score}/100.
 
 Property details:
-- Price: £{property_info.get('price', 'N/A')}
-- Location: {property_info.get('location', 'N/A')}
-- Bedrooms: {property_info.get('bedrooms', 'N/A')}
-- Yield: {property_info.get('yield_percent', 'N/A')}%
-- ROI: {property_info.get('roi_percent', 'N/A')}%
+- Price: £{property_info.get("price", "N/A")}
+- Location: {property_info.get("location", "N/A")}
+- Bedrooms: {property_info.get("bedrooms", "N/A")}
+- Yield: {property_info.get("yield_percent", "N/A")}%
+- ROI: {property_info.get("roi_percent", "N/A")}%
 
 Please provide:
 1. A brief paragraph summary (2-3 sentences) explaining what this score means

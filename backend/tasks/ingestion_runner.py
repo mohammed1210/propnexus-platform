@@ -16,9 +16,9 @@ normalized rows to the Supabase `properties` table in batches.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import time
-import logging
 from typing import List
 
 try:

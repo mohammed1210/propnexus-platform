@@ -3,6 +3,7 @@ Test /users/plan endpoint with Authorization header support (Sprint 11).
 """
 
 from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
 

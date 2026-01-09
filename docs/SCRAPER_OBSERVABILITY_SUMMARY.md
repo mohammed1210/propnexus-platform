@@ -95,7 +95,7 @@ ORDER BY started_at DESC;
 
 **Success rate:**
 ```sql
-SELECT 
+SELECT
   provider,
   COUNT(*) as total,
   SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as successful,
@@ -178,7 +178,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-key
 
 ---
 
-**Author:** GitHub Copilot  
-**Date:** 2025-11-19  
-**Branch:** copilot/scraper-observability-and-orchestration  
+**Author:** GitHub Copilot
+**Date:** 2025-11-19
+**Branch:** copilot/scraper-observability-and-orchestration
 **Tests:** 13/13 passing ✅

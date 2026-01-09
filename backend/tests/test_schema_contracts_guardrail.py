@@ -2,6 +2,7 @@ import os
 from typing import Set
 
 import pytest
+
 from supabase import Client, create_client
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")

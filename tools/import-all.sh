@@ -54,24 +54,24 @@ IFS=',' read -ra LOCATIONS <<< "$LOCATIONS_CSV"
 for LOCATION in "${LOCATIONS[@]}"; do
   # Trim whitespace
   LOCATION=$(echo "$LOCATION" | xargs)
-  
+
   echo "🔄 Importing: $LOCATION"
   echo "---"
-  
+
   # Make the API request
   RESPONSE=$(curl -s -X POST \
     "$API_BASE/import/all" \
     -H "Content-Type: application/json" \
     -H "x-api-key: $OFF_MARKET_ADMIN_TOKEN" \
     -d "{\"location\": \"$LOCATION\"}")
-  
+
   # Pretty print the JSON response
   echo "$RESPONSE" | jq '.'
-  
+
   # Extract count
   COUNT=$(echo "$RESPONSE" | jq -r '.count // 0')
   TOTAL_COUNT=$((TOTAL_COUNT + COUNT))
-  
+
   echo "✅ Imported $COUNT properties from $LOCATION"
   echo ""
 done

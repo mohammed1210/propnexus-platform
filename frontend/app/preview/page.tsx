@@ -60,7 +60,7 @@ export default function PreviewHub() {
       {/* Hero Section */}
       <div className="relative overflow-hidden bg-gradient-to-br from-brand-600 via-brand-500 to-cyan-600 text-white">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC4xIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSJ1cmwoI2dyaWQpIi8+PC9zdmc+')] opacity-20" />
-        
+
         <div className="relative max-w-7xl mx-auto px-4 py-16">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div>
@@ -99,7 +99,7 @@ export default function PreviewHub() {
                 </div>
               </div>
             </div>
-            
+
             <div className="hidden md:block">
               <div className="relative">
                 <div className="absolute -inset-4 bg-gradient-to-r from-cyan-400 to-brand-400 rounded-brand-xl blur-2xl opacity-30" />
@@ -157,7 +157,7 @@ export default function PreviewHub() {
               >
                 {/* Gradient Background on Hover */}
                 <div className={`absolute inset-0 bg-gradient-to-br ${preview.color} opacity-0 group-hover:opacity-5 transition-opacity duration-brand`} />
-                
+
                 <div className="relative p-6">
                   {/* Badge */}
                   <div className="flex items-center justify-between mb-4">

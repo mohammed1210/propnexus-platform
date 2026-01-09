@@ -16,11 +16,11 @@ function getSiteUrl(): string {
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  
+
   if (!url || !key) {
     throw new Error('Supabase credentials not configured');
   }
-  
+
   return createClient(url, key);
 }
 
@@ -60,7 +60,7 @@ export default function MagicLoginPage() {
       <div className="card">
         <h1 className="text-2xl font-semibold mb-2 text-slate-900 dark:text-white">Magic Link Login</h1>
         <p className="text-slate-600 dark:text-slate-400 mb-6">Enter your email to receive a secure login link</p>
-        
+
         <form onSubmit={sendLink} className="space-y-4">
           <input
             type="email"

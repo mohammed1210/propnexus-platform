@@ -1,29 +1,30 @@
+import asyncio
 import os
 import re
 import time
-import asyncio
-import aiohttp
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
+
+import aiohttp
 from bs4 import BeautifulSoup
 
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.render import (
-    render_page,
     PLAYWRIGHT_ENABLE,
     capture_debug_html,
     capture_debug_json,
-)
-from backend.utils.scraper_logger import (
-    ScraperStats,
-    log_scrape_start,
-    log_page_fetch_error,
-    log_scraperapi_fallback,
-    log_image_extraction,
+    render_page,
 )
 from backend.utils.retry import retry_async
-from backend.utils.validation import should_insert_property, clean_property_data
 from backend.utils.runlog import RunLog
+from backend.utils.scraper_logger import (
+    ScraperStats,
+    log_image_extraction,
+    log_page_fetch_error,
+    log_scrape_start,
+    log_scraperapi_fallback,
+)
+from backend.utils.validation import clean_property_data, should_insert_property
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -529,7 +530,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
 
                             external_id = (
                                 _extract_property_id(card)
-                                or f"rm-{hash(title+location_text) & 0xffffffff}"
+                                or f"rm-{hash(title + location_text) & 0xFFFFFFFF}"
                             )
 
                             coords = await _enrich_coordinates(location_text)

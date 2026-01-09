@@ -1,6 +1,7 @@
 # backend/main.py
 from __future__ import annotations
 
+import logging
 import os
 from urllib.parse import urlparse
 
@@ -8,66 +9,69 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Load env (safe if missing)
-load_dotenv()
-
-# Initialize Sentry before other imports
-try:
-    from backend.utils.sentry_init import init_sentry
-
-    init_sentry()
-except Exception as e:
-    print(f"[WARNING] Sentry initialization failed: {e}")
-
-# Local routers
-from backend.routes.ai import router as ai_router  # noqa: E402
+from backend.routes import admin_schedule, import_routes
+from backend.routes.ai import router as ai_router
 from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
 from backend.routes.gpt_routes import router as gpt_router
-from backend.routes.health import router as health_router
 from backend.routes.import_routes import router as import_router
 from backend.routes.notes import router as notes_router
 from backend.routes.off_market_routes import router as off_market_router
-from backend.routes.save_deal import router as save_deal_router
 from backend.routes.properties_routes import router as properties_router
+from backend.routes.save_deal import router as save_deal_router
+from backend.routes.stripe_routes import router as stripe_routes_router
+from backend.routes.stripe_webhook import router as stripe_webhook_router
 from backend.routes.tradesmen_routes import router as tradesmen_router
 from backend.routes.users_routes import router as users_router
-from backend.routes import import_routes, admin_schedule
+from backend.utils.sentry_init import init_sentry
 
-# ✅ Stripe routers (named distinctly to avoid duplicate includes)
-from backend.routes.stripe_webhook import router as stripe_webhook_router  # POST /stripe/webhook
-from backend.routes.stripe_routes import router as stripe_routes_router  # POST /stripe/create-portal-session
+logger = logging.getLogger(__name__)
+
+# Load env (safe if missing)
+load_dotenv()
+
+# Initialize Sentry (only enables in prod + DSN configured)
+try:
+    init_sentry()
+except Exception as e:
+    logger.warning(f"Sentry initialization failed: {e}")
 
 app = FastAPI()
 
+
 # ======================
-# 🌍 CORS (Vercel-ready)
+# ❤️ Health Check (DO NOT MOVE)
 # ======================
-# NOTE:
-# - FastAPI CORS does NOT support wildcard domains in allow_origins (e.g. https://*.vercel.app).
-# - For Vercel preview deployments, you MUST use allow_origin_regex.
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+# ======================
+# 🌍 CORS (stable for prod + previews)
+# ======================
 _ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,"
-    "https://propnexus-platform.vercel.app",
+    "http://localhost:3000,https://propnexus-platform.vercel.app",
 )
+
 ALLOWED_ORIGINS = [o.strip() for o in _ALLOWED_ORIGINS.split(",") if o.strip()]
 
-# Allow any Vercel preview domain (e.g. https://propnexus-platform-git-xyz.vercel.app)
-# You can override this via env if needed.
-ALLOWED_ORIGIN_REGEX = os.getenv(
-    "ALLOWED_ORIGIN_REGEX",
-    r"^https:\/\/.*\.vercel\.app$",
+# Allow any Vercel preview like https://propnexus-platform-git-xyz.vercel.app
+ALLOW_ORIGIN_REGEX = os.getenv(
+    "ALLOW_ORIGIN_REGEX",
+    r"^https:\/\/.*(\.vercel\.app|\.app\.github\.dev|\.github\.dev)$",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
+    allow_origin_regex=ALLOW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 # ======================
 # 🧪 Debug Routes (Safe)
@@ -80,7 +84,6 @@ def debug_supabase_env():
     """
     url = (os.getenv("SUPABASE_URL") or "").strip()
 
-    # Accept multiple key names so Railway + local env never mismatch
     key = (
         os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         or os.getenv("SUPABASE_SERVICE_ROLE")
@@ -89,7 +92,6 @@ def debug_supabase_env():
         or ""
     ).strip()
 
-    host = ""
     try:
         host = urlparse(url).netloc or url
     except Exception:
@@ -118,27 +120,28 @@ def root():
     return {"ok": True, "service": "propnexus-backend"}
 
 
-# Core routers
+# ======================
+# 🔌 Routers
+# ======================
 app.include_router(ai_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
 app.include_router(gpt_router)
-app.include_router(health_router)
 app.include_router(import_router)
 app.include_router(notes_router)
 app.include_router(off_market_router)
 app.include_router(save_deal_router)
-app.include_router(properties_router)  # GET /properties
-app.include_router(tradesmen_router)  # GET /tradesmen/nearby, POST /tradesmen/contact
+app.include_router(properties_router)
+app.include_router(tradesmen_router)
 app.include_router(import_routes.router)
 app.include_router(admin_schedule.router)
 
-# ✅ Stripe (include exactly once each)
-app.include_router(stripe_webhook_router)  # POST /stripe/webhook
-app.include_router(stripe_routes_router)  # POST /stripe/create-portal-session
+# Stripe
+app.include_router(stripe_webhook_router)
+app.include_router(stripe_routes_router)
 
-# ✅ Users router
-app.include_router(users_router)  # GET /users/plan
+# Users
+app.include_router(users_router)
 
 
 if __name__ == "__main__":
@@ -147,5 +150,6 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
     uvicorn.run("backend.main:app", host="0.0.0.0", port=port)
 
-# Trigger rebuild
+
+# Trigger rebuild (DO NOT REMOVE)
 REBUILD_FLAG = "2025-11-25"

@@ -4,8 +4,9 @@ import asyncio
 import logging
 import os
 import random
-from typing import Any, Callable, TypeVar, Optional, Dict
 from functools import wraps
+from typing import Any, Callable, Dict, Optional, TypeVar
+
 import aiohttp
 
 logger = logging.getLogger("scraper.retry")

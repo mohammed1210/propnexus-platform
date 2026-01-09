@@ -15,7 +15,7 @@ INSERT INTO tradesmen (full_name, trade_type, email, phone, website, rating, lat
 ('Northern Plumbing Solutions', 'plumber', 'enquiries@northernplumbing.co.uk', '0161 234 5678', 'www.northernplumbing.co.uk', 4.4, 53.4839, -2.2446, 25),
 ('Manchester Electricals', 'electrician', 'service@manchesterelectricals.co.uk', '0161 345 6789', NULL, 4.3, 53.4808, -2.2426, 20),
 
--- Birmingham area  
+-- Birmingham area
 ('Birmingham Building Services', 'builder', 'info@birminghambuilding.co.uk', '0121 123 4567', 'www.birminghambuilding.co.uk', 4.5, 52.4862, -1.8904, 25),
 ('Midlands Plumbing & Heating', 'plumber', 'contact@midlandsplumbing.co.uk', '0121 234 5678', 'www.midlandsplumbing.co.uk', 4.7, 52.4862, -1.8904, 30),
 ('West Midlands Electricians', 'electrician', 'info@wmelec.co.uk', '0121 345 6789', NULL, 4.4, 52.4800, -1.9025, 20),
@@ -54,58 +54,58 @@ INSERT INTO tradesmen (full_name, trade_type, email, phone, website, rating, lat
 
 -- Insert sample reviews for some tradesmen
 -- Note: user_id is set to NULL as we don't have actual users in this seed
-INSERT INTO tradesmen_reviews (tradesman_id, user_id, rating, review) 
-SELECT 
+INSERT INTO tradesmen_reviews (tradesman_id, user_id, rating, review)
+SELECT
     id,
     NULL,
     5,
     'Excellent work, very professional and completed on time. Highly recommended!'
-FROM tradesmen 
+FROM tradesmen
 WHERE full_name = 'John Smith Construction';
 
 INSERT INTO tradesmen_reviews (tradesman_id, user_id, rating, review)
-SELECT 
+SELECT
     id,
     NULL,
     4,
     'Good service, prompt response and fair pricing.'
-FROM tradesmen 
+FROM tradesmen
 WHERE full_name = 'Thames Plumbing Services';
 
 INSERT INTO tradesmen_reviews (tradesman_id, user_id, rating, review)
-SELECT 
+SELECT
     id,
     NULL,
     5,
     'Outstanding electrician, very knowledgeable and tidy.'
-FROM tradesmen 
+FROM tradesmen
 WHERE full_name = 'Capital Electricians Ltd';
 
 INSERT INTO tradesmen_reviews (tradesman_id, user_id, rating, review)
-SELECT 
+SELECT
     id,
     NULL,
     5,
     'Best surveyor we have used. Thorough report and excellent advice.'
-FROM tradesmen 
+FROM tradesmen
 WHERE full_name = 'Premier Property Surveyors';
 
 INSERT INTO tradesmen_reviews (tradesman_id, user_id, rating, review)
-SELECT 
+SELECT
     id,
     NULL,
     4,
     'Did a great job on our loft conversion. Minor delays but quality work.'
-FROM tradesmen 
+FROM tradesmen
 WHERE full_name = 'Manchester Master Builders';
 
 -- Display summary
-SELECT 
+SELECT
     trade_type,
     COUNT(*) as count,
     ROUND(AVG(rating)::numeric, 2) as avg_rating
-FROM tradesmen 
-GROUP BY trade_type 
+FROM tradesmen
+GROUP BY trade_type
 ORDER BY count DESC;
 
 SELECT COUNT(*) as total_tradesmen FROM tradesmen;

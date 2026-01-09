@@ -46,7 +46,7 @@ export default function DealScore({ property }: DealScoreProps) {
   const [loading, setLoading] = useState(true);
   const [showExplanation, setShowExplanation] = useState(false);
   const [loadingExplanation, setLoadingExplanation] = useState(false);
-  
+
   // Sprint 11.3: Animation state
   const [isVisible, setIsVisible] = useState(false);
   const [animatedScore, setAnimatedScore] = useState(0);
@@ -109,10 +109,10 @@ export default function DealScore({ property }: DealScoreProps) {
     const animate = (currentTime: number) => {
       const elapsed = currentTime - start;
       const progress = Math.min(elapsed / duration, 1);
-      
+
       // Ease-out cubic
       const easeProgress = 1 - Math.pow(1 - progress, 3);
-      
+
       setAnimatedScore(targetScore * easeProgress);
 
       if (progress < 1) {
@@ -243,7 +243,7 @@ export default function DealScore({ property }: DealScoreProps) {
                   className={`h-full rounded-full transition-all duration-1000 ease-out ${
                     isVisible ? 'score-bar score-bar-glow' : ''
                   }`}
-                  style={{ 
+                  style={{
                     width: isVisible ? `${percentage}%` : '0%',
                     background: 'linear-gradient(90deg, #6ae0ff, #7c6cff)',
                   }}

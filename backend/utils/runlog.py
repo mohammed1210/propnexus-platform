@@ -2,8 +2,7 @@
 import os
 import sys
 import time
-import uuid
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 try:
     from supabase import create_client
@@ -105,16 +104,20 @@ class RunLog:
             self.run_id = None
             return
         try:
-            result = _sb.table("scrape_runs").insert(
-                {
-                    "provider": self.source,
-                    "mode": self.mode,
-                    "location": self.location,
-                    "status": "running",
-                    "properties_imported": 0,
-                    "meta": self.meta,
-                }
-            ).execute()
+            result = (
+                _sb.table("scrape_runs")
+                .insert(
+                    {
+                        "provider": self.source,
+                        "mode": self.mode,
+                        "location": self.location,
+                        "status": "running",
+                        "properties_imported": 0,
+                        "meta": self.meta,
+                    }
+                )
+                .execute()
+            )
 
             # If DB returns an id, prefer it
             if getattr(result, "data", None) and len(result.data) > 0:
@@ -203,4 +206,3 @@ class RunLog:
     ):
         """Convenience factory."""
         return cls(source=source, mode=mode, location=location, meta=meta)
-    

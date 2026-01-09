@@ -10,14 +10,14 @@ export const dynamic = 'force-dynamic';
 
 /**
  * Clerk Webhook Handler
- * 
+ *
  * This webhook syncs Clerk user events to Supabase users table.
- * 
+ *
  * Events handled:
  * - user.created: Creates a new user in Supabase with default 'free' plan
  * - user.updated: Updates user email if changed in Clerk
  * - user.deleted: Optionally handle user deletion
- * 
+ *
  * Setup in Clerk Dashboard:
  * 1. Go to Webhooks section
  * 2. Add endpoint: https://your-domain.vercel.app/api/webhooks/clerk
@@ -27,7 +27,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   // Get webhook secret
   const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
-  
+
   if (!webhookSecret) {
     console.error('[Clerk Webhook] CLERK_WEBHOOK_SECRET not configured');
     return NextResponse.json(
@@ -95,12 +95,12 @@ export async function POST(req: Request) {
     switch (eventType) {
       case 'user.created': {
         const { id, email_addresses, primary_email_address_id } = evt.data;
-        
+
         // Get primary email
         const primaryEmail = email_addresses.find(
           (e) => e.id === primary_email_address_id
         );
-        
+
         if (!primaryEmail?.email_address) {
           console.error('[Clerk Webhook] No primary email found for user:', id);
           return NextResponse.json(
@@ -149,12 +149,12 @@ export async function POST(req: Request) {
 
       case 'user.updated': {
         const { id, email_addresses, primary_email_address_id } = evt.data;
-        
+
         // Get primary email
         const primaryEmail = email_addresses.find(
           (e) => e.id === primary_email_address_id
         );
-        
+
         if (!primaryEmail?.email_address) {
           console.warn('[Clerk Webhook] No primary email found for user update:', id);
           return NextResponse.json({ success: true, action: 'skip' });
@@ -183,12 +183,12 @@ export async function POST(req: Request) {
       case 'user.deleted': {
         const { id } = evt.data;
         console.log(`[Clerk Webhook] User deleted with ID: ${id}`);
-        
+
         // Note: user.deleted event doesn't include email_addresses
         // If you need to handle deletions, you'll need to look up by Clerk user ID
         // or maintain a mapping in your database
         // For now, we'll just log the event
-        
+
         return NextResponse.json({ success: true, action: 'logged' });
       }
 

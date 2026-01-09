@@ -3,6 +3,8 @@ import Image from 'next/image';
 import { Metadata } from 'next';
 import { GalleryImage } from '@/components/GalleryImage';
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: 'Demo - PropNexus Platform',
   description: 'Explore PropNexus features with sample property data and analytics.',

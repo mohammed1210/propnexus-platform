@@ -4,8 +4,9 @@ Tests for scraper observability features:
 - smart ScraperAPI mode
 """
 
-import sys
 import os  # noqa: E402
+import sys
+
 import pytest  # noqa: E402
 
 # NOTE:
@@ -15,13 +16,13 @@ if os.environ.get("CI", "").lower() == "true":
     pytest.skip("Skipping observability tests in CI environment", allow_module_level=True)
 
 
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
 
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from scraper.utils import _is_valid_html, _looks_blocked, smart_fetch_html
 from utils.runlog import RunLog
-from scraper.utils import smart_fetch_html, _looks_blocked, _is_valid_html
 
 
 class TestRunLog:
@@ -364,7 +365,6 @@ class TestSmartFetchHTML:
 def test_imports():
     """Ensure all required modules can be imported"""
     try:
-
         print("✓ All modules imported successfully")
     except Exception as e:
         pytest.fail(f"Import failed: {e}")
@@ -502,6 +502,7 @@ class TestScraperModeConfiguration:
 
 # ==== CI helper: optionally skip heavy RunLog integration tests ====
 import os as _os  # noqa: E402
+
 import pytest as _pytest  # noqa: E402
 
 _CI_SKIP_RUNLOG = _os.environ.get("CI", "").lower() == "true"
@@ -517,6 +518,7 @@ if _CI_SKIP_RUNLOG:
 
 # ==== CI helper: optionally skip heavy RunLog integration tests ====
 import os as _os  # noqa: E402
+
 import pytest as _pytest  # noqa: E402
 
 _CI_SKIP_RUNLOG = _os.environ.get("CI", "").lower() == "true"

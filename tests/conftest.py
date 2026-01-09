@@ -1,5 +1,6 @@
 import os
 
+
 def pytest_configure():
     # Safe placeholders for tests (no real secrets)
     os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")

@@ -25,7 +25,7 @@ export default function PageWrapper({ children, className = '', showOrbs = true 
           <div className="orb orb-3" />
         </div>
       )}
-      
+
       {children}
     </div>
   );

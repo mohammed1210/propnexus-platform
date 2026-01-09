@@ -128,18 +128,18 @@ image_url = img_el.get("data-src") or img_el.get("src")
 def _extract_images(card: BeautifulSoup) -> List[str]:
     """Extract ALL image URLs from a property card."""
     images = []
-    
+
     # Check all img tags
     for img in card.select("img"):
         url = (
-            img.get("data-src") or 
-            img.get("src") or 
+            img.get("data-src") or
+            img.get("src") or
             img.get("data-lazy-src") or
             img.get("data-original")
         )
         if url and not is_placeholder(url):
             images.append(normalize_url(url))
-    
+
     # Parse srcset for higher resolution images
     for img in card.select("img[srcset]"):
         srcset = img.get("srcset", "")
@@ -147,7 +147,7 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
             url = extract_url_from_srcset(item)
             if url and not is_placeholder(url):
                 images.append(normalize_url(url))
-    
+
     return deduplicate(images)
 ```
 
@@ -171,13 +171,13 @@ def _extract_description(card: BeautifulSoup) -> Optional[str]:
         card.select_one(".property-description") or
         card.select_one("[itemprop='description']")
     )
-    
+
     if desc_el:
         desc = desc_el.get_text(" ", strip=True)
         # Only return if meaningful (> 20 chars)
         if desc and len(desc) > 20:
             return desc
-    
+
     return None
 ```
 
@@ -332,8 +332,8 @@ SCRAPER_LOG_LEVEL=INFO           # DEBUG, INFO, WARNING, ERROR
 2025-11-13 14:30:05 [INFO] scraper: [rightmove] Falling back to ScraperAPI for https://www.rightmove.co.uk/...
 2025-11-13 14:30:10 [DEBUG] scraper: [rightmove] Extracted 5 image(s) for property rm-12345
 2025-11-13 14:30:10 [WARNING] scraper: [rightmove] Missing description in London: rm-12346
-2025-11-13 14:30:15 [INFO] scraper: [rightmove] Scrape summary for 'London': 
-                            found=24, parsed=22, failed=2, 
+2025-11-13 14:30:15 [INFO] scraper: [rightmove] Scrape summary for 'London':
+                            found=24, parsed=22, failed=2,
                             validation_failed=0, duplicates=0
 2025-11-13 14:30:15 [INFO] scraper: [rightmove] Missing fields: image_url=3, description=8
 2025-11-13 14:30:15 ✅ Scraped 22 Rightmove properties for 'London'

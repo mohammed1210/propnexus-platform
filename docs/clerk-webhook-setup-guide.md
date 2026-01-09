@@ -29,7 +29,7 @@ This guide walks you through setting up the Clerk webhook in the Clerk Dashboard
 Dashboard Navigation:
 ├── Overview
 ├── Users
-├── Sessions  
+├── Sessions
 ├── Configure
 │   └── Webhooks  ← Click here
 ├── Developers
@@ -51,7 +51,7 @@ Dashboard Navigation:
    ```
    https://your-domain.vercel.app/api/webhooks/clerk
    ```
-   
+
    **Examples:**
    - Production: `https://propnexus-platform.vercel.app/api/webhooks/clerk`
    - Staging: `https://propnexus-platform-staging.vercel.app/api/webhooks/clerk`
@@ -434,8 +434,8 @@ curl -X POST https://your-domain.vercel.app/api/webhooks/clerk \
 
 ---
 
-**Estimated Time:** 5-10 minutes  
-**Difficulty:** Easy (just copy-paste and click buttons)  
+**Estimated Time:** 5-10 minutes
+**Difficulty:** Easy (just copy-paste and click buttons)
 **Prerequisites:** Deployed application, Clerk account, Supabase database
 
 Good luck! 🚀

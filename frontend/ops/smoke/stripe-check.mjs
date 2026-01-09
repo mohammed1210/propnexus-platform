@@ -66,7 +66,7 @@ function expect(cond, message) {
     if (res.status >= 200 && res.status < 400) {
       console.log('✅ Webhook health passes (GET ?health=1 returns OK)');
     } else {
-      console.warn(`⚠️ Webhook health endpoint not detected (${res.status}). 
+      console.warn(`⚠️ Webhook health endpoint not detected (${res.status}).
 Add a GET handler that returns 200 for ?health=1 to silence this warning.`);
     }
   }

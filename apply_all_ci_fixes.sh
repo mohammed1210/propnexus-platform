@@ -71,8 +71,7 @@ PY
 # -------------------------------------------------------
 SANITY=".github/workflows/sanity-test.yml"
 if [ -f "$SANITY" ]; then
-    sed -i 's/python -c "import backend.main"/python -c "import main"/' "$SANITY"
-    sed -i 's/from backend/main/from /' "$SANITY"
+    sed -i 's/python -c "import main"/python -c "import backend.main"/' "$SANITY"
     echo "✅ Patched sanity-test.yml import path."
 fi
 

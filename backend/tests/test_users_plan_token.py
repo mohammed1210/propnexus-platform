@@ -3,6 +3,7 @@ Tests for token-based authentication on /users/plan endpoint.
 """
 
 from unittest.mock import MagicMock, patch
+
 from fastapi.testclient import TestClient
 
 

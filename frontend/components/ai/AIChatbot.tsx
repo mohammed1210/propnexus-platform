@@ -42,7 +42,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const propertyId = property?.id || 'default';
   const { plan, loading: planLoading } = useUserPlan();
-  
+
   // Check if user has access to chatbot (investor plan)
   const userHasAccess = hasAccess(plan, 'investor');
 
@@ -96,7 +96,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
   const handleSend = async () => {
     const text = input.trim();
     if (!text || isLoading) return;
-    
+
     const userMessage: Message = { role: 'user', content: text };
     setMessages((prev) => prev.concat(userMessage));
     setInput('');
@@ -270,7 +270,7 @@ export default function AIChatbot({ property }: AIChatbotProps) {
         </div>
       ) : null}
     </div>
-    
+
     {/* Upgrade Modal */}
     {showUpgradeModal && (
       <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -278,20 +278,20 @@ export default function AIChatbot({ property }: AIChatbotProps) {
           <div className="flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 text-white mx-auto">
             <FiLock className="w-8 h-8" />
           </div>
-          
+
           <h3 className="text-2xl font-bold text-center">AI Chat Assistant</h3>
-          
+
           <p className="text-center text-gray-600 dark:text-gray-400">
             Get instant answers to your property investment questions with our AI-powered chatbot.
           </p>
-          
+
           <div className="bg-gradient-to-br from-brand-50 to-emerald-50 dark:from-brand-950/30 dark:to-emerald-950/30 rounded-lg p-4 space-y-2">
             <p className="text-sm font-semibold text-gray-900 dark:text-white">✨ Premium Feature</p>
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Available with Investor plan
             </p>
           </div>
-          
+
           <div className="flex gap-3">
             <button
               onClick={() => setShowUpgradeModal(false)}

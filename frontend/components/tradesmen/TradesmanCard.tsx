@@ -32,7 +32,7 @@ export default function TradesmanCard({ tradesman, onContact }: TradesmanCardPro
           <p className="text-sm text-slate-600 dark:text-slate-400 capitalize mb-2">
             {trade_type}
           </p>
-          
+
           <div className="flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400 mb-3">
             {rating > 0 && (
               <div className="flex items-center gap-1">

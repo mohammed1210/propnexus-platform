@@ -12,7 +12,7 @@ jobs:
     name: Verify Deployment
     runs-on: ubuntu-latest
     env:
-      API_BASE: ${{ secrets.API_BASE }}
+      API_BASE: ${{ secrets.API_BASE != '' && secrets.API_BASE || 'https://propnexus-backend-production.up.railway.app' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3

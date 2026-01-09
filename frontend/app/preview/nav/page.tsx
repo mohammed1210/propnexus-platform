@@ -129,7 +129,7 @@ export default function NavigationPreview() {
           <p className="text-lg text-slate-600 max-w-2xl mx-auto mb-8">
             This demonstrates the navigation header with brand colors, CTAs, and responsive mobile menu.
           </p>
-          
+
           <div className="bg-white border border-slate-200 rounded-brand-xl p-8 max-w-2xl mx-auto">
             <h2 className="text-2xl font-bold text-slate-900 mb-4">Features</h2>
             <ul className="text-left space-y-3 text-slate-600">

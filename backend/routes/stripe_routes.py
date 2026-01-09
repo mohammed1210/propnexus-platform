@@ -3,10 +3,10 @@ from __future__ import annotations
 import os
 from typing import Optional
 
+import stripe
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-import stripe
 from supabase import create_client
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
@@ -15,24 +15,25 @@ router = APIRouter(prefix="/stripe", tags=["stripe"])
 sb = None  # tests patch backend.routes.stripe_routes.sb
 # The stripe module itself is patched by tests
 
+
 class CheckoutRequest(BaseModel):
     email: str
     price_id: str
 
+
 class PortalRequest(BaseModel):
     email: str
+
 
 def _get_supabase():
     url = os.getenv("SUPABASE_URL") or "http://localhost"
     key = os.getenv("SUPABASE_KEY") or "anon"
     return create_client(url, key)
 
+
 def _frontend_url() -> str:
-    return (
-        os.getenv("FRONTEND_URL")
-        or os.getenv("NEXT_PUBLIC_SITE_URL")
-        or "http://localhost:3000"
-    )
+    return os.getenv("FRONTEND_URL") or os.getenv("NEXT_PUBLIC_SITE_URL") or "http://localhost:3000"
+
 
 @router.post("/create-checkout-session")
 def create_checkout_session(payload: CheckoutRequest):
@@ -91,6 +92,7 @@ def create_checkout_session(payload: CheckoutRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"create checkout session failed: {e}")
+
 
 @router.post("/create-portal-session")
 def create_portal_session(payload: PortalRequest):

@@ -9,12 +9,12 @@ interface PlanBadgeProps {
    * Size variant of the badge
    */
   size?: 'sm' | 'md' | 'lg';
-  
+
   /**
    * Show loading spinner instead of plan when loading
    */
   showLoading?: boolean;
-  
+
   /**
    * Custom className for additional styling
    */
@@ -49,14 +49,14 @@ const SIZE_CLASSES = {
 
 /**
  * PlanBadge - Displays the user's current subscription plan as a badge.
- * 
+ *
  * Features:
  * - Auto-fetches user plan using useUserPlan hook
  * - Color-coded badges for each plan level
  * - Multiple size variants
  * - Loading state support
  * - Accessible with proper ARIA attributes
- * 
+ *
  * Example usage:
  *   <PlanBadge size="md" />
  */
@@ -115,7 +115,7 @@ export default function PlanBadge({
           />
         </svg>
       )}
-      
+
       <span className="capitalize">{plan}</span>
     </span>
   );

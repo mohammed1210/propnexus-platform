@@ -5,8 +5,8 @@ Only initializes Sentry in production when DSN is configured.
 In development and test environments, Sentry is disabled to prevent false events.
 """
 
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +29,8 @@ def init_sentry():
     try:
         import sentry_sdk
         from sentry_sdk.integrations.fastapi import FastApiIntegration
-        from sentry_sdk.integrations.starlette import StarletteIntegration
         from sentry_sdk.integrations.logging import LoggingIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
 
         # Configure Sentry
         sentry_sdk.init(
