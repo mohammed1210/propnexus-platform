@@ -8,6 +8,8 @@ import stripe
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from backend.middleware.rate_limit import WEBHOOK_RATE_LIMIT, limiter
+
 # Set up logger
 logger = logging.getLogger(__name__)
 
@@ -79,6 +81,7 @@ def get_webhook_secret() -> Optional[str]:
 
 
 @router.post("/webhook")
+@limiter.limit(WEBHOOK_RATE_LIMIT)
 async def stripe_webhook(request: Request):
     """
     Minimal, test-friendly webhook:
