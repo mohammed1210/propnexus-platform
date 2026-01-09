@@ -6,5 +6,5 @@
 @@
      app.include_router(properties_router)   # GET /properties
 +    app.include_router(users_router)        # GET /users/plan
- 
+
 *** End Patch

@@ -1,8 +1,8 @@
-import os
 import asyncio
+import os
 import time
-from typing import Optional, Sequence
 from pathlib import Path
+from typing import Optional, Sequence
 
 PLAYWRIGHT_ENABLE = os.getenv("PLAYWRIGHT_ENABLE", "0") == "1"
 PLAYWRIGHT_TIMEOUT_MS = int(os.getenv("PLAYWRIGHT_TIMEOUT_MS", "15000"))
@@ -189,7 +189,7 @@ async def render_page_capture(
                     data = await resp.json()
                     if isinstance(data, dict):
                         captured.append({"url": url_r, "data": data})
-                        capture_debug_json(f"capture_{hash(url_r) & 0xffffffff}", data)
+                        capture_debug_json(f"capture_{hash(url_r) & 0xFFFFFFFF}", data)
                 except Exception:
                     pass
 

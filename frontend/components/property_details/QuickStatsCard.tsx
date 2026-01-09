@@ -13,7 +13,7 @@ const formatValue = (value: number | undefined, format: 'currency' | 'percent' |
   if (value === undefined || value === null || isNaN(value)) {
     return '—';
   }
-  
+
   switch (format) {
     case 'currency':
       return new Intl.NumberFormat('en-GB', {
@@ -36,7 +36,7 @@ export default function QuickStatsCard({ price, yieldPercent, roiPercent, aiScor
       <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide">
         Quick Stats
       </h3>
-      
+
       {price !== undefined && (
         <div>
           <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Price</div>

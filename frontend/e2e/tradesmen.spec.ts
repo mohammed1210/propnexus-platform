@@ -33,7 +33,7 @@ test.describe('Tradesmen Connector Module', () => {
 
     // Look for the tradesmen section heading (case-insensitive, flexible)
     const tradesmenHeading = page.locator('text=/tradesmen|local.*service/i');
-    
+
     // The section might be collapsed, so just check if it exists in the DOM
     await expect(tradesmenHeading.first()).toBeInViewport({ timeout: 10000 }).catch(() => {
       // If not in viewport, that's okay - it might be collapsed
@@ -70,7 +70,7 @@ test.describe('Tradesmen Connector Module', () => {
 
     // Try to expand the tradesmen section if it's collapsed
     const tradesmenSection = page.locator('text=/tradesmen|local.*service/i').first();
-    
+
     if (await tradesmenSection.isVisible()) {
       await tradesmenSection.click({ timeout: 5000 }).catch(() => {
         // Section might already be expanded

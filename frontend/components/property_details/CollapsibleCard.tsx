@@ -40,7 +40,7 @@ export default function CollapsibleCard({
           )}
         </div>
       </button>
-      
+
       {isExpanded && (
         <div className="animate-slide-down">
           {children}

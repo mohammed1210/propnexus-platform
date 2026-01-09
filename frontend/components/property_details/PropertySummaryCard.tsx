@@ -25,7 +25,7 @@ const formatValue = (value: number | null | undefined, format: 'currency' | 'per
   if (value === null || value === undefined || isNaN(value)) {
     return '—';
   }
-  
+
   switch (format) {
     case 'currency':
       return new Intl.NumberFormat('en-GB', {
@@ -42,7 +42,7 @@ const formatValue = (value: number | null | undefined, format: 'currency' | 'per
 
 export default function PropertySummaryCard({ property, metrics }: PropertySummaryCardProps) {
   const { title, location, price, bedrooms, bathrooms, propertyType, investmentType } = property;
-  
+
   return (
     <div className="card">
       <div className="space-y-4">
@@ -63,21 +63,21 @@ export default function PropertySummaryCard({ property, metrics }: PropertySumma
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Price</p>
             <p className="text-lg font-semibold">{formatValue(price, 'currency')}</p>
           </div>
-          
+
           {bedrooms !== undefined && bedrooms !== null && (
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Bedrooms</p>
               <p className="text-lg font-semibold">{formatValue(bedrooms)}</p>
             </div>
           )}
-          
+
           {bathrooms !== undefined && bathrooms !== null && (
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Bathrooms</p>
               <p className="text-lg font-semibold">{formatValue(bathrooms)}</p>
             </div>
           )}
-          
+
           {propertyType && (
             <div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Type</p>
@@ -102,7 +102,7 @@ export default function PropertySummaryCard({ property, metrics }: PropertySumma
                     </p>
                   </div>
                 )}
-                
+
                 {metrics.monthlyPayment !== undefined && (
                   <div className="text-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Monthly Payment</p>
@@ -111,20 +111,20 @@ export default function PropertySummaryCard({ property, metrics }: PropertySumma
                     </p>
                   </div>
                 )}
-                
+
                 {metrics.netCashflow !== undefined && (
                   <div className="text-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Net Cashflow</p>
                     <p className={`text-xl font-bold ${
-                      metrics.netCashflow >= 0 
-                        ? 'text-green-600 dark:text-green-400' 
+                      metrics.netCashflow >= 0
+                        ? 'text-green-600 dark:text-green-400'
                         : 'text-red-600 dark:text-red-400'
                     }`}>
                       {formatValue(metrics.netCashflow, 'currency')}
                     </p>
                   </div>
                 )}
-                
+
                 {metrics.yield !== undefined && (
                   <div className="text-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Yield</p>
@@ -133,7 +133,7 @@ export default function PropertySummaryCard({ property, metrics }: PropertySumma
                     </p>
                   </div>
                 )}
-                
+
                 {metrics.roi !== undefined && (
                   <div className="text-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">ROI</p>

@@ -19,12 +19,16 @@ yarn-debug.log*
 .env
 .env.*
 frontend/.env.local
+frontend.env.production.local
 backend/.env.local
+backend/.env
+frontend/.env
 
 # Python
 __pycache__/
 *.pyc
 .venv/
+venv/
 
 # OS / Editor
 .DS_Store
@@ -35,3 +39,13 @@ __pycache__/
 # Build metadata
 *.tsbuildinfo
 tsconfig.tsbuildinfo
+
+# temp / debug artefacts
+frontend/dev.pid
+**/*.bak
+backend/debug/
+*.patch
+
+# Debug scrape artifacts
+backend/debug/*.html
+backend/debug/

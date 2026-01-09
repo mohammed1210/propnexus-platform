@@ -2,12 +2,14 @@ name: Pre-commit
 
 on:
   pull_request:
+    branches: [ main, sprint-*, po* ]
   push:
-    branches: [ main, sprint-4-ai-upgrades ]
+    branches: [ main, sprint-*, po* ]
 
 jobs:
   run-pre-commit:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -15,7 +17,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Cache pre-commit
         uses: actions/cache@v4
@@ -25,8 +27,8 @@ jobs:
           restore-keys: |
             pre-commit-${{ runner.os }}-
 
-      - name: Install pre-commit
-        run: python -m pip install --upgrade pip pre-commit
-
       - name: Run pre-commit (all hooks)
         uses: pre-commit/action@v3.0.1
+        env:
+          SKIP: offmarket-import-all,offmarket-import
+          

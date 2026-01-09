@@ -8,7 +8,7 @@ export default function ListingsPreview() {
   const [viewMode, setViewMode] = useState<'grid' | 'map'>('grid');
 
   const filters = ['£200k-£400k', '2+ beds', 'London', 'High Yield'];
-  
+
   const properties = [
     {
       id: 1,
@@ -194,7 +194,7 @@ export default function ListingsPreview() {
                         {property.title}
                       </h3>
                     </div>
-                    
+
                     <p className="flex items-center gap-1.5 text-slate-600 text-sm mb-4">
                       <FiMapPin className="w-4 h-4" />
                       {property.location}

@@ -31,12 +31,12 @@ def test_list_properties_endpoint_exists(mock_create_client, client):
     mock_query.limit.return_value = mock_query
     mock_query.order.return_value = mock_query
     mock_query.execute.return_value = Mock(data=[])
-    
+
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
 
     response = client.get("/properties")
-    
+
     # Should not be 404 (endpoint exists)
     assert response.status_code != 404
     assert response.status_code == 200
@@ -55,7 +55,7 @@ def test_list_properties_with_filters(mock_create_client, client):
     mock_query.lte.return_value = mock_query
     mock_query.in_.return_value = mock_query
     mock_query.order.return_value = mock_query
-    
+
     # Mock response data
     mock_properties = [
         {
@@ -71,7 +71,7 @@ def test_list_properties_with_filters(mock_create_client, client):
         }
     ]
     mock_query.execute.return_value = Mock(data=mock_properties)
-    
+
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
 
@@ -88,11 +88,11 @@ def test_list_properties_with_filters(mock_create_client, client):
             "dir": "asc",
         },
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert isinstance(data, list)
-    
+
     # Verify filters were applied
     mock_query.or_.assert_called_once()
     assert mock_query.gte.call_count >= 2  # price and bedrooms filters
@@ -110,14 +110,14 @@ def test_list_properties_default_sort(mock_create_client, client):
     mock_query.limit.return_value = mock_query
     mock_query.order.return_value = mock_query
     mock_query.execute.return_value = Mock(data=[])
-    
+
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
 
     response = client.get("/properties")
-    
+
     assert response.status_code == 200
-    
+
     # Should order by created_at by default
     mock_query.order.assert_called_once()
     call_args = mock_query.order.call_args
@@ -134,14 +134,14 @@ def test_list_properties_invalid_sort(mock_create_client, client):
     mock_query.limit.return_value = mock_query
     mock_query.order.return_value = mock_query
     mock_query.execute.return_value = Mock(data=[])
-    
+
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
 
     response = client.get("/properties", params={"sort": "invalid_column"})
-    
+
     assert response.status_code == 200
-    
+
     # Should fall back to created_at
     call_args = mock_query.order.call_args
     assert call_args[0][0] == "created_at"
@@ -156,7 +156,7 @@ def test_get_property_by_id(mock_create_client, client):
     mock_query.select.return_value = mock_query
     mock_query.eq.return_value = mock_query
     mock_query.maybe_single.return_value = mock_query
-    
+
     # Mock property data
     mock_property = {
         "id": "123",
@@ -165,12 +165,12 @@ def test_get_property_by_id(mock_create_client, client):
         "price": 250000,
     }
     mock_query.execute.return_value = Mock(data=mock_property)
-    
+
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
 
     response = client.get("/properties/123")
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == "123"
@@ -187,10 +187,10 @@ def test_get_property_not_found(mock_create_client, client):
     mock_query.eq.return_value = mock_query
     mock_query.maybe_single.return_value = mock_query
     mock_query.execute.return_value = Mock(data=None)
-    
+
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
 
     response = client.get("/properties/nonexistent")
-    
+
     assert response.status_code == 404

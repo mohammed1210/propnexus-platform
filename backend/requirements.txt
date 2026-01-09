@@ -7,7 +7,6 @@ asyncpg
 sqlalchemy
 pydantic
 beautifulsoup4
-aiohttp
 playwright
 python-dotenv>=1.0.0
 python-jose==3.5.0
@@ -16,3 +15,5 @@ openai>=1.14.0
 stripe==14.0.1
 sentry-sdk>=2.0.0
 pytest-asyncio>=0.23.0
+ruff==0.6.9
+aiohttp>=3.9.0

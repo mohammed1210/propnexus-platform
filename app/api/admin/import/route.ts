@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Admin proxy for property import operations
- * 
+ *
  * This server-side route forwards import requests to the backend API
  * with admin authentication, keeping the admin token secure.
- * 
+ *
  * POST /api/admin/import
  * Body: { location: string }
- * 
+ *
  * Security: Uses OFF_MARKET_ADMIN_TOKEN from server environment
  * No caching to ensure fresh data
  */

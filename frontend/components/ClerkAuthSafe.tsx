@@ -15,9 +15,14 @@ function useClerkAvailable() {
   const [isChecked, setIsChecked] = useState(false);
 
   useEffect(() => {
-    // Check if Clerk publishable key is set
-    const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-    setIsAvailable(hasClerkKey);
+    const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    const enableClerk =
+      !!pk &&
+      pk.startsWith('pk_') &&
+      !pk.toLowerCase().includes('dummy') &&
+      pk.length > 30;
+
+    setIsAvailable(enableClerk);
     setIsChecked(true);
   }, []);
 
@@ -26,7 +31,7 @@ function useClerkAvailable() {
 
 export function SafeSignedIn({ children }: { children: ReactNode }) {
   const { isAvailable, isChecked } = useClerkAvailable();
-  
+
   if (!isChecked) return null;
   if (!isAvailable) return null;
 
@@ -36,9 +41,9 @@ export function SafeSignedIn({ children }: { children: ReactNode }) {
 
 export function SafeSignedOut({ children }: { children: ReactNode }) {
   const { isAvailable, isChecked } = useClerkAvailable();
-  
+
   if (!isChecked) return null;
-  
+
   if (!isAvailable) {
     // Show signed out content by default when Clerk isn't configured
     return <>{children}</>;
@@ -49,7 +54,7 @@ export function SafeSignedOut({ children }: { children: ReactNode }) {
 
 export function SafeUserButton(props: any) {
   const { isAvailable, isChecked } = useClerkAvailable();
-  
+
   if (!isChecked) return null;
   if (!isAvailable) return null;
 
@@ -58,9 +63,9 @@ export function SafeUserButton(props: any) {
 
 export function SafeSignInButton({ children, ...props }: any) {
   const { isAvailable, isChecked } = useClerkAvailable();
-  
+
   if (!isChecked) return null;
-  
+
   if (!isAvailable) {
     // Render children directly when Clerk isn't configured
     return <>{children}</>;
@@ -71,9 +76,9 @@ export function SafeSignInButton({ children, ...props }: any) {
 
 export function SafeSignUpButton({ children, ...props }: any) {
   const { isAvailable, isChecked } = useClerkAvailable();
-  
+
   if (!isChecked) return null;
-  
+
   if (!isAvailable) {
     // Render children directly when Clerk isn't configured
     return <>{children}</>;

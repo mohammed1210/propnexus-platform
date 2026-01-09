@@ -3,12 +3,12 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, Iterable, List, Tuple
 
+from backend.scraper.onthemarket_scraper import scrape_onthemarket_properties
+
 # Scraper functions (async)
 from backend.scraper.rightmove_scraper import scrape_rightmove_properties
-from backend.scraper.zoopla_scraper import scrape_zoopla_properties
-from backend.scraper.onthemarket_scraper import scrape_onthemarket_properties
 from backend.scraper.spare_room_scraper import scrape_spareroom_properties
-
+from backend.scraper.zoopla_scraper import scrape_zoopla_properties
 
 POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b", re.IGNORECASE)
 

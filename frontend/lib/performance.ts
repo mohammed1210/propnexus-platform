@@ -1,6 +1,6 @@
 /**
  * Performance Optimization Guidelines for PropNexus
- * 
+ *
  * This file documents performance best practices and optimization techniques
  * used throughout the application.
  */

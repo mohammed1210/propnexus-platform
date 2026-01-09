@@ -82,7 +82,7 @@ export default function ListingsFilters() {
   }, [router]);
 
   return (
-    <div className="border-b backdrop-blur-sm sticky top-[var(--header-h)] z-20" style={{ 
+    <div className="border-b backdrop-blur-sm sticky top-[var(--header-h)] z-20" style={{
       borderColor: 'var(--border-primary)',
       background: 'var(--card-bg)'
     }}>

@@ -86,7 +86,7 @@
 </button>
 
 // ✅ After - Focus visible, proper label
-<button 
+<button
   onClick={handleClick}
   className="focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
   aria-label="Save this property"
@@ -106,13 +106,13 @@
 </div>
 
 // ✅ After
-<div 
-  role="dialog" 
+<div
+  role="dialog"
   aria-modal="true"
   aria-labelledby="dialog-title"
 >
   <h2 id="dialog-title">Dialog Title</h2>
-  <button 
+  <button
     onClick={close}
     aria-label="Close dialog"
     className="focus-visible:ring-2"
@@ -125,15 +125,15 @@
 ### Image Loading
 ```tsx
 // ❌ Before - No lazy loading, poor sizing
-<Image 
-  src={url} 
-  alt="Property" 
+<Image
+  src={url}
+  alt="Property"
   fill
 />
 
 // ✅ After - Optimized loading
-<Image 
-  src={url} 
+<Image
+  src={url}
   alt="Modern 3-bed property in Manchester"
   fill
   sizes="(max-width: 768px) 100vw, 33vw"
@@ -219,7 +219,7 @@ npx playwright test e2e/accessibility-keyboard.spec.ts
 import Button from '@/components/ui/Button';
 
 // Icon-only button - always add aria-label
-<button 
+<button
   onClick={handleAction}
   className="focus:outline-none focus-visible:ring-2"
   aria-label="Descriptive action name"
@@ -228,7 +228,7 @@ import Button from '@/components/ui/Button';
 </button>
 
 // Toggle button - use aria-pressed
-<button 
+<button
   onClick={toggleState}
   aria-pressed={isActive}
   className="focus-visible:ring-2"

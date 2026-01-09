@@ -63,11 +63,11 @@ If you already have data in your Supabase project:
 3. Verify the changes:
    ```sql
    -- Check the users table structure
-   SELECT column_name, data_type, column_default 
-   FROM information_schema.columns 
+   SELECT column_name, data_type, column_default
+   FROM information_schema.columns
    WHERE table_name = 'users' AND table_schema = 'public'
    ORDER BY ordinal_position;
-   
+
    -- Verify the constraint exists
    SELECT constraint_name, check_clause
    FROM information_schema.check_constraints

@@ -7,8 +7,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException, Header, Request, status
-from jose import jwt, JWTError
+from fastapi import APIRouter, Header, HTTPException, Request, status
+from jose import JWTError, jwt
+
 from supabase import Client, create_client
 
 load_dotenv()

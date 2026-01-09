@@ -1,10 +1,12 @@
 # backend/routes/users_routes.py
-from fastapi import APIRouter, HTTPException, Query, Header
-from fastapi.responses import JSONResponse
 import os
-from supabase import create_client, Client
 from typing import Optional
-from backend.utils.supabase_jwt import verify_supabase_token, extract_bearer_token
+
+from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi.responses import JSONResponse
+
+from backend.utils.supabase_jwt import extract_bearer_token, verify_supabase_token
+from supabase import Client, create_client
 
 router = APIRouter(prefix="/users", tags=["users"])
 

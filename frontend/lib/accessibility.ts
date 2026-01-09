@@ -1,6 +1,6 @@
 /**
  * Accessibility Configuration & Guidelines
- * 
+ *
  * This file documents the accessibility standards and patterns used throughout PropNexus.
  * Follow these guidelines when creating or modifying UI components.
  */
@@ -10,7 +10,7 @@ export const A11Y_STANDARDS = {
    * WCAG 2.1 Level AA Compliance Requirements
    */
   WCAG_LEVEL: 'AA',
-  
+
   /**
    * Color Contrast Ratios
    * - Normal text (< 18pt): 4.5:1 minimum
@@ -181,7 +181,7 @@ export const SR_ONLY_CLASSES = {
       white-space: nowrap;
       border-width: 0;
     }
-    
+
     .sr-only:focus {
       position: static;
       width: auto;
@@ -207,7 +207,7 @@ export const TESTING_CHECKLIST = {
     'No keyboard traps',
     'Skip links work correctly',
   ],
-  
+
   SCREEN_READER: [
     'All images have appropriate alt text',
     'Forms have associated labels',
@@ -216,7 +216,7 @@ export const TESTING_CHECKLIST = {
     'Dynamic content changes are announced',
     'Error messages are announced',
   ],
-  
+
   VISUAL: [
     'Sufficient color contrast (4.5:1 for text)',
     'Focus indicators are visible',
@@ -224,7 +224,7 @@ export const TESTING_CHECKLIST = {
     'No content is conveyed by color alone',
     'Text can be resized without breaking layout',
   ],
-  
+
   AUTOMATED: [
     'Run axe-core or similar tool',
     'Check with Lighthouse accessibility audit',

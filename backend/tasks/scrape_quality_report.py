@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Quick CLI to inspect scrape data quality in Supabase.
 
 Run inside the backend venv:
@@ -9,6 +7,8 @@ Run inside the backend venv:
 It prints, per source, how many recent rows are missing
 bedrooms, bathrooms, description, or imageurl.
 """
+
+from __future__ import annotations
 
 from collections import Counter, defaultdict
 from typing import Any, Dict, List

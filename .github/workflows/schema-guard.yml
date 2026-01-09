@@ -1,0 +1,41 @@
+name: Schema Guard
+
+on:
+  push:
+    branches: [ main, sprint-*, po* ]
+    paths:
+      - "backend/**"
+      - ".github/workflows/schema-guard.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/schema-guard.yml"
+
+jobs:
+  schema-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest==8.3.3
+
+      - name: Run schema guard tests
+        working-directory: backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          pytest tests/test_schema_contracts_guardrail.py

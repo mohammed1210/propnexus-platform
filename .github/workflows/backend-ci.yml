@@ -4,20 +4,20 @@ on:
   push:
     branches: [ main, po2, sprint-*, po* ]
     paths:
-      - 'backend/**'
-      - 'pyproject.toml'
-      - '.github/workflows/backend-ci.yml'
+      - "backend/**"
+      - "pyproject.toml"
+      - ".github/workflows/backend-ci.yml"
   pull_request:
     paths:
-      - 'backend/**'
-      - 'pyproject.toml'
-      - '.github/workflows/backend-ci.yml'
+      - "backend/**"
+      - "pyproject.toml"
+      - ".github/workflows/backend-ci.yml"
 
 jobs:
   backend:
     name: Backend CI
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -35,7 +35,9 @@ jobs:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
-          # pin for reproducible CI
+          pip install "aiohttp==3.13.2"
+          python -c "import aiohttp; print('aiohttp:', aiohttp.__version__)"
+          # Pin tools for reproducible CI
           pip install ruff==0.6.9 black==24.10.0 pytest==8.3.3
 
       - name: Lint (ruff + black --check)
@@ -44,14 +46,12 @@ jobs:
           ruff check .
           black --check .
 
-      - name: Run tests (if any)
-        env:
-          PYTHONPATH: ${{ github.workspace }}
+      - name: Run backend contract + schema guardrail tests
         working-directory: backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
         run: |
-          if ls -1 *_test.py tests 2>/dev/null | grep -q '.'; then
-            echo "Running pytest..."
-            pytest -q
-          else
-            echo "No tests found, skipping pytest"
-          fi
+          # Run contract + schema guardrail tests (same as local)
+          pytest tests/test_contracts.py tests/test_schema_contracts_guardrail.py

@@ -150,7 +150,7 @@ Updated `app/property/[id]/page.tsx`:
 
 Updated `frontend/lib/api.ts`:
 - Added `postAIChat()` - chat endpoint wrapper
-- Added `postAIScore()` - scoring endpoint wrapper  
+- Added `postAIScore()` - scoring endpoint wrapper
 - Added `postAIScoreExplain()` - explanation endpoint wrapper
 - Added `getAreaIntel()` - area intelligence getter
 - Added `getComps()` - comparables getter

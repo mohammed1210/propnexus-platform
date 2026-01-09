@@ -14,17 +14,17 @@ export interface UserPlanData {
 
 /**
  * Custom hook to fetch and track the current user's subscription plan.
- * 
+ *
  * Now uses Clerk for authentication:
  * 1. Gets the authenticated user from Clerk
  * 2. Fetches plan details from backend /users/plan endpoint using user email
  * 3. Returns plan, stripe_customer_id, loading state, error, and refetch function
- * 
+ *
  * Usage:
  *   const { plan, loading, error, refetch } = useUserPlan();
  *   if (loading) return <div>Loading...</div>;
  *   if (plan === 'investor') return <InvestorContent />;
- * 
+ *
  * After subscription upgrade:
  *   await refetch(); // Manually refresh plan data
  */
@@ -32,7 +32,7 @@ export function useUserPlan(): UserPlanData {
   // Check if Clerk is available
   let user: any = null;
   let clerkLoaded = true;
-  
+
   try {
     const clerkHook = useUser();
     user = clerkHook.user;
@@ -42,7 +42,7 @@ export function useUserPlan(): UserPlanData {
     console.warn('[useUserPlan] Clerk not available:', error);
     clerkLoaded = true; // Treat as loaded but without user
   }
-  
+
   const [plan, setPlan] = useState<UserPlan>('free');
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

@@ -149,7 +149,7 @@ curl -X POST https://your-domain.vercel.app/api/webhooks/clerk \
    ```bash
    git branch --show-current
    ```
-   
+
 2. **Push to correct branch:**
    ```bash
    git push origin your-branch-name
@@ -216,7 +216,7 @@ curl -X POST https://your-domain.vercel.app/api/webhooks/clerk \
    ```typescript
    // Missing dependencies
    npm install svix @clerk/nextjs @supabase/supabase-js
-   
+
    // TypeScript errors
    // Fix type issues in route.ts
    ```

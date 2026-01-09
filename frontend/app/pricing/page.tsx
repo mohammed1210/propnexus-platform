@@ -8,15 +8,15 @@ const PRICE_INVESTOR =
 
 /**
  * 7-Day Free Trial Configuration:
- * 
+ *
  * The trial period is configured in the backend at `/stripe/create-checkout-session`
  * via `subscription_data.trial_period_days: 7`. This ensures all paid subscriptions
  * start with a 7-day trial period where no payment is collected.
- * 
+ *
  * The trial can also be configured directly on the Stripe Price object in the
- * Stripe Dashboard (Price Settings > Trial period). If both are configured, 
+ * Stripe Dashboard (Price Settings > Trial period). If both are configured,
  * the checkout session setting takes precedence.
- * 
+ *
  * No additional frontend code is required - Stripe handles the trial logic
  * and the webhook updates the user's plan with `plan_status: "trialing"`.
  */

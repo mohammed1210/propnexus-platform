@@ -37,8 +37,8 @@ After running the schema, verify that the following tables exist:
 
 Check that RLS is enabled on user-facing tables:
 ```sql
-SELECT tablename, rowsecurity 
-FROM pg_tables 
+SELECT tablename, rowsecurity
+FROM pg_tables
 WHERE schemaname = 'public';
 ```
 

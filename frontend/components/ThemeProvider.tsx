@@ -20,7 +20,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setMounted(true);
     const stored = localStorage.getItem('propnexus-theme') as Theme | null;
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
+
     if (stored) {
       setTheme(stored);
     } else if (prefersDark) {
@@ -33,7 +33,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Apply theme to document
   useEffect(() => {
     if (!mounted) return;
-    
+
     const root = document.documentElement;
     root.classList.remove('light', 'dark');
     root.classList.add(theme);

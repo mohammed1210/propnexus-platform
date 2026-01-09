@@ -32,38 +32,38 @@ TOTAL_COUNT=0
 for location in "${LOCATION_ARRAY[@]}"; do
   # Trim whitespace
   location=$(echo "$location" | xargs)
-  
+
   if [ -z "$location" ]; then
     continue
   fi
-  
+
   echo "[Cron] Importing properties for location: $location"
-  
+
   # Call /import/all endpoint
   RESPONSE=$(curl -s -X POST "$API_BASE_URL/import/all" \
     -H "Content-Type: application/json" \
     -H "x-api-key: $API_KEY" \
     -d "{\"location\": \"$location\"}" \
     -w "\n%{http_code}" || echo -e "\n000")
-  
+
   # Extract status code (last line)
   HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
   # Extract body (all but last line)
   BODY=$(echo "$RESPONSE" | sed '$d')
-  
+
   if [ "$HTTP_CODE" != "200" ]; then
     echo "❌ Import failed for $location with status $HTTP_CODE"
     echo "Response: $BODY"
     exit 1
   fi
-  
+
   # Parse count from JSON response using grep and sed
   COUNT=$(echo "$BODY" | grep -o '"count"[[:space:]]*:[[:space:]]*[0-9]*' | grep -o '[0-9]*')
-  
+
   if [ -z "$COUNT" ]; then
     COUNT=0
   fi
-  
+
   echo "✅ Imported $COUNT properties for $location"
   TOTAL_COUNT=$((TOTAL_COUNT + COUNT))
 done

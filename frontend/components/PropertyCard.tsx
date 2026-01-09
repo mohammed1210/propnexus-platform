@@ -188,7 +188,7 @@ export default function PropertyCard({ p }: { p: Property }) {
           loading="lazy"
           priority={false}
         />
-        
+
         {/* Sprint 11.3: Prominent Save button in top-left */}
         <button
           type="button"
@@ -248,7 +248,7 @@ export default function PropertyCard({ p }: { p: Property }) {
             </>
           )}
         </button>
-        
+
         {/* Badges for yield and ROI - moved to top-right */}
         <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
           {typeof p.yield_percent === 'number' && (

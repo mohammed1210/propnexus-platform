@@ -17,11 +17,11 @@ function AccountPageContent() {
   const [loadingPortal, setLoadingPortal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { refetch: refetchPlan } = useUserPlan();
-  
+
   // Try to use Clerk, fallback if not available
   let user: any = null;
   let isLoaded = true;
-  
+
   try {
     const clerkHook = useUser();
     user = clerkHook.user;
@@ -37,11 +37,11 @@ function AccountPageContent() {
       if (searchParams) {
         const success = searchParams.get('success');
         const sessionId = searchParams.get('session_id');
-        
+
         if (success === 'true' && sessionId) {
           // Show success message
           toast.success('Subscription updated successfully!');
-          
+
           // Refresh plan data to reflect the change
           // Use a small delay to allow webhook processing
           setTimeout(async () => {
