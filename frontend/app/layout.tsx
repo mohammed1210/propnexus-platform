@@ -1,4 +1,4 @@
-// frontend/app/layout.tsx (server component)
+// app/layout.tsx (server component)
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "../styles/design-tokens.css";
@@ -58,7 +58,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
 
         <Providers>
-          <RootShell>{children}</RootShell>
+          {/* Ensure skip-link target exists and is focusable */}
+          <div id="main" tabIndex={-1} className="flex-1 outline-none">
+            <RootShell>{children}</RootShell>
+          </div>
         </Providers>
       </body>
     </html>
