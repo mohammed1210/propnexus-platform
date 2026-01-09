@@ -19,8 +19,14 @@ export default function OffMarketCard({ deal }: Props) {
     <div className="card overflow-hidden">
       {img ? (
         <div className="relative w-full aspect-[16/10] bg-zinc-100 dark:bg-zinc-800">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img} alt={d.title} className="w-full h-full object-cover" />
+          <Image 
+            src={img} 
+            alt={d.title} 
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="object-cover"
+            unoptimized={img.includes('supabase') ? false : true}
+          />
         </div>
       ) : (
         <div className="w-full aspect-[16/10] grid place-items-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500 text-sm">
