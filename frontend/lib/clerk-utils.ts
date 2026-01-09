@@ -1,23 +1,32 @@
 /**
  * Utility for validating Clerk publishable keys.
- * Used by both middleware and providers to ensure consistent validation.
+ * Used by both middleware and Providers to ensure CI-safe behaviour.
  */
 
-// Minimum length for a valid Clerk publishable key
-const MIN_CLERK_KEY_LENGTH = 25;
-
 /**
- * Checks if a Clerk publishable key is valid.
- * @param pk - The publishable key to validate
- * @returns true if the key has a valid format (pk_test_* or pk_live_*) and sufficient length
+ * Strict Clerk publishable key validation.
+ *
+ * Accepts ONLY real-looking keys:
+ *   - pk_test_*
+ *   - pk_live_*
+ *
+ * Prevents Next.js prerender/build crashes in CI caused by
+ * placeholder, dummy, or truncated keys.
  */
 export function hasValidClerkKey(pk?: string): boolean {
   if (!pk) return false;
 
-  const normalized = pk.toLowerCase();
-  return (
-    (pk.startsWith("pk_test_") || pk.startsWith("pk_live_")) &&
-    pk.length > MIN_CLERK_KEY_LENGTH &&
-    !normalized.includes("dummy")
-  );
+  // Reject obvious placeholders / CI fallbacks
+  if (
+    pk.includes("placeholder") ||
+    pk.includes("dummy") ||
+    pk.includes("example") ||
+    pk.endsWith("_")
+  ) {
+    return false;
+  }
+
+  // Clerk publishable keys are long, URL-safe, and prefixed
+  // This regex intentionally errs on the side of safety
+  return /^(pk_test_|pk_live_)[A-Za-z0-9_]{20,}$/.test(pk);
 }
