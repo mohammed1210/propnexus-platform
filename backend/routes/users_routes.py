@@ -1,26 +1,24 @@
 # backend/routes/users_routes.py
+from __future__ import annotations
+
 import os
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
+from supabase import Client, create_client
 
 from backend.utils.supabase_jwt import extract_bearer_token, verify_supabase_token
-from supabase import Client, create_client
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 # --- ENV ---
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-
-# Optional Supabase client
-sb: Optional[Client] = None
-if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
-    try:
-        sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    except Exception:
-        sb = None
+SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").strip()
+# Prefer service role key; fall back to SUPABASE_KEY only if that's how the env is set
+SUPABASE_SERVICE_ROLE_KEY = (
+    (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
+    or (os.getenv("SUPABASE_KEY") or "").strip()
+)
 
 USERS_TABLE = os.getenv("USERS_TABLE", "users")
 EMAIL_COL = os.getenv("USERS_EMAIL_COL", "email")
@@ -28,19 +26,31 @@ PLAN_COL = os.getenv("USERS_PLAN_COL", "plan")
 CUST_COL = os.getenv("USERS_STRIPE_COL", "stripe_customer_id")
 
 
+def _get_supabase_client() -> Optional[Client]:
+    """Create a Supabase client if credentials exist, otherwise return None."""
+    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
+        return None
+    try:
+        return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    except Exception:
+        return None
+
+
+# Optional Supabase client
+sb: Optional[Client] = _get_supabase_client()
+
+
 def _resolve_email(email_param: Optional[str], authorization: Optional[str]) -> str:
-    """Resolve user email using precedence: query param > Authorization header.
+    """
+    Resolve user email using precedence: query param > Authorization header.
 
-    Returns:
-        Email string
-
-    Raises:
-        HTTPException:
-          - 401 if auth header malformed/invalid or missing both sources
+    - If email query param is provided, use it.
+    - Else, if Authorization: Bearer <jwt> exists, verify and extract email/sub.
+    - Else, 401.
     """
     # 1) Query param takes precedence if provided
     if email_param:
-        return email_param
+        return email_param.strip()
 
     # 2) Fallback to Authorization header (Bearer token)
     if authorization:
@@ -52,8 +62,10 @@ def _resolve_email(email_param: Optional[str], authorization: Optional[str]) -> 
         if not payload:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-        # Supabase JWTs may have email or sub
-        return payload.get("email") or payload.get("sub") or ""
+        resolved = (payload.get("email") or payload.get("sub") or "").strip()
+        if not resolved:
+            raise HTTPException(status_code=401, detail="Token did not contain a usable identity")
+        return resolved
 
     # 3) Neither provided
     raise HTTPException(status_code=401, detail="Missing authentication")
@@ -67,22 +79,13 @@ async def get_user_plan(
     """
     Get user plan information from Supabase users table.
 
-    Supports two authentication methods:
+    Supports two lookup methods:
     1) Query parameter: ?email=user@example.com
     2) Authorization header: Bearer <jwt-token>
 
-    Priority: query parameter takes precedence over Authorization header.
-
-    Returns:
-    - plan: Subscription plan (free, pro, investor)
-    - stripe_customer_id: Stripe customer ID
+    Priority: query param takes precedence over Authorization header.
     """
-    # Resolve email with expected precedence and error handling
     user_email = _resolve_email(email, authorization)
-
-    if not user_email:
-        # Defensive: if token payload had neither email nor sub
-        raise HTTPException(status_code=401, detail="Missing authentication")
 
     if not sb:
         raise HTTPException(status_code=500, detail="Supabase not configured on server")
@@ -91,13 +94,12 @@ async def get_user_plan(
         res = sb.table(USERS_TABLE).select("*").eq(EMAIL_COL, user_email).maybe_single().execute()
 
         row = None
-        if res is not None and hasattr(res, "data"):
+        if res and hasattr(res, "data"):
             if isinstance(res.data, dict):
                 row = res.data
             elif isinstance(res.data, list) and res.data:
                 row = res.data[0]
 
-        # If user not found, return default free plan
         if not row:
             return JSONResponse({"plan": "free", "stripe_customer_id": None})
 
@@ -108,9 +110,7 @@ async def get_user_plan(
             }
         )
 
-    except HTTPException:
-        raise
     except Exception as e:
-        # Keep error visible (tests may expect 500 in some cases)
-        print(f"[users_routes] Error fetching user plan: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch user plan: {str(e)}")
+        # Keep errors explicit in logs, but surface a controlled API error
+        print(f"[users_routes] Error fetching user plan for {user_email}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch user plan")

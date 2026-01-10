@@ -80,8 +80,16 @@ def get_webhook_secret() -> Optional[str]:
     return os.getenv("STRIPE_WEBHOOK_SECRET")
 
 
+def _is_test_env() -> bool:
+    """
+    Disable rate limits during pytest runs.
+    Pytest sets PYTEST_CURRENT_TEST for each test.
+    """
+    return bool(os.getenv("PYTEST_CURRENT_TEST")) or os.getenv("ENVIRONMENT") == "test"
+
+
 @router.post("/webhook")
-@limiter.limit(WEBHOOK_RATE_LIMIT)
+@limiter.limit(WEBHOOK_RATE_LIMIT, exempt_when=lambda request: _is_test_env())
 async def stripe_webhook(request: Request):
     """
     Minimal, test-friendly webhook:
