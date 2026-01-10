@@ -73,6 +73,13 @@ def _resolve_email(email_param: Optional[str], authorization: Optional[str]) -> 
 
         email = payload.get("email")
         if not email:
+            sub = payload.get("sub")
+            # Some test/mocked payloads (and some auth setups) store the email in `sub`.
+            # Only accept it as an email if it looks like one.
+            if isinstance(sub, str) and "@" in sub:
+                email = sub
+
+        if not email:
             raise HTTPException(status_code=401, detail="Token missing email claim")
         return email
 
