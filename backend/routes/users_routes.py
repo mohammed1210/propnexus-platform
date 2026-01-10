@@ -8,44 +8,47 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from backend.utils.supabase_jwt import extract_bearer_token, verify_supabase_token
-from supabase import Client, create_client
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-# --- ENV ---
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
+# --- Supabase client (patchable for tests) ---
+sb = None  # IMPORTANT: tests patch backend.routes.users_routes.sb
+
+
+def _get_sb():
+    """
+    Lazily create/get Supabase client.
+
+    - Keeps a module-level `sb` so unit tests can patch it.
+    - Avoids creating the client at import-time (CI/env-safe).
+    """
+    global sb
+    if sb is not None:
+        return sb
+
+    # Import here so it only happens when needed
+    # Adjust these imports to match your project structure:
+    from supabase import create_client
+
+    url = os.getenv("SUPABASE_URL", "")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY", "")
+
+    # If env vars are missing, leave sb as None and raise a clear error
+    if not url or not key:
+        raise RuntimeError(
+            "Supabase env vars missing: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_KEY)"
+        )
+
+    sb = create_client(url, key)
+    return sb
+
+
+# --- ENV ---
 USERS_TABLE = os.getenv("USERS_TABLE", "users")
 EMAIL_COL = os.getenv("USERS_EMAIL_COL", "email")
 PLAN_COL = os.getenv("USERS_PLAN_COL", "plan")
 CUST_COL = os.getenv("USERS_STRIPE_COL", "stripe_customer_id")
-
-
-# Allow tests to monkeypatch this symbol if needed
-supabase: Optional[Client] = None
-
-
-def get_supabase_client() -> Optional[Client]:
-    """
-    Lazy Supabase client acquisition.
-
-    - If tests monkeypatch the module-level `supabase`, use it.
-    - Otherwise, attempt to create a real client from env vars.
-    - Return None if not configured.
-    """
-    global supabase
-
-    if supabase is not None:
-        return supabase
-
-    if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
-        return None
-
-    try:
-        return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-    except Exception:
-        return None
 
 
 def _resolve_email(email_param: Optional[str], authorization: Optional[str]) -> str:
@@ -97,12 +100,12 @@ async def get_user_plan(
     """
     user_email = _resolve_email(email, authorization)
 
-    sb = get_supabase_client()
-    if not sb:
-        raise HTTPException(status_code=500, detail="Supabase not configured on server")
+    client = _get_sb()
 
     try:
-        res = sb.table(USERS_TABLE).select("*").eq(EMAIL_COL, user_email).maybe_single().execute()
+        res = (
+            client.table(USERS_TABLE).select("*").eq(EMAIL_COL, user_email).maybe_single().execute()
+        )
 
         row = None
         if res and hasattr(res, "data"):
