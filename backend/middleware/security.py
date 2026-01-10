@@ -29,11 +29,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = frame_options
 
         # Referrer-Policy: controls referrer information
-        referrer_policy = os.getenv("SECURITY_REFERRER_POLICY", "strict-origin-when-cross-origin")
+        referrer_policy = os.getenv(
+            "SECURITY_REFERRER_POLICY", "strict-origin-when-cross-origin"
+        )
         response.headers["Referrer-Policy"] = referrer_policy
 
         # Content-Security-Policy: light CSP for API (can be tightened)
-        # For API endpoints, we primarily want to prevent inline scripts
         csp = os.getenv(
             "SECURITY_CSP",
             "default-src 'self'; frame-ancestors 'none'; base-uri 'self'",
@@ -44,7 +45,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # X-XSS-Protection: legacy header but harmless to include
         response.headers["X-XSS-Protection"] = "1; mode=block"
 
-        # Remove X-Powered-By if present (though FastAPI doesn't add it by default)
-        response.headers.pop("X-Powered-By", None)
+        # Remove X-Powered-By if present (Starlette headers don't support .pop())
+        if "X-Powered-By" in response.headers:
+            del response.headers["X-Powered-By"]
 
         return response

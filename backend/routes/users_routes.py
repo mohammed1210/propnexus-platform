@@ -4,9 +4,9 @@ from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
+from supabase import Client, create_client
 
 from backend.utils.supabase_jwt import extract_bearer_token, verify_supabase_token
-from supabase import Client, create_client
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -28,10 +28,15 @@ PLAN_COL = os.getenv("USERS_PLAN_COL", "plan")
 CUST_COL = os.getenv("USERS_STRIPE_COL", "stripe_customer_id")
 
 
-def _resolve_email(email_param: Optional[str], authorization: Optional[str]) -> Optional[str]:
+def _resolve_email(email_param: Optional[str], authorization: Optional[str]) -> str:
     """Resolve user email using precedence: query param > Authorization header.
 
-    Returns email string or raises HTTPException for malformed/invalid auth.
+    Returns:
+        Email string
+
+    Raises:
+        HTTPException:
+          - 401 if auth header malformed/invalid or missing both sources
     """
     # 1) Query param takes precedence if provided
     if email_param:
@@ -47,7 +52,8 @@ def _resolve_email(email_param: Optional[str], authorization: Optional[str]) -> 
         if not payload:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-        return payload.get("email") or payload.get("sub")
+        # Supabase JWTs may have email or sub
+        return payload.get("email") or payload.get("sub") or ""
 
     # 3) Neither provided
     raise HTTPException(status_code=401, detail="Missing authentication")
@@ -62,10 +68,10 @@ async def get_user_plan(
     Get user plan information from Supabase users table.
 
     Supports two authentication methods:
-    1. Query parameter: ?email=user@example.com
-    2. Authorization header: Bearer <jwt-token>
+    1) Query parameter: ?email=user@example.com
+    2) Authorization header: Bearer <jwt-token>
 
-    Priority: Authorization header takes precedence over query parameter.
+    Priority: query parameter takes precedence over Authorization header.
 
     Returns:
     - plan: Subscription plan (free, pro, investor)
@@ -74,16 +80,24 @@ async def get_user_plan(
     # Resolve email with expected precedence and error handling
     user_email = _resolve_email(email, authorization)
 
+    if not user_email:
+        # Defensive: if token payload had neither email nor sub
+        raise HTTPException(status_code=401, detail="Missing authentication")
+
     if not sb:
         raise HTTPException(status_code=500, detail="Supabase not configured on server")
 
     try:
-        # Query the users table for the given email
-        res = sb.table(USERS_TABLE).select("*").eq(EMAIL_COL, user_email).maybe_single().execute()
+        res = (
+            sb.table(USERS_TABLE)
+            .select("*")
+            .eq(EMAIL_COL, user_email)
+            .maybe_single()
+            .execute()
+        )
 
-        # Extract row data
         row = None
-        if res and hasattr(res, "data"):
+        if res is not None and hasattr(res, "data"):
             if isinstance(res.data, dict):
                 row = res.data
             elif isinstance(res.data, list) and res.data:
@@ -93,12 +107,17 @@ async def get_user_plan(
         if not row:
             return JSONResponse({"plan": "free", "stripe_customer_id": None})
 
-        # Return plan and customer ID
         return JSONResponse(
-            {"plan": row.get(PLAN_COL, "free"), "stripe_customer_id": row.get(CUST_COL)}
+            {
+                "plan": row.get(PLAN_COL, "free"),
+                "stripe_customer_id": row.get(CUST_COL),
+            }
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
-        # Log error but return free plan as fallback
+        # Keep error visible (tests may expect 500 in some cases)
         print(f"[users_routes] Error fetching user plan: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch user plan: {str(e)}")
+    

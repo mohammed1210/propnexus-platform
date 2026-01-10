@@ -74,7 +74,7 @@ This document summarizes the production hardening changes applied to the PropNex
 ### Phase C - Frontend Production Polish ✅
 
 #### C1. Next.js Image Optimization
-- **Files**: 
+- **Files**:
   - `frontend/components/offMarket/OffMarketCard.tsx`
   - `frontend/app/off-market/[id]/page.tsx`
 - **Changes**:
@@ -89,7 +89,7 @@ This document summarizes the production hardening changes applied to the PropNex
 
 #### C2. Clerk CI-Safe Gating
 - **Status**: Already implemented correctly
-- **Files**: 
+- **Files**:
   - `frontend/app/providers.tsx`
   - `frontend/lib/clerk-utils.ts`
 - **Validation**:

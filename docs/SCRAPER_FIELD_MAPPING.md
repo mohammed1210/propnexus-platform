@@ -332,7 +332,7 @@ Tracks scraping sessions:
 
 **Last Updated**: 2026-01-09  
 **Maintainer**: Development Team  
-**Related Docs**: 
+**Related Docs**:
 - `docs/scrapers/config.md` - Scraper configuration
 - `docs/SCRAPER_ENHANCEMENTS.md` - Enhancement history
 - `docs/ai/` - AI model documentation
