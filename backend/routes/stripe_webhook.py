@@ -8,7 +8,7 @@ import stripe
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from backend.middleware.rate_limit import WEBHOOK_RATE_LIMIT, limiter
+from backend.middleware.rate_limit import WEBHOOK_RATE_LIMIT, is_test_or_ci, limiter
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -80,16 +80,8 @@ def get_webhook_secret() -> Optional[str]:
     return os.getenv("STRIPE_WEBHOOK_SECRET")
 
 
-def _is_test_env() -> bool:
-    """
-    Disable rate limits during pytest runs.
-    Pytest sets PYTEST_CURRENT_TEST for each test.
-    """
-    return bool(os.getenv("PYTEST_CURRENT_TEST")) or os.getenv("ENVIRONMENT") == "test"
-
-
 @router.post("/webhook")
-@limiter.limit(WEBHOOK_RATE_LIMIT, exempt_when=lambda request: _is_test_env())
+@limiter.limit(WEBHOOK_RATE_LIMIT, exempt_when=is_test_or_ci)
 async def stripe_webhook(request: Request):
     """
     Minimal, test-friendly webhook:

@@ -14,6 +14,15 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 
+def is_test_or_ci() -> bool:
+    # PYTEST_CURRENT_TEST is set by pytest for each test
+    return (
+        os.getenv("CI", "").lower() == "true"
+        or os.getenv("ENVIRONMENT", "").lower() in {"test", "ci"}
+        or os.getenv("PYTEST_CURRENT_TEST") is not None
+    )
+
+
 def _is_test_env() -> bool:
     """
     Detect pytest/CI environments where rate limiting should be relaxed.

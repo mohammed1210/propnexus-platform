@@ -8,7 +8,7 @@ import logging
 import os
 from typing import Any
 
-from fastapi import Request, status
+from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -25,6 +25,8 @@ class ErrorHandlerMiddleware(BaseHTTPMiddleware):
         try:
             response = await call_next(request)
             return response
+        except HTTPException:
+            raise
         except Exception as exc:
             # Log the full error for debugging
             logger.exception("Unhandled exception during request processing")
