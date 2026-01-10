@@ -69,8 +69,15 @@ async def _ingest_location(location: str) -> int:
         if sb and normalized:
             for batch in _chunk(normalized):
                 try:
+                    db_batch = []
+                    for p in batch:
+                        if isinstance(p, dict):
+                            row = dict(p)
+                            row.pop("ai_ready", None)
+                            db_batch.append(row)
+
                     # Ensure upsert resolves on (source,external_id) as a single param value
-                    sb.table("properties").upsert(batch, on_conflict="source,external_id").execute()  # type: ignore
+                    sb.table("properties").upsert(db_batch, on_conflict="source,external_id").execute()  # type: ignore
                 except Exception as e:  # pragma: no cover
                     logging.warning("Upsert failed for batch (%s): %s", location, e)
         dur = (time.time() - start) * 1000

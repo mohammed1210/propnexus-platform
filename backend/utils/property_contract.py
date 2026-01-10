@@ -1,10 +1,8 @@
 # backend/utils/property_contract.py
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
-
 
 # A canonical list of keys we expect every property dict to contain.
 # This is intentionally "superset-friendly" so adding fields later is safe.
