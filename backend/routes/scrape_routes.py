@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 try:
@@ -89,12 +90,19 @@ async def scrape_endpoint(req: ScrapeRequest):
         normalized = await scrape_all_sources(location)
         count = len(normalized)
 
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for p in normalized:
+            if isinstance(p, dict):
+                p["last_seen_at"] = now_iso
+
         # Upsert in chunks (if Supabase configured)
         if supabase and normalized:
             for batch in _chunk(normalized):
                 try:
-                    # Rely on unique constraint on external_id
-                    supabase.table("properties").upsert(batch).execute()
+                    # Rely on unique constraint on (source, external_id)
+                    supabase.table("properties").upsert(
+                        batch, on_conflict="source,external_id"
+                    ).execute()
                 except Exception as db_err:  # pragma: no cover
                     logging.warning("properties upsert failed: %s", db_err)
                     # Continue other batches rather than failing entirely

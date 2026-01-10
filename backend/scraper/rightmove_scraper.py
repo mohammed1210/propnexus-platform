@@ -40,6 +40,7 @@ _POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
 def _looks_like_postcode(s: str) -> bool:
     return bool(s and _POSTCODE_RE.search(s))
 
+
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 RM_MAX_PAGES = int(os.getenv("RM_MAX_PAGES", "1"))

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import inspect
+from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
 try:
@@ -90,8 +91,14 @@ async def import_all(req: ImportRequest, request: Request):
     try:
         normalized = await _maybe_await(scrape_all_sources(loc))
         if sb and normalized:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for p in normalized:
+                if isinstance(p, dict):
+                    p["last_seen_at"] = now_iso
             try:
-                sb.table("properties").upsert(normalized).execute()
+                sb.table("properties").upsert(
+                    normalized, on_conflict="source,external_id"
+                ).execute()
             except Exception:
                 # Do not fail the import if DB write fails
                 pass
@@ -113,7 +120,11 @@ async def import_zoopla(req: ImportRequest):
     ]
     if sb and items:
         try:
-            sb.table("properties").upsert(items).execute()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for p in items:
+                if isinstance(p, dict):
+                    p["last_seen_at"] = now_iso
+            sb.table("properties").upsert(items, on_conflict="source,external_id").execute()
         except Exception:
             pass
     return {"count": len(items)}
@@ -129,7 +140,11 @@ async def import_rightmove(req: ImportRequest):
     ]
     if sb and items:
         try:
-            sb.table("properties").upsert(items).execute()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for p in items:
+                if isinstance(p, dict):
+                    p["last_seen_at"] = now_iso
+            sb.table("properties").upsert(items, on_conflict="source,external_id").execute()
         except Exception:
             pass
     return {"count": len(items)}
@@ -147,7 +162,11 @@ async def import_onthemarket(req: ImportRequest):
     ]
     if sb and items:
         try:
-            sb.table("properties").upsert(items).execute()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for p in items:
+                if isinstance(p, dict):
+                    p["last_seen_at"] = now_iso
+            sb.table("properties").upsert(items, on_conflict="source,external_id").execute()
         except Exception:
             pass
     return {"count": len(items)}
@@ -163,7 +182,11 @@ async def import_spareroom(req: ImportRequest):
     ]
     if sb and items:
         try:
-            sb.table("properties").upsert(items).execute()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for p in items:
+                if isinstance(p, dict):
+                    p["last_seen_at"] = now_iso
+            sb.table("properties").upsert(items, on_conflict="source,external_id").execute()
         except Exception:
             pass
     return {"count": len(items)}

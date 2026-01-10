@@ -5,7 +5,7 @@ import hashlib
 import inspect
 import os
 import re
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlencode
 
 try:
@@ -15,6 +15,7 @@ except ModuleNotFoundError:
 
 if TYPE_CHECKING:
     import aiohttp as aiohttp_types
+
 from bs4 import BeautifulSoup
 
 from backend.utils.postcode import get_lat_lng_from_postcode
@@ -48,6 +49,7 @@ _POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
 
 def _looks_like_postcode(s: str) -> bool:
     return bool(s and _POSTCODE_RE.search(s))
+
 
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
@@ -339,7 +341,9 @@ def _stable_id(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
 
 
-def _extract_external_id_and_url(card: BeautifulSoup, title: str, location: str) -> tuple[str, Optional[str]]:
+def _extract_external_id_and_url(
+    card: BeautifulSoup, title: str, location: str
+) -> tuple[str, Optional[str]]:
     """Extract external ID + best-effort listing URL.
 
     Uses stable SHA-256 fallback to avoid run-to-run duplicates.
