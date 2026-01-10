@@ -8,7 +8,12 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
+from backend.middleware.error_handler import ErrorHandlerMiddleware
+from backend.middleware.rate_limit import limiter
+from backend.middleware.security import SecurityHeadersMiddleware
 from backend.routes import admin_schedule, import_routes
 from backend.routes.ai import router as ai_router
 from backend.routes.area_intel_routes import router as area_intel_router
@@ -38,13 +43,30 @@ except Exception as e:
 
 app = FastAPI()
 
+# Attach rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Add security middleware (applied in order)
+app.add_middleware(ErrorHandlerMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+
 
 # ======================
 # ❤️ Health Check (DO NOT MOVE)
 # ======================
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    """
+    Health check endpoint with version information.
+    Returns minimal system status without exposing secrets.
+    """
+    return {
+        "status": "ok",
+        "service": "propnexus-backend",
+        "version": os.getenv("APP_VERSION", "unknown"),
+        "environment": os.getenv("ENVIRONMENT", "development"),
+    }
 
 
 # ======================

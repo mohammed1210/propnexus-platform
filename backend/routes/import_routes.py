@@ -5,7 +5,7 @@ import inspect
 from typing import Any, Dict, Tuple
 
 try:
-    from fastapi import APIRouter, HTTPException  # type: ignore
+    from fastapi import APIRouter, HTTPException, Request  # type: ignore
 except Exception:  # pragma: no cover
 
     class HTTPException(Exception):
@@ -23,6 +23,9 @@ except Exception:  # pragma: no cover
                 return func
 
             return deco
+
+    class Request:  # minimal shim
+        pass
 
 
 try:
@@ -43,6 +46,12 @@ try:
     from backend.db import sb  # type: ignore
 except Exception:
     sb = None  # graceful if local-only
+
+# Rate limiting
+try:
+    from backend.middleware.rate_limit import limiter
+except Exception:
+    limiter = None  # graceful if not available
 
 
 router = APIRouter(prefix="/import", tags=["import"])
@@ -68,7 +77,8 @@ def _unique_key(p: Dict[str, Any]) -> Tuple[Any, Any, Any]:
 
 
 @router.post("/all")
-async def import_all(req: ImportRequest):
+@limiter.limit("5/minute") if limiter else lambda f: f
+async def import_all(req: ImportRequest, request: Request):
     """
     Scrape Zoopla + Rightmove + OnTheMarket + SpareRoom for `location`, dedupe, upsert to Supabase.
     Returns { count } and the first few items (preview).

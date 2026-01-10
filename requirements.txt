@@ -58,3 +58,5 @@ uvicorn==0.37.0
 virtualenv==20.34.0
 websockets==15.0.1
 sentry-sdk==1.43.0
+slowapi==0.1.9
+stripe

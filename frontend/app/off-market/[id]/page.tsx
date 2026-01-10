@@ -6,6 +6,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import PageWrapper from '@/components/PageWrapper';
@@ -93,8 +94,16 @@ export default function DealDetail({ params }: PageProps) {
             <div className="lg:col-span-2 space-y-4">
               <div className="card overflow-hidden">
                 {row.image_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={row.image_url} alt={row.title} className="w-full h-80 object-cover" />
+                  <div className="relative w-full h-80 bg-zinc-100 dark:bg-zinc-800">
+                    <Image
+                      src={row.image_url}
+                      alt={row.title}
+                      fill
+                      sizes="(max-width: 1024px) 100vw, 66vw"
+                      className="object-cover"
+                      unoptimized={row.image_url.includes('supabase') ? false : true}
+                    />
+                  </div>
                 ) : (
                   <div className="w-full h-80 grid place-items-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
                     No photo
