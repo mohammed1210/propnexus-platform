@@ -1,7 +1,7 @@
 import asyncio
+import hashlib
 import os
 import re
-import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
@@ -32,6 +32,13 @@ USER_AGENT = (
 )
 
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic", "bot detection"]
+
+
+_POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
+
+
+def _looks_like_postcode(s: str) -> bool:
+    return bool(s and _POSTCODE_RE.search(s))
 
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
@@ -375,6 +382,31 @@ def _extract_property_id(card: BeautifulSoup) -> Optional[str]:
     return None
 
 
+def _stable_id(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def _extract_external_id_and_url(
+    card: BeautifulSoup, *, title: str, location: str
+) -> tuple[str, Optional[str]]:
+    link = card.select_one("a[href*='/properties/']")
+    href = link.get("href") if link else None
+
+    listing_url = None
+    if href and isinstance(href, str):
+        listing_url = href if href.startswith("http") else f"https://www.rightmove.co.uk{href}"
+        m = re.search(r"/properties/(\d+)", href)
+        if m:
+            return m.group(1), listing_url
+
+    data_id = card.get("data-id")
+    if data_id:
+        return str(data_id), listing_url
+
+    signature = listing_url or f"{title}|{location}"
+    return f"rm-{_stable_id(signature)}", listing_url
+
+
 def _collect_selectors(soup: BeautifulSoup) -> List[BeautifulSoup]:
     selectors = [
         "[data-testid='propertyCard']",
@@ -528,12 +560,15 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             # Extract property type
                             property_type = _extract_property_type(card)
 
-                            external_id = (
-                                _extract_property_id(card)
-                                or f"rm-{hash(title + location_text) & 0xFFFFFFFF}"
+                            external_id, listing_url = _extract_external_id_and_url(
+                                card, title=title, location=location_text
                             )
 
-                            coords = await _enrich_coordinates(location_text)
+                            coords = (
+                                await _enrich_coordinates(location_text)
+                                if _looks_like_postcode(location_text)
+                                else {"latitude": 0.0, "longitude": 0.0}
+                            )
 
                             property_data = {
                                 "external_id": external_id,
@@ -549,7 +584,8 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 "latitude": coords["latitude"],
                                 "longitude": coords["longitude"],
                                 "source": "rightmove",
-                                "raw_url": url,
+                                "raw_url": listing_url or url,
+                                "listing_url": listing_url,
                             }
 
                             # Track missing fields
@@ -575,7 +611,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                     if len(results) >= limit:
                         break
                     # polite delay
-                    time.sleep(RM_DELAY_MS / 1000.0)
+                    await asyncio.sleep(RM_DELAY_MS / 1000.0)
 
             stats.log_summary()
             print(f"✅ Scraped {len(results)} Rightmove properties for '{location}'")

@@ -1,6 +1,7 @@
+import asyncio
+import hashlib
 import os
 import re
-import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
@@ -33,6 +34,13 @@ ZP_DELAY_MS = int(os.getenv("ZP_DELAY_MS", "900"))
 SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
+
+
+_POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
+
+
+def _looks_like_postcode(s: str) -> bool:
+    return bool(s and _POSTCODE_RE.search(s))
 
 
 def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
@@ -350,13 +358,24 @@ async def _enrich_coordinates(location: str) -> Dict[str, float]:
         return {"latitude": 0.0, "longitude": 0.0}
 
 
-def _extract_external_id(card: BeautifulSoup) -> str:
+def _stable_id(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def _extract_external_id_and_url(card: BeautifulSoup) -> tuple[str, Optional[str]]:
     link = card.select_one("a[href*='/for-sale/details/']")
-    if link and link.get("href"):
-        m = re.search(r"/for-sale/details/(\d+)", link.get("href"))
+    href = link.get("href") if link else None
+
+    listing_url = None
+    if href and isinstance(href, str):
+        listing_url = href if href.startswith("http") else f"https://www.zoopla.co.uk{href}"
+        m = re.search(r"/for-sale/details/(\d+)", href)
         if m:
-            return m.group(1)
-    return f"zp-{abs(hash(card.get_text()) % (10**9))}"
+            return f"zp-{m.group(1)}", listing_url
+
+    # Stable fallback (URL if we have it, otherwise text signature)
+    signature = listing_url or card.get_text(" ", strip=True)
+    return f"zp-{_stable_id(signature)}", listing_url
 
 
 async def scrape_zoopla_properties(
@@ -444,8 +463,12 @@ async def scrape_zoopla_properties(
                             # Extract property type
                             property_type = _extract_property_type(card)
 
-                            external_id = _extract_external_id(card)
-                            coords = await _enrich_coordinates(location_text)
+                            external_id, listing_url = _extract_external_id_and_url(card)
+                            coords = (
+                                await _enrich_coordinates(location_text)
+                                if _looks_like_postcode(location_text)
+                                else {"latitude": 0.0, "longitude": 0.0}
+                            )
 
                             property_data = {
                                 "external_id": external_id,
@@ -461,7 +484,8 @@ async def scrape_zoopla_properties(
                                 "latitude": coords["latitude"],
                                 "longitude": coords["longitude"],
                                 "source": "zoopla",
-                                "raw_url": url,
+                                "raw_url": listing_url or url,
+                                "listing_url": listing_url,
                             }
 
                             # Track missing fields
@@ -486,7 +510,7 @@ async def scrape_zoopla_properties(
                             stats.log_parse_failure(str(e))
                     if len(results) >= limit:
                         break
-                    time.sleep(ZP_DELAY_MS / 1000.0)
+                    await asyncio.sleep(ZP_DELAY_MS / 1000.0)
 
             stats.log_summary()
             print(f"✅ Scraped {len(results)} Zoopla properties for '{location}'")
