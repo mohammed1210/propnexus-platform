@@ -1,8 +1,8 @@
+import asyncio
 import hashlib
 import inspect
 import os
 import re
-import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlencode
 
@@ -27,6 +27,14 @@ USER_AGENT = (
 )
 
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic", "robot"]
+
+
+_POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
+
+
+def _looks_like_postcode(s: str) -> bool:
+    return bool(s and _POSTCODE_RE.search(s))
+
 
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
@@ -300,31 +308,40 @@ async def _enrich_coordinates(location: str) -> Dict[str, float]:
         return {"latitude": 0.0, "longitude": 0.0}
 
 
-def _extract_external_id(card: BeautifulSoup, title: str, location: str, search_url: str) -> str:
+def _stable_id(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def _extract_external_id_and_url(card: BeautifulSoup) -> tuple[str, Optional[str]]:
+    """Extract external ID + best-effort listing URL.
+
+    Uses stable SHA-256 fallback to avoid run-to-run duplicates.
     """
-    Extract external ID from card. If not parseable, generate hash-based ID.
-    """
-    # Try data-id or href pattern
-    # Common id attributes
     data_id = card.get("data-advert-id") or card.get("data-listing-id") or card.get("data-id")
     if data_id:
-        return f"sr-{data_id}"
+        return f"sr-{data_id}", None
 
-    # Try to extract from any link href
     link = card.select_one("a[href]")
-    if link and link.get("href"):
-        href = link.get("href")
+    href = link.get("href") if link else None
+
+    listing_url = None
+    if href and isinstance(href, str):
+        if href.startswith("http"):
+            listing_url = href
+        elif href.startswith("/"):
+            listing_url = f"https://www.spareroom.co.uk{href}"
+        else:
+            listing_url = f"https://www.spareroom.co.uk/{href.lstrip('/')}"
+
         m = re.search(r"flatshare_id=(\d+)", href)
         if m:
-            return f"sr-{m.group(1)}"
+            return f"sr-{m.group(1)}", listing_url
         m2 = re.search(r"(\d{6,})", href)
         if m2:
-            return f"sr-{m2.group(1)}"
+            return f"sr-{m2.group(1)}", listing_url
 
-    # Fallback: stable hash of title+location+search_url+first_link
-    basis = f"{title}|{location}|{search_url}|{link.get('href') if link else ''}"
-    digest = hashlib.sha1(basis.encode("utf-8", errors="ignore")).hexdigest()[:10]
-    return f"sr-{digest}"
+    signature = listing_url or card.get_text(" ", strip=True)
+    return f"sr-{_stable_id(signature)}", listing_url
 
 
 async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Dict[str, Any]]:
@@ -421,7 +438,7 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                             description = _extract_description(card)
 
                             # Generate external ID
-                            external_id = _extract_external_id(card, title, location_text, url)
+                            external_id, listing_url = _extract_external_id_and_url(card)
 
                             # Deduplicate by external_id
                             if external_id in seen_ids:
@@ -430,7 +447,11 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                             seen_ids.add(external_id)
 
                             # Enrich with coordinates
-                            coords = await _enrich_coordinates(location_text)
+                            coords = (
+                                await _enrich_coordinates(location_text)
+                                if _looks_like_postcode(location_text)
+                                else {"latitude": 0.0, "longitude": 0.0}
+                            )
 
                             property_data = {
                                 "external_id": external_id,
@@ -445,7 +466,8 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                                 "latitude": coords["latitude"],
                                 "longitude": coords["longitude"],
                                 "source": "spareroom",
-                                "raw_url": url,
+                                "raw_url": listing_url or url,
+                                "listing_url": listing_url,
                             }
 
                             # Track missing fields
@@ -472,7 +494,7 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                         break
 
                     # Polite delay between pages
-                    time.sleep(SR_DELAY_MS / 1000.0)
+                    await asyncio.sleep(SR_DELAY_MS / 1000.0)
 
             stats.log_summary()
             print(f"✅ Scraped {len(results)} SpareRoom properties for '{location}'")

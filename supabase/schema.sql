@@ -78,7 +78,7 @@ create table if not exists public.saved_deals (
 -- Properties table - property listings
 create table if not exists public.properties (
   id uuid primary key default uuid_generate_v4(),
-  external_id text unique,
+  external_id text,
   title text not null,
   description text,
   price numeric,
@@ -101,8 +101,10 @@ create table if not exists public.properties (
   -- Additional display fields
   location text,
   imageurl text,
+  last_seen_at timestamptz default now(),
   created_at timestamp with time zone default now(),
-  updated_at timestamp with time zone default now()
+  updated_at timestamp with time zone default now(),
+  constraint properties_source_external_id_key unique (source, external_id)
 );
 
 -- Payments log table - tracks payment events

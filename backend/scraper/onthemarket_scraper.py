@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import inspect
 import os
 import re
-import time
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlencode
 
 try:
     import aiohttp
 except ModuleNotFoundError:
     aiohttp = None
+
+if TYPE_CHECKING:
+    import aiohttp as aiohttp_types
+
 from bs4 import BeautifulSoup
 
 from backend.utils.postcode import get_lat_lng_from_postcode
@@ -37,6 +42,14 @@ USER_AGENT = (
 )
 
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic", "robot"]
+
+
+_POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
+
+
+def _looks_like_postcode(s: str) -> bool:
+    return bool(s and _POSTCODE_RE.search(s))
+
 
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
@@ -97,7 +110,7 @@ def _build_search_url(location: str, page: int = 0) -> str:
     return f"{base}?view=grid"
 
 
-async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Optional[str]:
+async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str) -> Optional[str]:
     """Internal fetch function with retry logic."""
     headers = {"User-Agent": USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
 
@@ -184,7 +197,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
         return None
 
 
-async def _fetch_html(session: aiohttp.ClientSession, url: str) -> Optional[str]:
+async def _fetch_html(session: "aiohttp_types.ClientSession", url: str) -> Optional[str]:
     """Fetch HTML with retry logic and exponential backoff."""
     return await retry_async(
         _fetch_html_internal,
@@ -324,23 +337,33 @@ async def _enrich_coordinates(location: str) -> Dict[str, float]:
         return {"latitude": 0.0, "longitude": 0.0}
 
 
-def _extract_external_id(card: BeautifulSoup, title: str, location: str) -> str:
+def _stable_id(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:16]
+
+
+def _extract_external_id_and_url(
+    card: BeautifulSoup, title: str, location: str
+) -> tuple[str, Optional[str]]:
+    """Extract external ID + best-effort listing URL.
+
+    Uses stable SHA-256 fallback to avoid run-to-run duplicates.
     """
-    Extract external ID from card. If not parseable, generate hash-based ID.
-    """
-    # Try data-id or href pattern
     data_id = card.get("data-id")
     if data_id:
-        return f"ot-{data_id}"
+        return f"ot-{data_id}", None
 
     link = card.select_one("a[href*='/details/']")
-    if link and link.get("href"):
-        m = re.search(r"/details/(\d+)", link.get("href"))
-        if m:
-            return f"ot-{m.group(1)}"
+    href = link.get("href") if link else None
 
-    # Fallback: hash of title + location
-    return f"ot-{hash(title + location) & 0xFFFFFFFF}"
+    listing_url = None
+    if href and isinstance(href, str):
+        listing_url = href if href.startswith("http") else f"https://www.onthemarket.com{href}"
+        m = re.search(r"/details/(\d+)", href)
+        if m:
+            return f"ot-{m.group(1)}", listing_url
+
+    signature = listing_url or f"{title}|{location}"
+    return f"ot-{_stable_id(signature)}", listing_url
 
 
 async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[Dict[str, Any]]:
@@ -481,7 +504,9 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                             description = _extract_description(card)
 
                             # Generate external ID
-                            external_id = _extract_external_id(card, title, location_text)
+                            external_id, listing_url = _extract_external_id_and_url(
+                                card, title, location_text
+                            )
 
                             # Deduplicate by external_id
                             if external_id in seen_ids:
@@ -490,7 +515,11 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                             seen_ids.add(external_id)
 
                             # Enrich with coordinates
-                            coords = await _enrich_coordinates(location_text)
+                            coords = (
+                                await _enrich_coordinates(location_text)
+                                if _looks_like_postcode(location_text)
+                                else {"latitude": 0.0, "longitude": 0.0}
+                            )
 
                             property_data = {
                                 "external_id": external_id,
@@ -505,7 +534,8 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                                 "latitude": coords["latitude"],
                                 "longitude": coords["longitude"],
                                 "source": "onthemarket",
-                                "raw_url": url,
+                                "raw_url": listing_url or url,
+                                "listing_url": listing_url,
                             }
 
                             # Track missing fields
@@ -532,7 +562,7 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                         break
 
                     # Polite delay between pages
-                    time.sleep(OT_DELAY_MS / 1000.0)
+                    await asyncio.sleep(OT_DELAY_MS / 1000.0)
 
             stats.log_summary()
             print(f"✅ Scraped {len(results)} OnTheMarket properties for '{location}'")
