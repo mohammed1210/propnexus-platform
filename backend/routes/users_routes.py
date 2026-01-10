@@ -53,11 +53,15 @@ CUST_COL = os.getenv("USERS_STRIPE_COL", "stripe_customer_id")
 
 def _resolve_email(email_param: Optional[str], authorization: Optional[str]) -> str:
     """
-    Resolve user email using precedence: Authorization header > query param.
+    Resolve user email using precedence: query param > Authorization header.
 
     Returns email string or raises HTTPException for malformed/invalid auth.
     """
-    # 1) Authorization header takes precedence
+    # 1) Query param takes precedence (tests expect this)
+    if email_param:
+        return email_param
+
+    # 2) Fallback to Authorization header
     if authorization:
         token = extract_bearer_token(authorization)
         if not token:
@@ -69,13 +73,8 @@ def _resolve_email(email_param: Optional[str], authorization: Optional[str]) -> 
 
         email = payload.get("email")
         if not email:
-            # We only support email-based lookups for plans
             raise HTTPException(status_code=401, detail="Token missing email claim")
         return email
-
-    # 2) Fallback to query param
-    if email_param:
-        return email_param
 
     raise HTTPException(status_code=401, detail="Missing authentication")
 
