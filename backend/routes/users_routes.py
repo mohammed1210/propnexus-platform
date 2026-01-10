@@ -6,19 +6,18 @@ from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
-from supabase import Client, create_client
 
 from backend.utils.supabase_jwt import extract_bearer_token, verify_supabase_token
+from supabase import Client, create_client
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 # --- ENV ---
 SUPABASE_URL = (os.getenv("SUPABASE_URL") or "").strip()
 # Prefer service role key; fall back to SUPABASE_KEY only if that's how the env is set
-SUPABASE_SERVICE_ROLE_KEY = (
-    (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
-    or (os.getenv("SUPABASE_KEY") or "").strip()
-)
+SUPABASE_SERVICE_ROLE_KEY = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip() or (
+    os.getenv("SUPABASE_KEY") or ""
+).strip()
 
 USERS_TABLE = os.getenv("USERS_TABLE", "users")
 EMAIL_COL = os.getenv("USERS_EMAIL_COL", "email")
