@@ -123,7 +123,7 @@ All scrapers output a normalized format before insertion into the database:
 ## AI Scoring & Analysis Inputs
 
 ### Investment Summary Generation
-**Endpoint**: `POST /ai/summary`  
+**Endpoint**: `POST /ai/summary`
 **File**: `backend/routes/ai.py`
 
 | AI Input Field | Source | Description |
@@ -220,12 +220,12 @@ EPC data to be added in future:
 - `potential_rating` - Potential rating after improvements
 - `environmental_impact` - CO2 emissions rating
 
-**Data Source**: UK Government EPC API  
+**Data Source**: UK Government EPC API
 **Usage in AI**: Factor into sustainability score and running costs
 
 ## Property Comparables (Comps)
 
-**Endpoint**: `POST /comps/search`  
+**Endpoint**: `POST /comps/search`
 **Purpose**: Find similar properties for valuation
 
 ### Search Criteria
@@ -330,8 +330,8 @@ Tracks scraping sessions:
 
 ---
 
-**Last Updated**: 2026-01-09  
-**Maintainer**: Development Team  
+**Last Updated**: 2026-01-09
+**Maintainer**: Development Team
 **Related Docs**:
 - `docs/scrapers/config.md` - Scraper configuration
 - `docs/SCRAPER_ENHANCEMENTS.md` - Enhancement history

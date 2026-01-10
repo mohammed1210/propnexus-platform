@@ -29,9 +29,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = frame_options
 
         # Referrer-Policy: controls referrer information
-        referrer_policy = os.getenv(
-            "SECURITY_REFERRER_POLICY", "strict-origin-when-cross-origin"
-        )
+        referrer_policy = os.getenv("SECURITY_REFERRER_POLICY", "strict-origin-when-cross-origin")
         response.headers["Referrer-Policy"] = referrer_policy
 
         # Content-Security-Policy: light CSP for API (can be tightened)

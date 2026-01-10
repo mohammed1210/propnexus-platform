@@ -4,9 +4,9 @@ from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
-from supabase import Client, create_client
 
 from backend.utils.supabase_jwt import extract_bearer_token, verify_supabase_token
+from supabase import Client, create_client
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -88,13 +88,7 @@ async def get_user_plan(
         raise HTTPException(status_code=500, detail="Supabase not configured on server")
 
     try:
-        res = (
-            sb.table(USERS_TABLE)
-            .select("*")
-            .eq(EMAIL_COL, user_email)
-            .maybe_single()
-            .execute()
-        )
+        res = sb.table(USERS_TABLE).select("*").eq(EMAIL_COL, user_email).maybe_single().execute()
 
         row = None
         if res is not None and hasattr(res, "data"):
@@ -120,4 +114,3 @@ async def get_user_plan(
         # Keep error visible (tests may expect 500 in some cases)
         print(f"[users_routes] Error fetching user plan: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch user plan: {str(e)}")
-    

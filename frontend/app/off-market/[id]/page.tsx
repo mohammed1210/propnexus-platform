@@ -95,9 +95,9 @@ export default function DealDetail({ params }: PageProps) {
               <div className="card overflow-hidden">
                 {row.image_url ? (
                   <div className="relative w-full h-80 bg-zinc-100 dark:bg-zinc-800">
-                    <Image 
-                      src={row.image_url} 
-                      alt={row.title} 
+                    <Image
+                      src={row.image_url}
+                      alt={row.title}
                       fill
                       sizes="(max-width: 1024px) 100vw, 66vw"
                       className="object-cover"
