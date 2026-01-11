@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 
@@ -12,52 +12,55 @@ from urllib.parse import urlparse
 # URL + Image URL validation
 # -----------------------------
 def is_valid_url(url: Optional[str]) -> bool:
-    """Check if a string is a valid URL.
-
-    Args:
-        url: URL string to validate
-
-    Returns:
-        True if valid URL, False otherwise
-    """
+    """Check if a string is a valid absolute URL (http/https only)."""
     if not url or not isinstance(url, str):
         return False
 
     try:
         result = urlparse(url.strip())
-        return all([result.scheme, result.netloc])
+        if not (result.scheme and result.netloc):
+            return False
+        return result.scheme in {"http", "https"}
     except Exception:
         return False
 
 
 def is_valid_image_url(url: Optional[str]) -> bool:
-    """Check if a URL is likely a valid image URL.
+    """Check if a URL is likely a valid image URL."""
+    if not url or not isinstance(url, str):
+        return False
 
-    Args:
-        url: Image URL to validate
+    url = url.strip()
 
-    Returns:
-        True if likely valid image URL, False otherwise
-    """
+    # Data URLs are valid for images
+    if url.startswith("data:image/"):
+        return True
+
     if not is_valid_url(url):
-        # Data URLs are valid for images
-        return bool(url and isinstance(url, str) and url.startswith("data:image/"))
+        return False
 
     url_lower = url.lower()
 
     # Check for common image extensions
-    image_extensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"]
-    has_extension = any(url_lower.endswith(ext) for ext in image_extensions)
+    image_extensions = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg")
+    if url_lower.endswith(image_extensions):
+        return True
 
     # Check for common image URL patterns (e.g., /images/, /photos/, etc.)
-    image_patterns = ["/image", "/photo", "/picture", "/media", "/upload"]
-    has_pattern = any(pattern in url_lower for pattern in image_patterns)
-
-    return has_extension or has_pattern
+    image_patterns = (
+        "/image",
+        "/photo",
+        "/picture",
+        "/media",
+        "/upload",
+        "cdn",
+        "cloudfront",
+    )
+    return any(pattern in url_lower for pattern in image_patterns)
 
 
 # -----------------------------
-# Coercion + normalization helpers (NEW, internal)
+# Coercion + normalization helpers (internal)
 # -----------------------------
 def _as_str(v: Any) -> Optional[str]:
     if v is None:
@@ -155,13 +158,12 @@ def _normalize_image_urls(v: Any) -> List[str]:
         return []
 
     out: List[str] = []
-    seen = set()
+    seen: set[str] = set()
 
     for item in v:
         u = _as_str(item)
         if not u:
             continue
-        # keep only likely images (or at least valid URL)
         if not is_valid_image_url(u):
             continue
         if u not in seen:
@@ -191,7 +193,7 @@ def _ai_ready(data: Dict[str, Any]) -> bool:
 
 
 # -----------------------------
-# Public validation API (kept)
+# Public validation API
 # -----------------------------
 def validate_property_data(data: Dict[str, Any]) -> Dict[str, List[str]]:
     """Validate property data and return validation issues."""
@@ -207,7 +209,7 @@ def validate_property_data(data: Dict[str, Any]) -> Dict[str, List[str]]:
     if (
         not title
         or not str(title).strip()
-        or str(title).strip().lower() in ["untitled", "property"]
+        or str(title).strip().lower() in ["untitled", "property", "listing"]
     ):
         issues.setdefault("title", []).append("Missing or generic title")
 
@@ -223,9 +225,8 @@ def validate_property_data(data: Dict[str, Any]) -> Dict[str, List[str]]:
 
     # Validate image_url
     image_url = data.get("image_url")
-    if image_url:
-        if not is_valid_image_url(image_url):
-            issues.setdefault("image_url", []).append(f"Invalid image URL: {image_url}")
+    if image_url and not is_valid_image_url(str(image_url)):
+        issues.setdefault("image_url", []).append(f"Invalid image URL: {image_url}")
 
     # Validate image_urls array
     image_urls = data.get("image_urls")
@@ -233,7 +234,7 @@ def validate_property_data(data: Dict[str, Any]) -> Dict[str, List[str]]:
         if not isinstance(image_urls, list):
             issues.setdefault("image_urls", []).append("image_urls must be a list")
         else:
-            invalid_urls = [url for url in image_urls if not is_valid_image_url(url)]
+            invalid_urls = [url for url in image_urls if not is_valid_image_url(str(url))]
             if invalid_urls:
                 issues.setdefault("image_urls", []).append(
                     f"Invalid image URLs: {invalid_urls[:3]}"  # Show first 3
@@ -275,12 +276,16 @@ def validate_property_data(data: Dict[str, Any]) -> Dict[str, List[str]]:
     if not source or not str(source).strip():
         issues.setdefault("source", []).append("Missing source")
 
+    # Validate raw_url if present (optional but useful)
+    raw_url = data.get("raw_url")
+    if raw_url and not is_valid_url(str(raw_url)):
+        issues.setdefault("raw_url", []).append(f"Invalid raw_url: {raw_url}")
+
     return issues
 
 
-def should_insert_property(data: Dict[str, Any]) -> tuple[bool, Optional[str]]:
+def should_insert_property(data: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     """Determine if a property should be inserted into the database."""
-    # Critical fields that must be present
     external_id = data.get("external_id")
     if not external_id or not str(external_id).strip():
         return False, "Missing external_id"
@@ -289,7 +294,6 @@ def should_insert_property(data: Dict[str, Any]) -> tuple[bool, Optional[str]]:
     if not title or not str(title).strip():
         return False, "Missing title"
 
-    # Check if title is too generic
     title_lower = str(title).strip().lower()
     if title_lower in ["untitled", "property", "listing"]:
         return False, f"Generic title: {title}"
@@ -297,7 +301,6 @@ def should_insert_property(data: Dict[str, Any]) -> tuple[bool, Optional[str]]:
     # Must have either price or location
     price = data.get("price")
     location = data.get("location") or data.get("address")
-
     if not price and not location:
         return False, "Missing both price and location"
 
@@ -344,45 +347,42 @@ def clean_property_data(data: Dict[str, Any]) -> Dict[str, Any]:
 
     # Normalize string fields
     for field in ["title", "location", "address", "description", "source", "raw_url"]:
-        if field in cleaned and cleaned[field]:
-            cleaned[field] = str(cleaned[field]).strip()
+        if field in cleaned and cleaned[field] is not None:
+            cleaned[field] = str(cleaned[field]).strip() or None
 
-    # Normalize source to lowercase (small improvement, safe)
+    # Normalize source to lowercase
     cleaned["source"] = _normalize_source(cleaned.get("source"))
 
-    # Normalize numeric fields (BUT treat 0 beds/baths as missing)
-    # This matches your scraper behavior where 0 often means "unknown".
-    if "price" in cleaned:
-        cleaned["price"] = _coerce_int(cleaned.get("price"))
+    # Normalize numeric fields (treat 0 beds/baths as missing)
+    cleaned["price"] = _coerce_int(cleaned.get("price"))
 
     for field in ["bedrooms", "bathrooms"]:
-        if field in cleaned:
-            v = _coerce_int(cleaned.get(field))
-            cleaned[field] = None if v == 0 else v
+        v = _coerce_int(cleaned.get(field))
+        cleaned[field] = None if v == 0 else v
 
     # Normalize coordinate fields
-    for field in ["latitude", "longitude"]:
-        if field in cleaned:
-            cleaned[field] = _coerce_float(cleaned.get(field))
+    cleaned["latitude"] = _coerce_float(cleaned.get("latitude"))
+    cleaned["longitude"] = _coerce_float(cleaned.get("longitude"))
 
-    # Normalize property type (NEW, safe)
+    # Normalize property type (safe)
     cleaned["property_type"] = _normalize_property_type(cleaned.get("property_type"))
 
-    # Clean image URLs
-    # Prefer image_urls[] first valid image if image_url is missing/bad
+    # Normalize + de-dupe images
     imgs = _normalize_image_urls(cleaned.get("image_urls"))
     cleaned["image_urls"] = imgs
 
     image_url = _as_str(cleaned.get("image_url"))
     if image_url and not is_valid_image_url(image_url):
         image_url = None
-
     if not image_url and imgs:
         image_url = imgs[0]
-
     cleaned["image_url"] = image_url
 
-    # Optional: add ai_ready marker (won't break DB upsert if column doesn't exist)
+    # Validate raw_url if present; otherwise set None
+    raw_url = _as_str(cleaned.get("raw_url"))
+    cleaned["raw_url"] = raw_url if (raw_url and is_valid_url(raw_url)) else None
+
+    # Optional computed field (routes now strip before DB upsert)
     cleaned["ai_ready"] = _ai_ready(cleaned)
 
     return cleaned
