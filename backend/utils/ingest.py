@@ -406,6 +406,97 @@ def ingest(
     log(f"Done. Upserted OK={total_ok}, Failed={total_fail} into '{table}'")
 
 
+# ============================================================
+# Async scraping helper (RESTORED EXPORT for backwards compat)
+# ============================================================
+# Some routes/tests expect: from backend.utils.ingest import scrape_all_sources
+# Keep this function present to avoid ImportError in CI and runtime.
+# We use lazy imports so missing optional scraper deps won't crash imports.
+
+
+async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
+    """Backwards-compatible async aggregator.
+
+    Tries to scrape supported sources and normalizes them into a single list.
+
+    IMPORTANT:
+    - Uses lazy imports (inside function) to avoid ImportError at module import-time.
+    - If a scraper isn't available (or deps missing), we log and continue.
+    """
+
+    import inspect
+
+    loc = (location or "").strip()
+    if not loc:
+        return []
+
+    results: List[Dict[str, Any]] = []
+
+    async def _extend_from(source: str, items: Any) -> None:
+        if inspect.isawaitable(items):
+            items = await items
+        if not isinstance(items, list):
+            return
+        for raw in items:
+            if isinstance(raw, dict):
+                results.append(normalize_record(raw, source=source))
+
+    # ---- Rightmove ----
+    try:
+        try:
+            from backend.scraper.rightmove_scraper import (  # type: ignore
+                scrape_rightmove_properties,
+            )
+        except Exception:
+            from scraper.rightmove_scraper import scrape_rightmove_properties  # type: ignore
+
+        await _extend_from("rightmove", scrape_rightmove_properties(loc))
+    except Exception as e:
+        warn(f"Rightmove scrape skipped/failed: {e}")
+
+    # ---- Zoopla ----
+    try:
+        try:
+            from backend.scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
+        except Exception:
+            from scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
+
+        await _extend_from("zoopla", scrape_zoopla_properties(loc))
+    except Exception as e:
+        warn(f"Zoopla scrape skipped/failed: {e}")
+
+    # ---- OnTheMarket ----
+    try:
+        try:
+            from backend.scraper.onthemarket_scraper import (  # type: ignore
+                scrape_onthemarket_properties,
+            )
+        except Exception:
+            from scraper.onthemarket_scraper import scrape_onthemarket_properties  # type: ignore
+
+        await _extend_from("onthemarket", scrape_onthemarket_properties(loc))
+    except Exception as e:
+        warn(f"OnTheMarket scrape skipped/failed: {e}")
+
+    # ---- SpareRoom ----
+    try:
+        try:
+            from backend.scraper.spare_room_scraper import (  # type: ignore
+                scrape_spareroom_properties,
+            )
+        except Exception:
+            from scraper.spare_room_scraper import scrape_spareroom_properties  # type: ignore
+
+        await _extend_from("spareroom", scrape_spareroom_properties(loc))
+    except Exception as e:
+        warn(f"SpareRoom scrape skipped/failed: {e}")
+
+    # Drop empty rows (match ingest() logic)
+    results = [r for r in results if r.get("title") or r.get("location") or r.get("price")]
+
+    return results
+
+
 # ----------------------------
 # CLI
 # ----------------------------

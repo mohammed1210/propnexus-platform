@@ -45,8 +45,6 @@ except Exception:  # pragma: no cover
         raise RuntimeError("Supabase SDK not available")
 
 
-from backend.utils.ingest import scrape_all_sources
-
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
@@ -70,32 +68,9 @@ def _chunk(items: List[Dict[str, Any]], size: int = 100) -> List[List[Dict[str, 
     return [items[i : i + size] for i in range(0, len(items), size)]
 
 
-def _is_missing_column_or_constraint_error(msg: str) -> bool:
-    """
-    Best-effort check for the kinds of PostgREST/Supabase errors you get when:
-      - on_conflict references columns that don't exist
-      - the constraint/index isn't present
-    """
-    s = (msg or "").lower()
-    return (
-        "on_conflict" in s
-        or "does not exist" in s
-        or "could not find" in s
-        or "missing" in s
-        or "constraint" in s
-        or "column" in s
-        or "no unique constraint" in s
-        or "duplicate key value" in s
-    )
-
-
 @router.post("/scrape")
 async def scrape_endpoint(req: ScrapeRequest):
     """DEPRECATED: Use /import/all instead.
-
-    This endpoint is maintained for backwards compatibility but will be removed
-    in a future version. Please migrate to /import/all which provides the same
-    functionality with better error handling and logging.
 
     Aggregate scrape of all sources -> normalized -> upsert -> return preview.
 
@@ -103,11 +78,14 @@ async def scrape_endpoint(req: ScrapeRequest):
     """
     logging.warning("DEPRECATED: /scrape endpoint called, use /import/all instead")
 
-    location = (req.location or "").strip()
+    location = (getattr(req, "location", "") or "").strip()
     if not location:
         raise HTTPException(status_code=400, detail="Location is required")
 
     try:
+        # Lazy import to avoid module-import crashes in CI if scrape code changes
+        from backend.utils.ingest import scrape_all_sources  # type: ignore
+
         normalized = await scrape_all_sources(location)
         count = len(normalized)
 
@@ -143,23 +121,22 @@ async def scrape_endpoint(req: ScrapeRequest):
                 except Exception as db_err:  # pragma: no cover
                     logging.warning("properties upsert (source,external_id) failed: %s", db_err)
 
-                    # Attempt 2: plain upsert (lets PostgREST choose PK/constraints)
-                    try:
-                        supabase.table("properties").upsert(batch).execute()  # type: ignore
-                        total_written += len(batch)
-                        continue
-                    except Exception as db_err2:  # pragma: no cover
-                        logging.warning("properties fallback upsert failed: %s", db_err2)
+                # Attempt 2: plain upsert (lets PostgREST choose PK/constraints)
+                try:
+                    supabase.table("properties").upsert(batch).execute()  # type: ignore
+                    total_written += len(batch)
+                    continue
+                except Exception as db_err2:  # pragma: no cover
+                    logging.warning("properties fallback upsert failed: %s", db_err2)
 
-                        # Attempt 3: insert best-effort (may create duplicates if no constraints)
-                        try:
-                            supabase.table("properties").insert(batch).execute()  # type: ignore
-                            total_written += len(batch)
-                            continue
-                        except Exception as db_err3:  # pragma: no cover
-                            logging.warning("properties insert fallback failed: %s", db_err3)
-                            total_failed += len(batch)
-                            # Continue other batches rather than failing entirely
+                # Attempt 3: insert best-effort (may create duplicates if no constraints)
+                try:
+                    supabase.table("properties").insert(batch).execute()  # type: ignore
+                    total_written += len(batch)
+                    continue
+                except Exception as db_err3:  # pragma: no cover
+                    logging.warning("properties insert fallback failed: %s", db_err3)
+                    total_failed += len(batch)
 
             logging.info("Scrape DB write summary: ok=%s failed=%s", total_written, total_failed)
 
