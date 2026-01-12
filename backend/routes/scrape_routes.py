@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 try:
     from fastapi import APIRouter, HTTPException  # type: ignore
@@ -50,7 +50,7 @@ from backend.utils.ingest import scrape_all_sources
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
-supabase = None
+supabase: Optional[Client] = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)  # type: ignore
@@ -65,7 +65,28 @@ class ScrapeRequest(BaseModel):
 
 
 def _chunk(items: List[Dict[str, Any]], size: int = 100) -> List[List[Dict[str, Any]]]:
+    if size <= 0:
+        size = 100
     return [items[i : i + size] for i in range(0, len(items), size)]
+
+
+def _is_missing_column_or_constraint_error(msg: str) -> bool:
+    """
+    Best-effort check for the kinds of PostgREST/Supabase errors you get when:
+      - on_conflict references columns that don't exist
+      - the constraint/index isn't present
+    """
+    s = (msg or "").lower()
+    return (
+        "on_conflict" in s
+        or "does not exist" in s
+        or "could not find" in s
+        or "missing" in s
+        or "constraint" in s
+        or "column" in s
+        or "no unique constraint" in s
+        or "duplicate key value" in s
+    )
 
 
 @router.post("/scrape")
@@ -105,18 +126,46 @@ async def scrape_endpoint(req: ScrapeRequest):
 
         # Upsert in chunks (if Supabase configured)
         if supabase and db_rows:
-            for batch in _chunk(db_rows):
+            total_written = 0
+            total_failed = 0
+
+            for batch in _chunk(db_rows, size=100):
+                if not batch:
+                    continue
+
+                # Attempt 1: upsert with preferred conflict key
                 try:
-                    # Rely on unique constraint on (source, external_id)
-                    supabase.table("properties").upsert(
+                    supabase.table("properties").upsert(  # type: ignore
                         batch, on_conflict="source,external_id"
                     ).execute()
+                    total_written += len(batch)
+                    continue
                 except Exception as db_err:  # pragma: no cover
-                    logging.warning("properties upsert failed: %s", db_err)
-                    # Continue other batches rather than failing entirely
+                    logging.warning("properties upsert (source,external_id) failed: %s", db_err)
+
+                    # Attempt 2: plain upsert (lets PostgREST choose PK/constraints)
+                    try:
+                        supabase.table("properties").upsert(batch).execute()  # type: ignore
+                        total_written += len(batch)
+                        continue
+                    except Exception as db_err2:  # pragma: no cover
+                        logging.warning("properties fallback upsert failed: %s", db_err2)
+
+                        # Attempt 3: insert best-effort (may create duplicates if no constraints)
+                        try:
+                            supabase.table("properties").insert(batch).execute()  # type: ignore
+                            total_written += len(batch)
+                            continue
+                        except Exception as db_err3:  # pragma: no cover
+                            logging.warning("properties insert fallback failed: %s", db_err3)
+                            total_failed += len(batch)
+                            # Continue other batches rather than failing entirely
+
+            logging.info("Scrape DB write summary: ok=%s failed=%s", total_written, total_failed)
 
         preview = normalized[:10]
         return {"count": count, "preview": preview}
+
     except HTTPException:
         raise
     except Exception as e:  # pragma: no cover
