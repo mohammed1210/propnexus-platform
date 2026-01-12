@@ -95,9 +95,17 @@ async def scrape_endpoint(req: ScrapeRequest):
             if isinstance(p, dict):
                 p["last_seen_at"] = now_iso
 
+        # Safeguard: keep ai_ready for internal logic/preview, but don't send it to DB.
+        db_rows: List[Dict[str, Any]] = []
+        for p in normalized:
+            if isinstance(p, dict):
+                row = dict(p)
+                row.pop("ai_ready", None)
+                db_rows.append(row)
+
         # Upsert in chunks (if Supabase configured)
-        if supabase and normalized:
-            for batch in _chunk(normalized):
+        if supabase and db_rows:
+            for batch in _chunk(db_rows):
                 try:
                     # Rely on unique constraint on (source, external_id)
                     supabase.table("properties").upsert(

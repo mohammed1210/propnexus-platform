@@ -95,10 +95,16 @@ async def import_all(req: ImportRequest, request: Request):
             for p in normalized:
                 if isinstance(p, dict):
                     p["last_seen_at"] = now_iso
+
+            # Safeguard: keep ai_ready for internal logic, but don't send it to DB.
+            db_rows = []
+            for p in normalized:
+                if isinstance(p, dict):
+                    row = dict(p)
+                    row.pop("ai_ready", None)
+                    db_rows.append(row)
             try:
-                sb.table("properties").upsert(
-                    normalized, on_conflict="source,external_id"
-                ).execute()
+                sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
             except Exception:
                 # Do not fail the import if DB write fails
                 pass
@@ -124,7 +130,14 @@ async def import_zoopla(req: ImportRequest):
             for p in items:
                 if isinstance(p, dict):
                     p["last_seen_at"] = now_iso
-            sb.table("properties").upsert(items, on_conflict="source,external_id").execute()
+
+            db_rows = []
+            for p in items:
+                if isinstance(p, dict):
+                    row = dict(p)
+                    row.pop("ai_ready", None)
+                    db_rows.append(row)
+            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
     return {"count": len(items)}
@@ -144,7 +157,14 @@ async def import_rightmove(req: ImportRequest):
             for p in items:
                 if isinstance(p, dict):
                     p["last_seen_at"] = now_iso
-            sb.table("properties").upsert(items, on_conflict="source,external_id").execute()
+
+            db_rows = []
+            for p in items:
+                if isinstance(p, dict):
+                    row = dict(p)
+                    row.pop("ai_ready", None)
+                    db_rows.append(row)
+            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
     return {"count": len(items)}
@@ -166,7 +186,14 @@ async def import_onthemarket(req: ImportRequest):
             for p in items:
                 if isinstance(p, dict):
                     p["last_seen_at"] = now_iso
-            sb.table("properties").upsert(items, on_conflict="source,external_id").execute()
+
+            db_rows = []
+            for p in items:
+                if isinstance(p, dict):
+                    row = dict(p)
+                    row.pop("ai_ready", None)
+                    db_rows.append(row)
+            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
     return {"count": len(items)}
@@ -186,7 +213,14 @@ async def import_spareroom(req: ImportRequest):
             for p in items:
                 if isinstance(p, dict):
                     p["last_seen_at"] = now_iso
-            sb.table("properties").upsert(items, on_conflict="source,external_id").execute()
+
+            db_rows = []
+            for p in items:
+                if isinstance(p, dict):
+                    row = dict(p)
+                    row.pop("ai_ready", None)
+                    db_rows.append(row)
+            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
     return {"count": len(items)}

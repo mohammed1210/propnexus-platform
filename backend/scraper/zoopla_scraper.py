@@ -371,11 +371,15 @@ def _extract_external_id_and_url(card: BeautifulSoup) -> tuple[str, Optional[str
         listing_url = href if href.startswith("http") else f"https://www.zoopla.co.uk{href}"
         m = re.search(r"/for-sale/details/(\d+)", href)
         if m:
-            return f"zp-{m.group(1)}", listing_url
+            # IMPORTANT: Keep Zoopla external_id numeric to match historical runs.
+            # The DB upsert uses on_conflict="source,external_id"; adding a prefix
+            # (e.g., "zp-") would break matching and create duplicates.
+            return m.group(1), listing_url
 
     # Stable fallback (URL if we have it, otherwise text signature)
     signature = listing_url or card.get_text(" ", strip=True)
-    return f"zp-{_stable_id(signature)}", listing_url
+    # Only used when Zoopla doesn't expose a numeric listing id.
+    return f"zp-hash-{_stable_id(signature)}", listing_url
 
 
 async def scrape_zoopla_properties(
