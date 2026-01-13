@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
 try:
-    from fastapi import APIRouter, HTTPException, Request  # type: ignore
+    from fastapi import APIRouter, HTTPException, Query, Request  # type: ignore
 except Exception:  # pragma: no cover
 
     class HTTPException(Exception):
@@ -27,6 +27,9 @@ except Exception:  # pragma: no cover
 
     class Request:  # minimal shim
         pass
+
+    def Query(*_a: object, **_kw: object) -> object:  # type: ignore
+        return None
 
 
 try:
@@ -78,41 +81,32 @@ def _unique_key(p: Dict[str, Any]) -> Tuple[Any, Any, Any]:
 
 
 @router.post("/all")
-@limiter.limit("5/minute") if limiter else lambda f: f
-async def import_all(req: ImportRequest, request: Request):
-    """
-    Scrape Zoopla + Rightmove + OnTheMarket + SpareRoom for `location`, dedupe, upsert to Supabase.
-    Returns { count } and the first few items (preview).
-    """
-    loc = (req.location or "").strip()
+async def import_all(
+    request: Request,
+    req: str | None = Query(None, description="Location e.g. London"),
+):
+    # 1) Prefer query param
+    loc = (req or "").strip()
+
+    # 2) Backwards compatible: accept JSON body {"location":"..."} WITHOUT typing it
     if not loc:
-        raise HTTPException(status_code=400, detail="Location is required")
+        try:
+            payload = await request.json()  # type: ignore[attr-defined]
+        except Exception:
+            payload = {}
+        loc = str(payload.get("location") or "").strip()
 
-    try:
-        normalized = await _maybe_await(scrape_all_sources(loc))
-        if sb and normalized:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            for p in normalized:
-                if isinstance(p, dict):
-                    p["last_seen_at"] = now_iso
+    if not loc:
+        raise HTTPException(
+            status_code=422,
+            detail="Missing location. Use ?req=London or JSON body {'location':'London'}",
+        )
 
-            # Safeguard: keep ai_ready for internal logic, but don't send it to DB.
-            db_rows = []
-            for p in normalized:
-                if isinstance(p, dict):
-                    row = dict(p)
-                    row.pop("ai_ready", None)
-                    db_rows.append(row)
-            try:
-                sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-            except Exception:
-                # Do not fail the import if DB write fails
-                pass
+    # TODO: call your scraper/import service here
+    # result = await run_import_all(loc)
+    # return result
 
-        preview = normalized[:10]
-        return {"count": len(normalized), "preview": preview}
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"Import failed: {type(e).__name__}")
+    return {"count": 0, "preview": [], "location": loc}
 
 
 @router.post("/zoopla")
