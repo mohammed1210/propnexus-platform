@@ -1,11 +1,9 @@
-// app/layout.tsx (server component)
+// frontend/app/layout.tsx (server component)
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "../styles/design-tokens.css";
 import RootShell from "@components/RootShell";
 import Providers from "./providers";
-
-import { ClerkProvider } from "@clerk/nextjs";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://propnexus-platform.vercel.app";
@@ -52,29 +50,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
-        <ClerkProvider
-          appearance={{
-            layout: { logoPlacement: "outside", helpPageUrl: "/help" },
-            variables: {
-              colorPrimary: "#148898",
-              borderRadius: "12px",
-              fontFamily: "Inter, system-ui, sans-serif",
-            },
-          }}
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 z-50 rounded bg-zinc-900 px-3 py-2 text-white"
         >
-          <a
-            href="#main"
-            className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 z-50 rounded bg-zinc-900 px-3 py-2 text-white"
-          >
-            Skip to content
-          </a>
+          Skip to content
+        </a>
 
-          <Providers>
-            <div id="main" tabIndex={-1} className="flex-1 outline-none">
-              <RootShell>{children}</RootShell>
-            </div>
-          </Providers>
-        </ClerkProvider>
+        <Providers>
+          <div id="main" tabIndex={-1} className="flex-1 outline-none">
+            <RootShell>{children}</RootShell>
+          </div>
+        </Providers>
       </body>
     </html>
   );

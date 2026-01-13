@@ -1,8 +1,33 @@
+"use client";
+
 // frontend/lib/useUserPlan.ts
 import { useEffect, useState, useCallback } from 'react';
-import { useUser } from '@clerk/nextjs';
 
 export type UserPlan = 'free' | 'pro' | 'investor';
+
+type ClerkUser = {
+  primaryEmailAddress?: { emailAddress?: string };
+  emailAddresses?: Array<{ emailAddress?: string }>;
+};
+
+function hasValidClerkKey(key?: string) {
+  if (!key) return false;
+  const trimmed = key.trim();
+  if (!trimmed) return false;
+  if (trimmed.toLowerCase().includes('your_') || trimmed.toLowerCase().includes('placeholder')) return false;
+  return true;
+}
+
+function isClerkEnabled() {
+  return hasValidClerkKey(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+}
+
+function getClerkUserEmail(user?: ClerkUser | null): string | null {
+  const primary = user?.primaryEmailAddress?.emailAddress;
+  if (primary) return primary;
+  const fallback = user?.emailAddresses?.[0]?.emailAddress;
+  return fallback || null;
+}
 
 export interface UserPlanData {
   plan: UserPlan;
@@ -29,20 +54,6 @@ export interface UserPlanData {
  *   await refetch(); // Manually refresh plan data
  */
 export function useUserPlan(): UserPlanData {
-  // Check if Clerk is available
-  let user: any = null;
-  let clerkLoaded = true;
-
-  try {
-    const clerkHook = useUser();
-    user = clerkHook.user;
-    clerkLoaded = clerkHook.isLoaded;
-  } catch (error) {
-    // Clerk not available (e.g., missing ClerkProvider)
-    console.warn('[useUserPlan] Clerk not available:', error);
-    clerkLoaded = true; // Treat as loaded but without user
-  }
-
   const [plan, setPlan] = useState<UserPlan>('free');
   const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,12 +65,51 @@ export function useUserPlan(): UserPlanData {
       setLoading(true);
       setError(null);
 
-      // Wait for Clerk to load
-      if (!clerkLoaded) {
+      // If Clerk isn't enabled, never touch Clerk at all.
+      if (!isClerkEnabled()) {
+        setPlan('free');
+        setStripeCustomerId(null);
+        setLoading(false);
         return;
       }
 
-      // If no user, default to free plan
+      // Clerk enabled, but provider/scripts might not be mounted (during build/prerender).
+      if (typeof window === 'undefined') {
+        setPlan('free');
+        setStripeCustomerId(null);
+        setLoading(false);
+        return;
+      }
+
+      const clerk = (window as any).Clerk as
+        | undefined
+        | {
+            loaded?: boolean;
+            user?: ClerkUser | null;
+            session?: unknown;
+            load?: () => Promise<void>;
+          };
+
+      if (!clerk) {
+        setPlan('free');
+        setStripeCustomerId(null);
+        setLoading(false);
+        return;
+      }
+
+      if (typeof clerk.load === 'function' && !clerk.loaded) {
+        try {
+          await clerk.load();
+        } catch {
+          // If Clerk can't load for any reason, stay safe.
+          setPlan('free');
+          setStripeCustomerId(null);
+          setLoading(false);
+          return;
+        }
+      }
+
+      const user = clerk.user;
       if (!user) {
         setPlan('free');
         setStripeCustomerId(null);
@@ -67,8 +117,7 @@ export function useUserPlan(): UserPlanData {
         return;
       }
 
-      // Get user email from Clerk
-      const email = user.primaryEmailAddress?.emailAddress;
+      const email = getClerkUserEmail(user);
       if (!email) {
         console.warn('[useUserPlan] No email found for user');
         setPlan('free');
@@ -106,7 +155,7 @@ export function useUserPlan(): UserPlanData {
       setPlan('free'); // Fallback to free on error
       setLoading(false);
     }
-  }, [user, clerkLoaded]);
+  }, []);
 
   const refetch = useCallback(async () => {
     setRefreshTrigger((prev) => prev + 1);
@@ -114,15 +163,9 @@ export function useUserPlan(): UserPlanData {
   }, [fetchPlan]);
 
   useEffect(() => {
-    let cancelled = false;
-
     (async () => {
       await fetchPlan();
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [refreshTrigger, fetchPlan]);
 
   return {
