@@ -7,7 +7,6 @@ import Link from 'next/link';
 import nextDynamic from 'next/dynamic';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
 import { FiSearch, FiSliders, FiMap, FiGrid, FiX } from 'react-icons/fi';
-import { useUser } from '@clerk/nextjs';
 
 import PropertyCard from '@/components/PropertyCard';
 
@@ -33,6 +32,51 @@ function sanitizeSearch(q: string): string {
   if (!q) return '';
   const sanitized = q.replace(/[%_,;'"\\]/g, ' ').replace(/\s+/g, ' ').trim();
   return sanitized.slice(0, 64);
+}
+
+// ✅ Safe auth hook (prevents Clerk from loading in CI/build when disabled)
+type UseUserReturn = { user: any; isLoaded: boolean };
+
+function useOptionalUser(): UseUserReturn {
+  const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === '1';
+  const [state, setState] = useState<UseUserReturn>({ user: null, isLoaded: authDisabled });
+
+  useEffect(() => {
+    if (authDisabled) {
+      setState({ user: null, isLoaded: true });
+      return;
+    }
+
+    const clerk = (globalThis as any)?.Clerk as
+      | undefined
+      | {
+          loaded?: boolean;
+          user?: any;
+          load?: () => Promise<void>;
+        };
+
+    if (!clerk) {
+      setState({ user: null, isLoaded: true });
+      return;
+    }
+
+    if (clerk.loaded) {
+      setState({ user: clerk.user ?? null, isLoaded: true });
+      return;
+    }
+
+    if (typeof clerk.load === 'function') {
+      clerk
+        .load()
+        .then(() => setState({ user: clerk.user ?? null, isLoaded: true }))
+        .catch(() => setState({ user: null, isLoaded: true }));
+      return;
+    }
+
+    setState({ user: null, isLoaded: true });
+  }, [authDisabled]);
+
+  return state;
 }
 
 /**
@@ -345,7 +389,7 @@ function ListingsInner() {
   const [rows, setRows] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded } = useOptionalUser();
 
   const [scrapeLoading, setScrapeLoading] = useState(false);
   const [scrapeMsg, setScrapeMsg] = useState<string | null>(null);
