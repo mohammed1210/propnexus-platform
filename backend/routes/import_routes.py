@@ -96,12 +96,6 @@ async def import_all(
     request: Request,
     req: str | None = Query(None, description="Location e.g. London"),
 ):
-    """
-    Scrape all sources for a location and upsert into Supabase.
-    Accepts:
-      - /import/all?req=London
-      - JSON body { "location": "London" } (backward compatible)
-    """
     _require_admin(request)
 
     # 1) Prefer query param
@@ -110,7 +104,7 @@ async def import_all(
     # 2) Backwards compatible: accept JSON body {"location":"..."}
     if not loc:
         try:
-            payload = await request.json()
+            payload = await request.json()  # type: ignore[attr-defined]
         except Exception:
             payload = {}
         loc = str(payload.get("location") or "").strip()
@@ -121,34 +115,34 @@ async def import_all(
             detail="Missing location. Use ?req=London or JSON body {'location':'London'}",
         )
 
-    # Scrape
-    scraped = await _maybe_await(scrape_all_sources(loc))
-    items: List[Dict[str, Any]] = [p for p in (scraped or []) if isinstance(p, dict)]
+    # ✅ Run scrapers
+    items = await _maybe_await(scrape_all_sources(loc))
+    if not isinstance(items, list):
+        items = []
 
-    items = _dedupe(items)
+    # ✅ Add last_seen_at, remove non-db fields
+    now_iso = datetime.now(timezone.utc).isoformat()
+    db_rows = []
+    for p in items:
+        if not isinstance(p, dict):
+            continue
+        p["last_seen_at"] = now_iso
+        row = dict(p)
+        row.pop("ai_ready", None)
+        db_rows.append(row)
 
-    # Upsert
-    now_iso = _now_iso()
-    db_rows = [_clean_row(p, now_iso) for p in items]
-
+    # ✅ Upsert into Supabase
     inserted = 0
     if sb and db_rows:
         try:
-            # expects a unique constraint on (source, external_id)
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
             inserted = len(db_rows)
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Upsert failed: {e}")
+            raise HTTPException(status_code=500, detail=f"DB upsert failed: {e}")
 
-    preview = db_rows[:10] if db_rows else []
-
-    return {
-        "count": inserted,
-        "preview": preview,
-        "location": loc,
-        "scraped": len(items),
-        "timestamp": now_iso,
-    }
+    # Return small preview only (avoid huge payloads)
+    preview = db_rows[:10]
+    return {"count": inserted, "preview": preview, "location": loc}
 
 
 # ---------------- existing endpoints kept as-is ----------------
