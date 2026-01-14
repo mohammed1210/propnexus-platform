@@ -4,6 +4,7 @@ import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { hasValidClerkKey } from '@/lib/clerk-utils';
+import { isAuthEnabled } from '@/lib/auth';
 
 // Legacy path redirect handler
 function handleRedirects(req: NextRequest) {
@@ -21,7 +22,7 @@ function handleRedirects(req: NextRequest) {
 }
 
 // Use Clerk middleware only if keys are configured, otherwise just handle redirects
-export default hasValidClerkKey(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)
+export default isAuthEnabled && hasValidClerkKey(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY)
   ? clerkMiddleware((_auth, req) => handleRedirects(req))
   : handleRedirects;
 

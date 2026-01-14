@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
 import { toast } from 'sonner';
+import { isAuthEnabled } from '@/lib/auth';
 
 type Props = {
   priceId: string;
@@ -15,18 +15,13 @@ export default function UpgradeButton({ priceId, children = 'Upgrade', className
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
-  // Try to use Clerk, fallback if not available
-  let user: any = null;
-  let isLoaded = true;
+  const clerk =
+    isAuthEnabled && typeof window !== 'undefined'
+      ? ((window as any).Clerk as undefined | { loaded?: boolean; user?: any })
+      : undefined;
 
-  try {
-    const clerkHook = useUser();
-    user = clerkHook.user;
-    isLoaded = clerkHook.isLoaded;
-  } catch (error) {
-    console.warn('[UpgradeButton] Clerk not available:', error);
-    isLoaded = true; // Treat as loaded but without user
-  }
+  const isLoaded = !isAuthEnabled || !!clerk?.loaded;
+  const user = isAuthEnabled ? clerk?.user ?? null : null;
 
   const handleClick = async () => {
     // Wait for Clerk to load

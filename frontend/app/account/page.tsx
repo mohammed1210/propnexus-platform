@@ -2,12 +2,12 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import StripePortalButton from '@/components/StripePortalButton';
 import PlanBadge from '@/components/PlanBadge';
 import { useUserPlan } from '@/lib/useUserPlan';
 import { toast } from 'sonner';
+import { isAuthEnabled } from '@/lib/auth';
 
 /** Force dynamic so we don't cache auth state */
 export const dynamic = 'force-dynamic';
@@ -18,18 +18,13 @@ function AccountPageContent() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { refetch: refetchPlan } = useUserPlan();
 
-  // Try to use Clerk, fallback if not available
-  let user: any = null;
-  let isLoaded = true;
+  const clerk =
+    isAuthEnabled && typeof window !== 'undefined'
+      ? ((window as any).Clerk as undefined | { loaded?: boolean; user?: any })
+      : undefined;
 
-  try {
-    const clerkHook = useUser();
-    user = clerkHook.user;
-    isLoaded = clerkHook.isLoaded;
-  } catch (error) {
-    console.warn('[AccountPage] Clerk not available:', error);
-    isLoaded = true; // Treat as loaded but without user
-  }
+  const isLoaded = !isAuthEnabled || !!clerk?.loaded;
+  const user = isAuthEnabled ? clerk?.user ?? null : null;
 
   useEffect(() => {
     (async () => {

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ClerkProvider } from '@clerk/nextjs';
+import { isAuthEnabled } from '@/lib/auth';
 
 function isValidClerkPk(pk?: string) {
   if (!pk) return false;
@@ -15,7 +15,9 @@ export default function ClerkGate({ children }: { children: React.ReactNode }) {
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   // ✅ If no valid key, do NOT mount Clerk at all (prevents prerender crash)
-  if (!isValidClerkPk(pk)) return <>{children}</>;
+  if (!isAuthEnabled || !isValidClerkPk(pk)) return <>{children}</>;
+
+  const { ClerkProvider } = require('@clerk/nextjs') as typeof import('@clerk/nextjs');
 
   return <ClerkProvider publishableKey={pk}>{children}</ClerkProvider>;
 }
