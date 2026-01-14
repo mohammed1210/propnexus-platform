@@ -1,88 +1,59 @@
 // frontend/components/ClerkAuthSafe.tsx
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
-import { SignedIn, SignedOut, UserButton, SignInButton, SignUpButton } from '@clerk/nextjs';
+import { ReactNode } from 'react';
+import { isAuthEnabled } from '@/lib/auth';
 
 /**
- * Safe wrappers for Clerk components that won't break if Clerk isn't configured.
- * These components check if Clerk is available before rendering.
+ * Safe wrappers for Clerk components that won't break if Clerk isn't configured
+ * OR if auth is intentionally disabled.
  */
 
-// Check if we're in a Clerk context
-function useClerkAvailable() {
-  const [isAvailable, setIsAvailable] = useState(false);
-  const [isChecked, setIsChecked] = useState(false);
-
-  useEffect(() => {
-    const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-    const enableClerk =
-      !!pk &&
-      pk.startsWith('pk_') &&
-      !pk.toLowerCase().includes('dummy') &&
-      pk.length > 30;
-
-    setIsAvailable(enableClerk);
-    setIsChecked(true);
-  }, []);
-
-  return { isAvailable, isChecked };
+function getClerk() {
+  if (!isAuthEnabled) return null;
+  return require('@clerk/nextjs') as typeof import('@clerk/nextjs');
 }
 
 export function SafeSignedIn({ children }: { children: ReactNode }) {
-  const { isAvailable, isChecked } = useClerkAvailable();
-
-  if (!isChecked) return null;
-  if (!isAvailable) return null;
-
-  // Use static import - this maintains the React context from ClerkProvider
+  const clerk = getClerk();
+  if (!clerk) return null;
+  const { SignedIn } = clerk;
   return <SignedIn>{children}</SignedIn>;
 }
 
 export function SafeSignedOut({ children }: { children: ReactNode }) {
-  const { isAvailable, isChecked } = useClerkAvailable();
-
-  if (!isChecked) return null;
-
-  if (!isAvailable) {
-    // Show signed out content by default when Clerk isn't configured
+  const clerk = getClerk();
+  if (!clerk) {
+    // If auth is disabled, treat users as signed out.
     return <>{children}</>;
   }
-
+  const { SignedOut } = clerk;
   return <SignedOut>{children}</SignedOut>;
 }
 
 export function SafeUserButton(props: any) {
-  const { isAvailable, isChecked } = useClerkAvailable();
-
-  if (!isChecked) return null;
-  if (!isAvailable) return null;
-
+  const clerk = getClerk();
+  if (!clerk) return null;
+  const { UserButton } = clerk;
   return <UserButton {...props} />;
 }
 
 export function SafeSignInButton({ children, ...props }: any) {
-  const { isAvailable, isChecked } = useClerkAvailable();
-
-  if (!isChecked) return null;
-
-  if (!isAvailable) {
-    // Render children directly when Clerk isn't configured
+  const clerk = getClerk();
+  if (!clerk) {
+    // Render children directly when auth is disabled.
     return <>{children}</>;
   }
-
+  const { SignInButton } = clerk;
   return <SignInButton {...props}>{children}</SignInButton>;
 }
 
 export function SafeSignUpButton({ children, ...props }: any) {
-  const { isAvailable, isChecked } = useClerkAvailable();
-
-  if (!isChecked) return null;
-
-  if (!isAvailable) {
-    // Render children directly when Clerk isn't configured
+  const clerk = getClerk();
+  if (!clerk) {
+    // Render children directly when auth is disabled.
     return <>{children}</>;
   }
-
+  const { SignUpButton } = clerk;
   return <SignUpButton {...props}>{children}</SignUpButton>;
 }

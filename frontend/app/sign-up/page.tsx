@@ -1,11 +1,27 @@
 "use client";
 
-import { SignUp } from "@clerk/nextjs";
 import Link from "next/link";
+import { isAuthEnabled } from "@/lib/auth";
 
 export const dynamic = 'force-dynamic';
 
 export default function SignUpPage() {
+  if (!isAuthEnabled) {
+    return (
+      <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md bg-white rounded-brand-xl border border-slate-200 shadow-brand-xl p-6">
+          <h1 className="text-xl font-bold text-slate-900 mb-2">Create account</h1>
+          <p className="text-sm text-slate-600 mb-4">Authentication is currently disabled.</p>
+          <Link href="/" className="text-brand-600 hover:text-brand-700 font-medium">
+            Go back home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const { SignUp } = require('@clerk/nextjs') as typeof import('@clerk/nextjs');
+
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
