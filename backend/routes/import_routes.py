@@ -2,42 +2,12 @@
 from __future__ import annotations
 
 import inspect
+import os
 from datetime import datetime, timezone
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
-try:
-    from fastapi import APIRouter, HTTPException, Request  # type: ignore
-except Exception:  # pragma: no cover
-
-    class HTTPException(Exception):
-        def __init__(self, status_code: int = 500, detail: str | None = None):
-            super().__init__(detail)
-            self.status_code = status_code
-            self.detail = detail
-
-    class APIRouter:  # minimal shim
-        def __init__(self, *_a, **_kw):
-            pass
-
-        def post(self, *_a, **_kw):
-            def deco(func):
-                return func
-
-            return deco
-
-    class Request:  # minimal shim
-        pass
-
-
-try:
-    from pydantic import BaseModel  # type: ignore
-except Exception:  # pragma: no cover
-
-    class BaseModel:  # minimal stub
-        def __init__(self, **data):
-            for k, v in data.items():
-                setattr(self, k, v)
-
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel
 
 # Scrapers (existing)
 from backend.utils.ingest import scrape_all_sources
@@ -48,7 +18,7 @@ try:
 except Exception:
     sb = None  # graceful if local-only
 
-# Rate limiting
+# Rate limiting (optional)
 try:
     from backend.middleware.rate_limit import limiter
 except Exception:
@@ -59,65 +29,131 @@ router = APIRouter(prefix="/import", tags=["import"])
 
 
 async def _maybe_await(result: Any) -> Any:
-    """
-    Helper to handle both sync and async scraper functions.
-    If the result is an awaitable/coroutine, await it.
-    Otherwise, return it directly.
-    """
     if inspect.iscoroutine(result) or inspect.isawaitable(result):
         return await result
     return result
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
+    """
+    Normalise a scraped property dict into something safe to upsert.
+    - Adds last_seen_at
+    - Removes fields not in DB schema (like ai_ready)
+    - Leaves everything else intact
+    """
+    row = dict(p)
+    row["last_seen_at"] = now_iso
+    row.pop("ai_ready", None)
+    return row
+
+
+def _dedupe(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Dedupe across sources by (source, external_id) if available,
+    otherwise by (title, price, location).
+    """
+    seen: set[Tuple[Any, Any, Any]] = set()
+    out: List[Dict[str, Any]] = []
+
+    for p in items:
+        source = p.get("source")
+        ext_id = p.get("external_id")
+
+        if source and ext_id:
+            key = ("sid", source, ext_id)
+        else:
+            key = ("tpl", p.get("title"), p.get("price"), p.get("location"))
+
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(p)
+
+    return out
+
+
+def _require_admin(request: Request) -> None:
+    """
+    Optional protection:
+    If IMPORT_ADMIN_TOKEN is set, require header X-Admin-Token to match.
+    If not set, endpoint is open (UI button is still admin-only).
+    """
+    token = (os.getenv("IMPORT_ADMIN_TOKEN") or "").strip()
+    if not token:
+        return
+
+    got = (request.headers.get("x-admin-token") or "").strip()
+    if not got or got != token:
+        raise HTTPException(status_code=401, detail="Admin token required")
+
+
+@router.post("/all")
+async def import_all(
+    request: Request,
+    req: str | None = Query(None, description="Location e.g. London"),
+):
+    _require_admin(request)
+
+    # 1) Prefer query param
+    loc = (req or "").strip()
+
+    # 2) Backwards compatible: accept JSON body {"location":"..."}
+    if not loc:
+        try:
+            payload = await request.json()  # type: ignore[attr-defined]
+        except Exception:
+            payload = {}
+        loc = str(payload.get("location") or "").strip()
+
+    if not loc:
+        raise HTTPException(
+            status_code=422,
+            detail="Missing location. Use ?req=London or JSON body {'location':'London'}",
+        )
+
+    # ✅ Run scrapers
+    items = await _maybe_await(scrape_all_sources(loc))
+    if not isinstance(items, list):
+        items = []
+
+    # ✅ Add last_seen_at, remove non-db fields
+    now_iso = datetime.now(timezone.utc).isoformat()
+    db_rows = []
+    for p in items:
+        if not isinstance(p, dict):
+            continue
+        p["last_seen_at"] = now_iso
+        row = dict(p)
+        row.pop("ai_ready", None)
+        db_rows.append(row)
+
+    # ✅ Upsert into Supabase
+    inserted = 0
+    if sb and db_rows:
+        try:
+            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
+            inserted = len(db_rows)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"DB upsert failed: {e}")
+
+    # Return small preview only (avoid huge payloads)
+    preview = db_rows[:10]
+    return {"count": inserted, "preview": preview, "location": loc}
+
+
+# ---------------- existing endpoints kept as-is ----------------
 
 
 class ImportRequest(BaseModel):
     location: str
 
 
-def _unique_key(p: Dict[str, Any]) -> Tuple[Any, Any, Any]:
-    return (p.get("title"), p.get("price"), p.get("location"))
-
-
-@router.post("/all")
-@limiter.limit("5/minute") if limiter else lambda f: f
-async def import_all(req: ImportRequest, request: Request):
-    """
-    Scrape Zoopla + Rightmove + OnTheMarket + SpareRoom for `location`, dedupe, upsert to Supabase.
-    Returns { count } and the first few items (preview).
-    """
-    loc = (req.location or "").strip()
-    if not loc:
-        raise HTTPException(status_code=400, detail="Location is required")
-
-    try:
-        normalized = await _maybe_await(scrape_all_sources(loc))
-        if sb and normalized:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            for p in normalized:
-                if isinstance(p, dict):
-                    p["last_seen_at"] = now_iso
-
-            # Safeguard: keep ai_ready for internal logic, but don't send it to DB.
-            db_rows = []
-            for p in normalized:
-                if isinstance(p, dict):
-                    row = dict(p)
-                    row.pop("ai_ready", None)
-                    db_rows.append(row)
-            try:
-                sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-            except Exception:
-                # Do not fail the import if DB write fails
-                pass
-
-        preview = normalized[:10]
-        return {"count": len(normalized), "preview": preview}
-    except Exception as e:  # pragma: no cover
-        raise HTTPException(status_code=500, detail=f"Import failed: {type(e).__name__}")
-
-
 @router.post("/zoopla")
 async def import_zoopla(req: ImportRequest):
-    # Backward compatibility: reuse aggregate and filter client-side
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -126,17 +162,8 @@ async def import_zoopla(req: ImportRequest):
     ]
     if sb and items:
         try:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            for p in items:
-                if isinstance(p, dict):
-                    p["last_seen_at"] = now_iso
-
-            db_rows = []
-            for p in items:
-                if isinstance(p, dict):
-                    row = dict(p)
-                    row.pop("ai_ready", None)
-                    db_rows.append(row)
+            now_iso = _now_iso()
+            db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
@@ -153,17 +180,8 @@ async def import_rightmove(req: ImportRequest):
     ]
     if sb and items:
         try:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            for p in items:
-                if isinstance(p, dict):
-                    p["last_seen_at"] = now_iso
-
-            db_rows = []
-            for p in items:
-                if isinstance(p, dict):
-                    row = dict(p)
-                    row.pop("ai_ready", None)
-                    db_rows.append(row)
+            now_iso = _now_iso()
+            db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
@@ -182,17 +200,8 @@ async def import_onthemarket(req: ImportRequest):
     ]
     if sb and items:
         try:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            for p in items:
-                if isinstance(p, dict):
-                    p["last_seen_at"] = now_iso
-
-            db_rows = []
-            for p in items:
-                if isinstance(p, dict):
-                    row = dict(p)
-                    row.pop("ai_ready", None)
-                    db_rows.append(row)
+            now_iso = _now_iso()
+            db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
@@ -209,17 +218,8 @@ async def import_spareroom(req: ImportRequest):
     ]
     if sb and items:
         try:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            for p in items:
-                if isinstance(p, dict):
-                    p["last_seen_at"] = now_iso
-
-            db_rows = []
-            for p in items:
-                if isinstance(p, dict):
-                    row = dict(p)
-                    row.pop("ai_ready", None)
-                    db_rows.append(row)
+            now_iso = _now_iso()
+            db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass

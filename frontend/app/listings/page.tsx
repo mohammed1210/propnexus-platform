@@ -34,6 +34,51 @@ function sanitizeSearch(q: string): string {
   return sanitized.slice(0, 64);
 }
 
+// ✅ Safe auth hook (prevents Clerk from loading in CI/build when disabled)
+type UseUserReturn = { user: any; isLoaded: boolean };
+
+function useOptionalUser(): UseUserReturn {
+  const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === '1';
+  const [state, setState] = useState<UseUserReturn>({ user: null, isLoaded: authDisabled });
+
+  useEffect(() => {
+    if (authDisabled) {
+      setState({ user: null, isLoaded: true });
+      return;
+    }
+
+    const clerk = (globalThis as any)?.Clerk as
+      | undefined
+      | {
+          loaded?: boolean;
+          user?: any;
+          load?: () => Promise<void>;
+        };
+
+    if (!clerk) {
+      setState({ user: null, isLoaded: true });
+      return;
+    }
+
+    if (clerk.loaded) {
+      setState({ user: clerk.user ?? null, isLoaded: true });
+      return;
+    }
+
+    if (typeof clerk.load === 'function') {
+      clerk
+        .load()
+        .then(() => setState({ user: clerk.user ?? null, isLoaded: true }))
+        .catch(() => setState({ user: null, isLoaded: true }));
+      return;
+    }
+
+    setState({ user: null, isLoaded: true });
+  }, [authDisabled]);
+
+  return state;
+}
+
 /**
  * Safe coordinate parsing.
  * - Accepts numbers or numeric strings
@@ -344,6 +389,23 @@ function ListingsInner() {
   const [rows, setRows] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const { user, isLoaded } = useOptionalUser();
+
+  const [scrapeLoading, setScrapeLoading] = useState(false);
+  const [scrapeMsg, setScrapeMsg] = useState<string | null>(null);
+  const [scrapeErr, setScrapeErr] = useState<string | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+
+  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const userEmail = user?.primaryEmailAddress?.emailAddress || '';
+  const isAdmin =
+    adminEmails.length > 0
+      ? adminEmails.includes(userEmail)
+      : userEmail === 'abbas_m90@hotmail.com';
+
   useEffect(() => {
     let cancelled = false;
 
@@ -410,7 +472,7 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, baths, types, sort, dir]);
+  }, [q, minP, maxP, beds, baths, types, sort, dir, refreshNonce]);
 
   // ✅ robust points creation (no falsy checks, reject invalid/null-island)
   const points = useMemo(() => {
@@ -442,6 +504,43 @@ function ListingsInner() {
     if (sort) p.set('sort', sort);
     if (dir) p.set('dir', dir);
     router.push(`/listings?${p.toString()}`);
+  };
+
+  const runScrape = async () => {
+    setScrapeErr(null);
+    setScrapeMsg(null);
+
+    const loc = sanitizeSearch(searchInput || qRaw || '');
+    if (!loc) {
+      setScrapeErr('Enter a location first (e.g. London, UB7, Manchester).');
+      return;
+    }
+
+    setScrapeLoading(true);
+
+    try {
+      const res = await fetch('/api/admin/import-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location: loc }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(data?.detail || data?.error || `Scrape failed (${res.status})`);
+      }
+
+      const c = typeof data?.count === 'number' ? data.count : 0;
+      setScrapeMsg(`Scrape complete: imported ${c} listings for “${loc}”. Refreshing…`);
+
+      // refresh the listings fetch
+      setRefreshNonce((n) => n + 1);
+    } catch (e: any) {
+      setScrapeErr(e?.message || 'Scrape failed');
+    } finally {
+      setScrapeLoading(false);
+    }
   };
 
   const resetFilters = () => {
@@ -563,19 +662,56 @@ function ListingsInner() {
               </div>
             </div>
 
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="h-11 px-6 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-300"
-            >
-              <FiSliders className="w-5 h-5" />
-              Filters
-              {activeFilters.length > 0 && (
-                <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-brand-500 text-white text-xs font-medium">
-                  {activeFilters.length}
-                </span>
+            <div className="flex gap-2">
+              <button
+                onClick={applyFilters}
+                className="h-11 px-6 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold transition-all duration-300 flex items-center gap-2"
+                disabled={loading}
+              >
+                <FiSearch className="w-5 h-5" />
+                Search
+              </button>
+
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="h-11 px-6 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-300"
+              >
+                <FiSliders className="w-5 h-5" />
+                Filters
+                {activeFilters.length > 0 && (
+                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-brand-500 text-white text-xs font-medium">
+                    {activeFilters.length}
+                  </span>
+                )}
+              </button>
+
+              {isLoaded && isAdmin && (
+                <button
+                  onClick={runScrape}
+                  className="h-11 px-6 rounded-lg border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-300"
+                  disabled={scrapeLoading}
+                  title="Admin: run scrapers and import fresh listings"
+                >
+                  {scrapeLoading ? 'Running scrape…' : 'Run Scrape'}
+                </button>
               )}
-            </button>
+            </div>
           </div>
+
+          {(scrapeMsg || scrapeErr) && (
+            <div className="mt-3">
+              {scrapeMsg && (
+                <div className="px-4 py-3 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/40 dark:bg-emerald-900/20 dark:text-emerald-200">
+                  {scrapeMsg}
+                </div>
+              )}
+              {scrapeErr && (
+                <div className="px-4 py-3 rounded-lg border border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800/40 dark:bg-rose-900/20 dark:text-rose-200">
+                  {scrapeErr}
+                </div>
+              )}
+            </div>
+          )}
 
           {showFilters && (
             <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">

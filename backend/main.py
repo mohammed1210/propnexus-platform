@@ -14,7 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.rate_limit import limiter
 from backend.middleware.security import SecurityHeadersMiddleware
-from backend.routes import admin_schedule, import_routes
+from backend.routes import admin_schedule
 from backend.routes.ai import router as ai_router
 from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
@@ -155,7 +155,6 @@ app.include_router(off_market_router)
 app.include_router(save_deal_router)
 app.include_router(properties_router)
 app.include_router(tradesmen_router)
-app.include_router(import_routes.router)
 app.include_router(admin_schedule.router)
 
 # Stripe

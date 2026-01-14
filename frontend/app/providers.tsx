@@ -1,32 +1,18 @@
-"use client";
+'use client';
 
-import { ReactNode } from "react";
-import { ClerkProvider } from "@clerk/nextjs";
-import { hasValidClerkKey } from "@/lib/clerk-utils";
+import React from 'react';
 
-export default function Providers({ children }: { children: ReactNode }) {
+export default function Providers({ children }: { children: React.ReactNode }) {
+  const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === '1';
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-  // ✅ CI-safe Clerk gating:
-  // Only mount Clerk if a real publishable key exists.
-  // This prevents Next.js prerender/build from crashing in CI.
-  if (!hasValidClerkKey(pk)) {
+  // ✅ CI / preview / local builds without Clerk keys
+  if (authDisabled || !pk) {
     return <>{children}</>;
   }
 
-  return (
-    <ClerkProvider
-      publishableKey={pk}
-      appearance={{
-        layout: { logoPlacement: "outside", helpPageUrl: "/help" },
-        variables: {
-          colorPrimary: "#148898",
-          borderRadius: "12px",
-          fontFamily: "Inter, system-ui, sans-serif",
-        },
-      }}
-    >
-      {children}
-    </ClerkProvider>
-  );
+  // ✅ Only load Clerk when actually enabled
+  const { ClerkProvider } = require('@clerk/nextjs') as typeof import('@clerk/nextjs');
+
+  return <ClerkProvider publishableKey={pk}>{children}</ClerkProvider>;
 }

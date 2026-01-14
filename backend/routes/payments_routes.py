@@ -6,8 +6,9 @@ from fastapi import APIRouter, HTTPException, Request
 
 from backend.utils.emailer import send_magic_email
 from backend.utils.jwt_utils import make_magic_token
+from backend.utils.supabase_client import get_supabase
 
-from .supabase_client import supabase  # your existing client module
+supabase = get_supabase()
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -32,12 +33,13 @@ async def stripe_webhook(req: Request):
         data = event["data"]["object"]
         email = (data.get("customer_details") or {}).get("email") or data.get("customer_email")
         if email:
-            # Upsert subscription/tier
-            supabase.table("users").upsert({"email": email, "tier": "pro"}).execute()
+            # Upsert subscription/tier (if Supabase configured)
+            if supabase:
+                supabase.table("users").upsert({"email": email, "tier": "pro"}).execute()
             # Issue magic link
             token = make_magic_token(email, tier="pro")
             url = f"{APP_BASE}/auth/magic/verify?token={token}"
-            send_magic_email(email, url)
+            await send_magic_email(email, url)
     return {"ok": True}
 
 
@@ -46,5 +48,5 @@ async def stripe_webhook(req: Request):
 async def issue_magic(email: str):
     token = make_magic_token(email, tier="pro")
     url = f"{APP_BASE}/auth/magic/verify?token={token}"
-    send_magic_email(email, url)
+    await send_magic_email(email, url)
     return {"sent": True}
