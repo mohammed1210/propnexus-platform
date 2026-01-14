@@ -2,8 +2,23 @@
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { Webhook } from 'svix';
-import { WebhookEvent } from '@clerk/nextjs/server';
 import { createClient } from '@supabase/supabase-js';
+
+type ClerkEmailAddress = {
+  id: string;
+  email_address: string;
+};
+
+type ClerkUserEventData = {
+  id: string;
+  email_addresses?: ClerkEmailAddress[];
+  primary_email_address_id?: string | null;
+};
+
+type WebhookEvent = {
+  type: string;
+  data: ClerkUserEventData;
+};
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -96,8 +111,10 @@ export async function POST(req: Request) {
       case 'user.created': {
         const { id, email_addresses, primary_email_address_id } = evt.data;
 
+        const emailAddresses = email_addresses ?? [];
+
         // Get primary email
-        const primaryEmail = email_addresses.find(
+        const primaryEmail = emailAddresses.find(
           (e) => e.id === primary_email_address_id
         );
 
@@ -150,8 +167,10 @@ export async function POST(req: Request) {
       case 'user.updated': {
         const { id, email_addresses, primary_email_address_id } = evt.data;
 
+        const emailAddresses = email_addresses ?? [];
+
         // Get primary email
-        const primaryEmail = email_addresses.find(
+        const primaryEmail = emailAddresses.find(
           (e) => e.id === primary_email_address_id
         );
 

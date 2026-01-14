@@ -2,6 +2,7 @@
 
 // frontend/lib/useUserPlan.ts
 import { useEffect, useState, useCallback } from 'react';
+import { isAuthEnabled } from '@/lib/auth';
 
 export type UserPlan = 'free' | 'pro' | 'investor';
 
@@ -9,18 +10,6 @@ type ClerkUser = {
   primaryEmailAddress?: { emailAddress?: string };
   emailAddresses?: Array<{ emailAddress?: string }>;
 };
-
-function hasValidClerkKey(key?: string) {
-  if (!key) return false;
-  const trimmed = key.trim();
-  if (!trimmed) return false;
-  if (trimmed.toLowerCase().includes('your_') || trimmed.toLowerCase().includes('placeholder')) return false;
-  return true;
-}
-
-function isClerkEnabled() {
-  return hasValidClerkKey(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-}
 
 function getClerkUserEmail(user?: ClerkUser | null): string | null {
   const primary = user?.primaryEmailAddress?.emailAddress;
@@ -66,7 +55,7 @@ export function useUserPlan(): UserPlanData {
       setError(null);
 
       // If Clerk isn't enabled, never touch Clerk at all.
-      if (!isClerkEnabled()) {
+      if (!isAuthEnabled) {
         setPlan('free');
         setStripeCustomerId(null);
         setLoading(false);
