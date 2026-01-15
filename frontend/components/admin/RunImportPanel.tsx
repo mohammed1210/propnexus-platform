@@ -6,6 +6,7 @@ import { toast } from "sonner";
 export default function RunImportPanel() {
   const [location, setLocation] = useState("");
   const [isRunning, setIsRunning] = useState(false);
+  const [lastRunAt, setLastRunAt] = useState<string | null>(null);
 
   async function runImport() {
     const trimmed = location.trim();
@@ -35,7 +36,8 @@ export default function RunImportPanel() {
       }
 
       toast.dismiss(t);
-      toast.success("Import started successfully");
+      setLastRunAt(new Date().toISOString());
+      toast.success(data?.message || "Import started successfully");
     } catch (err: any) {
       toast.dismiss(t);
       toast.error(err?.message || "Import request failed");
@@ -77,6 +79,12 @@ export default function RunImportPanel() {
         This calls <span className="font-mono">/api/admin/import-all</span>. Auth is enforced by middleware (Clerk + admin allowlist)
         and the backend token stays server-side.
       </p>
+
+      {lastRunAt ? (
+        <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+          Last run: <span className="font-mono">{new Date(lastRunAt).toLocaleString()}</span>
+        </p>
+      ) : null}
     </div>
   );
 }

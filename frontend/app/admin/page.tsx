@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
+import AuthStatusPanel from "@/components/admin/AuthStatusPanel";
 import RunImportPanel from "@/components/admin/RunImportPanel";
 
 export const metadata = { title: "Admin • PropNexus" };
@@ -42,12 +43,33 @@ function getTier(subscription: any): string {
   // - subscription.prices.products.metadata.tier
   // - subscription.prices.product.metadata.tier
   // - subscription.product.metadata.tier
-  const tier =
+  // Preferred: explicit tier metadata (legacy shape)
+  const tierFromMetadata =
     subscription?.prices?.products?.metadata?.tier ??
     subscription?.prices?.product?.metadata?.tier ??
     subscription?.product?.metadata?.tier;
 
-  return safeString(tier);
+  const normalizedMetadataTier = safeString(tierFromMetadata);
+  if (normalizedMetadataTier) return normalizedMetadataTier;
+
+  // Schema-aligned: infer from Stripe price ids (most reliable)
+  const priceId: string =
+    safeString(subscription?.price_id) ||
+    safeString(subscription?.prices?.stripe_price_id) ||
+    safeString(subscription?.prices?.id);
+
+  const proPrice = safeString(process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO);
+  const investorPrice = safeString(process.env.NEXT_PUBLIC_STRIPE_PRICE_INVESTOR);
+
+  if (investorPrice && priceId && priceId === investorPrice) return "investor";
+  if (proPrice && priceId && priceId === proPrice) return "pro";
+
+  // Last resort: infer from price nickname
+  const nickname = safeString(subscription?.prices?.nickname).toLowerCase();
+  if (nickname.includes("investor")) return "investor";
+  if (nickname.includes("pro")) return "pro";
+
+  return "";
 }
 
 function isTier(subscription: any, tierName: "investor" | "pro"): boolean {
@@ -94,16 +116,72 @@ async function getAdminStats(): Promise<AdminStats> {
     }
 
     // 2) Pull active subs for MRR + tier calculations
+    // Schema expects: subscriptions.price_id -> prices.stripe_price_id
+    let activeSubsList: any[] = [];
+
     const { data: subscriptions, error: mrrError } = await supabase
       .from("subscriptions")
-      .select("*, prices(*, products(*))")
+      .select("*, prices(*)")
       .in("status", ["trialing", "active"]);
 
-    if (mrrError) {
-      warnings.push(`MRR query failed: ${mrrError.message}`);
-    }
+    if (!mrrError) {
+      activeSubsList = Array.isArray(subscriptions) ? subscriptions : [];
+    } else {
+      const msg = mrrError.message || "";
+      const looksLikeRelationshipError =
+        msg.toLowerCase().includes("schema cache") ||
+        msg.toLowerCase().includes("could not find a relationship") ||
+        msg.toLowerCase().includes("relationship between");
 
-    const activeSubsList = Array.isArray(subscriptions) ? subscriptions : [];
+      warnings.push(
+        looksLikeRelationshipError
+          ? "MRR join is not available (missing FK/relationship in Supabase schema cache). Falling back to manual lookup."
+          : `MRR query failed: ${mrrError.message}`
+      );
+
+      // Fallback: fetch subscriptions only, then map prices by stripe_price_id.
+      const { data: subsOnly, error: subsOnlyError } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .in("status", ["trialing", "active"]);
+
+      if (subsOnlyError) {
+        warnings.push(`MRR fallback subscriptions query failed: ${subsOnlyError.message}`);
+        activeSubsList = [];
+      } else {
+        const subsList = Array.isArray(subsOnly) ? subsOnly : [];
+        const priceIds = Array.from(
+          new Set(
+            subsList
+              .map((s: any) => safeString(s?.price_id))
+              .filter(Boolean)
+          )
+        );
+
+        let pricesMap = new Map<string, any>();
+        if (priceIds.length) {
+          const { data: prices, error: pricesError } = await supabase
+            .from("prices")
+            .select("*")
+            .in("stripe_price_id", priceIds);
+
+          if (pricesError) {
+            warnings.push(`MRR fallback prices query failed: ${pricesError.message}`);
+          } else {
+            (Array.isArray(prices) ? prices : []).forEach((p: any) => {
+              const key = safeString(p?.stripe_price_id);
+              if (key) pricesMap.set(key, p);
+            });
+          }
+        }
+
+        activeSubsList = subsList.map((s: any) => {
+          const pid = safeString(s?.price_id);
+          const price = pid ? pricesMap.get(pid) : null;
+          return price ? { ...s, prices: price } : s;
+        });
+      }
+    }
 
     const investorActive = activeSubsList.filter((s) => isTier(s, "investor"));
     const proActive = activeSubsList.filter((s) => isTier(s, "pro"));
@@ -124,7 +202,7 @@ async function getAdminStats(): Promise<AdminStats> {
     const anyTierPresent = activeSubsList.some((s) => !!getTier(s));
     if (activeSubsList.length > 0 && !anyTierPresent) {
       warnings.push(
-        "No product tier metadata found. Confirm prices → products relationship and products.metadata.tier is set."
+        "No tier signal found. Ensure NEXT_PUBLIC_STRIPE_PRICE_PRO / NEXT_PUBLIC_STRIPE_PRICE_INVESTOR are set or add tier metadata."
       );
     }
 
@@ -245,6 +323,8 @@ export default async function AdminPage() {
           Live stats based on active subscriptions (trialing + active).
         </p>
       </div>
+
+      <AuthStatusPanel />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard label="Subscribers" value={stats.subscribers} />

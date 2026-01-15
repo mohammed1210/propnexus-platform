@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET() {
+  return NextResponse.json(
+    { error: 'Method Not Allowed. Use POST.' },
+    { status: 405, headers: { Allow: 'POST' } }
+  );
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));

@@ -175,6 +175,30 @@ uvicorn main:app --reload
 
 ## Environment Configuration
 
+### Auth + Admin Ops (Sprint 11.4)
+
+**Clerk URL best-practice (use relative paths)**
+
+```env
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/listings
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/listings
+```
+
+**Auth debug endpoint**
+
+- `GET /api/debug/auth` returns a runtime snapshot including `vercelEnv`, `commitSha`, publishable key prefix/length/whitespace, and the computed `isAuthEnabled`.
+
+**Admin import (token-based, POST-only)**
+
+```bash
+curl -X POST "https://propnexus-platform.vercel.app/api/admin/import-all" \
+   -H "content-type: application/json" \
+   -H "x-admin-token: <IMPORT_ADMIN_TOKEN>" \
+   -d '{"location":"London"}'
+```
+
 ### Frontend Environment Variables
 
 Required for development and production:
