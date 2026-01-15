@@ -13,15 +13,12 @@ import {
 import { isAuthEnabled } from '@/lib/auth';
 
 export function SafeSignedIn({ children }: { children: ReactNode }) {
-  if (!isAuthEnabled) return null;
+  if (!isAuthEnabled) return <>{children}</>;
   return <SignedIn>{children}</SignedIn>;
 }
 
 export function SafeSignedOut({ children }: { children: ReactNode }) {
-  if (!isAuthEnabled) {
-    // If auth is disabled, treat users as signed out.
-    return <>{children}</>;
-  }
+  if (!isAuthEnabled) return <>{children}</>;
   return <SignedOut>{children}</SignedOut>;
 }
 
