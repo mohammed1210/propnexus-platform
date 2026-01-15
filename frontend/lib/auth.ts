@@ -11,4 +11,4 @@ export const disableAuthRaw = (process.env.NEXT_PUBLIC_DISABLE_AUTH ?? '')
 export const disableAuth = ['1', 'true', 'yes', 'on'].includes(disableAuthRaw);
 
 export const isAuthEnabled: boolean =
-  !disableAuth && hasValidClerkKey(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+  !disableAuth && hasValidClerkKey((process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '').trim());

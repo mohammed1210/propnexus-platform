@@ -29,8 +29,9 @@ function handleRedirects(req: NextRequest) {
 
 // Use Clerk middleware only if keys are configured, otherwise just handle redirects
 export default async function middleware(req: NextRequest, evt: NextFetchEvent) {
-  const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  const enabled = isAuthEnabled && hasValidClerkKey(pk);
+  const pk = (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '').trim();
+  const sk = (process.env.CLERK_SECRET_KEY ?? '').trim();
+  const enabled = isAuthEnabled && hasValidClerkKey(pk) && Boolean(sk);
 
   const adminToken =
     process.env.OFF_MARKET_ADMIN_TOKEN ||
