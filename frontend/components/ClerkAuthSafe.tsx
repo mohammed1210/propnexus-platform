@@ -2,58 +2,46 @@
 'use client';
 
 import { ReactNode } from 'react';
+import {
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from '@clerk/nextjs';
+
 import { isAuthEnabled } from '@/lib/auth';
 
-/**
- * Safe wrappers for Clerk components that won't break if Clerk isn't configured
- * OR if auth is intentionally disabled.
- */
-
-function getClerk() {
-  if (!isAuthEnabled) return null;
-  return require('@clerk/nextjs') as typeof import('@clerk/nextjs');
-}
-
 export function SafeSignedIn({ children }: { children: ReactNode }) {
-  const clerk = getClerk();
-  if (!clerk) return null;
-  const { SignedIn } = clerk;
+  if (!isAuthEnabled) return null;
   return <SignedIn>{children}</SignedIn>;
 }
 
 export function SafeSignedOut({ children }: { children: ReactNode }) {
-  const clerk = getClerk();
-  if (!clerk) {
+  if (!isAuthEnabled) {
     // If auth is disabled, treat users as signed out.
     return <>{children}</>;
   }
-  const { SignedOut } = clerk;
   return <SignedOut>{children}</SignedOut>;
 }
 
 export function SafeUserButton(props: any) {
-  const clerk = getClerk();
-  if (!clerk) return null;
-  const { UserButton } = clerk;
+  if (!isAuthEnabled) return null;
   return <UserButton {...props} />;
 }
 
 export function SafeSignInButton({ children, ...props }: any) {
-  const clerk = getClerk();
-  if (!clerk) {
+  if (!isAuthEnabled) {
     // Render children directly when auth is disabled.
     return <>{children}</>;
   }
-  const { SignInButton } = clerk;
   return <SignInButton {...props}>{children}</SignInButton>;
 }
 
 export function SafeSignUpButton({ children, ...props }: any) {
-  const clerk = getClerk();
-  if (!clerk) {
+  if (!isAuthEnabled) {
     // Render children directly when auth is disabled.
     return <>{children}</>;
   }
-  const { SignUpButton } = clerk;
   return <SignUpButton {...props}>{children}</SignUpButton>;
 }

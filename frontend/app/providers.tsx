@@ -1,18 +1,20 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { isAuthEnabled } from '@/lib/auth';
+import * as React from "react";
+import { ClerkProvider } from "@clerk/nextjs";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  // Client-side visibility check (helps debug Vercel env replacement)
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-  // ✅ CI / preview / local builds without Clerk keys
-  if (!isAuthEnabled || !pk) {
-    return <>{children}</>;
-  }
+  React.useEffect(() => {
+    if (!pk) {
+      console.warn(
+        "[AUTH] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing on client. " +
+          "Check Vercel env vars (Production + Preview) and redeploy with Clear Cache."
+      );
+    }
+  }, [pk]);
 
-  // ✅ Only load Clerk when actually enabled
-  const { ClerkProvider } = require('@clerk/nextjs') as typeof import('@clerk/nextjs');
-
-  return <ClerkProvider publishableKey={pk}>{children}</ClerkProvider>;
+  return <ClerkProvider>{children}</ClerkProvider>;
 }
