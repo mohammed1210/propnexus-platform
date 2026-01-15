@@ -86,6 +86,30 @@ function getUnitAmount(subscription: any): number {
   return safeNumber(subscription?.prices?.unit_amount ?? subscription?.unit_amount);
 }
 
+function getBillingInterval(subscription: any): string {
+  const interval =
+    subscription?.prices?.billing_interval ??
+    subscription?.prices?.recurring?.interval ??
+    subscription?.billing_interval ??
+    subscription?.interval;
+  return safeString(interval).toLowerCase();
+}
+
+function getMRRContributionGBP(subscription: any): number {
+  if (!isGBP(subscription)) return 0;
+
+  const unitAmount = getUnitAmount(subscription);
+  const amountGBP = safeNumber(unitAmount) / 100;
+  const interval = getBillingInterval(subscription);
+
+  // Convert annual pricing to monthly recurring revenue.
+  if (interval === 'year' || interval === 'annual') {
+    return amountGBP / 12;
+  }
+
+  return amountGBP;
+}
+
 async function getAdminStats(): Promise<AdminStats> {
   const warnings: string[] = [];
 
@@ -186,23 +210,27 @@ async function getAdminStats(): Promise<AdminStats> {
     const investorActive = activeSubsList.filter((s) => isTier(s, "investor"));
     const proActive = activeSubsList.filter((s) => isTier(s, "pro"));
 
-    const investorMRRGBP =
-      investorActive
-        .filter((s) => isGBP(s))
-        .reduce((total, s) => total + getUnitAmount(s), 0) / 100;
+    const investorMRRGBP = investorActive.reduce(
+      (total, s) => total + getMRRContributionGBP(s),
+      0
+    );
 
-    const proMRRGBP =
-      proActive
-        .filter((s) => isGBP(s))
-        .reduce((total, s) => total + getUnitAmount(s), 0) / 100;
+    const proMRRGBP = proActive.reduce((total, s) => total + getMRRContributionGBP(s), 0);
 
-    const totalMRRGBP = safeNumber(investorMRRGBP) + safeNumber(proMRRGBP);
+    const totalMRRGBP = activeSubsList.reduce(
+      (total, s) => total + getMRRContributionGBP(s),
+      0
+    );
 
-    // If tier metadata isn't present, warn (helps debugging)
-    const anyTierPresent = activeSubsList.some((s) => !!getTier(s));
-    if (activeSubsList.length > 0 && !anyTierPresent) {
+    // If tier inference is missing, still show total MRR, but explain why breakdown is incomplete.
+    const unknownTierCount = activeSubsList.filter((s) => !getTier(s)).length;
+    if (activeSubsList.length > 0 && unknownTierCount === activeSubsList.length) {
       warnings.push(
-        "No tier signal found. Ensure NEXT_PUBLIC_STRIPE_PRICE_PRO / NEXT_PUBLIC_STRIPE_PRICE_INVESTOR are set or add tier metadata."
+        'Could not infer tier for any active subscriptions. Set NEXT_PUBLIC_STRIPE_PRICE_PRO / NEXT_PUBLIC_STRIPE_PRICE_INVESTOR or populate prices.nickname.'
+      );
+    } else if (unknownTierCount > 0) {
+      warnings.push(
+        `${unknownTierCount} active subscription(s) have unknown tier. Included in total MRR, but excluded from tier breakdown.`
       );
     }
 

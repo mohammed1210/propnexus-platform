@@ -2,6 +2,7 @@
 
 // frontend/lib/useUserPlan.ts
 import { useEffect, useState, useCallback } from 'react';
+import { useUser } from '@clerk/nextjs';
 import { isAuthEnabled } from '@/lib/auth';
 
 export type UserPlan = 'free' | 'pro' | 'investor';
@@ -49,6 +50,8 @@ export function useUserPlan(): UserPlanData {
   const [error, setError] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  const { isLoaded: clerkLoaded, user: clerkUser } = useUser();
+
   const fetchPlan = useCallback(async () => {
     try {
       setLoading(true);
@@ -62,43 +65,12 @@ export function useUserPlan(): UserPlanData {
         return;
       }
 
-      // Clerk enabled, but provider/scripts might not be mounted (during build/prerender).
-      if (typeof window === 'undefined') {
-        setPlan('free');
-        setStripeCustomerId(null);
-        setLoading(false);
+      // Wait for Clerk state to be ready.
+      if (!clerkLoaded) {
         return;
       }
 
-      const clerk = (window as any).Clerk as
-        | undefined
-        | {
-            loaded?: boolean;
-            user?: ClerkUser | null;
-            session?: unknown;
-            load?: () => Promise<void>;
-          };
-
-      if (!clerk) {
-        setPlan('free');
-        setStripeCustomerId(null);
-        setLoading(false);
-        return;
-      }
-
-      if (typeof clerk.load === 'function' && !clerk.loaded) {
-        try {
-          await clerk.load();
-        } catch {
-          // If Clerk can't load for any reason, stay safe.
-          setPlan('free');
-          setStripeCustomerId(null);
-          setLoading(false);
-          return;
-        }
-      }
-
-      const user = clerk.user;
+      const user = (clerkUser as unknown as ClerkUser | null) ?? null;
       if (!user) {
         setPlan('free');
         setStripeCustomerId(null);
@@ -144,7 +116,7 @@ export function useUserPlan(): UserPlanData {
       setPlan('free'); // Fallback to free on error
       setLoading(false);
     }
-  }, []);
+  }, [clerkLoaded, clerkUser]);
 
   const refetch = useCallback(async () => {
     setRefreshTrigger((prev) => prev + 1);

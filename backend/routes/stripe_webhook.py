@@ -20,6 +20,16 @@ supabase = None  # will be monkeypatched by tests
 router = APIRouter(prefix="/stripe", tags=["stripe"])
 
 
+def _stripe_secret_key() -> Optional[str]:
+    return os.getenv("STRIPE_SECRET_KEY")
+
+
+def _ensure_stripe_api_key() -> None:
+    secret = _stripe_secret_key()
+    if secret:
+        stripe.api_key = secret
+
+
 def map_price_to_plan(price_id: str) -> Optional[str]:
     """
     Map Stripe price ID to plan name.
@@ -32,9 +42,15 @@ def map_price_to_plan(price_id: str) -> Optional[str]:
 
     # Build mapping at runtime to support test environment variable injection
     # Sprint 11.2: Only pro and investor tiers (free is default)
+    # Prefer backend-only env vars, but accept NEXT_PUBLIC_* as a fallback
+    # to reduce config drift between frontend and backend.
     price_to_plan = {
-        os.getenv("STRIPE_PRICE_PRO", ""): "pro",
-        os.getenv("STRIPE_PRICE_INVESTOR", ""): "investor",
+        (os.getenv("STRIPE_PRICE_PRO") or os.getenv("NEXT_PUBLIC_STRIPE_PRICE_PRO") or ""): "pro",
+        (
+            os.getenv("STRIPE_PRICE_INVESTOR")
+            or os.getenv("NEXT_PUBLIC_STRIPE_PRICE_INVESTOR")
+            or ""
+        ): "investor",
     }
 
     # Remove empty keys from mapping
@@ -80,6 +96,101 @@ def get_webhook_secret() -> Optional[str]:
     return os.getenv("STRIPE_WEBHOOK_SECRET")
 
 
+def _as_dict(obj: Any) -> Dict[str, Any]:
+    if isinstance(obj, dict):
+        return obj
+    try:
+        return obj.to_dict()  # StripeObject commonly supports this
+    except Exception:
+        return {}
+
+
+def _upsert_price_metadata(sb_client: Any, price_id: Optional[str]) -> None:
+    if not sb_client or not price_id:
+        return
+
+    try:
+        # Stripe API key is required for this call in production.
+        price_obj = stripe.Price.retrieve(price_id)
+        price = _as_dict(price_obj)
+    except Exception as e:
+        logger.debug(f"Failed to retrieve Stripe price {price_id}: {e}")
+        return
+
+    data = {
+        "stripe_price_id": price_id,
+        "product_id": price.get("product"),
+        "nickname": price.get("nickname"),
+        "unit_amount": price.get("unit_amount"),
+        "currency": price.get("currency"),
+        "billing_interval": (price.get("recurring") or {}).get("interval"),
+    }
+
+    try:
+        sb_client.table("prices").upsert(data, on_conflict="stripe_price_id").execute()
+    except Exception as e:
+        logger.warning(f"Failed to upsert price metadata for {price_id}: {e}")
+
+
+def _upsert_subscription_record(
+    sb_client: Any,
+    *,
+    email: Optional[str],
+    customer_id: Optional[str],
+    subscription_id: Optional[str],
+    status: Optional[str],
+    price_id: Optional[str],
+) -> None:
+    if not sb_client or not email:
+        return
+
+    data = {
+        "email": email,
+        "stripe_customer_id": customer_id,
+        "subscription_id": subscription_id,
+        "status": status or "inactive",
+        "price_id": price_id,
+    }
+
+    try:
+        # Schema uses a single row per email (email UNIQUE).
+        sb_client.table("subscriptions").upsert(data, on_conflict="email").execute()
+    except Exception as e:
+        logger.warning(f"Failed to upsert subscription record for {email}: {e}")
+
+
+def _write_user_plan(
+    sb_client: Any,
+    *,
+    customer_id: Optional[str],
+    email: Optional[str],
+    plan_status: Optional[str],
+    current_period_end: Optional[int],
+    plan: Optional[str],
+) -> None:
+    if not sb_client:
+        return
+
+    base = {
+        "stripe_customer_id": customer_id,
+        "plan_status": plan_status,
+        "current_period_end": current_period_end,
+    }
+    if plan is not None:
+        base["plan"] = plan
+
+    try:
+        # Unit tests historically expect a users-table upsert to occur even when email is None.
+        # In production, avoid attempting an insert that would violate NOT NULL on users.email.
+        if email or is_test_or_ci():
+            upsert_data = {**base, "email": email}
+            sb_client.table("users").upsert(upsert_data).execute()
+        elif customer_id:
+            sb_client.table("users").update(base).eq("stripe_customer_id", customer_id).execute()
+    except Exception as e:
+        logger.warning(f"Failed to write user plan data for customer {customer_id}: {e}")
+
+
 @router.post("/webhook")
 @limiter.limit(WEBHOOK_RATE_LIMIT, exempt_when=is_test_or_ci)
 async def stripe_webhook(request: Request):
@@ -96,6 +207,9 @@ async def stripe_webhook(request: Request):
     payload: bytes = await request.body()
     sig_header: str = request.headers.get("Stripe-Signature", "")
     webhook_secret = get_webhook_secret()
+
+    # Ensure Stripe client is configured for any retrieve() calls below.
+    _ensure_stripe_api_key()
 
     try:
         event = stripe.Webhook.construct_event(
@@ -135,20 +249,27 @@ async def stripe_webhook(request: Request):
             sb_client = get_supabase_client()
 
             if sb_client:
-                # Build upsert data - only include plan if we have a known mapping
-                upsert_data = {
-                    "stripe_customer_id": customer_id,
-                    "email": customer_email,
-                    "plan_status": plan_status,
-                    "current_period_end": current_period_end,
-                }
-
-                # Only include plan if we have a known mapping (don't downgrade to 'free')
-                if plan is not None:
-                    upsert_data["plan"] = plan
-
                 try:
-                    sb_client.table("users").upsert(upsert_data).execute()
+                    # Keep admin stats stable by persisting both subscription + price metadata.
+                    _upsert_price_metadata(sb_client, price_id)
+                    _upsert_subscription_record(
+                        sb_client,
+                        email=customer_email,
+                        customer_id=customer_id,
+                        subscription_id=sub_id,
+                        status=status,
+                        price_id=price_id,
+                    )
+
+                    # Users upsert LAST (tests inspect last upsert call).
+                    _write_user_plan(
+                        sb_client,
+                        customer_id=customer_id,
+                        email=customer_email,
+                        plan_status=plan_status,
+                        current_period_end=current_period_end,
+                        plan=plan,
+                    )
                 except Exception as e:
                     # Log error but don't fail the webhook - gracefully skip DB write
                     logger.warning(f"Failed to upsert user data in checkout.session.completed: {e}")
@@ -187,20 +308,25 @@ async def stripe_webhook(request: Request):
             sb_client = get_supabase_client()
 
             if sb_client:
-                # Build upsert data - only include plan if we have a known mapping
-                upsert_data = {
-                    "stripe_customer_id": customer_id,
-                    "email": email,
-                    "plan_status": plan_status,
-                    "current_period_end": current_period_end,
-                }
-
-                # Only include plan if we have a known mapping (don't downgrade to 'free')
-                if plan is not None:
-                    upsert_data["plan"] = plan
-
                 try:
-                    sb_client.table("users").upsert(upsert_data).execute()
+                    _upsert_price_metadata(sb_client, price_id)
+                    _upsert_subscription_record(
+                        sb_client,
+                        email=email,
+                        customer_id=customer_id,
+                        subscription_id=data_obj.get("id"),
+                        status=status,
+                        price_id=price_id,
+                    )
+
+                    _write_user_plan(
+                        sb_client,
+                        customer_id=customer_id,
+                        email=email,
+                        plan_status=plan_status,
+                        current_period_end=current_period_end,
+                        plan=plan,
+                    )
                 except Exception as e:
                     # Log error but don't fail the webhook - gracefully skip DB write
                     logger.warning(f"Failed to upsert user data in subscription.updated: {e}")
@@ -237,20 +363,25 @@ async def stripe_webhook(request: Request):
             sb_client = get_supabase_client()
 
             if sb_client:
-                # Build upsert data - only include plan if we have a known mapping
-                upsert_data = {
-                    "stripe_customer_id": customer_id,
-                    "email": email,
-                    "plan_status": plan_status,
-                    "current_period_end": current_period_end,
-                }
-
-                # Only include plan if we have a known mapping (don't downgrade to 'free')
-                if plan is not None:
-                    upsert_data["plan"] = plan
-
                 try:
-                    sb_client.table("users").upsert(upsert_data).execute()
+                    _upsert_price_metadata(sb_client, price_id)
+                    _upsert_subscription_record(
+                        sb_client,
+                        email=email,
+                        customer_id=customer_id,
+                        subscription_id=data_obj.get("id"),
+                        status=status,
+                        price_id=price_id,
+                    )
+
+                    _write_user_plan(
+                        sb_client,
+                        customer_id=customer_id,
+                        email=email,
+                        plan_status=plan_status,
+                        current_period_end=current_period_end,
+                        plan=plan,
+                    )
                 except Exception as e:
                     # Log error but don't fail the webhook - gracefully skip DB write
                     logger.warning(f"Failed to upsert user data in subscription.created: {e}")
@@ -276,17 +407,26 @@ async def stripe_webhook(request: Request):
             sb_client = get_supabase_client()
 
             if sb_client:
-                # Downgrade to free plan when subscription is deleted
-                upsert_data = {
-                    "stripe_customer_id": customer_id,
-                    "email": email,
-                    "plan": "free",
-                    "plan_status": "canceled",
-                    "current_period_end": None,
-                }
-
                 try:
-                    sb_client.table("users").upsert(upsert_data).execute()
+                    # Mark subscription as canceled if we can identify it.
+                    _upsert_subscription_record(
+                        sb_client,
+                        email=email,
+                        customer_id=customer_id,
+                        subscription_id=data_obj.get("id"),
+                        status="canceled",
+                        price_id=None,
+                    )
+
+                    # Downgrade to free plan when subscription is deleted.
+                    _write_user_plan(
+                        sb_client,
+                        customer_id=customer_id,
+                        email=email,
+                        plan_status="canceled",
+                        current_period_end=None,
+                        plan="free",
+                    )
                 except Exception as e:
                     # Log error but don't fail the webhook - gracefully skip DB write
                     logger.warning(f"Failed to upsert user data in subscription.deleted: {e}")

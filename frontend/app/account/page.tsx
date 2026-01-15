@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useUser } from '@clerk/nextjs';
 import StripePortalButton from '@/components/StripePortalButton';
 import PlanBadge from '@/components/PlanBadge';
 import { useUserPlan } from '@/lib/useUserPlan';
@@ -18,13 +19,9 @@ function AccountPageContent() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { refetch: refetchPlan } = useUserPlan();
 
-  const clerk =
-    isAuthEnabled && typeof window !== 'undefined'
-      ? ((window as any).Clerk as undefined | { loaded?: boolean; user?: any })
-      : undefined;
-
-  const isLoaded = !isAuthEnabled || !!clerk?.loaded;
-  const user = isAuthEnabled ? clerk?.user ?? null : null;
+  const { isLoaded: clerkLoaded, isSignedIn, user } = useUser();
+  const isLoaded = !isAuthEnabled || clerkLoaded;
+  const effectiveUser = isAuthEnabled && isSignedIn ? user : null;
 
   useEffect(() => {
     (async () => {
@@ -54,7 +51,7 @@ function AccountPageContent() {
 
   /** Manual/fallback Customer Portal opener (kept visible for redundancy) */
   async function openPortalManually() {
-    const email = user?.primaryEmailAddress?.emailAddress;
+    const email = effectiveUser?.primaryEmailAddress?.emailAddress;
     if (!email) return;
     setErrorMsg(null);
     setLoadingPortal(true);
@@ -101,12 +98,12 @@ function AccountPageContent() {
 
       {!isLoaded ? (
         <p>Loading…</p>
-      ) : user ? (
+      ) : effectiveUser ? (
         <div className="space-y-6">
           <div className="flex items-center justify-between rounded-md border border-zinc-200 dark:border-zinc-800 p-4">
             <div>
               <div className="text-sm text-zinc-500">Signed in as</div>
-              <div className="font-semibold">{user.primaryEmailAddress?.emailAddress}</div>
+              <div className="font-semibold">{effectiveUser.primaryEmailAddress?.emailAddress}</div>
               <div className="mt-2">
                 <PlanBadge />
               </div>
@@ -114,7 +111,7 @@ function AccountPageContent() {
           </div>
 
           {/* Primary shadcn-styled portal button */}
-          <StripePortalButton email={user.primaryEmailAddress?.emailAddress || ''} />
+          <StripePortalButton email={effectiveUser.primaryEmailAddress?.emailAddress || ''} />
 
           {/* Optional fallback */}
           <button
