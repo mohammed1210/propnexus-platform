@@ -2,9 +2,8 @@
    excellent readability and pairs well with the platform's clean design. */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
 /* Import AI-focused theme system */
 @import '../styles/theme.css';
