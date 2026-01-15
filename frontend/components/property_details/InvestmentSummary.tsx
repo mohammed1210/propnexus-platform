@@ -92,6 +92,60 @@ export default function InvestmentSummary({ property }: Props) {
           ))}
         </ul>
       )}
+
+      {/* Visual scores */}
+      <div className="space-y-3">
+        <ScoreBar
+          label="ROI strength"
+          value={roiScore}
+          fallbackLabel={property.roi_percent != null ? `${property.roi_percent}%` : 'N/A'}
+        />
+        <ScoreBar
+          label="Yield potential"
+          value={yieldScore}
+          fallbackLabel={property.yield_percent != null ? `${property.yield_percent}%` : 'N/A'}
+        />
+      </div>
+
+      {/* Tiny explainer */}
+      <details className="mt-3 text-sm text-slate-500">
+        <summary className="cursor-pointer select-none inline-flex items-center gap-1">
+          <span>❓</span> What do these scores mean?
+        </summary>
+        <div className="mt-2">
+          These bars are a simple visual based on the ROI and gross yield figures for this listing.
+          They’re scaled to typical residential ranges (ROI ≈ 0–25%, Yield ≈ 0–12%) to give a quick
+          sense of strength at a glance. Always validate with your own numbers.
+        </div>
+      </details>
+    </div>
+  );
+}
+
+/** Tiny, dependency-free progress bar */
+function ScoreBar({
+  label,
+  value,
+  fallbackLabel,
+}: {
+  label: string;
+  value: number | null;
+  fallbackLabel: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-medium text-slate-700">{label}</span>
+        <span className="text-xs text-slate-500">
+          {value == null ? fallbackLabel : `${Math.round(value)} / 100`}
+        </span>
+      </div>
+      <div className="h-2 w-full rounded bg-slate-200 overflow-hidden">
+        <div
+          style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%` }}
+          className="h-full rounded bg-gradient-to-r from-blue-500 to-emerald-500 transition-[width] duration-500"
+        />
+      </div>
     </div>
   );
 }
