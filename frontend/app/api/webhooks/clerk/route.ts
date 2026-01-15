@@ -13,6 +13,7 @@ type ClerkUserEventData = {
   id: string;
   email_addresses?: ClerkEmailAddress[];
   primary_email_address_id?: string | null;
+  public_metadata?: Record<string, unknown>;
 };
 
 type WebhookEvent = {
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
   }
 
   // Get Supabase credentials
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!supabaseUrl || !supabaseServiceKey) {
@@ -77,9 +78,8 @@ export async function POST(req: Request) {
     );
   }
 
-  // Get body
-  const payload = await req.json();
-  const body = JSON.stringify(payload);
+  // Get RAW body for Svix verification (must be exact bytes/content)
+  const body = await req.text();
 
   // Verify webhook signature
   const wh = new Webhook(webhookSecret);
@@ -92,7 +92,10 @@ export async function POST(req: Request) {
       'svix-signature': svixSignature,
     }) as WebhookEvent;
   } catch (err: any) {
-    console.error('[Clerk Webhook] Verification failed:', err.message);
+    console.error('[Clerk Webhook] Verification failed:', {
+      message: err?.message || String(err),
+      svixId,
+    });
     return NextResponse.json(
       { error: 'Invalid signature' },
       { status: 400 }
@@ -106,97 +109,78 @@ export async function POST(req: Request) {
   const eventType = evt.type;
   console.log(`[Clerk Webhook] Processing event: ${eventType}`);
 
+  const extractPrimaryEmail = (data: ClerkUserEventData): string | null => {
+    const emailAddresses = data.email_addresses ?? [];
+    const primaryEmail = emailAddresses.find(
+      (e) => e.id === data.primary_email_address_id
+    );
+    return primaryEmail?.email_address ?? emailAddresses?.[0]?.email_address ?? null;
+  };
+
+  const extractPlanTier = (data: ClerkUserEventData): string | null => {
+    const pm = data.public_metadata ?? {};
+    const tier = (pm as any).tier ?? (pm as any).plan ?? (pm as any).plan_tier;
+    return typeof tier === 'string' && tier.trim() ? tier.trim() : null;
+  };
+
   try {
     switch (eventType) {
       case 'user.created': {
-        const { id, email_addresses, primary_email_address_id } = evt.data;
+        const { id } = evt.data;
+        const email = extractPrimaryEmail(evt.data);
+        const planTier = extractPlanTier(evt.data) ?? 'free';
 
-        const emailAddresses = email_addresses ?? [];
+        if (!email) {
+          console.error('[Clerk Webhook] No email found for user:', id);
+          return NextResponse.json({ error: 'No email address found' }, { status: 400 });
+        }
 
-        // Get primary email
-        const primaryEmail = emailAddresses.find(
-          (e) => e.id === primary_email_address_id
-        );
+        console.log(`[Clerk Webhook] Upserting user: ${email} (${id})`);
 
-        if (!primaryEmail?.email_address) {
-          console.error('[Clerk Webhook] No primary email found for user:', id);
-          return NextResponse.json(
-            { error: 'No email address found' },
-            { status: 400 }
+        const { error: upsertError } = await supabase
+          .from('users')
+          .upsert(
+            {
+              clerk_user_id: id,
+              email,
+              plan: planTier,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'clerk_user_id' }
           );
-        }
 
-        const email = primaryEmail.email_address;
-        console.log(`[Clerk Webhook] Creating user: ${email}`);
+        if (upsertError) throw upsertError;
 
-        // Check if user already exists
-        const { data: existingUser, error: checkError } = await supabase
-          .from('users')
-          .select('id, email, plan')
-          .eq('email', email)
-          .maybeSingle();
-
-        if (checkError && checkError.code !== 'PGRST116') {
-          // PGRST116 is "not found" which is fine
-          throw checkError;
-        }
-
-        if (existingUser) {
-          console.log(`[Clerk Webhook] User already exists: ${email}, skipping`);
-          return NextResponse.json({ success: true, action: 'skip' });
-        }
-
-        // Create new user with free plan
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert({
-            email,
-            plan: 'free',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-
-        if (insertError) {
-          throw insertError;
-        }
-
-        console.log(`[Clerk Webhook] User created successfully: ${email}`);
-        return NextResponse.json({ success: true, action: 'created' });
+        return NextResponse.json({ success: true, action: 'upserted' });
       }
 
       case 'user.updated': {
-        const { id, email_addresses, primary_email_address_id } = evt.data;
+        const { id } = evt.data;
+        const email = extractPrimaryEmail(evt.data);
+        const planTier = extractPlanTier(evt.data);
 
-        const emailAddresses = email_addresses ?? [];
-
-        // Get primary email
-        const primaryEmail = emailAddresses.find(
-          (e) => e.id === primary_email_address_id
-        );
-
-        if (!primaryEmail?.email_address) {
-          console.warn('[Clerk Webhook] No primary email found for user update:', id);
+        if (!email) {
+          console.warn('[Clerk Webhook] No email found for user update:', id);
           return NextResponse.json({ success: true, action: 'skip' });
         }
 
-        const email = primaryEmail.email_address;
-        console.log(`[Clerk Webhook] User updated: ${email}`);
+        const updatePayload: Record<string, unknown> = {
+          clerk_user_id: id,
+          email,
+          updated_at: new Date().toISOString(),
+        };
+        if (planTier) updatePayload.plan = planTier;
 
-        // Update user record if it exists
-        const { error: updateError } = await supabase
+        const { error: upsertError } = await supabase
           .from('users')
-          .update({
-            email,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('email', email);
+          .upsert(updatePayload, { onConflict: 'clerk_user_id' });
 
-        if (updateError) {
-          console.warn('[Clerk Webhook] User update failed:', updateError);
-          // Don't fail the webhook for update errors
+        if (upsertError) {
+          console.warn('[Clerk Webhook] User upsert failed:', upsertError);
         }
 
-        return NextResponse.json({ success: true, action: 'updated' });
+        return NextResponse.json({ success: true, action: 'upserted' });
       }
 
       case 'user.deleted': {

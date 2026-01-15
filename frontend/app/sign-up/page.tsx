@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SignUp } from "@clerk/nextjs";
 import { isAuthEnabled } from "@/lib/auth";
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +21,8 @@ export default function SignUpPage() {
     );
   }
 
-  const { SignUp } = require('@clerk/nextjs') as typeof import('@clerk/nextjs');
+  const afterSignUpUrl = process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL ?? "/listings";
+  const signInUrl = process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL ?? "/sign-in";
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-br from-slate-50 via-blue-50 to-cyan-50 flex items-center justify-center px-4 py-12">
@@ -42,7 +44,8 @@ export default function SignUpPage() {
             }}
             routing="path"
             path="/sign-up"
-            signInUrl="/sign-in"
+            signInUrl={signInUrl}
+            afterSignUpUrl={afterSignUpUrl}
           />
         </div>
 

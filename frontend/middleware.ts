@@ -5,6 +5,13 @@ import type { NextFetchEvent, NextRequest } from 'next/server';
 import { hasValidClerkKey } from '@/lib/clerk-utils';
 import { isAuthEnabled } from '@/lib/auth';
 
+function parseAdminEmails(raw: string | undefined): string[] {
+  return (raw || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 // Legacy path redirect handler
 function handleRedirects(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -25,12 +32,97 @@ export default async function middleware(req: NextRequest, evt: NextFetchEvent) 
   const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
   const enabled = isAuthEnabled && hasValidClerkKey(pk);
 
+  const adminToken =
+    process.env.OFF_MARKET_ADMIN_TOKEN ||
+    process.env.IMPORT_ADMIN_TOKEN ||
+    process.env.ADMIN_TOKEN ||
+    '';
+
   if (!enabled) {
     return handleRedirects(req);
   }
 
-  const { clerkMiddleware } = await import('@clerk/nextjs/server');
-  return clerkMiddleware((_auth, request) => handleRedirects(request))(req, evt);
+  const { clerkMiddleware, createRouteMatcher, clerkClient } = await import(
+    '@clerk/nextjs/server'
+  );
+
+  const isProtectedRoute = createRouteMatcher([
+    '/listings(.*)',
+    '/off-market(.*)',
+    '/saved-deals(.*)',
+    '/account(.*)',
+    '/admin(.*)',
+    '/api/admin(.*)',
+  ]);
+
+  const adminEmails = parseAdminEmails(process.env.ADMIN_EMAILS);
+
+  return clerkMiddleware(async (auth, request) => {
+    const redirectRes = handleRedirects(request);
+    // If handleRedirects issued a redirect, return it immediately.
+    if (redirectRes.headers.get('location')) return redirectRes;
+
+    if (!isProtectedRoute(request)) {
+      return redirectRes;
+    }
+
+    // Allow token-based admin API calls without a Clerk session.
+    if (request.nextUrl.pathname.startsWith('/api/admin')) {
+      const tokenHeader = request.headers.get('x-admin-token') ?? '';
+      if (adminToken && tokenHeader && tokenHeader === adminToken) {
+        return redirectRes;
+      }
+    }
+
+    const a = await auth();
+    if (!a.userId) {
+      const url = new URL('/sign-in', request.url);
+      url.searchParams.set('redirect_url', request.url);
+      return NextResponse.redirect(url);
+    }
+
+    if (
+      request.nextUrl.pathname.startsWith('/admin') ||
+      request.nextUrl.pathname.startsWith('/api/admin')
+    ) {
+      // Default-deny if ADMIN_EMAILS isn't configured.
+      if (adminEmails.length === 0) {
+        return NextResponse.redirect(new URL('/account?forbidden=admin', request.url));
+      }
+
+      let email: string | null = null;
+
+      // Try to read email from session claims (fast path).
+      const claims: any = a.sessionClaims;
+      email =
+        claims?.email ??
+        claims?.primary_email ??
+        claims?.primaryEmail ??
+        claims?.primary_email_address ??
+        null;
+
+      // Fallback: fetch from Clerk if claims don't include an email.
+      if (!email && a.userId) {
+        try {
+          const client = await clerkClient();
+          const user = await client.users.getUser(a.userId);
+          email =
+            user.primaryEmailAddress?.emailAddress ??
+            user.emailAddresses?.[0]?.emailAddress ??
+            null;
+        } catch {
+          email = null;
+        }
+      }
+
+      const normalized = (email || '').trim().toLowerCase();
+      if (!normalized || !adminEmails.includes(normalized)) {
+        return NextResponse.redirect(new URL('/account?forbidden=admin', request.url));
+      }
+    }
+
+    return redirectRes;
+  })(req, evt);
 }
 
 // Official matcher pattern plus explicit legacy aliases to ensure execution.
