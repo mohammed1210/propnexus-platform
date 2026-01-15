@@ -5,10 +5,10 @@ import { hasValidClerkKey } from './clerk-utils';
  *
  * Important: this must match the gating used by Providers + any Clerk usage.
  */
-const disableAuthRaw = (process.env.NEXT_PUBLIC_DISABLE_AUTH ?? '')
+export const disableAuthRaw = (process.env.NEXT_PUBLIC_DISABLE_AUTH ?? '')
   .trim()
   .toLowerCase();
-const disableAuth = ['1', 'true', 'yes', 'on'].includes(disableAuthRaw);
+export const disableAuth = ['1', 'true', 'yes', 'on'].includes(disableAuthRaw);
 
 export const isAuthEnabled: boolean =
   !disableAuth && hasValidClerkKey(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);

@@ -9,6 +9,7 @@ import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
 import { FiSearch, FiSliders, FiMap, FiGrid, FiX } from 'react-icons/fi';
 
 import PropertyCard from '@/components/PropertyCard';
+import { isAuthEnabled } from '@/lib/auth';
 
 /* ---------------- Helper Functions ---------------- */
 /**
@@ -38,7 +39,7 @@ function sanitizeSearch(q: string): string {
 type UseUserReturn = { user: any; isLoaded: boolean };
 
 function useOptionalUser(): UseUserReturn {
-  const authDisabled = process.env.NEXT_PUBLIC_DISABLE_AUTH === '1';
+  const authDisabled = !isAuthEnabled;
   const [state, setState] = useState<UseUserReturn>({ user: null, isLoaded: authDisabled });
 
   useEffect(() => {
