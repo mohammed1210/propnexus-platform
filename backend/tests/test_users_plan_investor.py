@@ -60,13 +60,27 @@ def test_webhook_investor_plan_checkout():
                     data = response.json()
                     assert data["ok"] is True
 
-                    # Verify upsert was called with correct plan
-                    mock_table.upsert.assert_called_once()
-                    call_args = mock_table.upsert.call_args[0][0]
-                    assert call_args["plan"] == "investor"
-                    assert call_args["email"] == "investor@example.com"
-                    assert call_args["stripe_customer_id"] == "cus_123"
-                    assert call_args["plan_status"] == "active"
+                    # Webhook performs two upserts:
+                    # 1) User record (conflict on email)
+                    # 2) Plan fields (plan/period end)
+                    assert mock_table.upsert.call_count == 2
+
+                    first_call = mock_table.upsert.call_args_list[0]
+                    first_payload = first_call.args[0]
+                    assert first_call.kwargs.get("on_conflict") == "email"
+                    assert first_payload["email"] == "investor@example.com"
+                    assert first_payload["stripe_customer_id"] == "cus_123"
+                    assert first_payload["subscription_id"] == "sub_123"
+                    assert first_payload["status"] == "active"
+                    assert first_payload["price_id"] == "price_investor_123"
+
+                    second_call = mock_table.upsert.call_args_list[1]
+                    second_payload = second_call.args[0]
+                    assert "on_conflict" not in second_call.kwargs
+                    assert second_payload["plan"] == "investor"
+                    assert second_payload["plan_status"] == "active"
+                    assert second_payload["current_period_end"] == 1735689600
+                    assert second_payload["email"] == "investor@example.com"
 
 
 def test_webhook_pro_plan_checkout():
