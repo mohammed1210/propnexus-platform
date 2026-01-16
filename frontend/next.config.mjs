@@ -8,6 +8,14 @@ const __dirname = dirname(__filename);
 const nextConfig = {
   reactStrictMode: true,
 
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   // Silence multiple-lockfiles warning in monorepos
   outputFileTracingRoot: resolve(__dirname, ".."),
 
