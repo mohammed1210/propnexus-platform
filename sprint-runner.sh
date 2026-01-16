@@ -7,8 +7,16 @@ BACKEND="$REPO/backend"
 PY="$REPO/.venv/bin/python"
 
 print_help() {
+	local commit_sha
+	commit_sha=""
+	if command -v git >/dev/null 2>&1; then
+		commit_sha="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || true)"
+	fi
+
 	cat <<EOF
 PropNexus: Sprint Runner
+
+Repo: ${commit_sha:-unknown}
 
 Usage:
   ./sprint-runner.sh
