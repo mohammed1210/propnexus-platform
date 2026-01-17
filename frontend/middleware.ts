@@ -4,7 +4,7 @@ import { clerkMiddleware, createRouteMatcher, clerkClient } from "@clerk/nextjs/
 import { hasValidClerkKey } from "@/lib/clerk-utils";
 import { isAuthEnabled } from "@/lib/auth";
 
-const DEFAULT_ADMIN_EMAIL = "abbas_m90@hotmail.com";
+const DEFAULT_ADMIN_EMAILS = ["abbas_m90@hotmail.com", "ysoserious360@gmail.com"];
 
 function parseAdminEmails(raw: string | undefined): string[] {
   return (raw || "")
@@ -71,7 +71,7 @@ export default clerkMiddleware(async (auth, req) => {
       new Set([
         ...parseAdminEmails(process.env.ADMIN_EMAILS),
         ...parseAdminEmails(process.env.NEXT_PUBLIC_ADMIN_EMAILS),
-        DEFAULT_ADMIN_EMAIL,
+        ...DEFAULT_ADMIN_EMAILS,
       ])
     );
 
