@@ -4,6 +4,8 @@ import { clerkMiddleware, createRouteMatcher, clerkClient } from "@clerk/nextjs/
 import { hasValidClerkKey } from "@/lib/clerk-utils";
 import { isAuthEnabled } from "@/lib/auth";
 
+const DEFAULT_ADMIN_EMAIL = "abbas_m90@hotmail.com";
+
 function parseAdminEmails(raw: string | undefined): string[] {
   return (raw || "")
     .split(",")
@@ -65,7 +67,13 @@ export default clerkMiddleware(async (auth, req) => {
   }
 
   if (req.nextUrl.pathname.startsWith("/admin") || req.nextUrl.pathname.startsWith("/api/admin")) {
-    const adminEmails = parseAdminEmails(process.env.ADMIN_EMAILS);
+    const adminEmails = Array.from(
+      new Set([
+        ...parseAdminEmails(process.env.ADMIN_EMAILS),
+        ...parseAdminEmails(process.env.NEXT_PUBLIC_ADMIN_EMAILS),
+        DEFAULT_ADMIN_EMAIL,
+      ])
+    );
 
     if (adminEmails.length === 0) {
       return NextResponse.redirect(new URL("/account?forbidden=admin", req.url));
