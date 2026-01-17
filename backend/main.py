@@ -18,6 +18,7 @@ from backend.routes import admin_schedule
 from backend.routes.ai import router as ai_router
 from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
+from backend.routes.debug_properties import router as debug_properties_router
 from backend.routes.gpt_routes import router as gpt_router
 from backend.routes.import_routes import router as import_router
 from backend.routes.notes import router as notes_router
@@ -149,6 +150,7 @@ def root():
 app.include_router(ai_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
+app.include_router(debug_properties_router)
 app.include_router(gpt_router)
 app.include_router(import_router)
 app.include_router(notes_router)
