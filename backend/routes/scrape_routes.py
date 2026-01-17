@@ -100,6 +100,13 @@ async def scrape_endpoint(req: ScrapeRequest):
             if isinstance(p, dict):
                 row = dict(p)
                 row.pop("ai_ready", None)
+
+                # DB schema uses `url`; scrapers may emit `listing_url`/`raw_url`.
+                if not row.get("url"):
+                    row["url"] = row.get("listing_url") or row.get("raw_url")
+                row.pop("listing_url", None)
+                row.pop("raw_url", None)
+
                 db_rows.append(row)
 
         # Upsert in chunks (if Supabase configured)

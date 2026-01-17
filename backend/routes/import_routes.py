@@ -48,6 +48,15 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
     row = dict(p)
     row["last_seen_at"] = now_iso
     row.pop("ai_ready", None)
+
+    # DB schema uses `url` (see supabase/schema.sql). Scrapers/normalizers may
+    # emit `listing_url` or `raw_url`; map those into `url` and drop the alias
+    # to avoid PostgREST "column does not exist" failures.
+    if not row.get("url"):
+        row["url"] = row.get("listing_url") or row.get("raw_url")
+    row.pop("listing_url", None)
+    row.pop("raw_url", None)
+
     return row
 
 
@@ -126,10 +135,7 @@ async def import_all(
     for p in items:
         if not isinstance(p, dict):
             continue
-        p["last_seen_at"] = now_iso
-        row = dict(p)
-        row.pop("ai_ready", None)
-        db_rows.append(row)
+        db_rows.append(_clean_row(p, now_iso))
 
     # ✅ Upsert into Supabase
     inserted = 0

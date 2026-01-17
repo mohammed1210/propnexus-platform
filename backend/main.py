@@ -24,6 +24,7 @@ from backend.routes.notes import router as notes_router
 from backend.routes.off_market_routes import router as off_market_router
 from backend.routes.properties_routes import router as properties_router
 from backend.routes.save_deal import router as save_deal_router
+from backend.routes.scrape_routes import router as scrape_router
 from backend.routes.stripe_routes import router as stripe_routes_router
 from backend.routes.stripe_webhook import router as stripe_webhook_router
 from backend.routes.tradesmen_routes import router as tradesmen_router
@@ -154,6 +155,7 @@ app.include_router(notes_router)
 app.include_router(off_market_router)
 app.include_router(save_deal_router)
 app.include_router(properties_router)
+app.include_router(scrape_router)
 app.include_router(tradesmen_router)
 app.include_router(admin_schedule.router)
 
