@@ -89,7 +89,7 @@ export default clerkMiddleware(async (auth, req) => {
 
     if (!email && a.userId) {
       try {
-        const client = clerkClient();
+        const client = await clerkClient();
         const user = await client.users.getUser(a.userId);
         email =
           user.primaryEmailAddress?.emailAddress ??
