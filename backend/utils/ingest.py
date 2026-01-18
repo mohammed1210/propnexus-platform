@@ -21,6 +21,7 @@ python ingest.py --input scraper/output.json --source zoopla --dry-run
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import re
@@ -426,6 +427,8 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
 
     import inspect
 
+    timeout_s = float(os.getenv("SCRAPER_TIMEOUT_SECONDS", "20"))
+
     loc = (location or "").strip()
     if not loc:
         return []
@@ -434,9 +437,17 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
 
     async def _extend_from(source: str, items: Any) -> None:
         if inspect.isawaitable(items):
-            items = await items
+            try:
+                items = await asyncio.wait_for(items, timeout=timeout_s)
+            except asyncio.TimeoutError:
+                log(f"INFO: {source} timed out after {timeout_s}s for location={loc}")
+                return
         if not isinstance(items, list):
             return
+
+        if len(items) == 0:
+            log(f"INFO: {source} returned 0 properties for location={loc}")
+
         for raw in items:
             if isinstance(raw, dict):
                 results.append(normalize_record(raw, source=source))
@@ -450,7 +461,10 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
         except Exception:
             from scraper.rightmove_scraper import scrape_rightmove_properties  # type: ignore
 
-        await _extend_from("rightmove", scrape_rightmove_properties(loc))
+        if inspect.iscoroutinefunction(scrape_rightmove_properties):
+            await _extend_from("rightmove", scrape_rightmove_properties(loc))
+        else:
+            await _extend_from("rightmove", asyncio.to_thread(scrape_rightmove_properties, loc))
     except Exception as e:
         warn(f"Rightmove scrape skipped/failed: {e}")
 
@@ -461,7 +475,10 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
         except Exception:
             from scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
 
-        await _extend_from("zoopla", scrape_zoopla_properties(loc))
+        if inspect.iscoroutinefunction(scrape_zoopla_properties):
+            await _extend_from("zoopla", scrape_zoopla_properties(loc))
+        else:
+            await _extend_from("zoopla", asyncio.to_thread(scrape_zoopla_properties, loc))
     except Exception as e:
         warn(f"Zoopla scrape skipped/failed: {e}")
 
@@ -474,7 +491,10 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
         except Exception:
             from scraper.onthemarket_scraper import scrape_onthemarket_properties  # type: ignore
 
-        await _extend_from("onthemarket", scrape_onthemarket_properties(loc))
+        if inspect.iscoroutinefunction(scrape_onthemarket_properties):
+            await _extend_from("onthemarket", scrape_onthemarket_properties(loc))
+        else:
+            await _extend_from("onthemarket", asyncio.to_thread(scrape_onthemarket_properties, loc))
     except Exception as e:
         warn(f"OnTheMarket scrape skipped/failed: {e}")
 
@@ -487,7 +507,10 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
         except Exception:
             from scraper.spare_room_scraper import scrape_spareroom_properties  # type: ignore
 
-        await _extend_from("spareroom", scrape_spareroom_properties(loc))
+        if inspect.iscoroutinefunction(scrape_spareroom_properties):
+            await _extend_from("spareroom", scrape_spareroom_properties(loc))
+        else:
+            await _extend_from("spareroom", asyncio.to_thread(scrape_spareroom_properties, loc))
     except Exception as e:
         warn(f"SpareRoom scrape skipped/failed: {e}")
 

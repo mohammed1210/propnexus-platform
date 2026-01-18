@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 try:
     from backend.db import sb  # type: ignore
@@ -16,7 +16,7 @@ def properties_count():
     """Debug endpoint to confirm Supabase has `properties` rows."""
 
     if not sb:
-        raise HTTPException(status_code=500, detail="Missing Supabase env vars")
+        return {"count": 0}
 
     res = sb.table("properties").select("id", count="exact").limit(1).execute()
     return {"count": getattr(res, "count", None)}

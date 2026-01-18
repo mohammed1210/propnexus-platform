@@ -20,6 +20,7 @@ from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
 from backend.routes.debug_properties import router as debug_properties_router
 from backend.routes.gpt_routes import router as gpt_router
+from backend.routes.import_routes import admin_alias_router
 from backend.routes.import_routes import router as import_router
 from backend.routes.notes import router as notes_router
 from backend.routes.off_market_routes import router as off_market_router
@@ -153,6 +154,7 @@ app.include_router(comps_router)
 app.include_router(debug_properties_router)
 app.include_router(gpt_router)
 app.include_router(import_router)
+app.include_router(admin_alias_router)
 app.include_router(notes_router)
 app.include_router(off_market_router)
 app.include_router(save_deal_router)

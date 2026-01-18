@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel
 
 # Scrapers (existing)
@@ -26,6 +27,9 @@ except Exception:
 
 
 router = APIRouter(prefix="/import", tags=["import"])
+
+# Backwards-compatible alias router (no prefix)
+admin_alias_router = APIRouter(tags=["import"])
 
 
 async def _maybe_await(result: Any) -> Any:
@@ -85,38 +89,21 @@ def _dedupe(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
-def _require_admin(request: Request) -> None:
-    """
-    Optional protection:
-    If IMPORT_ADMIN_TOKEN is set, require header X-Admin-Token to match.
-    If not set, endpoint is open (UI button is still admin-only).
-    """
-    token = (os.getenv("IMPORT_ADMIN_TOKEN") or "").strip()
-    if not token:
-        return
-
-    got = (request.headers.get("x-admin-token") or "").strip()
-    if not got or got != token:
+def _require_admin(x_admin_token: str | None = None) -> None:
+    required = os.getenv("IMPORT_ADMIN_TOKEN")
+    if required and x_admin_token != required:
         raise HTTPException(status_code=401, detail="Admin token required")
 
 
 @router.post("/all")
 async def import_all(
-    request: Request,
     req: str | None = Query(None, description="Location e.g. London"),
+    x_admin_token: str | None = Header(None),
 ):
-    _require_admin(request)
+    _require_admin(x_admin_token)
 
-    # 1) Prefer query param
+    # Prefer query param
     loc = (req or "").strip()
-
-    # 2) Backwards compatible: accept JSON body {"location":"..."}
-    if not loc:
-        try:
-            payload = await request.json()  # type: ignore[attr-defined]
-        except Exception:
-            payload = {}
-        loc = str(payload.get("location") or "").strip()
 
     if not loc:
         raise HTTPException(
@@ -128,6 +115,18 @@ async def import_all(
     items = await _maybe_await(scrape_all_sources(loc))
     if not isinstance(items, list):
         items = []
+
+    sources: Dict[str, int] = {
+        "rightmove": 0,
+        "zoopla": 0,
+        "onthemarket": 0,
+        "spareroom": 0,
+    }
+    for p in items:
+        if isinstance(p, dict):
+            src = str(p.get("source") or "").strip()
+            if src in sources:
+                sources[src] += 1
 
     # ✅ Add last_seen_at, remove non-db fields
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -146,9 +145,14 @@ async def import_all(
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"DB upsert failed: {e}")
 
-    # Return small preview only (avoid huge payloads)
-    preview = db_rows[:10]
-    return {"count": inserted, "preview": preview, "location": loc}
+    if inserted == 0:
+        logging.info("Import completed with 0 properties for location=%s", loc)
+
+    return {
+        "location": loc,
+        "total_imported": inserted,
+        "sources": sources,
+    }
 
 
 # ---------------- existing endpoints kept as-is ----------------
@@ -230,3 +234,18 @@ async def import_spareroom(req: ImportRequest):
         except Exception:
             pass
     return {"count": len(items)}
+
+
+# ---------------- backwards-compatible alias ----------------
+
+
+_import_router = router
+router = admin_alias_router
+
+
+@router.post("/admin/import-all")
+async def admin_import_all(req: str, x_admin_token: str = Header(None)):
+    return await import_all(req=req, x_admin_token=x_admin_token)
+
+
+router = _import_router
