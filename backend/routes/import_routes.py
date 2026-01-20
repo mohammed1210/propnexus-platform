@@ -95,6 +95,41 @@ def _require_admin(x_admin_token: str | None = None) -> None:
         raise HTTPException(status_code=401, detail="Admin token required")
 
 
+def _scrape_zero_warning(location: str, sources: Dict[str, int] | None = None) -> str | None:
+    """Return a human-readable warning when scrapers return 0 results.
+
+    This is intentionally heuristic: production datacenter IPs are often blocked by
+    listing sites. If no proxy (ScraperAPI) and no browser rendering is enabled,
+    returning 0 with no explanation is confusing.
+    """
+
+    loc = (location or "").strip()
+    if not loc:
+        return None
+
+    # Only warn if everything is 0 (or unknown)
+    if sources and any(v > 0 for v in sources.values()):
+        return None
+
+    scraper_mode = (os.getenv("SCRAPER_MODE") or "direct").strip().lower()
+    has_scraperapi = bool((os.getenv("SCRAPERAPI_KEY") or "").strip())
+    playwright_enabled = (os.getenv("PLAYWRIGHT_ENABLE") or "0") == "1"
+
+    if has_scraperapi:
+        # Even with ScraperAPI configured, some locations can legitimately yield 0.
+        return None
+
+    # No ScraperAPI key. If Playwright is also off, the most likely reason is blocking.
+    if (scraper_mode in ("direct", "smart")) and not playwright_enabled:
+        return (
+            "Scrape returned 0. Likely blocked from this network (common on Railway/VPS IPs). "
+            "Set SCRAPERAPI_KEY and use SCRAPER_MODE=scraperapi (or smart), "
+            "or enable PLAYWRIGHT_ENABLE=1 with Playwright browsers installed."
+        )
+
+    return None
+
+
 @router.post("/all")
 async def import_all(
     req: str | None = Query(None, description="Location e.g. London"),
@@ -148,11 +183,15 @@ async def import_all(
     if inserted == 0:
         logging.info("Import completed with 0 properties for location=%s", loc)
 
-    return {
+    warning = _scrape_zero_warning(loc, sources=sources)
+    payload = {
         "location": loc,
         "total_imported": inserted,
         "sources": sources,
     }
+    if warning:
+        payload["warning"] = warning
+    return payload
 
 
 # ---------------- existing endpoints kept as-is ----------------
@@ -177,7 +216,11 @@ async def import_zoopla(req: ImportRequest):
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
-    return {"count": len(items)}
+    payload = {"count": len(items)}
+    warning = _scrape_zero_warning(loc, sources={"zoopla": len(items)})
+    if warning:
+        payload["warning"] = warning
+    return payload
 
 
 @router.post("/rightmove")
@@ -195,7 +238,11 @@ async def import_rightmove(req: ImportRequest):
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
-    return {"count": len(items)}
+    payload = {"count": len(items)}
+    warning = _scrape_zero_warning(loc, sources={"rightmove": len(items)})
+    if warning:
+        payload["warning"] = warning
+    return payload
 
 
 @router.post("/onthemarket")
@@ -215,7 +262,11 @@ async def import_onthemarket(req: ImportRequest):
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
-    return {"count": len(items)}
+    payload = {"count": len(items)}
+    warning = _scrape_zero_warning(loc, sources={"onthemarket": len(items)})
+    if warning:
+        payload["warning"] = warning
+    return payload
 
 
 @router.post("/spareroom")
@@ -233,7 +284,11 @@ async def import_spareroom(req: ImportRequest):
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
         except Exception:
             pass
-    return {"count": len(items)}
+    payload = {"count": len(items)}
+    warning = _scrape_zero_warning(loc, sources={"spareroom": len(items)})
+    if warning:
+        payload["warning"] = warning
+    return payload
 
 
 # ---------------- backwards-compatible alias ----------------

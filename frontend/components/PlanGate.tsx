@@ -5,6 +5,7 @@ import React from 'react';
 import Link from 'next/link';
 import { useUserPlan, UserPlan } from '@/lib/useUserPlan';
 import { hasAccess, getUpgradeMessage, getPlanLabel } from '@/lib/planPermissions';
+import { isAuthEnabled } from '@/lib/auth';
 
 interface PlanGateProps {
   /**
@@ -44,6 +45,29 @@ interface PlanGateProps {
  *   </PlanGate>
  */
 export default function PlanGate({
+  require,
+  children,
+  deniedMessage,
+  deniedComponent,
+}: PlanGateProps) {
+  // When auth is disabled (or Clerk keys missing), Clerk hooks will throw.
+  // Fail open for gating so builds and preview environments don't crash.
+  if (!isAuthEnabled) {
+    return <>{children}</>;
+  }
+
+  return (
+    <PlanGateAuthed
+      require={require}
+      deniedMessage={deniedMessage}
+      deniedComponent={deniedComponent}
+    >
+      {children}
+    </PlanGateAuthed>
+  );
+}
+
+function PlanGateAuthed({
   require,
   children,
   deniedMessage,

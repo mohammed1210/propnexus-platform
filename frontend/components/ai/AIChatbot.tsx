@@ -9,6 +9,7 @@ import { postAIChat } from '@/lib/api';
 import { FF } from '@/lib/flags';
 import { useUserPlan } from '@/lib/useUserPlan';
 import { hasAccess } from '@/lib/planPermissions';
+import { isAuthEnabled } from '@/lib/auth';
 
 type LooseProperty = Property & {
   latitude?: number | null;
@@ -26,7 +27,26 @@ interface AIChatbotProps {
 
 const STORAGE_KEY_PREFIX = 'pn_chat_history_';
 
-export default function AIChatbot({ property }: AIChatbotProps) {
+export default function AIChatbot(props: AIChatbotProps) {
+  // If auth is disabled (or Clerk keys missing), we must not touch Clerk hooks.
+  // Fail open so builds don't crash.
+  if (!isAuthEnabled) {
+    return <AIChatbotInner {...props} userHasAccess={true} />;
+  }
+
+  return <AIChatbotAuthed {...props} />;
+}
+
+function AIChatbotAuthed(props: AIChatbotProps) {
+  const { plan } = useUserPlan();
+  const userHasAccess = hasAccess(plan, 'investor');
+  return <AIChatbotInner {...props} userHasAccess={userHasAccess} />;
+}
+
+function AIChatbotInner({
+  property,
+  userHasAccess,
+}: AIChatbotProps & { userHasAccess: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [input, setInput] = useState('');
@@ -41,10 +61,6 @@ export default function AIChatbot({ property }: AIChatbotProps) {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const propertyId = property?.id || 'default';
-  const { plan, loading: planLoading } = useUserPlan();
-
-  // Check if user has access to chatbot (investor plan)
-  const userHasAccess = hasAccess(plan, 'investor');
 
   // Load conversation history from localStorage on mount
   useEffect(() => {

@@ -24,6 +24,9 @@ backend/.env.local
 backend/.env
 frontend/.env
 
+# Local-only admin token (do not commit)
+.admin_token
+
 # Python
 __pycache__/
 *.pyc
