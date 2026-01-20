@@ -93,29 +93,36 @@ def _extract_balanced_json_object(text: str, start_index: int) -> Optional[str]:
 
 def _extract_preloaded_state(soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
     """Attempt to extract Rightmove embedded model JSON from __PRELOADED_STATE__."""
-    try:
-        scripts = soup.find_all("script")
-        for script in scripts:
-            script_text = script.string or script.get_text() or ""
-            if "__PRELOADED_STATE__" not in script_text:
-                continue
+    scripts = soup.find_all("script")
+    for script in scripts:
+        script_text = script.string or script.get_text() or ""
+        if "__PRELOADED_STATE__" not in script_text:
+            continue
 
-            # Common pattern: window.__PRELOADED_STATE__ = { ... }
-            idx = script_text.find("__PRELOADED_STATE__")
-            brace_start = script_text.find("{", idx)
-            if brace_start != -1:
-                raw = _extract_balanced_json_object(script_text, brace_start)
-                if raw:
+        # Common pattern: window.__PRELOADED_STATE__ = { ... }
+        idx = script_text.find("__PRELOADED_STATE__")
+        brace_start = script_text.find("{", idx)
+        if brace_start != -1:
+            raw = _extract_balanced_json_object(script_text, brace_start)
+            if raw:
+                try:
                     return json.loads(raw)
+                except Exception:
+                    # brace_start can hit the '{' inside a JSON.parse("{...}") string.
+                    # In that case json.loads(raw) will fail due to escaped quotes.
+                    # Continue to the JSON.parse(...) extraction below instead.
+                    pass
 
-            # Alternative pattern: window.__PRELOADED_STATE__ = JSON.parse("...")
-            m = re.search(r"__PRELOADED_STATE__\s*=\s*JSON\.parse\((['\"])(.*?)\1\)", script_text)
-            if m:
-                encoded = m.group(2)
+        # Alternative pattern: window.__PRELOADED_STATE__ = JSON.parse("...")
+        m = re.search(r"__PRELOADED_STATE__\s*=\s*JSON\.parse\((['\"])(.*?)\1\)", script_text)
+        if m:
+            encoded = m.group(2)
+            try:
                 decoded = json.loads(f'"{encoded}"')
                 return json.loads(decoded)
-    except Exception:
-        return None
+            except Exception:
+                continue
+
     return None
 
 
