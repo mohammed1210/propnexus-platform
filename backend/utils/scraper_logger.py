@@ -111,3 +111,37 @@ def log_image_extraction(source: str, external_id: str, image_count: int):
         logger.warning(f"[{source}] No images found for property {external_id}")
     else:
         logger.debug(f"[{source}] Extracted {image_count} image(s) for {external_id}")
+
+
+def log_fetch_diagnostics(
+    source: str,
+    url: str,
+    *,
+    status: int,
+    text: str,
+    via: str,
+) -> None:
+    """Log quick diagnostics right after a fetch.
+
+    This is intentionally lightweight: it helps distinguish fetch vs parse failures
+    by logging response size and the presence of key markers.
+    """
+
+    try:
+        content = text or ""
+        lowered = content.lower()
+        markers = {
+            "__NEXT_DATA__": "__next_data__" in lowered,
+            "__PRELOADED_STATE__": "__preloaded_state__" in lowered,
+            "cdn-cgi": "cdn-cgi" in lowered,
+            "cloudflare": "cloudflare" in lowered,
+            "captcha": "captcha" in lowered,
+            "access denied": "access denied" in lowered,
+        }
+        marker_summary = ",".join([k for k, present in markers.items() if present]) or "none"
+        logger.info(
+            f"[{source}] Fetch diag via={via} status={int(status)} bytes={len(content)} markers={marker_summary} url={url}"
+        )
+    except Exception:
+        # Never let diagnostics logging break scraping.
+        return

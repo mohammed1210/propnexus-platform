@@ -1,6 +1,8 @@
 import asyncio
 import hashlib
+import json
 import os
+import random
 import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
@@ -15,6 +17,7 @@ from backend.utils.retry import retry_async
 from backend.utils.runlog import RunLog
 from backend.utils.scraper_logger import (
     ScraperStats,
+    log_fetch_diagnostics,
     log_image_extraction,
     log_page_fetch_error,
     log_scrape_start,
@@ -36,6 +39,156 @@ SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
 
 
+def _extract_next_data(soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
+    """Extract Next.js __NEXT_DATA__ JSON when present."""
+    try:
+        el = soup.find("script", id="__NEXT_DATA__")
+        if not el:
+            return None
+        raw = el.string or el.get_text() or ""
+        raw = raw.strip()
+        if not raw:
+            return None
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def _find_zoopla_listings_in_next_data(next_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    if not isinstance(next_data, dict):
+        return []
+
+    def _looks_like_listing(d: Any) -> bool:
+        if not isinstance(d, dict):
+            return False
+        has_id = any(k in d for k in ("listingId", "listing_id", "id"))
+        has_price = "price" in d or "displayPrice" in d
+        has_addr = any(k in d for k in ("displayAddress", "address", "title"))
+        return bool(has_id and (has_price or has_addr))
+
+    preferred_keys = ("listings", "regularListings", "results", "searchResults", "properties")
+
+    def _scan(obj: Any, depth: int = 0) -> Optional[List[Dict[str, Any]]]:
+        if depth > 8:
+            return None
+        if isinstance(obj, dict):
+            for k in preferred_keys:
+                v = obj.get(k)
+                if isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
+                    if sum(1 for x in v if _looks_like_listing(x)) >= max(1, len(v) // 4):
+                        return v  # type: ignore[return-value]
+            for v in obj.values():
+                found = _scan(v, depth + 1)
+                if found:
+                    return found
+        elif isinstance(obj, list):
+            if obj and all(isinstance(x, dict) for x in obj):
+                if sum(1 for x in obj if _looks_like_listing(x)) >= max(1, len(obj) // 4):
+                    return obj  # type: ignore[return-value]
+            for v in obj:
+                found = _scan(v, depth + 1)
+                if found:
+                    return found
+        return None
+
+    found = _scan(next_data)
+    return found or []
+
+
+def _zoopla_property_from_listing_dict(d: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    try:
+        listing_id = d.get("listingId") or d.get("listing_id") or d.get("id")
+        if listing_id is None:
+            return None
+        external_id = str(listing_id)
+
+        title = (
+            d.get("title")
+            or d.get("displayAddress")
+            or d.get("address")
+            or d.get("summary")
+            or "Untitled"
+        )
+
+        price_val: Any = d.get("price") or d.get("displayPrice")
+        price: Optional[int] = None
+        if isinstance(price_val, dict):
+            price = price_val.get("amount") or price_val.get("value")
+        elif isinstance(price_val, (int, float)):
+            price = int(price_val)
+        elif isinstance(price_val, str):
+            price = _parse_price(price_val)
+
+        bedrooms = d.get("bedrooms") or d.get("numBedrooms") or d.get("num_bedrooms") or 0
+        bathrooms = d.get("bathrooms") or d.get("numBathrooms") or d.get("num_bathrooms") or 0
+
+        property_type_raw = (
+            d.get("propertyType") or d.get("property_type") or d.get("propertySubType")
+        )
+        property_type = (
+            _normalize_property_type(str(property_type_raw)) if property_type_raw else None
+        )
+
+        description = d.get("description") or d.get("summary")
+        if isinstance(description, str):
+            description = description.strip()
+            if len(description) < 20:
+                description = None
+        else:
+            description = None
+
+        image_urls: List[str] = []
+        for key in ("imageUrls", "image_urls", "images"):
+            v = d.get(key)
+            if isinstance(v, list):
+                for item in v:
+                    if isinstance(item, str):
+                        image_urls.append(item)
+                    elif isinstance(item, dict):
+                        url = item.get("url") or item.get("src")
+                        if url and isinstance(url, str):
+                            image_urls.append(url)
+        single_img = d.get("imageUrl") or d.get("image_url")
+        if single_img and isinstance(single_img, str):
+            image_urls.insert(0, single_img)
+        # De-dupe
+        seen = set()
+        image_urls = [u for u in image_urls if not (u in seen or seen.add(u))]
+        image_url = image_urls[0] if image_urls else None
+
+        listing_url = d.get("listingUrl") or d.get("url")
+        if not listing_url:
+            listing_url = f"https://www.zoopla.co.uk/for-sale/details/{external_id}/"
+
+        loc_text = d.get("displayAddress") or d.get("address") or str(title)
+        lat = None
+        lng = None
+        geo = d.get("location") or d.get("geo") or {}
+        if isinstance(geo, dict):
+            lat = geo.get("latitude") or geo.get("lat")
+            lng = geo.get("longitude") or geo.get("lng")
+
+        return {
+            "external_id": external_id,
+            "title": str(title).strip(),
+            "description": description,
+            "location": str(loc_text).strip(),
+            "price": price,
+            "bedrooms": int(bedrooms) if isinstance(bedrooms, (int, float)) else bedrooms,
+            "bathrooms": int(bathrooms) if isinstance(bathrooms, (int, float)) else bathrooms,
+            "property_type": property_type,
+            "image_url": image_url,
+            "image_urls": image_urls,
+            "latitude": float(lat) if isinstance(lat, (int, float)) else 0.0,
+            "longitude": float(lng) if isinstance(lng, (int, float)) else 0.0,
+            "source": "zoopla",
+            "raw_url": listing_url,
+            "listing_url": listing_url,
+        }
+    except Exception:
+        return None
+
+
 _POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
 
 
@@ -43,7 +196,7 @@ def _looks_like_postcode(s: str) -> bool:
     return bool(s and _POSTCODE_RE.search(s))
 
 
-def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
+def make_scraperapi_url(target_url: str, *, render: bool = True) -> str:
     """
     Build a ScraperAPI URL for the given target URL.
 
@@ -63,12 +216,27 @@ def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
 
     params = {
         "api_key": api_key,
+        "render": "true" if render else None,
         "country_code": "gb",
+        "keep_headers": "true",
         "url": target_url,
     }
+
+    params = {k: v for k, v in params.items() if v is not None}
+
     if render:
-        params["render"] = "true"
         params["device_type"] = "desktop"
+
+    session_fixed = (os.getenv("SCRAPERAPI_SESSION_NUMBER") or "").strip()
+    session_random = (os.getenv("SCRAPERAPI_SESSION_RANDOM") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if session_fixed:
+        params["session_number"] = session_fixed
+    elif session_random:
+        params["session_number"] = str(random.randint(1, 999999))
 
     return f"{SCRAPERAPI_BASE}?{urlencode(params)}"
 
@@ -118,6 +286,13 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             url_to_fetch, headers=headers, timeout=60 if mode == "scraperapi" else 30
         ) as resp:
             text = await resp.text()
+            log_fetch_diagnostics(
+                "zoopla",
+                url,
+                status=resp.status,
+                text=text,
+                via="scraperapi" if mode == "scraperapi" else "direct",
+            )
 
             # If direct mode and we detect blocking, try ScraperAPI as fallback
             if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
@@ -127,6 +302,13 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 try:
                     async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
                         p_text = await p_resp.text()
+                        log_fetch_diagnostics(
+                            "zoopla",
+                            url,
+                            status=p_resp.status,
+                            text=p_text,
+                            via="scraperapi-fallback",
+                        )
                         if _looks_blocked(p_text, p_resp.status):
                             return None
                         return p_text
@@ -151,6 +333,13 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 proxy_url = make_scraperapi_url(url, render=True)
                 async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
                     p_text = await p_resp.text()
+                    log_fetch_diagnostics(
+                        "zoopla",
+                        url,
+                        status=p_resp.status,
+                        text=p_text,
+                        via="scraperapi-exception-fallback",
+                    )
                     if _looks_blocked(p_text, p_resp.status):
                         return None
                     return p_text
@@ -418,6 +607,32 @@ async def scrape_zoopla_properties(
                     soup = BeautifulSoup(html, "html.parser")
                     cards = _collect_cards(soup)
                     if not cards:
+                        next_data = _extract_next_data(soup)
+                        embedded_listings = (
+                            _find_zoopla_listings_in_next_data(next_data) if next_data else []
+                        )
+                        if embedded_listings:
+                            for d in embedded_listings:
+                                if len(results) >= limit:
+                                    break
+                                mapped = _zoopla_property_from_listing_dict(d)
+                                if not mapped:
+                                    continue
+                                should_insert, reason = should_insert_property(mapped)
+                                if should_insert:
+                                    results.append(clean_property_data(mapped))
+                                    stats.log_parse_success()
+                                else:
+                                    stats.log_validation_failure(reason or "Unknown")
+
+                            if results:
+                                stats.log_summary()
+                                print(
+                                    f"✅ Zoopla embedded JSON returned {len(results)} properties for '{location}'"
+                                )
+                                run_log.set_count(len(results))
+                                return results
+
                         if PLAYWRIGHT_ENABLE:
                             rendered = await render_page(
                                 url,

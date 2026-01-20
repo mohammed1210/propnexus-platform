@@ -1,6 +1,8 @@
 import asyncio
 import hashlib
+import json
 import os
+import random
 import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
@@ -19,6 +21,7 @@ from backend.utils.retry import retry_async
 from backend.utils.runlog import RunLog
 from backend.utils.scraper_logger import (
     ScraperStats,
+    log_fetch_diagnostics,
     log_image_extraction,
     log_page_fetch_error,
     log_scrape_start,
@@ -53,7 +56,206 @@ RIGHTMOVE_API_BASE = "https://www.rightmove.co.uk/api/_search"
 SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 
 
-def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
+def _extract_balanced_json_object(text: str, start_index: int) -> Optional[str]:
+    """Extract a balanced JSON object starting at start_index (which must point at '{')."""
+    if start_index < 0 or start_index >= len(text) or text[start_index] != "{":
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+
+    for i in range(start_index, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start_index : i + 1]
+
+    return None
+
+
+def _extract_preloaded_state(soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
+    """Attempt to extract Rightmove embedded model JSON from __PRELOADED_STATE__."""
+    scripts = soup.find_all("script")
+    for script in scripts:
+        script_text = script.string or script.get_text() or ""
+        if "__PRELOADED_STATE__" not in script_text:
+            continue
+
+        # Common pattern: window.__PRELOADED_STATE__ = { ... }
+        idx = script_text.find("__PRELOADED_STATE__")
+        brace_start = script_text.find("{", idx)
+        if brace_start != -1:
+            raw = _extract_balanced_json_object(script_text, brace_start)
+            if raw:
+                try:
+                    return json.loads(raw)
+                except Exception:
+                    # brace_start can hit the '{' inside a JSON.parse("{...}") string.
+                    # In that case json.loads(raw) will fail due to escaped quotes.
+                    # Continue to the JSON.parse(...) extraction below instead.
+                    pass
+
+        # Alternative pattern: window.__PRELOADED_STATE__ = JSON.parse("...")
+        m = re.search(r"__PRELOADED_STATE__\s*=\s*JSON\.parse\((['\"])(.*?)\1\)", script_text)
+        if m:
+            encoded = m.group(2)
+            try:
+                decoded = json.loads(f'"{encoded}"')
+                return json.loads(decoded)
+            except Exception:
+                continue
+
+    return None
+
+
+def _find_rightmove_properties_in_state(state: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Try to locate a properties list inside the preloaded state."""
+    if not isinstance(state, dict):
+        return []
+
+    # Prefer common known paths first.
+    candidates: List[Any] = []
+    for path in (
+        ("searchResults", "properties"),
+        ("properties",),
+        ("results", "properties"),
+        ("propertySearch", "properties"),
+    ):
+        cur: Any = state
+        ok = True
+        for key in path:
+            if isinstance(cur, dict) and key in cur:
+                cur = cur[key]
+            else:
+                ok = False
+                break
+        if ok:
+            candidates.append(cur)
+
+    def _looks_like_property_dict(d: Any) -> bool:
+        if not isinstance(d, dict):
+            return False
+        has_id = any(k in d for k in ("id", "propertyId", "listingId", "identifier"))
+        has_addr = any(k in d for k in ("displayAddress", "address", "summary"))
+        has_price = "price" in d or "priceAmount" in d
+        return bool(has_id and (has_addr or has_price))
+
+    def _find_list(obj: Any, depth: int = 0) -> Optional[List[Dict[str, Any]]]:
+        if depth > 7:
+            return None
+        if isinstance(obj, list) and obj and all(isinstance(x, dict) for x in obj):
+            if sum(1 for x in obj if _looks_like_property_dict(x)) >= max(1, len(obj) // 4):
+                return obj  # type: ignore[return-value]
+        if isinstance(obj, dict):
+            for v in obj.values():
+                found = _find_list(v, depth + 1)
+                if found:
+                    return found
+        if isinstance(obj, list):
+            for v in obj:
+                found = _find_list(v, depth + 1)
+                if found:
+                    return found
+        return None
+
+    for c in candidates:
+        found = _find_list(c)
+        if found:
+            return found
+
+    # Fall back to a bounded recursive scan of the entire state.
+    found = _find_list(state)
+    return found or []
+
+
+def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    try:
+        property_id = str(
+            p.get("id") or p.get("propertyId") or p.get("identifier") or p.get("listingId") or ""
+        )
+        if not property_id:
+            return None
+
+        title = p.get("displayAddress") or p.get("address") or p.get("summary") or "Untitled"
+
+        description = p.get("summary") or p.get("propertySubType") or None
+        if description and isinstance(description, str) and len(description) > 20:
+            description = description.strip()
+        else:
+            description = None
+
+        property_type_raw = p.get("propertySubType") or p.get("propertyType") or ""
+        property_type = _normalize_property_type(property_type_raw) if property_type_raw else None
+
+        price_obj = p.get("price") or {}
+        price = None
+        if isinstance(price_obj, dict):
+            price = price_obj.get("amount") or price_obj.get("price")
+        elif isinstance(price_obj, (int, float)):
+            price = int(price_obj)
+
+        bedrooms = p.get("bedrooms") or p.get("numBedrooms") or 0
+        bathrooms = p.get("bathrooms") or p.get("numBathrooms") or 0
+
+        image_urls: List[str] = []
+        media = p.get("media") or []
+        if isinstance(media, list) and media:
+            for m in media:
+                if isinstance(m, dict):
+                    img = m.get("url") or m.get("mediaUrl")
+                    if img and isinstance(img, str):
+                        image_urls.append(img)
+
+        img = image_urls[0] if image_urls else None
+
+        loc_text = title
+        loc_lat = None
+        loc_lng = None
+        geo = p.get("location") or {}
+        if isinstance(geo, dict):
+            loc_lat = geo.get("latitude")
+            loc_lng = geo.get("longitude")
+        coords = {"latitude": loc_lat or 0.0, "longitude": loc_lng or 0.0}
+
+        return {
+            "external_id": property_id,
+            "title": str(title).strip(),
+            "description": description,
+            "location": loc_text,
+            "price": price,
+            "bedrooms": bedrooms,
+            "bathrooms": bathrooms,
+            "property_type": property_type,
+            "image_url": img,
+            "image_urls": image_urls,
+            "latitude": coords["latitude"],
+            "longitude": coords["longitude"],
+            "source": "rightmove",
+            "raw_url": f"https://www.rightmove.co.uk/properties/{property_id}",
+        }
+    except Exception:
+        return None
+
+
+def make_scraperapi_url(target_url: str, *, render: bool = True) -> str:
     """
     Build a ScraperAPI URL for the given target URL.
 
@@ -73,12 +275,29 @@ def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
 
     params = {
         "api_key": api_key,
+        "render": "true" if render else None,
         "country_code": "gb",
+        "keep_headers": "true",
         "url": target_url,
     }
+
+    # Drop None values to avoid render=None in the query string.
+    params = {k: v for k, v in params.items() if v is not None}
+
     if render:
-        params["render"] = "true"
         params["device_type"] = "desktop"
+
+    # Optional session pinning / sharding.
+    session_fixed = (os.getenv("SCRAPERAPI_SESSION_NUMBER") or "").strip()
+    session_random = (os.getenv("SCRAPERAPI_SESSION_RANDOM") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if session_fixed:
+        params["session_number"] = session_fixed
+    elif session_random:
+        params["session_number"] = str(random.randint(1, 999999))
 
     return f"{SCRAPERAPI_BASE}?{urlencode(params)}"
 
@@ -143,6 +362,13 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             url_to_fetch, headers=headers, timeout=60 if mode == "scraperapi" else 30
         ) as resp:
             text = await resp.text()
+            log_fetch_diagnostics(
+                "rightmove",
+                url,
+                status=resp.status,
+                text=text,
+                via="scraperapi" if mode == "scraperapi" else "direct",
+            )
 
             # If direct mode and we detect blocking, try ScraperAPI as fallback
             if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
@@ -152,6 +378,13 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 try:
                     async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
                         p_text = await p_resp.text()
+                        log_fetch_diagnostics(
+                            "rightmove",
+                            url,
+                            status=p_resp.status,
+                            text=p_text,
+                            via="scraperapi-fallback",
+                        )
                         if _looks_blocked(p_text, p_resp.status):
                             return None
                         return p_text
@@ -176,6 +409,13 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 proxy_url = make_scraperapi_url(url, render=True)
                 async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
                     p_text = await p_resp.text()
+                    log_fetch_diagnostics(
+                        "rightmove",
+                        url,
+                        status=p_resp.status,
+                        text=p_text,
+                        via="scraperapi-exception-fallback",
+                    )
                     if _looks_blocked(p_text, p_resp.status):
                         return None
                     return p_text
@@ -509,6 +749,36 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             log_page_fetch_error("rightmove", page, "blocked or empty")
                             continue
                     soup = BeautifulSoup(html, "html.parser")
+
+                    # If the DOM doesn't contain cards, try the embedded state model.
+                    embedded_state = _extract_preloaded_state(soup)
+                    embedded_props = (
+                        _find_rightmove_properties_in_state(embedded_state)
+                        if embedded_state
+                        else []
+                    )
+                    if embedded_props:
+                        for p in embedded_props:
+                            if len(results) >= limit:
+                                break
+                            mapped = _rm_property_from_api_dict(p)
+                            if not mapped:
+                                continue
+                            should_insert, reason = should_insert_property(mapped)
+                            if should_insert:
+                                results.append(clean_property_data(mapped))
+                                stats.log_parse_success()
+                            else:
+                                stats.log_validation_failure(reason or "Unknown")
+
+                        if results:
+                            stats.log_summary()
+                            print(
+                                f"✅ Rightmove embedded JSON returned {len(results)} properties for '{location}'"
+                            )
+                            run_log.set_count(len(results))
+                            return results
+
                     cards = _collect_selectors(soup)
                     if not cards:
                         if PLAYWRIGHT_ENABLE:
@@ -674,10 +944,10 @@ async def _fetch_api_properties(
             async with session.get(url, headers=headers, timeout=35) as resp:
                 if resp.status != 200:
                     # Production hosts frequently get blocked on this endpoint.
-                    # If configured, retry through ScraperAPI (no-render) to obtain JSON.
+                    # If configured, retry through ScraperAPI (render) for UK targeting consistency.
                     if SCRAPERAPI_KEY:
                         try:
-                            proxy_url = make_scraperapi_url(url, render=False)
+                            proxy_url = make_scraperapi_url(url, render=True)
                             async with session.get(
                                 proxy_url, headers=headers, timeout=60
                             ) as p_resp:

@@ -1,5 +1,6 @@
 import inspect
 import os
+import random
 import re
 from typing import Any, Dict, Optional
 
@@ -72,9 +73,26 @@ def build_scraperapi_url(url: str, scraperapi_key: str, render: bool = False) ->
     Build a ScraperAPI proxy URL.
     Keeping this helper central makes the tests and scrapers consistent.
     """
-    base = f"http://api.scraperapi.com/?api_key={scraperapi_key}&url={url}&country_code=gb"
+    base = (
+        f"https://api.scraperapi.com/?api_key={scraperapi_key}"
+        f"&url={url}"
+        f"&country_code=gb"
+        f"&keep_headers=true"
+    )
     if render:
         base += "&render=true&device_type=desktop"
+
+    session_fixed = (os.getenv("SCRAPERAPI_SESSION_NUMBER") or "").strip()
+    session_random = (os.getenv("SCRAPERAPI_SESSION_RANDOM") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if session_fixed:
+        base += f"&session_number={session_fixed}"
+    elif session_random:
+        base += f"&session_number={random.randint(1, 999999)}"
+
     return base
 
 
