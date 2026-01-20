@@ -1,0 +1,513 @@
+from __future__ import annotations
+
+import asyncio
+import os
+import time
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Header, HTTPException, Query
+
+router = APIRouter(tags=["debug"])
+
+
+def _require_admin(x_admin_token: str | None = None) -> None:
+    """Reuse the same admin gate as /import/*.
+
+    This endpoint can trigger outbound scraping requests, so it must be protected
+    when IMPORT_ADMIN_TOKEN is configured.
+    """
+
+    required = os.getenv("IMPORT_ADMIN_TOKEN")
+    if required and x_admin_token != required:
+        raise HTTPException(status_code=401, detail="Admin token required")
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _generic_blocked_markers(text: str) -> bool:
+    lowered = (text or "").lower()
+    markers = (
+        "cloudflare",
+        "just a moment",
+        "checking your browser",
+        "enable javascript",
+        "verify you are human",
+        "access denied",
+        "unusual traffic",
+        "captcha",
+        "bot detection",
+    )
+    return any(m in lowered for m in markers)
+
+
+def _safe_source_list(sources: Optional[str]) -> List[str]:
+    allowed = ["zoopla", "rightmove", "onthemarket", "spareroom"]
+    if not sources:
+        return allowed
+
+    requested = [s.strip().lower() for s in sources.split(",") if s.strip()]
+    return [s for s in requested if s in allowed]
+
+
+async def _fetch_text(
+    session: Any, url: str, *, headers: Dict[str, str], timeout_seconds: int
+) -> tuple[int, str]:
+    async with session.get(url, headers=headers, timeout=timeout_seconds) as resp:
+        status = getattr(resp, "status", 0)
+        text = await resp.text()
+        return status, text
+
+
+async def _probe_zoopla(
+    session: Any, location: str, page: int, timeout_seconds: int
+) -> Dict[str, Any]:
+    from bs4 import BeautifulSoup
+
+    from backend.scraper import zoopla_scraper as zp
+
+    target_url = zp._build_search_url(location, page=page)
+
+    mode = (os.getenv("SCRAPER_MODE") or "direct").lower()
+    has_key = bool((os.getenv("SCRAPERAPI_KEY") or "").strip())
+    proxy_used = mode == "scraperapi" and has_key
+
+    headers = {"User-Agent": zp.USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
+
+    started = time.monotonic()
+    try:
+        fetch_url = zp.make_scraperapi_url(target_url, render=True) if proxy_used else target_url
+        status, text = await _fetch_text(
+            session, fetch_url, headers=headers, timeout_seconds=timeout_seconds
+        )
+    except asyncio.TimeoutError:
+        return {
+            "target_url": target_url,
+            "proxy_used": proxy_used,
+            "classification": "timeout",
+            "elapsed_ms": int((time.monotonic() - started) * 1000),
+        }
+
+    initial_blocked = bool(zp._looks_blocked(text, status) or _generic_blocked_markers(text))
+    initial_status = status
+    initial_len = len(text or "")
+
+    # Match scraper behavior: in direct mode, attempt ScraperAPI fallback when blocked.
+    fallback_used = False
+    if (not proxy_used) and has_key and initial_blocked:
+        fallback_used = True
+        try:
+            proxy_url = zp.make_scraperapi_url(target_url, render=True)
+            status, text = await _fetch_text(
+                session, proxy_url, headers=headers, timeout_seconds=max(timeout_seconds, 60)
+            )
+        except Exception:
+            # Keep the original blocked response
+            status, text = initial_status, text
+
+    blocked = bool(zp._looks_blocked(text, status) or _generic_blocked_markers(text))
+    soup = BeautifulSoup(text, "html.parser")
+    cards = zp._collect_cards(soup)
+
+    classification = "blocked" if blocked else ("parsed" if len(cards) > 0 else "fetched_no_cards")
+
+    return {
+        "target_url": target_url,
+        "proxy_used": bool(proxy_used or fallback_used),
+        "initial_http_status": initial_status,
+        "initial_html_len": initial_len,
+        "initial_blocked": initial_blocked,
+        "proxy_fallback_used": fallback_used,
+        "http_status": status,
+        "html_len": len(text or ""),
+        "cards_found": len(cards),
+        "blocked": blocked,
+        "classification": classification,
+        "elapsed_ms": int((time.monotonic() - started) * 1000),
+    }
+
+
+async def _probe_rightmove(
+    session: Any, location: str, page: int, timeout_seconds: int
+) -> Dict[str, Any]:
+    from bs4 import BeautifulSoup
+
+    from backend.scraper import rightmove_scraper as rm
+
+    mode = (os.getenv("SCRAPER_MODE") or "direct").lower()
+    has_key = bool((os.getenv("SCRAPERAPI_KEY") or "").strip())
+
+    # 1) Probe JSON API if we know a region identifier.
+    api_probe: Dict[str, Any] = {"classification": "skipped"}
+    region_id = rm._LOCATION_IDENTIFIER.get(location.lower())
+    if region_id:
+        api_started = time.monotonic()
+        api_url = (
+            f"{rm.RIGHTMOVE_API_BASE}?locationIdentifier={region_id}"
+            "&numberOfPropertiesPerPage=24&sortType=2&index=0&channel=BUY"
+        )
+        api_headers = {
+            "User-Agent": rm.USER_AGENT,
+            "Accept": "application/json, text/plain, */*",
+            "Referer": "https://www.rightmove.co.uk/",
+        }
+
+        try:
+            proxy_used = mode == "scraperapi" and has_key
+            fetch_url = rm.make_scraperapi_url(api_url, render=False) if proxy_used else api_url
+            async with session.get(fetch_url, headers=api_headers, timeout=timeout_seconds) as resp:
+                api_status = getattr(resp, "status", 0)
+                data = await resp.json(content_type=None)
+
+            # Match scraper behavior: in direct mode, retry through ScraperAPI on non-200.
+            fallback_used = False
+            if (not proxy_used) and has_key and api_status != 200:
+                fallback_used = True
+                proxy_url = rm.make_scraperapi_url(api_url, render=False)
+                async with session.get(
+                    proxy_url, headers=api_headers, timeout=max(timeout_seconds, 60)
+                ) as p_resp:
+                    api_status = getattr(p_resp, "status", 0)
+                    data = await p_resp.json(content_type=None)
+
+            props = []
+            if isinstance(data, dict):
+                props = data.get("properties") or []
+
+            blocked = bool(
+                api_status in (403, 503)
+                or (isinstance(data, str) and _generic_blocked_markers(data))
+            )
+            api_probe = {
+                "target_url": api_url,
+                "proxy_used": bool(proxy_used or fallback_used),
+                "proxy_fallback_used": fallback_used,
+                "http_status": api_status,
+                "properties_found": len(props) if isinstance(props, list) else 0,
+                "blocked": blocked,
+                "classification": (
+                    "blocked"
+                    if blocked
+                    else (
+                        "parsed"
+                        if isinstance(props, list) and len(props) > 0
+                        else "fetched_no_results"
+                    )
+                ),
+                "elapsed_ms": int((time.monotonic() - api_started) * 1000),
+            }
+        except asyncio.TimeoutError:
+            api_probe = {
+                "target_url": api_url,
+                "proxy_used": mode == "scraperapi" and has_key,
+                "classification": "timeout",
+                "elapsed_ms": int((time.monotonic() - api_started) * 1000),
+            }
+        except Exception as e:
+            api_probe = {
+                "target_url": api_url,
+                "proxy_used": mode == "scraperapi" and has_key,
+                "classification": "error",
+                "error": str(e),
+                "elapsed_ms": int((time.monotonic() - api_started) * 1000),
+            }
+
+    # 2) Probe HTML listing page and run selector-based card detection.
+    html_started = time.monotonic()
+    html_target_url = rm._build_search_url(location, page=page)
+    html_proxy_used = mode == "scraperapi" and has_key
+    html_fetch_url = (
+        rm.make_scraperapi_url(html_target_url, render=True) if html_proxy_used else html_target_url
+    )
+
+    html_headers = {"User-Agent": rm.USER_AGENT}
+
+    try:
+        html_status, html_text = await _fetch_text(
+            session, html_fetch_url, headers=html_headers, timeout_seconds=timeout_seconds
+        )
+    except asyncio.TimeoutError:
+        html_probe = {
+            "target_url": html_target_url,
+            "proxy_used": html_proxy_used,
+            "classification": "timeout",
+            "elapsed_ms": int((time.monotonic() - html_started) * 1000),
+        }
+        return {"api": api_probe, "html": html_probe}
+
+    initial_blocked = bool(
+        rm._looks_blocked(html_text, html_status) or _generic_blocked_markers(html_text)
+    )
+    initial_status = html_status
+    initial_len = len(html_text or "")
+
+    # Match scraper behavior: in direct mode, attempt ScraperAPI fallback when blocked.
+    html_fallback_used = False
+    if (not html_proxy_used) and has_key and initial_blocked:
+        html_fallback_used = True
+        try:
+            proxy_url = rm.make_scraperapi_url(html_target_url, render=True)
+            html_status, html_text = await _fetch_text(
+                session, proxy_url, headers=html_headers, timeout_seconds=max(timeout_seconds, 60)
+            )
+        except Exception:
+            html_status, html_text = initial_status, html_text
+
+    blocked = bool(rm._looks_blocked(html_text, html_status) or _generic_blocked_markers(html_text))
+    soup = BeautifulSoup(html_text, "html.parser")
+    cards = rm._collect_selectors(soup)
+
+    lowered = (html_text or "").lower()
+    maybe_not_found = (
+        "page-not-found" in lowered or "page not found" in lowered or "we couldn't find" in lowered
+    )
+
+    if blocked:
+        classification = "blocked"
+    elif len(cards) > 0:
+        classification = "parsed"
+    elif maybe_not_found:
+        classification = "redirected_not_found"
+    else:
+        classification = "fetched_no_cards"
+
+    html_probe = {
+        "target_url": html_target_url,
+        "proxy_used": bool(html_proxy_used or html_fallback_used),
+        "initial_http_status": initial_status,
+        "initial_html_len": initial_len,
+        "initial_blocked": initial_blocked,
+        "proxy_fallback_used": html_fallback_used,
+        "http_status": html_status,
+        "html_len": len(html_text or ""),
+        "cards_found": len(cards),
+        "blocked": blocked,
+        "page_not_found_signal": maybe_not_found,
+        "classification": classification,
+        "elapsed_ms": int((time.monotonic() - html_started) * 1000),
+    }
+
+    return {"api": api_probe, "html": html_probe}
+
+
+async def _probe_onthemarket(
+    session: Any, location: str, page: int, timeout_seconds: int
+) -> Dict[str, Any]:
+    from bs4 import BeautifulSoup
+
+    from backend.scraper import onthemarket_scraper as otm
+
+    target_url = otm._build_search_url(location, page=page)
+
+    mode = (os.getenv("SCRAPER_MODE") or "direct").lower()
+    has_key = bool((os.getenv("SCRAPERAPI_KEY") or "").strip())
+    proxy_used = mode == "scraperapi" and has_key
+
+    headers = {"User-Agent": otm.USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
+
+    started = time.monotonic()
+    try:
+        fetch_url = otm.make_scraperapi_url(target_url, render=True) if proxy_used else target_url
+        status, text = await _fetch_text(
+            session, fetch_url, headers=headers, timeout_seconds=timeout_seconds
+        )
+    except asyncio.TimeoutError:
+        return {
+            "target_url": target_url,
+            "proxy_used": proxy_used,
+            "classification": "timeout",
+            "elapsed_ms": int((time.monotonic() - started) * 1000),
+        }
+
+    initial_blocked = bool(otm._looks_blocked(text, status) or _generic_blocked_markers(text))
+    initial_status = status
+    initial_len = len(text or "")
+
+    fallback_used = False
+    if (not proxy_used) and has_key and initial_blocked:
+        fallback_used = True
+        try:
+            proxy_url = otm.make_scraperapi_url(target_url, render=True)
+            status, text = await _fetch_text(
+                session, proxy_url, headers=headers, timeout_seconds=max(timeout_seconds, 60)
+            )
+        except Exception:
+            status, text = initial_status, text
+
+    blocked = bool(otm._looks_blocked(text, status) or _generic_blocked_markers(text))
+    soup = BeautifulSoup(text, "html.parser")
+    cards = otm._collect_cards(soup)
+
+    classification = "blocked" if blocked else ("parsed" if len(cards) > 0 else "fetched_no_cards")
+
+    return {
+        "target_url": target_url,
+        "proxy_used": bool(proxy_used or fallback_used),
+        "initial_http_status": initial_status,
+        "initial_html_len": initial_len,
+        "initial_blocked": initial_blocked,
+        "proxy_fallback_used": fallback_used,
+        "http_status": status,
+        "html_len": len(text or ""),
+        "cards_found": len(cards),
+        "blocked": blocked,
+        "classification": classification,
+        "elapsed_ms": int((time.monotonic() - started) * 1000),
+    }
+
+
+async def _probe_spareroom(
+    session: Any, location: str, page: int, timeout_seconds: int
+) -> Dict[str, Any]:
+    from bs4 import BeautifulSoup
+
+    from backend.scraper import spare_room_scraper as sr
+
+    target_url = sr._build_search_url(location, page=page)
+
+    mode = (os.getenv("SCRAPER_MODE") or "direct").lower()
+    has_key = bool((os.getenv("SCRAPERAPI_KEY") or "").strip())
+    proxy_used = mode == "scraperapi" and has_key
+
+    headers = {"User-Agent": sr.USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
+
+    started = time.monotonic()
+    try:
+        fetch_url = sr.make_scraperapi_url(target_url, render=True) if proxy_used else target_url
+        status, text = await _fetch_text(
+            session, fetch_url, headers=headers, timeout_seconds=timeout_seconds
+        )
+    except asyncio.TimeoutError:
+        return {
+            "target_url": target_url,
+            "proxy_used": proxy_used,
+            "classification": "timeout",
+            "elapsed_ms": int((time.monotonic() - started) * 1000),
+        }
+
+    initial_blocked = bool(sr._looks_blocked(text, status) or _generic_blocked_markers(text))
+    initial_status = status
+    initial_len = len(text or "")
+
+    fallback_used = False
+    if (not proxy_used) and has_key and initial_blocked:
+        fallback_used = True
+        try:
+            proxy_url = sr.make_scraperapi_url(target_url, render=True)
+            status, text = await _fetch_text(
+                session, proxy_url, headers=headers, timeout_seconds=max(timeout_seconds, 60)
+            )
+        except Exception:
+            status, text = initial_status, text
+
+    blocked = bool(sr._looks_blocked(text, status) or _generic_blocked_markers(text))
+    soup = BeautifulSoup(text, "html.parser")
+    cards = sr._collect_cards(soup)
+
+    classification = "blocked" if blocked else ("parsed" if len(cards) > 0 else "fetched_no_cards")
+
+    return {
+        "target_url": target_url,
+        "proxy_used": bool(proxy_used or fallback_used),
+        "initial_http_status": initial_status,
+        "initial_html_len": initial_len,
+        "initial_blocked": initial_blocked,
+        "proxy_fallback_used": fallback_used,
+        "http_status": status,
+        "html_len": len(text or ""),
+        "cards_found": len(cards),
+        "blocked": blocked,
+        "classification": classification,
+        "elapsed_ms": int((time.monotonic() - started) * 1000),
+    }
+
+
+async def _run_probe(
+    location: str,
+    *,
+    sources: List[str],
+    page: int,
+    timeout_seconds: int,
+) -> Dict[str, Any]:
+    import aiohttp
+
+    out: Dict[str, Any] = {}
+
+    async with aiohttp.ClientSession() as session:
+        tasks: Dict[str, Any] = {}
+
+        if "zoopla" in sources:
+            tasks["zoopla"] = asyncio.create_task(
+                _probe_zoopla(session, location, page, timeout_seconds)
+            )
+        if "rightmove" in sources:
+            tasks["rightmove"] = asyncio.create_task(
+                _probe_rightmove(session, location, page, timeout_seconds)
+            )
+        if "onthemarket" in sources:
+            tasks["onthemarket"] = asyncio.create_task(
+                _probe_onthemarket(session, location, page, timeout_seconds)
+            )
+        if "spareroom" in sources:
+            tasks["spareroom"] = asyncio.create_task(
+                _probe_spareroom(session, location, page, timeout_seconds)
+            )
+
+        for name, task in tasks.items():
+            try:
+                out[name] = await task
+            except Exception as e:
+                out[name] = {"classification": "error", "error": str(e)}
+
+    return out
+
+
+@router.get("/debug/scrape-probe")
+async def debug_scrape_probe(
+    location: str = Query(..., description="Location e.g. London"),
+    sources: str | None = Query(
+        None,
+        description="Comma-separated subset: zoopla,rightmove,onthemarket,spareroom",
+    ),
+    page: int = Query(0, ge=0, le=3, description="Page index to probe (0-based)"),
+    timeout_seconds: int = Query(
+        int(os.getenv("SCRAPE_PROBE_TIMEOUT_SECONDS", os.getenv("SCRAPER_TIMEOUT_SECONDS", "35"))),
+        ge=5,
+        le=120,
+        description="Total timeout per probe request",
+    ),
+    x_admin_token: str | None = Header(None),
+):
+    """Probe each scraper source and report blocked vs parsed vs timeout.
+
+    Returns only metadata (status codes, lengths, counts). Never returns raw HTML.
+    Protected by IMPORT_ADMIN_TOKEN when configured.
+    """
+
+    _require_admin(x_admin_token)
+
+    loc = (location or "").strip()
+    if not loc:
+        raise HTTPException(status_code=422, detail="Missing location")
+
+    selected = _safe_source_list(sources)
+    if not selected:
+        raise HTTPException(status_code=422, detail="No valid sources requested")
+
+    started = time.monotonic()
+    results = await _run_probe(loc, sources=selected, page=page, timeout_seconds=timeout_seconds)
+
+    return {
+        "ok": True,
+        "ts": _now_iso(),
+        "location": loc,
+        "sources": selected,
+        "scraper_mode": (os.getenv("SCRAPER_MODE") or "direct"),
+        "scraperapi_enabled": bool((os.getenv("SCRAPERAPI_KEY") or "").strip()),
+        "playwright_enabled": (os.getenv("PLAYWRIGHT_ENABLE") or "0") == "1",
+        "timeout_seconds": timeout_seconds,
+        "elapsed_ms": int((time.monotonic() - started) * 1000),
+        "results": results,
+    }

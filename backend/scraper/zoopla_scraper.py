@@ -397,8 +397,24 @@ async def scrape_zoopla_properties(
                     url = _build_search_url(location, page)
                     html = await _fetch_html(session, url)
                     if not html:
-                        log_page_fetch_error("zoopla", page, "blocked or empty")
-                        continue
+                        # If direct fetch gets blocked/empty, try browser rendering if enabled.
+                        if PLAYWRIGHT_ENABLE:
+                            rendered = await render_page(
+                                url,
+                                [
+                                    "[data-testid='search-result']",
+                                    ".c-propertyCard",
+                                    ".l-searchResult",
+                                ],
+                            )
+                            if rendered:
+                                html = rendered
+                            else:
+                                log_page_fetch_error("zoopla", page, "blocked or empty")
+                                continue
+                        else:
+                            log_page_fetch_error("zoopla", page, "blocked or empty")
+                            continue
                     soup = BeautifulSoup(html, "html.parser")
                     cards = _collect_cards(soup)
                     if not cards:

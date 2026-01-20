@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ClerkProvider } from "@clerk/nextjs";
+import { isAuthEnabled } from "@/lib/auth";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   // Helpful runtime debug: confirms env var is truly present client-side on Vercel
@@ -14,6 +15,12 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       );
     }
   }, []);
+
+  // Prevent CI/SSG failures: ClerkProvider throws if publishableKey is missing.
+  // If auth is disabled (or key missing), render without Clerk.
+  if (!isAuthEnabled) {
+    return <>{children}</>;
+  }
 
   return <ClerkProvider>{children}</ClerkProvider>;
 }

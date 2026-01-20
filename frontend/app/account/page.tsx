@@ -166,6 +166,31 @@ function AccountPageContent() {
 }
 
 export default function AccountPage() {
+  // If auth is disabled (or Clerk publishable key is missing), Clerk hooks will throw.
+  // Render a safe fallback so Next.js can build/prerender.
+  if (!isAuthEnabled) {
+    return (
+      <main className="mx-auto max-w-3xl px-6 py-10">
+        <div className="flex items-center gap-3 mb-2">
+          <h1 className="text-2xl font-bold tracking-tight">Manage Subscription</h1>
+          <PlanBadge size="md" />
+        </div>
+        <p className="text-zinc-600 dark:text-zinc-300 mb-6">
+          Subscription management is unavailable because authentication is disabled.
+        </p>
+        <div className="text-sm text-zinc-600 dark:text-zinc-400">
+          If this is unexpected, set <code>NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY</code> (and ensure auth
+          is not disabled) then redeploy.
+        </div>
+        <div className="mt-4">
+          <Link href="/pricing" className="underline hover:text-blue-600">
+            View pricing
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <Suspense fallback={
       <main className="mx-auto max-w-3xl px-6 py-10">

@@ -491,8 +491,23 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                     html = await _fetch_html(session, url)
                     # Playwright fallback if enabled and static HTML yielded no cards later
                     if not html:
-                        log_page_fetch_error("rightmove", page, "blocked or empty")
-                        continue
+                        if PLAYWRIGHT_ENABLE:
+                            rendered = await render_page(
+                                url,
+                                [
+                                    "[data-testid='propertyCard']",
+                                    "article.propertyCard",
+                                    ".propertyCard",
+                                ],
+                            )
+                            if rendered:
+                                html = rendered
+                            else:
+                                log_page_fetch_error("rightmove", page, "blocked or empty")
+                                continue
+                        else:
+                            log_page_fetch_error("rightmove", page, "blocked or empty")
+                            continue
                     soup = BeautifulSoup(html, "html.parser")
                     cards = _collect_selectors(soup)
                     if not cards:
@@ -658,8 +673,23 @@ async def _fetch_api_properties(
         try:
             async with session.get(url, headers=headers, timeout=35) as resp:
                 if resp.status != 200:
-                    break
-                data = await resp.json(content_type=None)
+                    # Production hosts frequently get blocked on this endpoint.
+                    # If configured, retry through ScraperAPI (no-render) to obtain JSON.
+                    if SCRAPERAPI_KEY:
+                        try:
+                            proxy_url = make_scraperapi_url(url, render=False)
+                            async with session.get(
+                                proxy_url, headers=headers, timeout=60
+                            ) as p_resp:
+                                if p_resp.status != 200:
+                                    break
+                                data = await p_resp.json(content_type=None)
+                        except Exception:
+                            break
+                    else:
+                        break
+                else:
+                    data = await resp.json(content_type=None)
         except Exception:
             break
         if not data or "properties" not in data:
