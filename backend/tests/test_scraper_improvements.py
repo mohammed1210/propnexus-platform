@@ -265,6 +265,14 @@ def test_scraperapi_mode_handling():
         importlib.reload(rightmove_scraper)
 
 
+def test_zoopla_search_url_slugified():
+    """Zoopla location path should be slugified (lowercase + hyphen)."""
+    from backend.scraper.zoopla_scraper import _build_search_url
+
+    assert _build_search_url("London") == "https://www.zoopla.co.uk/for-sale/property/london/"
+    assert _build_search_url("St Albans") == "https://www.zoopla.co.uk/for-sale/property/st-albans/"
+
+
 def main():
     """Run all tests."""
     print("\n=== Running Scraper Smoke Tests ===\n")
@@ -279,6 +287,7 @@ def main():
         ("Logger statistics", test_logger_stats),
         ("ScraperAPI URL builder", test_scraperapi_url_builder),
         ("ScraperAPI mode handling", test_scraperapi_mode_handling),
+        ("Zoopla URL slugified", test_zoopla_search_url_slugified),
     ]
 
     results = []

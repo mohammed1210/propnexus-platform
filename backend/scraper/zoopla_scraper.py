@@ -39,6 +39,24 @@ SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
 
 
+def _has_cloudflare_marker(text: str) -> bool:
+    lowered = (text or "").lower()
+    return ("cdn-cgi" in lowered) or ("cloudflare" in lowered)
+
+
+_SLUG_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+
+
+def _slugify_location(location: str) -> str:
+    s = (location or "").strip().lower()
+    if not s:
+        return ""
+    s = s.replace("'", "").replace("’", "")
+    s = _SLUG_NON_ALNUM_RE.sub("-", s)
+    s = s.strip("-")
+    return s
+
+
 def _extract_next_data(soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
     """Extract Next.js __NEXT_DATA__ JSON when present."""
     try:
@@ -196,7 +214,13 @@ def _looks_like_postcode(s: str) -> bool:
     return bool(s and _POSTCODE_RE.search(s))
 
 
-def make_scraperapi_url(target_url: str, *, render: bool = True) -> str:
+def make_scraperapi_url(
+    target_url: str,
+    *,
+    render: bool = True,
+    premium: bool = False,
+    session_number: Optional[str] = None,
+) -> str:
     """
     Build a ScraperAPI URL for the given target URL.
 
@@ -219,6 +243,7 @@ def make_scraperapi_url(target_url: str, *, render: bool = True) -> str:
         "render": "true" if render else None,
         "country_code": "gb",
         "keep_headers": "true",
+        "premium": "true" if premium else None,
         "url": target_url,
     }
 
@@ -227,16 +252,19 @@ def make_scraperapi_url(target_url: str, *, render: bool = True) -> str:
     if render:
         params["device_type"] = "desktop"
 
-    session_fixed = (os.getenv("SCRAPERAPI_SESSION_NUMBER") or "").strip()
-    session_random = (os.getenv("SCRAPERAPI_SESSION_RANDOM") or "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
-    if session_fixed:
-        params["session_number"] = session_fixed
-    elif session_random:
-        params["session_number"] = str(random.randint(1, 999999))
+    if session_number:
+        params["session_number"] = str(session_number)
+    else:
+        session_fixed = (os.getenv("SCRAPERAPI_SESSION_NUMBER") or "").strip()
+        session_random = (os.getenv("SCRAPERAPI_SESSION_RANDOM") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if session_fixed:
+            params["session_number"] = session_fixed
+        elif session_random:
+            params["session_number"] = str(random.randint(1, 999999))
 
     return f"{SCRAPERAPI_BASE}?{urlencode(params)}"
 
@@ -250,7 +278,7 @@ def _looks_blocked(html: str, status: int) -> bool:
 
 def _build_search_url(location: str, page: int = 0) -> str:
     # Zoopla pagination uses ?page=2 etc.
-    encoded = location.strip()
+    encoded = _slugify_location(location)
     base = f"https://www.zoopla.co.uk/for-sale/property/{encoded}/"
     if page > 0:
         return f"{base}?page={page + 1}"
@@ -294,8 +322,42 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 via="scraperapi" if mode == "scraperapi" else "direct",
             )
 
+            blocked = (
+                _looks_blocked(text, resp.status)
+                or _has_cloudflare_marker(text)
+                or not (text or "").strip()
+            )
+
+            # If already using ScraperAPI and we hit Cloudflare/blocked, retry once with premium.
+            if mode == "scraperapi" and blocked and SCRAPERAPI_KEY:
+                premium_url = make_scraperapi_url(
+                    url,
+                    render=True,
+                    premium=True,
+                    session_number=str(random.randint(1, 999999)),
+                )
+                try:
+                    async with session.get(premium_url, headers=headers, timeout=75) as p_resp:
+                        p_text = await p_resp.text()
+                        log_fetch_diagnostics(
+                            "zoopla",
+                            url,
+                            status=p_resp.status,
+                            text=p_text,
+                            via="scraperapi-premium",
+                        )
+                        premium_blocked = (
+                            _looks_blocked(p_text, p_resp.status)
+                            or _has_cloudflare_marker(p_text)
+                            or not (p_text or "").strip()
+                        )
+                        if not premium_blocked:
+                            return p_text
+                except Exception:
+                    return None
+
             # If direct mode and we detect blocking, try ScraperAPI as fallback
-            if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
+            if mode == "direct" and blocked and SCRAPERAPI_KEY:
                 log_scraperapi_fallback("zoopla", url)
                 proxy_url = make_scraperapi_url(url, render=True)
                 print(f"ℹ️ Fallback to ScraperAPI for blocked URL: {url}")
@@ -309,14 +371,43 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             text=p_text,
                             via="scraperapi-fallback",
                         )
-                        if _looks_blocked(p_text, p_resp.status):
-                            return None
-                        return p_text
+                        blocked_proxy = (
+                            _looks_blocked(p_text, p_resp.status)
+                            or _has_cloudflare_marker(p_text)
+                            or not (p_text or "").strip()
+                        )
+                        if not blocked_proxy:
+                            return p_text
+
+                        # One more attempt: premium + session pinning.
+                        premium_url = make_scraperapi_url(
+                            url,
+                            render=True,
+                            premium=True,
+                            session_number=str(random.randint(1, 999999)),
+                        )
+                        async with session.get(premium_url, headers=headers, timeout=75) as pp_resp:
+                            pp_text = await pp_resp.text()
+                            log_fetch_diagnostics(
+                                "zoopla",
+                                url,
+                                status=pp_resp.status,
+                                text=pp_text,
+                                via="scraperapi-premium-fallback",
+                            )
+                            blocked_premium = (
+                                _looks_blocked(pp_text, pp_resp.status)
+                                or _has_cloudflare_marker(pp_text)
+                                or not (pp_text or "").strip()
+                            )
+                            if blocked_premium:
+                                return None
+                            return pp_text
                 except Exception:
                     return None
 
             # If still looks blocked, return None
-            if _looks_blocked(text, resp.status):
+            if blocked:
                 return None
 
             return text
@@ -340,9 +431,35 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         text=p_text,
                         via="scraperapi-exception-fallback",
                     )
-                    if _looks_blocked(p_text, p_resp.status):
-                        return None
-                    return p_text
+                    blocked_proxy = (
+                        _looks_blocked(p_text, p_resp.status)
+                        or _has_cloudflare_marker(p_text)
+                        or not (p_text or "").strip()
+                    )
+                    if not blocked_proxy:
+                        return p_text
+
+                    premium_url = make_scraperapi_url(
+                        url,
+                        render=True,
+                        premium=True,
+                        session_number=str(random.randint(1, 999999)),
+                    )
+                    async with session.get(premium_url, headers=headers, timeout=75) as pp_resp:
+                        pp_text = await pp_resp.text()
+                        log_fetch_diagnostics(
+                            "zoopla",
+                            url,
+                            status=pp_resp.status,
+                            text=pp_text,
+                            via="scraperapi-premium-exception-fallback",
+                        )
+                        blocked_premium = (
+                            _looks_blocked(pp_text, pp_resp.status)
+                            or _has_cloudflare_marker(pp_text)
+                            or not (pp_text or "").strip()
+                        )
+                        return None if blocked_premium else pp_text
             except Exception:
                 return None
         return None
