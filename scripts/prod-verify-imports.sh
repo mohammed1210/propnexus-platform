@@ -36,7 +36,7 @@ echo "==> 2.5) Scrape probe (if endpoint exists)"
 # This returns only metadata (blocked/parsed/timeout), never raw HTML.
 curl -sS \
   -H "x-admin-token: $ADMIN_TOKEN" \
-  "$BACKEND_URL/debug/scrape-probe?location=$(python -c 'import urllib.parse,os; print(urllib.parse.quote(os.environ["LOCATION"]))')&sources=$(python -c 'import urllib.parse,os; print(urllib.parse.quote(os.environ["SOURCES"]))')&page=$PAGE&timeout_seconds=$TIMEOUT_SECONDS" \
+  "$BACKEND_URL/debug/scrape-probe?location=$(python -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$LOCATION")&sources=$(python -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$SOURCES")&page=$PAGE&timeout_seconds=$TIMEOUT_SECONDS" \
   | python -m json.tool \
   || echo "(no /debug/scrape-probe endpoint yet)"
 
@@ -84,7 +84,7 @@ done
 echo
 echo "==> 6) Run /import/all?req=$LOCATION (aggregated)"
 http_code="$(curl -sS --max-time 300 -o /tmp/import_all.out -w "%{http_code}" \
-  -X POST "$BACKEND_URL/import/all?req=$(python -c 'import urllib.parse,os; print(urllib.parse.quote(os.environ["LOCATION"]))')" \
+  -X POST "$BACKEND_URL/import/all?req=$(python -c 'import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))' "$LOCATION")" \
   -H "x-admin-token: $ADMIN_TOKEN" || true)"
 echo "HTTP:$http_code"
 python -m json.tool /tmp/import_all.out || (echo "(non-JSON)"; sed -n '1,80p' /tmp/import_all.out)
