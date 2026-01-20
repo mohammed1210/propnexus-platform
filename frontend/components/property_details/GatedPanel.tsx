@@ -5,6 +5,7 @@ import { ReactNode } from 'react';
 import { useUserPlan } from '@/lib/useUserPlan';
 import { hasAccess } from '@/lib/planPermissions';
 import LockedFeature from '@/components/LockedFeature';
+import { isAuthEnabled } from '@/lib/auth';
 
 interface GatedPanelProps {
   children: ReactNode;
@@ -23,6 +24,12 @@ export default function GatedPanel({
   requiredPlan,
   featureEnabled,
 }: GatedPanelProps) {
+  // If auth is disabled (or Clerk keys missing), fail open and render the feature.
+  // This avoids build-time failures from Clerk hooks.
+  if (!isAuthEnabled) {
+    return featureEnabled ? <>{children}</> : null;
+  }
+
   const { plan, loading } = useUserPlan();
 
   // Simple local-dev bypass so designers/PMs can preview gated UI

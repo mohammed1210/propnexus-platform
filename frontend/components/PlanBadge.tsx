@@ -3,6 +3,7 @@
 
 import React from 'react';
 import { useUserPlan, UserPlan } from '@/lib/useUserPlan';
+import { isAuthEnabled } from '@/lib/auth';
 
 interface PlanBadgeProps {
   /**
@@ -65,6 +66,18 @@ export default function PlanBadge({
   showLoading = true,
   className = '',
 }: PlanBadgeProps) {
+  if (!isAuthEnabled) {
+    return (
+      <span
+        className={`inline-flex items-center ${SIZE_CLASSES[size]} rounded-full border font-semibold ${PLAN_COLORS.free.bg} ${PLAN_COLORS.free.text} ${PLAN_COLORS.free.border} ${className}`}
+        role="status"
+        aria-label="Current plan: free"
+      >
+        <span className="capitalize">free</span>
+      </span>
+    );
+  }
+
   const { plan, loading } = useUserPlan();
 
   // Show loading spinner if enabled and still loading
