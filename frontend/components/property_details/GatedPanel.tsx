@@ -24,14 +24,6 @@ export default function GatedPanel({
   requiredPlan,
   featureEnabled,
 }: GatedPanelProps) {
-  // If auth is disabled (or Clerk keys missing), fail open and render the feature.
-  // This avoids build-time failures from Clerk hooks.
-  if (!isAuthEnabled) {
-    return featureEnabled ? <>{children}</> : null;
-  }
-
-  const { plan, loading } = useUserPlan();
-
   // Simple local-dev bypass so designers/PMs can preview gated UI
   const bypassGating =
     typeof window !== 'undefined' && process.env.NEXT_PUBLIC_BYPASS_GATING === 'true';
@@ -40,6 +32,33 @@ export default function GatedPanel({
   if (!featureEnabled) {
     return null;
   }
+
+  // If auth is disabled (or Clerk keys missing), fail open and render the feature.
+  // This avoids build-time failures from Clerk hooks.
+  if (!isAuthEnabled) {
+    return <>{children}</>;
+  }
+
+  return (
+    <GatedPanelAuthed
+      title={title}
+      requiredPlan={requiredPlan}
+      featureEnabled={featureEnabled}
+      bypassGating={bypassGating}
+    >
+      {children}
+    </GatedPanelAuthed>
+  );
+}
+
+function GatedPanelAuthed({
+  children,
+  title,
+  requiredPlan,
+  featureEnabled,
+  bypassGating,
+}: GatedPanelProps & { bypassGating: boolean }) {
+  const { plan, loading } = useUserPlan();
 
   // Loading state
   if (loading) {
