@@ -19,6 +19,7 @@ from backend.routes.ai import router as ai_router
 from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
 from backend.routes.debug_properties import router as debug_properties_router
+from backend.routes.debug_scrape_probe import router as debug_scrape_probe_router
 from backend.routes.gpt_routes import router as gpt_router
 from backend.routes.import_routes import admin_alias_router
 from backend.routes.import_routes import router as import_router
@@ -137,6 +138,28 @@ def debug_supabase_env():
     }
 
 
+@app.get("/debug/scraper-env")
+def debug_scraper_env():
+    """Expose scraper configuration in a safe way (no secrets)."""
+
+    scraper_mode = (os.getenv("SCRAPER_MODE") or "direct").strip()
+    scraperapi_key = (os.getenv("SCRAPERAPI_KEY") or "").strip()
+    return {
+        "SCRAPER_MODE": scraper_mode,
+        "SCRAPER_TIMEOUT_SECONDS": os.getenv("SCRAPER_TIMEOUT_SECONDS", "20"),
+        "SCRAPERAPI_KEY_present": bool(scraperapi_key),
+        "SCRAPERAPI_KEY_len": len(scraperapi_key),
+        "SCRAPERAPI_KEY_prefix": scraperapi_key[:6] if scraperapi_key else "",
+        "PLAYWRIGHT_ENABLE": os.getenv("PLAYWRIGHT_ENABLE", "0") == "1",
+        "PLAYWRIGHT_BROWSER": os.getenv("PLAYWRIGHT_BROWSER", "chromium"),
+        "PLAYWRIGHT_TIMEOUT_MS": os.getenv("PLAYWRIGHT_TIMEOUT_MS", "15000"),
+        "ZP_MAX_PAGES": os.getenv("ZP_MAX_PAGES", "1"),
+        "RM_MAX_PAGES": os.getenv("RM_MAX_PAGES", "1"),
+        "OTM_MAX_PAGES": os.getenv("OTM_MAX_PAGES", "1"),
+        "SR_MAX_PAGES": os.getenv("SR_MAX_PAGES", "1"),
+    }
+
+
 # ======================
 # 🏠 Root Route
 # ======================
@@ -152,6 +175,7 @@ app.include_router(ai_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
 app.include_router(debug_properties_router)
+app.include_router(debug_scrape_probe_router)
 app.include_router(gpt_router)
 app.include_router(import_router)
 app.include_router(admin_alias_router)
