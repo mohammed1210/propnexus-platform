@@ -440,7 +440,7 @@ def _has_challenge_marker(html: str) -> bool:
 
 def _build_search_url(location: str, page: int = 0) -> str:
     """
-    Rightmove listing pages use paginationIndex. locationIdentifier can be derived
+    Rightmove listing pages use index (offset). locationIdentifier can be derived
     via an initial search API call; for a generic free-text we rely on searchLocation.
     NOTE: For higher accuracy you may resolve locationIdentifier separately.
     """
@@ -451,12 +451,10 @@ def _build_search_url(location: str, page: int = 0) -> str:
     # Pragmatic reliability fix: London is known-good via REGION identifier.
     # Avoid free-text searchLocation flows which can vary and omit embedded state.
     if loc_key == "london":
-        params = [
-            "locationIdentifier=REGION%5E87490",
-            "sortType=2",
-            "includeSSTC=false",
-            f"paginationIndex={page * 24}",
-        ]
+        # Match the simplest known-good URL for the first page.
+        params = ["locationIdentifier=REGION%5E87490", "sortType=2", "includeSSTC=false"]
+        if page > 0:
+            params.append(f"index={page * 24}")
         return f"{base}?{'&'.join(params)}"
 
     params = [
@@ -469,7 +467,7 @@ def _build_search_url(location: str, page: int = 0) -> str:
         "sortType=2",
         "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
         "furnishTypes=&keywords=",
-        f"paginationIndex={page * 24}",  # Rightmove step size often 24
+        f"index={page * 24}",  # Rightmove step size often 24
     ]
     return f"{base}?{'&'.join(params)}"
 
