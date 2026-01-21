@@ -255,7 +255,7 @@ def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
 
 
-def make_scraperapi_url(target_url: str, *, render: bool = True) -> str:
+def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
     """
     Build a ScraperAPI URL for the given target URL.
 
@@ -318,6 +318,18 @@ def _build_search_url(location: str, page: int = 0) -> str:
     encoded = location.strip()
     loc_key = encoded.lower()
     base = "https://www.rightmove.co.uk/property-for-sale/find.html"
+
+    # Pragmatic reliability fix: London is known-good via REGION identifier.
+    # Avoid free-text searchLocation flows which can vary and omit embedded state.
+    if loc_key == "london":
+        params = [
+            "locationIdentifier=REGION%5E87490",
+            "sortType=2",
+            "includeSSTC=false",
+            f"paginationIndex={page * 24}",
+        ]
+        return f"{base}?{'&'.join(params)}"
+
     params = [
         # Prefer region identifier when known; improves reliability
         (
@@ -349,8 +361,8 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             )
             url_to_fetch = url
         else:
-            # Use ScraperAPI with rendering for HTML fallback
-            url_to_fetch = make_scraperapi_url(url, render=True)
+            # Rightmove typically includes embedded state in the HTML; rendering increases latency.
+            url_to_fetch = make_scraperapi_url(url, render=False)
             print(f"ℹ️ Using ScraperAPI for Rightmove HTML fetch: {url}")
     else:
         # Direct mode - use original URL
@@ -373,7 +385,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             # If direct mode and we detect blocking, try ScraperAPI as fallback
             if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
                 log_scraperapi_fallback("rightmove", url)
-                proxy_url = make_scraperapi_url(url, render=True)
+                proxy_url = make_scraperapi_url(url, render=False)
                 print(f"ℹ️ Fallback to ScraperAPI for blocked URL: {url}")
                 try:
                     async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
@@ -406,7 +418,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
         if SCRAPERAPI_KEY:
             print(f"⚠️ Direct fetch failed, trying ScraperAPI fallback: {e}")
             try:
-                proxy_url = make_scraperapi_url(url, render=True)
+                proxy_url = make_scraperapi_url(url, render=False)
                 async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
                     p_text = await p_resp.text()
                     log_fetch_diagnostics(
@@ -697,7 +709,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
         try:
             async with aiohttp.ClientSession() as session:
                 # 1. Attempt JSON API first for efficiency & reliability
-                loc_key = location.lower()
+                loc_key = (location or "").strip().lower()
                 region_id = _LOCATION_IDENTIFIER.get(loc_key)
                 api_results: List[Dict[str, Any]] = []
                 if region_id:
@@ -942,24 +954,41 @@ async def _fetch_api_properties(
         url = f"{RIGHTMOVE_API_BASE}?{'&'.join(params)}"
         try:
             async with session.get(url, headers=headers, timeout=35) as resp:
+                raw = await resp.text()
+                log_fetch_diagnostics(
+                    "rightmove",
+                    url,
+                    status=resp.status,
+                    text=raw,
+                    via="direct-json",
+                )
+
                 if resp.status != 200:
                     # Production hosts frequently get blocked on this endpoint.
-                    # If configured, retry through ScraperAPI (render) for UK targeting consistency.
-                    if SCRAPERAPI_KEY:
-                        try:
-                            proxy_url = make_scraperapi_url(url, render=True)
-                            async with session.get(
-                                proxy_url, headers=headers, timeout=60
-                            ) as p_resp:
-                                if p_resp.status != 200:
-                                    break
-                                data = await p_resp.json(content_type=None)
-                        except Exception:
-                            break
-                    else:
+                    # If configured, retry through ScraperAPI for UK targeting consistency.
+                    if not SCRAPERAPI_KEY:
+                        break
+                    try:
+                        proxy_url = make_scraperapi_url(url, render=False)
+                        async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
+                            p_raw = await p_resp.text()
+                            log_fetch_diagnostics(
+                                "rightmove",
+                                url,
+                                status=p_resp.status,
+                                text=p_raw,
+                                via="scraperapi-json",
+                            )
+                            if p_resp.status != 200:
+                                break
+                            data = json.loads(p_raw)
+                    except Exception:
                         break
                 else:
-                    data = await resp.json(content_type=None)
+                    try:
+                        data = json.loads(raw)
+                    except Exception:
+                        break
         except Exception:
             break
         if not data or "properties" not in data:
