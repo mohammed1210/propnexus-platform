@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import inspect
 import json
 import os
 import random
@@ -327,9 +328,10 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
 
     # Fetch the URL (either direct or via ScraperAPI)
     try:
-        async with session.get(
-            url_to_fetch, headers=headers, timeout=60 if mode == "scraperapi" else 30
-        ) as resp:
+        req = session.get(url_to_fetch, headers=headers, timeout=60 if mode == "scraperapi" else 30)
+        if inspect.isawaitable(req):
+            req = await req
+        async with req as resp:
             text = await resp.text()
             log_fetch_diagnostics(
                 "zoopla",
@@ -338,6 +340,56 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 text=text,
                 via="scraperapi" if mode == "scraperapi" else "direct",
             )
+
+            # ScraperAPI (and occasionally origin) can return 5xx with a small JSON payload.
+            # Treat this as actionable fetch failure: log snippet and retry once with premium.
+            if 500 <= int(resp.status) <= 599:
+                snippet = (text or "").strip().replace("\n", " ").replace("\r", " ")
+                snippet = re.sub(r"\s+", " ", snippet)[:300]
+                print(
+                    f"⚠️ [zoopla] 5xx via={('scraperapi' if mode == 'scraperapi' else 'direct')} status={int(resp.status)} bytes={len(text or '')} snippet={snippet}"
+                )
+
+                if SCRAPERAPI_KEY:
+                    premium_url = make_scraperapi_url(
+                        url,
+                        render=True,
+                        premium=True,
+                        session_number=str(random.randint(1, 999999)),
+                    )
+                    try:
+                        p_req = session.get(premium_url, headers=headers, timeout=75)
+                        if inspect.isawaitable(p_req):
+                            p_req = await p_req
+                        async with p_req as p_resp:
+                            p_text = await p_resp.text()
+                            log_fetch_diagnostics(
+                                "zoopla",
+                                url,
+                                status=p_resp.status,
+                                text=p_text,
+                                via="scraperapi-premium-5xx-retry",
+                            )
+                            if 500 <= int(p_resp.status) <= 599:
+                                p_snippet = (
+                                    (p_text or "").strip().replace("\n", " ").replace("\r", " ")
+                                )
+                                p_snippet = re.sub(r"\s+", " ", p_snippet)[:300]
+                                print(
+                                    f"⚠️ [zoopla] premium 5xx status={int(p_resp.status)} bytes={len(p_text or '')} snippet={p_snippet}"
+                                )
+                                return None
+
+                            premium_blocked = (
+                                _looks_blocked(p_text, int(p_resp.status))
+                                or _has_cloudflare_marker(p_text)
+                                or not (p_text or "").strip()
+                            )
+                            return None if premium_blocked else p_text
+                    except Exception:
+                        return None
+
+                return None
 
             blocked = (
                 _looks_blocked(text, resp.status)
@@ -354,7 +406,10 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                     session_number=str(random.randint(1, 999999)),
                 )
                 try:
-                    async with session.get(premium_url, headers=headers, timeout=75) as p_resp:
+                    p_req = session.get(premium_url, headers=headers, timeout=75)
+                    if inspect.isawaitable(p_req):
+                        p_req = await p_req
+                    async with p_req as p_resp:
                         p_text = await p_resp.text()
                         log_fetch_diagnostics(
                             "zoopla",
@@ -379,7 +434,10 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 proxy_url = make_scraperapi_url(url, render=True)
                 print(f"ℹ️ Fallback to ScraperAPI for blocked URL: {url}")
                 try:
-                    async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
+                    p_req = session.get(proxy_url, headers=headers, timeout=60)
+                    if inspect.isawaitable(p_req):
+                        p_req = await p_req
+                    async with p_req as p_resp:
                         p_text = await p_resp.text()
                         log_fetch_diagnostics(
                             "zoopla",
@@ -403,7 +461,10 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             premium=True,
                             session_number=str(random.randint(1, 999999)),
                         )
-                        async with session.get(premium_url, headers=headers, timeout=75) as pp_resp:
+                        pp_req = session.get(premium_url, headers=headers, timeout=75)
+                        if inspect.isawaitable(pp_req):
+                            pp_req = await pp_req
+                        async with pp_req as pp_resp:
                             pp_text = await pp_resp.text()
                             log_fetch_diagnostics(
                                 "zoopla",
@@ -439,7 +500,10 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             print(f"⚠️ Direct fetch failed, trying ScraperAPI fallback: {e}")
             try:
                 proxy_url = make_scraperapi_url(url, render=True)
-                async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
+                p_req = session.get(proxy_url, headers=headers, timeout=60)
+                if inspect.isawaitable(p_req):
+                    p_req = await p_req
+                async with p_req as p_resp:
                     p_text = await p_resp.text()
                     log_fetch_diagnostics(
                         "zoopla",
@@ -462,7 +526,10 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         premium=True,
                         session_number=str(random.randint(1, 999999)),
                     )
-                    async with session.get(premium_url, headers=headers, timeout=75) as pp_resp:
+                    pp_req = session.get(premium_url, headers=headers, timeout=75)
+                    if inspect.isawaitable(pp_req):
+                        pp_req = await pp_req
+                    async with pp_req as pp_resp:
                         pp_text = await pp_resp.text()
                         log_fetch_diagnostics(
                             "zoopla",

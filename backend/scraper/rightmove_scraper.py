@@ -37,6 +37,17 @@ USER_AGENT = (
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic", "bot detection"]
 
 
+CONSENT_MARKERS = [
+    "consent",
+    "consent-manager",
+    "sp-message",
+    "didomi",
+    "privacy",
+    "gdpr",
+    "cmp",
+]
+
+
 _POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
 
 
@@ -124,6 +135,79 @@ def _extract_preloaded_state(soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
                 continue
 
     return None
+
+
+def _extract_next_data(soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
+    """Extract Next.js __NEXT_DATA__ JSON when present."""
+    try:
+        el = soup.find("script", id="__NEXT_DATA__")
+        if not el:
+            return None
+        raw = el.string or el.get_text() or ""
+        raw = raw.strip()
+        if not raw:
+            return None
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
+def _find_rightmove_properties_in_next_data(next_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Try to locate a Rightmove listings/properties list inside __NEXT_DATA__."""
+    if not isinstance(next_data, dict):
+        return []
+
+    preferred_keys = (
+        "properties",
+        "propertyList",
+        "results",
+        "searchResults",
+        "listings",
+        "propertyResults",
+    )
+
+    def _unwrap(d: Any) -> Any:
+        if isinstance(d, dict):
+            # Some payloads nest the actual listing under a subkey.
+            for k in ("property", "listing", "result", "data"):
+                if k in d and isinstance(d[k], dict):
+                    return d[k]
+        return d
+
+    def _looks_like_property_dict(d: Any) -> bool:
+        d = _unwrap(d)
+        if not isinstance(d, dict):
+            return False
+        has_id = any(k in d for k in ("id", "propertyId", "listingId", "identifier"))
+        has_addr = any(k in d for k in ("displayAddress", "address", "summary"))
+        has_price = "price" in d or "priceAmount" in d
+        return bool(has_id and (has_addr or has_price))
+
+    def _scan(obj: Any, depth: int = 0) -> Optional[List[Dict[str, Any]]]:
+        if depth > 9:
+            return None
+        if isinstance(obj, dict):
+            for k in preferred_keys:
+                v = obj.get(k)
+                if isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
+                    if sum(1 for x in v if _looks_like_property_dict(x)) >= max(1, len(v) // 4):
+                        return v  # type: ignore[return-value]
+            for v in obj.values():
+                found = _scan(v, depth + 1)
+                if found:
+                    return found
+        elif isinstance(obj, list):
+            if obj and all(isinstance(x, dict) for x in obj):
+                if sum(1 for x in obj if _looks_like_property_dict(x)) >= max(1, len(obj) // 4):
+                    return obj  # type: ignore[return-value]
+            for v in obj:
+                found = _scan(v, depth + 1)
+                if found:
+                    return found
+        return None
+
+    found = _scan(next_data)
+    return found or []
 
 
 def _find_rightmove_properties_in_state(state: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -255,7 +339,13 @@ def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
 
 
-def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
+def make_scraperapi_url(
+    target_url: str,
+    *,
+    render: bool = False,
+    premium: bool = False,
+    session_number: Optional[str] = None,
+) -> str:
     """
     Build a ScraperAPI URL for the given target URL.
 
@@ -278,6 +368,7 @@ def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
         "render": "true" if render else None,
         "country_code": "gb",
         "keep_headers": "true",
+        "premium": "true" if premium else None,
         "url": target_url,
     }
 
@@ -288,16 +379,19 @@ def make_scraperapi_url(target_url: str, *, render: bool = False) -> str:
         params["device_type"] = "desktop"
 
     # Optional session pinning / sharding.
-    session_fixed = (os.getenv("SCRAPERAPI_SESSION_NUMBER") or "").strip()
-    session_random = (os.getenv("SCRAPERAPI_SESSION_RANDOM") or "").strip().lower() in (
-        "1",
-        "true",
-        "yes",
-    )
-    if session_fixed:
-        params["session_number"] = session_fixed
-    elif session_random:
-        params["session_number"] = str(random.randint(1, 999999))
+    if session_number:
+        params["session_number"] = str(session_number)
+    else:
+        session_fixed = (os.getenv("SCRAPERAPI_SESSION_NUMBER") or "").strip()
+        session_random = (os.getenv("SCRAPERAPI_SESSION_RANDOM") or "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        if session_fixed:
+            params["session_number"] = session_fixed
+        elif session_random:
+            params["session_number"] = str(random.randint(1, 999999))
 
     return f"{SCRAPERAPI_BASE}?{urlencode(params)}"
 
@@ -307,6 +401,27 @@ def _looks_blocked(html: str, status: int) -> bool:
         return True
     lowered = html.lower()
     return any(k in lowered for k in CAPTCHA_KEYWORDS)
+
+
+def _has_consent_marker(html: str) -> bool:
+    lowered = (html or "").lower()
+    return any(k in lowered for k in CONSENT_MARKERS)
+
+
+def _has_challenge_marker(html: str) -> bool:
+    lowered = (html or "").lower()
+    return any(
+        marker in lowered
+        for marker in (
+            "cdn-cgi",
+            "challenge-platform",
+            "cf-chl-",
+            "cf_chl_",
+            "checking your browser before accessing",
+            "attention required! | cloudflare",
+            "turnstile",
+        )
+    )
 
 
 def _build_search_url(location: str, page: int = 0) -> str:
@@ -663,9 +778,11 @@ def _extract_external_id_and_url(
 def _collect_selectors(soup: BeautifulSoup) -> List[BeautifulSoup]:
     selectors = [
         "[data-testid='propertyCard']",
+        "[data-test='propertyCard']",
         "[data-test='property-card']",
         ".propertyCard",
         "article.propertyCard",
+        "div[class*='propertyCard']",
     ]
     cards = []
     for sel in selectors:
@@ -762,6 +879,42 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             continue
                     soup = BeautifulSoup(html, "html.parser")
 
+                    # 1) Prefer Next.js JSON payload when present.
+                    next_data = _extract_next_data(soup)
+                    next_props = (
+                        _find_rightmove_properties_in_next_data(next_data) if next_data else []
+                    )
+                    if next_props:
+                        for p in next_props:
+                            if len(results) >= limit:
+                                break
+                            # Some payloads nest listing under a subkey.
+                            if isinstance(p, dict) and any(
+                                k in p and isinstance(p[k], dict)
+                                for k in ("property", "listing", "result", "data")
+                            ):
+                                for k in ("property", "listing", "result", "data"):
+                                    if k in p and isinstance(p[k], dict):
+                                        p = p[k]  # type: ignore[assignment]
+                                        break
+                            mapped = _rm_property_from_api_dict(p)
+                            if not mapped:
+                                continue
+                            should_insert, reason = should_insert_property(mapped)
+                            if should_insert:
+                                results.append(clean_property_data(mapped))
+                                stats.log_parse_success()
+                            else:
+                                stats.log_validation_failure(reason or "Unknown")
+
+                        if results:
+                            stats.log_summary()
+                            print(
+                                f"✅ Rightmove __NEXT_DATA__ returned {len(results)} properties for '{location}'"
+                            )
+                            run_log.set_count(len(results))
+                            return results
+
                     # If the DOM doesn't contain cards, try the embedded state model.
                     embedded_state = _extract_preloaded_state(soup)
                     embedded_props = (
@@ -792,12 +945,116 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             return results
 
                     cards = _collect_selectors(soup)
+
+                    # Conditional ScraperAPI render retry when parsing yields 0 and we see consent/challenge markers.
+                    # This avoids wasting render credits on pages that already contain embedded JSON.
+                    if (
+                        (not results)
+                        and (not cards)
+                        and SCRAPERAPI_KEY
+                        and (
+                            _has_consent_marker(html)
+                            or _has_challenge_marker(html)
+                            or any(k in (html or "").lower() for k in CAPTCHA_KEYWORDS)
+                        )
+                    ):
+                        try:
+                            retry_url = make_scraperapi_url(
+                                url,
+                                render=True,
+                                premium=_has_challenge_marker(html)
+                                or any(k in (html or "").lower() for k in CAPTCHA_KEYWORDS),
+                                session_number=str(random.randint(1, 999999)),
+                            )
+                            async with session.get(
+                                retry_url, headers={"User-Agent": USER_AGENT}, timeout=75
+                            ) as r:
+                                r_text = await r.text()
+                                log_fetch_diagnostics(
+                                    "rightmove",
+                                    url,
+                                    status=r.status,
+                                    text=r_text,
+                                    via="scraperapi-render-retry",
+                                )
+                                retry_soup = BeautifulSoup(r_text, "html.parser")
+
+                                retry_next = _extract_next_data(retry_soup)
+                                retry_next_props = (
+                                    _find_rightmove_properties_in_next_data(retry_next)
+                                    if retry_next
+                                    else []
+                                )
+                                if retry_next_props:
+                                    for p in retry_next_props:
+                                        if len(results) >= limit:
+                                            break
+                                        if isinstance(p, dict) and any(
+                                            k in p and isinstance(p[k], dict)
+                                            for k in ("property", "listing", "result", "data")
+                                        ):
+                                            for k in ("property", "listing", "result", "data"):
+                                                if k in p and isinstance(p[k], dict):
+                                                    p = p[k]  # type: ignore[assignment]
+                                                    break
+                                        mapped = _rm_property_from_api_dict(p)
+                                        if not mapped:
+                                            continue
+                                        should_insert, reason = should_insert_property(mapped)
+                                        if should_insert:
+                                            results.append(clean_property_data(mapped))
+                                            stats.log_parse_success()
+                                        else:
+                                            stats.log_validation_failure(reason or "Unknown")
+
+                                    if results:
+                                        stats.log_summary()
+                                        print(
+                                            f"✅ Rightmove render retry (__NEXT_DATA__) returned {len(results)} properties for '{location}'"
+                                        )
+                                        run_log.set_count(len(results))
+                                        return results
+
+                                retry_state = _extract_preloaded_state(retry_soup)
+                                retry_props = (
+                                    _find_rightmove_properties_in_state(retry_state)
+                                    if retry_state
+                                    else []
+                                )
+                                if retry_props:
+                                    for p in retry_props:
+                                        if len(results) >= limit:
+                                            break
+                                        mapped = _rm_property_from_api_dict(p)
+                                        if not mapped:
+                                            continue
+                                        should_insert, reason = should_insert_property(mapped)
+                                        if should_insert:
+                                            results.append(clean_property_data(mapped))
+                                            stats.log_parse_success()
+                                        else:
+                                            stats.log_validation_failure(reason or "Unknown")
+                                    if results:
+                                        stats.log_summary()
+                                        print(
+                                            f"✅ Rightmove render retry (__PRELOADED_STATE__) returned {len(results)} properties for '{location}'"
+                                        )
+                                        run_log.set_count(len(results))
+                                        return results
+
+                                retry_cards = _collect_selectors(retry_soup)
+                                if retry_cards:
+                                    soup = retry_soup
+                                    cards = retry_cards
+                        except Exception:
+                            pass
                     if not cards:
                         if PLAYWRIGHT_ENABLE:
                             rendered = await render_page(
                                 url,
                                 [
                                     "[data-testid='propertyCard']",
+                                    "[data-test='propertyCard']",
                                     "article.propertyCard",
                                     ".propertyCard",
                                 ],

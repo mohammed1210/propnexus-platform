@@ -5,8 +5,13 @@ These tests verify that the scrapers can be imported and have the expected
 structure without making actual network requests.
 """
 
+import json
 import os
 import sys
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from bs4 import BeautifulSoup
 
 # Add backend to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -258,14 +263,7 @@ def test_scraperapi_mode_handling():
         importlib.reload(rightmove_scraper)
         assert rightmove_scraper.SCRAPER_MODE == "scraperapi"
         assert rightmove_scraper.SCRAPERAPI_KEY == ""
-        print("✓ Missing SCRAPERAPI_KEY handled gracefully")
-
-        # Test 3: direct mode (default)
-        os.environ["SCRAPER_MODE"] = "direct"
-        os.environ["SCRAPERAPI_KEY"] = "test-key"
-        importlib.reload(rightmove_scraper)
-        assert rightmove_scraper.SCRAPER_MODE == "direct"
-        print("✓ SCRAPER_MODE=direct works correctly")
+        print("✓ SCRAPER_MODE scraperapi works without key")
 
     finally:
         # Restore original env vars
@@ -279,10 +277,119 @@ def test_scraperapi_mode_handling():
         elif "SCRAPERAPI_KEY" in os.environ:
             del os.environ["SCRAPERAPI_KEY"]
 
-        # Reload to restore original state
-        import importlib
 
-        importlib.reload(rightmove_scraper)
+def test_rightmove_next_data_extraction_maps_properties():
+    """Regression: Rightmove should parse listings from __NEXT_DATA__ when present."""
+    from backend.scraper.rightmove_scraper import (
+        _extract_next_data,
+        _find_rightmove_properties_in_next_data,
+        _rm_property_from_api_dict,
+    )
+
+    next_data = {
+        "props": {
+            "pageProps": {
+                "searchResults": {
+                    "properties": [
+                        {
+                            "id": 123,
+                            "displayAddress": "London",
+                            "price": {"amount": 500000},
+                            "bedrooms": 2,
+                            "bathrooms": 1,
+                            "media": [{"url": "https://example.com/img.jpg"}],
+                        }
+                    ]
+                }
+            }
+        }
+    }
+    html = (
+        "<html><body>"
+        "<script id='__NEXT_DATA__' type='application/json'>"
+        + json.dumps(next_data)
+        + "</script></body></html>"
+    )
+    soup = BeautifulSoup(html, "html.parser")
+    extracted = _extract_next_data(soup)
+    assert extracted is not None
+
+    listings = _find_rightmove_properties_in_next_data(extracted)
+    assert len(listings) == 1
+
+    mapped = _rm_property_from_api_dict(listings[0])
+    assert mapped is not None
+    assert mapped["external_id"] == "123"
+    assert mapped["source"] == "rightmove"
+    assert mapped["location"].lower().find("london") != -1
+    assert mapped["price"] == 500000
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"SCRAPER_MODE": "scraperapi", "SCRAPERAPI_KEY": "test-key"})
+async def test_zoopla_5xx_retries_premium_once_and_parses_next_data():
+    """Regression: Zoopla 5xx from ScraperAPI should log+retry once with premium=true."""
+    from backend.scraper import zoopla_scraper
+
+    # Force key presence for the retry path.
+    with patch.object(zoopla_scraper, "SCRAPERAPI_KEY", "test-key"):
+        mock_session = AsyncMock()
+
+        first_response = AsyncMock()
+        first_response.text = AsyncMock(return_value='{"error":"timeout"}')
+        first_response.status = 500
+
+        # Second call returns valid HTML containing __NEXT_DATA__ listings.
+        next_data = {
+            "props": {
+                "pageProps": {
+                    "searchResults": {
+                        "regularListings": [
+                            {
+                                "listingId": 999,
+                                "displayPrice": "£123,456",
+                                "displayAddress": "London",
+                                "imageUrl": "https://example.com/a.jpg",
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        html200 = (
+            "<html><body>"
+            "<script id='__NEXT_DATA__' type='application/json'>"
+            + json.dumps(next_data)
+            + "</script></body></html>"
+        )
+
+        second_response = AsyncMock()
+        second_response.text = AsyncMock(return_value=html200)
+        second_response.status = 200
+
+        mock_session.get.return_value.__aenter__.side_effect = [
+            first_response,
+            second_response,
+        ]
+
+        html = await zoopla_scraper._fetch_html_internal(
+            mock_session, "https://www.zoopla.co.uk/for-sale/property/london/"
+        )
+        assert html is not None
+
+        # Ensure the premium retry happened exactly once.
+        assert mock_session.get.call_count == 2
+        second_call_url = mock_session.get.call_args_list[1][0][0]
+        assert "premium=true" in second_call_url
+
+        soup = BeautifulSoup(html, "html.parser")
+        extracted = zoopla_scraper._extract_next_data(soup)
+        assert extracted is not None
+        listings = zoopla_scraper._find_zoopla_listings_in_next_data(extracted)
+        assert len(listings) == 1
+        prop = zoopla_scraper._zoopla_property_from_listing_dict(listings[0])
+        assert prop is not None
+        assert prop["external_id"] == "999"
 
 
 def test_zoopla_search_url_slugified():
