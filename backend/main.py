@@ -65,11 +65,19 @@ def health():
     Health check endpoint with version information.
     Returns minimal system status without exposing secrets.
     """
+    version = (
+        os.getenv("APP_VERSION")
+        or os.getenv("RAILWAY_GIT_COMMIT_SHA")
+        or os.getenv("GIT_COMMIT_SHA")
+        or os.getenv("GIT_SHA")
+        or "unknown"
+    )
+    environment = os.getenv("ENVIRONMENT") or os.getenv("RAILWAY_ENVIRONMENT") or "development"
     return {
         "status": "ok",
         "service": "propnexus-backend",
-        "version": os.getenv("APP_VERSION", "unknown"),
-        "environment": os.getenv("ENVIRONMENT", "development"),
+        "version": version,
+        "environment": environment,
     }
 
 
