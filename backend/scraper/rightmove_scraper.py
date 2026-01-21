@@ -359,6 +359,7 @@ def make_scraperapi_url(
     render: bool = False,
     premium: bool = False,
     session_number: Optional[str] = None,
+    keep_headers: bool = True,
 ) -> str:
     """
     Build a ScraperAPI URL for the given target URL.
@@ -381,7 +382,7 @@ def make_scraperapi_url(
         "api_key": api_key,
         "render": "true" if render else None,
         "country_code": "gb",
-        "keep_headers": "true",
+        "keep_headers": "true" if keep_headers else None,
         "premium": "true" if premium else None,
         "url": target_url,
     }
@@ -543,6 +544,40 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             text = r_text
                 except Exception:
                     pass
+
+            # Rightmove sometimes returns a 200 "place not found" variant when proxied.
+            # Retry once more without keep_headers to let ScraperAPI choose its own headers.
+            if (
+                mode == "scraperapi"
+                and SCRAPERAPI_KEY
+                and resp.status == 200
+                and (text or "").strip()
+                and (not _has_listings_signals(text))
+            ):
+                lowered = (text or "").lower()
+                if "find the place you were looking for" in lowered:
+                    try:
+                        retry_url = make_scraperapi_url(
+                            url,
+                            render=False,
+                            keep_headers=False,
+                            premium=_has_challenge_marker(text)
+                            or any(k in lowered for k in CAPTCHA_KEYWORDS),
+                            session_number=str(random.randint(1, 999999)),
+                        )
+                        async with session.get(retry_url, headers=headers, timeout=75) as r_resp:
+                            r_text = await r_resp.text()
+                            log_fetch_diagnostics(
+                                "rightmove",
+                                url,
+                                status=r_resp.status,
+                                text=r_text,
+                                via="scraperapi-no-keep-headers-retry",
+                            )
+                            if r_resp.status == 200 and (r_text or "").strip():
+                                text = r_text
+                    except Exception:
+                        pass
 
             # If direct mode and we detect blocking, try ScraperAPI as fallback
             if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
