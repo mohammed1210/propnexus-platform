@@ -55,6 +55,20 @@ def _looks_like_postcode(s: str) -> bool:
     return bool(s and _POSTCODE_RE.search(s))
 
 
+def _has_listings_signals(html: str) -> bool:
+    lowered = (html or "").lower()
+    return any(
+        m in lowered
+        for m in (
+            "__next_data__",
+            "__preloaded_state__",
+            "propertycard",
+            'data-testid="propertycard"',
+            'data-test="propertycard"',
+        )
+    )
+
+
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 RM_MAX_PAGES = int(os.getenv("RM_MAX_PAGES", "1"))
@@ -462,7 +476,11 @@ def _build_search_url(location: str, page: int = 0) -> str:
 
 async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Optional[str]:
     """Internal fetch function with retry logic."""
-    headers = {"User-Agent": USER_AGENT}
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept-Language": "en-GB,en;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    }
 
     # Determine which URL to fetch based on SCRAPER_MODE
     mode = os.getenv("SCRAPER_MODE", "direct").lower()
@@ -496,6 +514,37 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 text=text,
                 via="scraperapi" if mode == "scraperapi" else "direct",
             )
+
+            # If ScraperAPI mode and the response looks like a non-listings/soft-block page,
+            # retry once with a fresh session_number (keep render off for latency).
+            if (
+                mode == "scraperapi"
+                and SCRAPERAPI_KEY
+                and resp.status == 200
+                and (text or "").strip()
+                and (not _has_listings_signals(text))
+            ):
+                try:
+                    retry_url = make_scraperapi_url(
+                        url,
+                        render=False,
+                        premium=_has_challenge_marker(text)
+                        or any(k in (text or "").lower() for k in CAPTCHA_KEYWORDS),
+                        session_number=str(random.randint(1, 999999)),
+                    )
+                    async with session.get(retry_url, headers=headers, timeout=75) as r_resp:
+                        r_text = await r_resp.text()
+                        log_fetch_diagnostics(
+                            "rightmove",
+                            url,
+                            status=r_resp.status,
+                            text=r_text,
+                            via="scraperapi-session-retry",
+                        )
+                        if r_resp.status == 200 and (r_text or "").strip():
+                            text = r_text
+                except Exception:
+                    pass
 
             # If direct mode and we detect blocking, try ScraperAPI as fallback
             if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
@@ -946,15 +995,14 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
 
                     cards = _collect_selectors(soup)
 
-                    # Conditional ScraperAPI render retry when parsing yields 0 and we see consent/challenge markers.
+                    # Conditional ScraperAPI render retry when parsing yields 0 and we see explicit challenge/captcha markers.
                     # This avoids wasting render credits on pages that already contain embedded JSON.
                     if (
                         (not results)
                         and (not cards)
                         and SCRAPERAPI_KEY
                         and (
-                            _has_consent_marker(html)
-                            or _has_challenge_marker(html)
+                            _has_challenge_marker(html)
                             or any(k in (html or "").lower() for k in CAPTCHA_KEYWORDS)
                         )
                     ):
