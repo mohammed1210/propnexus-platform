@@ -427,7 +427,9 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
 
     import inspect
 
-    timeout_s = float(os.getenv("SCRAPER_TIMEOUT_SECONDS", "20"))
+    timeout_s = float(
+        os.getenv("INGEST_TIMEOUT_SECONDS", os.getenv("SCRAPER_TIMEOUT_SECONDS", "20"))
+    )
 
     loc = (location or "").strip()
     if not loc:
