@@ -48,7 +48,22 @@ CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic", "robot"]
 
 def _has_cloudflare_marker(text: str) -> bool:
     lowered = (text or "").lower()
-    return ("cdn-cgi" in lowered) or ("cloudflare" in lowered)
+    # Avoid false positives from Cloudflare analytics/beacons.
+    if "cdn-cgi" in lowered or "/cdn-cgi/" in lowered:
+        return True
+    return any(
+        marker in lowered
+        for marker in (
+            "challenge-platform",
+            "cf-chl-",
+            "cf_chl_",
+            "checking your browser before accessing",
+            "please wait while we check your browser",
+            "attention required! | cloudflare",
+            "ddos protection by cloudflare",
+            "turnstile",
+        )
+    )
 
 
 _POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)

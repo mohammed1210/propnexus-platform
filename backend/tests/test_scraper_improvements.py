@@ -166,6 +166,26 @@ def test_logger_stats():
     print("✓ ScraperStats tracking works")
 
 
+def test_cloudflare_marker_detection_is_specific():
+    """Ensure Cloudflare detection doesn't false-positive on analytics beacons."""
+    from backend.scraper.zoopla_scraper import _has_cloudflare_marker
+
+    ok_html = """
+    <html><head>
+    <script src=\"https://static.cloudflareinsights.com/beacon.min.js\"></script>
+    </head><body><div>Normal page content</div></body></html>
+    """.strip()
+    assert _has_cloudflare_marker(ok_html) is False
+
+    blocked_html = """
+    <html><head><title>Attention Required! | Cloudflare</title></head>
+    <body>Checking your browser before accessing example.com</body></html>
+    """.strip()
+    assert _has_cloudflare_marker(blocked_html) is True
+    assert _has_cloudflare_marker("/cdn-cgi/challenge-platform/") is True
+    print("✓ Cloudflare marker detection is specific")
+
+
 def test_scraperapi_url_builder():
     """Test ScraperAPI URL builder helper."""
     from backend.scraper.rightmove_scraper import make_scraperapi_url

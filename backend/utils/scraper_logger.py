@@ -130,11 +130,25 @@ def log_fetch_diagnostics(
     try:
         content = text or ""
         lowered = content.lower()
+        cf_challenge = any(
+            marker in lowered
+            for marker in (
+                "cdn-cgi",
+                "challenge-platform",
+                "cf-chl-",
+                "cf_chl_",
+                "checking your browser before accessing",
+                "please wait while we check your browser",
+                "attention required! | cloudflare",
+                "ddos protection by cloudflare",
+                "turnstile",
+            )
+        )
         markers = {
             "__NEXT_DATA__": "__next_data__" in lowered,
             "__PRELOADED_STATE__": "__preloaded_state__" in lowered,
             "cdn-cgi": "cdn-cgi" in lowered,
-            "cloudflare": "cloudflare" in lowered,
+            "cf-challenge": cf_challenge,
             "captcha": "captcha" in lowered,
             "access denied": "access denied" in lowered,
         }

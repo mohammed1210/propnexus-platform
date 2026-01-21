@@ -41,7 +41,24 @@ CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
 
 def _has_cloudflare_marker(text: str) -> bool:
     lowered = (text or "").lower()
-    return ("cdn-cgi" in lowered) or ("cloudflare" in lowered)
+    # Avoid false positives: many normal pages include Cloudflare analytics/beacons
+    # (e.g. static.cloudflareinsights.com). We only treat clear challenge/block pages
+    # as Cloudflare-blocked.
+    if "cdn-cgi" in lowered or "/cdn-cgi/" in lowered:
+        return True
+    return any(
+        marker in lowered
+        for marker in (
+            "challenge-platform",
+            "cf-chl-",
+            "cf_chl_",
+            "checking your browser before accessing",
+            "please wait while we check your browser",
+            "attention required! | cloudflare",
+            "ddos protection by cloudflare",
+            "turnstile",
+        )
+    )
 
 
 _SLUG_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
