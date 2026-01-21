@@ -147,6 +147,7 @@ def debug_scraper_env():
     return {
         "SCRAPER_MODE": scraper_mode,
         "SCRAPER_TIMEOUT_SECONDS": os.getenv("SCRAPER_TIMEOUT_SECONDS", "20"),
+        "INGEST_TIMEOUT_SECONDS": os.getenv("INGEST_TIMEOUT_SECONDS", ""),
         "SCRAPERAPI_KEY_present": bool(scraperapi_key),
         "SCRAPERAPI_KEY_len": len(scraperapi_key),
         "SCRAPERAPI_KEY_prefix": scraperapi_key[:6] if scraperapi_key else "",

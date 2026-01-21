@@ -166,6 +166,26 @@ def test_logger_stats():
     print("✓ ScraperStats tracking works")
 
 
+def test_cloudflare_marker_detection_is_specific():
+    """Ensure Cloudflare detection doesn't false-positive on analytics beacons."""
+    from backend.scraper.zoopla_scraper import _has_cloudflare_marker
+
+    ok_html = """
+    <html><head>
+    <script src=\"https://static.cloudflareinsights.com/beacon.min.js\"></script>
+    </head><body><div>Normal page content</div></body></html>
+    """.strip()
+    assert _has_cloudflare_marker(ok_html) is False
+
+    blocked_html = """
+    <html><head><title>Attention Required! | Cloudflare</title></head>
+    <body>Checking your browser before accessing example.com</body></html>
+    """.strip()
+    assert _has_cloudflare_marker(blocked_html) is True
+    assert _has_cloudflare_marker("/cdn-cgi/challenge-platform/") is True
+    print("✓ Cloudflare marker detection is specific")
+
+
 def test_scraperapi_url_builder():
     """Test ScraperAPI URL builder helper."""
     from backend.scraper.rightmove_scraper import make_scraperapi_url
@@ -265,6 +285,14 @@ def test_scraperapi_mode_handling():
         importlib.reload(rightmove_scraper)
 
 
+def test_zoopla_search_url_slugified():
+    """Zoopla location path should be slugified (lowercase + hyphen)."""
+    from backend.scraper.zoopla_scraper import _build_search_url
+
+    assert _build_search_url("London") == "https://www.zoopla.co.uk/for-sale/property/london/"
+    assert _build_search_url("St Albans") == "https://www.zoopla.co.uk/for-sale/property/st-albans/"
+
+
 def main():
     """Run all tests."""
     print("\n=== Running Scraper Smoke Tests ===\n")
@@ -279,6 +307,7 @@ def main():
         ("Logger statistics", test_logger_stats),
         ("ScraperAPI URL builder", test_scraperapi_url_builder),
         ("ScraperAPI mode handling", test_scraperapi_mode_handling),
+        ("Zoopla URL slugified", test_zoopla_search_url_slugified),
     ]
 
     results = []

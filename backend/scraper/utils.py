@@ -198,6 +198,13 @@ async def smart_fetch_html(
     scraper_mode = _get_scraper_mode()
     scraperapi_key = _get_scraperapi_key()
 
+    # Align request timeouts across ingest/scraper layers.
+    # If SCRAPER_TIMEOUT_SECONDS is set higher (e.g. 120), avoid hidden 45s caps.
+    try:
+        timeout_s = int((os.getenv("SCRAPER_TIMEOUT_SECONDS") or str(timeout)).strip())
+    except Exception:
+        timeout_s = int(timeout)
+
     async def _get(url_to_fetch: str, req_timeout: int) -> tuple[int, str]:
         """
         Works with real aiohttp AND pytest AsyncMock session.get.
@@ -222,7 +229,7 @@ async def smart_fetch_html(
 
         proxy_url = build_scraperapi_url(url, scraperapi_key=scraperapi_key, render=True)
         try:
-            status, text = await _get(proxy_url, req_timeout=60)
+            status, text = await _get(proxy_url, req_timeout=max(60, timeout_s))
             if _looks_blocked(text, status):
                 return None
             return text if is_valid_html(text) else None
@@ -236,7 +243,7 @@ async def smart_fetch_html(
     if scraper_mode == "smart":
         # Step 1: Try direct fetch
         try:
-            status, text = await _get(url, req_timeout=timeout)
+            status, text = await _get(url, req_timeout=timeout_s)
             if (not _looks_blocked(text, status)) and is_valid_html(text):
                 return text
             print("ℹ️ Direct fetch blocked or invalid, trying ScraperAPI...")
@@ -250,7 +257,7 @@ async def smart_fetch_html(
         # Step 2: ScraperAPI without render
         try:
             proxy_url = build_scraperapi_url(url, scraperapi_key=scraperapi_key, render=False)
-            status, text = await _get(proxy_url, req_timeout=45)
+            status, text = await _get(proxy_url, req_timeout=max(45, timeout_s))
             if (not _looks_blocked(text, status)) and is_valid_html(text):
                 print("✅ ScraperAPI (no-render) successful")
                 return text
@@ -261,7 +268,7 @@ async def smart_fetch_html(
         # Step 3: ScraperAPI with render
         try:
             proxy_url = build_scraperapi_url(url, scraperapi_key=scraperapi_key, render=True)
-            status, text = await _get(proxy_url, req_timeout=60)
+            status, text = await _get(proxy_url, req_timeout=max(60, timeout_s))
             if _looks_blocked(text, status):
                 print("⚠️ ScraperAPI (with render) still blocked")
                 return None
@@ -274,7 +281,7 @@ async def smart_fetch_html(
     # Mode: direct (default)
     # ------------------------------------------------------------
     try:
-        status, text = await _get(url, req_timeout=timeout)
+        status, text = await _get(url, req_timeout=timeout_s)
 
         # If blocked, optionally fallback to ScraperAPI render (legacy behavior)
         if _looks_blocked(text, status) and scraperapi_key:
