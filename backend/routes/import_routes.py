@@ -206,9 +206,14 @@ async def import_zoopla(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [
-        p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "zoopla")
-    ]
+    try:
+        from backend.scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
+
+        items = await _maybe_await(scrape_zoopla_properties(loc))
+        if not isinstance(items, list):
+            items = []
+    except Exception:
+        items = []
     if sb and items:
         try:
             now_iso = _now_iso()
@@ -228,9 +233,14 @@ async def import_rightmove(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [
-        p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "rightmove")
-    ]
+    try:
+        from backend.scraper.rightmove_scraper import scrape_rightmove_properties  # type: ignore
+
+        items = await _maybe_await(scrape_rightmove_properties(loc))
+        if not isinstance(items, list):
+            items = []
+    except Exception:
+        items = []
     if sb and items:
         try:
             now_iso = _now_iso()
@@ -250,11 +260,16 @@ async def import_onthemarket(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [
-        p
-        for p in (await _maybe_await(scrape_all_sources(loc)))
-        if (p.get("source") == "onthemarket")
-    ]
+    try:
+        from backend.scraper.onthemarket_scraper import (
+            scrape_onthemarket_properties,  # type: ignore
+        )
+
+        items = await _maybe_await(scrape_onthemarket_properties(loc))
+        if not isinstance(items, list):
+            items = []
+    except Exception:
+        items = []
     if sb and items:
         try:
             now_iso = _now_iso()
@@ -274,9 +289,14 @@ async def import_spareroom(req: ImportRequest):
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
-    items = [
-        p for p in (await _maybe_await(scrape_all_sources(loc))) if (p.get("source") == "spareroom")
-    ]
+    try:
+        from backend.scraper.spare_room_scraper import scrape_spareroom_properties  # type: ignore
+
+        items = await _maybe_await(scrape_spareroom_properties(loc))
+        if not isinstance(items, list):
+            items = []
+    except Exception:
+        items = []
     if sb and items:
         try:
             now_iso = _now_iso()
