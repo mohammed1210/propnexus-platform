@@ -6,6 +6,7 @@ parse failures, and scrape statistics.
 
 import logging
 import os
+import re
 from collections import defaultdict
 from typing import Any, Dict, Optional
 
@@ -130,6 +131,11 @@ def log_fetch_diagnostics(
     try:
         content = text or ""
         lowered = content.lower()
+        # Extract title (helps identify consent/interstitial pages even when markers are absent).
+        title = ""
+        m = re.search(r"<title[^>]*>(.*?)</title>", content, re.I | re.S)
+        if m:
+            title = re.sub(r"\s+", " ", m.group(1)).strip()[:120]
         cf_challenge = any(
             marker in lowered
             for marker in (
@@ -154,7 +160,7 @@ def log_fetch_diagnostics(
         }
         marker_summary = ",".join([k for k, present in markers.items() if present]) or "none"
         logger.info(
-            f"[{source}] Fetch diag via={via} status={int(status)} bytes={len(content)} markers={marker_summary} url={url}"
+            f"[{source}] Fetch diag via={via} status={int(status)} bytes={len(content)} markers={marker_summary} title={title or '<none>'} url={url}"
         )
     except Exception:
         # Never let diagnostics logging break scraping.
