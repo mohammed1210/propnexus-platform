@@ -237,6 +237,7 @@ def make_scraperapi_url(
     *,
     render: bool = True,
     premium: bool = False,
+    ultra_premium: bool = False,
     session_number: Optional[str] = None,
 ) -> str:
     """
@@ -262,6 +263,7 @@ def make_scraperapi_url(
         "country_code": "gb",
         "keep_headers": "true",
         "premium": "true" if premium else None,
+        "ultra_premium": "true" if ultra_premium else None,
         "url": target_url,
     }
 
@@ -378,6 +380,39 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                                 print(
                                     f"⚠️ [zoopla] premium 5xx status={int(p_resp.status)} bytes={len(p_text or '')} snippet={p_snippet}"
                                 )
+
+                                # ScraperAPI explicitly suggests ultra_premium for some protected domains.
+                                if "ultra_premium" in (p_text or "").lower():
+                                    ultra_url = make_scraperapi_url(
+                                        url,
+                                        render=True,
+                                        premium=False,
+                                        ultra_premium=True,
+                                        session_number=str(random.randint(1, 999999)),
+                                    )
+                                    try:
+                                        u_req = session.get(ultra_url, headers=headers, timeout=90)
+                                        if inspect.isawaitable(u_req):
+                                            u_req = await u_req
+                                        async with u_req as u_resp:
+                                            u_text = await u_resp.text()
+                                            log_fetch_diagnostics(
+                                                "zoopla",
+                                                url,
+                                                status=u_resp.status,
+                                                text=u_text,
+                                                via="scraperapi-ultra-premium-5xx-retry",
+                                            )
+                                            if 500 <= int(u_resp.status) <= 599:
+                                                return None
+                                            ultra_blocked = (
+                                                _looks_blocked(u_text, int(u_resp.status))
+                                                or _has_cloudflare_marker(u_text)
+                                                or not (u_text or "").strip()
+                                            )
+                                            return None if ultra_blocked else u_text
+                                    except Exception:
+                                        return None
                                 return None
 
                             premium_blocked = (
