@@ -2,7 +2,7 @@ import inspect
 import os
 import random
 import re
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import aiohttp
 
@@ -307,3 +307,203 @@ async def smart_fetch_html(
             except Exception:
                 return None
         return None
+
+
+def _marker_summary(text: str) -> Dict[str, bool]:
+    lowered = (text or "").lower()
+    return {
+        "__NEXT_DATA__": "__next_data__" in lowered,
+        "__PRELOADED_STATE__": "__preloaded_state__" in lowered,
+        "propertyCard": "propertycard" in lowered,
+        "consent": any(
+            k in lowered
+            for k in (
+                "consent",
+                "consent-manager",
+                "sp-message",
+                "didomi",
+                "privacy",
+                "cmp",
+            )
+        ),
+        "captcha": any(k in lowered for k in CAPTCHA_KEYWORDS),
+        "cdn-cgi": "cdn-cgi" in lowered,
+    }
+
+
+def _snippet_for_diag(text: str, *, max_chars: int = 200) -> str:
+    s = (text or "").strip().replace("\n", " ").replace("\r", " ")
+    s = re.sub(r"\s+", " ", s)
+    return s[:max_chars]
+
+
+async def smart_fetch_html_with_diag(
+    session: aiohttp.ClientSession,
+    url: str,
+    headers: dict,
+    timeout: int = 30,
+) -> Tuple[Optional[int], Optional[str], Dict[str, Any]]:
+    """Smart fetch with diagnostics.
+
+    This is a backward-safe companion to smart_fetch_html(). It follows the same
+    SCRAPER_MODE behavior but returns (status, text, diag) so callers can log
+    actionable failures (e.g. 5xx error payloads from ScraperAPI).
+
+    Returns:
+        (status, text, diag)
+        - status: HTTP status code when available
+        - text: response body (HTML or error payload)
+        - diag: dict with keys: via, status, bytes, markers, snippet, attempts
+    """
+
+    scraper_mode = _get_scraper_mode()
+    scraperapi_key = _get_scraperapi_key()
+
+    try:
+        timeout_s = int((os.getenv("SCRAPER_TIMEOUT_SECONDS") or str(timeout)).strip())
+    except Exception:
+        timeout_s = int(timeout)
+
+    attempts: list[Dict[str, Any]] = []
+
+    async def _attempt(via: str, url_to_fetch: str, req_timeout: int) -> Tuple[int, str]:
+        try:
+            req = session.get(url_to_fetch, headers=headers, timeout=req_timeout)
+            req = await _maybe_await(req)
+            async with req as resp:
+                text = await _read_response_text(resp)
+                status = int(getattr(resp, "status", 200))
+                attempts.append(
+                    {
+                        "via": via,
+                        "status": status,
+                        "bytes": len(text or ""),
+                        "markers": _marker_summary(text or ""),
+                        "snippet": (
+                            _snippet_for_diag(text or "", max_chars=200 if status >= 400 else 0)
+                            if (status >= 400 or not (text or "").strip())
+                            else ""
+                        ),
+                    }
+                )
+                return status, text
+        except Exception as e:
+            attempts.append(
+                {
+                    "via": via,
+                    "status": None,
+                    "bytes": 0,
+                    "markers": {},
+                    "snippet": f"exception={type(e).__name__}: {e}",
+                }
+            )
+            raise
+
+    def _finalize(
+        status: Optional[int], text: Optional[str], via: str
+    ) -> Tuple[Optional[int], Optional[str], Dict[str, Any]]:
+        last_text = text or ""
+        diag = {
+            "via": via,
+            "status": status,
+            "bytes": len(last_text),
+            "markers": _marker_summary(last_text),
+            "snippet": (
+                _snippet_for_diag(last_text, max_chars=200)
+                if (status is None or status >= 400 or not last_text.strip())
+                else ""
+            ),
+            "attempts": attempts,
+        }
+        return status, text, diag
+
+    # ------------------------------------------------------------
+    # Mode: scraperapi-only
+    # ------------------------------------------------------------
+    if scraper_mode == "scraperapi":
+        if not scraperapi_key:
+            return _finalize(None, None, "scraperapi")
+        proxy_url = build_scraperapi_url(url, scraperapi_key=scraperapi_key, render=True)
+        try:
+            status, text = await _attempt(
+                "scraperapi-render", proxy_url, req_timeout=max(60, timeout_s)
+            )
+            if _looks_blocked(text, status):
+                return _finalize(status, text, "scraperapi-render")
+            return _finalize(status, text, "scraperapi-render")
+        except Exception:
+            return _finalize(None, None, "scraperapi-render")
+
+    # ------------------------------------------------------------
+    # Mode: smart fallback
+    # ------------------------------------------------------------
+    if scraper_mode == "smart":
+        # Step 1: direct
+        try:
+            status, text = await _attempt("direct", url, req_timeout=timeout_s)
+            if (not _looks_blocked(text, status)) and is_valid_html(text):
+                return _finalize(status, text, "direct")
+        except Exception:
+            pass
+
+        if not scraperapi_key:
+            return _finalize(None, None, "direct")
+
+        # Step 2: ScraperAPI no-render
+        try:
+            proxy_url = build_scraperapi_url(url, scraperapi_key=scraperapi_key, render=False)
+            status, text = await _attempt(
+                "scraperapi-no-render", proxy_url, req_timeout=max(45, timeout_s)
+            )
+            if (not _looks_blocked(text, status)) and is_valid_html(text):
+                return _finalize(status, text, "scraperapi-no-render")
+        except Exception:
+            pass
+
+        # Step 3: ScraperAPI render
+        try:
+            proxy_url = build_scraperapi_url(url, scraperapi_key=scraperapi_key, render=True)
+            status, text = await _attempt(
+                "scraperapi-render", proxy_url, req_timeout=max(60, timeout_s)
+            )
+            if _looks_blocked(text, status):
+                return _finalize(status, text, "scraperapi-render")
+            return _finalize(status, text if is_valid_html(text) else None, "scraperapi-render")
+        except Exception:
+            return _finalize(None, None, "scraperapi-render")
+
+    # ------------------------------------------------------------
+    # Mode: direct (default)
+    # ------------------------------------------------------------
+    try:
+        status, text = await _attempt("direct", url, req_timeout=timeout_s)
+        if _looks_blocked(text, status) and scraperapi_key:
+            proxy_url = build_scraperapi_url(url, scraperapi_key=scraperapi_key, render=True)
+            p_status, p_text = await _attempt(
+                "scraperapi-render-fallback", proxy_url, req_timeout=60
+            )
+            if _looks_blocked(p_text, p_status):
+                return _finalize(p_status, p_text, "scraperapi-render-fallback")
+            return _finalize(
+                p_status, p_text if is_valid_html(p_text) else None, "scraperapi-render-fallback"
+            )
+
+        return _finalize(status, text, "direct")
+    except Exception:
+        if scraperapi_key:
+            try:
+                proxy_url = build_scraperapi_url(url, scraperapi_key=scraperapi_key, render=True)
+                p_status, p_text = await _attempt(
+                    "scraperapi-render-exception-fallback", proxy_url, req_timeout=60
+                )
+                if _looks_blocked(p_text, p_status):
+                    return _finalize(p_status, p_text, "scraperapi-render-exception-fallback")
+                return _finalize(
+                    p_status,
+                    p_text if is_valid_html(p_text) else None,
+                    "scraperapi-render-exception-fallback",
+                )
+            except Exception:
+                return _finalize(None, None, "scraperapi-render-exception-fallback")
+
+        return _finalize(None, None, "direct")

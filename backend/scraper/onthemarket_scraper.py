@@ -143,6 +143,19 @@ def _looks_blocked(html: str, status: int) -> bool:
     return any(k in lowered for k in CAPTCHA_KEYWORDS)
 
 
+def _captcha_hit_snippet(text: str) -> Optional[str]:
+    lowered = (text or "").lower()
+    for k in CAPTCHA_KEYWORDS:
+        idx = lowered.find(k)
+        if idx != -1:
+            start = max(0, idx - 60)
+            end = min(len(text), idx + len(k) + 60)
+            snippet = (text[start:end] or "").replace("\n", " ").replace("\r", " ")
+            snippet = re.sub(r"\s+", " ", snippet)
+            return f"keyword={k} snippet={snippet}"
+    return None
+
+
 def _build_search_url(location: str, page: int = 0) -> str:
     """
     Build OnTheMarket search URL for property listings.
@@ -205,6 +218,10 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
                 or _has_cloudflare_marker(text)
                 or not (text or "").strip()
             )
+
+            hit = _captcha_hit_snippet(text)
+            if hit:
+                print(f"⚠️ [onthemarket] captcha_detected=true {hit}")
 
             if mode == "scraperapi" and blocked and SCRAPERAPI_KEY:
                 premium_url = make_scraperapi_url(
