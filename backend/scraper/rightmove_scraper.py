@@ -471,6 +471,8 @@ def _build_search_url(location: str, page: int = 0) -> str:
         params = [
             "locationIdentifier=REGION%5E87490",
             "sortType=2",
+            "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
+            "furnishTypes=&keywords=",
             "includeSSTC=false",
             f"paginationIndex={page * 24}",
         ]
