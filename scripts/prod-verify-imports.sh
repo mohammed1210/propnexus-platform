@@ -60,6 +60,7 @@ fi
 
 echo
 echo "==> 5) Run each importer ($LOCATION)"
+echo "SUCCESS CRITERIA: for $LOCATION, /import/rightmove returns count > 0"
 for src in zoopla rightmove onthemarket spareroom; do
   echo
   echo "---- POST /import/$src ----"
@@ -92,6 +93,10 @@ python -m json.tool /tmp/import_all.out || (echo "(non-JSON)"; sed -n '1,80p' /t
 echo
 echo "==> 7) Properties count (after)"
 curl -sS "$BACKEND_URL/debug/properties-count" | python -m json.tool || true
+
+echo
+echo "==> 8) Latest properties (if endpoint exists)"
+curl -sS "$BACKEND_URL/properties?sort=created_at&dir=desc&limit=5" | python -m json.tool || echo "(no /properties endpoint or non-JSON response)"
 
 echo
 echo "✅ DONE"
