@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -260,8 +261,19 @@ async def _probe_rightmove(
     cards = rm._collect_selectors(soup)
 
     lowered = (html_text or "").lower()
+    m = re.search(r"<title[^>]*>(.*?)</title>", html_text or "", re.IGNORECASE | re.DOTALL)
+    title = "<none>"
+    if m:
+        title = re.sub(r"\s+", " ", (m.group(1) or "")).strip() or "<none>"
+
+    next_data_present = "__next_data__" in lowered
+    property_card_present = "propertycard" in lowered
     maybe_not_found = (
-        "page-not-found" in lowered or "page not found" in lowered or "we couldn't find" in lowered
+        "page-not-found" in lowered
+        or "page not found" in lowered
+        or "we couldn't find" in lowered
+        or "we couldn’t find" in lowered
+        or "find the place you were looking for" in lowered
     )
 
     if blocked:
@@ -282,6 +294,9 @@ async def _probe_rightmove(
         "proxy_fallback_used": html_fallback_used,
         "http_status": html_status,
         "html_len": len(html_text or ""),
+        "title": title,
+        "next_data_present": bool(next_data_present),
+        "property_card_present": bool(property_card_present),
         "cards_found": len(cards),
         "blocked": blocked,
         "page_not_found_signal": maybe_not_found,
