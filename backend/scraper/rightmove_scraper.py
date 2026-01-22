@@ -471,6 +471,8 @@ def _build_search_url(location: str, page: int = 0) -> str:
         params = [
             "locationIdentifier=REGION%5E87490",
             "sortType=2",
+            "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
+            "furnishTypes=&keywords=",
             "includeSSTC=false",
             f"paginationIndex={page * 24}",
         ]
@@ -578,6 +580,14 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 and (not _has_listings_signals(text))
             ):
                 if _is_place_not_found_variant(text):
+                    retry_targets = [url]
+                    # Known edge-case: percent-encoded carets in REGION identifiers (%5E)
+                    # can trigger a "place not found" variant. Try unescaped caret first.
+                    if "%5e" in url.lower():
+                        alt_url = re.sub(r"%5e", "^", url, flags=re.IGNORECASE)
+                        if alt_url != url:
+                            retry_targets = [alt_url, url]
+
                     attempts = [
                         (
                             "scraperapi-premium-retry",
@@ -601,31 +611,34 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         ),
                     ]
 
-                    for via, opts, timeout_s in attempts:
-                        try:
-                            retry_url = make_scraperapi_url(
-                                url,
-                                keep_headers=False,
-                                session_number=str(random.randint(1, 999999)),
-                                **opts,
-                            )
-                            async with session.get(
-                                retry_url, headers=headers, timeout=timeout_s
-                            ) as r_resp:
-                                r_text = await r_resp.text()
-                                log_fetch_diagnostics(
-                                    "rightmove",
-                                    url,
-                                    status=r_resp.status,
-                                    text=r_text,
-                                    via=via,
+                    for target_url in retry_targets:
+                        for via, opts, timeout_s in attempts:
+                            try:
+                                retry_url = make_scraperapi_url(
+                                    target_url,
+                                    keep_headers=False,
+                                    session_number=str(random.randint(1, 999999)),
+                                    **opts,
                                 )
-                                if r_resp.status == 200 and (r_text or "").strip():
-                                    text = r_text
-                                if _has_listings_signals(text):
-                                    break
-                        except Exception:
-                            continue
+                                async with session.get(
+                                    retry_url, headers=headers, timeout=timeout_s
+                                ) as r_resp:
+                                    r_text = await r_resp.text()
+                                    log_fetch_diagnostics(
+                                        "rightmove",
+                                        target_url,
+                                        status=r_resp.status,
+                                        text=r_text,
+                                        via=via,
+                                    )
+                                    if r_resp.status == 200 and (r_text or "").strip():
+                                        text = r_text
+                                    if _has_listings_signals(text):
+                                        break
+                            except Exception:
+                                continue
+                        if _has_listings_signals(text):
+                            break
 
             # If direct mode and we detect blocking, try ScraperAPI as fallback
             if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:

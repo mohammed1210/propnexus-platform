@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import time
@@ -160,7 +161,13 @@ async def _probe_rightmove(
             fetch_url = rm.make_scraperapi_url(api_url, render=False) if proxy_used else api_url
             async with session.get(fetch_url, headers=api_headers, timeout=timeout_seconds) as resp:
                 api_status = getattr(resp, "status", 0)
-                data = await resp.json(content_type=None)
+                raw = await resp.text()
+
+            data: Any = raw
+            try:
+                data = json.loads(raw) if (raw or "").strip() else {}
+            except Exception:
+                data = raw
 
             # Match scraper behavior: in direct mode, retry through ScraperAPI on non-200.
             fallback_used = False
@@ -171,7 +178,11 @@ async def _probe_rightmove(
                     proxy_url, headers=api_headers, timeout=max(timeout_seconds, 60)
                 ) as p_resp:
                     api_status = getattr(p_resp, "status", 0)
-                    data = await p_resp.json(content_type=None)
+                    raw = await p_resp.text()
+                    try:
+                        data = json.loads(raw) if (raw or "").strip() else {}
+                    except Exception:
+                        data = raw
 
             props = []
             if isinstance(data, dict):
