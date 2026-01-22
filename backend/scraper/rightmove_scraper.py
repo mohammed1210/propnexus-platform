@@ -441,7 +441,7 @@ def _has_challenge_marker(html: str) -> bool:
 
 def _build_search_url(location: str, page: int = 0) -> str:
     """
-    Rightmove listing pages use index (offset). locationIdentifier can be derived
+    Rightmove listing pages use paginationIndex (offset). locationIdentifier can be derived
     via an initial search API call; for a generic free-text we rely on searchLocation.
     NOTE: For higher accuracy you may resolve locationIdentifier separately.
     """
@@ -452,10 +452,13 @@ def _build_search_url(location: str, page: int = 0) -> str:
     # Pragmatic reliability fix: London is known-good via REGION identifier.
     # Avoid free-text searchLocation flows which can vary and omit embedded state.
     if loc_key == "london":
-        # Match the simplest known-good URL for the first page.
-        params = ["locationIdentifier=REGION%5E87490", "sortType=2", "includeSSTC=false"]
-        if page > 0:
-            params.append(f"index={page * 24}")
+        params = [
+            "locationIdentifier=REGION%5E87490",
+            "sortType=2",
+            "includeSSTC=false",
+            f"paginationIndex={page * 24}",
+            "channel=BUY",
+        ]
         return f"{base}?{'&'.join(params)}"
 
     params = [
@@ -468,7 +471,8 @@ def _build_search_url(location: str, page: int = 0) -> str:
         "sortType=2",
         "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
         "furnishTypes=&keywords=",
-        f"index={page * 24}",  # Rightmove step size often 24
+        f"paginationIndex={page * 24}",  # Rightmove step size often 24
+        "channel=BUY",
     ]
     return f"{base}?{'&'.join(params)}"
 
@@ -630,8 +634,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             url,
                             render=True,
                             keep_headers=False,
-                            premium=_has_challenge_marker(text)
-                            or any(k in lowered for k in CAPTCHA_KEYWORDS),
+                            premium=True,
                             session_number=str(random.randint(1, 999999)),
                         )
                         async with session.get(retry_url, headers=headers, timeout=120) as r_resp:

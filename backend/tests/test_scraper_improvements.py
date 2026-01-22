@@ -400,6 +400,29 @@ def test_zoopla_search_url_slugified():
     assert _build_search_url("St Albans") == "https://www.zoopla.co.uk/for-sale/property/st-albans/"
 
 
+def test_rightmove_search_url_includes_paginationindex_page0():
+    """Regression: Rightmove HTML URL must include paginationIndex=0 for page 0."""
+    from backend.scraper.rightmove_scraper import _build_search_url
+
+    url0 = _build_search_url("London", page=0)
+    assert "paginationIndex=0" in url0
+    assert "locationIdentifier=REGION%5E87490" in url0
+
+
+def test_onthemarket_search_url_lowercases_location():
+    """Regression: OnTheMarket location path should be lowercased/slugified."""
+    from backend.scraper.onthemarket_scraper import _build_search_url
+
+    assert (
+        _build_search_url("London")
+        == "https://www.onthemarket.com/for-sale/property/london/?view=grid"
+    )
+    assert (
+        _build_search_url("St Albans")
+        == "https://www.onthemarket.com/for-sale/property/st-albans/?view=grid"
+    )
+
+
 def main():
     """Run all tests."""
     print("\n=== Running Scraper Smoke Tests ===\n")
