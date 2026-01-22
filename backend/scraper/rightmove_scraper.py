@@ -634,7 +634,8 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             url,
                             render=True,
                             keep_headers=False,
-                            premium=True,
+                            premium=_has_challenge_marker(text)
+                            or any(k in lowered for k in CAPTCHA_KEYWORDS),
                             session_number=str(random.randint(1, 999999)),
                         )
                         async with session.get(retry_url, headers=headers, timeout=120) as r_resp:
