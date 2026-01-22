@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import re
 import time
 from datetime import datetime, timezone
@@ -315,6 +316,98 @@ async def _probe_rightmove(
         "elapsed_ms": int((time.monotonic() - html_started) * 1000),
     }
 
+    # If we're in ScraperAPI mode and we got the "place not found" variant, run a
+    # metadata-only escalation ladder so we can see whether premium/ultra/country_code
+    # changes unlock the real listings HTML (without returning raw HTML).
+    if (
+        html_proxy_used
+        and has_key
+        and (not blocked)
+        and classification == "redirected_not_found"
+        and (html_text or "").strip()
+    ):
+        attempts_meta: List[Dict[str, Any]] = []
+
+        retry_targets = [html_target_url]
+        if "%5e" in html_target_url.lower():
+            alt_url = re.sub(r"%5e", "^", html_target_url, flags=re.IGNORECASE)
+            if alt_url != html_target_url:
+                retry_targets = [alt_url, html_target_url]
+
+        attempts = [
+            ("premium", dict(premium=True, ultra_premium=False, render=False), 70),
+            ("premium_render", dict(premium=True, ultra_premium=False, render=True), 120),
+            ("ultra", dict(premium=False, ultra_premium=True, render=False), 70),
+            ("ultra_render", dict(premium=False, ultra_premium=True, render=True), 120),
+        ]
+
+        recovered = False
+        for target_url in retry_targets:
+            for cc in ("gb", "uk"):
+                for via_suffix, opts, tmo in attempts:
+                    try:
+                        proxy_url = rm.make_scraperapi_url(
+                            target_url,
+                            keep_headers=True,
+                            country_code=cc,
+                            session_number=str(random.randint(1, 999999)),
+                            **opts,
+                        )
+                        st, txt = await _fetch_text(
+                            session,
+                            proxy_url,
+                            headers=html_headers,
+                            timeout_seconds=min(max(tmo, 20), timeout_seconds),
+                        )
+                    except Exception as e:  # pragma: no cover
+                        attempts_meta.append(
+                            {
+                                "via": f"{via_suffix}-{cc}",
+                                "target_url": target_url,
+                                "http_status": 0,
+                                "html_len": 0,
+                                "title": "<error>",
+                                "next_data_present": False,
+                                "property_card_present": False,
+                                "error": str(e),
+                            }
+                        )
+                        continue
+
+                    low = (txt or "").lower()
+                    m2 = re.search(
+                        r"<title[^>]*>(.*?)</title>", txt or "", re.IGNORECASE | re.DOTALL
+                    )
+                    t2 = "<none>"
+                    if m2:
+                        t2 = re.sub(r"\s+", " ", (m2.group(1) or "")).strip() or "<none>"
+
+                    nd2 = "__next_data__" in low
+                    pc2 = "propertycard" in low
+
+                    attempts_meta.append(
+                        {
+                            "via": f"{via_suffix}-{cc}",
+                            "target_url": target_url,
+                            "http_status": st,
+                            "html_len": len(txt or ""),
+                            "title": t2,
+                            "next_data_present": bool(nd2),
+                            "property_card_present": bool(pc2),
+                        }
+                    )
+
+                    if st == 200 and (nd2 or pc2):
+                        recovered = True
+                        break
+                if recovered:
+                    break
+            if recovered:
+                break
+
+        html_probe["escalation_attempts"] = attempts_meta
+        html_probe["escalation_recovered"] = bool(recovered)
+
     return {"api": api_probe, "html": html_probe}
 
 
@@ -511,7 +604,6 @@ async def debug_scrape_probe(
     Returns only metadata (status codes, lengths, counts). Never returns raw HTML.
     Protected by IMPORT_ADMIN_TOKEN when configured.
     """
-
     _require_admin(x_admin_token)
 
     loc = (location or "").strip()

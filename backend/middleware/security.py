@@ -3,6 +3,7 @@
 Security middleware for FastAPI application.
 Adds security headers and other production-ready security features.
 """
+
 from __future__ import annotations
 
 import os

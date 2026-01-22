@@ -2,6 +2,7 @@
 """
 Centralized error handling middleware for consistent error responses.
 """
+
 from __future__ import annotations
 
 import logging

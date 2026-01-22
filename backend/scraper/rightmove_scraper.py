@@ -359,6 +359,7 @@ def make_scraperapi_url(
     render: bool = False,
     premium: bool = False,
     ultra_premium: bool = False,
+    country_code: str = "gb",
     session_number: Optional[str] = None,
     keep_headers: bool = True,
 ) -> str:
@@ -382,7 +383,7 @@ def make_scraperapi_url(
     params = {
         "api_key": api_key,
         "render": "true" if render else None,
-        "country_code": "gb",
+        "country_code": (country_code or "gb"),
         "keep_headers": "true" if keep_headers else None,
         "premium": "true" if premium else None,
         "ultra_premium": "true" if ultra_premium else None,
@@ -612,31 +613,35 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                     ]
 
                     for target_url in retry_targets:
-                        for via, opts, timeout_s in attempts:
-                            try:
-                                retry_url = make_scraperapi_url(
-                                    target_url,
-                                    keep_headers=False,
-                                    session_number=str(random.randint(1, 999999)),
-                                    **opts,
-                                )
-                                async with session.get(
-                                    retry_url, headers=headers, timeout=timeout_s
-                                ) as r_resp:
-                                    r_text = await r_resp.text()
-                                    log_fetch_diagnostics(
-                                        "rightmove",
+                        for cc in ("gb", "uk"):
+                            for via, opts, timeout_s in attempts:
+                                try:
+                                    retry_url = make_scraperapi_url(
                                         target_url,
-                                        status=r_resp.status,
-                                        text=r_text,
-                                        via=via,
+                                        keep_headers=False,
+                                        country_code=cc,
+                                        session_number=str(random.randint(1, 999999)),
+                                        **opts,
                                     )
-                                    if r_resp.status == 200 and (r_text or "").strip():
-                                        text = r_text
-                                    if _has_listings_signals(text):
-                                        break
-                            except Exception:
-                                continue
+                                    async with session.get(
+                                        retry_url, headers=headers, timeout=timeout_s
+                                    ) as r_resp:
+                                        r_text = await r_resp.text()
+                                        log_fetch_diagnostics(
+                                            "rightmove",
+                                            target_url,
+                                            status=r_resp.status,
+                                            text=r_text,
+                                            via=f"{via}-{cc}",
+                                        )
+                                        if r_resp.status == 200 and (r_text or "").strip():
+                                            text = r_text
+                                        if _has_listings_signals(text):
+                                            break
+                                except Exception:
+                                    continue
+                            if _has_listings_signals(text):
+                                break
                         if _has_listings_signals(text):
                             break
 
