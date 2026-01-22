@@ -46,6 +46,15 @@ USER_AGENT = (
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic", "robot"]
 
 
+def _slugify_location(location: str) -> str:
+    s = (location or "").strip().lower()
+    # Keep alphanumerics, spaces, and hyphens; convert whitespace to hyphens.
+    s = re.sub(r"[^a-z0-9\s-]", "", s)
+    s = re.sub(r"\s+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    return s
+
+
 def _has_cloudflare_marker(text: str) -> bool:
     lowered = (text or "").lower()
     # Avoid false positives from Cloudflare analytics/beacons.
@@ -163,7 +172,8 @@ def _build_search_url(location: str, page: int = 0) -> str:
     URL pattern: https://www.onthemarket.com/for-sale/property/{encoded_location}/?view=grid&page={page+1}
     Note: If markup changes, scraper may yield 0 results; logging will warn.
     """
-    encoded = quote_plus(location.strip())
+    slug = _slugify_location(location)
+    encoded = quote_plus(slug)
     base = f"https://www.onthemarket.com/for-sale/property/{encoded}/"
     if page > 0:
         return f"{base}?view=grid&page={page + 1}"
