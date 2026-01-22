@@ -358,6 +358,7 @@ def make_scraperapi_url(
     *,
     render: bool = False,
     premium: bool = False,
+    ultra_premium: bool = False,
     session_number: Optional[str] = None,
     keep_headers: bool = True,
 ) -> str:
@@ -384,6 +385,7 @@ def make_scraperapi_url(
         "country_code": "gb",
         "keep_headers": "true" if keep_headers else None,
         "premium": "true" if premium else None,
+        "ultra_premium": "true" if ultra_premium else None,
         "url": target_url,
     }
 
@@ -439,6 +441,20 @@ def _has_challenge_marker(html: str) -> bool:
     )
 
 
+def _is_place_not_found_variant(html: str) -> bool:
+    lowered = (html or "").lower()
+    return any(
+        k in lowered
+        for k in (
+            "page-not-found",
+            "page not found",
+            "we couldn't find",
+            "we couldn’t find",
+            "find the place you were looking for",
+        )
+    )
+
+
 def _build_search_url(location: str, page: int = 0) -> str:
     """
     Rightmove listing pages use paginationIndex (offset). locationIdentifier can be derived
@@ -457,7 +473,6 @@ def _build_search_url(location: str, page: int = 0) -> str:
             "sortType=2",
             "includeSSTC=false",
             f"paginationIndex={page * 24}",
-            "channel=BUY",
         ]
         return f"{base}?{'&'.join(params)}"
 
@@ -472,7 +487,6 @@ def _build_search_url(location: str, page: int = 0) -> str:
         "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
         "furnishTypes=&keywords=",
         f"paginationIndex={page * 24}",  # Rightmove step size often 24
-        "channel=BUY",
     ]
     return f"{base}?{'&'.join(params)}"
 
@@ -533,6 +547,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         render=False,
                         premium=_has_challenge_marker(text)
                         or any(k in (text or "").lower() for k in CAPTCHA_KEYWORDS),
+                        ultra_premium=False,
                         session_number=str(random.randint(1, 999999)),
                     )
                     async with session.get(retry_url, headers=headers, timeout=75) as r_resp:
@@ -549,8 +564,12 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 except Exception:
                     pass
 
-            # Rightmove sometimes returns a 200 "place not found" variant when proxied.
-            # Retry once more without keep_headers to let ScraperAPI choose its own headers.
+            # If we still have no listing signals and this looks like the "place not found"
+            # variant, escalate ScraperAPI options in a strict ladder (once each):
+            # 1) premium=true
+            # 2) premium=true&render=true
+            # 3) ultra_premium=true
+            # 4) ultra_premium=true&render=true
             if (
                 mode == "scraperapi"
                 and SCRAPERAPI_KEY
@@ -558,99 +577,55 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 and (text or "").strip()
                 and (not _has_listings_signals(text))
             ):
-                lowered = (text or "").lower()
-                if "find the place you were looking for" in lowered:
-                    try:
-                        retry_url = make_scraperapi_url(
-                            url,
-                            render=False,
-                            keep_headers=False,
-                            premium=_has_challenge_marker(text)
-                            or any(k in lowered for k in CAPTCHA_KEYWORDS),
-                            session_number=str(random.randint(1, 999999)),
-                        )
-                        async with session.get(retry_url, headers=headers, timeout=75) as r_resp:
-                            r_text = await r_resp.text()
-                            log_fetch_diagnostics(
-                                "rightmove",
-                                url,
-                                status=r_resp.status,
-                                text=r_text,
-                                via="scraperapi-no-keep-headers-retry",
-                            )
-                            if r_resp.status == 200 and (r_text or "").strip():
-                                text = r_text
-                    except Exception:
-                        pass
+                if _is_place_not_found_variant(text):
+                    attempts = [
+                        (
+                            "scraperapi-premium-retry",
+                            dict(premium=True, ultra_premium=False, render=False),
+                            90,
+                        ),
+                        (
+                            "scraperapi-premium-render-retry",
+                            dict(premium=True, ultra_premium=False, render=True),
+                            140,
+                        ),
+                        (
+                            "scraperapi-ultra-premium-retry",
+                            dict(premium=False, ultra_premium=True, render=False),
+                            90,
+                        ),
+                        (
+                            "scraperapi-ultra-premium-render-retry",
+                            dict(premium=False, ultra_premium=True, render=True),
+                            140,
+                        ),
+                    ]
 
-            # If we still get the "place not found" variant, try a caret-unescaped URL.
-            # Some proxies/servers behave differently when the caret is percent-encoded.
-            if (
-                mode == "scraperapi"
-                and SCRAPERAPI_KEY
-                and resp.status == 200
-                and (text or "").strip()
-                and (not _has_listings_signals(text))
-            ):
-                lowered = (text or "").lower()
-                if "find the place you were looking for" in lowered and "%5e" in url.lower():
-                    try:
-                        alt_url = re.sub(r"%5e", "^", url, flags=re.IGNORECASE)
-                        retry_url = make_scraperapi_url(
-                            alt_url,
-                            render=False,
-                            keep_headers=False,
-                            premium=_has_challenge_marker(text)
-                            or any(k in lowered for k in CAPTCHA_KEYWORDS),
-                            session_number=str(random.randint(1, 999999)),
-                        )
-                        async with session.get(retry_url, headers=headers, timeout=90) as r_resp:
-                            r_text = await r_resp.text()
-                            log_fetch_diagnostics(
-                                "rightmove",
-                                alt_url,
-                                status=r_resp.status,
-                                text=r_text,
-                                via="scraperapi-caret-url-retry",
-                            )
-                            if r_resp.status == 200 and (r_text or "").strip():
-                                text = r_text
-                    except Exception:
-                        pass
-
-            # Final escalation: if we still have no listing signals and this looks like the
-            # "place not found" variant, retry with rendering enabled.
-            if (
-                mode == "scraperapi"
-                and SCRAPERAPI_KEY
-                and resp.status == 200
-                and (text or "").strip()
-                and (not _has_listings_signals(text))
-            ):
-                lowered = (text or "").lower()
-                if "find the place you were looking for" in lowered:
-                    try:
-                        retry_url = make_scraperapi_url(
-                            url,
-                            render=True,
-                            keep_headers=False,
-                            premium=_has_challenge_marker(text)
-                            or any(k in lowered for k in CAPTCHA_KEYWORDS),
-                            session_number=str(random.randint(1, 999999)),
-                        )
-                        async with session.get(retry_url, headers=headers, timeout=120) as r_resp:
-                            r_text = await r_resp.text()
-                            log_fetch_diagnostics(
-                                "rightmove",
+                    for via, opts, timeout_s in attempts:
+                        try:
+                            retry_url = make_scraperapi_url(
                                 url,
-                                status=r_resp.status,
-                                text=r_text,
-                                via="scraperapi-render-retry",
+                                keep_headers=False,
+                                session_number=str(random.randint(1, 999999)),
+                                **opts,
                             )
-                            if r_resp.status == 200 and (r_text or "").strip():
-                                text = r_text
-                    except Exception:
-                        pass
+                            async with session.get(
+                                retry_url, headers=headers, timeout=timeout_s
+                            ) as r_resp:
+                                r_text = await r_resp.text()
+                                log_fetch_diagnostics(
+                                    "rightmove",
+                                    url,
+                                    status=r_resp.status,
+                                    text=r_text,
+                                    via=via,
+                                )
+                                if r_resp.status == 200 and (r_text or "").strip():
+                                    text = r_text
+                                if _has_listings_signals(text):
+                                    break
+                        except Exception:
+                            continue
 
             # If direct mode and we detect blocking, try ScraperAPI as fallback
             if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:

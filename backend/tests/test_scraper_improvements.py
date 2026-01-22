@@ -407,6 +407,7 @@ def test_rightmove_search_url_includes_paginationindex_page0():
     url0 = _build_search_url("London", page=0)
     assert "paginationIndex=0" in url0
     assert "locationIdentifier=REGION%5E87490" in url0
+    assert "channel=BUY" not in url0
 
 
 def test_onthemarket_search_url_lowercases_location():
