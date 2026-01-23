@@ -400,12 +400,12 @@ def test_zoopla_search_url_slugified():
     assert _build_search_url("St Albans") == "https://www.zoopla.co.uk/for-sale/property/st-albans/"
 
 
-def test_rightmove_search_url_includes_paginationindex_page0():
-    """Regression: Rightmove HTML URL must include paginationIndex=0 for page 0."""
+def test_rightmove_search_url_includes_index_page0():
+    """Regression: Rightmove HTML URL must include index=0 for page 0."""
     from backend.scraper.rightmove_scraper import _build_search_url
 
     url0 = _build_search_url("London", page=0)
-    assert "paginationIndex=0" in url0
+    assert "index=0" in url0
     assert "locationIdentifier=REGION%5E87490" in url0
     assert "channel=BUY" not in url0
 
@@ -422,6 +422,16 @@ def test_onthemarket_search_url_lowercases_location():
         _build_search_url("St Albans")
         == "https://www.onthemarket.com/for-sale/property/st-albans/?view=grid"
     )
+
+
+def test_rightmove_caret_retry_targets_include_unescaped_first():
+    """Regression: caret-unescape retry should exist for REGION%5E URLs."""
+    from backend.scraper.rightmove_scraper import _rightmove_caret_url_variants
+
+    url = "https://www.rightmove.co.uk/property-for-sale/find.html?locationIdentifier=REGION%5E87490&index=0"
+    variants = _rightmove_caret_url_variants(url)
+    assert variants[0].count("REGION^") == 1
+    assert any("REGION%5E87490" in v for v in variants)
 
 
 def main():

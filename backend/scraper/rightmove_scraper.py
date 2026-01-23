@@ -456,6 +456,43 @@ def _is_place_not_found_variant(html: str) -> bool:
     )
 
 
+def _rightmove_caret_url_variants(url: str) -> List[str]:
+    """Return retry targets that include both '^' and '%5E' caret variants.
+
+    Rightmove region identifiers commonly appear as `REGION^12345` or `REGION%5E12345`.
+    We've seen the HTML response vary (including the deceptive "place not found" variant)
+    depending on whether the caret is percent-encoded, so ensure we try both.
+    """
+
+    url = url or ""
+    variants: List[str] = []
+
+    # Prefer unescaped caret first.
+    if "%5e" in url.lower():
+        unescaped = re.sub(r"%5e", "^", url, flags=re.IGNORECASE)
+        if unescaped and unescaped != url:
+            variants.append(unescaped)
+
+    # Original always included.
+    if url:
+        variants.append(url)
+
+    # Also try the encoded form when the URL contains a caret.
+    if "^" in url:
+        encoded = url.replace("^", "%5E")
+        if encoded and encoded != url:
+            variants.append(encoded)
+
+    # De-dup while preserving order.
+    out: List[str] = []
+    seen = set()
+    for v in variants:
+        if v not in seen:
+            seen.add(v)
+            out.append(v)
+    return out
+
+
 def _build_search_url(location: str, page: int = 0) -> str:
     """
     Rightmove listing pages use paginationIndex (offset). locationIdentifier can be derived
@@ -475,7 +512,7 @@ def _build_search_url(location: str, page: int = 0) -> str:
             "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
             "furnishTypes=&keywords=",
             "includeSSTC=false",
-            f"paginationIndex={page * 24}",
+            f"index={page * 24}",
         ]
         return f"{base}?{'&'.join(params)}"
 
@@ -489,7 +526,7 @@ def _build_search_url(location: str, page: int = 0) -> str:
         "sortType=2",
         "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
         "furnishTypes=&keywords=",
-        f"paginationIndex={page * 24}",  # Rightmove step size often 24
+        f"index={page * 24}",  # Rightmove step size often 24
     ]
     return f"{base}?{'&'.join(params)}"
 
@@ -581,13 +618,9 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 and (not _has_listings_signals(text))
             ):
                 if _is_place_not_found_variant(text):
-                    retry_targets = [url]
                     # Known edge-case: percent-encoded carets in REGION identifiers (%5E)
-                    # can trigger a "place not found" variant. Try unescaped caret first.
-                    if "%5e" in url.lower():
-                        alt_url = re.sub(r"%5e", "^", url, flags=re.IGNORECASE)
-                        if alt_url != url:
-                            retry_targets = [alt_url, url]
+                    # can trigger a "place not found" variant. Ensure we try both forms.
+                    retry_targets = _rightmove_caret_url_variants(url)
 
                     attempts = [
                         (
@@ -618,7 +651,6 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                                 try:
                                     retry_url = make_scraperapi_url(
                                         target_url,
-                                        keep_headers=False,
                                         country_code=cc,
                                         session_number=str(random.randint(1, 999999)),
                                         **opts,
@@ -1101,7 +1133,8 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         and (not cards)
                         and SCRAPERAPI_KEY
                         and (
-                            _has_challenge_marker(html)
+                            _has_consent_marker(html)
+                            or _has_challenge_marker(html)
                             or any(k in (html or "").lower() for k in CAPTCHA_KEYWORDS)
                         )
                     ):
