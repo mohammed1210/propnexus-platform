@@ -338,6 +338,7 @@ async def _probe_rightmove(
                     country_code=None,
                     keep_headers=None,
                     session_number=None,
+                    auto_session_number=False,
                 )
                 st2, txt2 = await _fetch_text(
                     session,
@@ -357,6 +358,18 @@ async def _probe_rightmove(
                 maybe_nf3 = rm._is_place_not_found_variant(txt2)
                 soup3 = BeautifulSoup(txt2, "html.parser")
                 cards3 = rm._collect_selectors(soup3)
+
+                html_probe["minimal_retry_attempt"] = {
+                    "via": "rightmove-minimal-url-retry",
+                    "target_url": minimal_target,
+                    "http_status": st2,
+                    "html_len": len(txt2 or ""),
+                    "title": t3,
+                    "next_data_present": bool(nd3),
+                    "property_card_present": bool(pc3),
+                    "cards_found": len(cards3),
+                    "page_not_found_signal": bool(maybe_nf3),
+                }
 
                 if st2 == 200 and (nd3 or pc3 or len(cards3) > 0):
                     html_probe.update(

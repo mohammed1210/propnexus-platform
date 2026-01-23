@@ -362,6 +362,7 @@ def make_scraperapi_url(
     country_code: Optional[str] = "gb",
     session_number: Optional[str] = None,
     keep_headers: Optional[bool] = True,
+    auto_session_number: bool = True,
 ) -> str:
     """
     Build a ScraperAPI URL for the given target URL.
@@ -403,7 +404,7 @@ def make_scraperapi_url(
     # Optional session pinning / sharding.
     if session_number:
         params["session_number"] = str(session_number)
-    else:
+    elif auto_session_number:
         session_fixed = (os.getenv("SCRAPERAPI_SESSION_NUMBER") or "").strip()
         session_random = (os.getenv("SCRAPERAPI_SESSION_RANDOM") or "").strip().lower() in (
             "1",
@@ -654,157 +655,159 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 except Exception:
                     pass
 
-            # If we still have no listing signals and this looks like the "place not found"
-            # variant, escalate ScraperAPI options in a strict ladder (once each):
-            # For REGION^ locationIdentifier URLs, first retry with the EXACT minimal URL using a
-            # plain ScraperAPI call (no country_code / keep_headers / premium / render), then
-            # escalate minimally (bounded).
+            # If we see the deceptive "place not found" variant (200 OK, no cards/Next.js),
+            # retry using the support-confirmed EXACT minimal URL + plain ScraperAPI call.
+            # IMPORTANT: do not gate on marker presence; the deceptive page can include unrelated
+            # embedded scripts and still be a soft-block.
             if (
                 mode == "scraperapi"
                 and SCRAPERAPI_KEY
                 and resp.status == 200
                 and (text or "").strip()
-                and (not _has_listings_signals(text))
+                and _is_place_not_found_variant(text)
             ):
-                if _is_place_not_found_variant(text):
-                    loc_id = _extract_location_identifier(url)
-                    if _is_region_location_identifier(loc_id):
-                        page_idx = _extract_page_index(url)
-                        minimal_target = _build_minimal_region_find_url(str(loc_id), page_idx)
+                loc_id = _extract_location_identifier(url)
+                if _is_region_location_identifier(loc_id):
+                    page_idx = _extract_page_index(url)
+                    minimal_target = _build_minimal_region_find_url(str(loc_id), page_idx)
 
-                        # Support-confirmed: start with a plain ScraperAPI call (no extra params)
-                        # then escalate in a bounded ladder (max 4 total attempts here).
-                        attempts = [
-                            (
-                                "rightmove-minimal-url-retry",
-                                dict(
-                                    render=False,
-                                    premium=False,
-                                    ultra_premium=False,
-                                    country_code=None,
-                                    keep_headers=None,
-                                    session_number=None,
-                                ),
-                                90,
+                    # Support-confirmed: start with a plain ScraperAPI call (no extra params)
+                    # then escalate in a bounded ladder (max 4 total attempts here).
+                    attempts = [
+                        (
+                            "rightmove-minimal-url-retry",
+                            dict(
+                                render=False,
+                                premium=False,
+                                ultra_premium=False,
+                                country_code=None,
+                                keep_headers=None,
+                                session_number=None,
+                                auto_session_number=False,
                             ),
-                            (
-                                "rightmove-minimal-url-premium-retry",
-                                dict(
-                                    render=False,
-                                    premium=True,
-                                    ultra_premium=False,
-                                    country_code=None,
-                                    keep_headers=None,
-                                    session_number=str(random.randint(1, 999999)),
-                                ),
-                                110,
+                            90,
+                        ),
+                        (
+                            "rightmove-minimal-url-premium-retry",
+                            dict(
+                                render=False,
+                                premium=True,
+                                ultra_premium=False,
+                                country_code=None,
+                                keep_headers=None,
+                                session_number=str(random.randint(1, 999999)),
+                                auto_session_number=False,
                             ),
-                            (
-                                "rightmove-minimal-url-premium-render-retry",
-                                dict(
-                                    render=True,
-                                    premium=True,
-                                    ultra_premium=False,
-                                    country_code=None,
-                                    keep_headers=None,
-                                    session_number=str(random.randint(1, 999999)),
-                                ),
-                                150,
+                            110,
+                        ),
+                        (
+                            "rightmove-minimal-url-premium-render-retry",
+                            dict(
+                                render=True,
+                                premium=True,
+                                ultra_premium=False,
+                                country_code=None,
+                                keep_headers=None,
+                                session_number=str(random.randint(1, 999999)),
+                                auto_session_number=False,
                             ),
-                            (
-                                "rightmove-minimal-url-ultra-premium-retry",
-                                dict(
-                                    render=False,
-                                    premium=False,
-                                    ultra_premium=True,
-                                    country_code=None,
-                                    keep_headers=None,
-                                    session_number=str(random.randint(1, 999999)),
-                                ),
-                                120,
+                            150,
+                        ),
+                        (
+                            "rightmove-minimal-url-ultra-premium-retry",
+                            dict(
+                                render=False,
+                                premium=False,
+                                ultra_premium=True,
+                                country_code=None,
+                                keep_headers=None,
+                                session_number=str(random.randint(1, 999999)),
+                                auto_session_number=False,
                             ),
-                        ]
+                            120,
+                        ),
+                    ]
 
-                        for via, opts, timeout_s in attempts:
-                            try:
-                                retry_url = make_scraperapi_url(minimal_target, **opts)
-                                async with session.get(
-                                    retry_url, headers=headers, timeout=timeout_s
-                                ) as r_resp:
-                                    r_text = await r_resp.text()
-                                    log_fetch_diagnostics(
-                                        "rightmove",
-                                        minimal_target,
-                                        status=r_resp.status,
-                                        text=r_text,
-                                        via=via,
-                                    )
-                                    if r_resp.status == 200 and (r_text or "").strip():
-                                        text = r_text
-                                    if _has_listings_signals(text):
-                                        break
-                            except Exception:
-                                continue
-                    else:
-                        # Non-REGION flows: keep the existing escalation ladder.
-                        # Known edge-case: percent-encoded carets in REGION identifiers (%5E)
-                        # can trigger a "place not found" variant. Ensure we try both forms.
-                        retry_targets = _rightmove_caret_url_variants(url)
-
-                        attempts = [
-                            (
-                                "scraperapi-premium-retry",
-                                dict(premium=True, ultra_premium=False, render=False),
-                                90,
-                            ),
-                            (
-                                "scraperapi-premium-render-retry",
-                                dict(premium=True, ultra_premium=False, render=True),
-                                140,
-                            ),
-                            (
-                                "scraperapi-ultra-premium-retry",
-                                dict(premium=False, ultra_premium=True, render=False),
-                                90,
-                            ),
-                            (
-                                "scraperapi-ultra-premium-render-retry",
-                                dict(premium=False, ultra_premium=True, render=True),
-                                140,
-                            ),
-                        ]
-
-                        for target_url in retry_targets:
-                            for cc in ("gb", "uk"):
-                                for via, opts, timeout_s in attempts:
-                                    try:
-                                        retry_url = make_scraperapi_url(
-                                            target_url,
-                                            country_code=cc,
-                                            session_number=str(random.randint(1, 999999)),
-                                            **opts,
-                                        )
-                                        async with session.get(
-                                            retry_url, headers=headers, timeout=timeout_s
-                                        ) as r_resp:
-                                            r_text = await r_resp.text()
-                                            log_fetch_diagnostics(
-                                                "rightmove",
-                                                target_url,
-                                                status=r_resp.status,
-                                                text=r_text,
-                                                via=f"{via}-{cc}",
-                                            )
-                                            if r_resp.status == 200 and (r_text or "").strip():
-                                                text = r_text
-                                            if _has_listings_signals(text):
-                                                break
-                                    except Exception:
-                                        continue
+                    for via, opts, timeout_s in attempts:
+                        try:
+                            retry_url = make_scraperapi_url(minimal_target, **opts)
+                            async with session.get(
+                                retry_url, headers=headers, timeout=timeout_s
+                            ) as r_resp:
+                                r_text = await r_resp.text()
+                                log_fetch_diagnostics(
+                                    "rightmove",
+                                    minimal_target,
+                                    status=r_resp.status,
+                                    text=r_text,
+                                    via=via,
+                                )
+                                if r_resp.status == 200 and (r_text or "").strip():
+                                    text = r_text
                                 if _has_listings_signals(text):
                                     break
+                        except Exception:
+                            continue
+                else:
+                    # Non-REGION flows: keep the existing escalation ladder.
+                    # Known edge-case: percent-encoded carets in REGION identifiers (%5E)
+                    # can trigger a "place not found" variant. Ensure we try both forms.
+                    retry_targets = _rightmove_caret_url_variants(url)
+
+                    attempts = [
+                        (
+                            "scraperapi-premium-retry",
+                            dict(premium=True, ultra_premium=False, render=False),
+                            90,
+                        ),
+                        (
+                            "scraperapi-premium-render-retry",
+                            dict(premium=True, ultra_premium=False, render=True),
+                            140,
+                        ),
+                        (
+                            "scraperapi-ultra-premium-retry",
+                            dict(premium=False, ultra_premium=True, render=False),
+                            90,
+                        ),
+                        (
+                            "scraperapi-ultra-premium-render-retry",
+                            dict(premium=False, ultra_premium=True, render=True),
+                            140,
+                        ),
+                    ]
+
+                    for target_url in retry_targets:
+                        for cc in ("gb", "uk"):
+                            for via, opts, timeout_s in attempts:
+                                try:
+                                    retry_url = make_scraperapi_url(
+                                        target_url,
+                                        country_code=cc,
+                                        session_number=str(random.randint(1, 999999)),
+                                        **opts,
+                                    )
+                                    async with session.get(
+                                        retry_url, headers=headers, timeout=timeout_s
+                                    ) as r_resp:
+                                        r_text = await r_resp.text()
+                                        log_fetch_diagnostics(
+                                            "rightmove",
+                                            target_url,
+                                            status=r_resp.status,
+                                            text=r_text,
+                                            via=f"{via}-{cc}",
+                                        )
+                                        if r_resp.status == 200 and (r_text or "").strip():
+                                            text = r_text
+                                        if _has_listings_signals(text):
+                                            break
+                                except Exception:
+                                    continue
                             if _has_listings_signals(text):
                                 break
+                        if _has_listings_signals(text):
+                            break
 
             # If direct mode and we detect blocking, try ScraperAPI as fallback
             if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
