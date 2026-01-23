@@ -962,13 +962,16 @@ def _collect_selectors(soup: BeautifulSoup) -> List[BeautifulSoup]:
         "[data-test='property-card']",
         ".propertyCard",
         "article.propertyCard",
-        "div[class*='propertyCard']",
     ]
     cards = []
     for sel in selectors:
         found = soup.select(sel)
         if found:
             cards.extend(found)
+
+    # Guard against overly broad matches (e.g. nested .propertyCard-* elements):
+    # only treat nodes as cards when they contain a listing link.
+    cards = [c for c in cards if c.select_one("a[href*='/properties/']") is not None]
     # De-duplicate
     seen = set()
     unique_cards = []
