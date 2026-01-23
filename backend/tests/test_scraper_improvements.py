@@ -8,7 +8,8 @@ structure without making actual network requests.
 import json
 import os
 import sys
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 from bs4 import BeautifulSoup
@@ -323,6 +324,100 @@ def test_rightmove_next_data_extraction_maps_properties():
     assert mapped["source"] == "rightmove"
     assert mapped["location"].lower().find("london") != -1
     assert mapped["price"] == 500000
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"SCRAPER_MODE": "scraperapi", "SCRAPERAPI_KEY": "test-key"})
+async def test_rightmove_place_not_found_retries_minimal_url_plain_scraperapi():
+    """Regression: deceptive Rightmove 'place not found' HTML should trigger minimal URL retry."""
+
+    from backend.scraper import rightmove_scraper
+
+    # Ensure the code path sees a key (module constant is loaded at import time).
+    with patch.object(rightmove_scraper, "SCRAPERAPI_KEY", "test-key"):
+        # aiohttp's session.get returns an awaitable async context manager, not a coroutine.
+        # Use MagicMock for get() so `async with session.get(...)` works in the unit test.
+        mock_session = MagicMock()
+
+        not_found_html = (
+            "<html><head><title>Rightmove - We couldn’t find the place you were looking for."  # noqa: RUF001
+            "</title></head><body>We couldn’t find the place you were looking for.</body></html>"  # noqa: RUF001
+        )
+
+        next_data = {
+            "props": {
+                "pageProps": {
+                    "searchResults": {
+                        "properties": [
+                            {
+                                "id": 321,
+                                "displayAddress": "London",
+                                "price": {"amount": 123456},
+                                "bedrooms": 1,
+                                "bathrooms": 1,
+                                "media": [{"url": "https://example.com/img.jpg"}],
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+        good_html = (
+            "<html><body><script id='__NEXT_DATA__' type='application/json'>"
+            + json.dumps(next_data)
+            + "</script></body></html>"
+        )
+
+        first_response = AsyncMock()
+        first_response.text = AsyncMock(return_value=not_found_html)
+        first_response.status = 200
+
+        second_response = AsyncMock()
+        second_response.text = AsyncMock(return_value=not_found_html)
+        second_response.status = 200
+
+        third_response = AsyncMock()
+        third_response.text = AsyncMock(return_value=good_html)
+        third_response.status = 200
+
+        # 1) initial fetch (wrapped ScraperAPI URL)
+        # 2) session-number retry (still not_found)
+        # 3) minimal URL plain ScraperAPI retry (should recover)
+        mock_session.get.return_value.__aenter__.side_effect = [
+            first_response,
+            second_response,
+            third_response,
+        ]
+        mock_session.get.return_value.__aexit__.return_value = False
+
+        url = rightmove_scraper._build_search_url("London", page=0)
+        html = await rightmove_scraper._fetch_html_internal(mock_session, url)
+        assert html is not None
+        assert "__NEXT_DATA__" in html
+
+        # Ensure we performed the minimal URL retry and that it is a plain ScraperAPI call
+        # (no keep_headers/country_code appended).
+        assert mock_session.get.call_count == 3
+        third_call_url = mock_session.get.call_args_list[2][0][0]
+        q = parse_qs(urlparse(third_call_url).query)
+
+        assert "country_code" not in q
+        assert "keep_headers" not in q
+
+        expected_minimal = (
+            "https://www.rightmove.co.uk/property-for-sale/find.html"
+            "?locationIdentifier=REGION%5E87490&sortType=2&includeSSTC=false&paginationIndex=0"
+        )
+        assert (q.get("url") or [""])[0] == expected_minimal
+        assert "channel=BUY" not in expected_minimal
+        assert "dontShow" not in expected_minimal
+        assert "propertyTypes" not in expected_minimal
+
+        soup = BeautifulSoup(html, "html.parser")
+        extracted = rightmove_scraper._extract_next_data(soup)
+        assert extracted is not None
+        listings = rightmove_scraper._find_rightmove_properties_in_next_data(extracted)
+        assert len(listings) == 1
 
 
 @pytest.mark.asyncio
