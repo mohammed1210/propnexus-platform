@@ -403,6 +403,7 @@ async def test_rightmove_place_not_found_retries_minimal_url_plain_scraperapi():
 
         assert "country_code" not in q
         assert "keep_headers" not in q
+        assert "session_number" not in q
 
         expected_minimal = (
             "https://www.rightmove.co.uk/property-for-sale/find.html"
