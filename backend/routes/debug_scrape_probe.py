@@ -316,6 +316,66 @@ async def _probe_rightmove(
         "elapsed_ms": int((time.monotonic() - html_started) * 1000),
     }
 
+    # If we hit the deceptive Rightmove "place not found" page under ScraperAPI, attempt the
+    # support-confirmed minimal URL via a plain ScraperAPI call (no keep_headers/country_code)
+    # so this probe reflects the production fallback behavior.
+    if (
+        html_proxy_used
+        and has_key
+        and (not blocked)
+        and classification == "redirected_not_found"
+        and (html_text or "").strip()
+    ):
+        loc_id = rm._extract_location_identifier(html_target_url)
+        if rm._is_region_location_identifier(loc_id):
+            minimal_target = rm._build_minimal_region_find_url(str(loc_id), page)
+            try:
+                plain_proxy = rm.make_scraperapi_url(
+                    minimal_target,
+                    render=False,
+                    premium=False,
+                    ultra_premium=False,
+                    country_code=None,
+                    keep_headers=None,
+                    session_number=None,
+                )
+                st2, txt2 = await _fetch_text(
+                    session,
+                    plain_proxy,
+                    headers=html_headers,
+                    timeout_seconds=max(timeout_seconds, 60),
+                )
+
+                low2 = (txt2 or "").lower()
+                m3 = re.search(r"<title[^>]*>(.*?)</title>", txt2 or "", re.IGNORECASE | re.DOTALL)
+                t3 = "<none>"
+                if m3:
+                    t3 = re.sub(r"\s+", " ", (m3.group(1) or "")).strip() or "<none>"
+
+                nd3 = "__next_data__" in low2
+                pc3 = "propertycard" in low2
+                maybe_nf3 = rm._is_place_not_found_variant(txt2)
+                soup3 = BeautifulSoup(txt2, "html.parser")
+                cards3 = rm._collect_selectors(soup3)
+
+                if st2 == 200 and (nd3 or pc3 or len(cards3) > 0):
+                    html_probe.update(
+                        {
+                            "via": "rightmove-minimal-url-retry",
+                            "target_url": minimal_target,
+                            "http_status": st2,
+                            "html_len": len(txt2 or ""),
+                            "title": t3,
+                            "next_data_present": bool(nd3),
+                            "property_card_present": bool(pc3),
+                            "cards_found": len(cards3),
+                            "page_not_found_signal": bool(maybe_nf3),
+                            "classification": "parsed" if len(cards3) > 0 else "fetched_no_cards",
+                        }
+                    )
+            except Exception:
+                pass
+
     # If we're in ScraperAPI mode and we got the "place not found" variant, run a
     # metadata-only escalation ladder so we can see whether premium/ultra/country_code
     # changes unlock the real listings HTML (without returning raw HTML).
