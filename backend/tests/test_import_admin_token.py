@@ -21,6 +21,7 @@ def _patch_import_scrapers(monkeypatch):
     async def _fake_scrape(_loc: str):
         return []
 
+    import backend.routes.import_routes as import_routes
     import backend.scraper.onthemarket_scraper as otm
     import backend.scraper.rightmove_scraper as rm
     import backend.scraper.spare_room_scraper as spareroom
@@ -32,6 +33,10 @@ def _patch_import_scrapers(monkeypatch):
     monkeypatch.setattr(otm, "scrape_onthemarket_properties", _fake_scrape, raising=True)
     monkeypatch.setattr(spareroom, "scrape_spareroom_properties", _fake_scrape, raising=True)
     monkeypatch.setattr(ingest, "scrape_all_sources", _fake_scrape, raising=True)
+    # import_routes binds scrape_all_sources at import time via
+    # `from backend.utils.ingest import scrape_all_sources`, so patch the bound
+    # symbol as well to keep /import/all fully hermetic.
+    monkeypatch.setattr(import_routes, "scrape_all_sources", _fake_scrape, raising=True)
 
 
 @pytest.mark.parametrize(
