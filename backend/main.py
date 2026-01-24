@@ -1,7 +1,6 @@
 # backend/main.py
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
 from urllib.parse import urlparse
@@ -167,50 +166,6 @@ def debug_scraper_env():
         "RM_MAX_PAGES": os.getenv("RM_MAX_PAGES", "1"),
         "OTM_MAX_PAGES": os.getenv("OTM_MAX_PAGES", "1"),
         "SR_MAX_PAGES": os.getenv("SR_MAX_PAGES", "1"),
-    }
-
-
-@app.get("/debug/stripe-env")
-def debug_stripe_env():
-    """Expose Stripe configuration safely (no raw secrets).
-
-    Useful for diagnosing Stripe webhook signature mismatches (test vs live).
-    """
-
-    def _mode_from_secret_key(key: str) -> str:
-        if key.startswith("sk_test_"):
-            return "test"
-        if key.startswith("sk_live_"):
-            return "live"
-        return "unknown"
-
-    def _fingerprint(value: str) -> str:
-        # Short hash to compare values across environments without revealing them.
-        return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
-
-    stripe_secret_key = (os.getenv("STRIPE_SECRET_KEY") or "").strip()
-    webhook_secret = (os.getenv("STRIPE_WEBHOOK_SECRET") or "").strip()
-
-    return {
-        "stripe_webhook_path": "/stripe/webhook",
-        "stripe_secret_key_present": bool(stripe_secret_key),
-        "stripe_secret_key_mode": (
-            _mode_from_secret_key(stripe_secret_key) if stripe_secret_key else "missing"
-        ),
-        "stripe_secret_key_prefix": stripe_secret_key[:8] if stripe_secret_key else "",
-        "stripe_secret_key_len": len(stripe_secret_key),
-        "stripe_secret_key_fingerprint": (
-            _fingerprint(stripe_secret_key) if stripe_secret_key else ""
-        ),
-        "stripe_webhook_secret_present": bool(webhook_secret),
-        "stripe_webhook_secret_prefix": webhook_secret[:6] if webhook_secret else "",
-        "stripe_webhook_secret_len": len(webhook_secret),
-        "stripe_webhook_secret_fingerprint": _fingerprint(webhook_secret) if webhook_secret else "",
-        "rate_limit_stripe_webhook": os.getenv("RATE_LIMIT_STRIPE_WEBHOOK", ""),
-        "rate_limit_webhook_default": os.getenv("RATE_LIMIT_WEBHOOK", ""),
-        "environment": os.getenv("ENVIRONMENT")
-        or os.getenv("RAILWAY_ENVIRONMENT")
-        or "development",
     }
 
 
