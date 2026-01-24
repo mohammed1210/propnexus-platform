@@ -133,7 +133,12 @@ async def _probe_zoopla(
 
 
 async def _probe_rightmove(
-    session: Any, location: str, page: int, timeout_seconds: int
+    session: Any,
+    location: str,
+    page: int,
+    timeout_seconds: int,
+    *,
+    include_escalation: bool,
 ) -> Dict[str, Any]:
     from bs4 import BeautifulSoup
 
@@ -176,7 +181,7 @@ async def _probe_rightmove(
                 fallback_used = True
                 proxy_url = rm.make_scraperapi_url(api_url, render=False)
                 async with session.get(
-                    proxy_url, headers=api_headers, timeout=max(timeout_seconds, 60)
+                    proxy_url, headers=api_headers, timeout=timeout_seconds
                 ) as p_resp:
                     api_status = getattr(p_resp, "status", 0)
                     raw = await p_resp.text()
@@ -263,7 +268,7 @@ async def _probe_rightmove(
         try:
             proxy_url = rm.make_scraperapi_url(html_target_url, render=True)
             html_status, html_text = await _fetch_text(
-                session, proxy_url, headers=html_headers, timeout_seconds=max(timeout_seconds, 60)
+                session, proxy_url, headers=html_headers, timeout_seconds=timeout_seconds
             )
         except Exception:
             html_status, html_text = initial_status, html_text
@@ -351,7 +356,7 @@ async def _probe_rightmove(
                         session,
                         plain_proxy,
                         headers=html_headers,
-                        timeout_seconds=max(timeout_seconds, 60),
+                        timeout_seconds=timeout_seconds,
                     )
 
                     low2 = (txt2 or "").lower()
@@ -407,11 +412,11 @@ async def _probe_rightmove(
             except Exception:
                 pass
 
-    # If we're in ScraperAPI mode and we got the "place not found" variant, run a
-    # metadata-only escalation ladder so we can see whether premium/ultra/country_code
-    # changes unlock the real listings HTML (without returning raw HTML).
+    # Optionally run a metadata-only escalation ladder so we can see whether
+    # premium/ultra/country_code changes unlock the real listings HTML.
     if (
-        html_proxy_used
+        include_escalation
+        and html_proxy_used
         and has_key
         and (not blocked)
         and classification == "redirected_not_found"
@@ -640,6 +645,7 @@ async def _run_probe(
     sources: List[str],
     page: int,
     timeout_seconds: int,
+    include_escalation: bool,
 ) -> Dict[str, Any]:
     import aiohttp
 
@@ -654,7 +660,13 @@ async def _run_probe(
             )
         if "rightmove" in sources:
             tasks["rightmove"] = asyncio.create_task(
-                _probe_rightmove(session, location, page, timeout_seconds)
+                _probe_rightmove(
+                    session,
+                    location,
+                    page,
+                    timeout_seconds,
+                    include_escalation=include_escalation,
+                )
             )
         if "onthemarket" in sources:
             tasks["onthemarket"] = asyncio.create_task(
@@ -688,6 +700,10 @@ async def debug_scrape_probe(
         le=120,
         description="Total timeout per probe request",
     ),
+    include_escalation: bool = Query(
+        False,
+        description="When true, runs an additional premium/ultra escalation ladder for Rightmove; can be slow",
+    ),
     x_admin_token: str | None = Header(None),
 ):
     """Probe each scraper source and report blocked vs parsed vs timeout.
@@ -706,7 +722,13 @@ async def debug_scrape_probe(
         raise HTTPException(status_code=422, detail="No valid sources requested")
 
     started = time.monotonic()
-    results = await _run_probe(loc, sources=selected, page=page, timeout_seconds=timeout_seconds)
+    results = await _run_probe(
+        loc,
+        sources=selected,
+        page=page,
+        timeout_seconds=timeout_seconds,
+        include_escalation=include_escalation,
+    )
 
     return {
         "ok": True,
@@ -717,6 +739,7 @@ async def debug_scrape_probe(
         "scraperapi_enabled": bool((os.getenv("SCRAPERAPI_KEY") or "").strip()),
         "playwright_enabled": (os.getenv("PLAYWRIGHT_ENABLE") or "0") == "1",
         "timeout_seconds": timeout_seconds,
+        "include_escalation": include_escalation,
         "elapsed_ms": int((time.monotonic() - started) * 1000),
         "results": results,
     }
