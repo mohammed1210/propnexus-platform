@@ -202,7 +202,10 @@ class ImportRequest(BaseModel):
 
 
 @router.post("/zoopla")
-async def import_zoopla(req: ImportRequest):
+async def import_zoopla(req: ImportRequest, x_admin_token: str | None = Header(None)):
+    # Optionally protect import endpoints in production.
+    # If IMPORT_ADMIN_TOKEN is unset, this is a no-op.
+    _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -229,7 +232,8 @@ async def import_zoopla(req: ImportRequest):
 
 
 @router.post("/rightmove")
-async def import_rightmove(req: ImportRequest):
+async def import_rightmove(req: ImportRequest, x_admin_token: str | None = Header(None)):
+    _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -256,7 +260,8 @@ async def import_rightmove(req: ImportRequest):
 
 
 @router.post("/onthemarket")
-async def import_onthemarket(req: ImportRequest):
+async def import_onthemarket(req: ImportRequest, x_admin_token: str | None = Header(None)):
+    _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -285,7 +290,8 @@ async def import_onthemarket(req: ImportRequest):
 
 
 @router.post("/spareroom")
-async def import_spareroom(req: ImportRequest):
+async def import_spareroom(req: ImportRequest, x_admin_token: str | None = Header(None)):
+    _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
