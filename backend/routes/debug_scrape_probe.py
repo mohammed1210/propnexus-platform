@@ -328,64 +328,82 @@ async def _probe_rightmove(
     ):
         loc_id = rm._extract_location_identifier(html_target_url)
         if rm._is_region_location_identifier(loc_id):
-            minimal_target = rm._build_minimal_region_find_url(str(loc_id), page)
+            page_idx = rm._extract_page_index(html_target_url)
+            minimal_target = rm._build_minimal_region_find_url(str(loc_id), page_idx)
             try:
-                plain_proxy = rm.make_scraperapi_url(
-                    minimal_target,
-                    render=False,
-                    premium=False,
-                    ultra_premium=False,
-                    country_code=None,
-                    keep_headers=None,
-                    session_number=None,
-                    auto_session_number=False,
-                )
-                st2, txt2 = await _fetch_text(
-                    session,
-                    plain_proxy,
-                    headers=html_headers,
-                    timeout_seconds=max(timeout_seconds, 60),
-                )
-
-                low2 = (txt2 or "").lower()
-                m3 = re.search(r"<title[^>]*>(.*?)</title>", txt2 or "", re.IGNORECASE | re.DOTALL)
-                t3 = "<none>"
-                if m3:
-                    t3 = re.sub(r"\s+", " ", (m3.group(1) or "")).strip() or "<none>"
-
-                nd3 = "__next_data__" in low2
-                pc3 = "propertycard" in low2
-                maybe_nf3 = rm._is_place_not_found_variant(txt2)
-                soup3 = BeautifulSoup(txt2, "html.parser")
-                cards3 = rm._collect_selectors(soup3)
-
-                html_probe["minimal_retry_attempt"] = {
-                    "via": "rightmove-minimal-url-retry",
-                    "target_url": minimal_target,
-                    "http_status": st2,
-                    "html_len": len(txt2 or ""),
-                    "title": t3,
-                    "next_data_present": bool(nd3),
-                    "property_card_present": bool(pc3),
-                    "cards_found": len(cards3),
-                    "page_not_found_signal": bool(maybe_nf3),
-                }
-
-                if st2 == 200 and (nd3 or pc3 or len(cards3) > 0):
-                    html_probe.update(
-                        {
-                            "via": "rightmove-minimal-url-retry",
-                            "target_url": minimal_target,
-                            "http_status": st2,
-                            "html_len": len(txt2 or ""),
-                            "title": t3,
-                            "next_data_present": bool(nd3),
-                            "property_card_present": bool(pc3),
-                            "cards_found": len(cards3),
-                            "page_not_found_signal": bool(maybe_nf3),
-                            "classification": "parsed" if len(cards3) > 0 else "fetched_no_cards",
-                        }
+                attempts_meta: List[Dict[str, Any]] = []
+                for via, cc in (
+                    ("rightmove-minimal-url-retry", None),
+                    ("rightmove-minimal-url-retry-gb", "gb"),
+                    ("rightmove-minimal-url-retry-uk", "uk"),
+                ):
+                    plain_proxy = rm.make_scraperapi_url(
+                        minimal_target,
+                        render=False,
+                        premium=False,
+                        ultra_premium=False,
+                        country_code=cc,
+                        keep_headers=None,
+                        session_number=None,
+                        auto_session_number=False,
                     )
+                    st2, txt2 = await _fetch_text(
+                        session,
+                        plain_proxy,
+                        headers=html_headers,
+                        timeout_seconds=max(timeout_seconds, 60),
+                    )
+
+                    low2 = (txt2 or "").lower()
+                    m3 = re.search(
+                        r"<title[^>]*>(.*?)</title>", txt2 or "", re.IGNORECASE | re.DOTALL
+                    )
+                    t3 = "<none>"
+                    if m3:
+                        t3 = re.sub(r"\s+", " ", (m3.group(1) or "")).strip() or "<none>"
+
+                    nd3 = "__next_data__" in low2
+                    pc3 = "propertycard" in low2
+                    maybe_nf3 = rm._is_place_not_found_variant(txt2)
+                    soup3 = BeautifulSoup(txt2, "html.parser")
+                    cards3 = rm._collect_selectors(soup3)
+
+                    meta = {
+                        "via": via,
+                        "target_url": minimal_target,
+                        "http_status": st2,
+                        "html_len": len(txt2 or ""),
+                        "title": t3,
+                        "next_data_present": bool(nd3),
+                        "property_card_present": bool(pc3),
+                        "cards_found": len(cards3),
+                        "page_not_found_signal": bool(maybe_nf3),
+                    }
+                    attempts_meta.append(meta)
+
+                    if st2 == 200 and (nd3 or pc3 or len(cards3) > 0):
+                        # Update overall probe with recovered payload.
+                        html_probe.update(
+                            {
+                                "via": via,
+                                "target_url": minimal_target,
+                                "http_status": st2,
+                                "html_len": len(txt2 or ""),
+                                "title": t3,
+                                "next_data_present": bool(nd3),
+                                "property_card_present": bool(pc3),
+                                "cards_found": len(cards3),
+                                "page_not_found_signal": bool(maybe_nf3),
+                                "classification": (
+                                    "parsed" if len(cards3) > 0 else "fetched_no_cards"
+                                ),
+                            }
+                        )
+                        break
+
+                # Always attach attempt metadata for visibility.
+                html_probe["minimal_retry_attempts"] = attempts_meta
+                html_probe["minimal_retry_attempt"] = attempts_meta[0] if attempts_meta else None
             except Exception:
                 pass
 

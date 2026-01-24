@@ -671,8 +671,10 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                     page_idx = _extract_page_index(url)
                     minimal_target = _build_minimal_region_find_url(str(loc_id), page_idx)
 
-                    # Support-confirmed: start with a plain ScraperAPI call (no extra params)
-                    # then escalate in a bounded ladder (max 4 total attempts here).
+                    # Support-confirmed: start with a plain ScraperAPI call (no extra params).
+                    # In production we've seen the deceptive variant persist even on the minimal URL,
+                    # so also try country_code targeting (still no keep_headers/session pinning)
+                    # before escalating premium/render.
                     attempts = [
                         (
                             "rightmove-minimal-url-retry",
@@ -681,6 +683,32 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                                 premium=False,
                                 ultra_premium=False,
                                 country_code=None,
+                                keep_headers=None,
+                                session_number=None,
+                                auto_session_number=False,
+                            ),
+                            90,
+                        ),
+                        (
+                            "rightmove-minimal-url-retry-gb",
+                            dict(
+                                render=False,
+                                premium=False,
+                                ultra_premium=False,
+                                country_code="gb",
+                                keep_headers=None,
+                                session_number=None,
+                                auto_session_number=False,
+                            ),
+                            90,
+                        ),
+                        (
+                            "rightmove-minimal-url-retry-uk",
+                            dict(
+                                render=False,
+                                premium=False,
+                                ultra_premium=False,
+                                country_code="uk",
                                 keep_headers=None,
                                 session_number=None,
                                 auto_session_number=False,
