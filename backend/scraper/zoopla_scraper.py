@@ -801,6 +801,31 @@ def _collect_cards(soup: BeautifulSoup) -> List[BeautifulSoup]:
         found = soup.select(sel)
         if found:
             cards.extend(found)
+
+    # Fallback: Zoopla markup changes can break the selector list above.
+    # If we can find detail links, treat their nearest container as a card.
+    if not cards:
+        try:
+            detail_links = soup.select("a[href*='/for-sale/details/']")
+            for a in detail_links:
+                # Walk up to a reasonable container.
+                container = a
+                for _ in range(0, 8):
+                    parent = getattr(container, "parent", None)
+                    if not parent:
+                        break
+                    container = parent
+                    tag = getattr(container, "name", "")
+                    if tag in ("article", "li"):
+                        cards.append(container)
+                        break
+                    attrs = getattr(container, "attrs", {}) or {}
+                    dt = attrs.get("data-testid")
+                    if dt and isinstance(dt, str) and "search" in dt and "result" in dt:
+                        cards.append(container)
+                        break
+        except Exception:
+            pass
     # De-duplicate by object id
     seen = set()
     uniq = []

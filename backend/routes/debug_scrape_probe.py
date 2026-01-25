@@ -127,6 +127,30 @@ async def _probe_zoopla(
     soup = BeautifulSoup(text, "html.parser")
     cards = zp._collect_cards(soup)
 
+    title_text = None
+    try:
+        title_text = soup.title.get_text(" ", strip=True) if soup.title else None
+    except Exception:
+        title_text = None
+
+    meta_robots = None
+    try:
+        mr = soup.find("meta", attrs={"name": "robots"})
+        if mr and mr.get("content"):
+            meta_robots = str(mr.get("content"))
+    except Exception:
+        meta_robots = None
+
+    # Additional signal: Zoopla detail links often exist even when card selectors break.
+    try:
+        detail_links = soup.select("a[href*='/for-sale/details/']")
+        detail_links_found = len(detail_links)
+    except Exception:
+        detail_links_found = 0
+
+    has_next_data_id = bool(soup.find("script", id="__NEXT_DATA__"))
+    has_next_data_marker = "__NEXT_DATA__" in (text or "")
+
     # Zoopla frequently renders listings via embedded Next.js JSON rather than
     # stable, easily countable DOM cards. Mirror the scraper's embedded extraction
     # so the probe can distinguish "no results" from "parser mismatch".
@@ -154,7 +178,7 @@ async def _probe_zoopla(
         }
 
     # Use whichever signal yields more results.
-    items_found = max(len(cards), embedded_count)
+    items_found = max(len(cards), embedded_count, detail_links_found)
 
     blocked_final, classification = _final_block_status(
         blocked_by_heuristic=blocked_by_heuristic, cards_found=items_found
@@ -163,6 +187,13 @@ async def _probe_zoopla(
         classification = "fetched_no_cards"
     if classification == "ok" and embedded_count > 0 and len(cards) == 0:
         classification = "parsed_embedded"
+    if (
+        classification == "ok"
+        and detail_links_found > 0
+        and len(cards) == 0
+        and embedded_count == 0
+    ):
+        classification = "parsed_links_only"
 
     return {
         "target_url": target_url,
@@ -174,9 +205,14 @@ async def _probe_zoopla(
         "http_status": status,
         "html_len": len(text or ""),
         "cards_found": len(cards),
+        "detail_links_found": detail_links_found,
         "embedded_listings_found": embedded_count,
         "embedded_listing_keys_sample": embedded_sample_keys,
         "embedded_listing_sample": embedded_sample,
+        "has_next_data_id": has_next_data_id,
+        "has_next_data_marker": has_next_data_marker,
+        "title": title_text,
+        "meta_robots": meta_robots,
         "blocked_by_heuristic": blocked_by_heuristic,
         "blocked": blocked_final,
         "classification": classification,
