@@ -55,6 +55,19 @@ def _safe_source_list(sources: Optional[str]) -> List[str]:
     return [s for s in requested if s in allowed]
 
 
+def _final_block_status(*, blocked_by_heuristic: bool, cards_found: int) -> tuple[bool, str]:
+    """Decide final block status.
+
+    Real signal beats heuristics: if we can parse cards, treat as not blocked.
+    """
+
+    if cards_found > 0:
+        return False, "ok"
+    if blocked_by_heuristic:
+        return True, "blocked"
+    return False, "ok"
+
+
 async def _fetch_text(
     session: Any, url: str, *, headers: Dict[str, str], timeout_seconds: int
 ) -> tuple[int, str]:
@@ -110,11 +123,15 @@ async def _probe_zoopla(
             # Keep the original blocked response
             status, text = initial_status, text
 
-    blocked = bool(zp._looks_blocked(text, status) or _generic_blocked_markers(text))
+    blocked_by_heuristic = bool(zp._looks_blocked(text, status) or _generic_blocked_markers(text))
     soup = BeautifulSoup(text, "html.parser")
     cards = zp._collect_cards(soup)
 
-    classification = "blocked" if blocked else ("parsed" if len(cards) > 0 else "fetched_no_cards")
+    blocked_final, classification = _final_block_status(
+        blocked_by_heuristic=blocked_by_heuristic, cards_found=len(cards)
+    )
+    if classification == "ok" and len(cards) == 0:
+        classification = "fetched_no_cards"
 
     return {
         "target_url": target_url,
@@ -126,7 +143,8 @@ async def _probe_zoopla(
         "http_status": status,
         "html_len": len(text or ""),
         "cards_found": len(cards),
-        "blocked": blocked,
+        "blocked_by_heuristic": blocked_by_heuristic,
+        "blocked": blocked_final,
         "classification": classification,
         "elapsed_ms": int((time.monotonic() - started) * 1000),
     }
@@ -551,11 +569,15 @@ async def _probe_onthemarket(
         except Exception:
             status, text = initial_status, text
 
-    blocked = bool(otm._looks_blocked(text, status) or _generic_blocked_markers(text))
+    blocked_by_heuristic = bool(otm._looks_blocked(text, status) or _generic_blocked_markers(text))
     soup = BeautifulSoup(text, "html.parser")
     cards = otm._collect_cards(soup)
 
-    classification = "blocked" if blocked else ("parsed" if len(cards) > 0 else "fetched_no_cards")
+    blocked_final, classification = _final_block_status(
+        blocked_by_heuristic=blocked_by_heuristic, cards_found=len(cards)
+    )
+    if classification == "ok" and len(cards) == 0:
+        classification = "fetched_no_cards"
 
     return {
         "target_url": target_url,
@@ -567,7 +589,8 @@ async def _probe_onthemarket(
         "http_status": status,
         "html_len": len(text or ""),
         "cards_found": len(cards),
-        "blocked": blocked,
+        "blocked_by_heuristic": blocked_by_heuristic,
+        "blocked": blocked_final,
         "classification": classification,
         "elapsed_ms": int((time.monotonic() - started) * 1000),
     }
@@ -617,11 +640,15 @@ async def _probe_spareroom(
         except Exception:
             status, text = initial_status, text
 
-    blocked = bool(sr._looks_blocked(text, status) or _generic_blocked_markers(text))
+    blocked_by_heuristic = bool(sr._looks_blocked(text, status) or _generic_blocked_markers(text))
     soup = BeautifulSoup(text, "html.parser")
     cards = sr._collect_cards(soup)
 
-    classification = "blocked" if blocked else ("parsed" if len(cards) > 0 else "fetched_no_cards")
+    blocked_final, classification = _final_block_status(
+        blocked_by_heuristic=blocked_by_heuristic, cards_found=len(cards)
+    )
+    if classification == "ok" and len(cards) == 0:
+        classification = "fetched_no_cards"
 
     return {
         "target_url": target_url,
@@ -633,7 +660,8 @@ async def _probe_spareroom(
         "http_status": status,
         "html_len": len(text or ""),
         "cards_found": len(cards),
-        "blocked": blocked,
+        "blocked_by_heuristic": blocked_by_heuristic,
+        "blocked": blocked_final,
         "classification": classification,
         "elapsed_ms": int((time.monotonic() - started) * 1000),
     }
