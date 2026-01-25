@@ -305,9 +305,11 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 except Exception:
                     return None
 
-            # If still looks blocked, return None
+            # If it still looks blocked, return the HTML anyway so downstream parsing
+            # + validation can decide whether there are usable cards. In practice,
+            # some responses trip keyword heuristics while still containing listings.
             if blocked:
-                return None
+                return text
 
             return text
     except Exception as e:
