@@ -251,7 +251,21 @@ STRIPE_PRICE_INVESTOR=price_xxx
 
 # CORS
 ALLOWED_ORIGINS=http://localhost:3000,https://your-domain.vercel.app
+
+# Admin ops (recommended in production)
+IMPORT_ADMIN_TOKEN=change-me
+OFF_MARKET_ADMIN_TOKEN=change-me
+
+# Scrapers
+# Modes: direct | scraperapi | smart
+SCRAPER_MODE=direct
+SCRAPERAPI_KEY=
+
+# Keep Playwright off in production unless explicitly needed.
+PLAYWRIGHT_ENABLE=false
 ```
+
+See the launch checklist: [docs/launch_checklist.md](docs/launch_checklist.md)
 
 ## Feature Flags
 

@@ -77,7 +77,9 @@ async def _ingest_location(location: str) -> int:
                             db_batch.append(row)
 
                     # Ensure upsert resolves on (source,external_id) as a single param value
-                    sb.table("properties").upsert(db_batch, on_conflict="source,external_id").execute()  # type: ignore
+                    sb.table("properties").upsert(
+                        db_batch, on_conflict="source,external_id"
+                    ).execute()  # type: ignore
                 except Exception as e:  # pragma: no cover
                     logging.warning("Upsert failed for batch (%s): %s", location, e)
         dur = (time.time() - start) * 1000

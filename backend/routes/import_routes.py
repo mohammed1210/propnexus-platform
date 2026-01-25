@@ -53,6 +53,112 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
     row["last_seen_at"] = now_iso
     row.pop("ai_ready", None)
 
+    def _norm_url(v: Any) -> Any:
+        if not isinstance(v, str):
+            return v
+        s = v.strip()
+        if s.startswith("//"):
+            return f"https:{s}"
+        return s
+
+    def _coerce_int(v: Any) -> int | None:
+        if v is None:
+            return None
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, int):
+            return v
+        if isinstance(v, float):
+            return int(v)
+        if isinstance(v, str):
+            digits = "".join(ch for ch in v if ch.isdigit())
+            try:
+                return int(digits) if digits else None
+            except Exception:
+                return None
+        return None
+
+    def _coerce_float(v: Any) -> float | None:
+        if v is None:
+            return None
+        if isinstance(v, bool):
+            return None
+        if isinstance(v, (int, float)):
+            return float(v)
+        if isinstance(v, str):
+            try:
+                return float(v.strip())
+            except Exception:
+                return None
+        return None
+
+    # Optional hydration from `data.raw` when top-level fields are missing.
+    data_obj = row.get("data")
+    raw_obj: Dict[str, Any] = {}
+    if isinstance(data_obj, dict):
+        if isinstance(data_obj.get("raw"), dict):
+            raw_obj = data_obj.get("raw")  # type: ignore[assignment]
+        else:
+            raw_obj = data_obj
+
+    def _pick_raw(keys: List[str]) -> Any:
+        for k in keys:
+            v = raw_obj.get(k)
+            if v not in (None, "", [], {}):
+                return v
+        return None
+
+    # Map scraper field names into DB schema.
+    if not row.get("imageurl"):
+        row["imageurl"] = (
+            row.get("image_url")
+            or row.get("imageUrl")
+            or _pick_raw(["imageurl", "image_url", "imageUrl", "image", "imageUrlLarge"])
+        )
+    row["imageurl"] = _norm_url(row.get("imageurl"))
+    row.pop("image_url", None)
+    row.pop("imageUrl", None)
+
+    if isinstance(row.get("image_urls"), list):
+        row["image_urls"] = [
+            _norm_url(u) for u in row.get("image_urls") if isinstance(u, str) and u.strip()
+        ]
+    elif not row.get("image_urls"):
+        raw_imgs = _pick_raw(["image_urls", "imageUrls", "images"])
+        if isinstance(raw_imgs, list):
+            row["image_urls"] = [_norm_url(u) for u in raw_imgs if isinstance(u, str) and u.strip()]
+
+    if not row.get("location"):
+        row["location"] = _pick_raw(["location", "displayAddress", "display_address"])
+    if not row.get("address"):
+        row["address"] = _pick_raw(["address", "displayAddress", "display_address", "location"])
+
+    if row.get("price") in (None, 0, 0.0, ""):
+        raw_price = _pick_raw(["price", "displayPrice", "display_price"])
+        row["price"] = _coerce_int(raw_price) if raw_price is not None else row.get("price")
+
+    if row.get("bedrooms") in (None, 0, ""):
+        raw_beds = _pick_raw(["bedrooms", "beds", "numBedrooms", "numberOfBedrooms"])
+        beds = _coerce_int(raw_beds)
+        if beds is not None and beds > 0:
+            row["bedrooms"] = beds
+
+    if row.get("bathrooms") in (None, 0, ""):
+        raw_baths = _pick_raw(["bathrooms", "baths", "numBathrooms", "numberOfBathrooms"])
+        baths = _coerce_int(raw_baths)
+        if baths is not None and baths > 0:
+            row["bathrooms"] = baths
+
+    if row.get("latitude") in (None, 0, 0.0, ""):
+        lat = _coerce_float(_pick_raw(["latitude", "lat"]))
+        if lat is not None and lat != 0.0:
+            row["latitude"] = lat
+
+    if row.get("longitude") in (None, 0, 0.0, ""):
+        lng = _coerce_float(_pick_raw(["longitude", "lng", "lon"]))
+        if lng is not None and lng != 0.0:
+            row["longitude"] = lng
+
     # DB schema uses `url` (see supabase/schema.sql). Scrapers/normalizers may
     # emit `listing_url` or `raw_url`; map those into `url` and drop the alias
     # to avoid PostgREST "column does not exist" failures.
@@ -202,7 +308,10 @@ class ImportRequest(BaseModel):
 
 
 @router.post("/zoopla")
-async def import_zoopla(req: ImportRequest):
+async def import_zoopla(req: ImportRequest, x_admin_token: str | None = Header(None)):
+    # Optionally protect import endpoints in production.
+    # If IMPORT_ADMIN_TOKEN is unset, this is a no-op.
+    _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -229,7 +338,8 @@ async def import_zoopla(req: ImportRequest):
 
 
 @router.post("/rightmove")
-async def import_rightmove(req: ImportRequest):
+async def import_rightmove(req: ImportRequest, x_admin_token: str | None = Header(None)):
+    _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -256,7 +366,8 @@ async def import_rightmove(req: ImportRequest):
 
 
 @router.post("/onthemarket")
-async def import_onthemarket(req: ImportRequest):
+async def import_onthemarket(req: ImportRequest, x_admin_token: str | None = Header(None)):
+    _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -285,7 +396,8 @@ async def import_onthemarket(req: ImportRequest):
 
 
 @router.post("/spareroom")
-async def import_spareroom(req: ImportRequest):
+async def import_spareroom(req: ImportRequest, x_admin_token: str | None = Header(None)):
+    _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")

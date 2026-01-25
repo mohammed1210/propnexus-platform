@@ -20,6 +20,11 @@ supabase = None  # will be monkeypatched by tests
 router = APIRouter(prefix="/stripe", tags=["stripe"])
 
 
+def _stripe_webhook_rate_limit() -> str:
+    """Allow a dedicated limit for Stripe webhooks to avoid accidental 429s."""
+    return os.getenv("RATE_LIMIT_STRIPE_WEBHOOK", WEBHOOK_RATE_LIMIT)
+
+
 def _stripe_secret_key() -> Optional[str]:
     return os.getenv("STRIPE_SECRET_KEY")
 
@@ -192,7 +197,7 @@ def _write_user_plan(
 
 
 @router.post("/webhook")
-@limiter.limit(WEBHOOK_RATE_LIMIT, exempt_when=is_test_or_ci)
+@limiter.limit(_stripe_webhook_rate_limit(), exempt_when=is_test_or_ci)
 async def stripe_webhook(request: Request):
     """
     Minimal, test-friendly webhook:
@@ -208,6 +213,18 @@ async def stripe_webhook(request: Request):
     sig_header: str = request.headers.get("Stripe-Signature", "")
     webhook_secret = get_webhook_secret()
 
+    if not payload:
+        return JSONResponse({"ok": False, "error": "missing_payload"}, status_code=400)
+
+    # Missing signature header is always a bad request from Stripe's perspective.
+    if not sig_header:
+        return JSONResponse({"ok": False, "error": "missing_stripe_signature"}, status_code=400)
+
+    # Missing secret is a server misconfiguration (should not be a 400).
+    if not webhook_secret:
+        logger.error("STRIPE_WEBHOOK_SECRET is not set")
+        return JSONResponse({"ok": False, "error": "missing_webhook_secret"}, status_code=500)
+
     # Ensure Stripe client is configured for any retrieve() calls below.
     _ensure_stripe_api_key()
 
@@ -215,8 +232,15 @@ async def stripe_webhook(request: Request):
         event = stripe.Webhook.construct_event(
             payload=payload, sig_header=sig_header, secret=webhook_secret
         )
-    except Exception as e:
+    except stripe.error.SignatureVerificationError as e:
         return JSONResponse({"ok": False, "error": f"bad_signature:{e}"}, status_code=400)
+    except ValueError as e:
+        # Raised for invalid JSON / parsing problems.
+        return JSONResponse({"ok": False, "error": f"bad_payload:{e}"}, status_code=400)
+    except Exception as e:
+        # Unexpected failures here are usually configuration/library issues.
+        logger.exception(f"Unexpected error constructing Stripe event: {e}")
+        return JSONResponse({"ok": False, "error": "webhook_internal_error"}, status_code=500)
 
     etype = event.get("type")
     data_obj: Dict[str, Any] = (event.get("data") or {}).get("object") or {}

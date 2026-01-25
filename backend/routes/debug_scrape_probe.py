@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import re
 import time
 from datetime import datetime, timezone
@@ -132,7 +133,12 @@ async def _probe_zoopla(
 
 
 async def _probe_rightmove(
-    session: Any, location: str, page: int, timeout_seconds: int
+    session: Any,
+    location: str,
+    page: int,
+    timeout_seconds: int,
+    *,
+    include_escalation: bool,
 ) -> Dict[str, Any]:
     from bs4 import BeautifulSoup
 
@@ -175,7 +181,7 @@ async def _probe_rightmove(
                 fallback_used = True
                 proxy_url = rm.make_scraperapi_url(api_url, render=False)
                 async with session.get(
-                    proxy_url, headers=api_headers, timeout=max(timeout_seconds, 60)
+                    proxy_url, headers=api_headers, timeout=timeout_seconds
                 ) as p_resp:
                     api_status = getattr(p_resp, "status", 0)
                     raw = await p_resp.text()
@@ -262,7 +268,7 @@ async def _probe_rightmove(
         try:
             proxy_url = rm.make_scraperapi_url(html_target_url, render=True)
             html_status, html_text = await _fetch_text(
-                session, proxy_url, headers=html_headers, timeout_seconds=max(timeout_seconds, 60)
+                session, proxy_url, headers=html_headers, timeout_seconds=timeout_seconds
             )
         except Exception:
             html_status, html_text = initial_status, html_text
@@ -314,6 +320,189 @@ async def _probe_rightmove(
         "classification": classification,
         "elapsed_ms": int((time.monotonic() - html_started) * 1000),
     }
+
+    # If we hit the deceptive Rightmove "place not found" page under ScraperAPI, attempt the
+    # support-confirmed minimal URL via a plain ScraperAPI call (no keep_headers/country_code)
+    # so this probe reflects the production fallback behavior.
+    if (
+        html_proxy_used
+        and has_key
+        and (not blocked)
+        and classification == "redirected_not_found"
+        and (html_text or "").strip()
+    ):
+        loc_id = rm._extract_location_identifier(html_target_url)
+        if rm._is_region_location_identifier(loc_id):
+            page_idx = rm._extract_page_index(html_target_url)
+            minimal_target = rm._build_minimal_region_find_url(str(loc_id), page_idx)
+            try:
+                attempts_meta: List[Dict[str, Any]] = []
+                for via, cc in (
+                    ("rightmove-minimal-url-retry", None),
+                    ("rightmove-minimal-url-retry-gb", "gb"),
+                    ("rightmove-minimal-url-retry-uk", "uk"),
+                ):
+                    plain_proxy = rm.make_scraperapi_url(
+                        minimal_target,
+                        render=False,
+                        premium=False,
+                        ultra_premium=False,
+                        country_code=cc,
+                        keep_headers=None,
+                        session_number=None,
+                        auto_session_number=False,
+                    )
+                    st2, txt2 = await _fetch_text(
+                        session,
+                        plain_proxy,
+                        headers=html_headers,
+                        timeout_seconds=timeout_seconds,
+                    )
+
+                    low2 = (txt2 or "").lower()
+                    m3 = re.search(
+                        r"<title[^>]*>(.*?)</title>", txt2 or "", re.IGNORECASE | re.DOTALL
+                    )
+                    t3 = "<none>"
+                    if m3:
+                        t3 = re.sub(r"\s+", " ", (m3.group(1) or "")).strip() or "<none>"
+
+                    nd3 = "__next_data__" in low2
+                    pc3 = "propertycard" in low2
+                    maybe_nf3 = rm._is_place_not_found_variant(txt2)
+                    soup3 = BeautifulSoup(txt2, "html.parser")
+                    cards3 = rm._collect_selectors(soup3)
+
+                    meta = {
+                        "via": via,
+                        "target_url": minimal_target,
+                        "http_status": st2,
+                        "html_len": len(txt2 or ""),
+                        "title": t3,
+                        "next_data_present": bool(nd3),
+                        "property_card_present": bool(pc3),
+                        "cards_found": len(cards3),
+                        "page_not_found_signal": bool(maybe_nf3),
+                    }
+                    attempts_meta.append(meta)
+
+                    if st2 == 200 and (nd3 or pc3 or len(cards3) > 0):
+                        # Update overall probe with recovered payload.
+                        html_probe.update(
+                            {
+                                "via": via,
+                                "target_url": minimal_target,
+                                "http_status": st2,
+                                "html_len": len(txt2 or ""),
+                                "title": t3,
+                                "next_data_present": bool(nd3),
+                                "property_card_present": bool(pc3),
+                                "cards_found": len(cards3),
+                                "page_not_found_signal": bool(maybe_nf3),
+                                "classification": (
+                                    "parsed" if len(cards3) > 0 else "fetched_no_cards"
+                                ),
+                            }
+                        )
+                        break
+
+                # Always attach attempt metadata for visibility.
+                html_probe["minimal_retry_attempts"] = attempts_meta
+                html_probe["minimal_retry_attempt"] = attempts_meta[0] if attempts_meta else None
+            except Exception:
+                pass
+
+    # Optionally run a metadata-only escalation ladder so we can see whether
+    # premium/ultra/country_code changes unlock the real listings HTML.
+    if (
+        include_escalation
+        and html_proxy_used
+        and has_key
+        and (not blocked)
+        and classification == "redirected_not_found"
+        and (html_text or "").strip()
+    ):
+        attempts_meta: List[Dict[str, Any]] = []
+
+        retry_targets = [html_target_url]
+        if "%5e" in html_target_url.lower():
+            alt_url = re.sub(r"%5e", "^", html_target_url, flags=re.IGNORECASE)
+            if alt_url != html_target_url:
+                retry_targets = [alt_url, html_target_url]
+
+        attempts = [
+            ("premium", dict(premium=True, ultra_premium=False, render=False), 70),
+            ("premium_render", dict(premium=True, ultra_premium=False, render=True), 120),
+            ("ultra", dict(premium=False, ultra_premium=True, render=False), 70),
+            ("ultra_render", dict(premium=False, ultra_premium=True, render=True), 120),
+        ]
+
+        recovered = False
+        for target_url in retry_targets:
+            for cc in ("gb", "uk"):
+                for via_suffix, opts, tmo in attempts:
+                    try:
+                        proxy_url = rm.make_scraperapi_url(
+                            target_url,
+                            keep_headers=True,
+                            country_code=cc,
+                            session_number=str(random.randint(1, 999999)),
+                            **opts,
+                        )
+                        st, txt = await _fetch_text(
+                            session,
+                            proxy_url,
+                            headers=html_headers,
+                            timeout_seconds=min(max(tmo, 20), timeout_seconds),
+                        )
+                    except Exception as e:  # pragma: no cover
+                        attempts_meta.append(
+                            {
+                                "via": f"{via_suffix}-{cc}",
+                                "target_url": target_url,
+                                "http_status": 0,
+                                "html_len": 0,
+                                "title": "<error>",
+                                "next_data_present": False,
+                                "property_card_present": False,
+                                "error": str(e),
+                            }
+                        )
+                        continue
+
+                    low = (txt or "").lower()
+                    m2 = re.search(
+                        r"<title[^>]*>(.*?)</title>", txt or "", re.IGNORECASE | re.DOTALL
+                    )
+                    t2 = "<none>"
+                    if m2:
+                        t2 = re.sub(r"\s+", " ", (m2.group(1) or "")).strip() or "<none>"
+
+                    nd2 = "__next_data__" in low
+                    pc2 = "propertycard" in low
+
+                    attempts_meta.append(
+                        {
+                            "via": f"{via_suffix}-{cc}",
+                            "target_url": target_url,
+                            "http_status": st,
+                            "html_len": len(txt or ""),
+                            "title": t2,
+                            "next_data_present": bool(nd2),
+                            "property_card_present": bool(pc2),
+                        }
+                    )
+
+                    if st == 200 and (nd2 or pc2):
+                        recovered = True
+                        break
+                if recovered:
+                    break
+            if recovered:
+                break
+
+        html_probe["escalation_attempts"] = attempts_meta
+        html_probe["escalation_recovered"] = bool(recovered)
 
     return {"api": api_probe, "html": html_probe}
 
@@ -456,6 +645,7 @@ async def _run_probe(
     sources: List[str],
     page: int,
     timeout_seconds: int,
+    include_escalation: bool,
 ) -> Dict[str, Any]:
     import aiohttp
 
@@ -470,7 +660,13 @@ async def _run_probe(
             )
         if "rightmove" in sources:
             tasks["rightmove"] = asyncio.create_task(
-                _probe_rightmove(session, location, page, timeout_seconds)
+                _probe_rightmove(
+                    session,
+                    location,
+                    page,
+                    timeout_seconds,
+                    include_escalation=include_escalation,
+                )
             )
         if "onthemarket" in sources:
             tasks["onthemarket"] = asyncio.create_task(
@@ -504,6 +700,10 @@ async def debug_scrape_probe(
         le=120,
         description="Total timeout per probe request",
     ),
+    include_escalation: bool = Query(
+        False,
+        description="When true, runs an additional premium/ultra escalation ladder for Rightmove; can be slow",
+    ),
     x_admin_token: str | None = Header(None),
 ):
     """Probe each scraper source and report blocked vs parsed vs timeout.
@@ -511,7 +711,6 @@ async def debug_scrape_probe(
     Returns only metadata (status codes, lengths, counts). Never returns raw HTML.
     Protected by IMPORT_ADMIN_TOKEN when configured.
     """
-
     _require_admin(x_admin_token)
 
     loc = (location or "").strip()
@@ -523,7 +722,13 @@ async def debug_scrape_probe(
         raise HTTPException(status_code=422, detail="No valid sources requested")
 
     started = time.monotonic()
-    results = await _run_probe(loc, sources=selected, page=page, timeout_seconds=timeout_seconds)
+    results = await _run_probe(
+        loc,
+        sources=selected,
+        page=page,
+        timeout_seconds=timeout_seconds,
+        include_escalation=include_escalation,
+    )
 
     return {
         "ok": True,
@@ -534,6 +739,7 @@ async def debug_scrape_probe(
         "scraperapi_enabled": bool((os.getenv("SCRAPERAPI_KEY") or "").strip()),
         "playwright_enabled": (os.getenv("PLAYWRIGHT_ENABLE") or "0") == "1",
         "timeout_seconds": timeout_seconds,
+        "include_escalation": include_escalation,
         "elapsed_ms": int((time.monotonic() - started) * 1000),
         "results": results,
     }
