@@ -96,6 +96,12 @@ _NEXT_DATA_RE = re.compile(
 )
 
 
+_NEXT_DATA_ASSIGN_RE = re.compile(
+    r"(?:window\.|self\.)?__NEXT_DATA__\s*=\s*(?P<json>\{.*?\})\s*;?\s*</script>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
 def _extract_next_data_from_html(html: str) -> Optional[Dict[str, Any]]:
     """Fallback extractor for Next.js __NEXT_DATA__.
 
@@ -107,12 +113,19 @@ def _extract_next_data_from_html(html: str) -> Optional[Dict[str, Any]]:
         if not html:
             return None
         m = _NEXT_DATA_RE.search(html)
-        if not m:
+        if m:
+            raw = (m.group("json") or "").strip()
+            if raw:
+                return json.loads(raw)
+
+        # Some deployments inline-assign the JSON instead of using id=__NEXT_DATA__.
+        m2 = _NEXT_DATA_ASSIGN_RE.search(html)
+        if not m2:
             return None
-        raw = (m.group("json") or "").strip()
-        if not raw:
+        raw2 = (m2.group("json") or "").strip()
+        if not raw2:
             return None
-        return json.loads(raw)
+        return json.loads(raw2)
     except Exception:
         return None
 
