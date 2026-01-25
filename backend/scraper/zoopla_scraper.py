@@ -90,6 +90,33 @@ def _extract_next_data(soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
         return None
 
 
+_NEXT_DATA_RE = re.compile(
+    r"<script[^>]*id=\"__NEXT_DATA__\"[^>]*>(?P<json>.*?)</script>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _extract_next_data_from_html(html: str) -> Optional[Dict[str, Any]]:
+    """Fallback extractor for Next.js __NEXT_DATA__.
+
+    Some proxied/rendered responses can trip up BeautifulSoup's `.string` handling
+    or slightly alter script nodes. This regex-based extractor is a best-effort
+    fallback when card parsing fails.
+    """
+    try:
+        if not html:
+            return None
+        m = _NEXT_DATA_RE.search(html)
+        if not m:
+            return None
+        raw = (m.group("json") or "").strip()
+        if not raw:
+            return None
+        return json.loads(raw)
+    except Exception:
+        return None
+
+
 def _find_zoopla_listings_in_next_data(next_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     if not isinstance(next_data, dict):
         return []
@@ -105,7 +132,7 @@ def _find_zoopla_listings_in_next_data(next_data: Dict[str, Any]) -> List[Dict[s
     preferred_keys = ("listings", "regularListings", "results", "searchResults", "properties")
 
     def _scan(obj: Any, depth: int = 0) -> Optional[List[Dict[str, Any]]]:
-        if depth > 8:
+        if depth > 14:
             return None
         if isinstance(obj, dict):
             for k in preferred_keys:
@@ -843,7 +870,7 @@ async def scrape_zoopla_properties(
                     soup = BeautifulSoup(html, "html.parser")
                     cards = _collect_cards(soup)
                     if not cards:
-                        next_data = _extract_next_data(soup)
+                        next_data = _extract_next_data(soup) or _extract_next_data_from_html(html)
                         embedded_listings = (
                             _find_zoopla_listings_in_next_data(next_data) if next_data else []
                         )
