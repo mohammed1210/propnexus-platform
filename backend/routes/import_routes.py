@@ -365,14 +365,22 @@ async def import_zoopla(
             items = []
     except Exception:
         items = []
-    if sb and items:
+    db_upsert_ok = False
+    db_error: str | None = None
+    if not sb:
+        db_error = "Supabase client not configured (missing SUPABASE_URL/keys)"
+    elif items:
         try:
             now_iso = _now_iso()
             db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-        except Exception:
-            pass
-    payload = {"count": len(items)}
+            db_upsert_ok = True
+        except Exception as e:
+            db_error = str(e)
+
+    payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
+    if db_error:
+        payload["db_error"] = db_error
     warning = _scrape_zero_warning(loc, sources={"zoopla": len(items)})
     if warning:
         payload["warning"] = warning
@@ -407,14 +415,22 @@ async def import_rightmove(
             items = []
     except Exception:
         items = []
-    if sb and items:
+    db_upsert_ok = False
+    db_error: str | None = None
+    if not sb:
+        db_error = "Supabase client not configured (missing SUPABASE_URL/keys)"
+    elif items:
         try:
             now_iso = _now_iso()
             db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-        except Exception:
-            pass
-    payload = {"count": len(items)}
+            db_upsert_ok = True
+        except Exception as e:
+            db_error = str(e)
+
+    payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
+    if db_error:
+        payload["db_error"] = db_error
     warning = _scrape_zero_warning(loc, sources={"rightmove": len(items)})
     if warning:
         payload["warning"] = warning
@@ -451,14 +467,22 @@ async def import_onthemarket(
             items = []
     except Exception:
         items = []
-    if sb and items:
+    db_upsert_ok = False
+    db_error: str | None = None
+    if not sb:
+        db_error = "Supabase client not configured (missing SUPABASE_URL/keys)"
+    elif items:
         try:
             now_iso = _now_iso()
             db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-        except Exception:
-            pass
-    payload = {"count": len(items)}
+            db_upsert_ok = True
+        except Exception as e:
+            db_error = str(e)
+
+    payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
+    if db_error:
+        payload["db_error"] = db_error
     warning = _scrape_zero_warning(loc, sources={"onthemarket": len(items)})
     if warning:
         payload["warning"] = warning
@@ -493,14 +517,22 @@ async def import_spareroom(
             items = []
     except Exception:
         items = []
-    if sb and items:
+    db_upsert_ok = False
+    db_error: str | None = None
+    if not sb:
+        db_error = "Supabase client not configured (missing SUPABASE_URL/keys)"
+    elif items:
         try:
             now_iso = _now_iso()
             db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-        except Exception:
-            pass
-    payload = {"count": len(items)}
+            db_upsert_ok = True
+        except Exception as e:
+            db_error = str(e)
+
+    payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
+    if db_error:
+        payload["db_error"] = db_error
     warning = _scrape_zero_warning(loc, sources={"spareroom": len(items)})
     if warning:
         payload["warning"] = warning
