@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from supabase import create_client
 
@@ -19,6 +19,9 @@ ALLOWED_SORT_COLS = {
     "roi_percent",
     "ai_score",
 }
+
+
+PROPERTIES_NORMALIZATION_VERSION = "v1"
 
 
 def _get_supabase():
@@ -143,6 +146,7 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
 @router.get("/properties")
 def list_properties(
+    response: Response,
     q: Optional[str] = Query(default=None),
     min: Optional[int] = Query(
         default=None
@@ -156,6 +160,8 @@ def list_properties(
     limit: int = Query(default=200, ge=1, le=1000),
 ):
     try:
+        response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
+
         sb = _get_supabase()
         query = sb.table("properties").select("*")
 
@@ -202,8 +208,10 @@ def list_properties(
 
 
 @router.get("/properties/{property_id}")
-def get_property(property_id: str):
+def get_property(property_id: str, response: Response):
     try:
+        response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
+
         sb = _get_supabase()
         query = sb.table("properties").select("*").eq("id", property_id).maybe_single()
         res = query.execute()

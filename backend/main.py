@@ -6,7 +6,7 @@ import os
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -60,7 +60,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # ❤️ Health Check (DO NOT MOVE)
 # ======================
 @app.get("/health")
-def health():
+def health(response: Response):
     """
     Health check endpoint with version information.
     Returns minimal system status without exposing secrets.
@@ -73,6 +73,10 @@ def health():
         or "unknown"
     )
     environment = os.getenv("ENVIRONMENT") or os.getenv("RAILWAY_ENVIRONMENT") or "development"
+
+    # Marker header to correlate deploy + response normalization behavior.
+    # Kept intentionally stable for curl-based runbooks.
+    response.headers["X-PropNexus-Properties-Normalization"] = "v1"
     return {
         "status": "ok",
         "service": "propnexus-backend",

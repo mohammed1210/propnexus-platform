@@ -40,6 +40,7 @@ def test_list_properties_endpoint_exists(mock_create_client, client):
     # Should not be 404 (endpoint exists)
     assert response.status_code != 404
     assert response.status_code == 200
+    assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
 
 
 @patch("backend.routes.properties_routes.create_client")
@@ -90,6 +91,7 @@ def test_list_properties_with_filters(mock_create_client, client):
     )
 
     assert response.status_code == 200
+    assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
     data = response.json()
     assert isinstance(data, list)
 
@@ -117,6 +119,7 @@ def test_list_properties_default_sort(mock_create_client, client):
     response = client.get("/properties")
 
     assert response.status_code == 200
+    assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
 
     # Should order by created_at by default
     mock_query.order.assert_called_once()
@@ -172,6 +175,7 @@ def test_get_property_by_id(mock_create_client, client):
     response = client.get("/properties/123")
 
     assert response.status_code == 200
+    assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
     data = response.json()
     assert data["id"] == "123"
     assert data["title"] == "Test Property"
