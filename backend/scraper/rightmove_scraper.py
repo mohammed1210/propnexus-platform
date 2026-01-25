@@ -563,7 +563,8 @@ def _build_search_url(location: str, page: int = 0) -> str:
             "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
             "furnishTypes=&keywords=",
             "includeSSTC=false",
-            f"index={page * 24}",
+            # Rightmove HTML pagination uses paginationIndex=0,1,2... for listings pages.
+            f"paginationIndex={int(page)}",
         ]
         return f"{base}?{'&'.join(params)}"
 
@@ -577,7 +578,9 @@ def _build_search_url(location: str, page: int = 0) -> str:
         "sortType=2",
         "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
         "furnishTypes=&keywords=",
-        f"index={page * 24}",  # Rightmove step size often 24
+        # Prefer paginationIndex for the HTML listing pages.
+        # Keep index-based pagination for free-text searches, which can still accept index offsets.
+        f"paginationIndex={int(page)}" if loc_key in _LOCATION_IDENTIFIER else f"index={page * 24}",
     ]
     return f"{base}?{'&'.join(params)}"
 
