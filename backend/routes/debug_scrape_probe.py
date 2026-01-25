@@ -127,11 +127,42 @@ async def _probe_zoopla(
     soup = BeautifulSoup(text, "html.parser")
     cards = zp._collect_cards(soup)
 
-    blocked_final, classification = _final_block_status(
-        blocked_by_heuristic=blocked_by_heuristic, cards_found=len(cards)
+    # Zoopla frequently renders listings via embedded Next.js JSON rather than
+    # stable, easily countable DOM cards. Mirror the scraper's embedded extraction
+    # so the probe can distinguish "no results" from "parser mismatch".
+    next_data = zp._extract_next_data(soup) or zp._extract_next_data_from_html(text)
+    embedded_listings = (
+        zp._find_zoopla_listings_in_next_data(next_data) if isinstance(next_data, dict) else []
     )
-    if classification == "ok" and len(cards) == 0:
+    embedded_count = len(embedded_listings) if isinstance(embedded_listings, list) else 0
+    embedded_sample: Dict[str, Any] = {}
+    embedded_sample_keys: List[str] = []
+    if embedded_listings and isinstance(embedded_listings[0], dict):
+        embedded_sample_keys = list(embedded_listings[0].keys())[:25]
+        embedded_sample = {
+            "listingId": embedded_listings[0].get("listingId")
+            or embedded_listings[0].get("listing_id")
+            or embedded_listings[0].get("id"),
+            "title": embedded_listings[0].get("title")
+            or embedded_listings[0].get("displayAddress")
+            or embedded_listings[0].get("address"),
+            "displayAddress": embedded_listings[0].get("displayAddress"),
+            "price": embedded_listings[0].get("price") or embedded_listings[0].get("displayPrice"),
+            "imageUrl": embedded_listings[0].get("imageUrl")
+            or embedded_listings[0].get("image_url"),
+            "url": embedded_listings[0].get("listingUrl") or embedded_listings[0].get("url"),
+        }
+
+    # Use whichever signal yields more results.
+    items_found = max(len(cards), embedded_count)
+
+    blocked_final, classification = _final_block_status(
+        blocked_by_heuristic=blocked_by_heuristic, cards_found=items_found
+    )
+    if classification == "ok" and items_found == 0:
         classification = "fetched_no_cards"
+    if classification == "ok" and embedded_count > 0 and len(cards) == 0:
+        classification = "parsed_embedded"
 
     return {
         "target_url": target_url,
@@ -143,6 +174,9 @@ async def _probe_zoopla(
         "http_status": status,
         "html_len": len(text or ""),
         "cards_found": len(cards),
+        "embedded_listings_found": embedded_count,
+        "embedded_listing_keys_sample": embedded_sample_keys,
+        "embedded_listing_sample": embedded_sample,
         "blocked_by_heuristic": blocked_by_heuristic,
         "blocked": blocked_final,
         "classification": classification,
