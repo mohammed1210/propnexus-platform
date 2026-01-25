@@ -1,6 +1,7 @@
 # backend/routes/import_routes.py
 from __future__ import annotations
 
+import asyncio
 import inspect
 import logging
 import os
@@ -36,6 +37,35 @@ async def _maybe_await(result: Any) -> Any:
     if inspect.iscoroutine(result) or inspect.isawaitable(result):
         return await result
     return result
+
+
+async def _scrape_and_upsert(*, location: str, scrape_fn: Any) -> int:
+    """Run scrape and upsert results, best-effort.
+
+    Used by the optional `?async=true` mode on /import/* endpoints to avoid request
+    timeouts in production.
+    """
+
+    try:
+        items = await _maybe_await(scrape_fn())
+        if not isinstance(items, list):
+            items = []
+    except Exception:
+        items = []
+
+    if sb and items:
+        try:
+            now_iso = _now_iso()
+            db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
+        except Exception:
+            pass
+
+    return len(items)
+
+
+def _queue_scrape_and_upsert(*, location: str, scrape_fn: Any) -> None:
+    asyncio.create_task(_scrape_and_upsert(location=location, scrape_fn=scrape_fn))
 
 
 def _now_iso() -> str:
@@ -308,7 +338,15 @@ class ImportRequest(BaseModel):
 
 
 @router.post("/zoopla")
-async def import_zoopla(req: ImportRequest, x_admin_token: str | None = Header(None)):
+async def import_zoopla(
+    req: ImportRequest,
+    x_admin_token: str | None = Header(None),
+    run_async: bool = Query(
+        False,
+        alias="async",
+        description="If true, queue scrape/upsert in background and return immediately",
+    ),
+):
     # Optionally protect import endpoints in production.
     # If IMPORT_ADMIN_TOKEN is unset, this is a no-op.
     _require_admin(x_admin_token)
@@ -317,6 +355,10 @@ async def import_zoopla(req: ImportRequest, x_admin_token: str | None = Header(N
         raise HTTPException(status_code=400, detail="Location is required")
     try:
         from backend.scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
+
+        if run_async:
+            _queue_scrape_and_upsert(location=loc, scrape_fn=lambda: scrape_zoopla_properties(loc))
+            return {"queued": True, "source": "zoopla", "location": loc}
 
         items = await _maybe_await(scrape_zoopla_properties(loc))
         if not isinstance(items, list):
@@ -338,13 +380,27 @@ async def import_zoopla(req: ImportRequest, x_admin_token: str | None = Header(N
 
 
 @router.post("/rightmove")
-async def import_rightmove(req: ImportRequest, x_admin_token: str | None = Header(None)):
+async def import_rightmove(
+    req: ImportRequest,
+    x_admin_token: str | None = Header(None),
+    run_async: bool = Query(
+        False,
+        alias="async",
+        description="If true, queue scrape/upsert in background and return immediately",
+    ),
+):
     _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
     try:
         from backend.scraper.rightmove_scraper import scrape_rightmove_properties  # type: ignore
+
+        if run_async:
+            _queue_scrape_and_upsert(
+                location=loc, scrape_fn=lambda: scrape_rightmove_properties(loc)
+            )
+            return {"queued": True, "source": "rightmove", "location": loc}
 
         items = await _maybe_await(scrape_rightmove_properties(loc))
         if not isinstance(items, list):
@@ -366,7 +422,15 @@ async def import_rightmove(req: ImportRequest, x_admin_token: str | None = Heade
 
 
 @router.post("/onthemarket")
-async def import_onthemarket(req: ImportRequest, x_admin_token: str | None = Header(None)):
+async def import_onthemarket(
+    req: ImportRequest,
+    x_admin_token: str | None = Header(None),
+    run_async: bool = Query(
+        False,
+        alias="async",
+        description="If true, queue scrape/upsert in background and return immediately",
+    ),
+):
     _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
@@ -375,6 +439,12 @@ async def import_onthemarket(req: ImportRequest, x_admin_token: str | None = Hea
         from backend.scraper.onthemarket_scraper import (
             scrape_onthemarket_properties,  # type: ignore
         )
+
+        if run_async:
+            _queue_scrape_and_upsert(
+                location=loc, scrape_fn=lambda: scrape_onthemarket_properties(loc)
+            )
+            return {"queued": True, "source": "onthemarket", "location": loc}
 
         items = await _maybe_await(scrape_onthemarket_properties(loc))
         if not isinstance(items, list):
@@ -396,13 +466,27 @@ async def import_onthemarket(req: ImportRequest, x_admin_token: str | None = Hea
 
 
 @router.post("/spareroom")
-async def import_spareroom(req: ImportRequest, x_admin_token: str | None = Header(None)):
+async def import_spareroom(
+    req: ImportRequest,
+    x_admin_token: str | None = Header(None),
+    run_async: bool = Query(
+        False,
+        alias="async",
+        description="If true, queue scrape/upsert in background and return immediately",
+    ),
+):
     _require_admin(x_admin_token)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
     try:
         from backend.scraper.spare_room_scraper import scrape_spareroom_properties  # type: ignore
+
+        if run_async:
+            _queue_scrape_and_upsert(
+                location=loc, scrape_fn=lambda: scrape_spareroom_properties(loc)
+            )
+            return {"queued": True, "source": "spareroom", "location": loc}
 
         items = await _maybe_await(scrape_spareroom_properties(loc))
         if not isinstance(items, list):
