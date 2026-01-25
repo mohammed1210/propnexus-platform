@@ -1,118 +1,206 @@
-# Launch Readiness Checklist
+# Go-Live PASS/FAIL Checklist
 
-Use this checklist before merging `launch-readiness` back into `main` and before each production deploy.
+This is a strict go-live checklist. Every step has a command, a PASS condition, and what to do if it FAILs.
 
-## 1) Code + CI
-- [ ] All changes are on a non-main branch (e.g. `launch-readiness`)
-- [ ] Backend tests: `pytest -q` is green
-- [ ] Frontend tests (if used): `cd frontend && npm test` is green
-- [ ] Playwright e2e (if used): `cd frontend && npx playwright test` is green
+## 0) Prereqs (one-time)
 
-## 2) Critical Integrations
+### Load env (Codespaces/devcontainer)
 
-### Stripe
-- [ ] `STRIPE_SECRET_KEY` configured (prod key in prod)
-- [ ] `STRIPE_WEBHOOK_SECRET` configured (prod webhook secret in prod)
-- [ ] Webhook endpoint returns `200` for valid events
-- [ ] Verified at least one real event in Stripe dashboard after deploy
-
-### Supabase
-- [ ] `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` configured
-- [ ] RLS policies and required tables exist
-- [ ] Schema is up-to-date with `supabase/schema.sql` (or any migration process you use)
-
-## 3) Scrapers
-
-### Global scraper settings
-- [ ] `SCRAPER_MODE` is set correctly in production (recommended: `scraperapi` or `smart`)
-- [ ] `SCRAPERAPI_KEY` present in production if `SCRAPER_MODE` is `scraperapi`/`smart`
-- [ ] `PLAYWRIGHT_ENABLE=false` in production unless explicitly needed
-
-### Rightmove
-- [ ] Rightmove import returns non-zero items for a known-good location (or logs explain why 0)
-- [ ] Minimal ScraperAPI URL retry works when the "place not found" variant appears
-- [ ] `backend/tests/test_rightmove_minimal_url_retry.py` passes
-
-### Other sources
-- [ ] Zoopla import works for a known location
-- [ ] OnTheMarket import works for a known location
-- [ ] SpareRoom import works for a known location
-
-## 4) Admin + Debug Endpoints
-- [ ] `IMPORT_ADMIN_TOKEN` configured (recommended in prod)
-- [ ] Import endpoints require `x-admin-token` when `IMPORT_ADMIN_TOKEN` is set
-- [ ] Debug scrape probe endpoint is protected in production
-
-### Quick curl checks (local or deployed)
-
-Set a base URL first:
+Command:
 
 ```bash
-export BASE_URL="http://localhost:8000"
-# or your Railway URL
+source scripts/codespaces_env.sh
 ```
 
-Then hit the key routes:
+PASS:
+- Prints `BACKEND_URL=...`
+- Prints `ADMIN_TOKEN=<set>`
+
+FAIL → Next action:
+- Create `.env.codespaces` or `.env.local` with `BACKEND_URL=...` and `ADMIN_TOKEN=...`, or create a local `.admin_token` file.
+
+## 1) Environment configured
+
+PASS:
+- Railway backend has `IMPORT_ADMIN_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and (if using ScraperAPI) `SCRAPERAPI_KEY`.
+- Vercel frontend has `NEXT_PUBLIC_API_BASE` pointing at Railway backend.
+
+FAIL → Next action:
+- Set missing env vars in Railway/Vercel and redeploy.
+
+## 2) Backend health
+
+Command:
 
 ```bash
-# Health
-curl -sS "$BASE_URL/health"
-
-# Imports (token required only if IMPORT_ADMIN_TOKEN is set)
-
-# Expect 401 when IMPORT_ADMIN_TOKEN is set and header is missing:
-curl -i -sS -X POST "$BASE_URL/import/rightmove" -H 'content-type: application/json' \
-	-d '{"location":"London"}'
-
-curl -sS -X POST "$BASE_URL/import/rightmove" -H 'content-type: application/json' \
-	-H "x-admin-token: $IMPORT_ADMIN_TOKEN" \
-	-d '{"location":"London"}'
-
-curl -sS -X POST "$BASE_URL/import/zoopla" -H 'content-type: application/json' \
-	-H "x-admin-token: $IMPORT_ADMIN_TOKEN" \
-	-d '{"location":"London"}'
-
-curl -sS -X POST "$BASE_URL/import/onthemarket" -H 'content-type: application/json' \
-	-H "x-admin-token: $IMPORT_ADMIN_TOKEN" \
-	-d '{"location":"London"}'
-
-curl -sS -X POST "$BASE_URL/import/spareroom" -H 'content-type: application/json' \
-	-H "x-admin-token: $IMPORT_ADMIN_TOKEN" \
-	-d '{"location":"London"}'
-
-# All-sources import
-curl -sS -X POST "$BASE_URL/import/all?req=London" -H "x-admin-token: $IMPORT_ADMIN_TOKEN"
-
-# Debug scrape probe (protected by IMPORT_ADMIN_TOKEN when configured)
-curl -sS "$BASE_URL/debug/scrape-probe?location=London&sources=rightmove,zoopla" \
-	-H "x-admin-token: $IMPORT_ADMIN_TOKEN"
-
-# AI routes
-curl -sS -X POST "$BASE_URL/ai/summary" -H 'content-type: application/json' \
-	-d '{"title":"2 bed flat","location":"London","price":350000,"yield":5.2,"roi":9.1,"description":"Bright, close to station"}'
-
-# GPT scoring routes
-curl -sS -X POST "$BASE_URL/gpt/score" -H 'content-type: application/json' -d '{}'
+curl -sS -o /dev/null -w "%{http_code}\n" "$BACKEND_URL/health"
 ```
 
-## 5) Runtime Smoke Test
-- [ ] Backend boots: `uvicorn backend.main:app` (or Railway) and `/health` returns `200`
-- [ ] Frontend boots (Vercel) and auth flow works end-to-end
-- [ ] Can import properties and see them in UI
-- [ ] AI endpoints return expected JSON structure (or are disabled via flags)
+PASS:
+- Output is `200`
 
-### UI smoke steps (5-10 minutes)
-- [ ] Create account / sign in
-- [ ] Import properties (Rightmove + at least one other source)
-- [ ] Open a listing detail page and confirm key fields render
-- [ ] Trigger AI summary/strategies and confirm consistent responses (or a clean 503 when AI is not configured)
+FAIL → Next action:
+- Check Railway logs for startup errors and confirm env vars are present.
 
-## 6) Stripe Webhook Verification (production)
-- [ ] Confirm webhook endpoint URL in Stripe points to `$BASE_URL/stripe/webhook`
-- [ ] From Stripe dashboard: send a test event (e.g. `checkout.session.completed`) and verify 2xx response
-- [ ] Confirm at least one real event appears after a real checkout
-- [ ] If failures occur: check Railway logs and Stripe “Webhook Attempts” error details
+## 3) Admin token gating
 
-## 6) Observability
-- [ ] Error reporting (Sentry) configured if enabled
-- [ ] Key logs/metrics present for scraping/import failures (zero-results warnings, blocking detection)
+Command (missing token):
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" -X POST "$BACKEND_URL/import/all?req=London"
+```
+
+PASS:
+- Output is `401` when `IMPORT_ADMIN_TOKEN` is set in production
+
+FAIL → Next action:
+- Confirm `IMPORT_ADMIN_TOKEN` is set on Railway and the backend is redeployed.
+
+Command (with token):
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" -X POST "$BACKEND_URL/import/all?req=London" \
+	-H "x-admin-token: $ADMIN_TOKEN"
+```
+
+PASS:
+- Output is `200`
+
+FAIL → Next action:
+- Verify `$ADMIN_TOKEN` matches Railway `IMPORT_ADMIN_TOKEN` exactly (no whitespace/newlines).
+
+## 4) Imports (expect non-zero for Zoopla/OTM/SpareRoom)
+
+NOTE:
+- Rightmove may be `0` until the ScraperAPI pool issue is resolved.
+- Zoopla / OnTheMarket / SpareRoom should be `> 0` for at least one known-good location.
+
+### Zoopla
+
+Command:
+
+```bash
+curl -sS -X POST "$BACKEND_URL/import/zoopla" \
+	-H "x-admin-token: $ADMIN_TOKEN" \
+	-H "content-type: application/json" \
+	-d '{"location":"London"}'
+```
+
+PASS:
+- Response JSON contains `"count"` and it is `> 0`
+
+FAIL → Next action:
+- Run the probe endpoint (Step 6) and check for blocking/timeouts.
+
+### OnTheMarket
+
+Command:
+
+```bash
+curl -sS -X POST "$BACKEND_URL/import/onthemarket" \
+	-H "x-admin-token: $ADMIN_TOKEN" \
+	-H "content-type: application/json" \
+	-d '{"location":"London"}'
+```
+
+PASS:
+- Response JSON contains `"count"` and it is `> 0`
+
+FAIL → Next action:
+- Run the probe endpoint (Step 6) and check for blocking/timeouts.
+
+### SpareRoom
+
+Command:
+
+```bash
+curl -sS -X POST "$BACKEND_URL/import/spareroom" \
+	-H "x-admin-token: $ADMIN_TOKEN" \
+	-H "content-type: application/json" \
+	-d '{"location":"Birmingham"}'
+```
+
+PASS:
+- Response JSON contains `"count"` and it is `> 0`
+
+FAIL → Next action:
+- Run the probe endpoint (Step 6) and check for blocking/timeouts.
+
+### Rightmove (known issue)
+
+Command:
+
+```bash
+curl -sS -X POST "$BACKEND_URL/import/rightmove" \
+	-H "x-admin-token: $ADMIN_TOKEN" \
+	-H "content-type: application/json" \
+	-d '{"location":"London"}'
+```
+
+PASS:
+- Response is `200` and includes `"count"` (may be `0` currently)
+
+FAIL → Next action:
+- Confirm `SCRAPER_MODE` and `SCRAPERAPI_KEY` are set; run Step 6 probe.
+
+## 5) Properties endpoint returns count > 0
+
+Command:
+
+```bash
+curl -sS "$BACKEND_URL/properties?limit=50" \
+	| /workspaces/propnexus-platform/.venv/bin/python - <<'PY'
+import json,sys
+data=json.load(sys.stdin)
+print(len(data) if isinstance(data,list) else 0)
+sys.exit(0 if isinstance(data,list) and len(data)>0 else 1)
+PY
+```
+
+PASS:
+- Command prints a number `> 0` and exits `0`
+
+FAIL → Next action:
+- Re-run Zoopla/OTM/SpareRoom imports; check Supabase table `properties` and Railway logs.
+
+## 6) Debug scrape probe (diagnostics)
+
+Command:
+
+```bash
+curl -sS "$BACKEND_URL/debug/scrape-probe?location=London&sources=zoopla,onthemarket,spareroom" \
+	-H "x-admin-token: $ADMIN_TOKEN"
+```
+
+PASS:
+- Response JSON has `"ok": true`
+- Each requested source has `classification` of `parsed` (or `fetched_no_results` with an obvious explanation)
+
+FAIL → Next action:
+- If `blocked`: enable/verify ScraperAPI settings.
+- If `timeout`: increase timeouts or reduce sources.
+
+## 7) Frontend rendering (images + cards)
+
+PASS:
+- Listings page shows property cards from Zoopla/OTM/SpareRoom.
+- Card images load (no broken `//...` URLs).
+
+FAIL → Next action:
+- Verify Step 5 returns items and that `imageurl`/`image_urls` are populated.
+
+## 8) Stripe webhooks (production)
+
+PASS:
+- Stripe dashboard test event to `$BACKEND_URL/stripe/webhook` returns 2xx.
+- At least one real event shows after a real checkout.
+
+FAIL → Next action:
+- Check Railway logs and Stripe “Webhook Attempts”. Verify `STRIPE_WEBHOOK_SECRET`.
+
+## 9) Rollback / mitigation
+
+If go-live checks fail:
+- Roll back Railway deploy to the previous successful release.
+- Disable scraping features by setting `SCRAPER_MODE=direct` (temporary) and communicating limitations.
+- If Rightmove is the only failure, proceed with Zoopla/OTM/SpareRoom while ScraperAPI investigates.
