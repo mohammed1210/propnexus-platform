@@ -268,8 +268,208 @@ def _zoopla_property_from_listing_dict(d: Dict[str, Any]) -> Optional[Dict[str, 
 _POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
 
 
+_DETAIL_ID_RE = re.compile(r"/for-sale/details/(?P<id>\d+)")
+
+
 def _looks_like_postcode(s: str) -> bool:
     return bool(s and _POSTCODE_RE.search(s))
+
+
+def _extract_external_id_from_detail_url(url: str) -> Optional[str]:
+    if not url or not isinstance(url, str):
+        return None
+    m = _DETAIL_ID_RE.search(url)
+    return m.group("id") if m else None
+
+
+def _collect_detail_listing_urls(soup: BeautifulSoup) -> List[str]:
+    """Collect Zoopla detail URLs from a search results page.
+
+    When Zoopla changes DOM structure, card selectors can fail while detail links
+    remain stable.
+    """
+
+    urls: List[str] = []
+    seen: set[str] = set()
+    for a in soup.select("a[href*='/for-sale/details/']"):
+        href = a.get("href")
+        if not href or not isinstance(href, str):
+            continue
+        u = href
+        if u.startswith("//"):
+            u = "https:" + u
+        elif u.startswith("/"):
+            u = "https://www.zoopla.co.uk" + u
+        if not u.startswith("http"):
+            continue
+        # Only keep URLs we can extract a numeric id from.
+        if not _extract_external_id_from_detail_url(u):
+            continue
+        if u not in seen:
+            seen.add(u)
+            urls.append(u)
+    return urls
+
+
+def _parse_zoopla_detail_page(html: str, url: str) -> Optional[Dict[str, Any]]:
+    """Best-effort parse of a Zoopla detail page.
+
+    Goal: extract enough fields to pass `should_insert_property` (external_id,
+    title, source, and either price or location) and provide a usable image.
+    """
+
+    external_id = _extract_external_id_from_detail_url(url)
+    if not external_id:
+        return None
+
+    soup = BeautifulSoup(html or "", "html.parser")
+
+    # 1) Try JSON-LD structured data.
+    title = None
+    location = None
+    price = None
+    latitude = 0.0
+    longitude = 0.0
+    image_urls: List[str] = []
+
+    def _norm_url(u: str) -> str:
+        u = (u or "").strip()
+        if u.startswith("//"):
+            return "https:" + u
+        if u.startswith("/"):
+            return "https://www.zoopla.co.uk" + u
+        return u
+
+    def _iter_jsonld_objects(obj: Any):
+        if isinstance(obj, dict):
+            yield obj
+            for v in obj.values():
+                yield from _iter_jsonld_objects(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                yield from _iter_jsonld_objects(v)
+
+    try:
+        for el in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            raw = (el.string or el.get_text() or "").strip()
+            if not raw:
+                continue
+            try:
+                data = json.loads(raw)
+            except Exception:
+                continue
+
+            for o in _iter_jsonld_objects(data):
+                # Look for an object with offers/price and an address/name.
+                offers = o.get("offers") if isinstance(o, dict) else None
+                addr = o.get("address") if isinstance(o, dict) else None
+                name = o.get("name") if isinstance(o, dict) else None
+                if not (offers or addr or name):
+                    continue
+
+                if not title and isinstance(name, str) and name.strip():
+                    title = name.strip()
+
+                if not location:
+                    if isinstance(addr, str) and addr.strip():
+                        location = addr.strip()
+                    elif isinstance(addr, dict):
+                        parts = [
+                            addr.get("streetAddress"),
+                            addr.get("addressLocality"),
+                            addr.get("postalCode"),
+                        ]
+                        parts = [p.strip() for p in parts if isinstance(p, str) and p.strip()]
+                        if parts:
+                            location = ", ".join(parts)
+
+                if price is None and offers is not None:
+                    cand = None
+                    if isinstance(offers, dict):
+                        cand = offers.get("price")
+                        if cand is None and isinstance(offers.get("priceSpecification"), dict):
+                            cand = offers["priceSpecification"].get("price")
+                    elif isinstance(offers, list) and offers and isinstance(offers[0], dict):
+                        cand = offers[0].get("price")
+                    if cand is not None:
+                        try:
+                            price = int(str(cand).replace(",", "").strip())
+                        except Exception:
+                            price = _parse_price(str(cand))
+
+                if not image_urls:
+                    img = o.get("image") if isinstance(o, dict) else None
+                    if isinstance(img, str):
+                        image_urls = [_norm_url(img)]
+                    elif isinstance(img, list):
+                        image_urls = [_norm_url(x) for x in img if isinstance(x, str) and x.strip()]
+
+                geo = o.get("geo") if isinstance(o, dict) else None
+                if isinstance(geo, dict):
+                    lat = geo.get("latitude")
+                    lng = geo.get("longitude")
+                    try:
+                        if lat is not None:
+                            latitude = float(lat)
+                        if lng is not None:
+                            longitude = float(lng)
+                    except Exception:
+                        pass
+
+            # If we got the core fields, no need to keep scanning.
+            if title and (price is not None or location) and image_urls:
+                break
+    except Exception:
+        pass
+
+    # 2) Fallback to meta tags / title text.
+    if not title:
+        try:
+            og_title = soup.find("meta", attrs={"property": "og:title"})
+            if og_title and og_title.get("content"):
+                title = str(og_title.get("content")).strip() or None
+        except Exception:
+            title = None
+    if not title and soup.title:
+        title = soup.title.get_text(" ", strip=True) or None
+
+    if price is None:
+        try:
+            og_desc = soup.find("meta", attrs={"property": "og:description"})
+            if og_desc and og_desc.get("content"):
+                price = _parse_price(str(og_desc.get("content")))
+        except Exception:
+            pass
+
+    if not image_urls:
+        try:
+            og_img = soup.find("meta", attrs={"property": "og:image"})
+            if og_img and og_img.get("content"):
+                image_urls = [_norm_url(str(og_img.get("content")))]
+        except Exception:
+            pass
+
+    image_urls = [u for u in image_urls if u]
+    seen = set()
+    image_urls = [u for u in image_urls if not (u in seen or seen.add(u))]
+    image_url = image_urls[0] if image_urls else None
+
+    return {
+        "external_id": external_id,
+        "title": title or f"Zoopla listing {external_id}",
+        "location": location,
+        "price": price,
+        "bedrooms": None,
+        "bathrooms": None,
+        "property_type": None,
+        "image_url": image_url,
+        "image_urls": image_urls,
+        "latitude": latitude,
+        "longitude": longitude,
+        "source": "zoopla",
+        "raw_url": url,
+        "listing_url": url,
+    }
 
 
 def make_scraperapi_url(
@@ -930,6 +1130,39 @@ async def scrape_zoopla_properties(
                                 stats.log_summary()
                                 print(
                                     f"✅ Zoopla embedded JSON returned {len(results)} properties for '{location}'"
+                                )
+                                run_log.set_count(len(results))
+                                return results
+
+                        # Fallback: if DOM selectors and embedded JSON both fail,
+                        # try extracting detail page links and parsing each detail page.
+                        detail_urls = _collect_detail_listing_urls(soup)
+                        if detail_urls:
+                            max_details = min(len(detail_urls), max(3, min(12, limit)))
+                            for detail_url in detail_urls[:max_details]:
+                                if len(results) >= limit:
+                                    break
+                                try:
+                                    detail_html = await _fetch_html(session, detail_url)
+                                except Exception:
+                                    detail_html = None
+                                if not detail_html:
+                                    continue
+
+                                parsed = _parse_zoopla_detail_page(detail_html, detail_url)
+                                if not parsed:
+                                    continue
+                                should_insert, reason = should_insert_property(parsed)
+                                if should_insert:
+                                    results.append(clean_property_data(parsed))
+                                    stats.log_parse_success()
+                                else:
+                                    stats.log_validation_failure(reason or "Unknown")
+
+                            if results:
+                                stats.log_summary()
+                                print(
+                                    f"✅ Zoopla detail-page fallback returned {len(results)} properties for '{location}'"
                                 )
                                 run_log.set_count(len(results))
                                 return results
