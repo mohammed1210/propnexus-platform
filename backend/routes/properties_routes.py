@@ -148,6 +148,11 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
 def list_properties(
     response: Response,
     q: Optional[str] = Query(default=None),
+    source: Optional[str] = Query(default=None, description="Filter by listing source"),
+    created_after: Optional[str] = Query(
+        default=None,
+        description="Filter rows with created_at >= this ISO timestamp",
+    ),
     min: Optional[int] = Query(
         default=None
     ),  # noqa: A002 (min is fine here; matches existing API usage)
@@ -164,6 +169,18 @@ def list_properties(
 
         sb = _get_supabase()
         query = sb.table("properties").select("*")
+
+        # Exact source filter (useful for verifying scraper inserts)
+        if source is not None:
+            src = str(source).strip().lower()
+            if src:
+                query = query.eq("source", src)
+
+        # Optional created_at filter (useful for "show me what just got inserted")
+        if created_after is not None:
+            ts = str(created_after).strip()
+            if ts:
+                query = query.gte("created_at", ts)
 
         # Search across common fields
         if q:

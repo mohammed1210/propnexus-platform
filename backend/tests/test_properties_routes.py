@@ -52,6 +52,7 @@ def test_list_properties_with_filters(mock_create_client, client):
     mock_query.select.return_value = mock_query
     mock_query.limit.return_value = mock_query
     mock_query.or_.return_value = mock_query
+    mock_query.eq.return_value = mock_query
     mock_query.gte.return_value = mock_query
     mock_query.lte.return_value = mock_query
     mock_query.in_.return_value = mock_query
@@ -80,6 +81,7 @@ def test_list_properties_with_filters(mock_create_client, client):
         "/properties",
         params={
             "q": "London",
+            "source": "zoopla",
             "min": 200000,
             "max": 300000,
             "beds": 2,
@@ -96,6 +98,7 @@ def test_list_properties_with_filters(mock_create_client, client):
     assert isinstance(data, list)
 
     # Verify filters were applied
+    mock_query.eq.assert_called_once()  # source filter
     mock_query.or_.assert_called_once()
     assert mock_query.gte.call_count >= 2  # price and bedrooms filters
     mock_query.lte.assert_called_once()  # max price filter
