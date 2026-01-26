@@ -200,6 +200,50 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
     return row
 
 
+def _strip_field(rows: list[Dict[str, Any]], field: str) -> list[Dict[str, Any]]:
+    cleaned: list[Dict[str, Any]] = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        if field in r:
+            nr = dict(r)
+            nr.pop(field, None)
+            cleaned.append(nr)
+        else:
+            cleaned.append(r)
+    return cleaned
+
+
+def _upsert_properties_rows(
+    *,
+    rows: list[Dict[str, Any]],
+    on_conflict: str = "source,external_id",
+) -> tuple[bool, str | None]:
+    """Upsert rows into Supabase with a compatibility retry.
+
+    Production schemas sometimes lag behind code (e.g. missing `last_seen_at`).
+    If we detect that specific schema-cache error, retry without the column.
+    """
+    if not sb:
+        return False, "Supabase client not configured (missing SUPABASE_URL/keys)"
+    if not rows:
+        return False, None
+
+    try:
+        sb.table("properties").upsert(rows, on_conflict=on_conflict).execute()
+        return True, None
+    except Exception as e:
+        msg = str(e)
+        if "last_seen_at" in msg and ("PGRST204" in msg or "Could not find" in msg):
+            try:
+                stripped = _strip_field(rows, "last_seen_at")
+                sb.table("properties").upsert(stripped, on_conflict=on_conflict).execute()
+                return True, None
+            except Exception as e2:
+                return False, str(e2)
+        return False, msg
+
+
 def _dedupe(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Dedupe across sources by (source, external_id) if available,
@@ -353,6 +397,7 @@ async def import_zoopla(
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
+    scrape_error: str | None = None
     try:
         from backend.scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
 
@@ -363,22 +408,19 @@ async def import_zoopla(
         items = await _maybe_await(scrape_zoopla_properties(loc))
         if not isinstance(items, list):
             items = []
-    except Exception:
+    except Exception as e:
+        scrape_error = str(e)
         items = []
     db_upsert_ok = False
     db_error: str | None = None
-    if not sb:
-        db_error = "Supabase client not configured (missing SUPABASE_URL/keys)"
-    elif items:
-        try:
-            now_iso = _now_iso()
-            db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
-            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-            db_upsert_ok = True
-        except Exception as e:
-            db_error = str(e)
+    if items:
+        now_iso = _now_iso()
+        db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+        db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
 
     payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
+    if scrape_error:
+        payload["scrape_error"] = scrape_error
     if db_error:
         payload["db_error"] = db_error
     warning = _scrape_zero_warning(loc, sources={"zoopla": len(items)})
@@ -470,6 +512,7 @@ async def import_onthemarket(
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
+    scrape_error: str | None = None
     try:
         from backend.scraper.onthemarket_scraper import (
             scrape_onthemarket_properties,  # type: ignore
@@ -484,22 +527,19 @@ async def import_onthemarket(
         items = await _maybe_await(scrape_onthemarket_properties(loc))
         if not isinstance(items, list):
             items = []
-    except Exception:
+    except Exception as e:
+        scrape_error = str(e)
         items = []
     db_upsert_ok = False
     db_error: str | None = None
-    if not sb:
-        db_error = "Supabase client not configured (missing SUPABASE_URL/keys)"
-    elif items:
-        try:
-            now_iso = _now_iso()
-            db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
-            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-            db_upsert_ok = True
-        except Exception as e:
-            db_error = str(e)
+    if items:
+        now_iso = _now_iso()
+        db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+        db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
 
     payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
+    if scrape_error:
+        payload["scrape_error"] = scrape_error
     if db_error:
         payload["db_error"] = db_error
     warning = _scrape_zero_warning(loc, sources={"onthemarket": len(items)})
@@ -522,6 +562,7 @@ async def import_spareroom(
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
+    scrape_error: str | None = None
     try:
         from backend.scraper.spare_room_scraper import scrape_spareroom_properties  # type: ignore
 
@@ -534,22 +575,19 @@ async def import_spareroom(
         items = await _maybe_await(scrape_spareroom_properties(loc))
         if not isinstance(items, list):
             items = []
-    except Exception:
+    except Exception as e:
+        scrape_error = str(e)
         items = []
     db_upsert_ok = False
     db_error: str | None = None
-    if not sb:
-        db_error = "Supabase client not configured (missing SUPABASE_URL/keys)"
-    elif items:
-        try:
-            now_iso = _now_iso()
-            db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
-            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-            db_upsert_ok = True
-        except Exception as e:
-            db_error = str(e)
+    if items:
+        now_iso = _now_iso()
+        db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+        db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
 
     payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
+    if scrape_error:
+        payload["scrape_error"] = scrape_error
     if db_error:
         payload["db_error"] = db_error
     warning = _scrape_zero_warning(loc, sources={"spareroom": len(items)})
