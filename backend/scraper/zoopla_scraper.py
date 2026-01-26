@@ -562,6 +562,10 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
     """Internal fetch function with retry logic."""
     headers = {"User-Agent": USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
 
+    # For Zoopla detail pages, ScraperAPI render=true can sometimes return less
+    # parseable HTML than the non-rendered response. Prefer render=false.
+    render_js = not _is_detail_url(url)
+
     # Determine which URL to fetch based on SCRAPER_MODE
     mode = os.getenv("SCRAPER_MODE", "direct").lower()
 
@@ -575,7 +579,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             url_to_fetch = url
         else:
             # Use ScraperAPI with rendering for HTML fallback
-            url_to_fetch = make_scraperapi_url(url, render=True)
+            url_to_fetch = make_scraperapi_url(url, render=render_js)
             print(f"ℹ️ Using ScraperAPI for Zoopla HTML fetch: {url}")
     else:
         # Direct mode - use original URL
@@ -608,7 +612,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 if SCRAPERAPI_KEY:
                     premium_url = make_scraperapi_url(
                         url,
-                        render=True,
+                        render=render_js,
                         premium=True,
                         session_number=str(random.randint(1, 999999)),
                     )
@@ -638,7 +642,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                                 if "ultra_premium" in (p_text or "").lower():
                                     ultra_url = make_scraperapi_url(
                                         url,
-                                        render=True,
+                                        render=render_js,
                                         premium=False,
                                         ultra_premium=True,
                                         session_number=str(random.randint(1, 999999)),
@@ -689,7 +693,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             if mode == "scraperapi" and blocked and SCRAPERAPI_KEY:
                 premium_url = make_scraperapi_url(
                     url,
-                    render=True,
+                    render=render_js,
                     premium=True,
                     session_number=str(random.randint(1, 999999)),
                 )
@@ -719,7 +723,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             # If direct mode and we detect blocking, try ScraperAPI as fallback
             if mode == "direct" and blocked and SCRAPERAPI_KEY:
                 log_scraperapi_fallback("zoopla", url)
-                proxy_url = make_scraperapi_url(url, render=True)
+                proxy_url = make_scraperapi_url(url, render=render_js)
                 print(f"ℹ️ Fallback to ScraperAPI for blocked URL: {url}")
                 try:
                     p_req = session.get(proxy_url, headers=headers, timeout=60)
@@ -745,7 +749,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         # One more attempt: premium + session pinning.
                         premium_url = make_scraperapi_url(
                             url,
-                            render=True,
+                            render=render_js,
                             premium=True,
                             session_number=str(random.randint(1, 999999)),
                         )
@@ -767,11 +771,14 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                                 or not (pp_text or "").strip()
                             )
                             if blocked_premium:
-                                return (
-                                    pp_text
-                                    if _is_detail_url(url) and (pp_text or "").strip()
-                                    else None
-                                )
+                                if (
+                                    _is_detail_url(url)
+                                    and int(pp_resp.status) == 200
+                                    and len(pp_text or "") > 50_000
+                                    and (pp_text or "").strip()
+                                ):
+                                    return pp_text
+                                return None
                             return pp_text
                 except Exception:
                     return None
@@ -780,7 +787,14 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             # Exception: for Zoopla detail pages, return the HTML anyway so the
             # parser can attempt JSON-LD/og:* extraction even when heuristics are noisy.
             if blocked:
-                return text if _is_detail_url(url) and (text or "").strip() else None
+                if (
+                    _is_detail_url(url)
+                    and int(resp.status) == 200
+                    and len(text or "") > 50_000
+                    and (text or "").strip()
+                ):
+                    return text
+                return None
 
             return text
     except Exception as e:
@@ -793,7 +807,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
         if SCRAPERAPI_KEY:
             print(f"⚠️ Direct fetch failed, trying ScraperAPI fallback: {e}")
             try:
-                proxy_url = make_scraperapi_url(url, render=True)
+                proxy_url = make_scraperapi_url(url, render=render_js)
                 p_req = session.get(proxy_url, headers=headers, timeout=60)
                 if inspect.isawaitable(p_req):
                     p_req = await p_req
@@ -816,7 +830,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
 
                     premium_url = make_scraperapi_url(
                         url,
-                        render=True,
+                        render=render_js,
                         premium=True,
                         session_number=str(random.randint(1, 999999)),
                     )
@@ -838,9 +852,14 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             or not (pp_text or "").strip()
                         )
                         if blocked_premium:
-                            return (
-                                pp_text if _is_detail_url(url) and (pp_text or "").strip() else None
-                            )
+                            if (
+                                _is_detail_url(url)
+                                and int(pp_resp.status) == 200
+                                and len(pp_text or "") > 50_000
+                                and (pp_text or "").strip()
+                            ):
+                                return pp_text
+                            return None
                         return pp_text
             except Exception:
                 return None
