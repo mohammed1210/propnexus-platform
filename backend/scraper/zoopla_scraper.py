@@ -40,6 +40,39 @@ SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
 
 
+def _allow_parse_despite_block(text: str, status: int, url: str) -> bool:
+    """Heuristic escape hatch.
+
+    In ScraperAPI mode, Zoopla responses can trip keyword-based blocking checks
+    while still containing perfectly parseable HTML (cards, __NEXT_DATA__, or
+    detail links). The probe endpoint uses a "cards beat heuristics" approach;
+    this helper brings the fetch layer in line by allowing parsing of large,
+    200-OK documents that look like real Zoopla pages.
+    """
+
+    try:
+        if int(status) != 200:
+            return False
+    except Exception:
+        return False
+
+    if not (text or "").strip():
+        return False
+    if len(text) < 50_000:
+        return False
+
+    if _is_detail_url(url):
+        return True
+
+    lowered = (text or "").lower()
+    # Listings/search pages should contain either detail links or Next.js payload.
+    if "/for-sale/details/" in lowered:
+        return True
+    if "__next_data__" in lowered:
+        return True
+    return False
+
+
 def _is_detail_url(url: str) -> bool:
     return bool(url and isinstance(url, str) and "/for-sale/details/" in url)
 
@@ -770,7 +803,9 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             or _has_cloudflare_marker(p_text)
                             or not (p_text or "").strip()
                         )
-                        if not premium_blocked:
+                        if not premium_blocked or _allow_parse_despite_block(
+                            p_text, int(p_resp.status), url
+                        ):
                             return p_text
                 except Exception:
                     return None
@@ -798,7 +833,9 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             or _has_cloudflare_marker(p_text)
                             or not (p_text or "").strip()
                         )
-                        if not blocked_proxy:
+                        if not blocked_proxy or _allow_parse_despite_block(
+                            p_text, int(p_resp.status), url
+                        ):
                             return p_text
 
                         # One more attempt: premium + session pinning.
@@ -826,12 +863,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                                 or not (pp_text or "").strip()
                             )
                             if blocked_premium:
-                                if (
-                                    _is_detail_url(url)
-                                    and int(pp_resp.status) == 200
-                                    and len(pp_text or "") > 50_000
-                                    and (pp_text or "").strip()
-                                ):
+                                if _allow_parse_despite_block(pp_text, int(pp_resp.status), url):
                                     return pp_text
                                 return None
                             return pp_text
@@ -842,12 +874,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             # Exception: for Zoopla detail pages, return the HTML anyway so the
             # parser can attempt JSON-LD/og:* extraction even when heuristics are noisy.
             if blocked:
-                if (
-                    _is_detail_url(url)
-                    and int(resp.status) == 200
-                    and len(text or "") > 50_000
-                    and (text or "").strip()
-                ):
+                if _allow_parse_despite_block(text, int(resp.status), url):
                     return text
                 return None
 
@@ -880,7 +907,9 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         or _has_cloudflare_marker(p_text)
                         or not (p_text or "").strip()
                     )
-                    if not blocked_proxy:
+                    if not blocked_proxy or _allow_parse_despite_block(
+                        p_text, int(p_resp.status), url
+                    ):
                         return p_text
 
                     premium_url = make_scraperapi_url(
@@ -907,12 +936,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             or not (pp_text or "").strip()
                         )
                         if blocked_premium:
-                            if (
-                                _is_detail_url(url)
-                                and int(pp_resp.status) == 200
-                                and len(pp_text or "") > 50_000
-                                and (pp_text or "").strip()
-                            ):
+                            if _allow_parse_despite_block(pp_text, int(pp_resp.status), url):
                                 return pp_text
                             return None
                         return pp_text
