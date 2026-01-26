@@ -142,14 +142,66 @@ async def _probe_zoopla(
         meta_robots = None
 
     # Additional signal: Zoopla detail links often exist even when card selectors break.
+    detail_links_found = 0
+    detail_urls_sample: List[str] = []
     try:
         detail_links = soup.select("a[href*='/for-sale/details/']")
         detail_links_found = len(detail_links)
+        # Reuse scraper helper to normalize + filter to numeric-id detail URLs.
+        detail_urls = zp._collect_detail_listing_urls(soup)
+        detail_urls_sample = detail_urls[:3]
     except Exception:
         detail_links_found = 0
+        detail_urls_sample = []
 
     has_next_data_id = bool(soup.find("script", id="__NEXT_DATA__"))
     has_next_data_marker = "__NEXT_DATA__" in (text or "")
+
+    # Optional deep diagnostic: fetch+parse the first detail page.
+    detail_page: Dict[str, Any] = {}
+    if detail_urls_sample:
+        detail_url = detail_urls_sample[0]
+        try:
+            detail_fetch_url = (
+                zp.make_scraperapi_url(detail_url, render=False) if proxy_used else detail_url
+            )
+            detail_headers = {
+                "User-Agent": zp.USER_AGENT,
+                "Accept-Language": "en-GB,en;q=0.9",
+                "Referer": target_url,
+            }
+            d_status, d_html = await _fetch_text(
+                session,
+                detail_fetch_url,
+                headers=detail_headers,
+                timeout_seconds=max(30, min(timeout_seconds, 120)),
+            )
+            d_blocked = bool(
+                zp._looks_blocked(d_html, d_status) or _generic_blocked_markers(d_html)
+            )
+            parsed = None
+            parsed_ok = None
+            parsed_reason = None
+            if d_html and not d_blocked:
+                parsed = zp._parse_zoopla_detail_page(d_html, detail_url)
+                if parsed:
+                    try:
+                        from backend.utils.validation import should_insert_property
+
+                        parsed_ok, parsed_reason = should_insert_property(parsed)
+                    except Exception:
+                        parsed_ok, parsed_reason = None, None
+            detail_page = {
+                "url": detail_url,
+                "http_status": d_status,
+                "html_len": len(d_html or ""),
+                "blocked": d_blocked,
+                "parsed": parsed,
+                "parsed_ok": parsed_ok,
+                "parsed_reason": parsed_reason,
+            }
+        except Exception as e:
+            detail_page = {"url": detail_urls_sample[0], "error": str(e)}
 
     # Zoopla frequently renders listings via embedded Next.js JSON rather than
     # stable, easily countable DOM cards. Mirror the scraper's embedded extraction
@@ -206,6 +258,8 @@ async def _probe_zoopla(
         "html_len": len(text or ""),
         "cards_found": len(cards),
         "detail_links_found": detail_links_found,
+        "detail_urls_sample": detail_urls_sample,
+        "detail_page": detail_page,
         "embedded_listings_found": embedded_count,
         "embedded_listing_keys_sample": embedded_sample_keys,
         "embedded_listing_sample": embedded_sample,
