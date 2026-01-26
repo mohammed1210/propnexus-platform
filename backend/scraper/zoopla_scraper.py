@@ -1179,8 +1179,9 @@ async def scrape_zoopla_properties(
     # Start audit logging
     with RunLog.start(source="zoopla", mode=SCRAPER_MODE, location=location) as run_log:
         try:
+            max_pages = max(1, int(os.getenv("ZP_MAX_PAGES", str(ZP_MAX_PAGES))))
             async with aiohttp.ClientSession() as session:
-                for page in range(ZP_MAX_PAGES):
+                for page in range(max_pages):
                     url = _build_search_url(location, page)
                     html = await _fetch_html(session, url)
                     if not html:

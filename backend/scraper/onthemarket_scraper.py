@@ -6,6 +6,7 @@ import inspect
 import os
 import random
 import re
+from html import unescape
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlencode
 
@@ -67,7 +68,8 @@ def _slugify_location(location: str) -> str:
 def _has_cloudflare_marker(text: str) -> bool:
     lowered = (text or "").lower()
     # Avoid false positives from Cloudflare analytics/beacons.
-    if "cdn-cgi" in lowered or "/cdn-cgi/" in lowered:
+    # Many normal pages include Cloudflare beacons; only treat explicit challenge paths as blocked.
+    if "/cdn-cgi/" in lowered:
         return True
     return any(
         marker in lowered
@@ -89,6 +91,127 @@ _POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
 
 def _looks_like_postcode(s: str) -> bool:
     return bool(s and _POSTCODE_RE.search(s))
+
+
+_DETAIL_ID_RE = re.compile(r"/details/(?P<id>\d+)")
+
+
+def _extract_external_id_from_detail_url(url: str) -> Optional[str]:
+    if not url or not isinstance(url, str):
+        return None
+    m = _DETAIL_ID_RE.search(url)
+    return m.group("id") if m else None
+
+
+def _collect_detail_listing_urls(soup: BeautifulSoup) -> List[str]:
+    urls: List[str] = []
+    seen: set[str] = set()
+    for a in soup.select("a[href*='/details/']"):
+        href = a.get("href")
+        if not href or not isinstance(href, str):
+            continue
+        u = href
+        if u.startswith("//"):
+            u = "https:" + u
+        elif u.startswith("/"):
+            u = "https://www.onthemarket.com" + u
+        if not u.startswith("http"):
+            continue
+        if not _extract_external_id_from_detail_url(u):
+            continue
+        if u not in seen:
+            seen.add(u)
+            urls.append(u)
+    return urls
+
+
+def _parse_otm_detail_page(
+    html: str, url: str, *, fallback_location: str
+) -> Optional[Dict[str, Any]]:
+    external_id = _extract_external_id_from_detail_url(url)
+    if not external_id:
+        return None
+
+    soup = BeautifulSoup(html or "", "html.parser")
+
+    title = None
+    try:
+        og_title = soup.find("meta", attrs={"property": "og:title"})
+        if og_title and og_title.get("content"):
+            title = str(og_title.get("content")).strip() or None
+    except Exception:
+        title = None
+    if not title and soup.title:
+        title = soup.title.get_text(" ", strip=True) or None
+    if title:
+        title = unescape(title).strip() or None
+
+    price = None
+    if title:
+        m = re.search(r"£\s*\d[\d,]*", title)
+        if m:
+            price = _parse_price(m.group(0))
+    if price is None:
+        try:
+            og_desc = soup.find("meta", attrs={"property": "og:description"})
+            if og_desc and og_desc.get("content"):
+                price = _parse_price(str(og_desc.get("content")))
+        except Exception:
+            pass
+
+    location = fallback_location
+    try:
+        og_url = soup.find("meta", attrs={"property": "og:url"})
+        _ = og_url  # unused; keep for future
+    except Exception:
+        pass
+
+    image_urls: List[str] = []
+    try:
+        og_img = soup.find("meta", attrs={"property": "og:image"})
+        if og_img and og_img.get("content"):
+            image_urls.append(str(og_img.get("content")).strip())
+    except Exception:
+        pass
+    try:
+        for link in soup.find_all("link", attrs={"rel": "preload"}):
+            if (link.get("as") or "").lower() != "image":
+                continue
+            href = link.get("href")
+            if href and isinstance(href, str):
+                image_urls.append(href.strip())
+    except Exception:
+        pass
+
+    def _norm(u: str) -> str:
+        u = (u or "").strip()
+        if u.startswith("//"):
+            return "https:" + u
+        if u.startswith("/"):
+            return "https://www.onthemarket.com" + u
+        return u
+
+    image_urls = [_norm(u) for u in image_urls if isinstance(u, str) and u.strip()]
+    seen = set()
+    image_urls = [u for u in image_urls if not (u in seen or seen.add(u))]
+    image_url = image_urls[0] if image_urls else None
+
+    return {
+        "external_id": f"ot-{external_id}",
+        "title": title or f"OnTheMarket listing {external_id}",
+        "location": location,
+        "price": price,
+        "bedrooms": None,
+        "bathrooms": None,
+        "property_type": None,
+        "image_url": image_url,
+        "image_urls": image_urls,
+        "latitude": 0.0,
+        "longitude": 0.0,
+        "source": "onthemarket",
+        "raw_url": url,
+        "listing_url": url,
+    }
 
 
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
@@ -568,15 +691,17 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
     results: List[Dict[str, Any]] = []
     seen_ids = set()
 
+    max_pages = max(1, int(os.getenv("OT_MAX_PAGES", str(OT_MAX_PAGES))))
+
     with RunLog.start(
         source="onthemarket",
         mode=mode,
         location=location,
-        meta={"max_pages": OT_MAX_PAGES},
+        meta={"max_pages": max_pages},
     ) as runlog:
         try:
             async with aiohttp.ClientSession() as session:
-                for page in range(OT_MAX_PAGES):
+                for page in range(max_pages):
                     url = _build_search_url(location, page)
                     html = await _fetch_html(session, url)
                     if not html:
@@ -587,6 +712,41 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                     cards = _collect_cards(soup)
 
                     if not cards:
+                        # Fallback: if card selectors fail, attempt to follow listing detail links.
+                        detail_urls = _collect_detail_listing_urls(soup)
+                        if detail_urls:
+                            max_details = min(
+                                len(detail_urls), max(3, min(12, limit - len(results)))
+                            )
+                            for detail_url in detail_urls[:max_details]:
+                                if len(results) >= limit:
+                                    break
+                                try:
+                                    detail_html = await _fetch_html(session, detail_url)
+                                except Exception:
+                                    detail_html = None
+                                if not detail_html:
+                                    continue
+                                parsed = _parse_otm_detail_page(
+                                    detail_html, detail_url, fallback_location=location
+                                )
+                                if not parsed:
+                                    continue
+                                should_insert, reason = should_insert_property(parsed)
+                                if should_insert:
+                                    results.append(clean_property_data(parsed))
+                                    stats.log_parse_success()
+                                else:
+                                    stats.log_validation_failure(reason or "Unknown")
+
+                            if results:
+                                stats.log_summary()
+                                print(
+                                    f"✅ OnTheMarket detail-page fallback returned {len(results)} properties"
+                                )
+                                runlog.set_count(len(results))
+                                return results
+
                         if PLAYWRIGHT_ENABLE:
                             # Attempt network capture to extract JSON listing payloads
                             rendered, payloads = await render_page_capture(
