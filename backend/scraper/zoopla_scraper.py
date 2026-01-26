@@ -1107,6 +1107,7 @@ async def scrape_zoopla_properties(
                             continue
                     soup = BeautifulSoup(html, "html.parser")
                     cards = _collect_cards(soup)
+                    page_results_before = len(results)
                     if not cards:
                         next_data = _extract_next_data(soup) or _extract_next_data_from_html(html)
                         embedded_listings = (
@@ -1277,6 +1278,67 @@ async def scrape_zoopla_properties(
 
                         except Exception as e:
                             stats.log_parse_failure(str(e))
+
+                    # If we detected cards (often via link-container fallback) but none
+                    # were valid enough to insert, try the same embedded/detail fallbacks
+                    # as the no-cards path.
+                    if cards and len(results) == page_results_before:
+                        next_data = _extract_next_data(soup) or _extract_next_data_from_html(html)
+                        embedded_listings = (
+                            _find_zoopla_listings_in_next_data(next_data) if next_data else []
+                        )
+                        if embedded_listings:
+                            for d in embedded_listings:
+                                if len(results) >= limit:
+                                    break
+                                mapped = _zoopla_property_from_listing_dict(d)
+                                if not mapped:
+                                    continue
+                                should_insert, reason = should_insert_property(mapped)
+                                if should_insert:
+                                    results.append(clean_property_data(mapped))
+                                    stats.log_parse_success()
+                                else:
+                                    stats.log_validation_failure(reason or "Unknown")
+
+                            if results:
+                                stats.log_summary()
+                                print(
+                                    f"✅ Zoopla embedded JSON returned {len(results)} properties for '{location}'"
+                                )
+                                run_log.set_count(len(results))
+                                return results
+
+                        detail_urls = _collect_detail_listing_urls(soup)
+                        if detail_urls:
+                            max_details = min(len(detail_urls), max(3, min(12, limit)))
+                            for detail_url in detail_urls[:max_details]:
+                                if len(results) >= limit:
+                                    break
+                                try:
+                                    detail_html = await _fetch_html(session, detail_url)
+                                except Exception:
+                                    detail_html = None
+                                if not detail_html:
+                                    continue
+
+                                parsed = _parse_zoopla_detail_page(detail_html, detail_url)
+                                if not parsed:
+                                    continue
+                                should_insert, reason = should_insert_property(parsed)
+                                if should_insert:
+                                    results.append(clean_property_data(parsed))
+                                    stats.log_parse_success()
+                                else:
+                                    stats.log_validation_failure(reason or "Unknown")
+
+                            if results:
+                                stats.log_summary()
+                                print(
+                                    f"✅ Zoopla detail-page fallback returned {len(results)} properties for '{location}'"
+                                )
+                                run_log.set_count(len(results))
+                                return results
                     if len(results) >= limit:
                         break
                     await asyncio.sleep(ZP_DELAY_MS / 1000.0)
