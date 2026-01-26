@@ -44,6 +44,7 @@ def _patch_import_scrapers(monkeypatch):
     [
         ("post", "/import/rightmove", {"location": "London"}),
         ("post", "/import/zoopla", {"location": "London"}),
+        ("get", "/import/zoopla?location=London", None),
         ("post", "/import/onthemarket", {"location": "London"}),
         ("post", "/import/spareroom", {"location": "London"}),
         ("post", "/import/all?req=London", None),
@@ -78,6 +79,7 @@ def test_import_endpoints_require_admin_token_when_configured(
     [
         ("post", "/import/rightmove", {"location": "London"}),
         ("post", "/import/zoopla", {"location": "London"}),
+        ("get", "/import/zoopla?location=London", None),
         ("post", "/import/onthemarket", {"location": "London"}),
         ("post", "/import/spareroom", {"location": "London"}),
         ("post", "/import/all?req=London", None),
