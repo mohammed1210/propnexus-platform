@@ -40,6 +40,10 @@ SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
 
 
+def _is_detail_url(url: str) -> bool:
+    return bool(url and isinstance(url, str) and "/for-sale/details/" in url)
+
+
 def _has_cloudflare_marker(text: str) -> bool:
     lowered = (text or "").lower()
     # Avoid false positives: many normal pages include Cloudflare analytics/beacons
@@ -433,6 +437,15 @@ def _parse_zoopla_detail_page(html: str, url: str) -> Optional[Dict[str, Any]]:
     if not title and soup.title:
         title = soup.title.get_text(" ", strip=True) or None
 
+    # If we still don't have a location, use title as a last-resort proxy.
+    # This is sufficient for should_insert_property (price OR location).
+    if not location and title:
+        location = title
+
+    # If we still don't have a price, try parsing it from the title.
+    if price is None and title:
+        price = _parse_price(title)
+
     if price is None:
         try:
             og_desc = soup.find("meta", attrs={"property": "og:description"})
@@ -754,14 +767,20 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                                 or not (pp_text or "").strip()
                             )
                             if blocked_premium:
-                                return None
+                                return (
+                                    pp_text
+                                    if _is_detail_url(url) and (pp_text or "").strip()
+                                    else None
+                                )
                             return pp_text
                 except Exception:
                     return None
 
-            # If still looks blocked, return None
+            # If still looks blocked, return None.
+            # Exception: for Zoopla detail pages, return the HTML anyway so the
+            # parser can attempt JSON-LD/og:* extraction even when heuristics are noisy.
             if blocked:
-                return None
+                return text if _is_detail_url(url) and (text or "").strip() else None
 
             return text
     except Exception as e:
@@ -818,7 +837,11 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             or _has_cloudflare_marker(pp_text)
                             or not (pp_text or "").strip()
                         )
-                        return None if blocked_premium else pp_text
+                        if blocked_premium:
+                            return (
+                                pp_text if _is_detail_url(url) and (pp_text or "").strip() else None
+                            )
+                        return pp_text
             except Exception:
                 return None
         return None
