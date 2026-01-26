@@ -335,6 +335,8 @@ def _parse_zoopla_detail_page(html: str, url: str) -> Optional[Dict[str, Any]]:
     latitude = 0.0
     longitude = 0.0
     image_urls: List[str] = []
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
 
     def _norm_url(u: str) -> str:
         u = (u or "").strip()
@@ -444,13 +446,27 @@ def _parse_zoopla_detail_page(html: str, url: str) -> Optional[Dict[str, Any]]:
 
     # If we still don't have a price, try parsing it from the title.
     if price is None and title:
-        price = _parse_price(title)
+        m = re.search(r"£\s*\d[\d,]*", title)
+        if m:
+            price = _parse_price(m.group(0))
+        else:
+            price = _parse_price(title)
 
     if price is None:
         try:
             og_desc = soup.find("meta", attrs={"property": "og:description"})
             if og_desc and og_desc.get("content"):
                 price = _parse_price(str(og_desc.get("content")))
+        except Exception:
+            pass
+
+    # Last-resort: search body text for a currency value.
+    if price is None:
+        try:
+            body_text = soup.get_text(" ", strip=True)
+            m = re.search(r"£\s*\d[\d,]*", body_text)
+            if m:
+                price = _parse_price(m.group(0))
         except Exception:
             pass
 
@@ -462,6 +478,45 @@ def _parse_zoopla_detail_page(html: str, url: str) -> Optional[Dict[str, Any]]:
         except Exception:
             pass
 
+    # Additional image sources: preload links and srcset.
+    if len(image_urls) < 2:
+        try:
+            for link in soup.find_all("link", attrs={"rel": "preload"}):
+                if (link.get("as") or "").lower() != "image":
+                    continue
+                href = link.get("href")
+                if href and isinstance(href, str):
+                    image_urls.append(_norm_url(href))
+        except Exception:
+            pass
+
+    if len(image_urls) < 2:
+        try:
+            for img in soup.select("img[src], img[srcset], source[srcset]"):
+                cand = img.get("src") or None
+                if not cand:
+                    srcset = img.get("srcset") or ""
+                    if isinstance(srcset, str) and srcset.strip():
+                        cand = srcset.split(",")[0].strip().split(" ")[0].strip()
+                if cand and isinstance(cand, str):
+                    image_urls.append(_norm_url(cand))
+                if len(image_urls) >= 6:
+                    break
+        except Exception:
+            pass
+
+    # Bedrooms/bathrooms best-effort from body text.
+    try:
+        body_text = soup.get_text(" ", strip=True)
+        m_bed = re.search(r"\b(\d{1,2})\s*(?:bed|beds|bedroom|bedrooms)\b", body_text, re.I)
+        if m_bed:
+            bedrooms = int(m_bed.group(1))
+        m_bath = re.search(r"\b(\d{1,2})\s*(?:bath|baths|bathroom|bathrooms)\b", body_text, re.I)
+        if m_bath:
+            bathrooms = int(m_bath.group(1))
+    except Exception:
+        pass
+
     image_urls = [u for u in image_urls if u]
     seen = set()
     image_urls = [u for u in image_urls if not (u in seen or seen.add(u))]
@@ -472,8 +527,8 @@ def _parse_zoopla_detail_page(html: str, url: str) -> Optional[Dict[str, Any]]:
         "title": title or f"Zoopla listing {external_id}",
         "location": location,
         "price": price,
-        "bedrooms": None,
-        "bathrooms": None,
+        "bedrooms": bedrooms,
+        "bathrooms": bathrooms,
         "property_type": None,
         "image_url": image_url,
         "image_urls": image_urls,
@@ -1195,6 +1250,8 @@ async def scrape_zoopla_properties(
                                 parsed = _parse_zoopla_detail_page(detail_html, detail_url)
                                 if not parsed:
                                     continue
+                                if not parsed.get("location"):
+                                    parsed["location"] = location
                                 should_insert, reason = should_insert_property(parsed)
                                 if should_insert:
                                     results.append(clean_property_data(parsed))
@@ -1367,6 +1424,8 @@ async def scrape_zoopla_properties(
                                 parsed = _parse_zoopla_detail_page(detail_html, detail_url)
                                 if not parsed:
                                     continue
+                                if not parsed.get("location"):
+                                    parsed["location"] = location
                                 should_insert, reason = should_insert_property(parsed)
                                 if should_insert:
                                     results.append(clean_property_data(parsed))

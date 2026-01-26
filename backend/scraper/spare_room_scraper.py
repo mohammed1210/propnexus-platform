@@ -403,6 +403,19 @@ def _extract_images(card: BeautifulSoup) -> List[str]:
             seen.add(img)
             unique_images.append(img)
 
+    # Filter common placeholder profile GIFs when other images exist.
+    lowered = [u.lower() for u in unique_images]
+    has_real = any(
+        ("profilepic" not in u) and (not u.endswith(".gif")) and ("unisex" not in u)
+        for u in lowered
+    )
+    if has_real:
+        unique_images = [
+            u
+            for u in unique_images
+            if ("profilepic" not in u.lower()) and ("unisex" not in u.lower())
+        ]
+
     return unique_images
 
 
@@ -474,10 +487,12 @@ def _extract_external_id_and_url(card: BeautifulSoup) -> tuple[str, Optional[str
     Uses stable SHA-256 fallback to avoid run-to-run duplicates.
     """
     data_id = card.get("data-advert-id") or card.get("data-listing-id") or card.get("data-id")
-    if data_id:
-        return f"sr-{data_id}", None
 
-    link = card.select_one("a[href]")
+    link = (
+        card.select_one("a[href*='flatshare_id=']")
+        or card.select_one("a[href*='flatshare_detail']")
+        or card.select_one("a[href]")
+    )
     href = link.get("href") if link else None
 
     listing_url = None
@@ -491,10 +506,13 @@ def _extract_external_id_and_url(card: BeautifulSoup) -> tuple[str, Optional[str
 
         m = re.search(r"flatshare_id=(\d+)", href)
         if m:
-            return f"sr-{m.group(1)}", listing_url
+            return (f"sr-{data_id}" if data_id else f"sr-{m.group(1)}"), listing_url
         m2 = re.search(r"(\d{6,})", href)
         if m2:
-            return f"sr-{m2.group(1)}", listing_url
+            return (f"sr-{data_id}" if data_id else f"sr-{m2.group(1)}"), listing_url
+
+    if data_id:
+        return f"sr-{data_id}", listing_url
 
     signature = listing_url or card.get_text(" ", strip=True)
     return f"sr-{_stable_id(signature)}", listing_url
@@ -558,6 +576,8 @@ async def scrape_spareroom_properties(location: str, limit: int = 50) -> List[Di
                                 or card.select_one(".price")
                             )
                             price = _parse_price(price_el.get_text(strip=True) if price_el else "")
+                            if price is None:
+                                price = _parse_price(card.get_text(" ", strip=True))
 
                             # Extract location/address
                             loc_el = (

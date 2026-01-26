@@ -155,10 +155,26 @@ def make_scraperapi_url(
 
 def _looks_blocked(html: str, status: int) -> bool:
     """Check if response indicates blocking or captcha."""
-    if status in (403, 503):
+    lowered = (html or "").lower()
+
+    strong_markers = [
+        *CAPTCHA_KEYWORDS,
+        "robot check",
+        "blocked",
+        "datadome",
+        "incapsula",
+        "access denied",
+    ]
+
+    # Explicit human-challenge signals should always count as blocked.
+    if any(k in lowered for k in strong_markers):
         return True
-    lowered = html.lower()
-    return any(k in lowered for k in CAPTCHA_KEYWORDS)
+
+    # For status-based blocks, require additional evidence.
+    if int(status) in (403, 429, 503):
+        return False
+
+    return False
 
 
 def _captcha_hit_snippet(text: str) -> Optional[str]:
