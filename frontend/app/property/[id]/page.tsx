@@ -44,6 +44,7 @@ type LooseProperty = Partial<Property> & {
   latitude?: number | null;
   longitude?: number | null;
   imageurl?: string | null;
+  image_urls?: unknown;
 };
 
 const toNum = (v: unknown) =>
@@ -56,6 +57,42 @@ export default function PropertyDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTradeType, setSelectedTradeType] = useState<string>('');
+
+  const PLACEHOLDER_IMG = '/placeholder.jpg';
+
+  const imageUrls = useMemo((): string[] => {
+    const raw = (property as any)?.image_urls ?? (property as any)?.imageUrls;
+    if (Array.isArray(raw)) {
+      return raw.filter((u) => typeof u === 'string' && u.trim()).map((u) => u.trim());
+    }
+    if (typeof raw === 'string' && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((u) => typeof u === 'string' && u.trim())
+            .map((u) => u.trim());
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return [];
+  }, [property]);
+
+  const fallbackImageUrl =
+    typeof property?.imageurl === "string" && property.imageurl.trim()
+      ? property.imageurl.trim()
+      : undefined;
+
+  const hasAnyPhoto = imageUrls.length > 0 || Boolean(fallbackImageUrl);
+
+  const initialMainImage = imageUrls[0] || fallbackImageUrl || PLACEHOLDER_IMG;
+  const [mainImage, setMainImage] = useState<string>(PLACEHOLDER_IMG);
+
+  useEffect(() => {
+    setMainImage(initialMainImage);
+  }, [initialMainImage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,6 +225,71 @@ export default function PropertyDetailsPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Image Gallery */}
+        <div className="card mb-6 overflow-hidden">
+          <div className="aspect-[16/9] bg-slate-100 dark:bg-slate-900 relative">
+            <img
+              src={mainImage}
+              alt={property.title ? String(property.title) : 'Property image'}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const img = e.currentTarget;
+                if (img.src.endsWith(PLACEHOLDER_IMG)) return;
+                img.src = PLACEHOLDER_IMG;
+                setMainImage(PLACEHOLDER_IMG);
+              }}
+            />
+
+            {!hasAnyPhoto ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="px-3 py-1.5 rounded-lg bg-white/90 dark:bg-slate-900/80 backdrop-blur-sm text-sm font-semibold text-slate-700 dark:text-slate-200 border border-slate-200/70 dark:border-slate-800/70">
+                  No photos available
+                </div>
+              </div>
+            ) : null}
+
+            {imageUrls.length > 0 ? (
+              <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-lg bg-white/90 backdrop-blur-sm text-sm font-semibold text-slate-900">
+                {Math.max(0, imageUrls.findIndex((u) => u === mainImage)) + 1} / {imageUrls.length}
+              </div>
+            ) : null}
+          </div>
+
+          {imageUrls.length > 1 ? (
+            <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {imageUrls.map((u, idx) => {
+                  const selected = u === mainImage;
+                  return (
+                    <button
+                      key={`${u}-${idx}`}
+                      type="button"
+                      onClick={() => setMainImage(u)}
+                      className={`shrink-0 rounded-lg overflow-hidden border transition-colors ${
+                        selected
+                          ? 'border-brand-500 ring-2 ring-brand-500/30'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                      aria-label={`View image ${idx + 1}`}
+                    >
+                      <img
+                        src={u}
+                        alt={`Thumbnail ${idx + 1}`}
+                        className="w-20 h-16 object-cover"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (img.src.endsWith(PLACEHOLDER_IMG)) return;
+                          img.src = PLACEHOLDER_IMG;
+                        }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-6">
