@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 # Scrapers (existing)
 from backend.utils.ingest import scrape_all_sources
+from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run
 
 # Shared Supabase client
 try:
@@ -39,33 +40,69 @@ async def _maybe_await(result: Any) -> Any:
     return result
 
 
-async def _scrape_and_upsert(*, location: str, scrape_fn: Any) -> int:
+async def _scrape_and_upsert(
+    *,
+    location: str,
+    scrape_fn: Any,
+    run_id: str | None = None,
+    source: str | None = None,
+) -> int:
     """Run scrape and upsert results, best-effort.
 
     Used by the optional `?async=true` mode on /import/* endpoints to avoid request
     timeouts in production.
     """
 
+    if not run_id and source:
+        run_id = create_scrape_run(source=source, location=location)
+
+    scrape_error: str | None = None
     try:
         items = await _maybe_await(scrape_fn())
         if not isinstance(items, list):
             items = []
-    except Exception:
+    except Exception as e:
+        scrape_error = str(e)
         items = []
 
-    if sb and items:
-        try:
-            now_iso = _now_iso()
-            db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
-            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-        except Exception:
-            pass
+    db_ok = False
+    db_error: str | None = None
+    inserted = 0
+    if items:
+        now_iso = _now_iso()
+        db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+        inserted = len(db_rows)
+        if sb and db_rows:
+            try:
+                sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
+                db_ok = True
+            except Exception as e:
+                db_error = str(e)
+
+    if run_id:
+        if db_ok:
+            finish_scrape_run(run_id=run_id, status="success", count_inserted=inserted)
+        else:
+            finish_scrape_run(
+                run_id=run_id,
+                status="error",
+                count_inserted=0,
+                error=(db_error or scrape_error or "unknown"),
+            )
 
     return len(items)
 
 
-def _queue_scrape_and_upsert(*, location: str, scrape_fn: Any) -> None:
-    asyncio.create_task(_scrape_and_upsert(location=location, scrape_fn=scrape_fn))
+def _queue_scrape_and_upsert(
+    *,
+    location: str,
+    scrape_fn: Any,
+    run_id: str | None = None,
+    source: str | None = None,
+) -> None:
+    asyncio.create_task(
+        _scrape_and_upsert(location=location, scrape_fn=scrape_fn, run_id=run_id, source=source)
+    )
 
 
 def _now_iso() -> str:
@@ -390,6 +427,8 @@ async def import_all(
             detail="Missing location. Use ?req=London or JSON body {'location':'London'}",
         )
 
+    run_id = create_scrape_run(source="all", location=loc)
+
     # ✅ Run scrapers
     items = await _maybe_await(scrape_all_sources(loc))
     if not isinstance(items, list):
@@ -422,7 +461,10 @@ async def import_all(
             sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
             inserted = len(db_rows)
         except Exception as e:
+            finish_scrape_run(run_id=run_id, status="error", count_inserted=0, error=str(e))
             raise HTTPException(status_code=500, detail=f"DB upsert failed: {e}")
+
+    finish_scrape_run(run_id=run_id, status="success", count_inserted=inserted)
 
     if inserted == 0:
         logging.info("Import completed with 0 properties for location=%s", loc)
@@ -461,12 +503,18 @@ async def import_zoopla(
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
+    run_id = create_scrape_run(source="zoopla", location=loc)
     scrape_error: str | None = None
     try:
         from backend.scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
 
         if run_async:
-            _queue_scrape_and_upsert(location=loc, scrape_fn=lambda: scrape_zoopla_properties(loc))
+            _queue_scrape_and_upsert(
+                location=loc,
+                scrape_fn=lambda: scrape_zoopla_properties(loc),
+                run_id=run_id,
+                source="zoopla",
+            )
             return {"queued": True, "source": "zoopla", "location": loc}
 
         items = await _maybe_await(scrape_zoopla_properties(loc))
@@ -481,6 +529,16 @@ async def import_zoopla(
         now_iso = _now_iso()
         db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
         db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
+
+    if db_upsert_ok:
+        finish_scrape_run(run_id=run_id, status="success", count_inserted=len(items))
+    else:
+        finish_scrape_run(
+            run_id=run_id,
+            status="error" if (scrape_error or db_error) else "success",
+            count_inserted=0 if (scrape_error or db_error) else len(items),
+            error=(db_error or scrape_error),
+        )
 
     payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
     if scrape_error:
@@ -526,12 +584,16 @@ async def import_rightmove(
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
+    run_id = create_scrape_run(source="rightmove", location=loc)
     try:
         from backend.scraper.rightmove_scraper import scrape_rightmove_properties  # type: ignore
 
         if run_async:
             _queue_scrape_and_upsert(
-                location=loc, scrape_fn=lambda: scrape_rightmove_properties(loc)
+                location=loc,
+                scrape_fn=lambda: scrape_rightmove_properties(loc),
+                run_id=run_id,
+                source="rightmove",
             )
             return {"queued": True, "source": "rightmove", "location": loc}
 
@@ -556,6 +618,16 @@ async def import_rightmove(
     payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
     if db_error:
         payload["db_error"] = db_error
+
+    if db_upsert_ok:
+        finish_scrape_run(run_id=run_id, status="success", count_inserted=len(items))
+    else:
+        finish_scrape_run(
+            run_id=run_id,
+            status="error" if db_error else "success",
+            count_inserted=0 if db_error else len(items),
+            error=db_error,
+        )
     warning = _scrape_zero_warning(loc, sources={"rightmove": len(items)})
     if warning:
         payload["warning"] = warning
@@ -576,6 +648,7 @@ async def import_onthemarket(
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
+    run_id = create_scrape_run(source="onthemarket", location=loc)
     scrape_error: str | None = None
     try:
         from backend.scraper.onthemarket_scraper import (
@@ -584,7 +657,10 @@ async def import_onthemarket(
 
         if run_async:
             _queue_scrape_and_upsert(
-                location=loc, scrape_fn=lambda: scrape_onthemarket_properties(loc)
+                location=loc,
+                scrape_fn=lambda: scrape_onthemarket_properties(loc),
+                run_id=run_id,
+                source="onthemarket",
             )
             return {"queued": True, "source": "onthemarket", "location": loc}
 
@@ -600,6 +676,16 @@ async def import_onthemarket(
         now_iso = _now_iso()
         db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
         db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
+
+    if db_upsert_ok:
+        finish_scrape_run(run_id=run_id, status="success", count_inserted=len(items))
+    else:
+        finish_scrape_run(
+            run_id=run_id,
+            status="error" if (scrape_error or db_error) else "success",
+            count_inserted=0 if (scrape_error or db_error) else len(items),
+            error=(db_error or scrape_error),
+        )
 
     payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
     if scrape_error:
@@ -626,13 +712,17 @@ async def import_spareroom(
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
+    run_id = create_scrape_run(source="spareroom", location=loc)
     scrape_error: str | None = None
     try:
         from backend.scraper.spare_room_scraper import scrape_spareroom_properties  # type: ignore
 
         if run_async:
             _queue_scrape_and_upsert(
-                location=loc, scrape_fn=lambda: scrape_spareroom_properties(loc)
+                location=loc,
+                scrape_fn=lambda: scrape_spareroom_properties(loc),
+                run_id=run_id,
+                source="spareroom",
             )
             return {"queued": True, "source": "spareroom", "location": loc}
 
@@ -648,6 +738,16 @@ async def import_spareroom(
         now_iso = _now_iso()
         db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
         db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
+
+    if db_upsert_ok:
+        finish_scrape_run(run_id=run_id, status="success", count_inserted=len(items))
+    else:
+        finish_scrape_run(
+            run_id=run_id,
+            status="error" if (scrape_error or db_error) else "success",
+            count_inserted=0 if (scrape_error or db_error) else len(items),
+            error=(db_error or scrape_error),
+        )
 
     payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
     if scrape_error:

@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import UpgradeButton from '@/components/UpgradeButton';
+import WaitlistForm from '@/components/WaitlistForm';
 
 const PRICE_PRO = process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO || 'price_1SKIBTRvsQUM0wWd1P0WWjCz';
 const PRICE_INVESTOR =
@@ -83,6 +84,18 @@ export default function PricingPage() {
       <p className="mt-12 text-center text-sm text-slate-500 dark:text-slate-400">
         Start with a 7-day free trial. No payment required during trial. Cancel anytime.
       </p>
+
+      <section className="mt-12 card">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          Not ready to upgrade?
+        </h2>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+          Join the early access waitlist for updates and launch perks.
+        </p>
+        <div className="mt-4">
+          <WaitlistForm sourcePage="/pricing" />
+        </div>
+      </section>
     </main>
   );
 }

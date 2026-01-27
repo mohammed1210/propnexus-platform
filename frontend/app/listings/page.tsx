@@ -123,8 +123,8 @@ type SortKey = (typeof SORTABLE)[number];
 const INVESTMENT_TYPES = ['HMO', 'BTL', 'SA', 'BRR', 'Flip', 'Commercial'] as const;
 
 type RawProperty = {
-  id: string | null;
-  title: string | null;
+  id: string;
+  title: string;
   location: string | null;
   price: number | null;
   bedrooms?: number | null;
@@ -133,6 +133,7 @@ type RawProperty = {
   yield_percent?: number | null;
   roi_percent?: number | null;
   imageurl?: string | null;
+  source?: string | null;
   latitude?: number | null;
   longitude?: number | null;
   created_at?: string | null;
@@ -444,9 +445,9 @@ function ListingsInner() {
 
         const data = await response.json();
 
-        const mappedData = (data || []).map((prop: any) => ({
-          id: prop.id,
-          title: prop.title,
+        const mappedData: RawProperty[] = (data || []).map((prop: any) => ({
+          id: String(prop.id ?? ''),
+          title: String(prop.title ?? ''),
           location: prop.location,
           price: prop.price,
           bedrooms: prop.bedrooms,
@@ -455,6 +456,7 @@ function ListingsInner() {
           yield_percent: prop.yield_percent,
           roi_percent: prop.roi_percent,
           imageurl: prop.imageurl,
+          source: prop.source,
           latitude: prop.latitude,
           longitude: prop.longitude,
           created_at: prop.created_at,
@@ -848,7 +850,7 @@ function ListingsInner() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {rows.map((property) => (
-                  <PropertyCard key={property.id ?? Math.random()} p={property as any} />
+                    <PropertyCard key={property.id || Math.random()} p={property} />
                 ))}
               </div>
             )}
@@ -873,7 +875,7 @@ function ListingsInner() {
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {rows.map((property) => (
-                    <PropertyCard key={property.id ?? Math.random()} p={property as any} />
+                    <PropertyCard key={property.id || Math.random()} p={property} />
                   ))}
                 </div>
               )}

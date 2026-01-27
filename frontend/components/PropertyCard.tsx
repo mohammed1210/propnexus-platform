@@ -14,6 +14,7 @@ function cx(...p: Array<string | false | null | undefined>) {
 type Property = {
   id: string;
   title: string;
+  source?: string | null;
   location?: string | null;
   price?: number | null;
   bedrooms?: number | null;
@@ -89,6 +90,19 @@ const YIELD_THRESHOLD_EXCELLENT = 6; // >= 6% is green
 const YIELD_THRESHOLD_GOOD = 4; // >= 4% is amber, < 4% is red
 const ROI_THRESHOLD_EXCELLENT = 12; // >= 12% is green
 const ROI_THRESHOLD_GOOD = 8; // >= 8% is amber, < 8% is red
+
+function formatSourceBadge(source: string | null | undefined): string {
+  const raw = (source ?? '').trim();
+  const normalized = raw.toLowerCase();
+
+  if (normalized === 'zoopla') return 'Zoopla';
+  if (normalized === 'onthemarket') return 'OTM';
+  if (normalized === 'spareroom') return 'SpareRoom';
+  if (!raw) return 'Unknown';
+
+  // Fallback: capitalize first character (keep rest as-is)
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
 
 export default function PropertyCard({ p }: { p: Property }) {
   const [saving, setSaving] = useState(false);
@@ -170,6 +184,8 @@ export default function PropertyCard({ p }: { p: Property }) {
     if (trimmed.length <= 180) return trimmed;
     return trimmed.slice(0, 177) + '...';
   }, [p.description]);
+
+  const sourceBadgeText = useMemo(() => formatSourceBadge(p.source), [p.source]);
 
   return (
     <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30">
@@ -284,6 +300,19 @@ export default function PropertyCard({ p }: { p: Property }) {
 
       <div className="p-4 space-y-2">
         <Link href={href} className="block group">
+          <div className="mb-1">
+            <span
+              className={cx(
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+                'bg-slate-100 text-slate-700 border border-slate-200',
+                'dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700',
+              )}
+              aria-label={`Source: ${sourceBadgeText}`}
+              title={`Source: ${sourceBadgeText}`}
+            >
+              {sourceBadgeText}
+            </span>
+          </div>
           <h3 className="font-semibold leading-snug line-clamp-2 group-hover:underline">
             {p.title || 'Untitled property'}
           </h3>

@@ -15,6 +15,7 @@ from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.rate_limit import limiter
 from backend.middleware.security import SecurityHeadersMiddleware
 from backend.routes import admin_schedule
+from backend.routes.admin_scrape_runs import router as admin_scrape_runs_router
 from backend.routes.ai import router as ai_router
 from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
@@ -32,6 +33,8 @@ from backend.routes.stripe_routes import router as stripe_routes_router
 from backend.routes.stripe_webhook import router as stripe_webhook_router
 from backend.routes.tradesmen_routes import router as tradesmen_router
 from backend.routes.users_routes import router as users_router
+from backend.routes.waitlist_routes import admin_router as admin_waitlist_router
+from backend.routes.waitlist_routes import router as waitlist_router
 from backend.utils.sentry_init import init_sentry
 
 logger = logging.getLogger(__name__)
@@ -192,6 +195,7 @@ app.include_router(debug_scrape_probe_router)
 app.include_router(gpt_router)
 app.include_router(import_router)
 app.include_router(admin_alias_router)
+app.include_router(admin_scrape_runs_router)
 app.include_router(notes_router)
 app.include_router(off_market_router)
 app.include_router(save_deal_router)
@@ -199,6 +203,10 @@ app.include_router(properties_router)
 app.include_router(scrape_router)
 app.include_router(tradesmen_router)
 app.include_router(admin_schedule.router)
+
+# Waitlist
+app.include_router(waitlist_router)
+app.include_router(admin_waitlist_router)
 
 # Stripe
 app.include_router(stripe_webhook_router)

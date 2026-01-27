@@ -15,6 +15,7 @@ describe('Listings Schema Validation', () => {
       title: 'Test Property',
       location: 'London, UK',
       price: 250000,
+      source: 'zoopla',
       bedrooms: 3,
       bathrooms: 2,
       description: 'A lovely property',
@@ -33,6 +34,7 @@ describe('Listings Schema Validation', () => {
       title: backendProperty.title,
       location: backendProperty.location,
       price: backendProperty.price,
+      source: backendProperty.source,
       bedrooms: backendProperty.bedrooms,
       bathrooms: backendProperty.bathrooms,
       description: backendProperty.description,
@@ -50,6 +52,7 @@ describe('Listings Schema Validation', () => {
     expect(mappedProperty.title).toBe('Test Property');
     expect(mappedProperty.location).toBe('London, UK');
     expect(mappedProperty.price).toBe(250000);
+    expect(mappedProperty.source).toBe('zoopla');
     expect(mappedProperty.bedrooms).toBe(3);
     expect(mappedProperty.bathrooms).toBe(2);
     expect(mappedProperty.description).toBe('A lovely property');
@@ -74,6 +77,7 @@ describe('Listings Schema Validation', () => {
       title: 'Minimal Property',
       location: null,
       price: 150000,
+      source: null,
       bedrooms: null,
       bathrooms: null,
       description: null,
@@ -91,6 +95,7 @@ describe('Listings Schema Validation', () => {
       title: backendProperty.title,
       location: backendProperty.location,
       price: backendProperty.price,
+      source: backendProperty.source,
       bedrooms: backendProperty.bedrooms,
       bathrooms: backendProperty.bathrooms,
       description: backendProperty.description,
@@ -108,6 +113,7 @@ describe('Listings Schema Validation', () => {
     expect(mappedProperty.title).toBe('Minimal Property');
     expect(mappedProperty.location).toBeNull();
     expect(mappedProperty.price).toBe(150000);
+    expect(mappedProperty.source).toBeNull();
     expect(mappedProperty.yield_percent).toBeNull();
     expect(mappedProperty.roi_percent).toBeNull();
     expect(mappedProperty.investment_type).toBeNull();
