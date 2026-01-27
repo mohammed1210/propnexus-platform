@@ -6,12 +6,13 @@ import os
 import random
 import re
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup
 from fastapi import BackgroundTasks
 
+from backend.scraper.utils import normalize_image_urls
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.render import PLAYWRIGHT_ENABLE, capture_debug_html, render_page
 from backend.utils.retry import retry_async
@@ -38,6 +39,116 @@ ZP_DELAY_MS = int(os.getenv("ZP_DELAY_MS", "900"))
 SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
+
+
+def _pick_best_from_srcset(srcset: str) -> Optional[str]:
+    """Pick the highest-width URL from a srcset string."""
+    if not srcset or not isinstance(srcset, str):
+        return None
+    best_url: Optional[str] = None
+    best_w = -1
+    for item in srcset.split(","):
+        parts = item.strip().split()
+        if not parts:
+            continue
+        u = parts[0].strip()
+        w = 0
+        if len(parts) > 1 and parts[1].endswith("w"):
+            try:
+                w = int(parts[1][:-1])
+            except Exception:
+                w = 0
+        if u and w >= best_w:
+            best_w = w
+            best_url = u
+    return best_url
+
+
+def _extract_zoopla_gallery_image_urls(html: str, page_url: str) -> List[str]:
+    """Extract gallery (non-thumbnail where possible) image URLs from a Zoopla detail page."""
+    if not html:
+        return []
+
+    soup = BeautifulSoup(html, "html.parser")
+    candidates: List[str] = []
+
+    # 1) Common gallery/carousel containers (best-effort selectors).
+    try:
+        for el in soup.select(
+            "[data-testid*='gallery'] img, [data-testid*='carousel'] img, [class*='gallery'] img, [class*='carousel'] img"
+        ):
+            u = (
+                el.get("data-src")
+                or el.get("data-lazy-src")
+                or el.get("data-original")
+                or el.get("src")
+            )
+            if isinstance(u, str) and u.strip():
+                candidates.append(urljoin(page_url, u.strip()))
+
+            srcset = el.get("srcset")
+            if isinstance(srcset, str) and srcset.strip():
+                best = _pick_best_from_srcset(srcset)
+                if best:
+                    candidates.append(urljoin(page_url, best))
+    except Exception:
+        pass
+
+    # 2) Any picture/source srcset (often contains higher-res URLs).
+    try:
+        for el in soup.select("source[srcset], img[srcset]"):
+            srcset = el.get("srcset")
+            if isinstance(srcset, str) and srcset.strip():
+                best = _pick_best_from_srcset(srcset)
+                if best:
+                    candidates.append(urljoin(page_url, best))
+    except Exception:
+        pass
+
+    # 3) Embedded Next.js payloads can include full image arrays.
+    try:
+        next_data = _extract_next_data(soup) or _extract_next_data_from_html(html)
+    except Exception:
+        next_data = None
+
+    if isinstance(next_data, dict):
+
+        def _scan(obj: Any, depth: int = 0) -> None:
+            if depth > 12:
+                return
+            if isinstance(obj, str):
+                s = obj.strip()
+                if not s:
+                    return
+                # Restrict to plausible Zoopla image URLs to avoid dragging in unrelated assets.
+                sl = s.lower()
+                if (
+                    ("zoocdn" in sl)
+                    or ("zoopla" in sl)
+                    or sl.startswith("http")
+                    or sl.startswith("//")
+                ):
+                    candidates.append(urljoin(page_url, s))
+                return
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    kl = str(k).lower()
+                    if kl in ("image", "imageurl", "imageurls", "images", "photos", "gallery"):
+                        _scan(v, depth + 1)
+                        continue
+                    # Common nested URL fields.
+                    if kl in ("url", "src", "original", "originalurl", "full", "large"):
+                        _scan(v, depth + 1)
+                        continue
+                    _scan(v, depth + 1)
+                return
+            if isinstance(obj, list):
+                for v in obj:
+                    _scan(v, depth + 1)
+
+        _scan(next_data)
+
+    return normalize_image_urls(candidates)
 
 
 def _allow_parse_despite_block(text: str, status: int, url: str) -> bool:
@@ -264,14 +375,15 @@ def _zoopla_property_from_listing_dict(d: Dict[str, Any]) -> Optional[Dict[str, 
         single_img = d.get("imageUrl") or d.get("image_url")
         if single_img and isinstance(single_img, str):
             image_urls.insert(0, single_img)
-        # De-dupe
-        seen = set()
-        image_urls = [u for u in image_urls if not (u in seen or seen.add(u))]
-        image_url = image_urls[0] if image_urls else None
-
         listing_url = d.get("listingUrl") or d.get("url")
         if not listing_url:
             listing_url = f"https://www.zoopla.co.uk/for-sale/details/{external_id}/"
+
+        # Normalize and de-dupe images now that we know the base URL.
+        image_urls = normalize_image_urls(
+            [urljoin(listing_url, u) for u in image_urls if isinstance(u, str)]
+        )
+        image_url = image_urls[0] if image_urls else None
 
         loc_text = d.get("displayAddress") or d.get("address") or str(title)
         lat = None
@@ -292,6 +404,7 @@ def _zoopla_property_from_listing_dict(d: Dict[str, Any]) -> Optional[Dict[str, 
             "property_type": property_type,
             "image_url": image_url,
             "image_urls": image_urls,
+            "imageurl": image_url,
             "latitude": float(lat) if isinstance(lat, (int, float)) else 0.0,
             "longitude": float(lng) if isinstance(lng, (int, float)) else 0.0,
             "source": "zoopla",
@@ -523,6 +636,14 @@ def _parse_zoopla_detail_page(html: str, url: str) -> Optional[Dict[str, Any]]:
         except Exception:
             pass
 
+    # Gallery / carousel images from the detail page (best-effort).
+    try:
+        gallery_urls = _extract_zoopla_gallery_image_urls(html, url)
+        if gallery_urls:
+            image_urls.extend(gallery_urls)
+    except Exception:
+        pass
+
     if len(image_urls) < 2:
         try:
             for img in soup.select("img[src], img[srcset], source[srcset]"):
@@ -550,9 +671,7 @@ def _parse_zoopla_detail_page(html: str, url: str) -> Optional[Dict[str, Any]]:
     except Exception:
         pass
 
-    image_urls = [u for u in image_urls if u]
-    seen = set()
-    image_urls = [u for u in image_urls if not (u in seen or seen.add(u))]
+    image_urls = normalize_image_urls([urljoin(url, u) for u in image_urls if isinstance(u, str)])
     image_url = image_urls[0] if image_urls else None
 
     return {
@@ -565,6 +684,7 @@ def _parse_zoopla_detail_page(html: str, url: str) -> Optional[Dict[str, Any]]:
         "property_type": None,
         "image_url": image_url,
         "image_urls": image_urls,
+        "imageurl": image_url,
         "latitude": latitude,
         "longitude": longitude,
         "source": "zoopla",
@@ -1250,6 +1370,44 @@ async def scrape_zoopla_properties(
                                     stats.log_validation_failure(reason or "Unknown")
 
                             if results:
+                                # Best-effort enrich with gallery images from each detail page.
+                                max_details = min(len(results), max(3, min(8, limit)))
+                                for item in results[:max_details]:
+                                    try:
+                                        detail_url = item.get("listing_url") or item.get("raw_url")
+                                        if (
+                                            not isinstance(detail_url, str)
+                                            or not detail_url.strip()
+                                        ):
+                                            continue
+                                        if (
+                                            isinstance(item.get("image_urls"), list)
+                                            and len(item["image_urls"]) >= 12
+                                        ):
+                                            continue
+                                        try:
+                                            detail_html = await _fetch_html(session, detail_url)
+                                        except Exception:
+                                            detail_html = None
+                                        if not detail_html:
+                                            continue
+                                        detail_imgs = _extract_zoopla_gallery_image_urls(
+                                            detail_html, detail_url
+                                        )
+                                        existing = item.get("image_urls")
+                                        existing_list = (
+                                            existing if isinstance(existing, list) else []
+                                        )
+                                        merged = normalize_image_urls(
+                                            [*detail_imgs, *existing_list]
+                                        )
+                                        if merged:
+                                            item["image_urls"] = merged
+                                            item["image_url"] = merged[0]
+                                            item["imageurl"] = merged[0]
+                                    except Exception:
+                                        continue
+
                                 stats.log_summary()
                                 print(
                                     f"✅ Zoopla embedded JSON returned {len(results)} properties for '{location}'"
@@ -1348,6 +1506,7 @@ async def scrape_zoopla_properties(
 
                             # Extract all images
                             image_urls = _extract_images(card)
+                            image_urls = normalize_image_urls(image_urls)
                             image_url = image_urls[0] if image_urls else None
                             log_image_extraction("zoopla", title, len(image_urls))
 
@@ -1358,6 +1517,25 @@ async def scrape_zoopla_properties(
                             property_type = _extract_property_type(card)
 
                             external_id, listing_url = _extract_external_id_and_url(card)
+
+                            # Enrich images from the detail page (best-effort).
+                            # Keep this additive: only override if we actually find a gallery.
+                            if listing_url and len(image_urls) < 12:
+                                try:
+                                    detail_html = await _fetch_html(session, listing_url)
+                                except Exception:
+                                    detail_html = None
+                                if detail_html:
+                                    try:
+                                        detail_imgs = _extract_zoopla_gallery_image_urls(
+                                            detail_html, listing_url
+                                        )
+                                        merged = normalize_image_urls([*detail_imgs, *image_urls])
+                                        if merged:
+                                            image_urls = merged
+                                            image_url = merged[0]
+                                    except Exception:
+                                        pass
                             coords = (
                                 await _enrich_coordinates(location_text)
                                 if _looks_like_postcode(location_text)
@@ -1375,6 +1553,7 @@ async def scrape_zoopla_properties(
                                 "property_type": property_type,
                                 "image_url": image_url,
                                 "image_urls": image_urls,
+                                "imageurl": image_url,
                                 "latitude": coords["latitude"],
                                 "longitude": coords["longitude"],
                                 "source": "zoopla",

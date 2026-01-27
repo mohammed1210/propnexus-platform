@@ -3,8 +3,52 @@ import os
 import random
 import re
 from typing import Any, Dict, Optional, Tuple
+from urllib.parse import urlparse
 
 import aiohttp
+
+
+def normalize_image_urls(urls: list[str]) -> list[str]:
+    """Normalize a list of image URLs.
+
+    - Removes duplicates while preserving order
+    - Drops empty/whitespace entries
+    - Normalizes protocol-relative URLs (//...) to https://...
+    - Ensures returned URLs are absolute http/https URLs
+
+    Note: callers should pre-resolve relative paths (e.g. via urljoin(detail_url, u))
+    before passing them here.
+    """
+
+    if not urls:
+        return []
+
+    out: list[str] = []
+    seen: set[str] = set()
+
+    for u in urls:
+        if not isinstance(u, str):
+            continue
+        s = u.strip()
+        if not s:
+            continue
+        if s.startswith("//"):
+            s = "https:" + s
+
+        try:
+            p = urlparse(s)
+        except Exception:
+            continue
+
+        if p.scheme not in ("http", "https") or not p.netloc:
+            continue
+
+        if s not in seen:
+            seen.add(s)
+            out.append(s)
+
+    return out
+
 
 try:
     from supabase import Client, create_client
@@ -23,8 +67,10 @@ supabase_url = os.getenv("SUPABASE_URL")
 # Use the service role key for server-side writes from scrapers
 supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 
-# Only create client if both URL and key are available
-supabase: Optional[Client] = None
+# Only create client if both URL and key are available.
+# Type is intentionally loose here because `Client` may be a runtime fallback
+# when the optional `supabase` dependency isn't installed in certain envs/CI.
+supabase: Any = None
 if supabase_url and supabase_key:
     try:
         supabase = create_client(supabase_url, supabase_key)

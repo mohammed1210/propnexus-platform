@@ -28,3 +28,28 @@ def test_normalize_property_row_hydrates_and_normalizes_urls():
     # imageurl should be usable (either from raw or from image_urls)
     assert out["imageurl"]
     assert out["imageurl"].startswith("https://")
+
+
+def test_normalize_property_row_image_urls_none_returns_empty_list():
+    out = _normalize_property_row({"id": "1", "image_urls": None, "imageurl": None})
+    assert isinstance(out.get("image_urls"), list)
+    assert out["image_urls"] == []
+
+
+def test_normalize_property_row_image_urls_json_string_is_parsed():
+    out = _normalize_property_row(
+        {
+            "id": "2",
+            "image_urls": '["https://a.example/x.jpg", "//b.example/y.jpg"]',
+            "imageurl": None,
+        }
+    )
+    assert isinstance(out.get("image_urls"), list)
+    assert out["image_urls"] == ["https://a.example/x.jpg", "https://b.example/y.jpg"]
+    assert out["imageurl"] == "https://a.example/x.jpg"
+
+
+def test_normalize_property_row_image_urls_invalid_json_string_becomes_empty_list():
+    out = _normalize_property_row({"id": "3", "image_urls": "not json", "imageurl": None})
+    assert isinstance(out.get("image_urls"), list)
+    assert out["image_urls"] == []

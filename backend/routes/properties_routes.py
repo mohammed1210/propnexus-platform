@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Dict, List, Optional
 
@@ -133,9 +134,26 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
 
     # image_urls normalization
     imgs = out.get("image_urls")
-    if isinstance(imgs, list):
+
+    # Supabase can return this column as None, a JSON string, or a native list.
+    if imgs is None:
+        out["image_urls"] = []
+    elif isinstance(imgs, str):
+        parsed: Any = None
+        try:
+            parsed = json.loads(imgs)
+        except Exception:
+            parsed = None
+        if isinstance(parsed, list):
+            normalized = [_norm_url(u) for u in parsed if isinstance(u, str) and u.strip()]
+            out["image_urls"] = _filter_junk_image_urls(normalized)
+        else:
+            out["image_urls"] = []
+    elif isinstance(imgs, list):
         normalized = [_norm_url(u) for u in imgs if isinstance(u, str) and u.strip()]
         out["image_urls"] = _filter_junk_image_urls(normalized)
+    else:
+        out["image_urls"] = []
 
     # imageurl fallback (front-end expects this)
     if not out.get("imageurl"):

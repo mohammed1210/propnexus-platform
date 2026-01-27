@@ -5,11 +5,12 @@ import os
 import random
 import re
 from typing import Any, Dict, List, Optional
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
 import aiohttp
 from bs4 import BeautifulSoup
 
+from backend.scraper.utils import normalize_image_urls
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.render import (
     PLAYWRIGHT_ENABLE,
@@ -164,6 +165,265 @@ def _extract_next_data(soup: BeautifulSoup) -> Optional[Dict[str, Any]]:
         return json.loads(raw)
     except Exception:
         return None
+
+
+def _pick_best_from_srcset(srcset: str) -> Optional[str]:
+    if not srcset or not isinstance(srcset, str):
+        return None
+    best_url: Optional[str] = None
+    best_w = -1
+    for item in srcset.split(","):
+        parts = item.strip().split()
+        if not parts:
+            continue
+        u = parts[0].strip()
+        w = 0
+        if len(parts) > 1 and parts[1].endswith("w"):
+            try:
+                w = int(parts[1][:-1])
+            except Exception:
+                w = 0
+        if u and w >= best_w:
+            best_w = w
+            best_url = u
+    return best_url
+
+
+def _extract_rightmove_detail_image_urls(html: str, page_url: str) -> List[str]:
+    """Extract gallery images from a Rightmove detail page (best-effort)."""
+    if not html:
+        return []
+
+    soup = BeautifulSoup(html or "", "html.parser")
+    candidates: List[str] = []
+
+    def _canonicalize_rightmove_media_url(u: str) -> str:
+        # Prefer a stable, original-ish URL for de-duping.
+        u2 = u.strip()
+        u2 = u2.replace("//media.rightmove.co.uk/dir/", "//media.rightmove.co.uk/")
+        u2 = u2.replace("https://media.rightmove.co.uk/dir/", "https://media.rightmove.co.uk/")
+        u2 = u2.replace("http://media.rightmove.co.uk/dir/", "http://media.rightmove.co.uk/")
+        u2 = re.sub(
+            r"_max_[^./]+(?=\.(?:jpe?g|png|webp)$)",
+            "",
+            u2,
+            flags=re.IGNORECASE,
+        )
+        return u2
+
+    def _looks_like_rightmove_property_photo(u: str) -> bool:
+        ul = (u or "").lower()
+        if "media.rightmove.co.uk" not in ul:
+            return False
+        if any(x in ul for x in ("brand_logo", "/assets/", "/dir/customer/")):
+            return False
+        if any(x in ul for x in ("industry-affiliation", "customer/industry-affiliation")):
+            return False
+        if any(x in ul for x in ("_flp_", "_epc_")):
+            return False
+        # Property photos use *_IMG_* naming in practice.
+        return "_img_" in ul
+
+    # 1) JSON-LD structured data (often includes image arrays).
+    try:
+        for el in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            raw = (el.string or el.get_text() or "").strip()
+            if not raw:
+                continue
+            try:
+                data = json.loads(raw)
+            except Exception:
+                continue
+
+            def _scan(obj: Any, depth: int = 0) -> None:
+                if depth > 10:
+                    return
+                if isinstance(obj, str):
+                    s = obj.strip()
+                    if s:
+                        candidates.append(urljoin(page_url, s))
+                    return
+                if isinstance(obj, list):
+                    for v in obj:
+                        _scan(v, depth + 1)
+                    return
+                if isinstance(obj, dict):
+                    if "image" in obj:
+                        _scan(obj.get("image"), depth + 1)
+                    for v in obj.values():
+                        _scan(v, depth + 1)
+
+            _scan(data)
+    except Exception:
+        pass
+
+    # 2) Embedded app state (__PRELOADED_STATE__ / __NEXT_DATA__).
+    try:
+        state = _extract_preloaded_state(soup)
+    except Exception:
+        state = None
+    try:
+        next_data = _extract_next_data(soup)
+    except Exception:
+        next_data = None
+
+    def _scan_state(obj: Any, depth: int = 0) -> None:
+        if depth > 12:
+            return
+        if isinstance(obj, str):
+            s = obj.strip()
+            if not s:
+                return
+            sl = s.lower()
+            if ("media.rightmove" in sl) or ("rightmove.co.uk" in sl) or sl.startswith("http"):
+                candidates.append(urljoin(page_url, s))
+            return
+        if isinstance(obj, list):
+            for v in obj:
+                _scan_state(v, depth + 1)
+            return
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                kl = str(k).lower()
+                if kl in ("image", "images", "imageurl", "imageurls", "media", "photos", "gallery"):
+                    _scan_state(v, depth + 1)
+                    continue
+                if kl in ("url", "src", "mediaurl", "original", "full", "large"):
+                    _scan_state(v, depth + 1)
+                    continue
+                _scan_state(v, depth + 1)
+
+    if isinstance(state, dict):
+        _scan_state(state)
+    if isinstance(next_data, dict):
+        _scan_state(next_data)
+
+    # 2b) Regex scan for embedded media URLs (some PDPs inline JSON without __PRELOADED_STATE__/__NEXT_DATA__).
+    try:
+        for u in re.findall(
+            r"https?://media\.rightmove\.co\.uk/[^\"'<>\\\s]+\.(?:jpe?g|png|webp)",
+            html,
+            flags=re.IGNORECASE,
+        ):
+            if isinstance(u, str) and u.strip():
+                candidates.append(u.strip())
+    except Exception:
+        pass
+
+    # 3) HTML gallery/carousel images.
+    try:
+        for el in soup.select(
+            "[class*='gallery'] img, [class*='carousel'] img, [data-testid*='gallery'] img"
+        ):
+            u = (
+                el.get("data-src")
+                or el.get("data-lazy-src")
+                or el.get("data-original")
+                or el.get("src")
+            )
+            if isinstance(u, str) and u.strip():
+                candidates.append(urljoin(page_url, u.strip()))
+
+            srcset = el.get("srcset")
+            if isinstance(srcset, str) and srcset.strip():
+                best = _pick_best_from_srcset(srcset)
+                if best:
+                    candidates.append(urljoin(page_url, best))
+    except Exception:
+        pass
+
+    # 4) Responsive picture sources.
+    try:
+        for el in soup.select("source[srcset], img[srcset]"):
+            srcset = el.get("srcset")
+            if isinstance(srcset, str) and srcset.strip():
+                best = _pick_best_from_srcset(srcset)
+                if best:
+                    candidates.append(urljoin(page_url, best))
+    except Exception:
+        pass
+
+    # 5) og:image fallback.
+    try:
+        og_img = soup.find("meta", attrs={"property": "og:image"})
+        if og_img and og_img.get("content"):
+            candidates.append(urljoin(page_url, str(og_img.get("content")).strip()))
+    except Exception:
+        pass
+
+    # Prefer best variants and drop non-photo media.
+    try:
+        ordered_best: Dict[str, str] = {}
+        ordered_keys: List[str] = []
+
+        for u in candidates:
+            if not isinstance(u, str) or not u.strip():
+                continue
+            u = urljoin(page_url, u.strip())
+            if not _looks_like_rightmove_property_photo(u):
+                continue
+
+            key = _canonicalize_rightmove_media_url(u)
+            if key not in ordered_best:
+                ordered_best[key] = u
+                ordered_keys.append(key)
+                continue
+
+            existing = ordered_best[key]
+            # Prefer originals over resized variants.
+            new_score = ("/dir/" in u.lower(), "_max_" in u.lower(), len(u))
+            old_score = ("/dir/" in existing.lower(), "_max_" in existing.lower(), len(existing))
+            if new_score < old_score:
+                ordered_best[key] = u
+
+        candidates = [ordered_best[k] for k in ordered_keys]
+    except Exception:
+        pass
+
+    return normalize_image_urls(candidates)
+
+
+async def _enrich_rightmove_results_with_detail_images(
+    session: aiohttp.ClientSession,
+    results: List[Dict[str, Any]],
+    *,
+    max_items: int = 6,
+) -> None:
+    """Best-effort: fetch detail pages and merge gallery images into image_urls."""
+    if not results:
+        return
+
+    for p in results[: max(0, int(max_items))]:
+        try:
+            detail_url = (
+                p.get("listing_url") or p.get("raw_url") or p.get("url") or p.get("property_url")
+            )
+            if not isinstance(detail_url, str) or not detail_url.strip():
+                continue
+            detail_url = detail_url.strip()
+
+            existing = p.get("image_urls")
+            existing_list: List[str] = existing if isinstance(existing, list) else []
+            if len(existing_list) >= 12:
+                continue
+
+            try:
+                detail_html = await _fetch_html(session, detail_url)
+            except Exception:
+                detail_html = None
+            if not detail_html:
+                continue
+
+            detail_imgs = _extract_rightmove_detail_image_urls(detail_html, detail_url)
+            merged = normalize_image_urls([*detail_imgs, *existing_list])
+            if not merged:
+                continue
+
+            p["image_urls"] = merged
+            p["image_url"] = merged[0]
+            p["imageurl"] = merged[0]
+        except Exception:
+            continue
 
 
 def _find_rightmove_properties_in_next_data(next_data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -322,6 +582,9 @@ def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                     if img and isinstance(img, str):
                         image_urls.append(img)
 
+        image_urls = normalize_image_urls(
+            [urljoin("https://www.rightmove.co.uk/", u) for u in image_urls if isinstance(u, str)]
+        )
         img = image_urls[0] if image_urls else None
 
         loc_text = title
@@ -344,6 +607,7 @@ def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             "property_type": property_type,
             "image_url": img,
             "image_urls": image_urls,
+            "imageurl": img,
             "latitude": coords["latitude"],
             "longitude": coords["longitude"],
             "source": "rightmove",
@@ -1254,6 +1518,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 stats.log_validation_failure(reason or "Unknown")
 
                         if results:
+                            await _enrich_rightmove_results_with_detail_images(session, results)
                             stats.log_summary()
                             print(
                                 f"✅ Rightmove __NEXT_DATA__ returned {len(results)} properties for '{location}'"
@@ -1283,6 +1548,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 stats.log_validation_failure(reason or "Unknown")
 
                         if results:
+                            await _enrich_rightmove_results_with_detail_images(session, results)
                             stats.log_summary()
                             print(
                                 f"✅ Rightmove embedded JSON returned {len(results)} properties for '{location}'"
@@ -1452,6 +1718,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
 
                             # Extract all images
                             image_urls = _extract_images(card)
+                            image_urls = normalize_image_urls(image_urls)
                             image_url = image_urls[0] if image_urls else None
                             log_image_extraction("rightmove", title, len(image_urls))
 
@@ -1464,6 +1731,25 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             external_id, listing_url = _extract_external_id_and_url(
                                 card, title=title, location=location_text
                             )
+
+                            # Enrich images from the detail page (best-effort).
+                            # Keep this additive: only override if we actually find a gallery.
+                            if listing_url and len(image_urls) < 12:
+                                try:
+                                    detail_html = await _fetch_html(session, listing_url)
+                                except Exception:
+                                    detail_html = None
+                                if detail_html:
+                                    try:
+                                        detail_imgs = _extract_rightmove_detail_image_urls(
+                                            detail_html, listing_url
+                                        )
+                                        merged = normalize_image_urls([*detail_imgs, *image_urls])
+                                        if merged:
+                                            image_urls = merged
+                                            image_url = merged[0]
+                                    except Exception:
+                                        pass
 
                             coords = (
                                 await _enrich_coordinates(location_text)
@@ -1482,6 +1768,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 "property_type": property_type,
                                 "image_url": image_url,
                                 "image_urls": image_urls,
+                                "imageurl": image_url,
                                 "latitude": coords["latitude"],
                                 "longitude": coords["longitude"],
                                 "source": "rightmove",

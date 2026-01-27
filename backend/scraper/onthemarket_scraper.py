@@ -8,7 +8,7 @@ import random
 import re
 from html import unescape
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
-from urllib.parse import quote_plus, urlencode
+from urllib.parse import quote_plus, urlencode, urljoin, urlparse
 
 try:
     import aiohttp
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 from bs4 import BeautifulSoup
 
+from backend.scraper.utils import normalize_image_urls
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.render import (
     PLAYWRIGHT_ENABLE,
@@ -103,6 +104,144 @@ def _extract_external_id_from_detail_url(url: str) -> Optional[str]:
     return m.group("id") if m else None
 
 
+def _pick_best_from_srcset(srcset: str) -> Optional[str]:
+    if not srcset or not isinstance(srcset, str):
+        return None
+    best_url: Optional[str] = None
+    best_w = -1
+    for item in srcset.split(","):
+        parts = item.strip().split()
+        if not parts:
+            continue
+        u = parts[0].strip()
+        w = 0
+        if len(parts) > 1 and parts[1].endswith("w"):
+            try:
+                w = int(parts[1][:-1])
+            except Exception:
+                w = 0
+        if u and w >= best_w:
+            best_w = w
+            best_url = u
+    return best_url
+
+
+def _is_otm_listing_photo_url(u: str) -> bool:
+    if not u or not isinstance(u, str):
+        return False
+    try:
+        p = urlparse(u)
+    except Exception:
+        return False
+    if p.scheme not in ("http", "https"):
+        return False
+
+    host = (p.netloc or "").lower()
+    path = (p.path or "").lower()
+
+    # Drop common non-photo assets that frequently appear in the DOM.
+    if host.endswith("onthemarket.com") and (
+        path.startswith("/assets/")
+        or "/images/icons/" in path
+        or path.endswith("vidbg.png")
+        or path.endswith("floorplanbg.png")
+        or "map-pill" in path
+    ):
+        return False
+
+    # Prefer the dedicated media host for listing imagery.
+    if host == "media.onthemarket.com":
+        return True
+
+    return False
+
+
+def _extract_otm_gallery_image_urls(html: str, page_url: str) -> List[str]:
+    """Extract gallery images from an OnTheMarket detail page."""
+    if not html:
+        return []
+
+    soup = BeautifulSoup(html or "", "html.parser")
+    candidates: List[str] = []
+
+    # 1) JSON-LD often includes an image array.
+    try:
+        for el in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            raw = (el.string or el.get_text() or "").strip()
+            if not raw:
+                continue
+            try:
+                data = __import__("json").loads(raw)
+            except Exception:
+                continue
+
+            def _scan(obj: Any, depth: int = 0) -> None:
+                if depth > 10:
+                    return
+                if isinstance(obj, str):
+                    s = obj.strip()
+                    if s:
+                        candidates.append(urljoin(page_url, s))
+                    return
+                if isinstance(obj, list):
+                    for v in obj:
+                        _scan(v, depth + 1)
+                    return
+                if isinstance(obj, dict):
+                    if "image" in obj:
+                        _scan(obj.get("image"), depth + 1)
+                    for v in obj.values():
+                        _scan(v, depth + 1)
+
+            _scan(data)
+    except Exception:
+        pass
+
+    # 2) Common gallery/carousel containers.
+    try:
+        for el in soup.select(
+            "[class*='gallery'] img, [class*='carousel'] img, [data-testid*='gallery'] img"
+        ):
+            u = (
+                el.get("data-src")
+                or el.get("data-lazy-src")
+                or el.get("data-original")
+                or el.get("src")
+            )
+            if isinstance(u, str) and u.strip():
+                candidates.append(urljoin(page_url, u.strip()))
+            srcset = el.get("srcset")
+            if isinstance(srcset, str) and srcset.strip():
+                best = _pick_best_from_srcset(srcset)
+                if best:
+                    candidates.append(urljoin(page_url, best))
+    except Exception:
+        pass
+
+    # 3) Responsive picture sources tend to include the large images.
+    try:
+        for el in soup.select("source[srcset], img[srcset]"):
+            srcset = el.get("srcset")
+            if isinstance(srcset, str) and srcset.strip():
+                best = _pick_best_from_srcset(srcset)
+                if best:
+                    candidates.append(urljoin(page_url, best))
+    except Exception:
+        pass
+
+    # 4) Keep og:image as a fallback.
+    try:
+        og_img = soup.find("meta", attrs={"property": "og:image"})
+        if og_img and og_img.get("content"):
+            candidates.append(urljoin(page_url, str(og_img.get("content")).strip()))
+    except Exception:
+        pass
+
+    normalized = normalize_image_urls(candidates)
+    filtered = [u for u in normalized if _is_otm_listing_photo_url(u)]
+    return filtered or normalized
+
+
 def _collect_detail_listing_urls(soup: BeautifulSoup) -> List[str]:
     urls: List[str] = []
     seen: set[str] = set()
@@ -168,32 +307,25 @@ def _parse_otm_detail_page(
 
     image_urls: List[str] = []
     try:
-        og_img = soup.find("meta", attrs={"property": "og:image"})
-        if og_img and og_img.get("content"):
-            image_urls.append(str(og_img.get("content")).strip())
-    except Exception:
-        pass
-    try:
+        # Preload image hints
         for link in soup.find_all("link", attrs={"rel": "preload"}):
             if (link.get("as") or "").lower() != "image":
                 continue
             href = link.get("href")
             if href and isinstance(href, str):
-                image_urls.append(href.strip())
+                image_urls.append(urljoin(url, href.strip()))
     except Exception:
         pass
 
-    def _norm(u: str) -> str:
-        u = (u or "").strip()
-        if u.startswith("//"):
-            return "https:" + u
-        if u.startswith("/"):
-            return "https://www.onthemarket.com" + u
-        return u
+    # Detail-page gallery (preferred)
+    try:
+        image_urls.extend(_extract_otm_gallery_image_urls(html, url))
+    except Exception:
+        pass
 
-    image_urls = [_norm(u) for u in image_urls if isinstance(u, str) and u.strip()]
-    seen = set()
-    image_urls = [u for u in image_urls if not (u in seen or seen.add(u))]
+    image_urls = normalize_image_urls([urljoin(url, u) for u in image_urls if isinstance(u, str)])
+    filtered_urls = [u for u in image_urls if _is_otm_listing_photo_url(u)]
+    image_urls = filtered_urls or image_urls
     image_url = image_urls[0] if image_urls else None
 
     return {
@@ -206,6 +338,7 @@ def _parse_otm_detail_page(
         "property_type": None,
         "image_url": image_url,
         "image_urls": image_urls,
+        "imageurl": image_url,
         "latitude": 0.0,
         "longitude": 0.0,
         "source": "onthemarket",
@@ -839,6 +972,9 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
 
                             # Extract all images
                             image_urls = _extract_images(card)
+                            image_urls = normalize_image_urls(image_urls)
+                            filtered_urls = [u for u in image_urls if _is_otm_listing_photo_url(u)]
+                            image_urls = filtered_urls or image_urls
                             image_url = image_urls[0] if image_urls else None
                             log_image_extraction("onthemarket", title, len(image_urls))
 
@@ -849,6 +985,29 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                             external_id, listing_url = _extract_external_id_and_url(
                                 card, title, location_text
                             )
+
+                            # Enrich images from the detail page (best-effort).
+                            # Keep this additive: only override if we actually find a gallery.
+                            if listing_url and len(image_urls) < 12:
+                                try:
+                                    detail_html = await _fetch_html(session, listing_url)
+                                except Exception:
+                                    detail_html = None
+                                if detail_html:
+                                    try:
+                                        detail_imgs = _extract_otm_gallery_image_urls(
+                                            detail_html, listing_url
+                                        )
+                                        merged = normalize_image_urls([*detail_imgs, *image_urls])
+                                        filtered_merged = [
+                                            u for u in merged if _is_otm_listing_photo_url(u)
+                                        ]
+                                        merged = filtered_merged or merged
+                                        if merged:
+                                            image_urls = merged
+                                            image_url = merged[0]
+                                    except Exception:
+                                        pass
 
                             # Deduplicate by external_id
                             if external_id in seen_ids:
@@ -873,6 +1032,7 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
                                 "bathrooms": bathrooms,
                                 "image_url": image_url,
                                 "image_urls": image_urls,
+                                "imageurl": image_url,
                                 "latitude": coords["latitude"],
                                 "longitude": coords["longitude"],
                                 "source": "onthemarket",
