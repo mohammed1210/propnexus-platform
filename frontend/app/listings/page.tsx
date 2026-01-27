@@ -445,7 +445,9 @@ function ListingsInner() {
 
         const data = await response.json();
 
-        const mappedData: RawProperty[] = (data || []).map((prop: any) => ({
+        const mappedData: RawProperty[] = (data || [])
+          .filter((prop: any) => String(prop?.source ?? '').toLowerCase() !== 'spareroom')
+          .map((prop: any) => ({
           id: String(prop.id ?? ''),
           title: String(prop.title ?? ''),
           location: prop.location,

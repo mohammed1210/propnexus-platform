@@ -438,7 +438,6 @@ async def import_all(
         "rightmove": 0,
         "zoopla": 0,
         "onthemarket": 0,
-        "spareroom": 0,
     }
     for p in items:
         if isinstance(p, dict):

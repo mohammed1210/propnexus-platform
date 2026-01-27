@@ -431,6 +431,27 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
         os.getenv("INGEST_TIMEOUT_SECONDS", os.getenv("SCRAPER_TIMEOUT_SECONDS", "20"))
     )
 
+    # SpareRoom is rentals/rooms, not sales listings. Keep the code available for
+    # a future rentals pipeline, but skip it by default in production.
+    env_name = (
+        (
+            os.getenv("ENVIRONMENT")
+            or os.getenv("RAILWAY_ENVIRONMENT")
+            or os.getenv("NODE_ENV")
+            or ""
+        )
+        .strip()
+        .lower()
+    )
+    is_production = env_name == "production"
+    pipeline_mode = (os.getenv("PIPELINE_MODE") or "sales").strip().lower()
+    allow_spareroom = (os.getenv("ENABLE_SPAREROOM_SALES") or "false").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    skip_spareroom = is_production and pipeline_mode == "sales" and not allow_spareroom
+
     loc = (location or "").strip()
     if not loc:
         return []
@@ -500,21 +521,26 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
     except Exception as e:
         warn(f"OnTheMarket scrape skipped/failed: {e}")
 
-    # ---- SpareRoom ----
-    try:
+    # ---- SpareRoom (rentals/rooms; disabled for production sales) ----
+    if skip_spareroom:
+        log(
+            "INFO: spareroom skipped (disabled for production sales pipeline; set ENABLE_SPAREROOM_SALES=true to override)"
+        )
+    else:
         try:
-            from backend.scraper.spare_room_scraper import (  # type: ignore
-                scrape_spareroom_properties,
-            )
-        except Exception:
-            from scraper.spare_room_scraper import scrape_spareroom_properties  # type: ignore
+            try:
+                from backend.scraper.spare_room_scraper import (  # type: ignore
+                    scrape_spareroom_properties,
+                )
+            except Exception:
+                from scraper.spare_room_scraper import scrape_spareroom_properties  # type: ignore
 
-        if inspect.iscoroutinefunction(scrape_spareroom_properties):
-            await _extend_from("spareroom", scrape_spareroom_properties(loc))
-        else:
-            await _extend_from("spareroom", asyncio.to_thread(scrape_spareroom_properties, loc))
-    except Exception as e:
-        warn(f"SpareRoom scrape skipped/failed: {e}")
+            if inspect.iscoroutinefunction(scrape_spareroom_properties):
+                await _extend_from("spareroom", scrape_spareroom_properties(loc))
+            else:
+                await _extend_from("spareroom", asyncio.to_thread(scrape_spareroom_properties, loc))
+        except Exception as e:
+            warn(f"SpareRoom scrape skipped/failed: {e}")
 
     # Drop empty rows (match ingest() logic)
     results = [r for r in results if r.get("title") or r.get("location") or r.get("price")]

@@ -149,32 +149,25 @@ echo "=============================================="
 
 check_health
 
-LOC_SPAREROOM="Birmingham"
 LOC_ZOOPLA="London"
 LOC_OTM="London"
 
-probe_source "spareroom"   "$LOC_SPAREROOM" 0
 probe_source "zoopla"      "$LOC_ZOOPLA" 0
 probe_source "onthemarket" "$LOC_OTM" 0
 
-run_import "spareroom"   "$LOC_SPAREROOM"
 run_import "zoopla"      "$LOC_ZOOPLA"
 run_import "onthemarket" "$LOC_OTM"
 
-check_latest_rows "spareroom" 5
 check_latest_rows "zoopla" 5
 check_latest_rows "onthemarket" 5
 
-C_SR=$(count_rows "spareroom")
 C_ZP=$(count_rows "zoopla")
 C_OT=$(count_rows "onthemarket")
 
 echo "---- counts (<=200 fetched) ----"
-echo "spareroom:   $C_SR"
 echo "zoopla:      $C_ZP"
 echo "onthemarket: $C_OT"
 
-[[ "$C_SR" -gt 0 ]] && pass "SpareRoom rows present" || fail "No SpareRoom rows returned"
 [[ "$C_ZP" -gt 0 ]] && pass "Zoopla rows present" || fail "No Zoopla rows returned"
 [[ "$C_OT" -gt 0 ]] && pass "OnTheMarket rows present" || fail "No OnTheMarket rows returned"
 
