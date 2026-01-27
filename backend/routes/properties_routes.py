@@ -94,10 +94,48 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
                 return v
         return None
 
+    def _is_junk_image_url(u: Any) -> bool:
+        s = (u or "").strip().lower() if isinstance(u, str) else ""
+        if not s:
+            return True
+        if "zoopla_static_agent_logo" in s:
+            return True
+        if "/_next/static/" in s:
+            return True
+        if "error-image" in s:
+            return True
+        # Keep floorplans (useful in gallery), but drop generic site icons.
+        if "onthemarket.com/assets/images/" in s:
+            return True
+        if "map-pill.png" in s:
+            return True
+        if "agentsmutual.co.uk/agent-products/" in s:
+            return True
+        if s.endswith(".svg"):
+            return True
+        return False
+
+    def _filter_junk_image_urls(urls: List[str]) -> List[str]:
+        if not urls:
+            return []
+
+        out: List[str] = []
+        seen: set[str] = set()
+        for u in urls:
+            if not isinstance(u, str):
+                continue
+            if _is_junk_image_url(u):
+                continue
+            if u not in seen:
+                seen.add(u)
+                out.append(u)
+        return out
+
     # image_urls normalization
     imgs = out.get("image_urls")
     if isinstance(imgs, list):
-        out["image_urls"] = [_norm_url(u) for u in imgs if isinstance(u, str) and u.strip()]
+        normalized = [_norm_url(u) for u in imgs if isinstance(u, str) and u.strip()]
+        out["image_urls"] = _filter_junk_image_urls(normalized)
 
     # imageurl fallback (front-end expects this)
     if not out.get("imageurl"):
@@ -107,6 +145,12 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
             else None
         )
     out["imageurl"] = _norm_url(out.get("imageurl"))
+
+    # If we have filtered image_urls, keep imageurl consistent (without
+    # clobbering a valid, non-junk imageurl).
+    if isinstance(out.get("image_urls"), list) and out["image_urls"]:
+        if (not out.get("imageurl")) or _is_junk_image_url(out.get("imageurl")):
+            out["imageurl"] = out["image_urls"][0]
 
     # Location/address hydration
     if not out.get("location"):

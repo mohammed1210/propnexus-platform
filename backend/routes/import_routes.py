@@ -72,6 +72,60 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _is_junk_image_url(u: Any) -> bool:
+    s = (u or "").strip().lower() if isinstance(u, str) else ""
+    if not s:
+        return True
+
+    # Zoopla static assets / logos / error placeholders
+    if "zoopla_static_agent_logo" in s:
+        return True
+    if "/_next/static/" in s:
+        return True
+    if "error-image" in s:
+        return True
+
+    # OnTheMarket site assets (icons/backgrounds)
+    # Keep floorplans (useful in gallery), but drop generic site icons.
+    if "onthemarket.com/assets/images/" in s:
+        return True
+    if "map-pill.png" in s:
+        return True
+
+    # Third-party ad/agent product creatives commonly embedded in OTM pages
+    if "agentsmutual.co.uk/agent-products/" in s:
+        return True
+
+    # SVGs are frequently logos/icons
+    if s.endswith(".svg"):
+        return True
+
+    return False
+
+
+def _filter_junk_image_urls(urls: List[str]) -> List[str]:
+    """Remove common non-listing images (logos/icons/placeholders).
+
+    Keep this intentionally conservative: only strip URLs that are very likely
+    to be site chrome rather than actual listing photos.
+    """
+
+    if not urls:
+        return []
+
+    out: List[str] = []
+    seen: set[str] = set()
+    for u in urls:
+        if not isinstance(u, str):
+            continue
+        if _is_junk_image_url(u):
+            continue
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+    return out
+
+
 def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
     """
     Normalise a scraped property dict into something safe to upsert.
@@ -157,6 +211,16 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
         raw_imgs = _pick_raw(["image_urls", "imageUrls", "images"])
         if isinstance(raw_imgs, list):
             row["image_urls"] = [_norm_url(u) for u in raw_imgs if isinstance(u, str) and u.strip()]
+
+    # Strip site chrome from image_urls, and prefer a real photo for imageurl.
+    if isinstance(row.get("image_urls"), list):
+        filtered = _filter_junk_image_urls([u for u in row["image_urls"] if isinstance(u, str)])
+        if filtered:
+            row["image_urls"] = filtered
+            # If imageurl is missing or looks like junk, promote first filtered image.
+            current = row.get("imageurl")
+            if (not isinstance(current, str)) or _is_junk_image_url(current):
+                row["imageurl"] = filtered[0]
 
     if not row.get("location"):
         row["location"] = _pick_raw(["location", "displayAddress", "display_address"])
