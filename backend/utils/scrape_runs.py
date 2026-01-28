@@ -8,7 +8,12 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def create_scrape_run(*, source: str, location: str | None) -> Optional[str]:
+def create_scrape_run(
+    *,
+    source: str,
+    location: str | None,
+    status: str = "started",
+) -> Optional[str]:
     """Insert a scrape_runs row and return its id.
 
     If Supabase is not configured, this becomes a no-op and returns None.
@@ -25,7 +30,7 @@ def create_scrape_run(*, source: str, location: str | None) -> Optional[str]:
     payload: dict[str, Any] = {
         "source": (source or "").strip().lower(),
         "location": (location or "").strip() or None,
-        "status": "started",
+        "status": (status or "").strip().lower() or "started",
         "started_at": _now_iso(),
     }
 

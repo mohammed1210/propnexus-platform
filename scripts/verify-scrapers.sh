@@ -153,48 +153,105 @@ except Exception:
 run_batch_import() {
   local cities_csv="$1"
   local max_pages="$2"
+  local run_async="${3:-1}"
   echo "---- import: batch (cities=$cities_csv, max_pages=$max_pages) ----"
 
-  local out
-  out=$(curl -sS -w "\n__HTTP_STATUS__:%{http_code}" -X POST "$BACKEND_URL/import/batch" \
-    -H "x-admin-token: $ADMIN_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d "{\"cities\":[\"$(echo "$cities_csv" | sed 's/,/\",\"/g')\"],\"max_pages\":${max_pages},\"delay_min_s\":0.5,\"delay_max_s\":1.5}" || true)
-
-  local http_status body
-  http_status="${out##*__HTTP_STATUS__:}"
-  body="${out%__HTTP_STATUS__:*}"
-
-  printf '%s\n' "$body" | json_head 160 || true
-
-  if [[ "$http_status" != "200" ]]; then
-    if [[ "$http_status" == "404" ]]; then
-      fail "Batch import endpoint not deployed at $BACKEND_URL/import/batch (HTTP 404)"
-    fi
-    fail "Batch import failed (HTTP $http_status)"
+  local run_async_json="false"
+  if [[ "$run_async" == "1" ]]; then
+    run_async_json="true"
   fi
 
-  if ! printf '%s' "$body" | python3 -c 'import json,sys
+  local attempt
+  for attempt in 1 2 3; do
+    local payload
+    payload="{\"cities\":[\"$(echo "$cities_csv" | sed 's/,/\",\"/g')\"],\"max_pages\":${max_pages},\"delay_min_s\":0.5,\"delay_max_s\":1.5"
+    if [[ "$run_async_json" == "true" ]]; then
+      payload+=" ,\"run_async\":true"
+    fi
+    payload+="}"
+
+    local out curl_rc
+    set +e
+    out=$(curl --http1.1 -sS -w "\n__HTTP_STATUS__:%{http_code}" -X POST "$BACKEND_URL/import/batch" \
+      -H "x-admin-token: $ADMIN_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "$payload")
+    curl_rc=$?
+    set -e
+
+    local http_status body
+    http_status="${out##*__HTTP_STATUS__:}"
+    body="${out%__HTTP_STATUS__:*}"
+
+    if [[ "$curl_rc" != "0" || "$http_status" == "000" ]]; then
+      if [[ "$attempt" -lt 3 ]]; then
+        echo "(batch retry $attempt/3 due to curl/http error)" >&2
+        sleep_retry 3
+        continue
+      fi
+      fail "Batch import failed (curl/http error)"
+    fi
+
+    printf '%s\n' "$body" | json_head 160 || true
+
+    if [[ "$http_status" != "200" ]]; then
+      # Deployed API may not yet support run_async; fall back once.
+      if [[ "$http_status" == "422" && "$run_async_json" == "true" ]]; then
+        echo "(batch 422; retrying without run_async)" >&2
+        run_async_json="false"
+        if [[ "$attempt" -lt 3 ]]; then
+          sleep_retry 1
+          continue
+        fi
+      fi
+      if [[ "$http_status" == "404" ]]; then
+        fail "Batch import endpoint not deployed at $BACKEND_URL/import/batch (HTTP 404)"
+      fi
+      fail "Batch import failed (HTTP $http_status)"
+    fi
+
+    if ! printf '%s' "$body" | python3 -c 'import json,sys
 try:
   j=json.load(sys.stdin)
   cities=j.get("cities") or []
-  total_scraped=int(j.get("total_scraped") or 0)
-  total_imported=int(j.get("total_imported") or 0)
   max_pages=int(j.get("max_pages") or 0)
+  queued=bool(j.get("queued"))
   per_city=j.get("per_city")
+  run_ids=j.get("run_ids")
+  batch_id=j.get("batch_id")
+  status_url=j.get("status_url")
+
   print("parsed_cities:", len(cities))
   print("parsed_max_pages:", max_pages)
-  print("parsed_total_scraped:", total_scraped)
-  print("parsed_total_imported:", total_imported)
-  print("parsed_per_city_keys:", len((per_city or {}).keys()) if isinstance(per_city, dict) else 0)
-  ok=(len(cities)>=1 and max_pages>=1 and isinstance(per_city, dict))
+  print("parsed_queued:", queued)
+  if isinstance(per_city, dict):
+    print("parsed_per_city_keys:", len(per_city.keys()))
+  if isinstance(run_ids, dict):
+    print("parsed_run_ids_keys:", len(run_ids.keys()))
+
+  # Async mode returns either:
+  # - {queued:true, batch_id:"...", status_url:"/import/batch/status/..."} (new)
+  # - {queued:true, run_ids:{city: run_id}} (legacy)
+  if queued:
+    ok=(len(cities)>=1 and max_pages>=1 and ((isinstance(batch_id,str) and batch_id and isinstance(status_url,str) and status_url) or (isinstance(run_ids, dict) and len(run_ids.keys())==len(cities))))
+  else:
+    # Sync mode returns {total_scraped, total_imported, per_city}
+    ok=(len(cities)>=1 and max_pages>=1 and isinstance(per_city, dict))
   sys.exit(0 if ok else 1)
 except Exception as e:
   print("batch_json_parse_error:", e)
   sys.exit(1)
 '; then
-    fail "Batch import failed (bad JSON or missing fields)"
-  fi
+      if [[ "$attempt" -lt 3 ]]; then
+        echo "(batch retry $attempt/3 due to parse error)" >&2
+        sleep_retry 2
+        continue
+      fi
+      fail "Batch import failed (bad JSON or missing fields)"
+    fi
+
+    return 0
+  done
 }
 
 echo "=============================================="
@@ -207,6 +264,7 @@ VERIFY_MAX_PAGES="${VERIFY_MAX_PAGES:-2}"
 # Comma-separated list override, e.g. VERIFY_CITIES='London,Birmingham,Manchester'
 VERIFY_CITIES="${VERIFY_CITIES:-London,Birmingham,Manchester}"
 VERIFY_RUN_BATCH="${VERIFY_RUN_BATCH:-0}"
+VERIFY_BATCH_ASYNC="${VERIFY_BATCH_ASYNC:-1}"
 
 IFS=',' read -r -a CITIES <<< "$VERIFY_CITIES"
 if [[ "${#CITIES[@]}" -lt 3 ]]; then
@@ -217,6 +275,7 @@ echo "---- config ----"
 echo "VERIFY_MAX_PAGES=$VERIFY_MAX_PAGES"
 echo "VERIFY_CITIES=$VERIFY_CITIES"
 echo "VERIFY_RUN_BATCH=$VERIFY_RUN_BATCH"
+echo "VERIFY_BATCH_ASYNC=$VERIFY_BATCH_ASYNC"
 
 for city in "${CITIES[@]}"; do
   city="$(echo "$city" | xargs)"
@@ -235,7 +294,7 @@ done
 if [[ "$VERIFY_RUN_BATCH" == "1" ]]; then
   # Keep it bounded + quick: use the first 3 cities.
   batch_cities="${CITIES[0]},${CITIES[1]},${CITIES[2]}"
-  run_batch_import "$batch_cities" "$VERIFY_MAX_PAGES"
+  run_batch_import "$batch_cities" "$VERIFY_MAX_PAGES" "$VERIFY_BATCH_ASYNC"
 fi
 
 check_latest_rows "zoopla" 5

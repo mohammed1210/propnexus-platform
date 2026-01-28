@@ -5,6 +5,8 @@ import asyncio
 import inspect
 import logging
 import os
+import random
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 
@@ -34,6 +36,141 @@ router = APIRouter(prefix="/import", tags=["import"])
 
 # Backwards-compatible alias router (no prefix)
 admin_alias_router = APIRouter(tags=["import"])
+
+
+# In-memory batch job state for /import/batch async mode.
+# Note: this is best-effort and not durable across deploys/restarts.
+_BATCH_JOBS: dict[str, dict[str, Any]] = {}
+
+
+def _overall_batch_status(per_city: dict[str, dict[str, Any]]) -> str:
+    statuses = [str(v.get("status") or "queued").lower() for v in (per_city or {}).values()]
+    if not statuses:
+        return "queued"
+    if any(s == "running" for s in statuses):
+        return "running"
+    ok = sum(1 for s in statuses if s == "success")
+    err = sum(1 for s in statuses if s == "error")
+    if ok == len(statuses):
+        return "success"
+    if err == len(statuses):
+        return "error"
+    if ok > 0 and err > 0:
+        return "partial"
+    return statuses[0]
+
+
+def _update_batch_job(batch_id: str, patch: dict[str, Any]) -> None:
+    job = _BATCH_JOBS.get(batch_id)
+    if not isinstance(job, dict):
+        return
+    job.update(patch)
+
+
+def _update_city(batch_id: str, city: str, patch: dict[str, Any]) -> None:
+    job = _BATCH_JOBS.get(batch_id)
+    if not isinstance(job, dict):
+        return
+    per_city = job.get("per_city")
+    if not isinstance(per_city, dict):
+        return
+    entry = per_city.get(city)
+    if not isinstance(entry, dict):
+        entry = {}
+        per_city[city] = entry
+    entry.update(patch)
+
+
+def _queue_batch_job(
+    *,
+    batch_id: str,
+    cities: list[str],
+    max_pages: int,
+    delay_min_s: float,
+    delay_max_s: float,
+) -> None:
+    async def _runner() -> None:
+        _update_batch_job(batch_id, {"status": "running"})
+
+        # Best-effort: reflect on scrape_runs status while job is in flight.
+        try:
+            if sb:
+                sb.table("scrape_runs").update({"status": "running"}).eq("id", batch_id).execute()
+        except Exception:
+            pass
+
+        total_scraped = 0
+        total_imported = 0
+        for i, city in enumerate(cities):
+            _update_city(batch_id, city, {"status": "running"})
+            try:
+                items = await _maybe_await(
+                    scrape_all_sources(
+                        city,
+                        zoopla_max_pages=max_pages,
+                        onthemarket_max_pages=max_pages,
+                    )
+                )
+                if not isinstance(items, list):
+                    items = []
+
+                scraped = len(items)
+                total_scraped += scraped
+
+                imported = 0
+                db_upsert_ok = True
+                db_error: str | None = None
+                if items:
+                    now_iso = _now_iso()
+                    db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+                    db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
+                    imported = len(db_rows) if db_upsert_ok else 0
+                    total_imported += imported
+
+                _update_city(
+                    batch_id,
+                    city,
+                    {
+                        "scraped": scraped,
+                        "imported": imported,
+                        "status": "success" if db_upsert_ok else "error",
+                        "error": db_error,
+                    },
+                )
+            except Exception as e:
+                _update_city(
+                    batch_id,
+                    city,
+                    {"scraped": 0, "imported": 0, "status": "error", "error": str(e)},
+                )
+
+            if i < len(cities) - 1:
+                await asyncio.sleep(random.uniform(delay_min_s, delay_max_s))
+
+        job = _BATCH_JOBS.get(batch_id) or {}
+        per_city = job.get("per_city") if isinstance(job, dict) else {}
+        overall = _overall_batch_status(per_city if isinstance(per_city, dict) else {})
+        _update_batch_job(
+            batch_id,
+            {
+                "status": overall,
+                "total_scraped": total_scraped,
+                "total_imported": total_imported,
+            },
+        )
+
+        # Persist final status best-effort.
+        try:
+            finish_scrape_run(
+                run_id=batch_id,
+                status=overall,
+                count_inserted=total_imported,
+                error=None,
+            )
+        except Exception:
+            pass
+
+    asyncio.create_task(_runner())
 
 
 async def _maybe_await(result: Any) -> Any:
@@ -493,6 +630,7 @@ class BatchImportRequest(BaseModel):
     max_pages: int = 1
     delay_min_s: float = 0.5
     delay_max_s: float = 1.5
+    run_async: bool = True
 
 
 @router.post("/zoopla")
@@ -763,6 +901,43 @@ async def import_batch(
     # Safety cap: keep the endpoint bounded.
     cities = cities[:25]
 
+    if req.run_async:
+        # Use scrape_runs.id as the batch_id so we persist a durable identifier.
+        # If Supabase isn't configured, fall back to a UUID.
+        batch_id = create_scrape_run(
+            source="batch",
+            location=f"{len(cities)} cities",
+            status="queued",
+        )
+        if not batch_id:
+            batch_id = str(uuid.uuid4())
+
+        _BATCH_JOBS[batch_id] = {
+            "batch_id": batch_id,
+            "status": "queued",
+            "cities": cities,
+            "max_pages": max_pages,
+            "delay_min_s": delay_min,
+            "delay_max_s": delay_max,
+            "total_scraped": 0,
+            "total_imported": 0,
+            "per_city": {c: {"scraped": 0, "imported": 0, "status": "queued"} for c in cities},
+        }
+
+        _queue_batch_job(
+            batch_id=batch_id,
+            cities=cities,
+            max_pages=max_pages,
+            delay_min_s=delay_min,
+            delay_max_s=delay_max,
+        )
+
+        return {
+            "queued": True,
+            "batch_id": batch_id,
+            "status_url": f"/import/batch/status/{batch_id}",
+        }
+
     run_id = create_scrape_run(source="batch", location=f"{len(cities)} cities")
 
     total_items = 0
@@ -887,6 +1062,54 @@ async def import_spareroom(
     if warning:
         payload["warning"] = warning
     return payload
+
+
+@router.get("/batch/status/{batch_id}")
+async def import_batch_status(
+    batch_id: str,
+    x_admin_token: str | None = Header(None),
+):
+    _require_admin(x_admin_token)
+
+    job = _BATCH_JOBS.get(batch_id)
+    if isinstance(job, dict):
+        per_city = job.get("per_city") if isinstance(job.get("per_city"), dict) else {}
+        overall = _overall_batch_status(per_city)
+        job["status"] = overall
+        return {
+            "batch_id": batch_id,
+            "status": overall,
+            "cities": job.get("cities") or [],
+            "max_pages": job.get("max_pages") or 1,
+            "total_scraped": job.get("total_scraped") or 0,
+            "total_imported": job.get("total_imported") or 0,
+            "per_city": per_city,
+            "error": job.get("error"),
+        }
+
+    # Fallback: if Supabase is configured, return scrape_runs status even if in-memory state was lost.
+    try:
+        if sb:
+            res = (
+                sb.table("scrape_runs")
+                .select("id,status,count_inserted,error")
+                .eq("id", batch_id)
+                .execute()
+            )
+            data = getattr(res, "data", None)
+            if isinstance(data, list) and data:
+                row = data[0]
+                return {
+                    "batch_id": batch_id,
+                    "status": (row.get("status") or "unknown"),
+                    "total_imported": int(row.get("count_inserted") or 0),
+                    "per_city": {},
+                    "error": row.get("error"),
+                }
+    except Exception:
+        pass
+
+    raise HTTPException(status_code=404, detail="Unknown batch_id")
 
 
 # ---------------- backwards-compatible alias ----------------

@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.routing import APIRoute
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -173,6 +174,35 @@ def debug_scraper_env():
         "RM_MAX_PAGES": os.getenv("RM_MAX_PAGES", "1"),
         "OTM_MAX_PAGES": os.getenv("OTM_MAX_PAGES", "1"),
         "SR_MAX_PAGES": os.getenv("SR_MAX_PAGES", "1"),
+    }
+
+
+@app.get("/debug/routes")
+def debug_routes():
+    """Return a sorted list of registered paths.
+
+    This helps confirm route registration in production without relying only on OpenAPI.
+    """
+
+    paths: set[str] = set()
+    detailed: list[dict] = []
+
+    for r in app.routes:
+        if not isinstance(r, APIRoute):
+            continue
+        paths.add(r.path)
+        detailed.append(
+            {
+                "path": r.path,
+                "methods": sorted([m for m in (r.methods or set()) if m]),
+                "name": r.name,
+            }
+        )
+
+    return {
+        "count": len(paths),
+        "paths": sorted(paths),
+        "routes": sorted(detailed, key=lambda x: x["path"]),
     }
 
 
