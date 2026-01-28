@@ -88,6 +88,7 @@ def _queue_batch_job(
     max_pages: int,
     delay_min_s: float,
     delay_max_s: float,
+    per_city_timeout_s: float,
 ) -> None:
     async def _runner() -> None:
         _update_batch_job(batch_id, {"status": "running"})
@@ -104,28 +105,38 @@ def _queue_batch_job(
         for i, city in enumerate(cities):
             _update_city(batch_id, city, {"status": "running"})
             try:
-                items = await _maybe_await(
-                    scrape_all_sources(
-                        city,
-                        zoopla_max_pages=max_pages,
-                        onthemarket_max_pages=max_pages,
+
+                async def _do_city() -> tuple[list[Any], int, str | None]:
+                    raw = await _maybe_await(
+                        scrape_all_sources(
+                            city,
+                            zoopla_max_pages=max_pages,
+                            onthemarket_max_pages=max_pages,
+                        )
                     )
+                    items_local: list[Any] = raw if isinstance(raw, list) else []
+
+                    imported_local = 0
+                    db_error_local: str | None = None
+                    if items_local:
+                        now_iso = _now_iso()
+                        db_rows = [
+                            _clean_row(p, now_iso) for p in items_local if isinstance(p, dict)
+                        ]
+                        ok, db_error_local = _upsert_properties_rows(rows=db_rows)
+                        imported_local = len(db_rows) if ok else 0
+                    return items_local, imported_local, db_error_local
+
+                items, imported, db_error = await asyncio.wait_for(
+                    _do_city(),
+                    timeout=max(1.0, float(per_city_timeout_s or 0)),
                 )
-                if not isinstance(items, list):
-                    items = []
 
                 scraped = len(items)
                 total_scraped += scraped
 
-                imported = 0
-                db_upsert_ok = True
-                db_error: str | None = None
-                if items:
-                    now_iso = _now_iso()
-                    db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
-                    db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
-                    imported = len(db_rows) if db_upsert_ok else 0
-                    total_imported += imported
+                db_upsert_ok = db_error is None
+                total_imported += int(imported or 0)
 
                 _update_city(
                     batch_id,
@@ -135,6 +146,17 @@ def _queue_batch_job(
                         "imported": imported,
                         "status": "success" if db_upsert_ok else "error",
                         "error": db_error,
+                    },
+                )
+            except asyncio.TimeoutError:
+                _update_city(
+                    batch_id,
+                    city,
+                    {
+                        "scraped": 0,
+                        "imported": 0,
+                        "status": "error",
+                        "error": f"timeout after {per_city_timeout_s}s",
                     },
                 )
             except Exception as e:
@@ -631,6 +653,7 @@ class BatchImportRequest(BaseModel):
     delay_min_s: float = 0.5
     delay_max_s: float = 1.5
     run_async: bool = True
+    per_city_timeout_s: float = 90.0
 
 
 @router.post("/zoopla")
@@ -873,9 +896,6 @@ async def import_batch(
     This is intentionally sequential with small delays to reduce rate-limit risk.
     """
 
-    import asyncio
-    import random
-
     _require_admin(x_admin_token)
 
     max_pages = max(1, min(5, int(req.max_pages or 1)))
@@ -930,6 +950,7 @@ async def import_batch(
             max_pages=max_pages,
             delay_min_s=delay_min,
             delay_max_s=delay_max,
+            per_city_timeout_s=max(1.0, float(req.per_city_timeout_s or 0)),
         )
 
         return {
