@@ -6,7 +6,7 @@ def test_parse_zoopla_detail_page_jsonld() -> None:
     html = """
     <html>
       <head>
-        <meta property="og:image" content="//cdn.example.com/fallback.jpg" />
+        <meta property="og:image" content="//lid.zoocdn.com/u/480/360/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg" />
       </head>
       <body>
         <script type="application/ld+json">
@@ -20,7 +20,10 @@ def test_parse_zoopla_detail_page_jsonld() -> None:
             "postalCode": "N1 1AA"
           },
           "offers": {"price": "450000"},
-          "image": ["//img.example.com/a.jpg", "https://img.example.com/b.jpg"],
+          "image": [
+            "//lid.zoocdn.com/u/480/360/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg",
+            "https://lid.zoocdn.com/u/1024/768/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg"
+          ],
           "geo": {"latitude": 51.5, "longitude": -0.12}
         }
         </script>
@@ -36,6 +39,7 @@ def test_parse_zoopla_detail_page_jsonld() -> None:
     assert parsed["location"] and "London" in parsed["location"]
     assert parsed["price"] == 450000
     assert parsed["image_url"].startswith("https://")
+    assert "lid.zoocdn.com" in parsed["image_url"]
     assert parsed["image_urls"][0].startswith("https://")
 
 
@@ -45,9 +49,9 @@ def test_parse_zoopla_detail_page_title_price_and_preload_images() -> None:
     <html>
       <head>
         <title>Valence View - Plot 218 £445,000 - Zoopla</title>
-        <meta property="og:image" content="//img.example.com/og.jpg" />
-        <link rel="preload" as="image" href="//img.example.com/preload-1.jpg" />
-        <link rel="preload" as="image" href="https://img.example.com/preload-2.jpg" />
+        <meta property="og:image" content="//lid.zoocdn.com/u/480/360/cccccccccccccccccccccccccccccccccccccccc.jpg" />
+        <link rel="preload" as="image" href="//lid.zoocdn.com/u/480/360/dddddddddddddddddddddddddddddddddddddddd.jpg" />
+        <link rel="preload" as="image" href="https://lid.zoocdn.com/u/1024/768/dddddddddddddddddddddddddddddddddddddddd.jpg" />
       </head>
       <body>
         <div>2 bedroom apartment</div>
@@ -62,3 +66,4 @@ def test_parse_zoopla_detail_page_title_price_and_preload_images() -> None:
     assert parsed["title"]
     assert parsed["image_urls"]
     assert parsed["image_urls"][0].startswith("https://")
+    assert "lid.zoocdn.com" in parsed["image_urls"][0]

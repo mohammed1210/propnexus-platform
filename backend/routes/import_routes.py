@@ -43,6 +43,28 @@ admin_alias_router = APIRouter(tags=["import"])
 _BATCH_JOBS: dict[str, dict[str, Any]] = {}
 
 
+def _update_city_source(batch_id: str, city: str, source: str, patch: dict[str, Any]) -> None:
+    job = _BATCH_JOBS.get(batch_id)
+    if not isinstance(job, dict):
+        return
+    per_city = job.get("per_city")
+    if not isinstance(per_city, dict):
+        return
+    entry = per_city.get(city)
+    if not isinstance(entry, dict):
+        entry = {}
+        per_city[city] = entry
+    sources = entry.get("sources")
+    if not isinstance(sources, dict):
+        sources = {}
+        entry["sources"] = sources
+    s_entry = sources.get(source)
+    if not isinstance(s_entry, dict):
+        s_entry = {}
+        sources[source] = s_entry
+    s_entry.update(patch)
+
+
 def _overall_batch_status(per_city: dict[str, dict[str, Any]]) -> str:
     statuses = [str(v.get("status") or "queued").lower() for v in (per_city or {}).values()]
     if not statuses:
@@ -103,15 +125,72 @@ def _queue_batch_job(
         total_scraped = 0
         total_imported = 0
         for i, city in enumerate(cities):
-            _update_city(batch_id, city, {"status": "running"})
+            # Pre-seed per-source status so the status endpoint can show progress.
+            for source in ("rightmove", "zoopla", "onthemarket"):
+                _update_city_source(
+                    batch_id,
+                    city,
+                    source,
+                    {"status": "running", "scraped": 0, "imported": 0, "error": None},
+                )
+            _update_city(
+                batch_id, city, {"status": "running", "scraped": 0, "imported": 0, "error": None}
+            )
             try:
 
                 async def _do_city() -> tuple[list[Any], int, str | None]:
+                    city_scraped_by_source: dict[str, int] = {
+                        "rightmove": 0,
+                        "zoopla": 0,
+                        "onthemarket": 0,
+                    }
+
+                    async def _on_source_complete(
+                        source: str,
+                        items: list[dict[str, Any]],
+                        status: str,
+                        error: str | None,
+                    ) -> None:
+                        scraped_local = len(items) if isinstance(items, list) else 0
+                        if source in city_scraped_by_source:
+                            city_scraped_by_source[source] = scraped_local
+
+                        normalized_status = (status or "success").lower()
+                        if normalized_status == "timeout":
+                            src_status = "error"
+                            src_error = error or "timeout"
+                        elif normalized_status == "error":
+                            src_status = "error"
+                            src_error = error or "error"
+                        else:
+                            src_status = "success"
+                            src_error = error
+
+                        _update_city_source(
+                            batch_id,
+                            city,
+                            source,
+                            {
+                                "status": src_status,
+                                "scraped": scraped_local,
+                                "imported": 0,
+                                "error": src_error,
+                            },
+                        )
+                        _update_city(
+                            batch_id,
+                            city,
+                            {
+                                "scraped": sum(city_scraped_by_source.values()),
+                            },
+                        )
+
                     raw = await _maybe_await(
                         scrape_all_sources(
                             city,
                             zoopla_max_pages=max_pages,
                             onthemarket_max_pages=max_pages,
+                            on_source_complete=_on_source_complete,
                         )
                     )
                     items_local: list[Any] = raw if isinstance(raw, list) else []
@@ -149,6 +228,13 @@ def _queue_batch_job(
                     },
                 )
             except asyncio.TimeoutError:
+                for source in ("rightmove", "zoopla", "onthemarket"):
+                    _update_city_source(
+                        batch_id,
+                        city,
+                        source,
+                        {"status": "error", "error": f"timeout after {per_city_timeout_s}s"},
+                    )
                 _update_city(
                     batch_id,
                     city,
@@ -160,6 +246,13 @@ def _queue_batch_job(
                     },
                 )
             except Exception as e:
+                for source in ("rightmove", "zoopla", "onthemarket"):
+                    _update_city_source(
+                        batch_id,
+                        city,
+                        source,
+                        {"status": "error", "error": str(e)},
+                    )
                 _update_city(
                     batch_id,
                     city,
@@ -941,7 +1034,34 @@ async def import_batch(
             "delay_max_s": delay_max,
             "total_scraped": 0,
             "total_imported": 0,
-            "per_city": {c: {"scraped": 0, "imported": 0, "status": "queued"} for c in cities},
+            "per_city": {
+                c: {
+                    "scraped": 0,
+                    "imported": 0,
+                    "status": "queued",
+                    "sources": {
+                        "rightmove": {
+                            "status": "queued",
+                            "scraped": 0,
+                            "imported": 0,
+                            "error": None,
+                        },
+                        "zoopla": {
+                            "status": "queued",
+                            "scraped": 0,
+                            "imported": 0,
+                            "error": None,
+                        },
+                        "onthemarket": {
+                            "status": "queued",
+                            "scraped": 0,
+                            "imported": 0,
+                            "error": None,
+                        },
+                    },
+                }
+                for c in cities
+            },
         }
 
         _queue_batch_job(

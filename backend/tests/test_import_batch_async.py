@@ -65,6 +65,14 @@ def test_import_batch_async_returns_immediately_with_status_url(client, monkeypa
     assert s["batch_id"] == "batch-test-1"
     assert isinstance(s.get("per_city"), dict)
     assert set(s["per_city"].keys()) == {"London", "Birmingham"}
+    for city in ("London", "Birmingham"):
+        entry = s["per_city"][city]
+        assert isinstance(entry, dict)
+        assert isinstance(entry.get("sources"), dict)
+        assert set(entry["sources"].keys()) == {"rightmove", "zoopla", "onthemarket"}
+        for src in ("rightmove", "zoopla", "onthemarket"):
+            assert isinstance(entry["sources"][src], dict)
+            assert entry["sources"][src].get("status") in {"queued", "running", "success", "error"}
     assert s.get("status") in {"queued", "running", "success", "partial", "error"}
 
 
@@ -103,5 +111,10 @@ def test_import_batch_async_city_error_does_not_crash_job(client, monkeypatch):
     assert status.status_code == 200
     s = status.json()
     assert set(s["per_city"].keys()) == {"GoodCity", "BadCity"}
+    for city in ("GoodCity", "BadCity"):
+        entry = s["per_city"][city]
+        assert isinstance(entry, dict)
+        assert isinstance(entry.get("sources"), dict)
+        assert set(entry["sources"].keys()) == {"rightmove", "zoopla", "onthemarket"}
     # One city may still be queued/running, but the status endpoint must be readable.
     assert s.get("status") in {"queued", "running", "success", "partial", "error"}

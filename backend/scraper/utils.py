@@ -27,10 +27,13 @@ TARGET_CITIES = [
 def normalize_image_urls(urls: list[str]) -> list[str]:
     """Normalize a list of image URLs.
 
-    - Removes duplicates while preserving order
-    - Drops empty/whitespace entries
-    - Normalizes protocol-relative URLs (//...) to https://...
-    - Ensures returned URLs are absolute http/https URLs
+        - Drops empty/whitespace entries
+        - Normalizes protocol-relative URLs (//...) to https://...
+        - Ensures returned URLs are absolute http/https URLs
+        - Aggressively filters out non-listing assets (logos, SVGs, Next.js static assets)
+        - Deduplicates and prefers highest-resolution variants when duplicates exist
+            (e.g. Zoopla u/1024/768 over u/480/360)
+        - Strips Zoopla ':p' suffix variants when both exist (keeps the clean URL)
 
     Note: callers should pre-resolve relative paths (e.g. via urljoin(detail_url, u))
     before passing them here.
@@ -39,10 +42,125 @@ def normalize_image_urls(urls: list[str]) -> list[str]:
     if not urls:
         return []
 
-    out: list[str] = []
-    seen: set[str] = set()
+    _allowed_exts = (".jpg", ".jpeg", ".png", ".webp")
+    _excluded_substrings = (
+        "zoopla_static_agent_logo",
+        "error-image",
+        "_next/static",
+    )
 
-    for u in urls:
+    def _strip_zoopla_p_suffix(s: str) -> str:
+        # Zoopla sometimes returns URLs like `...jpg:p`.
+        return re.sub(r":p(?=\?|$)", "", s)
+
+    def _looks_like_photo_url(p) -> bool:
+        host = (p.netloc or "").lower()
+        path = (p.path or "").lower()
+        full = (p.geturl() or "").lower()
+
+        # Quick global excludes.
+        if ".svg" in full or path.endswith(".svg"):
+            return False
+        if any(x in full for x in _excluded_substrings):
+            return False
+
+        # Must be an image extension.
+        if not path.endswith(_allowed_exts):
+            return False
+
+        # Zoopla photos live on lid.zoocdn.com.
+        if "lid.zoocdn.com" in host:
+            return True
+
+        # OnTheMarket listing photos are on media.onthemarket.com under /properties/.
+        if host == "media.onthemarket.com":
+            if "/properties/" not in path:
+                return False
+            # Drop agent/company logos and non-photo documents (EPCs/floorplans).
+            if "/agents/" in path or "/companies/" in path or "logo" in path:
+                return False
+            if "epc" in path or "floorplan" in path:
+                return False
+            return True
+
+        # Rightmove listing photos generally come from media.rightmove.co.uk and include _IMG_.
+        if host == "media.rightmove.co.uk":
+            if any(x in path for x in ("brand_logo", "/assets/", "/customer/")):
+                return False
+            if any(x in path for x in ("industry-affiliation", "_flp_", "_epc_")):
+                return False
+            return "_img_" in path
+
+        return False
+
+    def _resolution_score(p) -> int:
+        host = (p.netloc or "").lower()
+        path = p.path or ""
+
+        # Zoopla format: /u/<w>/<h>/...ext
+        if "lid.zoocdn.com" in host:
+            m = re.search(r"/u/(?P<w>\d{2,5})/(?P<h>\d{2,5})/", path)
+            if m:
+                try:
+                    return int(m.group("w")) * int(m.group("h"))
+                except Exception:
+                    return 0
+
+        # OTM format: ...-1024x1024.webp
+        m = re.search(r"-(?P<w>\d{2,5})x(?P<h>\d{2,5})(?=\.(?:jpe?g|png|webp)$)", path, re.I)
+        if m:
+            try:
+                return int(m.group("w")) * int(m.group("h"))
+            except Exception:
+                return 0
+
+        # Rightmove sometimes uses _max_#### tokens.
+        m = re.search(r"_max_(?P<w>\d{2,5})", path, re.I)
+        if m:
+            try:
+                w = int(m.group("w"))
+                return w * w
+            except Exception:
+                return 0
+
+        return 0
+
+    def _canonical_key(p) -> str:
+        host = (p.netloc or "").lower()
+        path = p.path or ""
+
+        if "lid.zoocdn.com" in host:
+            # Deduplicate across size variants by the hashed filename.
+            filename = (path.rsplit("/", 1)[-1] or "").lower()
+            filename = re.sub(r"\.(?:jpe?g|png|webp)$", "", filename, flags=re.I)
+            return f"{host}/{filename}"
+
+        if host == "media.onthemarket.com":
+            # Deduplicate across size variants by stripping '-<w>x<h>' before extension.
+            p2 = re.sub(
+                r"-(\d{2,5})x(\d{2,5})(?=\.(?:jpe?g|png|webp)$)",
+                "",
+                path,
+                flags=re.IGNORECASE,
+            )
+            return f"{host}{p2.lower()}"
+
+        if host == "media.rightmove.co.uk":
+            # Deduplicate across max-size variants.
+            p2 = re.sub(
+                r"_max_[^./]+(?=\.(?:jpe?g|png|webp)$)",
+                "",
+                path,
+                flags=re.IGNORECASE,
+            )
+            return f"{host}{p2.lower()}"
+
+        return f"{host}{path.lower()}"
+
+    best_by_key: dict[str, tuple[int, int, str]] = {}
+    first_index: dict[str, int] = {}
+
+    for idx, u in enumerate(urls):
         if not isinstance(u, str):
             continue
         s = u.strip()
@@ -51,6 +169,9 @@ def normalize_image_urls(urls: list[str]) -> list[str]:
         if s.startswith("//"):
             s = "https:" + s
 
+        # Strip Zoopla ':p' variants early so extension checks work.
+        s = _strip_zoopla_p_suffix(s)
+
         try:
             p = urlparse(s)
         except Exception:
@@ -58,12 +179,30 @@ def normalize_image_urls(urls: list[str]) -> list[str]:
 
         if p.scheme not in ("http", "https") or not p.netloc:
             continue
+        if not _looks_like_photo_url(p):
+            continue
 
-        if s not in seen:
-            seen.add(s)
-            out.append(s)
+        key = _canonical_key(p)
+        score = _resolution_score(p)
 
-    return out
+        if key not in first_index:
+            first_index[key] = idx
+
+        existing = best_by_key.get(key)
+        if existing is None:
+            best_by_key[key] = (score, idx, s)
+            continue
+
+        best_score, best_idx, best_url = existing
+        # Prefer higher resolution; if tied, prefer earlier occurrence.
+        if score > best_score or (score == best_score and idx < best_idx):
+            best_by_key[key] = (score, idx, s)
+        else:
+            best_by_key[key] = (best_score, best_idx, best_url)
+
+    # Preserve the original order of distinct images (first time we saw each image key).
+    ordered_keys = sorted(first_index.items(), key=lambda kv: kv[1])
+    return [best_by_key[k][2] for k, _ in ordered_keys if k in best_by_key]
 
 
 try:

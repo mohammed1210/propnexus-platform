@@ -420,6 +420,7 @@ async def scrape_all_sources(
     *,
     zoopla_max_pages: int | None = None,
     onthemarket_max_pages: int | None = None,
+    on_source_complete: Any | None = None,
 ) -> List[Dict[str, Any]]:
     """Backwards-compatible async aggregator.
 
@@ -461,24 +462,38 @@ async def scrape_all_sources(
     if not loc:
         return []
 
-    results: List[Dict[str, Any]] = []
-
-    async def _extend_from(source: str, items: Any) -> None:
+    async def _collect_from(
+        source: str, items: Any
+    ) -> tuple[List[Dict[str, Any]], str, str | None]:
         if inspect.isawaitable(items):
             try:
                 items = await asyncio.wait_for(items, timeout=timeout_s)
             except asyncio.TimeoutError:
                 log(f"INFO: {source} timed out after {timeout_s}s for location={loc}")
-                return
+                return [], "timeout", None
         if not isinstance(items, list):
-            return
+            return [], "error", "non-list result"
 
         if len(items) == 0:
             log(f"INFO: {source} returned 0 properties for location={loc}")
+            return [], "empty", None
 
+        out: List[Dict[str, Any]] = []
         for raw in items:
             if isinstance(raw, dict):
-                results.append(normalize_record(raw, source=source))
+                out.append(normalize_record(raw, source=source))
+        return out, "success", None
+
+    tasks: List[asyncio.Task[tuple[str, List[Dict[str, Any]], str, str | None]]] = []
+
+    async def _run_source(
+        source: str, items: Any
+    ) -> tuple[str, List[Dict[str, Any]], str, str | None]:
+        try:
+            out, status, error = await _collect_from(source, items)
+            return source, out, status, error
+        except Exception as e:
+            return source, [], "error", str(e)
 
     # ---- Rightmove ----
     try:
@@ -490,9 +505,10 @@ async def scrape_all_sources(
             from scraper.rightmove_scraper import scrape_rightmove_properties  # type: ignore
 
         if inspect.iscoroutinefunction(scrape_rightmove_properties):
-            await _extend_from("rightmove", scrape_rightmove_properties(loc))
+            items = scrape_rightmove_properties(loc)
         else:
-            await _extend_from("rightmove", asyncio.to_thread(scrape_rightmove_properties, loc))
+            items = asyncio.to_thread(scrape_rightmove_properties, loc)
+        tasks.append(asyncio.create_task(_run_source("rightmove", items)))
     except Exception as e:
         warn(f"Rightmove scrape skipped/failed: {e}")
 
@@ -504,12 +520,10 @@ async def scrape_all_sources(
             from scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
 
         if inspect.iscoroutinefunction(scrape_zoopla_properties):
-            await _extend_from("zoopla", scrape_zoopla_properties(loc, max_pages=zoopla_max_pages))
+            items = scrape_zoopla_properties(loc, max_pages=zoopla_max_pages)
         else:
-            await _extend_from(
-                "zoopla",
-                asyncio.to_thread(scrape_zoopla_properties, loc, max_pages=zoopla_max_pages),
-            )
+            items = asyncio.to_thread(scrape_zoopla_properties, loc, max_pages=zoopla_max_pages)
+        tasks.append(asyncio.create_task(_run_source("zoopla", items)))
     except Exception as e:
         warn(f"Zoopla scrape skipped/failed: {e}")
 
@@ -523,19 +537,14 @@ async def scrape_all_sources(
             from scraper.onthemarket_scraper import scrape_onthemarket_properties  # type: ignore
 
         if inspect.iscoroutinefunction(scrape_onthemarket_properties):
-            await _extend_from(
-                "onthemarket",
-                scrape_onthemarket_properties(loc, max_pages=onthemarket_max_pages),
-            )
+            items = scrape_onthemarket_properties(loc, max_pages=onthemarket_max_pages)
         else:
-            await _extend_from(
-                "onthemarket",
-                asyncio.to_thread(
-                    scrape_onthemarket_properties,
-                    loc,
-                    max_pages=onthemarket_max_pages,
-                ),
+            items = asyncio.to_thread(
+                scrape_onthemarket_properties,
+                loc,
+                max_pages=onthemarket_max_pages,
             )
+        tasks.append(asyncio.create_task(_run_source("onthemarket", items)))
     except Exception as e:
         warn(f"OnTheMarket scrape skipped/failed: {e}")
 
@@ -554,11 +563,33 @@ async def scrape_all_sources(
                 from scraper.spare_room_scraper import scrape_spareroom_properties  # type: ignore
 
             if inspect.iscoroutinefunction(scrape_spareroom_properties):
-                await _extend_from("spareroom", scrape_spareroom_properties(loc))
+                items = scrape_spareroom_properties(loc)
             else:
-                await _extend_from("spareroom", asyncio.to_thread(scrape_spareroom_properties, loc))
+                items = asyncio.to_thread(scrape_spareroom_properties, loc)
+            tasks.append(asyncio.create_task(_run_source("spareroom", items)))
         except Exception as e:
             warn(f"SpareRoom scrape skipped/failed: {e}")
+
+    results: List[Dict[str, Any]] = []
+    if tasks:
+        # Stream results as sources finish so callers can surface progress.
+        for fut in asyncio.as_completed(tasks):
+            try:
+                source, chunk, status, error = await fut
+            except Exception as e:
+                warn(f"Scrape task failed: {e}")
+                continue
+
+            if on_source_complete:
+                try:
+                    maybe = on_source_complete(source, chunk, status, error)
+                    if inspect.isawaitable(maybe):
+                        await maybe
+                except Exception as e:
+                    warn(f"on_source_complete failed: {e}")
+
+            if isinstance(chunk, list):
+                results.extend([r for r in chunk if isinstance(r, dict)])
 
     # Drop empty rows (match ingest() logic)
     results = [r for r in results if r.get("title") or r.get("location") or r.get("price")]
