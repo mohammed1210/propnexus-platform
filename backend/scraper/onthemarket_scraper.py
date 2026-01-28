@@ -804,7 +804,9 @@ def _extract_external_id_and_url(
     return f"ot-{_stable_id(signature)}", listing_url
 
 
-async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[Dict[str, Any]]:
+async def scrape_onthemarket_properties(
+    location: str, limit: int = 50, *, max_pages: int | None = None
+) -> List[Dict[str, Any]]:
     """
     Scrape OnTheMarket properties for a given location.
 
@@ -824,17 +826,22 @@ async def scrape_onthemarket_properties(location: str, limit: int = 50) -> List[
     results: List[Dict[str, Any]] = []
     seen_ids = set()
 
-    max_pages = max(1, int(os.getenv("OT_MAX_PAGES", str(OT_MAX_PAGES))))
+    effective_max_pages = (
+        int(max_pages)
+        if max_pages is not None
+        else int(os.getenv("OT_MAX_PAGES", str(OT_MAX_PAGES)))
+    )
+    effective_max_pages = max(1, min(5, int(effective_max_pages)))
 
     with RunLog.start(
         source="onthemarket",
         mode=mode,
         location=location,
-        meta={"max_pages": max_pages},
+        meta={"max_pages": effective_max_pages},
     ) as runlog:
         try:
             async with aiohttp.ClientSession() as session:
-                for page in range(max_pages):
+                for page in range(effective_max_pages):
                     url = _build_search_url(location, page)
                     html = await _fetch_html(session, url)
                     if not html:

@@ -7,6 +7,22 @@ from urllib.parse import urlparse
 
 import aiohttp
 
+TARGET_CITIES = [
+    "London",
+    "Birmingham",
+    "Manchester",
+    "Leeds",
+    "Liverpool",
+    "Sheffield",
+    "Nottingham",
+    "Leicester",
+    "Bristol",
+    "Cardiff",
+    "Newcastle",
+    "Glasgow",
+    "Edinburgh",
+]
+
 
 def normalize_image_urls(urls: list[str]) -> list[str]:
     """Normalize a list of image URLs.

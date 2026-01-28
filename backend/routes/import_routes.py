@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Tuple
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel
 
+from backend.scraper.utils import TARGET_CITIES
+
 # Scrapers (existing)
 from backend.utils.ingest import scrape_all_sources
 from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run
@@ -486,6 +488,13 @@ class ImportRequest(BaseModel):
     location: str
 
 
+class BatchImportRequest(BaseModel):
+    cities: List[str] | None = None
+    max_pages: int = 1
+    delay_min_s: float = 0.5
+    delay_max_s: float = 1.5
+
+
 @router.post("/zoopla")
 async def import_zoopla(
     req: ImportRequest,
@@ -494,6 +503,12 @@ async def import_zoopla(
         False,
         alias="async",
         description="If true, queue scrape/upsert in background and return immediately",
+    ),
+    max_pages: int = Query(
+        1,
+        ge=1,
+        le=5,
+        description="Max pages to paginate (capped at 5)",
     ),
 ):
     # Optionally protect import endpoints in production.
@@ -510,13 +525,13 @@ async def import_zoopla(
         if run_async:
             _queue_scrape_and_upsert(
                 location=loc,
-                scrape_fn=lambda: scrape_zoopla_properties(loc),
+                scrape_fn=lambda: scrape_zoopla_properties(loc, max_pages=max_pages),
                 run_id=run_id,
                 source="zoopla",
             )
             return {"queued": True, "source": "zoopla", "location": loc}
 
-        items = await _maybe_await(scrape_zoopla_properties(loc))
+        items = await _maybe_await(scrape_zoopla_properties(loc, max_pages=max_pages))
         if not isinstance(items, list):
             items = []
     except Exception as e:
@@ -559,6 +574,12 @@ async def import_zoopla_get(
         alias="async",
         description="If true, queue scrape/upsert in background and return immediately",
     ),
+    max_pages: int = Query(
+        1,
+        ge=1,
+        le=5,
+        description="Max pages to paginate (capped at 5)",
+    ),
 ):
     # Keep backwards compatibility with operational curl usage:
     # `GET /import/zoopla?location=London`
@@ -566,6 +587,7 @@ async def import_zoopla_get(
         ImportRequest(location=location),
         x_admin_token=x_admin_token,
         run_async=run_async,
+        max_pages=max_pages,
     )
 
 
@@ -642,6 +664,12 @@ async def import_onthemarket(
         alias="async",
         description="If true, queue scrape/upsert in background and return immediately",
     ),
+    max_pages: int = Query(
+        1,
+        ge=1,
+        le=5,
+        description="Max pages to paginate (capped at 5)",
+    ),
 ):
     _require_admin(x_admin_token)
     loc = (req.location or "").strip()
@@ -657,13 +685,13 @@ async def import_onthemarket(
         if run_async:
             _queue_scrape_and_upsert(
                 location=loc,
-                scrape_fn=lambda: scrape_onthemarket_properties(loc),
+                scrape_fn=lambda: scrape_onthemarket_properties(loc, max_pages=max_pages),
                 run_id=run_id,
                 source="onthemarket",
             )
             return {"queued": True, "source": "onthemarket", "location": loc}
 
-        items = await _maybe_await(scrape_onthemarket_properties(loc))
+        items = await _maybe_await(scrape_onthemarket_properties(loc, max_pages=max_pages))
         if not isinstance(items, list):
             items = []
     except Exception as e:
@@ -694,6 +722,108 @@ async def import_onthemarket(
     warning = _scrape_zero_warning(loc, sources={"onthemarket": len(items)})
     if warning:
         payload["warning"] = warning
+    return payload
+
+
+@router.post("/batch")
+async def import_batch(
+    req: BatchImportRequest,
+    x_admin_token: str | None = Header(None),
+):
+    """Batch import across multiple UK cities.
+
+    This is intentionally sequential with small delays to reduce rate-limit risk.
+    """
+
+    import asyncio
+    import random
+
+    _require_admin(x_admin_token)
+
+    max_pages = max(1, min(5, int(req.max_pages or 1)))
+    delay_min = max(0.0, float(req.delay_min_s))
+    delay_max = max(delay_min, float(req.delay_max_s))
+
+    raw_cities = req.cities if req.cities else TARGET_CITIES
+    cities: List[str] = []
+    seen = set()
+    for c in raw_cities:
+        s = (c or "").strip()
+        if not s:
+            continue
+        key = s.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cities.append(s)
+
+    if not cities:
+        raise HTTPException(status_code=400, detail="No cities provided")
+
+    # Safety cap: keep the endpoint bounded.
+    cities = cities[:25]
+
+    run_id = create_scrape_run(source="batch", location=f"{len(cities)} cities")
+
+    total_items = 0
+    total_inserted = 0
+    per_city: Dict[str, Dict[str, Any]] = {}
+    scrape_error: str | None = None
+    db_error: str | None = None
+
+    try:
+        for i, city in enumerate(cities):
+            items = await _maybe_await(
+                scrape_all_sources(
+                    city,
+                    zoopla_max_pages=max_pages,
+                    onthemarket_max_pages=max_pages,
+                )
+            )
+            if not isinstance(items, list):
+                items = []
+
+            total_items += len(items)
+            inserted = 0
+            if items:
+                now_iso = _now_iso()
+                db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+                ok, e = _upsert_properties_rows(rows=db_rows)
+                if ok:
+                    inserted = len(db_rows)
+                    total_inserted += inserted
+                else:
+                    db_error = e
+
+            per_city[city] = {
+                "count": len(items),
+                "inserted": inserted,
+            }
+
+            if i < len(cities) - 1:
+                await asyncio.sleep(random.uniform(delay_min, delay_max))
+
+    except Exception as e:
+        scrape_error = str(e)
+
+    if db_error:
+        finish_scrape_run(run_id=run_id, status="error", count_inserted=0, error=db_error)
+    elif scrape_error:
+        finish_scrape_run(run_id=run_id, status="error", count_inserted=0, error=scrape_error)
+    else:
+        finish_scrape_run(run_id=run_id, status="success", count_inserted=total_inserted)
+
+    payload: Dict[str, Any] = {
+        "cities": cities,
+        "max_pages": max_pages,
+        "total_scraped": total_items,
+        "total_imported": total_inserted,
+        "per_city": per_city,
+    }
+    if scrape_error:
+        payload["scrape_error"] = scrape_error
+    if db_error:
+        payload["db_error"] = db_error
     return payload
 
 

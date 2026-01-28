@@ -1314,7 +1314,11 @@ def _extract_external_id_and_url(card: BeautifulSoup) -> tuple[str, Optional[str
 
 
 async def scrape_zoopla_properties(
-    location: str, limit: int = 40, background_tasks: BackgroundTasks | None = None
+    location: str,
+    limit: int = 40,
+    background_tasks: BackgroundTasks | None = None,
+    *,
+    max_pages: int | None = None,
 ) -> List[Dict[str, Any]]:
     log_scrape_start("zoopla", location, SCRAPER_MODE)
     stats = ScraperStats("zoopla", location)
@@ -1323,9 +1327,14 @@ async def scrape_zoopla_properties(
     # Start audit logging
     with RunLog.start(source="zoopla", mode=SCRAPER_MODE, location=location) as run_log:
         try:
-            max_pages = max(1, int(os.getenv("ZP_MAX_PAGES", str(ZP_MAX_PAGES))))
+            effective_max_pages = (
+                int(max_pages)
+                if max_pages is not None
+                else int(os.getenv("ZP_MAX_PAGES", str(ZP_MAX_PAGES)))
+            )
+            effective_max_pages = max(1, min(5, int(effective_max_pages)))
             async with aiohttp.ClientSession() as session:
-                for page in range(max_pages):
+                for page in range(effective_max_pages):
                     url = _build_search_url(location, page)
                     html = await _fetch_html(session, url)
                     if not html:

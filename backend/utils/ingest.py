@@ -415,7 +415,12 @@ def ingest(
 # We use lazy imports so missing optional scraper deps won't crash imports.
 
 
-async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
+async def scrape_all_sources(
+    location: str,
+    *,
+    zoopla_max_pages: int | None = None,
+    onthemarket_max_pages: int | None = None,
+) -> List[Dict[str, Any]]:
     """Backwards-compatible async aggregator.
 
     Tries to scrape supported sources and normalizes them into a single list.
@@ -499,9 +504,12 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
             from scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
 
         if inspect.iscoroutinefunction(scrape_zoopla_properties):
-            await _extend_from("zoopla", scrape_zoopla_properties(loc))
+            await _extend_from("zoopla", scrape_zoopla_properties(loc, max_pages=zoopla_max_pages))
         else:
-            await _extend_from("zoopla", asyncio.to_thread(scrape_zoopla_properties, loc))
+            await _extend_from(
+                "zoopla",
+                asyncio.to_thread(scrape_zoopla_properties, loc, max_pages=zoopla_max_pages),
+            )
     except Exception as e:
         warn(f"Zoopla scrape skipped/failed: {e}")
 
@@ -515,9 +523,19 @@ async def scrape_all_sources(location: str) -> List[Dict[str, Any]]:
             from scraper.onthemarket_scraper import scrape_onthemarket_properties  # type: ignore
 
         if inspect.iscoroutinefunction(scrape_onthemarket_properties):
-            await _extend_from("onthemarket", scrape_onthemarket_properties(loc))
+            await _extend_from(
+                "onthemarket",
+                scrape_onthemarket_properties(loc, max_pages=onthemarket_max_pages),
+            )
         else:
-            await _extend_from("onthemarket", asyncio.to_thread(scrape_onthemarket_properties, loc))
+            await _extend_from(
+                "onthemarket",
+                asyncio.to_thread(
+                    scrape_onthemarket_properties,
+                    loc,
+                    max_pages=onthemarket_max_pages,
+                ),
+            )
     except Exception as e:
         warn(f"OnTheMarket scrape skipped/failed: {e}")
 
