@@ -217,15 +217,37 @@ def _queue_batch_job(
                 db_upsert_ok = db_error is None
                 total_imported += int(imported or 0)
 
+                # City-level success should mean we actually got listings.
+                # If everything returns 0 (common when blocked), treat that as an error.
+                if scraped <= 0:
+                    city_status = "error"
+                    city_error = "no results"
+                elif db_upsert_ok and int(imported or 0) > 0:
+                    city_status = "success"
+                    city_error = None
+                elif db_upsert_ok and int(imported or 0) == 0:
+                    # Scraped something but wrote nothing (unexpected)
+                    city_status = "error"
+                    city_error = "scraped results but imported 0"
+                else:
+                    city_status = "error"
+                    city_error = db_error
+
                 _update_city(
                     batch_id,
                     city,
                     {
                         "scraped": scraped,
                         "imported": imported,
-                        "status": "success" if db_upsert_ok else "error",
-                        "error": db_error,
+                        "status": city_status,
+                        "error": city_error,
                     },
+                )
+
+                # Keep overall totals fresh while job is running.
+                _update_batch_job(
+                    batch_id,
+                    {"total_scraped": total_scraped, "total_imported": total_imported},
                 )
             except asyncio.TimeoutError:
                 for source in ("rightmove", "zoopla", "onthemarket"):
@@ -245,6 +267,10 @@ def _queue_batch_job(
                         "error": f"timeout after {per_city_timeout_s}s",
                     },
                 )
+                _update_batch_job(
+                    batch_id,
+                    {"total_scraped": total_scraped, "total_imported": total_imported},
+                )
             except Exception as e:
                 for source in ("rightmove", "zoopla", "onthemarket"):
                     _update_city_source(
@@ -257,6 +283,10 @@ def _queue_batch_job(
                     batch_id,
                     city,
                     {"scraped": 0, "imported": 0, "status": "error", "error": str(e)},
+                )
+                _update_batch_job(
+                    batch_id,
+                    {"total_scraped": total_scraped, "total_imported": total_imported},
                 )
 
             if i < len(cities) - 1:
