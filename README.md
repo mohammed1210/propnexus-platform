@@ -135,6 +135,24 @@ See environment examples for required variables.
 
 See [supabase/README.md](supabase/README.md) for detailed setup instructions.
 
+## Debug / Proof: Multi-image scraping
+
+**Admin-only endpoint (backend):**
+
+- `GET /debug/properties-with-multiple-images?limit=10`
+
+Returns property `id`, `source`, and `image_count` for listings where `image_urls` contains 2+ images.
+
+**SQL (Supabase):**
+
+```sql
+select id, source, jsonb_array_length(image_urls) as image_count
+from properties
+where image_urls is not null
+order by image_count desc
+limit 10;
+```
+
 ### 5. Run Development Servers
 
 **Frontend:**
