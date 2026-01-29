@@ -25,10 +25,15 @@ def _admin_headers():
 
     We'll try Bearer first.
     """
-    token = os.getenv("ADMIN_TOKEN", "") or os.getenv("API_KEY", "")
+    token = (
+        os.getenv("OFF_MARKET_ADMIN_TOKEN", "")
+        or os.getenv("IMPORT_ADMIN_TOKEN", "")
+        or os.getenv("ADMIN_TOKEN", "")
+        or os.getenv("API_KEY", "")
+    )
     if not token:
         # If no token in test env, we skip tests that require admin auth.
-        pytest.skip("ADMIN_TOKEN/API_KEY not set in test environment")
+        pytest.skip("Admin token not set in test environment")
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -186,3 +191,53 @@ def test_admin_backfill_scores_allows_token_but_may_500_without_supabase(monkeyp
         assert res.status_code == 500
     else:
         assert res.status_code == 200
+
+
+def test_admin_backfill_scores_updates_zero_score_rows():
+    if not _supabase_configured():
+        pytest.skip("Supabase not configured")
+
+    headers = _admin_headers()
+
+    from postgrest.exceptions import APIError
+
+    from supabase import create_client
+
+    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+    assert url and key
+    sb = create_client(url, key)
+
+    test_id = str(uuid.uuid4())
+    location = _random_location()
+
+    try:
+        # Insert a legacy-style row with score=0 so backfill should update it.
+        # This requires the polish migration (score column) to be present.
+        try:
+            sb.table("off_market_leads").insert(
+                {"id": test_id, "title": "Backfill Test", "location": location, "score": 0}
+            ).execute()
+        except APIError as e:
+            # If schema isn't migrated (missing score column), skip cleanly.
+            if getattr(e, "code", None) == "PGRST204":
+                pytest.skip("off_market_leads.score column not available in this environment")
+            raise
+
+        res = client.post("/off-market/admin/backfill-scores?limit=200", headers=headers)
+        assert res.status_code == 200
+        body = res.json()
+        assert "attempted" in body
+        assert "updated" in body
+
+        res_get = client.get(f"/off-market/{test_id}")
+        assert res_get.status_code == 200
+        row = res_get.json()
+        assert row.get("id") == test_id
+        assert int(row.get("score") or 0) != 0
+    finally:
+        # Cleanup best-effort
+        try:
+            sb.table("off_market_leads").delete().eq("id", test_id).execute()
+        except Exception:
+            pass

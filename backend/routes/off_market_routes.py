@@ -2,6 +2,7 @@ import logging
 import os
 import random
 import uuid
+from datetime import datetime, timezone
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
@@ -410,18 +411,47 @@ def backfill_off_market_scores(limit: int = Query(default=200, ge=1, le=500)) ->
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
     try:
-        res = (
+        select_cols = "id,asking_price,estimated_value,discount_percent,bedrooms,location,score"
+
+        # PostgREST OR filters can be brittle across schema cache updates.
+        # Use two queries and merge unique ids.
+        res_null = (
             supabase.table(OFF_MARKET_TABLE)
-            .select("id,asking_price,estimated_value,discount_percent,bedrooms,location,score")
-            .or_("score.is.null,score.eq.0")
+            .select(select_cols)
+            .is_("score", "null")
             .limit(int(limit))
             .execute()
         )
-        rows = res.data or []
-        if not isinstance(rows, list):
-            rows = []
+        null_rows = res_null.data or []
+        if not isinstance(null_rows, list):
+            null_rows = []
+
+        res_zero = (
+            supabase.table(OFF_MARKET_TABLE)
+            .select(select_cols)
+            .lte("score", 0)
+            .limit(int(limit))
+            .execute()
+        )
+        zero_rows = res_zero.data or []
+        if not isinstance(zero_rows, list):
+            zero_rows = []
+
+        logger.info(
+            "Backfill selection: null_score_rows=%s zero_or_negative_score_rows=%s",
+            len(null_rows),
+            len(zero_rows),
+        )
+
+        merged_by_id: dict[str, dict] = {}
+        for r in [*null_rows, *zero_rows]:
+            if isinstance(r, dict) and r.get("id"):
+                merged_by_id[str(r["id"])] = r
+
+        rows = list(merged_by_id.values())[: int(limit)]
 
         attempted = len(rows)
+        logger.info("Backfill attempting %s rows", attempted)
         updated = 0
         for r in rows:
             if not isinstance(r, dict):
@@ -456,7 +486,12 @@ def backfill_off_market_scores(limit: int = Query(default=200, ge=1, le=500)) ->
                 location=r.get("location"),
             )
 
-            update_payload = {"score": score}
+            update_payload = {
+                "score": score,
+                # If updated_at is present (it is in the polish migration), ensure it's updated.
+                # If a trigger exists, it will also set updated_at.
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
             if discount_percent is not None:
                 update_payload["discount_percent"] = discount_percent
 
