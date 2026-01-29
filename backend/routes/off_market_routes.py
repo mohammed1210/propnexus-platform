@@ -306,7 +306,7 @@ SortParam = Literal["score_desc", "created_at_desc"]
 
 @router.get("")
 def list_off_market_leads(
-    limit: int = Query(default=20, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=200),
     location: Optional[str] = Query(default=None),
     investment_type: Optional[str] = Query(default=None),
     min_price: Optional[float] = Query(default=None),
