@@ -4,8 +4,7 @@ import React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
-import { getSupabase } from '@/lib/supabaseClient';
-import { apiPost } from '@/lib/api';
+import { API_BASE, apiPost, safeFetch } from '@/lib/api';
 import AddDealForm from '@/components/offMarket/AddDealForm';
 import OffMarketFilters from '@/components/offMarket/OffMarketFilters';
 import OffMarketCard from '@/components/offMarket/OffMarketCard';
@@ -18,15 +17,30 @@ type DBRow = {
   id: string;
   title?: string | null;
   location?: string | null;
+  asking_price?: number | null;
   price?: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
   investment_type?: string | null;
   contact?: string | null;
+  contact_email?: string | null;
   source?: string | null;
   notes?: string | null;
   created_at?: string | null;
-  image_url?: string | null; // display if present
+  updated_at?: string | null;
+  score?: number | null;
+  image_url?: string | null;
+  imageurl?: string | null;
+  address?: string | null;
+  postcode?: string | null;
+  estimated_value?: number | null;
+  refurb_cost?: number | null;
+  rent_potential?: number | null;
+  discount_percent?: number | null;
+  investment_score?: number | null;
+  agent_name?: string | null;
+  agent_phone?: string | null;
+  status?: string | null;
 };
 
 export const dynamic = 'force-dynamic';
@@ -44,35 +58,33 @@ export default function OffMarketPage() {
   const [count, setCount] = useState<string>('3');
   const [generating, setGenerating] = useState(false);
 
-  const sb = useMemo(() => getSupabase(), []);
+  const loadRows = async () => {
+    const data = await safeFetch<DBRow[]>(`${API_BASE}/off-market?limit=200&sort=score_desc`);
+    setRows((data as DBRow[]) ?? []);
+  };
 
   // load existing
   useEffect(() => {
     let ignore = false;
     (async () => {
       setLoading(true);
-      const { data, error } = await sb
-        .from('off_market_deals')
-        .select('*')
-        .order('created_at', { ascending: false });
-
       if (!ignore) {
-        if (error) console.error('off_market_deals', error);
-        setRows((data as DBRow[]) ?? []);
+        try {
+          await loadRows();
+        } catch (e) {
+          console.error('off_market_leads', e);
+          setRows([]);
+        }
         setLoading(false);
       }
     })();
     return () => {
       ignore = true;
     };
-  }, [sb]);
+  }, []);
 
   const refreshRows = async () => {
-    const { data } = await sb
-      .from('off_market_deals')
-      .select('*')
-      .order('created_at', { ascending: false });
-    setRows((data as DBRow[]) ?? []);
+    await loadRows();
   };
 
   // map db rows to UI model and apply filters
@@ -81,13 +93,30 @@ export default function OffMarketPage() {
       id: r.id,
       title: r.title || 'Untitled',
       location: r.location,
-      price: r.price ?? null,
+      asking_price: r.asking_price ?? null,
+      price: (r.asking_price ?? r.price) ?? null,
       bedrooms: r.bedrooms ?? null,
       bathrooms: r.bathrooms ?? null,
       notes: r.notes ?? null,
       source: r.source ?? null,
       created_at: r.created_at ?? null,
-      image_url: r.image_url ?? null,
+      updated_at: r.updated_at ?? null,
+      image_url: (r.image_url ?? r.imageurl) ?? null,
+      imageurl: (r.imageurl ?? r.image_url) ?? null,
+      score: r.score ?? null,
+      investment_score: (r.score ?? r.investment_score) ?? null,
+      investment_type: r.investment_type ?? null,
+      contact_email: (r.contact_email ?? r.contact) ?? null,
+
+      address: r.address ?? null,
+      postcode: r.postcode ?? null,
+      estimated_value: r.estimated_value ?? null,
+      refurb_cost: r.refurb_cost ?? null,
+      rent_potential: r.rent_potential ?? null,
+      discount_percent: r.discount_percent ?? null,
+      agent_name: r.agent_name ?? null,
+      agent_phone: r.agent_phone ?? null,
+      status: r.status ?? null,
     }));
 
     let list = mapped.map(ensureDerivedFields);
@@ -134,41 +163,15 @@ export default function OffMarketPage() {
         location: loc,
         budget: numBudget,
         count: numCount,
+        investment_type: 'HMO',
       });
 
       const parsed = Array.isArray(res.deals) ? res.deals : [];
       if (parsed.length === 0) throw new Error('Generator returned no deals.');
 
-      const nowIso = new Date().toISOString();
-      const payload = parsed.map((p: any, i: number) => ({
-        title: p.title || p.address || `Off-market deal ${i + 1}`,
-        location: p.location || loc,
-        price: Number(p.price ?? p.asking_price ?? 0) || null,
-        bedrooms: p.bedrooms != null ? Number(p.bedrooms) : null,
-        bathrooms: p.bathrooms != null ? Number(p.bathrooms) : null,
-        investment_type: p.investment_type || 'HMO',
-        contact: p.contact || null,
-        source: 'AI generated',
-        notes: p.description || p.notes || null,
-        created_at: nowIso,
-        image_url: null,
-      }));
-
-      const existingKey = new Set(
-        rows.map((r) => `${(r.title || '').trim().toLowerCase()}|${r.price ?? ''}`),
-      );
-      const toInsert = payload.filter(
-        (d) => !existingKey.has(`${(d.title || '').trim().toLowerCase()}|${d.price ?? ''}`),
-      );
-      if (toInsert.length === 0) {
-        alert('No new unique deals to insert.');
-        return;
-      }
-
-      const { data, error } = await sb.from('off_market_deals').insert(toInsert).select('*');
-      if (error) throw error;
-
-      setRows((prev) => [...(data as DBRow[]), ...prev]);
+      // Backend already inserted; just merge results and refresh.
+      setRows((prev) => [...(parsed as DBRow[]), ...prev]);
+      await refreshRows();
     } catch (err: any) {
       console.error(err);
       alert(err?.message || 'Failed to generate / save deals.');

@@ -45,6 +45,25 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 )
 
+# Rotate user agents for OTM only. Keep small list to reduce maintenance.
+_USER_AGENT_POOL = [
+    USER_AGENT,
+    (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    ),
+    (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    ),
+]
+
+_ACCEPT_LANGUAGE_POOL = [
+    "en-GB,en;q=0.9",
+    "en-GB,en;q=0.9,fr;q=0.6",
+    "en-US,en;q=0.9,en-GB;q=0.8",
+]
+
 # NOTE: Avoid overly-broad markers like "robot" which cause false positives due to
 # common meta tags (e.g. <meta name="robots" ...>) on normal pages.
 CAPTCHA_KEYWORDS = [
@@ -351,7 +370,42 @@ SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 OT_MAX_PAGES = int(os.getenv("OT_MAX_PAGES", "1"))
 OT_DELAY_MS = int(os.getenv("OT_DELAY_MS", "900"))  # delay between pages (ms)
+
+# OTM-only request pacing. Keep modest by default.
+OTM_MIN_REQUEST_DELAY_MS = int(os.getenv("OTM_MIN_REQUEST_DELAY_MS", "250"))
+OTM_MAX_REQUEST_DELAY_MS = int(os.getenv("OTM_MAX_REQUEST_DELAY_MS", "900"))
+OTM_ROTATE_HEADERS = (os.getenv("OTM_ROTATE_HEADERS", "1") or "1").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
 SCRAPERAPI_BASE = "https://api.scraperapi.com/"
+
+
+def _otm_headers() -> Dict[str, str]:
+    ua = USER_AGENT
+    lang = "en-GB,en;q=0.9"
+    if OTM_ROTATE_HEADERS:
+        ua = random.choice(_USER_AGENT_POOL)
+        lang = random.choice(_ACCEPT_LANGUAGE_POOL)
+
+    # Keep headers minimal; ScraperAPI keep_headers=true forwards them.
+    return {
+        "User-Agent": ua,
+        "Accept-Language": lang,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Referer": "https://www.onthemarket.com/",
+        "DNT": "1",
+    }
+
+
+async def _otm_request_jitter() -> None:
+    lo = max(0, int(OTM_MIN_REQUEST_DELAY_MS))
+    hi = max(lo, int(OTM_MAX_REQUEST_DELAY_MS))
+    if hi <= 0:
+        return
+    await asyncio.sleep(random.uniform(lo, hi) / 1000.0)
 
 
 def make_scraperapi_url(
@@ -359,6 +413,8 @@ def make_scraperapi_url(
     *,
     render: bool = True,
     premium: bool = False,
+    keep_headers: bool = True,
+    country_code: str | None = "gb",
     session_number: Optional[str] = None,
 ) -> str:
     """
@@ -378,11 +434,11 @@ def make_scraperapi_url(
     if not api_key:
         return target_url
 
-    params = {
+    params: Dict[str, str | None] = {
         "api_key": api_key,
         "render": "true" if render else None,
-        "country_code": "gb",
-        "keep_headers": "true",
+        "country_code": country_code,
+        "keep_headers": "true" if keep_headers else None,
         "premium": "true" if premium else None,
         "url": target_url,
     }
@@ -426,8 +482,16 @@ def _looks_blocked(html: str, status: int) -> bool:
     if any(k in lowered for k in strong_markers):
         return True
 
-    # For status-based blocks, require additional evidence.
+    # Status-based blocks: be conservative (treat as blocked if the body looks empty/challenge-like).
     if int(status) in (403, 429, 503):
+        if _has_cloudflare_marker(lowered):
+            return True
+        if not (html or "").strip():
+            return True
+        if len(lowered) < 1500:
+            return True
+        if "onthemarket" not in lowered:
+            return True
         return False
 
     return False
@@ -463,152 +527,148 @@ def _build_search_url(location: str, page: int = 0) -> str:
 
 async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str) -> Optional[str]:
     """Internal fetch function with retry logic."""
-    headers = {"User-Agent": USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
-
     # Determine which URL to fetch based on SCRAPER_MODE
     mode = os.getenv("SCRAPER_MODE", "direct").lower()
 
+    # Build a progressive attempt chain. This is OTM-only and should not affect other scrapers.
+    attempts: List[Dict[str, Any]] = []
     if mode == "scraperapi":
-        # Use ScraperAPI mode - wrap the URL with ScraperAPI
         if not SCRAPERAPI_KEY:
-            # No API key configured, fall back to direct with warning
             print(
                 "⚠️ SCRAPER_MODE=scraperapi but SCRAPERAPI_KEY not set, falling back to direct fetch"
             )
-            url_to_fetch = url
+            attempts.append({"via": "direct", "url": url, "timeout": 30})
         else:
-            # Use ScraperAPI with rendering for HTML fallback
-            url_to_fetch = make_scraperapi_url(url, render=True)
             print(f"ℹ️ Using ScraperAPI for OnTheMarket HTML fetch: {url}")
-    else:
-        # Direct mode - use original URL
-        url_to_fetch = url
-
-    # Fetch the URL (either direct or via ScraperAPI)
-    try:
-        timeout_value = 60 if mode == "scraperapi" else 30
-        req = session.get(url_to_fetch, headers=headers, timeout=timeout_value)
-
-        # If tests mock session.get as AsyncMock, req is awaitable.
-        if inspect.isawaitable(req):
-            req = await req
-
-        async with req as resp:
-            text = await resp.text()
-            status = getattr(resp, "status", 0)
-            log_fetch_diagnostics(
-                "onthemarket",
-                url,
-                status=int(status),
-                text=text,
-                via="scraperapi" if mode == "scraperapi" else "direct",
-            )
-
-            blocked = (
-                _looks_blocked(text, status)
-                or _has_cloudflare_marker(text)
-                or not (text or "").strip()
-            )
-
-            hit = _captcha_hit_snippet(text)
-            if hit:
-                print(f"⚠️ [onthemarket] captcha_detected=true {hit}")
-
-            if mode == "scraperapi" and blocked and SCRAPERAPI_KEY:
-                premium_url = make_scraperapi_url(
-                    url,
-                    render=True,
-                    premium=True,
-                    session_number=str(random.randint(1, 999999)),
-                )
-                try:
-                    premium_req = session.get(premium_url, headers=headers, timeout=75)
-                    if inspect.isawaitable(premium_req):
-                        premium_req = await premium_req
-                    async with premium_req as p_resp:
-                        p_text = await p_resp.text()
-                        p_status = getattr(p_resp, "status", 0)
-                        log_fetch_diagnostics(
-                            "onthemarket",
-                            url,
-                            status=int(p_status),
-                            text=p_text,
-                            via="scraperapi-premium",
-                        )
-                        premium_blocked = (
-                            _looks_blocked(p_text, int(p_status))
-                            or _has_cloudflare_marker(p_text)
-                            or not (p_text or "").strip()
-                        )
-                        if not premium_blocked:
-                            return p_text
-                except Exception:
-                    return None
-
-            # If direct mode and we detect blocking, try ScraperAPI as fallback
-            if mode == "direct" and blocked and SCRAPERAPI_KEY:
-                log_scraperapi_fallback("onthemarket", url)
-                proxy_url = make_scraperapi_url(url, render=True)
-                print(f"ℹ️ Fallback to ScraperAPI for blocked URL: {url}")
-                try:
-                    proxy_req = session.get(proxy_url, headers=headers, timeout=60)
-                    if inspect.isawaitable(proxy_req):
-                        proxy_req = await proxy_req
-
-                    async with proxy_req as p_resp:
-                        p_text = await p_resp.text()
-                        p_status = getattr(p_resp, "status", 0)
-                        log_fetch_diagnostics(
-                            "onthemarket",
-                            url,
-                            status=int(p_status),
-                            text=p_text,
-                            via="scraperapi-fallback",
-                        )
-
-                        blocked_proxy = (
-                            _looks_blocked(p_text, int(p_status))
-                            or _has_cloudflare_marker(p_text)
-                            or not (p_text or "").strip()
-                        )
-                        if not blocked_proxy:
-                            return p_text
-
-                        premium_url = make_scraperapi_url(
+            attempts.extend(
+                [
+                    {
+                        "via": "scraperapi",
+                        "url": make_scraperapi_url(
+                            url, render=True, premium=False, keep_headers=True
+                        ),
+                        "timeout": 60,
+                    },
+                    {
+                        "via": "scraperapi-premium",
+                        "url": make_scraperapi_url(
                             url,
                             render=True,
                             premium=True,
+                            keep_headers=True,
                             session_number=str(random.randint(1, 999999)),
-                        )
-                        premium_req = session.get(premium_url, headers=headers, timeout=75)
-                        if inspect.isawaitable(premium_req):
-                            premium_req = await premium_req
-                        async with premium_req as pp_resp:
-                            pp_text = await pp_resp.text()
-                            pp_status = getattr(pp_resp, "status", 0)
-                            log_fetch_diagnostics(
-                                "onthemarket",
-                                url,
-                                status=int(pp_status),
-                                text=pp_text,
-                                via="scraperapi-premium-fallback",
-                            )
-                            blocked_premium = (
-                                _looks_blocked(pp_text, int(pp_status))
-                                or _has_cloudflare_marker(pp_text)
-                                or not (pp_text or "").strip()
-                            )
-                            return None if blocked_premium else pp_text
-                except Exception:
-                    return None
+                        ),
+                        "timeout": 75,
+                    },
+                    # Some sites behave better when ScraperAPI does not forward headers.
+                    {
+                        "via": "scraperapi-premium-noheaders",
+                        "url": make_scraperapi_url(
+                            url,
+                            render=True,
+                            premium=True,
+                            keep_headers=False,
+                            session_number=str(random.randint(1, 999999)),
+                        ),
+                        "timeout": 90,
+                    },
+                    {
+                        "via": "scraperapi-noheaders",
+                        "url": make_scraperapi_url(
+                            url,
+                            render=True,
+                            premium=False,
+                            keep_headers=False,
+                            session_number=str(random.randint(1, 999999)),
+                        ),
+                        "timeout": 90,
+                    },
+                ]
+            )
+    else:
+        attempts.append({"via": "direct", "url": url, "timeout": 30})
+        if SCRAPERAPI_KEY:
+            attempts.extend(
+                [
+                    {
+                        "via": "scraperapi-fallback",
+                        "url": make_scraperapi_url(
+                            url, render=True, premium=False, keep_headers=True
+                        ),
+                        "timeout": 60,
+                    },
+                    {
+                        "via": "scraperapi-premium-fallback",
+                        "url": make_scraperapi_url(
+                            url,
+                            render=True,
+                            premium=True,
+                            keep_headers=True,
+                            session_number=str(random.randint(1, 999999)),
+                        ),
+                        "timeout": 75,
+                    },
+                    {
+                        "via": "scraperapi-premium-noheaders-fallback",
+                        "url": make_scraperapi_url(
+                            url,
+                            render=True,
+                            premium=True,
+                            keep_headers=False,
+                            session_number=str(random.randint(1, 999999)),
+                        ),
+                        "timeout": 90,
+                    },
+                ]
+            )
 
-            # If it still looks blocked, return the HTML anyway so downstream parsing
-            # + validation can decide whether there are usable cards. In practice,
-            # some responses trip keyword heuristics while still containing listings.
-            if blocked:
-                return text
+    last_text: Optional[str] = None
+    try:
+        for idx, attempt in enumerate(attempts):
+            via = str(attempt.get("via") or "")
+            url_to_fetch = str(attempt.get("url") or url)
+            timeout_value = int(attempt.get("timeout") or (60 if mode == "scraperapi" else 30))
+            headers = _otm_headers()
 
-            return text
+            # In direct mode, only log ScraperAPI fallback when we believe we were blocked.
+            if idx > 0 and mode == "direct" and via.startswith("scraperapi"):
+                log_scraperapi_fallback("onthemarket", url)
+
+            await _otm_request_jitter()
+            req = session.get(url_to_fetch, headers=headers, timeout=timeout_value)
+
+            # If tests mock session.get as AsyncMock, req is awaitable.
+            if inspect.isawaitable(req):
+                req = await req
+
+            async with req as resp:
+                text = await resp.text()
+                status = getattr(resp, "status", 0)
+                last_text = text
+                log_fetch_diagnostics(
+                    "onthemarket",
+                    url,
+                    status=int(status),
+                    text=text,
+                    via=via or ("scraperapi" if mode == "scraperapi" else "direct"),
+                )
+
+                blocked = (
+                    _looks_blocked(text, int(status))
+                    or _has_cloudflare_marker(text)
+                    or not (text or "").strip()
+                )
+
+                hit = _captcha_hit_snippet(text)
+                if hit:
+                    print(f"⚠️ [onthemarket] captcha_detected=true {hit}")
+
+                if not blocked:
+                    return text
+
+        # If it still looks blocked, return the last HTML anyway so downstream parsing
+        # + validation can decide whether there are usable cards.
+        return last_text
     except Exception as e:
         # On exception in scraperapi mode, we already tried ScraperAPI, so just fail
         if mode == "scraperapi":
@@ -620,7 +680,7 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
             print(f"⚠️ Direct fetch failed, trying ScraperAPI fallback: {e}")
             try:
                 proxy_url = make_scraperapi_url(url, render=True)
-                proxy_req = session.get(proxy_url, headers=headers, timeout=60)
+                proxy_req = session.get(proxy_url, headers=_otm_headers(), timeout=60)
                 if inspect.isawaitable(proxy_req):
                     proxy_req = await proxy_req
 
@@ -865,6 +925,29 @@ async def scrape_onthemarket_properties(
                                     detail_html = await _fetch_html(session, detail_url)
                                 except Exception:
                                     detail_html = None
+                                if detail_html and (
+                                    _looks_blocked(detail_html, 200)
+                                    or _has_cloudflare_marker(detail_html)
+                                    or not (detail_html or "").strip()
+                                ):
+                                    detail_html = None
+                                if not detail_html and PLAYWRIGHT_ENABLE:
+                                    try:
+                                        detail_html = (
+                                            await render_page_capture(
+                                                detail_url,
+                                                selectors=[
+                                                    "meta[property='og:title']",
+                                                    "script[type='application/ld+json']",
+                                                ],
+                                                click_selectors=[
+                                                    "#ccc-recommended-settings",
+                                                    "#ccc-accept-settings",
+                                                ],
+                                            )
+                                        )[0]
+                                    except Exception:
+                                        detail_html = None
                                 if not detail_html:
                                     continue
                                 parsed = _parse_otm_detail_page(
@@ -1000,6 +1083,29 @@ async def scrape_onthemarket_properties(
                                     detail_html = await _fetch_html(session, listing_url)
                                 except Exception:
                                     detail_html = None
+                                if detail_html and (
+                                    _looks_blocked(detail_html, 200)
+                                    or _has_cloudflare_marker(detail_html)
+                                    or not (detail_html or "").strip()
+                                ):
+                                    detail_html = None
+                                if not detail_html and PLAYWRIGHT_ENABLE:
+                                    try:
+                                        detail_html = (
+                                            await render_page_capture(
+                                                listing_url,
+                                                selectors=[
+                                                    "meta[property='og:title']",
+                                                    "script[type='application/ld+json']",
+                                                ],
+                                                click_selectors=[
+                                                    "#ccc-recommended-settings",
+                                                    "#ccc-accept-settings",
+                                                ],
+                                            )
+                                        )[0]
+                                    except Exception:
+                                        detail_html = None
                                 if detail_html:
                                     try:
                                         detail_imgs = _extract_otm_gallery_image_urls(

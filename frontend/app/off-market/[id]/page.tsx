@@ -10,7 +10,7 @@ import Image from 'next/image';
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
 import PageWrapper from '@/components/PageWrapper';
-import { getSupabase } from '@/lib/supabaseClient';
+import { API_BASE, safeFetch } from '@/lib/api';
 import type { OffMarketDeal } from '@/lib/offmarket/types';
 import { ensureDerivedFields, formatCurrency, formatDate } from '@/lib/offmarket/utils';
 
@@ -22,7 +22,6 @@ type PageProps = {
 
 export default function DealDetail({ params }: PageProps) {
   const [id, setId] = useState<string | null>(null);
-  const sb = useMemo(() => getSupabase(), []);
   const [row, setRow] = useState<OffMarketDeal | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -44,31 +43,39 @@ export default function DealDetail({ params }: PageProps) {
     let ignore = false;
     (async () => {
       setLoading(true);
-      const { data, error } = await sb
-        .from('off_market_deals')
-        .select('*')
-        .eq('id', id)
-        .limit(1)
-        .maybeSingle();
       if (ignore) return;
-      if (error) {
-        console.error(error);
-        setRow(null);
-      } else if (data) {
+      try {
+        const data = await safeFetch<any>(`${API_BASE}/off-market/${id}`);
         const mapped: OffMarketDeal = {
           id: data.id,
           title: data.title || 'Untitled',
           location: data.location,
-          price: data.price ?? null,
+          asking_price: data.asking_price ?? null,
+          price: (data.asking_price ?? data.price) ?? null,
           bedrooms: data.bedrooms ?? null,
           bathrooms: data.bathrooms ?? null,
           notes: data.notes ?? null,
           source: data.source ?? null,
           created_at: data.created_at ?? null,
+          updated_at: data.updated_at ?? null,
           image_url: data.image_url ?? null,
+          imageurl: data.imageurl ?? null,
+
+          address: data.address ?? null,
+          postcode: data.postcode ?? null,
+          estimated_value: data.estimated_value ?? null,
+          refurb_cost: data.refurb_cost ?? null,
+          rent_potential: data.rent_potential ?? null,
+          discount_percent: data.discount_percent ?? null,
+          score: data.score ?? null,
+          investment_score: (data.score ?? data.investment_score) ?? null,
+          agent_name: data.agent_name ?? null,
+          agent_phone: data.agent_phone ?? null,
+          status: data.status ?? null,
         };
         setRow(ensureDerivedFields(mapped));
-      } else {
+      } catch (e) {
+        console.error(e);
         setRow(null);
       }
       setLoading(false);
@@ -76,7 +83,7 @@ export default function DealDetail({ params }: PageProps) {
     return () => {
       ignore = true;
     };
-  }, [sb, id]);
+  }, [id]);
 
   return (
     <PageWrapper showOrbs={false}>
@@ -93,15 +100,17 @@ export default function DealDetail({ params }: PageProps) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
               <div className="card overflow-hidden">
-                {row.image_url ? (
+                {row.image_url || row.imageurl ? (
                   <div className="relative w-full h-80 bg-zinc-100 dark:bg-zinc-800">
                     <Image
-                      src={row.image_url}
+                      src={row.image_url || row.imageurl || ''}
                       alt={row.title}
                       fill
                       sizes="(max-width: 1024px) 100vw, 66vw"
                       className="object-cover"
-                      unoptimized={row.image_url.includes('supabase') ? false : true}
+                      unoptimized={
+                        (row.image_url || row.imageurl || '').includes('supabase') ? false : true
+                      }
                     />
                   </div>
                 ) : (

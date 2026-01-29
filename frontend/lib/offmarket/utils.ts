@@ -16,18 +16,25 @@ export function computeInvestmentScore(deal: Partial<OffMarketDeal>): number {
 }
 
 export function ensureDerivedFields(deal: OffMarketDeal): OffMarketDeal {
-  const price = toNum(deal.price);
+  const price = toNum(deal.asking_price ?? deal.price);
   const value = toNum(deal.estimated_value);
   let discount: number | null = deal.discount_percent ?? null;
   if (discount == null && price && value) {
     discount = ((value - price) / value) * 100;
   }
   const score =
-    deal.investment_score != null ? deal.investment_score : computeInvestmentScore(deal);
+    deal.score != null
+      ? deal.score
+      : deal.investment_score != null
+        ? deal.investment_score
+        : computeInvestmentScore({ ...deal, price });
   return {
     ...deal,
+    asking_price: deal.asking_price ?? price,
+    price: deal.price ?? price,
     discount_percent: discount,
     investment_score: score,
+    score,
   };
 }
 

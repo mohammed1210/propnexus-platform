@@ -76,18 +76,26 @@ export default function AddDealForm({ onCreated }: Props) {
       const payload = {
         title: f.title || null,
         location: f.location || null,
-        price: f.price ? Number(f.price) : null,
+        asking_price: f.price ? Number(f.price) : null,
         bedrooms: f.bedrooms ? Number(f.bedrooms) : null,
         bathrooms: f.bathrooms ? Number(f.bathrooms) : null,
         investment_type: f.investment_type || null,
-        contact: f.contact || null,
+        contact_email: f.contact || null,
         source: f.source || 'Manual',
         notes: f.notes || null,
-        image_url: imageUrl, // <-- shows on the card
+        imageurl: imageUrl,
+        image_url: imageUrl,
       };
 
-      const { error: insertErr } = await sb.from('off_market_deals').insert([payload]);
-      if (insertErr) throw insertErr;
+      const res = await fetch('/api/off-market/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || `Failed to create deal (${res.status})`);
+      }
 
       // 3) Reset + notify parent
       setF(initialState);

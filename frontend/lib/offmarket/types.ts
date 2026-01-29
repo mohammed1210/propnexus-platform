@@ -3,13 +3,21 @@ export interface OffMarketDeal {
   // core
   title: string;
   location?: string | null;
+  asking_price?: number | null;
   price?: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
   notes?: string | null;
   source?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
   image_url?: string | null;
+  score?: number | null;
+  investment_type?: string | null;
+  property_type?: string | null;
+  contact_email?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 
   // spark-extended (optional in DB)
   address?: string | null;

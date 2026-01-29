@@ -2,6 +2,7 @@
 
 import os
 
+import httpx
 import pytest
 
 from supabase import create_client
@@ -40,7 +41,10 @@ def test_required_columns_exist(table, columns):
     sb = create_client(url, key)
 
     # If the table has 0 rows, res.data can be empty – don’t crash
-    res = sb.table(table).select("*").limit(1).execute()
+    try:
+        res = sb.table(table).select("*").limit(1).execute()
+    except httpx.HTTPError as exc:
+        pytest.skip(f"Supabase not reachable ({type(exc).__name__}): {exc}")
 
     existing = set(res.data[0].keys()) if res.data else set()
 

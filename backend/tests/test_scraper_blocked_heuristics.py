@@ -27,6 +27,11 @@ def test_onthemarket_looks_blocked_flags_human_challenge_phrase():
     assert otm._looks_blocked(html, 200) is True
 
 
+def test_onthemarket_looks_blocked_flags_short_403_body():
+    html = "<html><head><title>Access denied</title></head><body>Denied</body></html>"
+    assert otm._looks_blocked(html, 403) is True
+
+
 def test_zoopla_extract_next_data_from_html_regex_fallback():
     html = (
         "<html><head></head><body>"
