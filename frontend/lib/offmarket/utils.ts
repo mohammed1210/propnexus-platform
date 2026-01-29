@@ -22,12 +22,14 @@ export function ensureDerivedFields(deal: OffMarketDeal): OffMarketDeal {
   if (discount == null && price && value) {
     discount = ((value - price) / value) * 100;
   }
-  const score =
-    deal.score != null
-      ? deal.score
-      : deal.investment_score != null
-        ? deal.investment_score
-        : computeInvestmentScore({ ...deal, price });
+
+  // Backward-compat: older rows may have score=0 simply because the column
+  // didn't exist yet when the row was created. Treat 0 as "missing" so we can
+  // fall back to a derived score for display.
+  const backendScore = deal.score != null && deal.score > 0 ? deal.score : null;
+  const legacyScore =
+    deal.investment_score != null && deal.investment_score > 0 ? deal.investment_score : null;
+  const score = backendScore ?? legacyScore ?? computeInvestmentScore({ ...deal, price });
   return {
     ...deal,
     asking_price: deal.asking_price ?? price,
