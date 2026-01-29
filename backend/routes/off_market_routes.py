@@ -22,7 +22,13 @@ supabase: Optional[Client] = (
     create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 )
 
-ADMIN_TOKEN = os.getenv("OFF_MARKET_ADMIN_TOKEN", "").strip()
+ADMIN_TOKEN = (
+    os.getenv("OFF_MARKET_ADMIN_TOKEN")
+    or os.getenv("IMPORT_ADMIN_TOKEN")
+    or os.getenv("ADMIN_TOKEN")
+    or os.getenv("API_KEY")
+    or ""
+).strip()
 OFF_MARKET_TABLE = "off_market_leads"
 
 
@@ -124,6 +130,7 @@ class CreateDealRequest(BaseModel):
     image_url: Optional[str] = None
     imageurl: Optional[str] = None
     cover_photo_url: Optional[str] = None
+    image_urls: Optional[List[str]] = None
 
     @field_validator("title", "location")
     @classmethod
@@ -154,6 +161,7 @@ class CreateDealResponse(BaseModel):
     score: Optional[int] = None
     imageurl: Optional[str] = None
     image_url: Optional[str] = None
+    image_urls: Optional[List[str]] = None
 
 
 # ---------- Routes ----------
@@ -168,10 +176,15 @@ def create_off_market_deal(payload: CreateDealRequest):
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
+    image_urls: List[str] = []
+    if payload.image_urls and isinstance(payload.image_urls, list):
+        image_urls = [str(u).strip() for u in payload.image_urls if str(u).strip()]
+
     chosen_image_url = (
         (payload.image_url or "").strip()
         or (payload.imageurl or "").strip()
         or (payload.cover_photo_url or "").strip()
+        or (image_urls[0] if image_urls else None)
         or None
     )
 
@@ -211,6 +224,7 @@ def create_off_market_deal(payload: CreateDealRequest):
         "score": score,
         "image_url": chosen_image_url,
         "imageurl": chosen_image_url,
+        "image_urls": image_urls or None,
     }
     try:
         inserted = _insert_with_schema_fallback(OFF_MARKET_TABLE, [data])
@@ -289,6 +303,7 @@ async def generate_off_market(payload: GenerateRequest):
                 "score": score,
                 "image_url": None,
                 "imageurl": None,
+                "image_urls": [],
             }
         )
 
@@ -386,3 +401,74 @@ def get_off_market_lead(lead_id: uuid.UUID) -> dict:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"off-market fetch failed: {e}")
+
+
+@router.post("/admin/backfill-scores", dependencies=[Depends(require_admin)])
+def backfill_off_market_scores(limit: int = Query(default=200, ge=1, le=500)) -> dict:
+    """Backfill score for legacy rows (score is NULL/0)."""
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    try:
+        res = (
+            supabase.table(OFF_MARKET_TABLE)
+            .select("id,asking_price,estimated_value,discount_percent,bedrooms,location,score")
+            .or_("score.is.null,score.eq.0")
+            .limit(int(limit))
+            .execute()
+        )
+        rows = res.data or []
+        if not isinstance(rows, list):
+            rows = []
+
+        attempted = len(rows)
+        updated = 0
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+
+            lead_id = r.get("id")
+            if not lead_id:
+                continue
+
+            asking_price = r.get("asking_price")
+            estimated_value = r.get("estimated_value")
+            discount_percent = r.get("discount_percent")
+
+            if (
+                discount_percent is None
+                and asking_price is not None
+                and estimated_value is not None
+                and float(estimated_value) > 0
+            ):
+                try:
+                    discount_percent = (
+                        (float(estimated_value) - float(asking_price)) / float(estimated_value)
+                    ) * 100
+                except Exception:
+                    discount_percent = None
+
+            score = compute_off_market_score(
+                asking_price=asking_price,
+                estimated_value=estimated_value,
+                discount_percent=discount_percent,
+                bedrooms=r.get("bedrooms"),
+                location=r.get("location"),
+            )
+
+            update_payload = {"score": score}
+            if discount_percent is not None:
+                update_payload["discount_percent"] = discount_percent
+
+            try:
+                supabase.table(OFF_MARKET_TABLE).update(update_payload).eq(
+                    "id", str(lead_id)
+                ).execute()
+                updated += 1
+            except Exception:
+                logger.exception("Failed to backfill score for %s", lead_id)
+
+        return {"attempted": attempted, "updated": updated}
+    except Exception as e:
+        logger.exception("Backfill scores failed")
+        raise HTTPException(status_code=500, detail="Backfill failed") from e

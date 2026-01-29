@@ -12,7 +12,7 @@ import SectionTitle from '@/components/ui/SectionTitle';
 import PageWrapper from '@/components/PageWrapper';
 import { API_BASE, safeFetch } from '@/lib/api';
 import type { OffMarketDeal } from '@/lib/offmarket/types';
-import { ensureDerivedFields, formatCurrency, formatDate } from '@/lib/offmarket/utils';
+import { ensureDerivedFields, formatCurrency, formatDate, primaryImageUrl } from '@/lib/offmarket/utils';
 
 // Match Next's generated PageProps exactly: params/searchParams as Promises.
 type PageProps = {
@@ -58,8 +58,9 @@ export default function DealDetail({ params }: PageProps) {
           source: data.source ?? null,
           created_at: data.created_at ?? null,
           updated_at: data.updated_at ?? null,
-          image_url: data.image_url ?? null,
-          imageurl: data.imageurl ?? null,
+          image_urls: data.image_urls ?? null,
+          image_url: primaryImageUrl({ image_url: data.image_url ?? null, imageurl: data.imageurl ?? null, image_urls: data.image_urls ?? null }),
+          imageurl: primaryImageUrl({ image_url: data.image_url ?? null, imageurl: data.imageurl ?? null, image_urls: data.image_urls ?? null }),
 
           address: data.address ?? null,
           postcode: data.postcode ?? null,
@@ -100,16 +101,16 @@ export default function DealDetail({ params }: PageProps) {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
               <div className="card overflow-hidden">
-                {row.image_url || row.imageurl ? (
+                {primaryImageUrl(row) ? (
                   <div className="relative w-full h-80 bg-zinc-100 dark:bg-zinc-800">
                     <Image
-                      src={row.image_url || row.imageurl || ''}
+                      src={primaryImageUrl(row) || ''}
                       alt={row.title}
                       fill
                       sizes="(max-width: 1024px) 100vw, 66vw"
                       className="object-cover"
                       unoptimized={
-                        (row.image_url || row.imageurl || '').includes('supabase') ? false : true
+                        (primaryImageUrl(row) || '').includes('supabase') ? false : true
                       }
                     />
                   </div>

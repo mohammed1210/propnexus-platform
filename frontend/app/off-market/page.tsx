@@ -10,7 +10,7 @@ import OffMarketFilters from '@/components/offMarket/OffMarketFilters';
 import OffMarketCard from '@/components/offMarket/OffMarketCard';
 import OffMarketTable from '@/components/offMarket/OffMarketTable';
 import type { DealFilters, OffMarketDeal, ViewMode } from '@/lib/offmarket/types';
-import { ensureDerivedFields } from '@/lib/offmarket/utils';
+import { ensureDerivedFields, primaryImageUrl } from '@/lib/offmarket/utils';
 import PageWrapper from '@/components/PageWrapper';
 
 type DBRow = {
@@ -31,6 +31,7 @@ type DBRow = {
   score?: number | null;
   image_url?: string | null;
   imageurl?: string | null;
+  image_urls?: string[] | null;
   address?: string | null;
   postcode?: string | null;
   estimated_value?: number | null;
@@ -101,8 +102,9 @@ export default function OffMarketPage() {
       source: r.source ?? null,
       created_at: r.created_at ?? null,
       updated_at: r.updated_at ?? null,
-      image_url: (r.image_url ?? r.imageurl) ?? null,
-      imageurl: (r.imageurl ?? r.image_url) ?? null,
+      image_urls: r.image_urls ?? null,
+      image_url: primaryImageUrl({ image_url: r.image_url ?? null, imageurl: r.imageurl ?? null, image_urls: r.image_urls ?? null }),
+      imageurl: primaryImageUrl({ image_url: r.image_url ?? null, imageurl: r.imageurl ?? null, image_urls: r.image_urls ?? null }),
       score: r.score ?? null,
       investment_score: (r.score ?? r.investment_score) ?? null,
       investment_type: r.investment_type ?? null,

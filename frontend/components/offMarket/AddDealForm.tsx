@@ -37,6 +37,17 @@ export default function AddDealForm({ onCreated }: Props) {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const toMessage = (err: unknown): string => {
+    if (!err) return 'Unknown error';
+    if (err instanceof Error) return err.message || 'Error';
+    if (typeof err === 'string') return err;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  };
+
   const set =
     (k: keyof FormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
@@ -50,29 +61,31 @@ export default function AddDealForm({ onCreated }: Props) {
     try {
       // 1) Upload selected photos (if any) to Supabase Storage
       const files = fileInputRef.current?.files ?? null;
-      let imageUrl: string | null = null;
+      const imageUrls: string[] = [];
+
+      const safeName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, '_');
 
       if (files && files.length > 0) {
-        const bucket = sb.storage.from('off-market');
+        const bucket = sb.storage.from('off_market_photos');
+        const stamp = Date.now();
+        const folder = `off-market/${stamp}-${crypto.randomUUID()}`;
 
         // upload sequentially; first uploaded will be used as card cover
         for (let i = 0; i < files.length; i++) {
           const file = files[i];
-          const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-          const path = `deals/${Date.now()}-${i}.${ext}`;
+          const path = `${folder}/${i}-${safeName(file.name || `photo-${i}.jpg`)}`;
 
           const { error: upErr } = await bucket.upload(path, file, { upsert: false });
           if (upErr) throw upErr;
 
           const { data: pub } = bucket.getPublicUrl(path);
           if (!pub?.publicUrl) throw new Error('Failed to create public URL for upload.');
-
-          // first image becomes the card image
-          if (!imageUrl) imageUrl = pub.publicUrl;
+          imageUrls.push(pub.publicUrl);
         }
       }
 
       // 2) Insert the deal row (including image_url if present)
+      const cover = imageUrls.length > 0 ? imageUrls[0] : null;
       const payload = {
         title: f.title || null,
         location: f.location || null,
@@ -83,8 +96,9 @@ export default function AddDealForm({ onCreated }: Props) {
         contact_email: f.contact || null,
         source: f.source || 'Manual',
         notes: f.notes || null,
-        imageurl: imageUrl,
-        image_url: imageUrl,
+        imageurl: cover,
+        image_url: cover,
+        image_urls: imageUrls,
       };
 
       const res = await fetch('/api/off-market/create', {
@@ -103,7 +117,7 @@ export default function AddDealForm({ onCreated }: Props) {
       onCreated?.();
     } catch (err: any) {
       console.error(err);
-      setError(err?.message || 'Failed to add deal.');
+      setError(toMessage(err) || 'Failed to add deal.');
     } finally {
       setSubmitting(false);
     }

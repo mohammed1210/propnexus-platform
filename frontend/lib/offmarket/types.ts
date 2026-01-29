@@ -12,6 +12,7 @@ export interface OffMarketDeal {
   created_at?: string | null;
   updated_at?: string | null;
   image_url?: string | null;
+  image_urls?: string[] | null;
   score?: number | null;
   investment_type?: string | null;
   property_type?: string | null;

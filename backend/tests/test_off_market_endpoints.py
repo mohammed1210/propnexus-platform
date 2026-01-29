@@ -158,3 +158,31 @@ def test_generate_off_market_inserts_and_returns_ids():
     res2 = client.get(f"/off-market/{lead_id}")
     assert res2.status_code == 200
     assert res2.json().get("id") == lead_id
+
+
+def test_admin_backfill_scores_requires_token_when_configured(monkeypatch):
+    # Backfill should be admin-only when a token is configured.
+    # We monkeypatch the module-level ADMIN_TOKEN so this is testable in CI.
+    from backend.routes import off_market_routes
+
+    monkeypatch.setattr(off_market_routes, "ADMIN_TOKEN", "test-token")
+
+    res = client.post("/off-market/admin/backfill-scores")
+    assert res.status_code == 401
+
+
+def test_admin_backfill_scores_allows_token_but_may_500_without_supabase(monkeypatch):
+    from backend.routes import off_market_routes
+
+    monkeypatch.setattr(off_market_routes, "ADMIN_TOKEN", "test-token")
+
+    res = client.post(
+        "/off-market/admin/backfill-scores?limit=1",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    # If Supabase isn't configured in this environment, the route returns 500.
+    if not _supabase_configured():
+        assert res.status_code == 500
+    else:
+        assert res.status_code == 200

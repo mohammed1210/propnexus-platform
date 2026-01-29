@@ -1,5 +1,15 @@
 import type { OffMarketDeal } from './types';
 
+export function primaryImageUrl(deal: Partial<OffMarketDeal>): string | null {
+  if (deal.image_url) return deal.image_url;
+  if (deal.imageurl) return deal.imageurl;
+  const first =
+    deal.image_urls && Array.isArray(deal.image_urls) && deal.image_urls.length > 0
+      ? deal.image_urls[0]
+      : null;
+  return first || null;
+}
+
 export function computeInvestmentScore(deal: Partial<OffMarketDeal>): number {
   const price = toNum(deal.price);
   const value = toNum(deal.estimated_value);
