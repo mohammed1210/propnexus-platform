@@ -11,6 +11,7 @@ import aiohttp
 from bs4 import BeautifulSoup
 
 from backend.scraper.utils import normalize_image_urls
+from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.render import (
     PLAYWRIGHT_ENABLE,
@@ -585,7 +586,11 @@ def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         image_urls = normalize_image_urls(
             [urljoin("https://www.rightmove.co.uk/", u) for u in image_urls if isinstance(u, str)]
         )
-        img = image_urls[0] if image_urls else None
+        try:
+            image_urls = dedupe_image_urls(image_urls, base_url="https://www.rightmove.co.uk/")
+        except Exception:
+            pass
+        img = pick_cover_image(image_urls) if image_urls else None
 
         loc_text = title
         loc_lat = None

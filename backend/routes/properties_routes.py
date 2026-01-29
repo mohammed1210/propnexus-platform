@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response
 
+from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from supabase import create_client
 
 router = APIRouter(tags=["properties"])
@@ -155,6 +156,12 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
     else:
         out["image_urls"] = []
 
+    # Dedupe by normalized URL and basename to reduce duplicates across variants.
+    try:
+        out["image_urls"] = dedupe_image_urls(out.get("image_urls") or [])
+    except Exception:
+        pass
+
     # imageurl fallback (front-end expects this)
     if not out.get("imageurl"):
         out["imageurl"] = _pick_raw(["imageurl", "image_url", "imageUrl"]) or (
@@ -163,6 +170,14 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
             else None
         )
     out["imageurl"] = _norm_url(out.get("imageurl"))
+
+    # Prefer a canonical cover image (avoid floorplan-only when possible).
+    try:
+        cover = pick_cover_image(out.get("image_urls") or [])
+        if cover and ((not out.get("imageurl")) or _is_junk_image_url(out.get("imageurl"))):
+            out["imageurl"] = cover
+    except Exception:
+        pass
 
     # If we have filtered image_urls, keep imageurl consistent (without
     # clobbering a valid, non-junk imageurl).

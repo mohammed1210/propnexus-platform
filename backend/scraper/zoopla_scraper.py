@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from fastapi import BackgroundTasks
 
 from backend.scraper.utils import normalize_image_urls
+from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.render import PLAYWRIGHT_ENABLE, capture_debug_html, render_page
 from backend.utils.retry import retry_async
@@ -672,7 +673,11 @@ def _parse_zoopla_detail_page(html: str, url: str) -> Optional[Dict[str, Any]]:
         pass
 
     image_urls = normalize_image_urls([urljoin(url, u) for u in image_urls if isinstance(u, str)])
-    image_url = image_urls[0] if image_urls else None
+    try:
+        image_urls = dedupe_image_urls(image_urls, base_url=url)
+    except Exception:
+        pass
+    image_url = pick_cover_image(image_urls) if image_urls else None
 
     return {
         "external_id": external_id,

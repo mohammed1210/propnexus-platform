@@ -21,6 +21,12 @@ if TYPE_CHECKING:
 from bs4 import BeautifulSoup
 
 from backend.scraper.utils import normalize_image_urls
+from backend.utils.image_utils import (
+    dedupe_image_urls,
+    extract_image_urls_from_next_data,
+    extract_next_data_json,
+    pick_cover_image,
+)
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.render import (
     PLAYWRIGHT_ENABLE,
@@ -256,7 +262,19 @@ def _extract_otm_gallery_image_urls(html: str, page_url: str) -> List[str]:
     except Exception:
         pass
 
+    # 5) Next.js payload scan (when present).
+    try:
+        next_data = extract_next_data_json(html)
+        if isinstance(next_data, dict):
+            candidates.extend(extract_image_urls_from_next_data(next_data, base_url=page_url))
+    except Exception:
+        pass
+
     normalized = normalize_image_urls(candidates)
+    try:
+        normalized = dedupe_image_urls(normalized, base_url=page_url)
+    except Exception:
+        pass
     filtered = [u for u in normalized if _is_otm_listing_photo_url(u)]
     return filtered or normalized
 
@@ -345,7 +363,11 @@ def _parse_otm_detail_page(
     image_urls = normalize_image_urls([urljoin(url, u) for u in image_urls if isinstance(u, str)])
     filtered_urls = [u for u in image_urls if _is_otm_listing_photo_url(u)]
     image_urls = filtered_urls or image_urls
-    image_url = image_urls[0] if image_urls else None
+    try:
+        image_urls = dedupe_image_urls(image_urls, base_url=url)
+    except Exception:
+        pass
+    image_url = pick_cover_image(image_urls) if image_urls else None
 
     return {
         "external_id": f"ot-{external_id}",
@@ -1065,7 +1087,11 @@ async def scrape_onthemarket_properties(
                             image_urls = normalize_image_urls(image_urls)
                             filtered_urls = [u for u in image_urls if _is_otm_listing_photo_url(u)]
                             image_urls = filtered_urls or image_urls
-                            image_url = image_urls[0] if image_urls else None
+                            try:
+                                image_urls = dedupe_image_urls(image_urls)
+                            except Exception:
+                                pass
+                            image_url = pick_cover_image(image_urls) if image_urls else None
                             log_image_extraction("onthemarket", title, len(image_urls))
 
                             # Extract description

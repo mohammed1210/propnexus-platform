@@ -14,9 +14,11 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from backend.scraper.utils import TARGET_CITIES
+from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 
 # Scrapers (existing)
 from backend.utils.ingest import scrape_all_sources
+from backend.utils.listing_keys import ensure_external_id, strip_empty_for_upsert
 from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run
 
 # Shared Supabase client
@@ -357,11 +359,9 @@ async def _scrape_and_upsert(
         db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
         inserted = len(db_rows)
         if sb and db_rows:
-            try:
-                sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-                db_ok = True
-            except Exception as e:
-                db_error = str(e)
+            db_ok, db_error = _upsert_properties_rows(
+                rows=db_rows, on_conflict="source,external_id"
+            )
 
     if run_id:
         if db_ok:
@@ -543,6 +543,24 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
             if (not isinstance(current, str)) or _is_junk_image_url(current):
                 row["imageurl"] = filtered[0]
 
+    # Ensure image_urls is always a list for DB + frontend compatibility.
+    if not isinstance(row.get("image_urls"), list):
+        row["image_urls"] = []
+
+    # Dedupe images by normalized URL and basename, and pick a canonical cover image.
+    try:
+        row["image_urls"] = dedupe_image_urls(row.get("image_urls") or [])
+    except Exception:
+        pass
+    try:
+        cover = pick_cover_image(row.get("image_urls") or [])
+        if cover and (
+            (not isinstance(row.get("imageurl"), str)) or _is_junk_image_url(row.get("imageurl"))
+        ):
+            row["imageurl"] = cover
+    except Exception:
+        pass
+
     if not row.get("location"):
         row["location"] = _pick_raw(["location", "displayAddress", "display_address"])
     if not row.get("address"):
@@ -582,6 +600,13 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
     row.pop("listing_url", None)
     row.pop("raw_url", None)
 
+    # Ensure a stable external_id for upsert/dedupe.
+    if not row.get("external_id"):
+        try:
+            row["external_id"] = ensure_external_id(row)
+        except Exception:
+            pass
+
     return row
 
 
@@ -614,14 +639,27 @@ def _upsert_properties_rows(
     if not rows:
         return False, None
 
+    # Drop empty fields so partial refreshes do not overwrite existing data with nulls/empties.
+    prepared: list[Dict[str, Any]] = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        rr = dict(r)
+        if not rr.get("external_id"):
+            try:
+                rr["external_id"] = ensure_external_id(rr)
+            except Exception:
+                pass
+        prepared.append(strip_empty_for_upsert(rr))
+
     try:
-        sb.table("properties").upsert(rows, on_conflict=on_conflict).execute()
+        sb.table("properties").upsert(prepared, on_conflict=on_conflict).execute()
         return True, None
     except Exception as e:
         msg = str(e)
         if "last_seen_at" in msg and ("PGRST204" in msg or "Could not find" in msg):
             try:
-                stripped = _strip_field(rows, "last_seen_at")
+                stripped = _strip_field(prepared, "last_seen_at")
                 sb.table("properties").upsert(stripped, on_conflict=on_conflict).execute()
                 return True, None
             except Exception as e2:
