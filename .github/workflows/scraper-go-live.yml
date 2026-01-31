@@ -22,7 +22,6 @@ on:
 jobs:
   scraper-go-live:
     runs-on: ubuntu-latest
-    if: ${{ secrets.API_BASE != '' && secrets.OFF_MARKET_ADMIN_TOKEN != '' }}
     permissions:
       contents: read
     steps:

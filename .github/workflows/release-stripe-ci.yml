@@ -16,7 +16,6 @@ jobs:
   stripe-smoke:
     name: Stripe & Pricing Smoke
     runs-on: ubuntu-latest
-    if: ${{ secrets.STRIPE_SECRET_KEY != '' }}
 
     env:
       # Provide these via GitHub “Repository variables / secrets”

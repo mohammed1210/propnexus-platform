@@ -8,11 +8,19 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ secrets.RAILWAY_TOKEN != '' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Secrets sanity check
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "ℹ️ RAILWAY_TOKEN not configured – skipping deploy (soft pass)."
+            exit 0
+          fi
 
       - name: Install Railway CLI
         run: |
