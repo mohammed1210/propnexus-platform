@@ -10,15 +10,29 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    if: ${{ secrets.NEXT_PUBLIC_BACKEND_URL != '' || secrets.API_BASE != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Secrets sanity check
+        env:
+          API_BASE: ${{ secrets.API_BASE }}
+          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
+        run: |
+          if [ -z "$API_BASE" ] && [ -z "$NEXT_PUBLIC_BACKEND_URL" ]; then
+            echo "ℹ️ API_BASE / NEXT_PUBLIC_BACKEND_URL not configured – skipping monitor run (soft pass)."
+            exit 0
+          fi
+
       - name: Health check
         env:
-          BACKEND_BASE: ${{ secrets.API_BASE != '' && secrets.API_BASE || secrets.NEXT_PUBLIC_BACKEND_URL }}
+          API_BASE: ${{ secrets.API_BASE }}
+          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
         run: |
+          BACKEND_BASE="$API_BASE"
+          if [ -z "$BACKEND_BASE" ]; then
+            BACKEND_BASE="$NEXT_PUBLIC_BACKEND_URL"
+          fi
           if [ -z "${BACKEND_BASE}" ]; then
             echo "⚠️ BACKEND_BASE not configured – skipping monitor run (soft pass)."
             exit 0
@@ -31,9 +45,14 @@ jobs:
 
       - name: Test import with Ilford
         env:
-          BACKEND_BASE: ${{ secrets.API_BASE != '' && secrets.API_BASE || secrets.NEXT_PUBLIC_BACKEND_URL }}
+          API_BASE: ${{ secrets.API_BASE }}
+          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
           OFF_MARKET_ADMIN_TOKEN: ${{ secrets.OFF_MARKET_ADMIN_TOKEN }}
         run: |
+          BACKEND_BASE="$API_BASE"
+          if [ -z "$BACKEND_BASE" ]; then
+            BACKEND_BASE="$NEXT_PUBLIC_BACKEND_URL"
+          fi
           if [ -z "${BACKEND_BASE}" ]; then
             echo "⚠️ BACKEND_BASE not configured – skipping import test (soft pass)."
             exit 0
