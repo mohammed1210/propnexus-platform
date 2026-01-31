@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  build:
+  frontend_lite:
     runs-on: ubuntu-latest
     defaults:
       run:
