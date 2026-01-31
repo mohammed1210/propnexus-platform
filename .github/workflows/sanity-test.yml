@@ -124,12 +124,7 @@ jobs:
       - name: Build (with CI-safe env)
         working-directory: frontend
         env:
-  NEXT_TELEMETRY_DISABLED: "1"
-  NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'anon_placeholder_key' }}
-  NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL || 'https://example.com' }}
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
-  CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
+          NEXT_TELEMETRY_DISABLED: "1"
 
           # Supabase placeholders so Next.js doesn't crash on missing NEXT_PUBLIC vars
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
