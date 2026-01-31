@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { FiMapPin, FiHome, FiDroplet, FiTrendingUp, FiDollarSign, FiTool } from 'react-icons/fi';
@@ -230,12 +231,15 @@ export default function PropertyDetailsPage() {
         {/* Image Gallery */}
         <div className="card mb-6 overflow-hidden">
           <div className="aspect-[16/9] bg-slate-100 dark:bg-slate-900 relative">
-            <img
+            <Image
               src={mainImage}
               alt={property.title ? String(property.title) : 'Property image'}
-              className="w-full h-full object-cover"
+              fill
+              sizes="100vw"
+              className="object-cover"
+              unoptimized
               onError={(e) => {
-                const img = e.currentTarget;
+                const img = e.currentTarget as HTMLImageElement;
                 if (img.src.endsWith(PLACEHOLDER_IMG)) return;
                 img.src = PLACEHOLDER_IMG;
                 setMainImage(PLACEHOLDER_IMG);
@@ -274,12 +278,15 @@ export default function PropertyDetailsPage() {
                       }`}
                       aria-label={`View image ${idx + 1}`}
                     >
-                      <img
+                      <Image
                         src={u}
                         alt={`Thumbnail ${idx + 1}`}
+                        width={80}
+                        height={64}
                         className="w-20 h-16 object-cover"
+                        unoptimized
                         onError={(e) => {
-                          const img = e.currentTarget;
+                          const img = e.currentTarget as HTMLImageElement;
                           if (img.src.endsWith(PLACEHOLDER_IMG)) return;
                           img.src = PLACEHOLDER_IMG;
                         }}
