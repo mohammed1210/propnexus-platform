@@ -593,13 +593,23 @@ def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         img = pick_cover_image(image_urls) if image_urls else None
 
         loc_text = title
-        loc_lat = None
-        loc_lng = None
+        loc_lat: float | None = None
+        loc_lng: float | None = None
         geo = p.get("location") or {}
         if isinstance(geo, dict):
-            loc_lat = geo.get("latitude")
-            loc_lng = geo.get("longitude")
-        coords = {"latitude": loc_lat or 0.0, "longitude": loc_lng or 0.0}
+            try:
+                loc_lat = float(geo.get("latitude")) if geo.get("latitude") is not None else None
+            except Exception:
+                loc_lat = None
+            try:
+                loc_lng = float(geo.get("longitude")) if geo.get("longitude") is not None else None
+            except Exception:
+                loc_lng = None
+
+        if loc_lat == 0.0:
+            loc_lat = None
+        if loc_lng == 0.0:
+            loc_lng = None
 
         return {
             "external_id": property_id,
@@ -613,8 +623,8 @@ def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             "image_url": img,
             "image_urls": image_urls,
             "imageurl": img,
-            "latitude": coords["latitude"],
-            "longitude": coords["longitude"],
+            "latitude": loc_lat,
+            "longitude": loc_lng,
             "source": "rightmove",
             "raw_url": f"https://www.rightmove.co.uk/properties/{property_id}",
         }

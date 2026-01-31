@@ -88,10 +88,21 @@ async def test_properties_api_returns_rows() -> None:
     assert r.status_code == 200, f"/properties failed with {r.status_code}"
 
     data = r.json()
-    assert isinstance(data, list), "API did not return a list"
+    # Back-compat: allow older deployments to return a raw list.
+    if isinstance(data, list):
+        items = data
+        total = len(items)
+    else:
+        assert isinstance(data, dict), "API did not return a list or object"
+        assert "items" in data and "total" in data, "API missing items/total"
+        items = data.get("items")
+        total = data.get("total")
 
-    if data:
-        sample = data[0]
+        assert isinstance(items, list), "API items must be a list"
+        assert isinstance(total, int), "API total must be an int"
+
+    if items:
+        sample = items[0]
         assert isinstance(sample, dict), "API list items must be objects"
         for col in REQUIRED_PROPERTIES_COLS:
             assert col in sample, f"Column '{col}' missing in API response"

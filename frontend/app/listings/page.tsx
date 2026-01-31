@@ -24,6 +24,15 @@ function parsePositiveInt(value: string): number | undefined {
   return Math.floor(num);
 }
 
+/** Parse a string to a non-negative integer (>= 0). */
+function parseNonNegativeInt(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const num = Number(trimmed);
+  if (isNaN(num) || num < 0) return undefined;
+  return Math.floor(num);
+}
+
 /**
  * Sanitize search query to prevent special character issues.
  * Escapes %, comma, and other special chars that could interfere with ilike queries.
@@ -117,7 +126,7 @@ const Popup = nextDynamic(() => import('react-leaflet').then((m) => m.Popup), { 
  */
 const useMap = () => require('react-leaflet').useMap();
 
-const SORTABLE = ['created_at', 'price', 'bedrooms', 'roi_percent', 'yield_percent'] as const;
+const SORTABLE = ['created_at_desc', 'price_asc', 'price_desc', 'yield_desc', 'roi_desc'] as const;
 type SortKey = (typeof SORTABLE)[number];
 
 const INVESTMENT_TYPES = ['HMO', 'BTL', 'SA', 'BRR', 'Flip', 'Commercial'] as const;
@@ -374,12 +383,34 @@ function ListingsInner() {
   const typesRaw = searchParams?.get('types') ?? '';
   const types = useMemo(() => (typesRaw ? typesRaw.split(',').filter(Boolean) : []), [typesRaw]);
 
+  const dir: 'asc' | 'desc' = searchParams?.get('dir') === 'asc' ? 'asc' : 'desc';
+
   const sort = ((): SortKey => {
     const s = (searchParams?.get('sort') || '').toLowerCase();
-    return (SORTABLE as readonly string[]).includes(s) ? (s as SortKey) : 'created_at';
+    if ((SORTABLE as readonly string[]).includes(s)) return s as SortKey;
+
+    // Back-compat mapping from legacy sort+dir
+    const legacy = (searchParams?.get('sort') || '').toLowerCase();
+    if (legacy === 'created_at') return 'created_at_desc';
+    if (legacy === 'price') return dir === 'asc' ? 'price_asc' : 'price_desc';
+    if (legacy === 'yield_percent') return 'yield_desc';
+    if (legacy === 'roi_percent') return 'roi_desc';
+
+    return 'created_at_desc';
   })();
 
-  const dir: 'asc' | 'desc' = searchParams?.get('dir') === 'asc' ? 'asc' : 'desc';
+  const limit = ((): number => {
+    const raw = searchParams?.get('limit') ?? '';
+    const v = parsePositiveInt(raw);
+    if (v === 25 || v === 50 || v === 100) return v;
+    return 50;
+  })();
+
+  const offset = ((): number => {
+    const raw = searchParams?.get('offset') ?? '';
+    const v = parseNonNegativeInt(raw);
+    return v ?? 0;
+  })();
 
   const [searchInput, setSearchInput] = useState(qRaw);
   const [minInput, setMinInput] = useState(searchParams?.get('min') ?? '');
@@ -390,6 +421,8 @@ function ListingsInner() {
 
   const [rows, setRows] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
   const { user, isLoaded } = useOptionalUser();
 
@@ -428,8 +461,8 @@ function ListingsInner() {
         if (baths !== undefined) params.set('baths', String(baths));
         if (types.length > 0) params.set('types', types.join(','));
         params.set('sort', sort);
-        params.set('dir', dir);
-        params.set('limit', '200');
+        params.set('limit', String(limit));
+        params.set('offset', String(offset));
 
         const response = await fetch(`${backendUrl}/properties?${params.toString()}`, {
           method: 'GET',
@@ -445,7 +478,16 @@ function ListingsInner() {
 
         const data = await response.json();
 
-        const mappedData: RawProperty[] = (data || [])
+        const items = Array.isArray(data) ? data : (data?.items ?? []);
+        const totalCount =
+          typeof data?.total === 'number'
+            ? data.total
+            : Array.isArray(items)
+              ? items.length
+              : 0;
+        const more = typeof data?.has_more === 'boolean' ? data.has_more : false;
+
+        const mappedData: RawProperty[] = (items || [])
           .filter((prop: any) => String(prop?.source ?? '').toLowerCase() !== 'spareroom')
           .map((prop: any) => ({
           id: String(prop.id ?? ''),
@@ -466,9 +508,13 @@ function ListingsInner() {
         }));
 
         setRows(mappedData);
+        setTotal(totalCount);
+        setHasMore(more);
       } catch (error) {
         console.error('[listings] fetch error', error);
         setRows([]);
+        setTotal(0);
+        setHasMore(false);
       } finally {
         setLoading(false);
       }
@@ -477,7 +523,7 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, baths, types, sort, dir, refreshNonce]);
+  }, [q, minP, maxP, beds, baths, types, sort, limit, offset, refreshNonce]);
 
   // ✅ robust points creation (no falsy checks, reject invalid/null-island)
   const points = useMemo(() => {
@@ -507,7 +553,8 @@ function ListingsInner() {
     if (bathsInput) p.set('baths', bathsInput);
     if (selectedTypes.length > 0) p.set('types', selectedTypes.join(','));
     if (sort) p.set('sort', sort);
-    if (dir) p.set('dir', dir);
+    p.set('limit', String(limit));
+    p.set('offset', '0');
     router.push(`/listings?${p.toString()}`);
   };
 
@@ -536,7 +583,12 @@ function ListingsInner() {
         throw new Error(data?.detail || data?.error || `Scrape failed (${res.status})`);
       }
 
-      const c = typeof data?.count === 'number' ? data.count : 0;
+      const c =
+        typeof data?.total_imported === 'number'
+          ? data.total_imported
+          : typeof data?.count === 'number'
+            ? data.count
+            : 0;
       setScrapeMsg(`Scrape complete: imported ${c} listings for “${loc}”. Refreshing…`);
 
       // refresh the listings fetch
@@ -568,8 +620,12 @@ function ListingsInner() {
     } else {
       p.delete(key);
     }
+    p.set('offset', '0');
     router.push(`/listings?${p.toString()}`);
   };
+
+  const showingFrom = total > 0 ? offset + 1 : 0;
+  const showingTo = total > 0 ? Math.min(offset + rows.length, total) : 0;
 
   const activeFilters: Array<{ key: string; label: string; value: string }> = [];
   if (qRaw) activeFilters.push({ key: 'q', label: qRaw, value: qRaw });
@@ -814,24 +870,74 @@ function ListingsInner() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {(viewMode === 'grid' || viewMode === 'split') && (
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-slate-600 dark:text-slate-400">
-              <span className="font-semibold text-slate-900 dark:text-white">{rows.length}</span> properties found
+              <span className="font-semibold text-slate-900 dark:text-white">
+                {showingFrom}-{showingTo}
+              </span>{' '}
+              of{' '}
+              <span className="font-semibold text-slate-900 dark:text-white">{total}</span>
             </p>
-            <select
-              value={sort}
-              onChange={(e) => {
-                const p = new URLSearchParams(searchParams?.toString());
-                p.set('sort', e.target.value);
-                router.push(`/listings?${p.toString()}`);
-              }}
-              className="input-field h-11 px-4 w-auto"
-            >
-              <option value="created_at">Most Recent</option>
-              <option value="yield_percent">Highest Yield</option>
-              <option value="price">Price: Low to High</option>
-              <option value="bedrooms">Most Bedrooms</option>
-            </select>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={limit}
+                onChange={(e) => {
+                  const p = new URLSearchParams(searchParams?.toString());
+                  p.set('limit', e.target.value);
+                  p.set('offset', '0');
+                  router.push(`/listings?${p.toString()}`);
+                }}
+                className="input-field h-11 px-4 w-auto"
+                aria-label="Page size"
+              >
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+
+              <select
+                value={sort}
+                onChange={(e) => {
+                  const p = new URLSearchParams(searchParams?.toString());
+                  p.set('sort', e.target.value);
+                  p.delete('dir');
+                  p.set('offset', '0');
+                  router.push(`/listings?${p.toString()}`);
+                }}
+                className="input-field h-11 px-4 w-auto"
+                aria-label="Sort"
+              >
+                <option value="created_at_desc">Most Recent</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="yield_desc">Highest Yield</option>
+                <option value="roi_desc">Highest ROI</option>
+              </select>
+
+              <button
+                onClick={() => {
+                  const p = new URLSearchParams(searchParams?.toString());
+                  p.set('offset', String(Math.max(0, offset - limit)));
+                  router.push(`/listings?${p.toString()}`);
+                }}
+                disabled={loading || offset <= 0}
+                className="h-11 px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => {
+                  const p = new URLSearchParams(searchParams?.toString());
+                  p.set('offset', String(offset + limit));
+                  router.push(`/listings?${p.toString()}`);
+                }}
+                disabled={loading || !hasMore}
+                className="h-11 px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
 
@@ -889,7 +995,13 @@ function ListingsInner() {
                   className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
                   style={{ height: 'calc(100vh - 220px)' }}
                 >
-                  <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
+                  {points.length === 0 ? (
+                    <div className="flex h-full w-full items-center justify-center text-sm text-slate-600 dark:text-slate-300">
+                      No mappable listings in this search yet
+                    </div>
+                  ) : (
+                    <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
+                  )}
                 </div>
               </div>
             </div>
@@ -901,7 +1013,13 @@ function ListingsInner() {
             className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
             style={{ height: 'calc(100vh - 300px)' }}
           >
-            <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
+            {points.length === 0 ? (
+              <div className="flex h-full w-full items-center justify-center text-sm text-slate-600 dark:text-slate-300">
+                No mappable listings in this search yet
+              </div>
+            ) : (
+              <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
+            )}
           </div>
         )}
       </div>

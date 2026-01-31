@@ -28,9 +28,9 @@ def test_list_properties_endpoint_exists(mock_create_client, client):
     mock_sb = Mock()
     mock_query = Mock()
     mock_query.select.return_value = mock_query
-    mock_query.limit.return_value = mock_query
+    mock_query.range.return_value = mock_query
     mock_query.order.return_value = mock_query
-    mock_query.execute.return_value = Mock(data=[])
+    mock_query.execute.return_value = Mock(data=[], count=0)
 
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
@@ -50,7 +50,7 @@ def test_list_properties_with_filters(mock_create_client, client):
     mock_sb = Mock()
     mock_query = Mock()
     mock_query.select.return_value = mock_query
-    mock_query.limit.return_value = mock_query
+    mock_query.range.return_value = mock_query
     mock_query.or_.return_value = mock_query
     mock_query.eq.return_value = mock_query
     mock_query.gte.return_value = mock_query
@@ -72,7 +72,7 @@ def test_list_properties_with_filters(mock_create_client, client):
             "longitude": -0.1278,
         }
     ]
-    mock_query.execute.return_value = Mock(data=mock_properties)
+    mock_query.execute.return_value = Mock(data=mock_properties, count=1)
 
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
@@ -95,7 +95,10 @@ def test_list_properties_with_filters(mock_create_client, client):
     assert response.status_code == 200
     assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
     data = response.json()
-    assert isinstance(data, list)
+    assert isinstance(data, dict)
+    assert isinstance(data.get("items"), list)
+    assert isinstance(data.get("total"), int)
+    assert len(data.get("items") or []) == 1
 
     # Verify filters were applied
     mock_query.eq.assert_called_once()  # source filter
@@ -112,9 +115,9 @@ def test_list_properties_default_sort(mock_create_client, client):
     mock_sb = Mock()
     mock_query = Mock()
     mock_query.select.return_value = mock_query
-    mock_query.limit.return_value = mock_query
+    mock_query.range.return_value = mock_query
     mock_query.order.return_value = mock_query
-    mock_query.execute.return_value = Mock(data=[])
+    mock_query.execute.return_value = Mock(data=[], count=0)
 
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
@@ -137,9 +140,9 @@ def test_list_properties_invalid_sort(mock_create_client, client):
     mock_sb = Mock()
     mock_query = Mock()
     mock_query.select.return_value = mock_query
-    mock_query.limit.return_value = mock_query
+    mock_query.range.return_value = mock_query
     mock_query.order.return_value = mock_query
-    mock_query.execute.return_value = Mock(data=[])
+    mock_query.execute.return_value = Mock(data=[], count=0)
 
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb

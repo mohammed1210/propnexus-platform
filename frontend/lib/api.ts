@@ -63,9 +63,21 @@ export type ListParams = {
   min?: number;
   max?: number;
   beds?: number;
-  sort?: 'created_at' | 'price' | 'bedrooms' | 'roi_percent' | 'yield_percent';
-  dir?: 'asc' | 'desc';
+  sort?:
+    | 'created_at_desc'
+    | 'price_asc'
+    | 'price_desc'
+    | 'yield_desc'
+    | 'roi_desc'
+    // legacy
+    | 'created_at'
+    | 'price'
+    | 'bedrooms'
+    | 'roi_percent'
+    | 'yield_percent';
+  dir?: 'asc' | 'desc'; // legacy
   limit?: number;
+  offset?: number;
 };
 
 export type PropertyRow = {
@@ -83,7 +95,15 @@ export type PropertyRow = {
   created_at?: string;
 };
 
-export async function listProperties(params: ListParams = {}): Promise<PropertyRow[]> {
+export type PropertiesPage = {
+  items: PropertyRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+};
+
+export async function listPropertiesPage(params: ListParams = {}): Promise<PropertiesPage> {
   const sp = new URLSearchParams();
   if (params.q) sp.set('q', params.q);
   if (params.min) sp.set('min', String(params.min));
@@ -92,8 +112,30 @@ export async function listProperties(params: ListParams = {}): Promise<PropertyR
   if (params.sort) sp.set('sort', params.sort);
   if (params.dir) sp.set('dir', params.dir);
   if (params.limit) sp.set('limit', String(params.limit));
+  if (typeof params.offset === 'number') sp.set('offset', String(params.offset));
 
-  return safeFetch<PropertyRow[]>(`${API_BASE}/properties?${sp.toString()}`);
+  const data = await safeFetch<any>(`${API_BASE}/properties?${sp.toString()}`);
+  if (Array.isArray(data)) {
+    return {
+      items: data as PropertyRow[],
+      total: data.length,
+      limit: params.limit ?? data.length,
+      offset: params.offset ?? 0,
+      has_more: false,
+    };
+  }
+  return {
+    items: (data?.items ?? []) as PropertyRow[],
+    total: typeof data?.total === 'number' ? data.total : 0,
+    limit: typeof data?.limit === 'number' ? data.limit : params.limit ?? 50,
+    offset: typeof data?.offset === 'number' ? data.offset : params.offset ?? 0,
+    has_more: Boolean(data?.has_more),
+  };
+}
+
+export async function listProperties(params: ListParams = {}): Promise<PropertyRow[]> {
+  const page = await listPropertiesPage(params);
+  return page.items;
 }
 
 /* ---------------------------------------------------

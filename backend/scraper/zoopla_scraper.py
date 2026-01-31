@@ -394,6 +394,13 @@ def _zoopla_property_from_listing_dict(d: Dict[str, Any]) -> Optional[Dict[str, 
             lat = geo.get("latitude") or geo.get("lat")
             lng = geo.get("longitude") or geo.get("lng")
 
+        lat_f = float(lat) if isinstance(lat, (int, float)) else None
+        lng_f = float(lng) if isinstance(lng, (int, float)) else None
+        if lat_f == 0.0:
+            lat_f = None
+        if lng_f == 0.0:
+            lng_f = None
+
         return {
             "external_id": external_id,
             "title": str(title).strip(),
@@ -406,8 +413,8 @@ def _zoopla_property_from_listing_dict(d: Dict[str, Any]) -> Optional[Dict[str, 
             "image_url": image_url,
             "image_urls": image_urls,
             "imageurl": image_url,
-            "latitude": float(lat) if isinstance(lat, (int, float)) else 0.0,
-            "longitude": float(lng) if isinstance(lng, (int, float)) else 0.0,
+            "latitude": lat_f,
+            "longitude": lng_f,
             "source": "zoopla",
             "raw_url": listing_url,
             "listing_url": listing_url,

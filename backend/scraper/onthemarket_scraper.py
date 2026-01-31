@@ -380,8 +380,8 @@ def _parse_otm_detail_page(
         "image_url": image_url,
         "image_urls": image_urls,
         "imageurl": image_url,
-        "latitude": 0.0,
-        "longitude": 0.0,
+        "latitude": None,
+        "longitude": None,
         "source": "onthemarket",
         "raw_url": url,
         "listing_url": url,
@@ -843,18 +843,25 @@ def _collect_cards(soup: BeautifulSoup) -> List[BeautifulSoup]:
     return unique
 
 
-async def _enrich_coordinates(location: str) -> Dict[str, float]:
+async def _enrich_coordinates(location: str) -> Dict[str, float | None]:
     """Get coordinates from postcode, best-effort."""
     try:
-        coords = await get_lat_lng_from_postcode(location)
-        if coords:
-            return {
-                "latitude": coords.get("latitude", 0.0),
-                "longitude": coords.get("longitude", 0.0),
-            }
-        return {"latitude": 0.0, "longitude": 0.0}
+        coords = await get_lat_lng_from_postcode(location, use_db_cache=True)
+        if not coords:
+            return {"latitude": None, "longitude": None}
+
+        lat = coords.get("latitude")
+        lng = coords.get("longitude")
+        if lat is None or lng is None:
+            return {"latitude": None, "longitude": None}
+        lat_f = float(lat)
+        lng_f = float(lng)
+        if lat_f == 0.0 or lng_f == 0.0:
+            return {"latitude": None, "longitude": None}
+
+        return {"latitude": lat_f, "longitude": lng_f}
     except Exception:
-        return {"latitude": 0.0, "longitude": 0.0}
+        return {"latitude": None, "longitude": None}
 
 
 def _stable_id(value: str) -> str:
@@ -1158,7 +1165,7 @@ async def scrape_onthemarket_properties(
                             coords = (
                                 await _enrich_coordinates(location_text)
                                 if _looks_like_postcode(location_text)
-                                else {"latitude": 0.0, "longitude": 0.0}
+                                else {"latitude": None, "longitude": None}
                             )
 
                             property_data = {

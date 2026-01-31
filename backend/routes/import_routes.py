@@ -18,7 +18,8 @@ from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 
 # Scrapers (existing)
 from backend.utils.ingest import scrape_all_sources
-from backend.utils.listing_keys import ensure_external_id, strip_empty_for_upsert
+from backend.utils.listing_keys import ensure_external_id, extract_postcode, strip_empty_for_upsert
+from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run
 
 # Shared Supabase client
@@ -326,6 +327,73 @@ async def _maybe_await(result: Any) -> Any:
     return result
 
 
+async def _fill_missing_coords_from_postcode(rows: list[Dict[str, Any]]) -> None:
+    """Best-effort geocoding for rows missing coordinates.
+
+    Rules:
+    - If latitude/longitude are 0,0 treat as missing
+    - If postcode exists and coords missing, resolve via backend.utils.postcode (cache-first)
+    - Never raise; import should still succeed without coords
+    """
+
+    if not rows:
+        return
+
+    # Escape hatch for ops / CI.
+    if (os.getenv("DISABLE_POSTCODE_GEOCODE") or "").strip() in ("1", "true", "yes"):
+        return
+
+    sem = asyncio.Semaphore(10)
+    cache: dict[str, Dict[str, float] | None] = {}
+
+    def _is_valid_coord(v: Any) -> bool:
+        try:
+            f = float(v)
+        except Exception:
+            return False
+        return (f != 0.0) and (abs(f) > 1e-12)
+
+    async def _resolve_for_row(row: Dict[str, Any]) -> None:
+        try:
+            lat_ok = _is_valid_coord(row.get("latitude"))
+            lng_ok = _is_valid_coord(row.get("longitude"))
+            if lat_ok and lng_ok:
+                return
+
+            pc = (
+                extract_postcode(row.get("postcode"))
+                or extract_postcode(row.get("address"))
+                or extract_postcode(row.get("location"))
+            )
+            if not pc:
+                return
+
+            if pc in cache:
+                coords = cache[pc]
+            else:
+                async with sem:
+                    coords = await get_lat_lng_from_postcode(pc, use_db_cache=True)
+                cache[pc] = coords
+
+            if not coords:
+                return
+            lat = coords.get("latitude")
+            lng = coords.get("longitude")
+            if lat is None or lng is None:
+                return
+
+            # Only write if we got real coordinates.
+            if float(lat) == 0.0 or float(lng) == 0.0:
+                return
+
+            row["latitude"] = float(lat)
+            row["longitude"] = float(lng)
+        except Exception:
+            return
+
+    await asyncio.gather(*[_resolve_for_row(r) for r in rows if isinstance(r, dict)])
+
+
 async def _scrape_and_upsert(
     *,
     location: str,
@@ -357,6 +425,7 @@ async def _scrape_and_upsert(
     if items:
         now_iso = _now_iso()
         db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+        await _fill_missing_coords_from_postcode(db_rows)
         inserted = len(db_rows)
         if sb and db_rows:
             db_ok, db_error = _upsert_properties_rows(
@@ -775,15 +844,18 @@ async def import_all(
             continue
         db_rows.append(_clean_row(p, now_iso))
 
+    # Best-effort postcode geocoding for map pins
+    await _fill_missing_coords_from_postcode(db_rows)
+
     # ✅ Upsert into Supabase
     inserted = 0
     if sb and db_rows:
-        try:
-            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
+        ok, err = _upsert_properties_rows(rows=db_rows, on_conflict="source,external_id")
+        if ok:
             inserted = len(db_rows)
-        except Exception as e:
-            finish_scrape_run(run_id=run_id, status="error", count_inserted=0, error=str(e))
-            raise HTTPException(status_code=500, detail=f"DB upsert failed: {e}")
+        else:
+            finish_scrape_run(run_id=run_id, status="error", count_inserted=0, error=str(err))
+            raise HTTPException(status_code=500, detail=f"DB upsert failed: {err}")
 
     finish_scrape_run(run_id=run_id, status="success", count_inserted=inserted)
 
@@ -864,6 +936,7 @@ async def import_zoopla(
     if items:
         now_iso = _now_iso()
         db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+        await _fill_missing_coords_from_postcode(db_rows)
         db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
 
     if db_upsert_ok:
@@ -953,8 +1026,11 @@ async def import_rightmove(
         try:
             now_iso = _now_iso()
             db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
-            sb.table("properties").upsert(db_rows, on_conflict="source,external_id").execute()
-            db_upsert_ok = True
+            await _fill_missing_coords_from_postcode(db_rows)
+            db_upsert_ok, db_error = _upsert_properties_rows(
+                rows=db_rows,
+                on_conflict="source,external_id",
+            )
         except Exception as e:
             db_error = str(e)
 
@@ -1024,6 +1100,7 @@ async def import_onthemarket(
     if items:
         now_iso = _now_iso()
         db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+        await _fill_missing_coords_from_postcode(db_rows)
         db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
 
     if db_upsert_ok:
@@ -1172,6 +1249,7 @@ async def import_batch(
             if items:
                 now_iso = _now_iso()
                 db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+                await _fill_missing_coords_from_postcode(db_rows)
                 ok, e = _upsert_properties_rows(rows=db_rows)
                 if ok:
                     inserted = len(db_rows)
@@ -1250,6 +1328,7 @@ async def import_spareroom(
     if items:
         now_iso = _now_iso()
         db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
+        await _fill_missing_coords_from_postcode(db_rows)
         db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
 
     if db_upsert_ok:

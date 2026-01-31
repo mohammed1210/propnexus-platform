@@ -5,6 +5,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response
+from pydantic import BaseModel, Field
 
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from supabase import create_client
@@ -24,6 +25,14 @@ ALLOWED_SORT_COLS = {
 
 
 PROPERTIES_NORMALIZATION_VERSION = "v1"
+
+
+class PropertiesPageResponse(BaseModel):
+    items: List[Dict[str, Any]] = Field(default_factory=list)
+    total: int = 0
+    limit: int = 50
+    offset: int = 0
+    has_more: bool = False
 
 
 def _get_supabase():
@@ -218,10 +227,22 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
         if lng is not None and lng != 0.0:
             out["longitude"] = lng
 
+    # Avoid placeholder coordinates breaking maps. Some older rows stored 0,0.
+    # Do not blanket-null real (0, x) or (x, 0) coordinates; only treat 0,0 as a placeholder.
+    lat_now = _coerce_float(out.get("latitude"))
+    lng_now = _coerce_float(out.get("longitude"))
+    if lat_now == 0.0 and lng_now == 0.0:
+        out["latitude"] = None
+        out["longitude"] = None
+    elif lat_now == 0.0 and lng_now is None:
+        out["latitude"] = None
+    elif lng_now == 0.0 and lat_now is None:
+        out["longitude"] = None
+
     return out
 
 
-@router.get("/properties")
+@router.get("/properties", response_model=PropertiesPageResponse)
 def list_properties(
     response: Response,
     q: Optional[str] = Query(default=None),
@@ -237,15 +258,23 @@ def list_properties(
     beds: Optional[int] = Query(default=None),
     baths: Optional[int] = Query(default=None),
     types: Optional[str] = Query(default=None, description="Comma-separated investment types"),
-    sort: Optional[str] = Query(default=None),
-    dir: str = Query(default="desc"),
-    limit: int = Query(default=200, ge=1, le=1000),
+    sort: str = Query(
+        default="created_at_desc",
+        description=(
+            "Sort order. Preferred values: created_at_desc, price_asc, price_desc, "
+            "yield_desc, roi_desc. Backwards compatible: you may also pass a column "
+            "name and use dir=asc|desc."
+        ),
+    ),
+    dir: str = Query(default="desc", description="Legacy sort direction (used with column sort)"),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
 ):
     try:
         response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
 
         sb = _get_supabase()
-        query = sb.table("properties").select("*")
+        query = sb.table("properties").select("*", count="exact")
 
         # Exact source filter (useful for verifying scraper inserts)
         if source is not None:
@@ -282,17 +311,48 @@ def list_properties(
             if type_list:
                 query = query.in_("investment_type", type_list)
 
-        # Sort fallback behaviour (tests expect this)
-        sort_col = sort if (sort in ALLOWED_SORT_COLS) else "created_at"
-        ascending = (dir or "").lower() == "asc"
-        query = query.order(sort_col, desc=not ascending)
+        # Sorting
+        sort_key = (sort or "").strip().lower()
+        sort_map = {
+            "created_at_desc": ("created_at", True),
+            "price_asc": ("price", False),
+            "price_desc": ("price", True),
+            "yield_desc": ("yield_percent", True),
+            "roi_desc": ("roi_percent", True),
+        }
 
-        query = query.limit(limit)
+        if sort_key in sort_map:
+            sort_col, desc = sort_map[sort_key]
+            query = query.order(sort_col, desc=desc)
+        else:
+            # Legacy behaviour: allow sorting by a column + dir=asc|desc
+            sort_col = sort_key if (sort_key in ALLOWED_SORT_COLS) else "created_at"
+            ascending = (dir or "").lower() == "asc"
+            query = query.order(sort_col, desc=not ascending)
+
+        # Pagination
+        start = offset
+        end = offset + limit - 1
+        query = query.range(start, end)
+
         res = query.execute()
         rows = res.data or []
         if not isinstance(rows, list):
-            return []
-        return [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
+            rows = []
+
+        total = getattr(res, "count", None)
+        total_int = int(total) if isinstance(total, (int, float)) else 0
+
+        items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
+        has_more = (offset + limit) < total_int
+
+        return {
+            "items": items,
+            "total": total_int,
+            "limit": limit,
+            "offset": offset,
+            "has_more": has_more,
+        }
 
     except HTTPException:
         raise
