@@ -9,7 +9,7 @@ on:
       - sprint-*
       - po3/**
 jobs:
-  build:
+  backend_smoke:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

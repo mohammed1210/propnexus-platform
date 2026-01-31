@@ -12,7 +12,7 @@ on:
       - ".github/workflows/frontend-ci.yml"
 
 jobs:
-  build:
+  frontend_build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
