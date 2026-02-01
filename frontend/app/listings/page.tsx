@@ -367,12 +367,21 @@ function ListingsInner() {
   const [viewMode, setViewMode] = useState<'grid' | 'split' | 'map'>('split');
   const [showFilters, setShowFilters] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [mappableCount, setMappableCount] = useState<number | null>(null);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Auto-dismiss filters dropdown on meaningful scroll.
+  useEffect(() => {
+    if (!showFilters) return;
+    const onScroll = () => setShowFilters(false);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [showFilters]);
 
   const qRaw = searchParams?.get('q') ?? '';
   const q = sanitizeSearch(qRaw);
@@ -479,6 +488,7 @@ function ListingsInner() {
         const data = await response.json();
 
         const items = Array.isArray(data) ? data : (data?.items ?? []);
+        const mappable = typeof data?.mappable_count === 'number' ? data.mappable_count : null;
         const totalCount =
           typeof data?.total === 'number'
             ? data.total
@@ -510,11 +520,13 @@ function ListingsInner() {
         setRows(mappedData);
         setTotal(totalCount);
         setHasMore(more);
+        setMappableCount(mappable);
       } catch (error) {
         console.error('[listings] fetch error', error);
         setRows([]);
         setTotal(0);
         setHasMore(false);
+        setMappableCount(0);
       } finally {
         setLoading(false);
       }
@@ -543,6 +555,16 @@ function ListingsInner() {
       })
       .filter(Boolean) as { id: string; title: string; lat: number; lng: number; price?: number }[];
   }, [rows]);
+
+  const mapAvailable = (mappableCount ?? points.length) > 0;
+
+  // If backend says nothing is mappable, force map hidden.
+  useEffect(() => {
+    if (loading) return;
+    if (!mapAvailable && (viewMode === 'map' || viewMode === 'split')) {
+      setViewMode('grid');
+    }
+  }, [loading, mapAvailable, viewMode]);
 
   const applyFilters = () => {
     const p = new URLSearchParams();
@@ -683,11 +705,12 @@ function ListingsInner() {
 
               <button
                 onClick={() => setViewMode('split')}
+                disabled={!mapAvailable}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
                   viewMode === 'split'
                     ? 'bg-brand-500 text-white'
                     : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                }`}
+                } ${!mapAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <FiGrid className="inline mr-1" />
                 <FiMap className="inline" />
@@ -695,17 +718,24 @@ function ListingsInner() {
 
               <button
                 onClick={() => setViewMode('map')}
+                disabled={!mapAvailable}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
                   viewMode === 'map'
                     ? 'bg-brand-500 text-white'
                     : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                }`}
+                } ${!mapAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <FiMap className="inline mr-1" />
                 {!isScrolled && 'Map'}
               </button>
             </div>
           </div>
+
+          {!mapAvailable && !loading && rows.length > 0 && (
+            <div className="mt-3 px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm">
+              Map hidden — no listings in this result have coordinates yet
+            </div>
+          )}
 
           {/* Search and Filters */}
           <div className="flex flex-col lg:flex-row gap-3">
@@ -775,8 +805,8 @@ function ListingsInner() {
           )}
 
           {showFilters && (
-            <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+            <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 max-h-[60vh] overflow-auto">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
                 <input
                   type="text"
                   value={minInput}
@@ -807,7 +837,7 @@ function ListingsInner() {
                 />
               </div>
 
-              <div className="mb-3">
+              <div className="mb-2">
                 <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
                   Investment Type
                 </label>
@@ -989,22 +1019,24 @@ function ListingsInner() {
               )}
             </div>
 
-            <div className="hidden lg:block w-[45%] relative">
-              <div className="sticky top-[180px]">
-                <div
-                  className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
-                  style={{ height: 'calc(100vh - 220px)' }}
-                >
-                  {points.length === 0 ? (
-                    <div className="flex h-full w-full items-center justify-center text-sm text-slate-600 dark:text-slate-300">
-                      No mappable listings in this search yet
-                    </div>
-                  ) : (
-                    <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
-                  )}
+            {mapAvailable && (
+              <div className="hidden lg:block w-[38%] relative">
+                <div className="sticky top-[180px]">
+                  <div
+                    className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+                    style={{ height: 'calc(100vh - 220px)' }}
+                  >
+                    {points.length === 0 ? (
+                      <div className="flex h-full w-full items-center justify-center text-sm text-slate-600 dark:text-slate-300">
+                        Map hidden — no listings in this result have coordinates yet
+                      </div>
+                    ) : (
+                      <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -1015,7 +1047,7 @@ function ListingsInner() {
           >
             {points.length === 0 ? (
               <div className="flex h-full w-full items-center justify-center text-sm text-slate-600 dark:text-slate-300">
-                No mappable listings in this search yet
+                Map hidden — no listings in this result have coordinates yet
               </div>
             ) : (
               <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />

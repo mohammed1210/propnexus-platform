@@ -42,6 +42,11 @@ def test_list_properties_endpoint_exists(mock_create_client, client):
     assert response.status_code == 200
     assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
 
+    data = response.json()
+    assert isinstance(data, dict)
+    assert "mappable_count" in data
+    assert isinstance(data.get("mappable_count"), int)
+
 
 @patch("backend.routes.properties_routes.create_client")
 def test_list_properties_with_filters(mock_create_client, client):
@@ -98,6 +103,7 @@ def test_list_properties_with_filters(mock_create_client, client):
     assert isinstance(data, dict)
     assert isinstance(data.get("items"), list)
     assert isinstance(data.get("total"), int)
+    assert isinstance(data.get("mappable_count"), int)
     assert len(data.get("items") or []) == 1
 
     # Verify filters were applied
@@ -128,9 +134,9 @@ def test_list_properties_default_sort(mock_create_client, client):
     assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
 
     # Should order by created_at by default
-    mock_query.order.assert_called_once()
-    call_args = mock_query.order.call_args
-    assert call_args[0][0] == "created_at"
+    assert mock_query.order.call_count >= 1
+    first_call = mock_query.order.call_args_list[0]
+    assert first_call[0][0] == "created_at"
 
 
 @patch("backend.routes.properties_routes.create_client")
@@ -152,8 +158,69 @@ def test_list_properties_invalid_sort(mock_create_client, client):
     assert response.status_code == 200
 
     # Should fall back to created_at
-    call_args = mock_query.order.call_args
-    assert call_args[0][0] == "created_at"
+    first_call = mock_query.order.call_args_list[0]
+    assert first_call[0][0] == "created_at"
+
+
+@patch("backend.routes.properties_routes.create_client")
+def test_list_properties_price_desc_returns_items_with_null_or_invalid_price(
+    mock_create_client, client
+):
+    """Regression: price_desc should not yield empty items when rows have null/invalid price values."""
+
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+
+    # Intentionally unsorted input (we're not relying on the Supabase mock to sort).
+    mock_properties = [
+        {
+            "id": "p1",
+            "title": "Null price",
+            "location": "London",
+            "price": None,
+            "latitude": 51.5,
+            "longitude": -0.12,
+        },
+        {
+            "id": "p3",
+            "title": "Numeric price",
+            "location": "London",
+            "price": 500000,
+            "latitude": 52.0,
+            "longitude": 0.1,
+        },
+        {
+            "id": "p2",
+            "title": "String price",
+            "location": "London",
+            "price": "£250,000",
+            "latitude": None,
+            "longitude": None,
+        },
+    ]
+
+    mock_query.execute.return_value = Mock(data=mock_properties, count=3)
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"sort": "price_desc"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert isinstance(data.get("items"), list)
+    assert len(data.get("items") or []) == 3
+    assert isinstance(data.get("mappable_count"), int)
+    # Two items have valid in-range coordinates.
+    assert data.get("mappable_count") == 2
+
+    items = data.get("items")
+    assert items[0]["id"] == "p3"  # 500k first
+    assert items[1]["id"] == "p2"  # "£250,000" coerced
+    assert items[2]["id"] == "p1"  # null last
 
 
 @patch("backend.routes.properties_routes.create_client")

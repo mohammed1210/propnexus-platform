@@ -98,6 +98,7 @@ export type PropertyRow = {
 export type PropertiesPage = {
   items: PropertyRow[];
   total: number;
+  mappable_count?: number;
   limit: number;
   offset: number;
   has_more: boolean;

@@ -90,9 +90,10 @@ def test_list_properties_returns_paginated_shape_and_total(monkeypatch):
     )
 
     assert isinstance(res, dict)
-    assert set(res.keys()) >= {"items", "total", "limit", "offset", "has_more"}
+    assert set(res.keys()) >= {"items", "total", "mappable_count", "limit", "offset", "has_more"}
     assert isinstance(res["items"], list)
     assert res["total"] == 1234
+    assert isinstance(res["mappable_count"], int)
     assert res["limit"] == 50
     assert res["offset"] == 0
     assert res["has_more"] is True

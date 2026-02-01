@@ -30,9 +30,64 @@ PROPERTIES_NORMALIZATION_VERSION = "v1"
 class PropertiesPageResponse(BaseModel):
     items: List[Dict[str, Any]] = Field(default_factory=list)
     total: int = 0
+    mappable_count: int = 0
     limit: int = 50
     offset: int = 0
     has_more: bool = False
+
+
+def _safe_order(query: Any, column: str, *, desc: bool, nulls_last: bool = True) -> Any:
+    """Order defensively across supabase/postgrest client versions.
+
+    We prefer explicit nulls-last ordering when supported to prevent
+    desc-ordering from surfacing NULLs first.
+    """
+
+    if nulls_last:
+        # postgrest-py commonly supports `nullsfirst`; set False => NULLS LAST.
+        try:
+            return query.order(column, desc=desc, nullsfirst=False)
+        except TypeError:
+            pass
+
+        # Some versions may support `nullslast` instead.
+        try:
+            return query.order(column, desc=desc, nullslast=True)
+        except TypeError:
+            pass
+
+    return query.order(column, desc=desc)
+
+
+def _is_mappable_coordinate_pair(lat: Any, lng: Any) -> bool:
+    def _to_float(v: Any) -> float | None:
+        if v is None or isinstance(v, bool):
+            return None
+        if isinstance(v, (int, float)):
+            f = float(v)
+        elif isinstance(v, str):
+            try:
+                f = float(v.strip())
+            except Exception:
+                return None
+        else:
+            return None
+
+        if not (f == f):  # NaN
+            return None
+        return f
+
+    lat_f = _to_float(lat)
+    lng_f = _to_float(lng)
+    if lat_f is None or lng_f is None:
+        return False
+
+    if lat_f < -90 or lat_f > 90:
+        return False
+    if lng_f < -180 or lng_f > 180:
+        return False
+
+    return True
 
 
 def _get_supabase():
@@ -201,11 +256,24 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
         out["address"] = _pick_raw(["address", "displayAddress", "display_address", "location"])
 
     # Numeric hydration
-    if out.get("price") in (None, 0, 0.0, ""):
+    # Price: keep numeric for sorting + UX. Attempt to coerce common string formats.
+    cur_price = out.get("price")
+    if isinstance(cur_price, str):
+        coerced = _coerce_int(cur_price)
+        if coerced is not None and coerced > 0:
+            out["price"] = coerced
+
+    if out.get("price") in (None, 0, 0.0, "") or not isinstance(out.get("price"), (int, float)):
         raw_price = _pick_raw(["price", "displayPrice", "display_price"])
         price = _coerce_int(raw_price)
         if price is not None and price > 0:
             out["price"] = price
+
+    # Yield/ROI: coerce to float when possible.
+    if isinstance(out.get("yield_percent"), str):
+        out["yield_percent"] = _coerce_float(out.get("yield_percent"))
+    if isinstance(out.get("roi_percent"), str):
+        out["roi_percent"] = _coerce_float(out.get("roi_percent"))
 
     if out.get("bedrooms") in (None, 0, ""):
         beds = _coerce_int(_pick_raw(["bedrooms", "beds", "numBedrooms", "numberOfBedrooms"]))
@@ -274,42 +342,48 @@ def list_properties(
         response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
 
         sb = _get_supabase()
-        query = sb.table("properties").select("*", count="exact")
 
-        # Exact source filter (useful for verifying scraper inserts)
-        if source is not None:
-            src = str(source).strip().lower()
-            if src:
-                query = query.eq("source", src)
+        def _build_base_query():
+            q0 = sb.table("properties").select("*", count="exact")
 
-        # Optional created_at filter (useful for "show me what just got inserted")
-        if created_after is not None:
-            ts = str(created_after).strip()
-            if ts:
-                query = query.gte("created_at", ts)
+            # Exact source filter (useful for verifying scraper inserts)
+            if source is not None:
+                src = str(source).strip().lower()
+                if src:
+                    q0 = q0.eq("source", src)
 
-        # Search across common fields
-        if q:
-            q_esc = q.replace("%", "").strip()
-            if q_esc:
-                # Supabase .or_ expects a comma-separated filter string
-                query = query.or_(f"title.ilike.%{q_esc}%,location.ilike.%{q_esc}%")
+            # Optional created_at filter (useful for "show me what just got inserted")
+            if created_after is not None:
+                ts = str(created_after).strip()
+                if ts:
+                    q0 = q0.gte("created_at", ts)
 
-        # Numeric filters
-        if min is not None:
-            query = query.gte("price", min)
-        if max is not None:
-            query = query.lte("price", max)
-        if beds is not None:
-            query = query.gte("bedrooms", beds)
-        if baths is not None:
-            query = query.gte("bathrooms", baths)
+            # Search across common fields
+            if q:
+                q_esc = q.replace("%", "").strip()
+                if q_esc:
+                    # Supabase .or_ expects a comma-separated filter string
+                    q0 = q0.or_(f"title.ilike.%{q_esc}%,location.ilike.%{q_esc}%")
 
-        # Types filter
-        if types:
-            type_list: List[str] = [t.strip() for t in types.split(",") if t.strip()]
-            if type_list:
-                query = query.in_("investment_type", type_list)
+            # Numeric filters
+            if min is not None:
+                q0 = q0.gte("price", min)
+            if max is not None:
+                q0 = q0.lte("price", max)
+            if beds is not None:
+                q0 = q0.gte("bedrooms", beds)
+            if baths is not None:
+                q0 = q0.gte("bathrooms", baths)
+
+            # Types filter
+            if types:
+                type_list: List[str] = [t.strip() for t in types.split(",") if t.strip()]
+                if type_list:
+                    q0 = q0.in_("investment_type", type_list)
+
+            return q0
+
+        query = _build_base_query()
 
         # Sorting
         sort_key = (sort or "").strip().lower()
@@ -323,19 +397,36 @@ def list_properties(
 
         if sort_key in sort_map:
             sort_col, desc = sort_map[sort_key]
-            query = query.order(sort_col, desc=desc)
+            query = _safe_order(query, sort_col, desc=desc, nulls_last=True)
+            # Stable fallback ordering for deterministic paging.
+            if sort_col != "created_at":
+                query = _safe_order(query, "created_at", desc=True, nulls_last=True)
         else:
             # Legacy behaviour: allow sorting by a column + dir=asc|desc
             sort_col = sort_key if (sort_key in ALLOWED_SORT_COLS) else "created_at"
             ascending = (dir or "").lower() == "asc"
-            query = query.order(sort_col, desc=not ascending)
+            query = _safe_order(query, sort_col, desc=not ascending, nulls_last=True)
+            if sort_col != "created_at":
+                query = _safe_order(query, "created_at", desc=True, nulls_last=True)
 
         # Pagination
         start = offset
         end = offset + limit - 1
         query = query.range(start, end)
 
-        res = query.execute()
+        fallback_sort = sort_key in {"price_asc", "price_desc", "yield_desc", "roi_desc"}
+        try:
+            res = query.execute()
+        except Exception:
+            # If PostgREST/supabase cannot order/cast cleanly (e.g. mixed/legacy data),
+            # fall back to a safe server-side sort based on normalized values.
+            if not fallback_sort:
+                raise
+
+            query = _build_base_query()
+            query = _safe_order(query, "created_at", desc=True, nulls_last=True)
+            query = query.range(start, end)
+            res = query.execute()
         rows = res.data or []
         if not isinstance(rows, list):
             rows = []
@@ -344,11 +435,55 @@ def list_properties(
         total_int = int(total) if isinstance(total, (int, float)) else 0
 
         items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
+
+        # Ensure numeric-safe sorting (nulls last) for common UI sorts.
+        # Python sorting is stable, so the secondary created_at ordering remains for ties.
+        def _num(v: Any) -> float | None:
+            if v is None or isinstance(v, bool):
+                return None
+            if isinstance(v, (int, float)):
+                return float(v)
+            if isinstance(v, str):
+                try:
+                    return float(v.strip())
+                except Exception:
+                    return None
+            return None
+
+        if sort_key == "price_asc":
+            items.sort(key=lambda it: (_num(it.get("price")) is None, _num(it.get("price")) or 0))
+        elif sort_key == "price_desc":
+            items.sort(
+                key=lambda it: (
+                    _num(it.get("price")) is None,
+                    -(_num(it.get("price")) or 0),
+                )
+            )
+        elif sort_key == "yield_desc":
+            items.sort(
+                key=lambda it: (
+                    _num(it.get("yield_percent")) is None,
+                    -(_num(it.get("yield_percent")) or 0),
+                )
+            )
+        elif sort_key == "roi_desc":
+            items.sort(
+                key=lambda it: (
+                    _num(it.get("roi_percent")) is None,
+                    -(_num(it.get("roi_percent")) or 0),
+                )
+            )
+        mappable_count = sum(
+            1
+            for it in items
+            if _is_mappable_coordinate_pair(it.get("latitude"), it.get("longitude"))
+        )
         has_more = (offset + limit) < total_int
 
         return {
             "items": items,
             "total": total_int,
+            "mappable_count": int(mappable_count),
             "limit": limit,
             "offset": offset,
             "has_more": has_more,
