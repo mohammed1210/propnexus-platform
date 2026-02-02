@@ -96,12 +96,33 @@ function formatSourceBadge(source: string | null | undefined): string {
   const normalized = raw.toLowerCase();
 
   if (normalized === 'zoopla') return 'Zoopla';
-  if (normalized === 'onthemarket') return 'OTM';
+  if (normalized === 'rightmove') return 'Rightmove';
+  if (normalized === 'onthemarket' || normalized === 'otm') return 'OTM';
   if (normalized === 'spareroom') return 'SpareRoom';
   if (!raw) return 'Unknown';
 
   // Fallback: capitalize first character (keep rest as-is)
   return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function getSourceBadgeClasses(source: string | null | undefined): string {
+  const normalized = (source ?? '').trim().toLowerCase();
+
+  // Requested brand colors:
+  // - Zoopla: purple
+  // - Rightmove: turquoise
+  // - OTM: redish/maroon
+  if (normalized === 'zoopla') {
+    return 'bg-purple-100 text-purple-800 border border-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-700';
+  }
+  if (normalized === 'rightmove') {
+    return 'bg-teal-100 text-teal-800 border border-teal-200 dark:bg-teal-900/30 dark:text-teal-200 dark:border-teal-700';
+  }
+  if (normalized === 'onthemarket' || normalized === 'otm') {
+    return 'bg-rose-100 text-rose-800 border border-rose-200 dark:bg-rose-900/30 dark:text-rose-200 dark:border-rose-700';
+  }
+
+  return 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700';
 }
 
 export default function PropertyCard({ p }: { p: Property }) {
@@ -186,6 +207,7 @@ export default function PropertyCard({ p }: { p: Property }) {
   }, [p.description]);
 
   const sourceBadgeText = useMemo(() => formatSourceBadge(p.source), [p.source]);
+  const sourceBadgeClasses = useMemo(() => getSourceBadgeClasses(p.source), [p.source]);
 
   return (
     <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30">
@@ -304,8 +326,7 @@ export default function PropertyCard({ p }: { p: Property }) {
             <span
               className={cx(
                 'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
-                'bg-slate-100 text-slate-700 border border-slate-200',
-                'dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700',
+                sourceBadgeClasses,
               )}
               aria-label={`Source: ${sourceBadgeText}`}
               title={`Source: ${sourceBadgeText}`}
