@@ -32,7 +32,7 @@
     "@pdf-lib/standard-fonts": "^1.0.0",
     "@pdf-lib/upng": "^1.0.1",
     "@sentry/nextjs": "^8.55.0",
-    "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.39.4",
     "@vis.gl/react-google-maps": "^1.7.1",
