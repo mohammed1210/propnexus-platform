@@ -11,8 +11,7 @@ Unification and normalization:
 
 - `backend/utils/ingest.py` aggregates all sources, normalizes data to the `properties` schema
 	(image_urls[], canonical `url`, address/postcode best‑effort) and dedupes.
-- `backend/routes/scrape_routes.py` exposes POST `/scrape { location }` to trigger a normalized scrape.
-- `backend/routes/import_routes.py` exposes POST `/import/all { location }` with a similar response.
+- `backend/routes/import_routes.py` exposes POST `/import/all?req=London` (admin token protected) to trigger a scrape + upsert.
 
 Continuous ingestion:
 
@@ -51,7 +50,7 @@ Production (Railway/Render) options:
 
 Verification:
 
-- Call POST `/scrape` with `{ "location": "Liverpool" }` and inspect `{ count, preview }`
+- Call POST `/import/all?req=Liverpool` with header `x-admin-token: $IMPORT_ADMIN_TOKEN` and inspect `{ total_imported, sources, warning? }`
 - Open the frontend `/listings` and confirm new rows appear
 - Check container logs for per‑location counts
 
