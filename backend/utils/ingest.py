@@ -255,6 +255,7 @@ SAFE_COLUMNS = {
     "yield_percent",
     "roi_percent",
     "imageurl",
+    "image_urls",
     "investment_type",
     "created_at",
 }
@@ -313,7 +314,43 @@ def _classify_investment_type(title: str | None, description: str | None) -> str
 
 
 def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
-    listing_url = clean_str(pick_first(raw, ["listing_url", "url", "link", "href"]))
+    def _norm_url(u: Any) -> str | None:
+        if not isinstance(u, str):
+            return None
+        s = u.strip()
+        if not s:
+            return None
+        if s.startswith("//"):
+            return f"https:{s}"
+        return s
+
+    def _normalize_image_urls(value: Any) -> list[str]:
+        if not value:
+            return []
+        if not isinstance(value, list):
+            return []
+        out: list[str] = []
+        seen: set[str] = set()
+        for v in value:
+            u = _norm_url(v)
+            if not u:
+                continue
+            if u in seen:
+                continue
+            seen.add(u)
+            out.append(u)
+        return out
+
+    # Many scrapers expose the canonical listing URL under different keys.
+    # Rightmove scraper uses `raw_url`.
+    listing_url = _norm_url(
+        pick_first(raw, ["listing_url", "url", "raw_url", "link", "href", "propertyUrl"])
+    )
+
+    # Preserve gallery photos when available.
+    image_urls = _normalize_image_urls(
+        pick_first(raw, ["image_urls", "imageUrls", "images", "photos", "gallery"])
+    )
 
     normalized: Dict[str, Any] = {
         "title": clean_str(pick_first(raw, ["title", "name", "headline"])),
@@ -329,13 +366,20 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
         "imageurl": clean_str(
             pick_first(raw, ["imageurl", "image_url", "image", "photo", "thumbnail"])
         ),
+        "image_urls": image_urls if image_urls else None,
         "investment_type": clean_str(pick_first(raw, ["investment_type", "strategy", "type"])),
         "created_at": clean_str(pick_first(raw, ["created_at", "scraped_at", "timestamp"])),
         # optional
         "external_id": extract_external_id(source=source, listing_url=listing_url, raw=raw),
         "source": clean_str(source),
         "listing_url": listing_url,
+        # DB schema uses `url`; keep it in sync with listing_url.
+        "url": listing_url,
     }
+
+    # If imageurl is missing, promote a cover from image_urls.
+    if not normalized.get("imageurl") and image_urls:
+        normalized["imageurl"] = image_urls[0]
 
     # Ensure scraped listings have a stable investment_type tag for filtering.
     # If the source does not provide one, infer from the title/description.

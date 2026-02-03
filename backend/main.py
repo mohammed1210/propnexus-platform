@@ -12,6 +12,16 @@ from fastapi.routing import APIRoute
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+# ruff: noqa: E402
+
+
+logger = logging.getLogger(__name__)
+
+# Load env early (safe if missing)
+# NOTE: Some internal modules initialize clients (e.g. Supabase) at import time.
+# Loading dotenv after importing them would prevent local .env values from taking effect.
+load_dotenv()
+
 from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.rate_limit import limiter
 from backend.middleware.security import SecurityHeadersMiddleware
@@ -37,11 +47,6 @@ from backend.routes.users_routes import router as users_router
 from backend.routes.waitlist_routes import admin_router as admin_waitlist_router
 from backend.routes.waitlist_routes import router as waitlist_router
 from backend.utils.sentry_init import init_sentry
-
-logger = logging.getLogger(__name__)
-
-# Load env (safe if missing)
-load_dotenv()
 
 # Initialize Sentry (only enables in prod + DSN configured)
 try:
