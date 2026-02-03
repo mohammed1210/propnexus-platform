@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import nextDynamic from 'next/dynamic';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
-import { FiSearch, FiSliders, FiMap, FiGrid, FiX } from 'react-icons/fi';
+import { FiSearch, FiSliders, FiMap, FiX } from 'react-icons/fi';
 
 import PropertyCard from '@/components/PropertyCard';
 import { isAuthEnabled } from '@/lib/auth';
@@ -130,6 +130,24 @@ const SORTABLE = ['created_at_desc', 'price_asc', 'price_desc', 'yield_desc', 'r
 type SortKey = (typeof SORTABLE)[number];
 
 const INVESTMENT_TYPES = ['HMO', 'BTL', 'SA', 'BRR', 'Flip', 'Commercial'] as const;
+
+const PRICE_RANGES = [
+  { key: 'any', label: 'Any', min: undefined, max: undefined },
+  { key: '0-150', label: '0–150k', min: 0, max: 150000 },
+  { key: '150-300', label: '150–300k', min: 150000, max: 300000 },
+  { key: '300-500', label: '300–500k', min: 300000, max: 500000 },
+  { key: '500-750', label: '500–750k', min: 500000, max: 750000 },
+  { key: '750+', label: '750k+', min: 750000, max: undefined },
+] as const;
+
+const COUNT_OPTIONS = [
+  { key: '', label: 'Any' },
+  { key: '1', label: '1+' },
+  { key: '2', label: '2+' },
+  { key: '3', label: '3+' },
+  { key: '4', label: '4+' },
+  { key: '5', label: '5+' },
+] as const;
 
 type RawProperty = {
   id: string;
@@ -364,7 +382,7 @@ function ListingsInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [viewMode, setViewMode] = useState<'grid' | 'split' | 'map'>('split');
+  const [showMap, setShowMap] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mappableCount, setMappableCount] = useState<number | null>(null);
@@ -558,13 +576,24 @@ function ListingsInner() {
 
   const mapAvailable = (mappableCount ?? points.length) > 0;
 
+  const priceRangeKey = useMemo(() => {
+    const minStr = (minInput ?? '').trim();
+    const maxStr = (maxInput ?? '').trim();
+    const minN = minStr ? Number(minStr) : undefined;
+    const maxN = maxStr ? Number(maxStr) : undefined;
+    const match = PRICE_RANGES.find((r) => r.min === minN && r.max === maxN);
+    return match?.key ?? 'any';
+  }, [minInput, maxInput]);
+
   // If backend says nothing is mappable, force map hidden.
   useEffect(() => {
     if (loading) return;
-    if (!mapAvailable && (viewMode === 'map' || viewMode === 'split')) {
-      setViewMode('grid');
+    if (!mapAvailable && showMap) {
+      setShowMap(false);
     }
-  }, [loading, mapAvailable, viewMode]);
+  }, [loading, mapAvailable, showMap]);
+
+  const showSplit = showMap && mapAvailable;
 
   const applyFilters = () => {
     const p = new URLSearchParams();
@@ -680,54 +709,106 @@ function ListingsInner() {
             paddingBottom: isScrolled ? '0.5rem' : '1rem',
           }}
         >
-          <div className={`flex items-center justify-between transition-all duration-300 ${isScrolled ? 'mb-2' : 'mb-4'}`}>
-            <h1
-              className={`font-bold text-slate-900 dark:text-white transition-all duration-300 ${
-                isScrolled ? 'text-lg' : 'text-2xl'
-              }`}
-            >
-              {!isScrolled && 'Property Listings'}
-              {isScrolled && 'Listings'}
-            </h1>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <h1 className="font-bold text-slate-900 dark:text-white text-lg">
+                Listings
+              </h1>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                  viewMode === 'grid'
-                    ? 'bg-brand-500 text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                }`}
-              >
-                <FiGrid className="inline mr-1" />
-                {!isScrolled && 'Grid'}
-              </button>
+              <div className="flex items-center gap-2">
+                <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  <FiMap className="w-4 h-4" />
+                  Map
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={showMap && mapAvailable}
+                    onClick={() => setShowMap((v) => !v)}
+                    disabled={!mapAvailable}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      showMap && mapAvailable ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'
+                    } ${!mapAvailable ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    title={mapAvailable ? 'Toggle map' : 'Map unavailable (no coordinates)'}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                        showMap && mapAvailable ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </label>
 
-              <button
-                onClick={() => setViewMode('split')}
-                disabled={!mapAvailable}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                  viewMode === 'split'
-                    ? 'bg-brand-500 text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                } ${!mapAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <FiGrid className="inline mr-1" />
-                <FiMap className="inline" />
-              </button>
+                <select
+                  value={sort}
+                  onChange={(e) => {
+                    const p = new URLSearchParams(searchParams?.toString());
+                    p.set('sort', e.target.value);
+                    p.delete('dir');
+                    p.set('offset', '0');
+                    router.push(`/listings?${p.toString()}`);
+                  }}
+                  className="input-field h-9 px-3 w-auto"
+                  aria-label="Sort"
+                >
+                  <option value="created_at_desc">Most recent</option>
+                  <option value="price_asc">Price: low to high</option>
+                  <option value="price_desc">Price: high to low</option>
+                  <option value="yield_desc">Highest yield</option>
+                  <option value="roi_desc">Highest ROI</option>
+                </select>
+              </div>
+            </div>
 
-              <button
-                onClick={() => setViewMode('map')}
-                disabled={!mapAvailable}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-300 ${
-                  viewMode === 'map'
-                    ? 'bg-brand-500 text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                } ${!mapAvailable ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <FiMap className="inline mr-1" />
-                {!isScrolled && 'Map'}
-              </button>
+            {/* Search + actions */}
+            <div className="flex flex-col lg:flex-row gap-2">
+              <div className="flex-1">
+                <div className="relative">
+                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                    placeholder="Search by location or postcode…"
+                    className="input-field w-full h-10 pl-10 pr-3"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={applyFilters}
+                  className="h-10 px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold transition-all duration-200 flex items-center gap-2"
+                  disabled={loading}
+                >
+                  <FiSearch className="w-4 h-4" />
+                  Search
+                </button>
+
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
+                >
+                  <FiSliders className="w-4 h-4" />
+                  Filters
+                  {activeFilters.length > 0 && (
+                    <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-brand-500 text-white text-xs font-medium">
+                      {activeFilters.length}
+                    </span>
+                  )}
+                </button>
+
+                {isLoaded && isAdmin && (
+                  <button
+                    onClick={runScrape}
+                    className="h-10 px-4 rounded-lg border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-200"
+                    disabled={scrapeLoading}
+                    title="Admin: run scrapers and import fresh listings"
+                  >
+                    {scrapeLoading ? 'Running…' : 'Run Scrape'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -737,57 +818,7 @@ function ListingsInner() {
             </div>
           )}
 
-          {/* Search and Filters */}
-          <div className="flex flex-col lg:flex-row gap-3">
-            <div className="flex-1">
-              <div className="relative">
-                <FiSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-                  placeholder="Search by location, postcode, or property type..."
-                  className="input-field w-full h-11 pl-12 pr-4"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={applyFilters}
-                className="h-11 px-6 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold transition-all duration-300 flex items-center gap-2"
-                disabled={loading}
-              >
-                <FiSearch className="w-5 h-5" />
-                Search
-              </button>
-
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="h-11 px-6 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-300"
-              >
-                <FiSliders className="w-5 h-5" />
-                Filters
-                {activeFilters.length > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-brand-500 text-white text-xs font-medium">
-                    {activeFilters.length}
-                  </span>
-                )}
-              </button>
-
-              {isLoaded && isAdmin && (
-                <button
-                  onClick={runScrape}
-                  className="h-11 px-6 rounded-lg border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-300"
-                  disabled={scrapeLoading}
-                  title="Admin: run scrapers and import fresh listings"
-                >
-                  {scrapeLoading ? 'Running scrape…' : 'Run Scrape'}
-                </button>
-              )}
-            </div>
-          </div>
+          {/* Filters panel */}
 
           {(scrapeMsg || scrapeErr) && (
             <div className="mt-3">
@@ -805,36 +836,80 @@ function ListingsInner() {
           )}
 
           {showFilters && (
-            <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 max-h-[60vh] overflow-auto">
+            <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 max-h-[60vh] overflow-auto">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-                <input
-                  type="text"
-                  value={minInput}
-                  onChange={(e) => setMinInput(e.target.value)}
-                  placeholder="Min price"
-                  className="input-field h-10"
-                />
-                <input
-                  type="text"
-                  value={maxInput}
-                  onChange={(e) => setMaxInput(e.target.value)}
-                  placeholder="Max price"
-                  className="input-field h-10"
-                />
-                <input
-                  type="text"
-                  value={bedsInput}
-                  onChange={(e) => setBedsInput(e.target.value)}
-                  placeholder="Min beds"
-                  className="input-field h-10"
-                />
-                <input
-                  type="text"
-                  value={bathsInput}
-                  onChange={(e) => setBathsInput(e.target.value)}
-                  placeholder="Min baths"
-                  className="input-field h-10"
-                />
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    Price
+                  </label>
+                  <select
+                    value={priceRangeKey}
+                    onChange={(e) => {
+                      const r = PRICE_RANGES.find((x) => x.key === e.target.value) ?? PRICE_RANGES[0];
+                      setMinInput(typeof r.min === 'number' ? String(r.min) : '');
+                      setMaxInput(typeof r.max === 'number' ? String(r.max) : '');
+                    }}
+                    className="input-field h-9 px-3 w-full"
+                    aria-label="Price range"
+                  >
+                    {PRICE_RANGES.map((r) => (
+                      <option key={r.key} value={r.key}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    Beds
+                  </label>
+                  <select
+                    value={(bedsInput ?? '').trim()}
+                    onChange={(e) => setBedsInput(e.target.value)}
+                    className="input-field h-9 px-3 w-full"
+                    aria-label="Bedrooms"
+                  >
+                    {COUNT_OPTIONS.map((o) => (
+                      <option key={o.key || 'any'} value={o.key}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    Baths
+                  </label>
+                  <select
+                    value={(bathsInput ?? '').trim()}
+                    onChange={(e) => setBathsInput(e.target.value)}
+                    className="input-field h-9 px-3 w-full"
+                    aria-label="Bathrooms"
+                  >
+                    {COUNT_OPTIONS.map((o) => (
+                      <option key={o.key || 'any'} value={o.key}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+                    Property type
+                  </label>
+                  <select
+                    value=""
+                    disabled
+                    className="input-field h-9 px-3 w-full opacity-70 cursor-not-allowed"
+                    aria-label="Property type (soon)"
+                    title="Radius/type filters are not supported in backend yet"
+                  >
+                    <option value="">Any (soon)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="mb-2">
@@ -899,79 +974,57 @@ function ListingsInner() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {(viewMode === 'grid' || viewMode === 'split') && (
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-slate-600 dark:text-slate-400">
-              <span className="font-semibold text-slate-900 dark:text-white">
-                {showingFrom}-{showingTo}
-              </span>{' '}
-              of{' '}
-              <span className="font-semibold text-slate-900 dark:text-white">{total}</span>
-            </p>
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-slate-600 dark:text-slate-400">
+            <span className="font-semibold text-slate-900 dark:text-white">
+              {showingFrom}-{showingTo}
+            </span>{' '}
+            of <span className="font-semibold text-slate-900 dark:text-white">{total}</span>
+          </p>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={limit}
-                onChange={(e) => {
-                  const p = new URLSearchParams(searchParams?.toString());
-                  p.set('limit', e.target.value);
-                  p.set('offset', '0');
-                  router.push(`/listings?${p.toString()}`);
-                }}
-                className="input-field h-11 px-4 w-auto"
-                aria-label="Page size"
-              >
-                <option value="25">25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-              </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={limit}
+              onChange={(e) => {
+                const p = new URLSearchParams(searchParams?.toString());
+                p.set('limit', e.target.value);
+                p.set('offset', '0');
+                router.push(`/listings?${p.toString()}`);
+              }}
+              className="input-field h-10 px-3 w-auto"
+              aria-label="Page size"
+            >
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
 
-              <select
-                value={sort}
-                onChange={(e) => {
-                  const p = new URLSearchParams(searchParams?.toString());
-                  p.set('sort', e.target.value);
-                  p.delete('dir');
-                  p.set('offset', '0');
-                  router.push(`/listings?${p.toString()}`);
-                }}
-                className="input-field h-11 px-4 w-auto"
-                aria-label="Sort"
-              >
-                <option value="created_at_desc">Most Recent</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-                <option value="yield_desc">Highest Yield</option>
-                <option value="roi_desc">Highest ROI</option>
-              </select>
-
-              <button
-                onClick={() => {
-                  const p = new URLSearchParams(searchParams?.toString());
-                  p.set('offset', String(Math.max(0, offset - limit)));
-                  router.push(`/listings?${p.toString()}`);
-                }}
-                disabled={loading || offset <= 0}
-                className="h-11 px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => {
-                  const p = new URLSearchParams(searchParams?.toString());
-                  p.set('offset', String(offset + limit));
-                  router.push(`/listings?${p.toString()}`);
-                }}
-                disabled={loading || !hasMore}
-                className="h-11 px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Next
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                const p = new URLSearchParams(searchParams?.toString());
+                p.set('offset', String(Math.max(0, offset - limit)));
+                router.push(`/listings?${p.toString()}`);
+              }}
+              disabled={loading || offset <= 0}
+              className="h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => {
+                const p = new URLSearchParams(searchParams?.toString());
+                p.set('offset', String(offset + limit));
+                router.push(`/listings?${p.toString()}`);
+              }}
+              disabled={loading || !hasMore}
+              className="h-10 px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
           </div>
-        )}
+        </div>
 
-        {viewMode === 'grid' && (
+        {!showSplit && (
           <>
             {loading ? (
               <div className="text-center py-12">
@@ -995,8 +1048,8 @@ function ListingsInner() {
           </>
         )}
 
-        {viewMode === 'split' && (
-          <div className="flex gap-6">
+        {showSplit && (
+          <div className="flex flex-col lg:flex-row gap-6">
             <div className="flex-1 min-w-0">
               {loading ? (
                 <div className="text-center py-12">
@@ -1019,39 +1072,21 @@ function ListingsInner() {
               )}
             </div>
 
-            {mapAvailable && (
-              <div className="hidden lg:block w-[38%] relative">
-                <div className="sticky top-[180px]">
-                  <div
-                    className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
-                    style={{ height: 'calc(100vh - 220px)' }}
-                  >
-                    {points.length === 0 ? (
-                      <div className="flex h-full w-full items-center justify-center text-sm text-slate-600 dark:text-slate-300">
-                        Map hidden — no listings in this result have coordinates yet
-                      </div>
-                    ) : (
-                      <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
-                    )}
-                  </div>
+            <div className="w-full lg:w-[38%] relative">
+              <div className="lg:sticky lg:top-[180px]">
+                <div
+                  className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden h-[360px] lg:h-[calc(100vh-220px)]"
+                >
+                  {points.length === 0 ? (
+                    <div className="flex h-full w-full items-center justify-center text-sm text-slate-600 dark:text-slate-300">
+                      Map hidden — no listings in this result have coordinates yet
+                    </div>
+                  ) : (
+                    <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
+                  )}
                 </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {viewMode === 'map' && (
-          <div
-            className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
-            style={{ height: 'calc(100vh - 300px)' }}
-          >
-            {points.length === 0 ? (
-              <div className="flex h-full w-full items-center justify-center text-sm text-slate-600 dark:text-slate-300">
-                Map hidden — no listings in this result have coordinates yet
-              </div>
-            ) : (
-              <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
-            )}
+            </div>
           </div>
         )}
       </div>

@@ -262,6 +262,56 @@ SAFE_COLUMNS = {
 OPTIONAL_COLUMNS = {"external_id", "source", "listing_url", "url", "updated_at"}
 
 
+def _classify_investment_type(title: str | None, description: str | None) -> str:
+    text = f"{title or ''} {description or ''}".lower()
+
+    # Minimal, launch-safe heuristics. Prioritize explicit signals.
+    hmo_signals = [
+        "hmo",
+        "licensed",
+        "licenced",
+        "rooms to let",
+        "room to let",
+        "rooms to rent",
+        "room to rent",
+    ]
+    sa_signals = [
+        "serviced accommodation",
+        "airbnb",
+        "short let",
+        "short-let",
+        "holiday let",
+    ]
+    flip_signals = [
+        "auction",
+        "modernisation",
+        "modernization",
+        "refurb",
+        "refurbishment",
+        "renovation",
+        "cash buyers",
+        "cash buyer",
+        "project",
+    ]
+    commercial_signals = [
+        "commercial",
+        "retail unit",
+        "shop",
+        "warehouse",
+    ]
+
+    if any(s in text for s in hmo_signals):
+        return "HMO"
+    if any(s in text for s in sa_signals):
+        return "SA"
+    if any(s in text for s in commercial_signals):
+        return "Commercial"
+    if any(s in text for s in flip_signals):
+        return "Flip"
+
+    return "BTL"
+
+
 def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
     listing_url = clean_str(pick_first(raw, ["listing_url", "url", "link", "href"]))
 
@@ -287,8 +337,87 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
         "listing_url": listing_url,
     }
 
+    # Ensure scraped listings have a stable investment_type tag for filtering.
+    # If the source does not provide one, infer from the title/description.
+    if not normalized.get("investment_type"):
+        normalized["investment_type"] = _classify_investment_type(
+            normalized.get("title"), normalized.get("description")
+        )
+
     # Remove nulls so we don't overwrite good data with null
     return {k: v for k, v in normalized.items() if v is not None}
+
+
+def backfill_investment_type(
+    sb: Client,
+    *,
+    table: str = DEFAULT_TABLE,
+    batch_size: int = 500,
+    max_rows: int | None = None,
+    dry_run: bool = False,
+) -> None:
+    """Backfill missing investment_type for existing DB rows.
+
+    Safety:
+    - Only targets rows where investment_type is NULL (and tries to include empty string too).
+    - Writes only {id, investment_type} via upsert.
+    """
+
+    processed = 0
+    total_updates = 0
+    offset = 0
+
+    cols = "id,title,description,investment_type"
+
+    while True:
+        remaining = None if max_rows is None else max(0, max_rows - processed)
+        if remaining == 0:
+            break
+
+        page_size = batch_size if remaining is None else min(batch_size, remaining)
+
+        try:
+            # Prefer including empty strings too (some scrapers may write "").
+            query = (
+                sb.table(table)
+                .select(cols)
+                .or_("investment_type.is.null,investment_type.eq.")
+                .range(offset, offset + page_size - 1)
+            )
+            resp = query.execute()
+        except Exception:
+            resp = (
+                sb.table(table)
+                .select(cols)
+                .is_("investment_type", "null")
+                .range(offset, offset + page_size - 1)
+                .execute()
+            )
+
+        rows = resp.data or []
+        if not rows:
+            break
+
+        updates: List[Dict[str, Any]] = []
+        for r in rows:
+            pid = r.get("id")
+            if not pid:
+                continue
+            inv = _classify_investment_type(r.get("title"), r.get("description"))
+            updates.append({"id": pid, "investment_type": inv})
+
+        if updates:
+            if dry_run:
+                log(f"DRY-RUN: would backfill {len(updates)} rows (showing up to 5): {updates[:5]}")
+            else:
+                sb.table(table).upsert(updates, on_conflict="id").execute()
+                total_updates += len(updates)
+                log(f"Backfilled investment_type for {len(updates)} rows")
+
+        processed += len(rows)
+        offset += len(rows)
+
+    log(f"Backfill complete. Processed={processed}, Updated={total_updates}")
 
 
 # ----------------------------
@@ -602,8 +731,8 @@ async def scrape_all_sources(
 # ----------------------------
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input", required=True, help="Path to JSON list or NDJSON file")
-    ap.add_argument("--source", required=True, help="Source name e.g. zoopla or rightmove")
+    ap.add_argument("--input", help="Path to JSON list or NDJSON file")
+    ap.add_argument("--source", help="Source name e.g. zoopla or rightmove")
     ap.add_argument(
         "--table", default=DEFAULT_TABLE, help="Supabase table name (default: properties)"
     )
@@ -611,14 +740,41 @@ def main() -> None:
         "--dry-run", action="store_true", help="Print normalized output, do not write to DB"
     )
     ap.add_argument("--batch-size", type=int, default=200, help="Upsert batch size (default: 200)")
+    ap.add_argument(
+        "--backfill-investment-type",
+        action="store_true",
+        help="Backfill missing investment_type in the DB (does not require --input)",
+    )
+    ap.add_argument(
+        "--backfill-limit",
+        type=int,
+        default=0,
+        help="Optional max rows to process during backfill (0 = no limit)",
+    )
     args = ap.parse_args()
+
+    sb = get_supabase_client()
+
+    if args.backfill_investment_type:
+        backfill_investment_type(
+            sb,
+            table=args.table,
+            batch_size=max(50, int(args.batch_size)),
+            max_rows=None if int(args.backfill_limit) <= 0 else int(args.backfill_limit),
+            dry_run=bool(args.dry_run),
+        )
+        return
+
+    if not args.input or not args.source:
+        raise SystemExit(
+            "--input and --source are required unless --backfill-investment-type is set"
+        )
 
     records = load_records(args.input)
     if not records:
         warn("No records found to ingest.")
         return
 
-    sb = get_supabase_client()
     ingest(
         sb=sb,
         table=args.table,
