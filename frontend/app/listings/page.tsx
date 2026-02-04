@@ -194,9 +194,8 @@ function ClientMap({
       const link = document.createElement('link');
       link.id = 'leaflet-css';
       link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      link.integrity = 'sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=';
-      link.crossOrigin = '';
+      // Self-hosted Leaflet assets (avoids CSP/CDN/SRI issues)
+      link.href = '/leaflet/leaflet.css';
       document.head.appendChild(link);
     }
   }, []);
@@ -207,10 +206,13 @@ function ClientMap({
       try {
         const leaflet = await import('leaflet');
         const L: any = leaflet.default ?? leaflet;
+        try {
+          delete L.Icon.Default.prototype._getIconUrl;
+        } catch {}
         L.Icon.Default.mergeOptions({
-          iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+          iconRetinaUrl: '/leaflet/marker-icon-2x.png',
+          iconUrl: '/leaflet/marker-icon.png',
+          shadowUrl: '/leaflet/marker-shadow.png',
         });
       } catch {}
     })();
@@ -555,8 +557,8 @@ function ListingsInner() {
           roi_percent: prop.roi_percent,
           imageurl: prop.imageurl,
           source: prop.source,
-          latitude: prop.latitude,
-          longitude: prop.longitude,
+          latitude: prop.latitude ?? prop.lat,
+          longitude: prop.longitude ?? prop.lng ?? prop.lon,
           created_at: prop.created_at,
           investment_type: prop.investment_type,
         }));

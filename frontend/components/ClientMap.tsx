@@ -25,6 +25,31 @@ export default function ClientMap({
 }) {
   const mapRef = useRef<LeafletMap | null>(null);
 
+  useEffect(() => {
+    if (typeof document !== 'undefined' && !document.getElementById('leaflet-css')) {
+      const link = document.createElement('link');
+      link.id = 'leaflet-css';
+      link.rel = 'stylesheet';
+      link.href = '/leaflet/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    (async () => {
+      try {
+        const leaflet = await import('leaflet');
+        const L: any = leaflet.default ?? leaflet;
+        try {
+          delete L.Icon.Default.prototype._getIconUrl;
+        } catch {}
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: '/leaflet/marker-icon-2x.png',
+          iconUrl: '/leaflet/marker-icon.png',
+          shadowUrl: '/leaflet/marker-shadow.png',
+        });
+      } catch {}
+    })();
+  }, []);
+
   const fit = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return;
     const bounds: LatLngBoundsExpression = pts.map((p) => [p.lat, p.lng]) as any;

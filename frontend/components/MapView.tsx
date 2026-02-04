@@ -45,8 +45,7 @@ export default function MapView({
       const link = document.createElement('link');
       link.id = 'leaflet-css';
       link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      link.crossOrigin = '';
+      link.href = '/leaflet/leaflet.css';
       document.head.appendChild(link);
     };
 
@@ -57,10 +56,13 @@ export default function MapView({
       L = leaflet.default ?? leaflet;
 
       // Fix default marker icons via CDN assets
+      try {
+        delete L.Icon.Default.prototype._getIconUrl;
+      } catch {}
       L.Icon.Default.mergeOptions({
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+        iconRetinaUrl: '/leaflet/marker-icon-2x.png',
+        iconUrl: '/leaflet/marker-icon.png',
+        shadowUrl: '/leaflet/marker-shadow.png',
       });
 
       if (!mapEl.current) return;
