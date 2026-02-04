@@ -6,7 +6,6 @@ import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { FiMapPin, FiHome, FiDroplet, FiTrendingUp, FiDollarSign, FiTool } from 'react-icons/fi';
 
-import PropertySummaryCard from '@/components/property_details/PropertySummaryCard';
 import QuickStatsActions from '@/components/property_details/QuickStatsActions';
 import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
@@ -86,14 +85,39 @@ export default function PropertyDetailsPage() {
       ? property.imageurl.trim()
       : undefined;
 
-  const hasAnyPhoto = imageUrls.length > 0 || Boolean(fallbackImageUrl);
+  const carouselImages = useMemo((): string[] => {
+    const list = [...imageUrls, ...(fallbackImageUrl ? [fallbackImageUrl] : [])]
+      .filter((u): u is string => typeof u === 'string' && Boolean(u.trim()))
+      .map((u) => u.trim());
 
-  const initialMainImage = imageUrls[0] || fallbackImageUrl || PLACEHOLDER_IMG;
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const u of list) {
+      if (seen.has(u)) continue;
+      seen.add(u);
+      out.push(u);
+    }
+    return out;
+  }, [imageUrls, fallbackImageUrl]);
+
+  const hasAnyPhoto = carouselImages.length > 0;
+  const displayImages = useMemo(() => {
+    return carouselImages.length > 0 ? carouselImages : [PLACEHOLDER_IMG];
+  }, [carouselImages]);
+
+  const initialMainImage = displayImages[0] || PLACEHOLDER_IMG;
   const [mainImage, setMainImage] = useState<string>(PLACEHOLDER_IMG);
 
   useEffect(() => {
     setMainImage(initialMainImage);
   }, [initialMainImage]);
+
+  const currentIndex = useMemo(() => {
+    const idx = displayImages.findIndex((u) => u === mainImage);
+    return idx >= 0 ? idx : 0;
+  }, [displayImages, mainImage]);
+
+  const canNavigate = hasAnyPhoto && displayImages.length > 1;
 
   useEffect(() => {
     let cancelled = false;
@@ -183,53 +207,52 @@ export default function PropertyDetailsPage() {
       />
 
       <div className="max-w-7xl mx-auto px-4 py-8 lg:pr-72">{/* Add right padding on desktop for floating sidebar */}
-        {/* Property Header Card */}
-        <div className="card mb-6 p-6">
-          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-                {property.title || 'Property Details'}
-              </h1>
-              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 mb-4">
-                <FiMapPin className="w-5 h-5" />
-                <span>{property.location || 'Location not specified'}</span>
-              </div>
-              <div className="flex flex-wrap gap-4">
-                {property.bedrooms !== undefined && (
-                  <div className="flex items-center gap-2">
-                    <FiHome className="w-5 h-5 text-brand-500" />
-                    <span className="text-slate-700 dark:text-slate-300">{property.bedrooms} beds</span>
-                  </div>
-                )}
-                {property.bathrooms !== undefined && (
-                  <div className="flex items-center gap-2">
-                    <FiDroplet className="w-5 h-5 text-brand-500" />
-                    <span className="text-slate-700 dark:text-slate-300">{property.bathrooms} baths</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              <div className="text-right">
-                <div className="text-sm text-slate-600 dark:text-slate-400 mb-1">Price</div>
-                <div className="text-3xl font-bold text-brand-600 dark:text-brand-400">
-                  £{(property.price ?? 0).toLocaleString()}
+        {/* Combined Header + Image carousel */}
+        <div className="card mb-6 overflow-hidden">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-2 truncate">
+                  {property.title || 'Property Details'}
+                </h1>
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400 mb-3">
+                  <FiMapPin className="w-5 h-5 shrink-0" />
+                  <span className="truncate">{property.location || 'Location not specified'}</span>
+                </div>
+                <div className="flex flex-wrap gap-4">
+                  {property.bedrooms !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <FiHome className="w-5 h-5 text-brand-500" />
+                      <span className="text-slate-700 dark:text-slate-300">{property.bedrooms} beds</span>
+                    </div>
+                  )}
+                  {property.bathrooms !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <FiDroplet className="w-5 h-5 text-brand-500" />
+                      <span className="text-slate-700 dark:text-slate-300">{property.bathrooms} baths</span>
+                    </div>
+                  )}
                 </div>
               </div>
-              {property.yield_percent !== undefined && (
-                <div className="flex items-center gap-2 justify-end">
-                  <FiTrendingUp className="w-5 h-5 text-emerald-500" />
-                  <span className="px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
-                    {property.yield_percent.toFixed(1)}% yield
-                  </span>
+              <div className="flex flex-col gap-3 lg:items-end">
+                <div className="text-left lg:text-right">
+                  <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Price</div>
+                  <div className="text-2xl sm:text-3xl font-bold text-brand-600 dark:text-brand-400">
+                    £{(property.price ?? 0).toLocaleString()}
+                  </div>
                 </div>
-              )}
+                {property.yield_percent !== undefined && (
+                  <div className="flex items-center gap-2">
+                    <FiTrendingUp className="w-5 h-5 text-emerald-500" />
+                    <span className="px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                      {property.yield_percent.toFixed(1)}% yield
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Image Gallery */}
-        <div className="card mb-6 overflow-hidden">
           <div className="aspect-[16/9] bg-slate-100 dark:bg-slate-900 relative">
             <Image
               src={mainImage}
@@ -246,6 +269,35 @@ export default function PropertyDetailsPage() {
               }}
             />
 
+            {canNavigate ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const len = displayImages.length;
+                    const next = (currentIndex - 1 + len) % len;
+                    setMainImage(displayImages[next] ?? displayImages[0] ?? PLACEHOLDER_IMG);
+                  }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white/90 dark:bg-slate-900/70 backdrop-blur-sm border border-slate-200/70 dark:border-slate-800/70 flex items-center justify-center hover:bg-white transition-colors"
+                  aria-label="Previous image"
+                >
+                  <span className="text-xl leading-none">‹</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const len = displayImages.length;
+                    const next = (currentIndex + 1) % len;
+                    setMainImage(displayImages[next] ?? displayImages[0] ?? PLACEHOLDER_IMG);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-white/90 dark:bg-slate-900/70 backdrop-blur-sm border border-slate-200/70 dark:border-slate-800/70 flex items-center justify-center hover:bg-white transition-colors"
+                  aria-label="Next image"
+                >
+                  <span className="text-xl leading-none">›</span>
+                </button>
+              </>
+            ) : null}
+
             {!hasAnyPhoto ? (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="px-3 py-1.5 rounded-lg bg-white/90 dark:bg-slate-900/80 backdrop-blur-sm text-sm font-semibold text-slate-700 dark:text-slate-200 border border-slate-200/70 dark:border-slate-800/70">
@@ -254,17 +306,39 @@ export default function PropertyDetailsPage() {
               </div>
             ) : null}
 
-            {imageUrls.length > 0 ? (
+            {hasAnyPhoto ? (
               <div className="absolute bottom-4 right-4 px-3 py-1.5 rounded-lg bg-white/90 backdrop-blur-sm text-sm font-semibold text-slate-900">
-                {Math.max(0, imageUrls.findIndex((u) => u === mainImage)) + 1} / {imageUrls.length}
+                {currentIndex + 1} / {displayImages.length}
+              </div>
+            ) : null}
+
+            {canNavigate && displayImages.length <= 8 ? (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/80 dark:bg-slate-900/60 backdrop-blur-sm border border-slate-200/70 dark:border-slate-800/70">
+                {displayImages.map((u, idx) => {
+                  const active = idx === currentIndex;
+                  return (
+                    <button
+                      key={`${u}-${idx}`}
+                      type="button"
+                      onClick={() => setMainImage(u)}
+                      className={
+                        active
+                          ? 'h-2.5 w-2.5 rounded-full bg-brand-500'
+                          : 'h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-600 hover:bg-slate-400'
+                      }
+                      aria-label={`Go to image ${idx + 1}`}
+                      aria-current={active ? 'true' : undefined}
+                    />
+                  );
+                })}
               </div>
             ) : null}
           </div>
 
-          {imageUrls.length > 1 ? (
+          {hasAnyPhoto && displayImages.length > 1 ? (
             <div className="p-3 border-t border-slate-200 dark:border-slate-800">
               <div className="flex gap-2 overflow-x-auto pb-1">
-                {imageUrls.map((u, idx) => {
+                {displayImages.map((u, idx) => {
                   const selected = u === mainImage;
                   return (
                     <button
@@ -294,6 +368,21 @@ export default function PropertyDetailsPage() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          ) : null}
+
+          {typeof (property as any).description === 'string' && (property as any).description.trim() ? (
+            <div className="p-6 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <div className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Description</div>
+              <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed space-y-2">
+                {String((property as any).description)
+                  .split(/\n{2,}/)
+                  .map((para, idx) => {
+                    const t = para.trim();
+                    if (!t) return null;
+                    return <p key={idx}>{t}</p>;
+                  })}
               </div>
             </div>
           ) : null}

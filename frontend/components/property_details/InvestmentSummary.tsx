@@ -73,24 +73,40 @@ export default function InvestmentSummary({ property }: Props) {
     property.description,
   ]);
 
-  if (loading) return <p data-testid="investment-summary-loading">Loading summary…</p>;
+  if (loading) return <p data-testid="investment-summary-loading" className="text-sm text-slate-600 dark:text-slate-400">Loading summary…</p>;
   if (error)
     return (
-      <p role="alert" className="text-red-600">
+      <p role="alert" className="text-sm text-red-600">
         Error: {error}
       </p>
     );
-  if (!data) return <p className="text-sm opacity-70">No summary available.</p>;
+  if (!data) return <p className="text-sm text-slate-600 dark:text-slate-400">No summary available.</p>;
 
   return (
-    <div data-testid="investment-summary-text" className="space-y-2">
-      {data.summary && <p>{data.summary}</p>}
+    <div data-testid="investment-summary-text" className="space-y-4">
+      {data.summary && (
+        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/30 p-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
+            Summary
+          </div>
+          <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200">{data.summary}</p>
+        </div>
+      )}
+
       {Array.isArray(data.bullets) && data.bullets.length > 0 && (
-        <ul className="list-disc pl-5">
-          {data.bullets.map((b, i) => (
-            <li key={i}>{b}</li>
-          ))}
-        </ul>
+        <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
+            Key points
+          </div>
+          <ul className="space-y-2">
+            {data.bullets.map((b, i) => (
+              <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300">
+                <span className="mt-1 h-1.5 w-1.5 rounded-full bg-brand-500 shrink-0" aria-hidden />
+                <span>{b}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
