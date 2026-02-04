@@ -1252,6 +1252,15 @@ function ListingsInner() {
       )}
 
       <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="mb-4 flex items-center justify-center sm:justify-start">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            Total properties:{' '}
+            <span className="font-semibold text-slate-900 dark:text-white">
+              {typeof total === 'number' ? total.toLocaleString() : '—'}
+            </span>
+          </p>
+        </div>
+
         {!showSplit && (
           <>
             {loading ? (
