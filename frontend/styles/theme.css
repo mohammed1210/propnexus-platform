@@ -332,3 +332,44 @@ body {
     --border-secondary: rgba(148, 163, 184, 0.4);
   }
 }
+
+/* ========================================
+   8) MAP MARKERS (Leaflet)
+   ======================================== */
+.pnx-map-pin {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: var(--pnx-pin-color, var(--accent-primary));
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 10px 18px rgba(15, 23, 42, 0.18);
+}
+
+.dark .pnx-map-pin {
+  border-color: rgba(15, 23, 42, 0.65);
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.45);
+}
+
+.pnx-map-pin--zoopla {
+  --pnx-pin-color: var(--accent-primary);
+}
+
+.pnx-map-pin--rightmove {
+  --pnx-pin-color: var(--error);
+}
+
+.pnx-map-pin--otm {
+  --pnx-pin-color: var(--warning);
+}
+
+.pnx-map-pin--onthemarket {
+  --pnx-pin-color: var(--warning);
+}
+
+.pnx-map-pin--purplebricks {
+  --pnx-pin-color: var(--info);
+}
+
+.pnx-map-pin--other {
+  --pnx-pin-color: var(--text-muted);
+}

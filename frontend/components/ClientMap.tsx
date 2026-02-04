@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
 import nextDynamic from 'next/dynamic';
 
@@ -14,7 +14,7 @@ const TileLayer = nextDynamic(() => import('react-leaflet').then((m) => m.TileLa
 const Marker = nextDynamic(() => import('react-leaflet').then((m) => m.Marker), { ssr: false });
 const Popup = nextDynamic(() => import('react-leaflet').then((m) => m.Popup), { ssr: false });
 
-type Point = { id: string; title: string; lat: number; lng: number; price?: number };
+type Point = { id: string; title: string; lat: number; lng: number; price?: number; source?: string | null };
 
 export default function ClientMap({
   points,
@@ -24,6 +24,7 @@ export default function ClientMap({
   defaultCenter: [number, number];
 }) {
   const mapRef = useRef<LeafletMap | null>(null);
+  const [leafletLib, setLeafletLib] = useState<any>(null);
 
   useEffect(() => {
     if (typeof document !== 'undefined' && !document.getElementById('leaflet-css')) {
@@ -38,6 +39,7 @@ export default function ClientMap({
       try {
         const leaflet = await import('leaflet');
         const L: any = leaflet.default ?? leaflet;
+        setLeafletLib(L);
         try {
           delete L.Icon.Default.prototype._getIconUrl;
         } catch {}
@@ -49,6 +51,40 @@ export default function ClientMap({
       } catch {}
     })();
   }, []);
+
+  const markerIcons = useMemo(() => {
+    const L: any = leafletLib;
+    if (!L?.divIcon) return null;
+
+    const mk = (key: string) =>
+      L.divIcon({
+        className: '',
+        html: `<div class="pnx-map-pin pnx-map-pin--${key}"></div>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+        popupAnchor: [0, -8],
+      });
+
+    return {
+      zoopla: mk('zoopla'),
+      rightmove: mk('rightmove'),
+      onthemarket: mk('onthemarket'),
+      otm: mk('otm'),
+      purplebricks: mk('purplebricks'),
+      other: mk('other'),
+    } as const;
+  }, [leafletLib]);
+
+  const sourceKey = (raw: unknown) => {
+    const s = String(raw ?? '').toLowerCase().trim();
+    if (!s) return 'other';
+    if (s.includes('rightmove')) return 'rightmove';
+    if (s.includes('zoopla')) return 'zoopla';
+    if (s.includes('onthemarket')) return 'onthemarket';
+    if (s === 'otm' || s.includes('otm')) return 'otm';
+    if (s.includes('purplebricks')) return 'purplebricks';
+    return 'other';
+  };
 
   const fit = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return;
@@ -82,7 +118,13 @@ export default function ClientMap({
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       {points.map((p) => (
-        <Marker key={p.id} position={{ lat: p.lat, lng: p.lng }}>
+        <Marker
+          key={p.id}
+          position={{ lat: p.lat, lng: p.lng }}
+          icon={
+            markerIcons ? (markerIcons as any)[sourceKey(p.source)] ?? (markerIcons as any).other : undefined
+          }
+        >
           <Popup>
             <div className="text-sm font-medium">{p.title}</div>
             {typeof p.price === 'number' && (
