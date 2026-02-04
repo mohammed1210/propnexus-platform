@@ -29,6 +29,9 @@ PROPERTIES_NORMALIZATION_VERSION = "v1"
 
 class PropertiesPageResponse(BaseModel):
     items: List[Dict[str, Any]] = Field(default_factory=list)
+    # Optional full-result map points (requested via include_points=1).
+    # Kept out of default responses to avoid large payloads.
+    points: Optional[List[Dict[str, Any]]] = None
     total: int = 0
     mappable_count: int = 0
     limit: int = 50
@@ -310,7 +313,11 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
-@router.get("/properties", response_model=PropertiesPageResponse)
+@router.get(
+    "/properties",
+    response_model=PropertiesPageResponse,
+    response_model_exclude_none=True,
+)
 def list_properties(
     response: Response,
     q: Optional[str] = Query(default=None),
@@ -337,6 +344,14 @@ def list_properties(
     dir: str = Query(default="desc", description="Legacy sort direction (used with column sort)"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
+    include_points: bool = Query(
+        default=False,
+        description=(
+            "Include non-paginated map points for all matching rows (capped by points_limit). "
+            "Use this for map pinning across the full result set, not just the current page."
+        ),
+    ),
+    points_limit: int = Query(default=2000, ge=1, le=10000),
 ):
     try:
         response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
@@ -436,6 +451,133 @@ def list_properties(
 
         items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
 
+        points: Optional[List[Dict[str, Any]]] = None
+        if include_points:
+            # Minimal payload for map pinning. We intentionally do not include images/raw payload.
+            def _build_points_query():
+                q0 = sb.table("properties").select(
+                    "id,title,location,price,bedrooms,investment_type,latitude,longitude,source,created_at"
+                )
+
+                if source is not None:
+                    src = str(source).strip().lower()
+                    if src:
+                        q0 = q0.eq("source", src)
+
+                if created_after is not None:
+                    ts = str(created_after).strip()
+                    if ts:
+                        q0 = q0.gte("created_at", ts)
+
+                if q:
+                    q_esc = q.replace("%", "").strip()
+                    if q_esc:
+                        q0 = q0.or_(f"title.ilike.%{q_esc}%,location.ilike.%{q_esc}%")
+
+                if min is not None:
+                    q0 = q0.gte("price", min)
+                if max is not None:
+                    q0 = q0.lte("price", max)
+                if beds is not None:
+                    q0 = q0.gte("bedrooms", beds)
+                if baths is not None:
+                    q0 = q0.gte("bathrooms", baths)
+
+                if types:
+                    type_list: List[str] = [t.strip() for t in types.split(",") if t.strip()]
+                    if type_list:
+                        q0 = q0.in_("investment_type", type_list)
+
+                return q0
+
+            points_q = _build_points_query()
+            # Deterministic ordering for stable point sets.
+            points_q = _safe_order(points_q, "created_at", desc=True, nulls_last=True)
+            points_q = points_q.range(0, points_limit - 1)
+
+            points_res = points_q.execute()
+            points_rows = points_res.data or []
+            if not isinstance(points_rows, list):
+                points_rows = []
+
+            def _coerce_float(v: Any) -> float | None:
+                if v is None or isinstance(v, bool):
+                    return None
+                if isinstance(v, (int, float)):
+                    f = float(v)
+                elif isinstance(v, str):
+                    try:
+                        f = float(v.strip())
+                    except Exception:
+                        return None
+                else:
+                    return None
+                if not (f == f):
+                    return None
+                return f
+
+            def _coerce_int(v: Any) -> int | None:
+                if v is None or isinstance(v, bool):
+                    return None
+                if isinstance(v, int):
+                    return v
+                if isinstance(v, float):
+                    if v == v:
+                        return int(v)
+                    return None
+                if isinstance(v, str):
+                    s = v.strip()
+                    if not s:
+                        return None
+                    cleaned = "".join(ch for ch in s if ch.isdigit())
+                    if not cleaned:
+                        return None
+                    try:
+                        return int(cleaned)
+                    except Exception:
+                        return None
+                return None
+
+            points_out: List[Dict[str, Any]] = []
+            for r in points_rows:
+                if not isinstance(r, dict):
+                    continue
+
+                lat = _coerce_float(
+                    r.get("latitude") if r.get("latitude") is not None else r.get("lat")
+                )
+                lng = _coerce_float(
+                    r.get("longitude")
+                    if r.get("longitude") is not None
+                    else (r.get("lng") if r.get("lng") is not None else r.get("lon"))
+                )
+                # Only treat (0,0) as placeholder.
+                if lat == 0.0 and lng == 0.0:
+                    lat = None
+                    lng = None
+
+                points_out.append(
+                    {
+                        "id": r.get("id"),
+                        "title": r.get("title"),
+                        "location": r.get("location"),
+                        "price": (
+                            _coerce_int(r.get("price")) if r.get("price") is not None else None
+                        ),
+                        "bedrooms": (
+                            _coerce_int(r.get("bedrooms"))
+                            if r.get("bedrooms") is not None
+                            else None
+                        ),
+                        "investment_type": r.get("investment_type"),
+                        "latitude": lat,
+                        "longitude": lng,
+                        "source": r.get("source"),
+                    }
+                )
+
+            points = points_out
+
         # Ensure numeric-safe sorting (nulls last) for common UI sorts.
         # Python sorting is stable, so the secondary created_at ordering remains for ties.
         def _num(v: Any) -> float | None:
@@ -482,6 +624,7 @@ def list_properties(
 
         return {
             "items": items,
+            "points": points,
             "total": total_int,
             "mappable_count": int(mappable_count),
             "limit": limit,

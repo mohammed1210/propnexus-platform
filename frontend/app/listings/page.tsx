@@ -432,6 +432,7 @@ function ListingsInner() {
   const [showFilters, setShowFilters] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [mappableCount, setMappableCount] = useState<number | null>(null);
+  const [mapRows, setMapRows] = useState<RawProperty[] | null>(null);
 
   // Keep map toggle state in URL so it persists across pagination/filter changes.
   useEffect(() => {
@@ -563,6 +564,13 @@ function ListingsInner() {
         params.set('limit', String(limit));
         params.set('offset', String(offset));
 
+        // When the map is enabled, request full-result points so pins reflect ALL
+        // matching properties (not just the current paged list).
+        if (showMap) {
+          params.set('include_points', '1');
+          params.set('points_limit', '5000');
+        }
+
         const response = await fetch(`${backendUrl}/properties?${params.toString()}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
@@ -578,6 +586,7 @@ function ListingsInner() {
         const data = await response.json();
 
         const items = Array.isArray(data) ? data : (data?.items ?? []);
+        const rawPoints = Array.isArray(data?.points) ? data.points : null;
         const mappable = typeof data?.mappable_count === 'number' ? data.mappable_count : null;
         const totalCount =
           typeof data?.total === 'number'
@@ -607,13 +616,37 @@ function ListingsInner() {
           investment_type: prop.investment_type,
         }));
 
+        const mappedPoints: RawProperty[] | null = rawPoints
+          ? (rawPoints || [])
+              .filter((prop: any) => String(prop?.source ?? '').toLowerCase() !== 'spareroom')
+              .map((prop: any) => ({
+                id: String(prop.id ?? ''),
+                title: String(prop.title ?? ''),
+                location: prop.location,
+                price: prop.price,
+                bedrooms: prop.bedrooms,
+                bathrooms: prop.bathrooms,
+                description: prop.description,
+                yield_percent: prop.yield_percent,
+                roi_percent: prop.roi_percent,
+                imageurl: prop.imageurl,
+                source: prop.source,
+                latitude: prop.latitude ?? prop.lat,
+                longitude: prop.longitude ?? prop.lng ?? prop.lon,
+                created_at: prop.created_at,
+                investment_type: prop.investment_type,
+              }))
+          : null;
+
         setRows(mappedData);
+        setMapRows(mappedPoints);
         setTotal(totalCount);
         setHasMore(more);
         setMappableCount(mappable);
       } catch (error) {
         console.error('[listings] fetch error', error);
         setRows([]);
+        setMapRows(null);
         setTotal(0);
         setHasMore(false);
         setMappableCount(0);
@@ -625,7 +658,7 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, baths, sort, limit, offset, refreshNonce]);
+  }, [q, minP, maxP, beds, baths, sort, limit, offset, refreshNonce, showMap]);
 
   type InvestmentType = (typeof INVESTMENT_TYPES)[number];
 
@@ -684,9 +717,26 @@ function ListingsInner() {
     return filtered.length > 0 ? filtered : rows;
   }, [inferredInvestmentTypes, rows, types]);
 
+  const typeFilteredMapRows = useMemo(() => {
+    if (!mapRows) return typeFilteredRows;
+    if (!types.length) return mapRows;
+
+    const selected = new Set(types as InvestmentType[]);
+    const filtered = mapRows.filter((p) => {
+      const inferred = inferredInvestmentTypes(p);
+      for (const t of selected) {
+        if (inferred.has(t)) return true;
+      }
+      return false;
+    });
+
+    // Never blank the map due to investment-type chips.
+    return filtered.length > 0 ? filtered : mapRows;
+  }, [inferredInvestmentTypes, mapRows, typeFilteredRows, types]);
+
   // ✅ robust points creation (no falsy checks, reject invalid/null-island)
   const points = useMemo(() => {
-    return typeFilteredRows
+    return typeFilteredMapRows
       .map((r) => {
         if (!r.id || !r.title) return null;
         const coords = toValidLatLng(r.latitude, r.longitude);
@@ -709,9 +759,9 @@ function ListingsInner() {
       price?: number;
       source?: string | null;
     }[];
-  }, [typeFilteredRows]);
+  }, [typeFilteredMapRows]);
 
-  const mapAvailable = (mappableCount ?? points.length) > 0;
+  const mapAvailable = points.length > 0;
 
   const priceRangeKey = useMemo(() => {
     const minStr = (minInput ?? '').trim();
