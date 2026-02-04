@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import nextDynamic from 'next/dynamic';
@@ -387,6 +387,14 @@ function ListingsInner() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mappableCount, setMappableCount] = useState<number | null>(null);
 
+  // Keep map toggle state in URL so it persists across pagination/filter changes.
+  useEffect(() => {
+    const mapParam = searchParams?.get('map');
+    if (mapParam === '0') setShowMap(false);
+    if (mapParam === '1') setShowMap(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams?.get('map')]);
+
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
@@ -446,6 +454,11 @@ function ListingsInner() {
   const [bathsInput, setBathsInput] = useState(searchParams?.get('baths') ?? '');
   const [selectedTypes, setSelectedTypes] = useState<string[]>(types);
 
+  // Keep local selection in sync with URL state (back/forward navigation).
+  useEffect(() => {
+    setSelectedTypes(types);
+  }, [types]);
+
   const [rows, setRows] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -457,6 +470,18 @@ function ListingsInner() {
   const [scrapeMsg, setScrapeMsg] = useState<string | null>(null);
   const [scrapeErr, setScrapeErr] = useState<string | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
+
+  const pushParams = useCallback(
+    (updater: (p: URLSearchParams) => void, opts?: { replace?: boolean }) => {
+      const p = new URLSearchParams(searchParams?.toString());
+      updater(p);
+      const qs = p.toString();
+      const url = qs ? `/listings?${qs}` : '/listings';
+      if (opts?.replace) router.replace(url);
+      else router.push(url);
+    },
+    [router, searchParams]
+  );
 
   const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
     .split(',')
@@ -486,7 +511,8 @@ function ListingsInner() {
         if (maxP !== undefined) params.set('max', String(maxP));
         if (beds !== undefined) params.set('beds', String(beds));
         if (baths !== undefined) params.set('baths', String(baths));
-        if (types.length > 0) params.set('types', types.join(','));
+        // Investment type filtering can be inconsistent in scraped datasets.
+        // We keep the UI chips, but apply them client-side so they never feel “broken”.
         params.set('sort', sort);
         params.set('limit', String(limit));
         params.set('offset', String(offset));
@@ -553,11 +579,68 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, baths, types, sort, limit, offset, refreshNonce]);
+  }, [q, minP, maxP, beds, baths, sort, limit, offset, refreshNonce]);
+
+  type InvestmentType = (typeof INVESTMENT_TYPES)[number];
+
+  const inferredInvestmentTypes = useCallback(
+    (p: RawProperty): Set<InvestmentType> => {
+      const out = new Set<InvestmentType>();
+
+      const invRaw = String(p.investment_type ?? '').trim();
+      if (invRaw) {
+        const normalized = invRaw.toLowerCase();
+        const match = INVESTMENT_TYPES.find((t) => t.toLowerCase() === normalized);
+        if (match) out.add(match);
+      }
+
+      const text = `${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`.toLowerCase();
+      const bedsN = typeof p.bedrooms === 'number' ? p.bedrooms : Number(p.bedrooms ?? 0);
+
+      if (/(^|\b)hmo(\b|$)|house\s+of\s+multiple\s+occupation|student\s+hous(e|ing)/i.test(text)) {
+        out.add('HMO');
+      }
+      if (Number.isFinite(bedsN) && bedsN >= 5) {
+        out.add('HMO');
+      }
+      if (/serviced\s+accommodation|short\s*let|air\s*bnb|airbnb|holiday\s+let/i.test(text)) {
+        out.add('SA');
+      }
+      if (/brr\b|brrrr\b|refurb|renovat|moderni[sz]e|needs\s+work|value\s+add/i.test(text)) {
+        out.add('BRR');
+      }
+      if (/flip\b|development\s+opportunity|cash\s+buyer|auction|motivated\s+seller/i.test(text)) {
+        out.add('Flip');
+      }
+      if (/commercial|retail|shop\b|office\b|warehouse|industrial/i.test(text)) {
+        out.add('Commercial');
+      }
+
+      // Default strategy: treat typical residential listings as BTL.
+      if (out.size === 0) out.add('BTL');
+      return out;
+    },
+    []
+  );
+
+  const typeFilteredRows = useMemo(() => {
+    if (!types.length) return rows;
+    const selected = new Set(types as InvestmentType[]);
+    const filtered = rows.filter((p) => {
+      const inferred = inferredInvestmentTypes(p);
+      for (const t of selected) {
+        if (inferred.has(t)) return true;
+      }
+      return false;
+    });
+
+    // Never blank the page due to investment-type chips.
+    return filtered.length > 0 ? filtered : rows;
+  }, [inferredInvestmentTypes, rows, types]);
 
   // ✅ robust points creation (no falsy checks, reject invalid/null-island)
   const points = useMemo(() => {
-    return rows
+    return typeFilteredRows
       .map((r) => {
         if (!r.id || !r.title) return null;
         const coords = toValidLatLng(r.latitude, r.longitude);
@@ -572,7 +655,7 @@ function ListingsInner() {
         };
       })
       .filter(Boolean) as { id: string; title: string; lat: number; lng: number; price?: number }[];
-  }, [rows]);
+  }, [typeFilteredRows]);
 
   const mapAvailable = (mappableCount ?? points.length) > 0;
 
@@ -596,17 +679,27 @@ function ListingsInner() {
   const showSplit = showMap && mapAvailable;
 
   const applyFilters = () => {
-    const p = new URLSearchParams();
+    const p = new URLSearchParams(searchParams?.toString());
+    // Set/clear in one place so paging/map/sort stay stable.
     if (searchInput) p.set('q', searchInput);
+    else p.delete('q');
     if (minInput) p.set('min', minInput);
+    else p.delete('min');
     if (maxInput) p.set('max', maxInput);
+    else p.delete('max');
     if (bedsInput) p.set('beds', bedsInput);
+    else p.delete('beds');
     if (bathsInput) p.set('baths', bathsInput);
+    else p.delete('baths');
     if (selectedTypes.length > 0) p.set('types', selectedTypes.join(','));
+    else p.delete('types');
     if (sort) p.set('sort', sort);
     p.set('limit', String(limit));
     p.set('offset', '0');
-    router.push(`/listings?${p.toString()}`);
+    p.set('map', showMap && mapAvailable ? '1' : '0');
+    const qs = p.toString();
+    router.push(qs ? `/listings?${qs}` : '/listings');
+    setShowFilters(false);
   };
 
   const runScrape = async () => {
@@ -658,25 +751,34 @@ function ListingsInner() {
     setBedsInput('');
     setBathsInput('');
     setSelectedTypes([]);
-    router.push('/listings');
+    pushParams((p) => {
+      p.delete('q');
+      p.delete('min');
+      p.delete('max');
+      p.delete('beds');
+      p.delete('baths');
+      p.delete('types');
+      p.set('offset', '0');
+    });
+    setShowFilters(false);
   };
 
   const removeFilter = (key: string, value?: string) => {
-    const p = new URLSearchParams(searchParams?.toString());
-    if (key === 'types' && value) {
-      const currentTypes = p.get('types')?.split(',').filter(Boolean) || [];
-      const newTypes = currentTypes.filter((t) => t !== value);
-      if (newTypes.length > 0) p.set('types', newTypes.join(','));
-      else p.delete('types');
-    } else {
-      p.delete(key);
-    }
-    p.set('offset', '0');
-    router.push(`/listings?${p.toString()}`);
+    pushParams((p) => {
+      if (key === 'types' && value) {
+        const currentTypes = p.get('types')?.split(',').filter(Boolean) || [];
+        const newTypes = currentTypes.filter((t) => t !== value);
+        if (newTypes.length > 0) p.set('types', newTypes.join(','));
+        else p.delete('types');
+      } else {
+        p.delete(key);
+      }
+      p.set('offset', '0');
+    });
   };
 
   const showingFrom = total > 0 ? offset + 1 : 0;
-  const showingTo = total > 0 ? Math.min(offset + rows.length, total) : 0;
+  const showingTo = total > 0 ? Math.min(offset + typeFilteredRows.length, total) : 0;
 
   const activeFilters: Array<{ key: string; label: string; value: string }> = [];
   if (qRaw) activeFilters.push({ key: 'q', label: qRaw, value: qRaw });
@@ -694,131 +796,385 @@ function ListingsInner() {
   if (baths) activeFilters.push({ key: 'baths', label: `${baths}+ baths`, value: String(baths) });
   types.forEach((type) => activeFilters.push({ key: 'types', label: type, value: type }));
 
+  const totalPages = total > 0 ? Math.max(1, Math.ceil(total / limit)) : 1;
+  const currentPage = total > 0 ? Math.min(totalPages, Math.floor(offset / limit) + 1) : 1;
+
+  const pageItems = useMemo(() => {
+    if (totalPages <= 1) return [] as Array<number | '…'>;
+    const windowSize = 1;
+    const pages = new Set<number>();
+    pages.add(1);
+    pages.add(totalPages);
+    for (let p = currentPage - windowSize; p <= currentPage + windowSize; p++) {
+      if (p >= 1 && p <= totalPages) pages.add(p);
+    }
+    const sorted = Array.from(pages).sort((a, b) => a - b);
+    const out: Array<number | '…'> = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const v = sorted[i];
+      const prev = sorted[i - 1];
+      if (i > 0 && prev !== undefined && v - prev > 1) out.push('…');
+      out.push(v);
+    }
+    return out;
+  }, [currentPage, totalPages]);
+
+  const PaginationControls = ({ placement }: { placement: 'top' | 'bottom' }) => {
+    if (total <= 0) return null;
+
+    return (
+      <div
+        className={
+          placement === 'top'
+            ? 'mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'
+            : 'mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
+        }
+      >
+        <p className="text-slate-600 dark:text-slate-400">
+          <span className="font-semibold text-slate-900 dark:text-white">
+            {showingFrom}-{showingTo}
+          </span>{' '}
+          of <span className="font-semibold text-slate-900 dark:text-white">{total}</span>
+          {totalPages > 1 && (
+            <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+              Page {currentPage} of {totalPages}
+            </span>
+          )}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={limit}
+            onChange={(e) => {
+              pushParams((p) => {
+                p.set('limit', e.target.value);
+                p.set('offset', '0');
+              });
+            }}
+            className="input-field"
+            style={{ height: 40, padding: '0.5rem 0.75rem' }}
+            aria-label="Page size"
+          >
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+
+          <button
+            onClick={() => {
+              pushParams((p) => {
+                p.set('offset', String(Math.max(0, offset - limit)));
+              });
+            }}
+            disabled={loading || offset <= 0}
+            className="h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Previous
+          </button>
+
+          {totalPages > 1 && (
+            <div className="hidden sm:flex items-center gap-1">
+              {pageItems.map((it, idx) =>
+                it === '…' ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 text-slate-500 dark:text-slate-400">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={`page-${it}`}
+                    onClick={() => {
+                      pushParams((p) => {
+                        p.set('offset', String((it - 1) * limit));
+                      });
+                    }}
+                    disabled={loading}
+                    className={
+                      it === currentPage
+                        ? 'h-10 min-w-[40px] px-2 rounded-lg bg-brand-500 text-white font-semibold'
+                        : 'h-10 min-w-[40px] px-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600'
+                    }
+                    aria-current={it === currentPage ? 'page' : undefined}
+                  >
+                    {it}
+                  </button>
+                )
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              pushParams((p) => {
+                p.set('offset', String(offset + limit));
+              });
+            }}
+            disabled={loading || !hasMore}
+            className="h-10 px-3 rounded-lg bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const FiltersPanelContent = (
+    <div className="p-4" style={{ paddingTop: 14 }}>
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <div className="text-sm font-semibold text-slate-900 dark:text-white">Filters</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            Compact filters (apply to search + paging)
+          </div>
+        </div>
+        <button
+          onClick={() => setShowFilters(false)}
+          className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700"
+          aria-label="Close"
+        >
+          <FiX className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+        <div className="col-span-2 md:col-span-2">
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Price</label>
+          <select
+            value={priceRangeKey}
+            onChange={(e) => {
+              const r = PRICE_RANGES.find((x) => x.key === e.target.value) ?? PRICE_RANGES[0];
+              setMinInput(typeof r.min === 'number' ? String(r.min) : '');
+              setMaxInput(typeof r.max === 'number' ? String(r.max) : '');
+            }}
+            className="input-field w-full"
+            style={{ height: 40, padding: '0.5rem 0.75rem' }}
+            aria-label="Price range"
+          >
+            {PRICE_RANGES.map((r) => (
+              <option key={r.key} value={r.key}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Beds</label>
+          <select
+            value={(bedsInput ?? '').trim()}
+            onChange={(e) => setBedsInput(e.target.value)}
+            className="input-field w-full"
+            style={{ height: 40, padding: '0.5rem 0.75rem' }}
+            aria-label="Bedrooms"
+          >
+            {COUNT_OPTIONS.map((o) => (
+              <option key={o.key || 'any'} value={o.key}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Baths</label>
+          <select
+            value={(bathsInput ?? '').trim()}
+            onChange={(e) => setBathsInput(e.target.value)}
+            className="input-field w-full"
+            style={{ height: 40, padding: '0.5rem 0.75rem' }}
+            aria-label="Bathrooms"
+          >
+            {COUNT_OPTIONS.map((o) => (
+              <option key={o.key || 'any'} value={o.key}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="col-span-2 md:col-span-4">
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Property type</label>
+          <select
+            value=""
+            disabled
+            className="input-field w-full opacity-70 cursor-not-allowed"
+            style={{ height: 40, padding: '0.5rem 0.75rem' }}
+            aria-label="Property type (soon)"
+            title="Property type filtering is not supported by backend yet"
+          >
+            <option value="">Any (coming soon)</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">Investment type</label>
+        <div className="flex flex-wrap gap-2">
+          {INVESTMENT_TYPES.map((type) => {
+            const isSelected = selectedTypes.includes(type);
+            return (
+              <button
+                key={type}
+                onClick={() => {
+                  if (isSelected) setSelectedTypes(selectedTypes.filter((t) => t !== type));
+                  else setSelectedTypes([...selectedTypes, type]);
+                }}
+                className={`px-3 py-1.5 rounded-full border text-sm font-semibold transition-colors ${
+                  isSelected
+                    ? 'bg-brand-500 text-white border-brand-500'
+                    : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:border-brand-400'
+                }`}
+                aria-pressed={isSelected}
+                aria-label={`${type} investment type`}
+              >
+                {type}
+              </button>
+            );
+          })}
+        </div>
+        {types.length > 0 && typeFilteredRows === rows && (
+          <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Investment type matching is improving — showing closest results when available.
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+        <button
+          onClick={resetFilters}
+          className="h-10 px-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 font-semibold text-slate-700 dark:text-slate-200"
+        >
+          Reset
+        </button>
+        <button
+          onClick={applyFilters}
+          className="h-10 px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold"
+          disabled={loading}
+        >
+          Apply
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Filter bar - sticky at very top when scrolling */}
-      <div
-        className={`bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 sticky top-0 z-40 transition-all duration-300 ${
-          isScrolled ? 'shadow-md' : ''
-        }`}
-      >
-        <div
-          className="max-w-7xl mx-auto px-4 transition-all duration-300"
-          style={{
-            paddingTop: isScrolled ? '0.5rem' : '1rem',
-            paddingBottom: isScrolled ? '0.5rem' : '1rem',
-          }}
-        >
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <h1 className="font-bold text-slate-900 dark:text-white text-lg">
-                Listings
-              </h1>
-
-              <div className="flex items-center gap-2">
-                <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  <FiMap className="w-4 h-4" />
-                  Map
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={showMap && mapAvailable}
-                    onClick={() => setShowMap((v) => !v)}
-                    disabled={!mapAvailable}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      showMap && mapAvailable ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'
-                    } ${!mapAvailable ? 'opacity-60 cursor-not-allowed' : ''}`}
-                    title={mapAvailable ? 'Toggle map' : 'Map unavailable (no coordinates)'}
-                  >
-                    <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                        showMap && mapAvailable ? 'translate-x-5' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </label>
-
-                <select
-                  value={sort}
-                  onChange={(e) => {
-                    const p = new URLSearchParams(searchParams?.toString());
-                    p.set('sort', e.target.value);
-                    p.delete('dir');
-                    p.set('offset', '0');
-                    router.push(`/listings?${p.toString()}`);
-                  }}
-                  className="input-field h-9 px-3 w-auto"
-                  aria-label="Sort"
-                >
-                  <option value="created_at_desc">Most recent</option>
-                  <option value="price_asc">Price: low to high</option>
-                  <option value="price_desc">Price: high to low</option>
-                  <option value="yield_desc">Highest yield</option>
-                  <option value="roi_desc">Highest ROI</option>
-                </select>
+      {/* Compact sticky controls bar */}
+      <div className={`sticky-filter ${isScrolled ? 'shadow-md' : ''}`}>
+        <div className="max-w-7xl mx-auto px-4 py-2">
+          <div className="flex flex-col md:flex-row md:items-center gap-2">
+            {/* Left: location search */}
+            <div className="flex-1">
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+                  placeholder="Search location or postcode…"
+                  className="input-field w-full"
+                  style={{ height: 40, paddingLeft: 40, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
+                  aria-label="Search by location"
+                />
               </div>
             </div>
 
-            {/* Search + actions */}
-            <div className="flex flex-col lg:flex-row gap-2">
-              <div className="flex-1">
-                <div className="relative">
-                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-                    placeholder="Search by location or postcode…"
-                    className="input-field w-full h-10 pl-10 pr-3"
+            {/* Right: controls */}
+            <div className="flex items-center gap-2 justify-between md:justify-end">
+              <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                <FiMap className="w-4 h-4" />
+                <span className="hidden sm:inline">Map</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={showMap && mapAvailable}
+                  onClick={() => {
+                    const next = !(showMap && mapAvailable);
+                    setShowMap(next);
+                    pushParams(
+                      (p) => {
+                        p.set('map', next && mapAvailable ? '1' : '0');
+                      },
+                      { replace: true }
+                    );
+                  }}
+                  disabled={!mapAvailable}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    showMap && mapAvailable ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'
+                  } ${!mapAvailable ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  title={mapAvailable ? 'Toggle map' : 'Map unavailable (no coordinates)'}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                      showMap && mapAvailable ? 'translate-x-5' : 'translate-x-1'
+                    }`}
                   />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={applyFilters}
-                  className="h-10 px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold transition-all duration-200 flex items-center gap-2"
-                  disabled={loading}
-                >
-                  <FiSearch className="w-4 h-4" />
-                  Search
                 </button>
+              </label>
 
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
-                >
-                  <FiSliders className="w-4 h-4" />
-                  Filters
-                  {activeFilters.length > 0 && (
-                    <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-brand-500 text-white text-xs font-medium">
-                      {activeFilters.length}
-                    </span>
-                  )}
-                </button>
+              <select
+                value={sort}
+                onChange={(e) => {
+                  pushParams((p) => {
+                    p.set('sort', e.target.value);
+                    p.delete('dir');
+                    p.set('offset', '0');
+                  });
+                }}
+                className="input-field"
+                style={{ height: 40, padding: '0.5rem 0.75rem' }}
+                aria-label="Sort"
+              >
+                <option value="created_at_desc">Most recent</option>
+                <option value="price_asc">Price: low to high</option>
+                <option value="price_desc">Price: high to low</option>
+                <option value="yield_desc">Highest yield</option>
+                <option value="roi_desc">Highest ROI</option>
+              </select>
 
-                {isLoaded && isAdmin && (
-                  <button
-                    onClick={runScrape}
-                    className="h-10 px-4 rounded-lg border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-200"
-                    disabled={scrapeLoading}
-                    title="Admin: run scrapers and import fresh listings"
-                  >
-                    {scrapeLoading ? 'Running…' : 'Run Scrape'}
-                  </button>
+              <button
+                onClick={applyFilters}
+                className="h-10 px-3 md:px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold transition-all duration-200 flex items-center gap-2"
+                disabled={loading}
+              >
+                <FiSearch className="w-4 h-4" />
+                <span className="hidden sm:inline">Search</span>
+              </button>
+
+              <button
+                onClick={() => setShowFilters((v) => !v)}
+                className="h-10 px-3 md:px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
+                aria-expanded={showFilters}
+                aria-controls="listings-filters-popover"
+              >
+                <FiSliders className="w-4 h-4" />
+                <span className="hidden sm:inline">Filters</span>
+                {activeFilters.length > 0 && (
+                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-brand-500 text-white text-xs font-medium">
+                    {activeFilters.length}
+                  </span>
                 )}
-              </div>
+              </button>
+
+              {isLoaded && isAdmin && (
+                <button
+                  onClick={runScrape}
+                  className="h-10 px-3 md:px-4 rounded-lg border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-200"
+                  disabled={scrapeLoading}
+                  title="Admin: run scrapers and import fresh listings"
+                >
+                  {scrapeLoading ? 'Running…' : 'Run Scrape'}
+                </button>
+              )}
             </div>
           </div>
 
           {!mapAvailable && !loading && rows.length > 0 && (
-            <div className="mt-3 px-4 py-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm">
+            <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">
               Map hidden — no listings in this result have coordinates yet
             </div>
           )}
-
-          {/* Filters panel */}
 
           {(scrapeMsg || scrapeErr) && (
             <div className="mt-3">
@@ -835,194 +1191,68 @@ function ListingsInner() {
             </div>
           )}
 
-          {showFilters && (
-            <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 max-h-[60vh] overflow-auto">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Price
-                  </label>
-                  <select
-                    value={priceRangeKey}
-                    onChange={(e) => {
-                      const r = PRICE_RANGES.find((x) => x.key === e.target.value) ?? PRICE_RANGES[0];
-                      setMinInput(typeof r.min === 'number' ? String(r.min) : '');
-                      setMaxInput(typeof r.max === 'number' ? String(r.max) : '');
-                    }}
-                    className="input-field h-9 px-3 w-full"
-                    aria-label="Price range"
-                  >
-                    {PRICE_RANGES.map((r) => (
-                      <option key={r.key} value={r.key}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Beds
-                  </label>
-                  <select
-                    value={(bedsInput ?? '').trim()}
-                    onChange={(e) => setBedsInput(e.target.value)}
-                    className="input-field h-9 px-3 w-full"
-                    aria-label="Bedrooms"
-                  >
-                    {COUNT_OPTIONS.map((o) => (
-                      <option key={o.key || 'any'} value={o.key}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Baths
-                  </label>
-                  <select
-                    value={(bathsInput ?? '').trim()}
-                    onChange={(e) => setBathsInput(e.target.value)}
-                    className="input-field h-9 px-3 w-full"
-                    aria-label="Bathrooms"
-                  >
-                    {COUNT_OPTIONS.map((o) => (
-                      <option key={o.key || 'any'} value={o.key}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-                    Property type
-                  </label>
-                  <select
-                    value=""
-                    disabled
-                    className="input-field h-9 px-3 w-full opacity-70 cursor-not-allowed"
-                    aria-label="Property type (soon)"
-                    title="Radius/type filters are not supported in backend yet"
-                  >
-                    <option value="">Any (soon)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mb-2">
-                <label className="block text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
-                  Investment Type
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {INVESTMENT_TYPES.map((type) => {
-                    const isSelected = selectedTypes.includes(type);
-                    return (
-                      <button
-                        key={type}
-                        onClick={() => {
-                          if (isSelected) setSelectedTypes(selectedTypes.filter((t) => t !== type));
-                          else setSelectedTypes([...selectedTypes, type]);
-                        }}
-                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all duration-200 transform ${
-                          isSelected
-                            ? 'bg-brand-500 text-white border-brand-500 scale-105 shadow-md'
-                            : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 hover:border-brand-400 hover:scale-105'
-                        }`}
-                        aria-pressed={isSelected}
-                        aria-label={`${type} investment type`}
-                      >
-                        {type}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button onClick={applyFilters} className="btn-primary px-6 py-2">
-                  Apply Filters
-                </button>
-                <button onClick={resetFilters} className="btn-secondary px-6 py-2">
-                  Reset
-                </button>
-              </div>
-            </div>
-          )}
-
-          {activeFilters.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-3">
-              {activeFilters.map((filter, idx) => (
-                <span
-                  key={`${filter.key}-${filter.value}-${idx}`}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 text-sm font-medium border border-brand-200 dark:border-brand-700"
-                >
-                  {filter.label}
-                  <button
-                    onClick={() => removeFilter(filter.key, filter.value)}
-                    className="hover:text-brand-900 dark:hover:text-brand-100 transition-colors"
-                  >
-                    <FiX className="w-4 h-4" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-slate-600 dark:text-slate-400">
-            <span className="font-semibold text-slate-900 dark:text-white">
-              {showingFrom}-{showingTo}
-            </span>{' '}
-            of <span className="font-semibold text-slate-900 dark:text-white">{total}</span>
-          </p>
+      {/* Filters popover / drawer */}
+      {showFilters && (
+        <div
+          id="listings-filters-popover"
+          className="fixed inset-0 z-50"
+          aria-modal="true"
+          role="dialog"
+        >
+          <button
+            className="absolute inset-0 bg-black/20 md:bg-transparent"
+            aria-label="Close filters"
+            onClick={() => setShowFilters(false)}
+          />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={limit}
-              onChange={(e) => {
-                const p = new URLSearchParams(searchParams?.toString());
-                p.set('limit', e.target.value);
-                p.set('offset', '0');
-                router.push(`/listings?${p.toString()}`);
-              }}
-              className="input-field h-10 px-3 w-auto"
-              aria-label="Page size"
-            >
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-            </select>
+          {/* Mobile drawer */}
+          <div
+            className="md:hidden absolute left-0 right-0 bottom-0 bg-white dark:bg-slate-800 rounded-t-2xl border border-slate-200 dark:border-slate-700 shadow-xl max-h-[75vh] overflow-auto"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {FiltersPanelContent}
+          </div>
 
-            <button
-              onClick={() => {
-                const p = new URLSearchParams(searchParams?.toString());
-                p.set('offset', String(Math.max(0, offset - limit)));
-                router.push(`/listings?${p.toString()}`);
-              }}
-              disabled={loading || offset <= 0}
-              className="h-10 px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <button
-              onClick={() => {
-                const p = new URLSearchParams(searchParams?.toString());
-                p.set('offset', String(offset + limit));
-                router.push(`/listings?${p.toString()}`);
-              }}
-              disabled={loading || !hasMore}
-              className="h-10 px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
+          {/* Desktop popover (anchored under sticky bar) */}
+          <div
+            className="hidden md:block absolute right-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl max-h-[70vh] overflow-auto"
+            style={{ top: 'calc(var(--header-h) + 56px + 8px)', width: 520 }}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {FiltersPanelContent}
           </div>
         </div>
+      )}
+
+      {activeFilters.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 pt-2">
+          <div className="flex flex-wrap gap-2">
+            {activeFilters.map((filter, idx) => (
+              <span
+                key={`${filter.key}-${filter.value}-${idx}`}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 text-sm font-medium border border-brand-200 dark:border-brand-700"
+              >
+                {filter.label}
+                <button
+                  onClick={() => removeFilter(filter.key, filter.value)}
+                  className="hover:text-brand-900 dark:hover:text-brand-100 transition-colors"
+                  aria-label={`Remove ${filter.label}`}
+                >
+                  <FiX className="w-4 h-4" />
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <PaginationControls placement="top" />
 
         {!showSplit && (
           <>
@@ -1031,7 +1261,7 @@ function ListingsInner() {
                 <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
                 <p className="mt-4 text-slate-600 dark:text-slate-400">Loading properties...</p>
               </div>
-            ) : rows.length === 0 ? (
+            ) : typeFilteredRows.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-xl text-slate-600 dark:text-slate-400">No properties found</p>
                 <button onClick={resetFilters} className="btn-primary mt-4">
@@ -1040,7 +1270,7 @@ function ListingsInner() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {rows.map((property) => (
+                {typeFilteredRows.map((property) => (
                     <PropertyCard key={property.id || Math.random()} p={property} />
                 ))}
               </div>
@@ -1056,7 +1286,7 @@ function ListingsInner() {
                   <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
                   <p className="mt-4 text-slate-600 dark:text-slate-400">Loading properties...</p>
                 </div>
-              ) : rows.length === 0 ? (
+              ) : typeFilteredRows.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-xl text-slate-600 dark:text-slate-400">No properties found</p>
                   <button onClick={resetFilters} className="btn-primary mt-4">
@@ -1065,7 +1295,7 @@ function ListingsInner() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {rows.map((property) => (
+                  {typeFilteredRows.map((property) => (
                     <PropertyCard key={property.id || Math.random()} p={property} />
                   ))}
                 </div>
@@ -1089,6 +1319,8 @@ function ListingsInner() {
             </div>
           </div>
         )}
+
+        <PaginationControls placement="bottom" />
       </div>
     </div>
   );
