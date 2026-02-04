@@ -1,5 +1,6 @@
 // frontend/app/layout.tsx (server component)
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import "../styles/design-tokens.css";
 import RootShell from "@components/RootShell";
@@ -49,6 +50,22 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <Script
+        id="pnx-theme-init"
+        strategy="beforeInteractive"
+      >{`
+        (function () {
+          try {
+            var stored = localStorage.getItem('propnexus-theme');
+            var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            var root = document.documentElement;
+            root.classList.remove('light', 'dark');
+            root.classList.add(theme);
+          } catch (e) {
+            // no-op
+          }
+        })();
+      `}</Script>
       <body className="flex min-h-screen flex-col">
         <a
           href="#main"
