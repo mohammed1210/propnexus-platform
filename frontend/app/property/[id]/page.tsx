@@ -291,6 +291,43 @@ export default function PropertyDetailsPage() {
             ) : null}
           </div>
 
+          {hasAnyPhoto && displayImages.length > 1 ? (
+            <div className="p-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {displayImages.map((u, idx) => {
+                  const selected = u === mainImage;
+                  return (
+                    <button
+                      key={`${u}-${idx}`}
+                      type="button"
+                      onClick={() => setMainImage(u)}
+                      className={`shrink-0 rounded-lg overflow-hidden border transition-colors ${
+                        selected
+                          ? 'border-brand-500 ring-2 ring-brand-500/30'
+                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                      }`}
+                      aria-label={`View image ${idx + 1}`}
+                    >
+                      <Image
+                        src={u}
+                        alt={`Thumbnail ${idx + 1}`}
+                        width={80}
+                        height={64}
+                        className="w-20 h-16 object-cover"
+                        unoptimized
+                        onError={(e) => {
+                          const img = e.currentTarget as HTMLImageElement;
+                          if (img.src.endsWith(PLACEHOLDER_IMG)) return;
+                          img.src = PLACEHOLDER_IMG;
+                        }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
           {/* Property details (below image, above description) */}
           <div className="p-6 pt-5 border-t border-slate-200 dark:border-slate-800">
             <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
@@ -336,43 +373,6 @@ export default function PropertyDetailsPage() {
               </div>
             </div>
           </div>
-
-          {hasAnyPhoto && displayImages.length > 1 ? (
-            <div className="p-3 border-t border-slate-200 dark:border-slate-800">
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {displayImages.map((u, idx) => {
-                  const selected = u === mainImage;
-                  return (
-                    <button
-                      key={`${u}-${idx}`}
-                      type="button"
-                      onClick={() => setMainImage(u)}
-                      className={`shrink-0 rounded-lg overflow-hidden border transition-colors ${
-                        selected
-                          ? 'border-brand-500 ring-2 ring-brand-500/30'
-                          : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
-                      }`}
-                      aria-label={`View image ${idx + 1}`}
-                    >
-                      <Image
-                        src={u}
-                        alt={`Thumbnail ${idx + 1}`}
-                        width={80}
-                        height={64}
-                        className="w-20 h-16 object-cover"
-                        unoptimized
-                        onError={(e) => {
-                          const img = e.currentTarget as HTMLImageElement;
-                          if (img.src.endsWith(PLACEHOLDER_IMG)) return;
-                          img.src = PLACEHOLDER_IMG;
-                        }}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ) : null}
 
           {typeof (property as any).description === 'string' && (property as any).description.trim() ? (
             <div className="p-6 pt-4 border-t border-slate-200 dark:border-slate-800">
