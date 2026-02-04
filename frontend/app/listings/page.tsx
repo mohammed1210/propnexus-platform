@@ -1310,9 +1310,9 @@ function ListingsInner() {
             </div>
 
             <div className="w-full lg:w-[38%] relative">
-              <div className="lg:sticky lg:top-[180px]">
+              <div className="lg:sticky lg:top-[calc(var(--header-h)+56px+16px)]">
                 <div
-                  className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden h-[360px] lg:h-[calc(100vh-220px)]"
+                  className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden h-[360px] lg:h-[calc(100vh-(var(--header-h)+56px+32px))]"
                 >
                   {points.length === 0 ? (
                     <div className="flex h-full w-full items-center justify-center text-sm text-slate-600 dark:text-slate-300">
