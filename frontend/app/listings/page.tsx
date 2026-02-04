@@ -827,10 +827,10 @@ function ListingsInner() {
         className={
           placement === 'top'
             ? 'mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'
-            : 'mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
+            : 'mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center sm:text-center'
         }
       >
-        <p className="text-slate-600 dark:text-slate-400">
+        <p className="text-slate-600 dark:text-slate-400 sm:order-2">
           <span className="font-semibold text-slate-900 dark:text-white">
             {showingFrom}-{showingTo}
           </span>{' '}
@@ -842,7 +842,7 @@ function ListingsInner() {
           )}
         </p>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:order-1 sm:justify-center">
           <select
             value={limit}
             onChange={(e) => {
@@ -1252,8 +1252,6 @@ function ListingsInner() {
       )}
 
       <div className="max-w-7xl mx-auto px-4 py-4">
-        <PaginationControls placement="top" />
-
         {!showSplit && (
           <>
             {loading ? (
