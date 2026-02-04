@@ -7,12 +7,15 @@
    1) LIGHT MODE (Default)
    ======================================== */
 :root {
-  /* AI-focused gradient backgrounds */
-  --bg-primary: linear-gradient(180deg, #f8f9fc 0%, #e8ebf5 100%);
-  --bg-secondary: linear-gradient(135deg, #ffffff 0%, #f5f7fb 100%);
-  --bg-hero: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(99, 102, 241, 0.08), transparent),
-             radial-gradient(ellipse 60% 50% at 0% 50%, rgba(139, 92, 246, 0.06), transparent),
-             linear-gradient(180deg, #f8f9fc 0%, #e8ebf5 100%);
+  /* Jobsleuth-inspired premium gradients (brand-tinted, subtle) */
+  --bg-primary:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(17, 114, 129, 0.10), transparent),
+    linear-gradient(135deg, #f8fafc 0%, #ffffff 55%, rgba(17, 114, 129, 0.05) 100%);
+  --bg-secondary: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  --bg-hero:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(17, 114, 129, 0.12), transparent),
+    radial-gradient(ellipse 60% 50% at 0% 55%, rgba(17, 114, 129, 0.06), transparent),
+    linear-gradient(135deg, #f8fafc 0%, #ffffff 60%, rgba(17, 114, 129, 0.05) 100%);
 
   /* Text colors */
   --text-primary: #1a202c;
@@ -26,14 +29,14 @@
   --surface-subtle: rgba(255, 255, 255, 0.6);
 
   /* Border colors */
-  --border-primary: rgba(99, 102, 241, 0.1);
-  --border-secondary: rgba(203, 213, 225, 0.6);
+  --border-primary: rgba(17, 114, 129, 0.12);
+  --border-secondary: rgba(203, 213, 225, 0.65);
 
-  /* Accent colors - AI theme */
-  --accent-primary: #6366f1;
-  --accent-secondary: #8b5cf6;
-  --accent-tertiary: #a78bfa;
-  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  /* Accent colors - keep PropNexus brand */
+  --accent-primary: var(--brand-600);
+  --accent-secondary: var(--brand-500);
+  --accent-tertiary: var(--brand-400);
+  --accent-gradient: linear-gradient(135deg, var(--brand-600) 0%, var(--brand-500) 100%);
 
   /* Shadow system */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -42,14 +45,14 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 
   /* Card backgrounds */
-  --card-bg: rgba(255, 255, 255, 0.8);
-  --card-bg-hover: rgba(255, 255, 255, 0.95);
-  --card-border: rgba(99, 102, 241, 0.1);
+  --card-bg: rgba(255, 255, 255, 0.92);
+  --card-bg-hover: rgba(255, 255, 255, 0.98);
+  --card-border: rgba(17, 114, 129, 0.10);
 
   /* Input colors */
   --input-bg: #ffffff;
-  --input-border: rgba(203, 213, 225, 0.6);
-  --input-focus: #6366f1;
+  --input-border: rgba(226, 232, 240, 0.9);
+  --input-focus: var(--brand-500);
 
   /* Status colors */
   --success: #10b981;
@@ -62,16 +65,16 @@
    2) DARK MODE
    ======================================== */
 .dark {
-  /* AI-focused gradient backgrounds - dark */
-  --bg-primary: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.15), transparent),
-                radial-gradient(ellipse 60% 50% at 0% 50%, rgba(88, 86, 214, 0.1), transparent),
-                radial-gradient(ellipse 60% 50% at 100% 50%, rgba(139, 92, 246, 0.1), transparent),
-                linear-gradient(180deg, #0a0e1a 0%, #0f1629 50%, #0a0e1a 100%);
-  --bg-secondary: linear-gradient(135deg, #0f1629 0%, #1a1f3a 100%);
-  --bg-hero: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.3), transparent),
-             radial-gradient(ellipse 60% 50% at 0% 50%, rgba(88, 86, 214, 0.2), transparent),
-             radial-gradient(ellipse 60% 50% at 100% 50%, rgba(139, 92, 246, 0.2), transparent),
-             linear-gradient(180deg, #0a0e1a 0%, #0f1629 50%, #0a0e1a 100%);
+  /* Premium dark gradients (brand-tinted, subtle) */
+  --bg-primary:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(17, 114, 129, 0.18), transparent),
+    radial-gradient(ellipse 60% 50% at 0% 55%, rgba(17, 114, 129, 0.10), transparent),
+    linear-gradient(180deg, #0b1220 0%, #0a0f1a 100%);
+  --bg-secondary: linear-gradient(135deg, #0b1220 0%, #0f172a 100%);
+  --bg-hero:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(17, 114, 129, 0.26), transparent),
+    radial-gradient(ellipse 60% 50% at 0% 55%, rgba(17, 114, 129, 0.14), transparent),
+    linear-gradient(180deg, #0b1220 0%, #0a0f1a 100%);
 
   /* Text colors */
   --text-primary: #f1f5f9;
@@ -85,14 +88,14 @@
   --surface-subtle: rgba(15, 22, 41, 0.4);
 
   /* Border colors */
-  --border-primary: rgba(99, 102, 241, 0.2);
-  --border-secondary: rgba(148, 163, 184, 0.1);
+  --border-primary: rgba(17, 114, 129, 0.22);
+  --border-secondary: rgba(148, 163, 184, 0.14);
 
-  /* Accent colors - AI theme (brighter in dark mode) */
-  --accent-primary: #818cf8;
-  --accent-secondary: #a78bfa;
-  --accent-tertiary: #c4b5fd;
-  --accent-gradient: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+  /* Accent colors - keep PropNexus brand (slightly brighter) */
+  --accent-primary: var(--brand-400);
+  --accent-secondary: var(--brand-300);
+  --accent-tertiary: var(--brand-200);
+  --accent-gradient: linear-gradient(135deg, var(--brand-400) 0%, var(--brand-300) 100%);
 
   /* Shadow system - more prominent in dark */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
@@ -101,14 +104,14 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
 
   /* Card backgrounds */
-  --card-bg: rgba(26, 31, 58, 0.6);
-  --card-bg-hover: rgba(26, 31, 58, 0.8);
-  --card-border: rgba(99, 102, 241, 0.2);
+  --card-bg: rgba(15, 23, 42, 0.55);
+  --card-bg-hover: rgba(15, 23, 42, 0.70);
+  --card-border: rgba(17, 114, 129, 0.22);
 
   /* Input colors */
-  --input-bg: rgba(15, 22, 41, 0.6);
-  --input-border: rgba(148, 163, 184, 0.2);
-  --input-focus: #818cf8;
+  --input-bg: rgba(15, 23, 42, 0.35);
+  --input-border: rgba(148, 163, 184, 0.18);
+  --input-focus: rgba(17, 114, 129, 0.55);
 
   /* Status colors - adjusted for dark mode */
   --success: #34d399;
@@ -150,13 +153,13 @@ body {
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(var(--border-primary) 1.5px, transparent 1.5px),
-    linear-gradient(90deg, var(--border-primary) 1.5px, transparent 1.5px);
-  background-size: 60px 60px;
+    linear-gradient(var(--border-primary) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-primary) 1px, transparent 1px);
+  background-size: 120px 120px;
   z-index: -1;
-  opacity: 0.3;
+  opacity: 0.08;
   pointer-events: none;
-  animation: grid-flow 20s linear infinite;
+  animation: none;
 }
 
 @keyframes grid-flow {
@@ -239,11 +242,7 @@ body {
    6) FLOATING ORBS FOR ALL PAGES
    ======================================== */
 .page-orbs {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  overflow: hidden;
+  display: none;
 }
 
 .orb {
@@ -257,7 +256,7 @@ body {
 .orb-1 {
   width: 400px;
   height: 400px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.6), rgba(99, 102, 241, 0) 70%);
+  background: radial-gradient(circle, rgba(17, 114, 129, 0.22), rgba(17, 114, 129, 0) 70%);
   top: 10%;
   left: 10%;
   animation-delay: 0s;
@@ -266,7 +265,7 @@ body {
 .orb-2 {
   width: 300px;
   height: 300px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.5), rgba(139, 92, 246, 0) 70%);
+  background: radial-gradient(circle, rgba(17, 114, 129, 0.18), rgba(17, 114, 129, 0) 70%);
   bottom: 10%;
   right: 10%;
   animation-delay: -10s;
@@ -275,7 +274,7 @@ body {
 .orb-3 {
   width: 250px;
   height: 250px;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.4), rgba(168, 85, 247, 0) 70%);
+  background: radial-gradient(circle, rgba(17, 114, 129, 0.14), rgba(17, 114, 129, 0) 70%);
   top: 50%;
   right: 20%;
   animation-delay: -5s;
@@ -324,12 +323,12 @@ body {
 /* High contrast mode support */
 @media (prefers-contrast: high) {
   :root {
-    --border-primary: rgba(99, 102, 241, 0.4);
+    --border-primary: rgba(17, 114, 129, 0.35);
     --border-secondary: rgba(203, 213, 225, 1);
   }
 
   .dark {
-    --border-primary: rgba(99, 102, 241, 0.6);
+    --border-primary: rgba(17, 114, 129, 0.55);
     --border-secondary: rgba(148, 163, 184, 0.4);
   }
 }

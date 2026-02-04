@@ -40,6 +40,11 @@
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 
+  /* Jobsleuth-style “AI / premium” shadows (brand-tinted) */
+  --shadow-ai: 0 10px 30px rgba(15, 23, 42, 0.08);
+  --shadow-ai-hover: 0 18px 45px rgba(15, 23, 42, 0.12);
+  --shadow-glow: 0 0 24px rgba(17, 114, 129, 0.18);
+
   /* Brand Shadows (with brand color tint) */
   --shadow-brand-sm: 0 1px 2px 0 rgba(17, 114, 129, 0.05);
   --shadow-brand-md: 0 4px 6px -1px rgba(17, 114, 129, 0.1), 0 2px 4px -1px rgba(17, 114, 129, 0.06);
@@ -91,15 +96,16 @@
   border: 1px solid var(--slate-200);
   border-radius: var(--radius-xl);
   padding: 1.5rem;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow var(--transition-base) var(--transition-timing),
-              border-color var(--transition-base) var(--transition-timing),
-              transform var(--transition-base) var(--transition-timing);
+  box-shadow: var(--shadow-ai);
+  transition:
+    box-shadow var(--transition-base) var(--transition-timing),
+    border-color var(--transition-base) var(--transition-timing),
+    transform var(--transition-base) var(--transition-timing);
 }
 
 .card:hover {
-  box-shadow: var(--shadow-lg);
-  border-color: var(--brand-300);
+  box-shadow: var(--shadow-ai-hover);
+  border-color: rgba(17, 114, 129, 0.25);
 }
 
 .dark .card {
@@ -122,19 +128,19 @@
   font-weight: 600;
   line-height: 1;
   color: white;
-  background: linear-gradient(135deg, var(--brand-500), var(--brand-600));
+  background: linear-gradient(135deg, var(--brand-600), var(--brand-500));
   border: none;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-brand-md);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-glow);
   cursor: pointer;
   transition: all var(--transition-base) var(--transition-timing);
   text-decoration: none;
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--brand-600), var(--brand-700));
-  box-shadow: var(--shadow-brand-lg);
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, var(--brand-700), var(--brand-600));
+  box-shadow: var(--shadow-ai-hover);
+  transform: translateY(-2px);
 }
 
 .btn-primary:active {
@@ -156,20 +162,21 @@
   font-size: 1rem;
   font-weight: 600;
   line-height: 1;
-  color: var(--slate-700);
+  color: var(--brand-700);
   background: white;
-  border: 2px solid var(--slate-300);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  border: 2px solid var(--brand-600);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-ai);
   cursor: pointer;
   transition: all var(--transition-base) var(--transition-timing);
   text-decoration: none;
 }
 
 .btn-secondary:hover {
-  background: var(--slate-50);
-  border-color: var(--brand-500);
-  box-shadow: var(--shadow-md);
+  background: var(--brand-50);
+  border-color: var(--brand-700);
+  box-shadow: var(--shadow-ai-hover);
+  transform: translateY(-2px);
 }
 
 .btn-secondary:active {
@@ -183,14 +190,14 @@
 }
 
 .dark .btn-secondary {
-  color: var(--slate-200);
-  background: var(--slate-800);
-  border-color: var(--slate-600);
+  color: var(--slate-800);
+  background: rgba(15, 23, 42, 0.2);
+  border-color: rgba(203, 213, 225, 0.18);
 }
 
 .dark .btn-secondary:hover {
-  background: var(--slate-700);
-  border-color: var(--brand-400);
+  background: rgba(15, 23, 42, 0.28);
+  border-color: rgba(17, 114, 129, 0.45);
 }
 
 .btn-ghost {
@@ -202,10 +209,10 @@
   font-size: 1rem;
   font-weight: 600;
   line-height: 1;
-  color: var(--brand-600);
+  color: var(--brand-700);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   cursor: pointer;
   transition: all var(--transition-base) var(--transition-timing);
   text-decoration: none;
@@ -242,20 +249,20 @@
   line-height: 1.5;
   color: var(--slate-900);
   background: white;
-  border: 1px solid var(--slate-300);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  border: 2px solid var(--slate-200);
+  border-radius: var(--radius-xl);
+  box-shadow: none;
   transition: all var(--transition-fast) var(--transition-timing);
 }
 
 .input-field:hover {
-  border-color: var(--slate-400);
+  border-color: var(--slate-300);
 }
 
 .input-field:focus {
   outline: none;
   border-color: var(--brand-500);
-  box-shadow: 0 0 0 3px rgba(17, 114, 129, 0.1);
+  box-shadow: 0 0 0 4px rgba(17, 114, 129, 0.10);
 }
 
 .input-field::placeholder {
@@ -264,17 +271,17 @@
 
 .dark .input-field {
   color: var(--slate-100);
-  background: var(--slate-800);
-  border-color: var(--slate-600);
+  background: rgba(15, 23, 42, 0.25);
+  border-color: rgba(203, 213, 225, 0.18);
 }
 
 .dark .input-field:hover {
-  border-color: var(--slate-500);
+  border-color: rgba(203, 213, 225, 0.28);
 }
 
 .dark .input-field:focus {
-  border-color: var(--brand-400);
-  box-shadow: 0 0 0 3px rgba(52, 174, 187, 0.1);
+  border-color: rgba(17, 114, 129, 0.55);
+  box-shadow: 0 0 0 4px rgba(17, 114, 129, 0.18);
 }
 
 /* Badge for Metrics */
