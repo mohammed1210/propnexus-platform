@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query, Response
 from fastapi.params import Param
+from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
 from backend.utils.deal_scoring import compute_deal_score
@@ -701,21 +703,68 @@ def backfill_property_scores(
 
     sb = _get_supabase()
     try:
-        select_cols = "id,price,asking_price,yield_percent,rental_yield_percent,roi_percent,rent,avg_rent,crime_index,schools_rating,score"
+        cols = [
+            "id",
+            "price",
+            "asking_price",
+            "yield_percent",
+            "rental_yield_percent",
+            "roi_percent",
+            "rent",
+            "avg_rent",
+            "crime_index",
+            "schools_rating",
+            "score",
+        ]
 
-        res_null = (
-            sb.table("properties")
+        def _missing_col_from_api_error(err: APIError) -> str | None:
+            payload = err.args[0] if err.args else None
+            msg = payload.get("message") if isinstance(payload, dict) else str(err)
+            if not msg:
+                return None
+            m = re.search(r"column properties\\.([a-zA-Z0-9_]+) does not exist", msg)
+            if not m:
+                return None
+            return m.group(1)
+
+        def _select_with_existing_cols(build_query):
+            nonlocal cols
+            for _ in range(10):
+                try:
+                    select_cols = ",".join(cols)
+                    return build_query(select_cols).execute()
+                except APIError as e:
+                    missing = _missing_col_from_api_error(e)
+                    if not missing:
+                        raise
+                    if missing == "score":
+                        raise HTTPException(
+                            status_code=500,
+                            detail="Backfill failed: DB is missing properties.score (apply the deal score migration first)",
+                        )
+                    if missing in cols and missing != "id":
+                        cols = [c for c in cols if c != missing]
+                        continue
+                    raise
+            raise HTTPException(
+                status_code=500, detail="Backfill failed: could not find a compatible column set"
+            )
+
+        res_null = _select_with_existing_cols(
+            lambda select_cols: sb.table("properties")
             .select(select_cols)
             .is_("score", "null")
             .limit(int(limit))
-            .execute()
         )
         null_rows = res_null.data or []
         if not isinstance(null_rows, list):
             null_rows = []
 
-        res_zero = (
-            sb.table("properties").select(select_cols).lte("score", 0).limit(int(limit)).execute()
+        res_zero = _select_with_existing_cols(
+            lambda select_cols: sb.table("properties")
+            .select(select_cols)
+            .lte("score", 0)
+            .limit(int(limit))
         )
         zero_rows = res_zero.data or []
         if not isinstance(zero_rows, list):
