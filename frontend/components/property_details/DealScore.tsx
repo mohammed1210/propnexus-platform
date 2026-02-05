@@ -94,7 +94,10 @@ export default function DealScore({ property }: DealScoreProps) {
   if (!scoreData) {
     return (
       <div className="text-gray-600 dark:text-neutral-400">
-        <p>Score unavailable</p>
+        <p>Score pending</p>
+        <p className="mt-1 text-xs">
+          This property doesn’t have a stored deal score yet.
+        </p>
       </div>
     );
   }

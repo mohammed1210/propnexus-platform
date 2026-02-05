@@ -110,8 +110,14 @@ def _get_supabase():
     Lazily create Supabase client so unit tests can patch create_client.
     Also avoids crashing if env vars aren't set in CI.
     """
-    url = os.getenv("SUPABASE_URL") or "http://localhost"
-    key = os.getenv("SUPABASE_KEY") or "anon"
+    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "http://localhost"
+    key = (
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        or os.getenv("SUPABASE_SERVICE_ROLE")
+        or os.getenv("SUPABASE_KEY")
+        or os.getenv("SUPABASE_ANON_KEY")
+        or "anon"
+    )
     return create_client(url, key)
 
 
