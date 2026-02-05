@@ -5,6 +5,8 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from backend.utils.deal_scoring import compute_deal_score
+
 try:
     from fastapi import APIRouter, HTTPException  # type: ignore
 except Exception:  # pragma: no cover
@@ -106,6 +108,15 @@ async def scrape_endpoint(req: ScrapeRequest):
                     row["url"] = row.get("listing_url") or row.get("raw_url")
                 row.pop("listing_url", None)
                 row.pop("raw_url", None)
+
+                # Deterministic deal score computed once at upsert time.
+                try:
+                    score, breakdown = compute_deal_score(row)
+                    row["score"] = score
+                    row["score_breakdown"] = breakdown
+                    row["score_updated_at"] = datetime.now(timezone.utc).isoformat()
+                except Exception:
+                    pass
 
                 db_rows.append(row)
 

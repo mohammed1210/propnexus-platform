@@ -69,10 +69,12 @@ export type ListParams = {
     | 'price_desc'
     | 'yield_desc'
     | 'roi_desc'
+    | 'score_desc'
     // legacy
     | 'created_at'
     | 'price'
     | 'bedrooms'
+    | 'score'
     | 'roi_percent'
     | 'yield_percent';
   dir?: 'asc' | 'desc'; // legacy
@@ -89,6 +91,7 @@ export type PropertyRow = {
   bathrooms?: number;
   yield_percent?: number;
   roi_percent?: number;
+  score?: number;
   imageurl?: string;
   latitude?: number;
   longitude?: number;

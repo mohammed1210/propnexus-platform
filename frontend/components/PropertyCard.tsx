@@ -296,6 +296,18 @@ export default function PropertyCard({ p }: { p: Property }) {
 
         {/* Badges for yield and ROI - moved to top-right */}
         <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+          {typeof p.score === 'number' && (
+            <span
+              className={cx(
+                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
+                'bg-slate-900/60 text-white dark:bg-slate-50/10 dark:text-slate-100',
+              )}
+              aria-label={`Deal score: ${Math.round(p.score)}/100`}
+              title={`Deal score: ${Math.round(p.score)}/100`}
+            >
+              Score {Math.round(p.score)}
+            </span>
+          )}
           {typeof p.yield_percent === 'number' && (
             <span
               className={cx(

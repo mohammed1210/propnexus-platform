@@ -19,6 +19,7 @@ import asyncio
 import logging
 import os
 import time
+from datetime import datetime, timezone
 from typing import List
 
 try:
@@ -35,6 +36,7 @@ try:
 except Exception:  # pragma: no cover
     create_client = None  # type: ignore
 
+from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.ingest import scrape_all_sources
 
 SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
@@ -74,6 +76,14 @@ async def _ingest_location(location: str) -> int:
                         if isinstance(p, dict):
                             row = dict(p)
                             row.pop("ai_ready", None)
+
+                            try:
+                                score, breakdown = compute_deal_score(row)
+                                row["score"] = score
+                                row["score_breakdown"] = breakdown
+                                row["score_updated_at"] = datetime.now(timezone.utc).isoformat()
+                            except Exception:
+                                pass
                             db_batch.append(row)
 
                     # Ensure upsert resolves on (source,external_id) as a single param value
