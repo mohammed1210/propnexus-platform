@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, ReactNode } from 'react';
-import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { ReactNode, useId, useState } from 'react';
+import { FiChevronDown } from 'react-icons/fi';
 
 interface CollapsibleCardProps {
   title: string;
@@ -19,33 +19,54 @@ export default function CollapsibleCard({
   className = '',
 }: CollapsibleCardProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const contentId = useId();
 
   return (
-    <div className={`card ${className}`}>
+    <section className={`card p-0 overflow-hidden ${className}`} aria-label={title}>
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between mb-4 hover:opacity-80 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-lg"
+        type="button"
+        onClick={() => setIsExpanded((v) => !v)}
+        className={
+          'w-full flex items-center gap-3 px-6 py-4 text-left ' +
+          'hover:bg-black/5 dark:hover:bg-white/5 transition-colors ' +
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500'
+        }
         aria-expanded={isExpanded}
-        aria-label={isExpanded ? `Collapse ${title}` : `Expand ${title}`}
+        aria-controls={contentId}
       >
-        <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          {icon}
-          {title}
-        </h2>
-        <div className="text-slate-600 dark:text-slate-400">
-          {isExpanded ? (
-            <FiChevronUp className="w-6 h-6" />
-          ) : (
-            <FiChevronDown className="w-6 h-6" />
-          )}
-        </div>
+        {icon ? <span className="shrink-0">{icon}</span> : null}
+        <span className="flex-1 min-w-0">
+          <span className="block text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate">
+            {title}
+          </span>
+          <span className="block text-xs text-slate-600 dark:text-slate-400">
+            {isExpanded ? 'Click to collapse' : 'Click to expand'}
+          </span>
+        </span>
+
+        <span
+          className={
+            'shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-lg ' +
+            'border border-slate-200/80 dark:border-slate-800/80 ' +
+            'bg-white/60 dark:bg-slate-900/40 backdrop-blur-sm'
+          }
+          aria-hidden="true"
+        >
+          <FiChevronDown
+            className={`h-5 w-5 text-slate-700 dark:text-slate-300 transition-transform ${
+              isExpanded ? 'rotate-180' : 'rotate-0'
+            }`}
+          />
+        </span>
       </button>
 
-      {isExpanded && (
-        <div className="animate-slide-down">
-          {children}
-        </div>
-      )}
-    </div>
+      <div
+        id={contentId}
+        hidden={!isExpanded}
+        className="border-t border-slate-200/70 dark:border-slate-800/70 px-6 pb-6"
+      >
+        <div className="pt-5">{children}</div>
+      </div>
+    </section>
   );
 }
