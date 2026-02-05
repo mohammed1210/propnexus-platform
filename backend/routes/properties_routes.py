@@ -722,7 +722,7 @@ def backfill_property_scores(
             msg = payload.get("message") if isinstance(payload, dict) else str(err)
             if not msg:
                 return None
-            m = re.search(r"column properties\\.([a-zA-Z0-9_]+) does not exist", msg)
+            m = re.search(r"column properties\.([a-zA-Z0-9_]+) does not exist", msg)
             if not m:
                 return None
             return m.group(1)
