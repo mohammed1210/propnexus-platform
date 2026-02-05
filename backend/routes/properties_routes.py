@@ -701,7 +701,7 @@ def backfill_property_scores(
 
     sb = _get_supabase()
     try:
-        select_cols = "id,price,asking_price,yield_percent,roi_percent,rent,avg_rent,crime_index,schools_rating,score"
+        select_cols = "id,price,asking_price,yield_percent,rental_yield_percent,roi_percent,rent,avg_rent,crime_index,schools_rating,score"
 
         res_null = (
             sb.table("properties")
