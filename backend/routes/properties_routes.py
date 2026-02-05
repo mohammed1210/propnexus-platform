@@ -5,6 +5,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi.params import Param
 from pydantic import BaseModel, Field
 
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
@@ -354,6 +355,13 @@ def list_properties(
     points_limit: int = Query(default=2000, ge=1, le=10000),
 ):
     try:
+        # When called directly (e.g. unit tests), FastAPI Param defaults like Query(...)
+        # are not resolved and will be passed through as objects.
+        if isinstance(include_points, Param):
+            include_points = bool(getattr(include_points, "default", False))
+        if isinstance(points_limit, Param):
+            points_limit = int(getattr(points_limit, "default", 2000))
+
         response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
 
         sb = _get_supabase()
