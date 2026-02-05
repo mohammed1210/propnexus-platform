@@ -4,7 +4,20 @@ import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import { FiMapPin, FiHome, FiDroplet, FiTrendingUp, FiDollarSign, FiTool } from 'react-icons/fi';
+import {
+  FiMapPin,
+  FiHome,
+  FiDroplet,
+  FiTrendingUp,
+  FiDollarSign,
+  FiTool,
+  FiFileText,
+  FiBarChart2,
+  FiRepeat,
+  FiGitBranch,
+  FiEdit3,
+  FiMap,
+} from 'react-icons/fi';
 
 import QuickStatsActions from '@/components/property_details/QuickStatsActions';
 import InvestmentSummary from '@/components/property_details/InvestmentSummary';
@@ -413,12 +426,28 @@ export default function PropertyDetailsPage() {
             </CollapsibleCard>
 
             {/* Investment Summary (AI-generated text) */}
-            <CollapsibleCard title="Investment Summary" defaultExpanded={true}>
+            <CollapsibleCard
+              title="Investment Summary"
+              icon={
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                  <FiFileText className="w-5 h-5 text-white" />
+                </div>
+              }
+              defaultExpanded={true}
+            >
               <InvestmentSummary property={property as any} />
             </CollapsibleCard>
 
             {/* Area Intelligence - Always visible, gated for non-pro users */}
-            <CollapsibleCard title="Area Intelligence" defaultExpanded={false}>
+            <CollapsibleCard
+              title="Area Intelligence"
+              icon={
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                  <FiBarChart2 className="w-5 h-5 text-white" />
+                </div>
+              }
+              defaultExpanded={false}
+            >
               <GatedPanel
                 title="Area Intelligence"
                 requiredPlan="pro"
@@ -429,7 +458,15 @@ export default function PropertyDetailsPage() {
             </CollapsibleCard>
 
             {/* Comparable Sales - Always visible, gated for non-pro users */}
-            <CollapsibleCard title="Comparable Sales" defaultExpanded={false}>
+            <CollapsibleCard
+              title="Comparable Sales"
+              icon={
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                  <FiRepeat className="w-5 h-5 text-white" />
+                </div>
+              }
+              defaultExpanded={false}
+            >
               <GatedPanel
                 title="Comparable Sales"
                 requiredPlan="pro"
@@ -499,7 +536,15 @@ export default function PropertyDetailsPage() {
             )}
 
             {/* Exit Strategies */}
-            <CollapsibleCard title="Exit Strategies" defaultExpanded={false}>
+            <CollapsibleCard
+              title="Exit Strategies"
+              icon={
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                  <FiGitBranch className="w-5 h-5 text-white" />
+                </div>
+              }
+              defaultExpanded={false}
+            >
               <ExitStrategyGenerator
                 title={String(property.title ?? '')}
                 location={String(property.location ?? '')}
@@ -517,7 +562,15 @@ export default function PropertyDetailsPage() {
             </CollapsibleCard>
 
             {/* Investor Notes */}
-            <CollapsibleCard title="Investor Notes" defaultExpanded={false}>
+            <CollapsibleCard
+              title="Investor Notes"
+              icon={
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                  <FiEdit3 className="w-5 h-5 text-white" />
+                </div>
+              }
+              defaultExpanded={false}
+            >
               {'id' in property ? <NotesFields propertyId={(property as any).id} /> : null}
             </CollapsibleCard>
 
@@ -531,7 +584,15 @@ export default function PropertyDetailsPage() {
             <StampDutyCalculator price={price} />
 
             {/* Location Map */}
-            <CollapsibleCard title="Location" defaultExpanded={false}>
+            <CollapsibleCard
+              title="Location"
+              icon={
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                  <FiMap className="w-5 h-5 text-white" />
+                </div>
+              }
+              defaultExpanded={false}
+            >
               <div className="rounded-lg overflow-hidden">
                 <MapSingle property={property} height={400} zoom={14} scrollWheelZoom={false} />
               </div>
