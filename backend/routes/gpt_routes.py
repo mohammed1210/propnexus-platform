@@ -3,6 +3,8 @@ import os
 from fastapi import APIRouter, HTTPException
 from openai import OpenAI
 
+from backend.utils.deal_scoring import compute_deal_score
+
 router = APIRouter(prefix="/gpt", tags=["GPT AI"])
 
 # Lazy client initialization to avoid import-time errors
@@ -128,63 +130,11 @@ async def ai_score(data: dict):
     Input: property data dict
     Returns: {"ok": true, "score": 78, "categories": {...}, "version": "v1.0"}
     """
-    # Extract relevant metrics with defaults
-    yield_pct = data.get("yield_percent") or data.get("rental_yield_percent") or 0
-    roi_pct = data.get("roi_percent") or 0
-    price = data.get("price") or 0
-    rent = data.get("rent") or data.get("avg_rent") or 0
+    score, breakdown = compute_deal_score(data)
+    categories = breakdown.get("categories") or {}
+    version = breakdown.get("version") or "v1.0"
 
-    # Use explicit None checks to preserve 0 values
-    crime = data.get("crime_index")
-    crime = 50 if crime is None else float(crime)
-
-    schools = data.get("schools_rating")
-    schools = 3.0 if schools is None else float(schools)
-
-    # Calculate price-to-rent ratio (lower is better)
-    price_to_rent_ratio = (price / (rent * 12)) if (rent and price) else 0
-
-    # Category scores (out of max points each)
-    # Yield: 0-20 points (5%+ yield = 20pts, linear)
-    yield_score = min(20, (yield_pct / 5.0) * 20) if yield_pct > 0 else 0
-
-    # ROI: 0-20 points (10%+ ROI = 20pts, linear)
-    roi_score = min(20, (roi_pct / 10.0) * 20) if roi_pct > 0 else 0
-
-    # Price-to-rent: 0-15 points (ratio < 15 = 15pts, inverse linear)
-    ptr_score = 0
-    if price_to_rent_ratio > 0:
-        ptr_score = max(0, 15 - price_to_rent_ratio) if price_to_rent_ratio < 15 else 0
-        ptr_score = min(15, ptr_score)
-
-    # Area demand (proxy): 0-15 points (mock based on rent levels)
-    area_score = min(15, (rent / 1500.0) * 15) if rent > 0 else 0
-
-    # Crime index inverse: 0-15 points (crime 0-100, inverted: 100-crime gives 0-100, scale to 15)
-    crime_score = ((100 - crime) / 100.0) * 15
-
-    # Schools access: 0-15 points (rating 0-5, scale to 15)
-    schools_score = (schools / 5.0) * 15
-
-    # Total score
-    total = yield_score + roi_score + ptr_score + area_score + crime_score + schools_score
-    total = min(100, max(0, total))
-
-    categories = {
-        "yield": round(yield_score, 1),
-        "roi": round(roi_score, 1),
-        "price_to_rent": round(ptr_score, 1),
-        "area_demand": round(area_score, 1),
-        "crime_index_inverse": round(crime_score, 1),
-        "schools_access": round(schools_score, 1),
-    }
-
-    return {
-        "ok": True,
-        "score": round(total, 1),
-        "categories": categories,
-        "version": "v1.0",
-    }
+    return {"ok": True, "score": score, "categories": categories, "version": version}
 
 
 @router.post("/score/explain")

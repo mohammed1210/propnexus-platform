@@ -40,6 +40,14 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _first_float(data: Dict[str, Any], keys: list[str]) -> float | None:
+    for k in keys:
+        v = _to_float(data.get(k))
+        if v is not None:
+            return float(v)
+    return None
+
+
 def compute_deal_score(property_row: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
     """Compute a deterministic 0-100 deal score for a property row.
 
@@ -51,10 +59,45 @@ def compute_deal_score(property_row: Dict[str, Any]) -> Tuple[int, Dict[str, Any
 
     data = property_row or {}
 
-    yield_pct = _to_float(data.get("yield_percent") or data.get("rental_yield_percent")) or 0.0
-    roi_pct = _to_float(data.get("roi_percent")) or 0.0
-    price = _to_float(data.get("price") or data.get("asking_price")) or 0.0
-    rent = _to_float(data.get("rent") or data.get("avg_rent")) or 0.0
+    yield_pct = (
+        _first_float(
+            data,
+            [
+                "yield",
+                "yield_percent",
+                "rental_yield_percent",
+                "rental_yield",
+                "gross_yield",
+                "yieldPercent",
+            ],
+        )
+        or 0.0
+    )
+    roi_pct = (
+        _first_float(
+            data,
+            [
+                "roi",
+                "roi_percent",
+                "annual_roi",
+                "roiPercent",
+            ],
+        )
+        or 0.0
+    )
+    price = (
+        _first_float(
+            data,
+            [
+                "price",
+                "asking_price",
+                "list_price",
+                "askingPrice",
+            ],
+        )
+        or 0.0
+    )
+    rent = _first_float(data, ["rent", "avg_rent"]) or 0.0
 
     # Preserve explicit 0 values; only default on None.
     crime_raw = _to_float(data.get("crime_index"))

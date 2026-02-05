@@ -43,3 +43,18 @@ def test_compute_deal_score_missing_data_safe_defaults():
     # With defaults, these should be deterministic
     assert cats.get("crime_index_inverse") == 7.5
     assert cats.get("schools_access") == 9.0
+
+
+def test_compute_deal_score_accepts_yield_and_roi_variants():
+    score, breakdown = compute_deal_score(
+        {
+            "price": 375000,
+            "yield": 6.5,
+            "roi": 12,
+            "rent": 1600,
+        }
+    )
+    cats = breakdown.get("categories") or {}
+    assert score > 0
+    assert cats.get("yield", 0) > 0
+    assert cats.get("roi", 0) > 0

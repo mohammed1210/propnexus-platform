@@ -692,6 +692,7 @@ def get_property(property_id: str, response: Response):
 @router.post("/properties/admin/backfill-scores")
 def backfill_property_scores(
     limit: int = Query(default=200, ge=1, le=500),
+    force: bool = Query(default=False),
     x_admin_token: str | None = Header(None),
 ):
     """Backfill score for legacy rows (score is NULL/0).
@@ -715,6 +716,7 @@ def backfill_property_scores(
             "crime_index",
             "schools_rating",
             "score",
+            "score_updated_at",
         ]
 
         def _missing_col_from_api_error(err: APIError) -> str | None:
@@ -750,32 +752,48 @@ def backfill_property_scores(
                 status_code=500, detail="Backfill failed: could not find a compatible column set"
             )
 
-        res_null = _select_with_existing_cols(
-            lambda select_cols: sb.table("properties")
-            .select(select_cols)
-            .is_("score", "null")
-            .limit(int(limit))
-        )
-        null_rows = res_null.data or []
-        if not isinstance(null_rows, list):
-            null_rows = []
+        if force:
+            res_all = _select_with_existing_cols(
+                lambda select_cols: (
+                    _safe_order(
+                        sb.table("properties").select(select_cols).limit(int(limit)),
+                        "score_updated_at",
+                        desc=False,
+                    )
+                    if "score_updated_at" in cols
+                    else sb.table("properties").select(select_cols).limit(int(limit))
+                )
+            )
+            rows = res_all.data or []
+            if not isinstance(rows, list):
+                rows = []
+        else:
+            res_null = _select_with_existing_cols(
+                lambda select_cols: sb.table("properties")
+                .select(select_cols)
+                .is_("score", "null")
+                .limit(int(limit))
+            )
+            null_rows = res_null.data or []
+            if not isinstance(null_rows, list):
+                null_rows = []
 
-        res_zero = _select_with_existing_cols(
-            lambda select_cols: sb.table("properties")
-            .select(select_cols)
-            .lte("score", 0)
-            .limit(int(limit))
-        )
-        zero_rows = res_zero.data or []
-        if not isinstance(zero_rows, list):
-            zero_rows = []
+            res_zero = _select_with_existing_cols(
+                lambda select_cols: sb.table("properties")
+                .select(select_cols)
+                .lte("score", 0)
+                .limit(int(limit))
+            )
+            zero_rows = res_zero.data or []
+            if not isinstance(zero_rows, list):
+                zero_rows = []
 
-        merged_by_id: dict[str, dict] = {}
-        for r in [*null_rows, *zero_rows]:
-            if isinstance(r, dict) and r.get("id"):
-                merged_by_id[str(r["id"])] = r
+            merged_by_id: dict[str, dict] = {}
+            for r in [*null_rows, *zero_rows]:
+                if isinstance(r, dict) and r.get("id"):
+                    merged_by_id[str(r["id"])] = r
 
-        rows = list(merged_by_id.values())[: int(limit)]
+            rows = list(merged_by_id.values())[: int(limit)]
         attempted = len(rows)
         updated = 0
 
