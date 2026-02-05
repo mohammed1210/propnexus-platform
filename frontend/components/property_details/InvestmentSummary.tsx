@@ -73,14 +73,32 @@ export default function InvestmentSummary({ property }: Props) {
     property.description,
   ]);
 
-  if (loading) return <p data-testid="investment-summary-loading" className="text-sm text-slate-600 dark:text-slate-400">Loading summary…</p>;
-  if (error)
+  if (loading)
     return (
-      <p role="alert" className="text-sm text-red-600">
-        Error: {error}
+      <p data-testid="investment-summary-loading" className="text-sm text-slate-600 dark:text-slate-400">
+        Loading summary…
       </p>
     );
-  if (!data) return <p className="text-sm text-slate-600 dark:text-slate-400">No summary available.</p>;
+
+  if (error)
+    return (
+      <div
+        role="alert"
+        className="rounded-lg border border-rose-200/60 dark:border-rose-800/30 bg-rose-50 dark:bg-rose-900/10 p-4"
+      >
+        <div className="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300 mb-1">
+          Summary unavailable
+        </div>
+        <p className="text-sm text-rose-800 dark:text-rose-200">{error}</p>
+      </div>
+    );
+
+  if (!data)
+    return (
+      <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/20 p-4">
+        <p className="text-sm text-slate-600 dark:text-slate-400">No summary available.</p>
+      </div>
+    );
 
   return (
     <div data-testid="investment-summary-text" className="space-y-4">

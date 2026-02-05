@@ -1,16 +1,27 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Header, HTTPException, Query, Response
+from fastapi.params import Param
 from pydantic import BaseModel, Field
 
+from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from supabase import create_client
 
 router = APIRouter(tags=["properties"])
+
+
+def _require_admin(x_admin_token: str | None = None) -> None:
+    required = os.getenv("IMPORT_ADMIN_TOKEN")
+    if required and x_admin_token != required:
+        raise HTTPException(status_code=401, detail="Admin token required")
+
 
 # Allowed sort columns (tests expect invalid -> fallback, not 500)
 ALLOWED_SORT_COLS = {
@@ -21,6 +32,7 @@ ALLOWED_SORT_COLS = {
     "yield_percent",
     "roi_percent",
     "ai_score",
+    "score",
 }
 
 
@@ -98,8 +110,14 @@ def _get_supabase():
     Lazily create Supabase client so unit tests can patch create_client.
     Also avoids crashing if env vars aren't set in CI.
     """
-    url = os.getenv("SUPABASE_URL") or "http://localhost"
-    key = os.getenv("SUPABASE_KEY") or "anon"
+    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "http://localhost"
+    key = (
+        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        or os.getenv("SUPABASE_SERVICE_ROLE")
+        or os.getenv("SUPABASE_KEY")
+        or os.getenv("SUPABASE_ANON_KEY")
+        or "anon"
+    )
     return create_client(url, key)
 
 
@@ -354,6 +372,13 @@ def list_properties(
     points_limit: int = Query(default=2000, ge=1, le=10000),
 ):
     try:
+        # When called directly (e.g. unit tests), FastAPI Param defaults like Query(...)
+        # are not resolved and will be passed through as objects.
+        if isinstance(include_points, Param):
+            include_points = bool(getattr(include_points, "default", False))
+        if isinstance(points_limit, Param):
+            points_limit = int(getattr(points_limit, "default", 2000))
+
         response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
 
         sb = _get_supabase()
@@ -408,6 +433,7 @@ def list_properties(
             "price_desc": ("price", True),
             "yield_desc": ("yield_percent", True),
             "roi_desc": ("roi_percent", True),
+            "score_desc": ("score", True),
         }
 
         if sort_key in sort_map:
@@ -659,3 +685,73 @@ def get_property(property_id: str, response: Response):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"property fetch failed: {e}")
+
+
+@router.post("/properties/admin/backfill-scores")
+def backfill_property_scores(
+    limit: int = Query(default=200, ge=1, le=500),
+    x_admin_token: str | None = Header(None),
+):
+    """Backfill score for legacy rows (score is NULL/0).
+
+    Bounded by `limit` and best-effort; failures per-row do not abort the run.
+    """
+
+    _require_admin(x_admin_token)
+
+    sb = _get_supabase()
+    try:
+        select_cols = "id,price,asking_price,yield_percent,rental_yield_percent,roi_percent,rent,avg_rent,crime_index,schools_rating,score"
+
+        res_null = (
+            sb.table("properties")
+            .select(select_cols)
+            .is_("score", "null")
+            .limit(int(limit))
+            .execute()
+        )
+        null_rows = res_null.data or []
+        if not isinstance(null_rows, list):
+            null_rows = []
+
+        res_zero = (
+            sb.table("properties").select(select_cols).lte("score", 0).limit(int(limit)).execute()
+        )
+        zero_rows = res_zero.data or []
+        if not isinstance(zero_rows, list):
+            zero_rows = []
+
+        merged_by_id: dict[str, dict] = {}
+        for r in [*null_rows, *zero_rows]:
+            if isinstance(r, dict) and r.get("id"):
+                merged_by_id[str(r["id"])] = r
+
+        rows = list(merged_by_id.values())[: int(limit)]
+        attempted = len(rows)
+        updated = 0
+
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            pid = r.get("id")
+            if not pid:
+                continue
+
+            try:
+                score, breakdown = compute_deal_score(r)
+                payload = {
+                    "score": score,
+                    "score_breakdown": breakdown,
+                    "score_updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                sb.table("properties").update(payload).eq("id", str(pid)).execute()
+                updated += 1
+            except Exception:
+                logging.exception("Failed to backfill score for property %s", pid)
+
+        return {"attempted": attempted, "updated": updated}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.exception("Backfill property scores failed")
+        raise HTTPException(status_code=500, detail="Backfill failed") from e

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel
 
 from backend.scraper.utils import TARGET_CITIES
+from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 
 # Scrapers (existing)
@@ -693,6 +694,22 @@ def _strip_field(rows: list[Dict[str, Any]], field: str) -> list[Dict[str, Any]]
     return cleaned
 
 
+def _strip_fields(rows: list[Dict[str, Any]], fields: list[str]) -> list[Dict[str, Any]]:
+    cleaned: list[Dict[str, Any]] = []
+    to_strip = set(fields or [])
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        if any(f in r for f in to_strip):
+            nr = dict(r)
+            for f in to_strip:
+                nr.pop(f, None)
+            cleaned.append(nr)
+        else:
+            cleaned.append(r)
+    return cleaned
+
+
 def _upsert_properties_rows(
     *,
     rows: list[Dict[str, Any]],
@@ -719,7 +736,19 @@ def _upsert_properties_rows(
                 rr["external_id"] = ensure_external_id(rr)
             except Exception:
                 pass
-        prepared.append(strip_empty_for_upsert(rr))
+        cleaned = strip_empty_for_upsert(rr)
+
+        # Deterministic deal score is computed once at ingest/upsert time.
+        try:
+            score, breakdown = compute_deal_score(cleaned)
+            cleaned["score"] = score
+            cleaned["score_breakdown"] = breakdown
+            cleaned["score_updated_at"] = _now_iso()
+        except Exception:
+            # Never fail ingestion due to scoring.
+            pass
+
+        prepared.append(cleaned)
 
     try:
         sb.table("properties").upsert(prepared, on_conflict=on_conflict).execute()
@@ -733,6 +762,17 @@ def _upsert_properties_rows(
                 return True, None
             except Exception as e2:
                 return False, str(e2)
+
+        # Score fields may not exist yet in some environments / schema cache.
+        if ("score" in msg or "score_updated_at" in msg or "score_breakdown" in msg) and (
+            "PGRST204" in msg or "Could not find" in msg
+        ):
+            try:
+                stripped = _strip_fields(prepared, ["score", "score_updated_at", "score_breakdown"])
+                sb.table("properties").upsert(stripped, on_conflict=on_conflict).execute()
+                return True, None
+            except Exception as e3:
+                return False, str(e3)
         return False, msg
 
 

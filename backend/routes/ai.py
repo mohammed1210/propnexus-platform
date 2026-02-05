@@ -39,7 +39,8 @@ def format_summary_prompt(req: SummaryRequest) -> List[Dict[str, str]]:
     """Build messages for summary generation."""
     sys_prompt = (
         "You are an investment analyst for UK buy-to-let properties. "
-        "Be concise and factual. Currency GBP. Use UK property terms."
+        "Be concise and factual. Currency GBP. Use UK property terms. "
+        "Return plain text only."
     )
     user_prompt = (
         f"Title: {req.title}\n"
@@ -48,7 +49,13 @@ def format_summary_prompt(req: SummaryRequest) -> List[Dict[str, str]]:
         f"Yield: {req.yield_ or 'N/A'}\n"
         f"ROI: {req.roi or 'N/A'}\n"
         f"Description: {req.description or 'N/A'}\n\n"
-        "Provide a short summary followed by bullet points highlighting the key investment factors."
+        "Write the response in this exact format:\n"
+        "1) First line: a single sentence investment summary (no label).\n"
+        "2) Next lines: 3-6 bullets, each on its own line, each starting with '- '.\n\n"
+        "Rules:\n"
+        "- Use only the provided facts; if something is missing, say it's unknown.\n"
+        "- Mention yield/ROI only if given.\n"
+        "- Avoid disclaimers and avoid speculation."
     )
     return [
         {"role": "system", "content": sys_prompt},
@@ -76,7 +83,8 @@ def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
     """Build messages for strategy generation."""
     sys_prompt = (
         "You are an investment analyst for UK buy-to-let properties. "
-        "Provide exit strategies with rationale, steps and risk. Currency GBP. Use UK property terms."
+        "Provide exit strategies with rationale, steps and risk. Currency GBP. Use UK property terms. "
+        "Return plain text only."
     )
     prop_lines = "\n".join(f"{k}: {v}" for k, v in req.property.items())
     constraints = req.constraints or {}
@@ -85,7 +93,17 @@ def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
     )
     user_prompt = (
         f"Property details:\n{prop_lines}{constraint_lines}\n\n"
-        "Suggest up to 3 exit strategies. For each strategy, provide a title, rationale, a numbered list of steps, and risk."
+        "Suggest up to 3 realistic exit strategies. Use this exact template for each strategy:\n\n"
+        "1. <Title>\n"
+        "Rationale: <1-2 sentences, factual>\n"
+        "- <Step 1>\n"
+        "- <Step 2>\n"
+        "- <Step 3>\n"
+        "Risk: <single sentence>\n\n"
+        "Rules:\n"
+        "- Keep steps action-oriented and specific to UK property investing.\n"
+        "- If constraints are provided, respect them.\n"
+        "- Avoid marketing tone and avoid speculation."
     )
     return [
         {"role": "system", "content": sys_prompt},
