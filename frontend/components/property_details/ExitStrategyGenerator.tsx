@@ -64,13 +64,21 @@ export default function ExitStrategyGenerator(props: Props) {
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-red-600">
-          Error: {error}
-        </p>
+        <div
+          role="alert"
+          className="rounded-lg border border-rose-200/60 dark:border-rose-800/30 bg-rose-50 dark:bg-rose-900/10 p-4"
+        >
+          <div className="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300 mb-1">
+            Strategies unavailable
+          </div>
+          <p className="text-sm text-rose-800 dark:text-rose-200">{error}</p>
+        </div>
       )}
 
       {strategies && strategies.length === 0 && !loading ? (
-        <p className="text-sm text-slate-600 dark:text-slate-400">No strategies returned.</p>
+        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/20 p-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">No strategies returned.</p>
+        </div>
       ) : null}
 
       <div className="space-y-3">

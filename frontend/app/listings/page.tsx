@@ -159,6 +159,7 @@ type RawProperty = {
   description?: string | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
+  ai_score?: number | null;
   imageurl?: string | null;
   source?: string | null;
   latitude?: number | null;
@@ -456,6 +457,16 @@ function ListingsInner() {
     return () => window.removeEventListener('scroll', onScroll);
   }, [showFilters]);
 
+  // Close filters on Escape.
+  useEffect(() => {
+    if (!showFilters) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowFilters(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showFilters]);
+
   const qRaw = searchParams?.get('q') ?? '';
   const q = sanitizeSearch(qRaw);
   const minP = parsePositiveInt(searchParams?.get('min') ?? '');
@@ -494,12 +505,47 @@ function ListingsInner() {
     return v ?? 0;
   })();
 
+  const urlMin = searchParams?.get('min') ?? '';
+  const urlMax = searchParams?.get('max') ?? '';
+  const urlBeds = searchParams?.get('beds') ?? '';
+  const urlBaths = searchParams?.get('baths') ?? '';
+
   const [searchInput, setSearchInput] = useState(qRaw);
-  const [minInput, setMinInput] = useState(searchParams?.get('min') ?? '');
-  const [maxInput, setMaxInput] = useState(searchParams?.get('max') ?? '');
-  const [bedsInput, setBedsInput] = useState(searchParams?.get('beds') ?? '');
-  const [bathsInput, setBathsInput] = useState(searchParams?.get('baths') ?? '');
+  const [minInput, setMinInput] = useState(urlMin);
+  const [maxInput, setMaxInput] = useState(urlMax);
+  const [bedsInput, setBedsInput] = useState(urlBeds);
+  const [bathsInput, setBathsInput] = useState(urlBaths);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(types);
+
+  const lastUrlInputsRef = useRef({
+    q: qRaw,
+    min: urlMin,
+    max: urlMax,
+    beds: urlBeds,
+    baths: urlBaths,
+  });
+
+  // Sync local inputs with URL state (back/forward, pagination), but do not overwrite
+  // values the user has already edited and not applied yet.
+  useEffect(() => {
+    const next = {
+      q: qRaw,
+      min: urlMin,
+      max: urlMax,
+      beds: urlBeds,
+      baths: urlBaths,
+    };
+
+    const prev = lastUrlInputsRef.current;
+
+    if (searchInput === prev.q && next.q !== prev.q) setSearchInput(next.q);
+    if (minInput === prev.min && next.min !== prev.min) setMinInput(next.min);
+    if (maxInput === prev.max && next.max !== prev.max) setMaxInput(next.max);
+    if (bedsInput === prev.beds && next.beds !== prev.beds) setBedsInput(next.beds);
+    if (bathsInput === prev.baths && next.baths !== prev.baths) setBathsInput(next.baths);
+
+    lastUrlInputsRef.current = next;
+  }, [qRaw, urlMin, urlMax, urlBeds, urlBaths, searchInput, minInput, maxInput, bedsInput, bathsInput]);
 
   // Keep local selection in sync with URL state (back/forward navigation).
   useEffect(() => {
@@ -608,6 +654,7 @@ function ListingsInner() {
           description: prop.description,
           yield_percent: prop.yield_percent,
           roi_percent: prop.roi_percent,
+          ai_score: prop.ai_score,
           imageurl: prop.imageurl,
           source: prop.source,
           latitude: prop.latitude ?? prop.lat,
@@ -629,6 +676,7 @@ function ListingsInner() {
                 description: prop.description,
                 yield_percent: prop.yield_percent,
                 roi_percent: prop.roi_percent,
+                ai_score: prop.ai_score,
                 imageurl: prop.imageurl,
                 source: prop.source,
                 latitude: prop.latitude ?? prop.lat,

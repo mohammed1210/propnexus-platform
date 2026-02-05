@@ -5,6 +5,7 @@ import { fetchWithRetry } from '@/lib/api';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiHeart } from 'react-icons/fi';
+import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -17,11 +18,15 @@ type Property = {
   source?: string | null;
   location?: string | null;
   price?: number | null;
+  asking_price?: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
   description?: string | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
+  ai_score?: number | null;
+  score?: number | null;
+  discount_percent?: number | null;
   imageurl?: string | null;
   image_urls?: string[] | null;
 };
@@ -209,6 +214,8 @@ export default function PropertyCard({ p }: { p: Property }) {
   const sourceBadgeText = useMemo(() => formatSourceBadge(p.source), [p.source]);
   const sourceBadgeClasses = useMemo(() => getSourceBadgeClasses(p.source), [p.source]);
 
+  const verdict = useMemo(() => buildVerdict(p), [p]);
+
   return (
     <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30">
       <Link
@@ -340,6 +347,24 @@ export default function PropertyCard({ p }: { p: Property }) {
         </Link>
 
         <p className="text-sm text-zinc-600 dark:text-zinc-400">{p.location || '—'}</p>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={cx(
+              'inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-semibold',
+              verdictToneClasses(verdict.tone),
+            )}
+            aria-label={`Verdict: ${verdict.label}`}
+            title={verdict.sentence}
+          >
+            {verdict.label}
+          </span>
+          {verdict.highlights.map((h) => (
+            <span key={h} className="text-xs text-slate-600 dark:text-slate-400">
+              {h}
+            </span>
+          ))}
+        </div>
 
         <div className="flex items-center justify-between pt-2">
           <div className="text-sm">
