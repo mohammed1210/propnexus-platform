@@ -82,7 +82,8 @@ export function buildVerdict(input: VerdictInput): VerdictOutput {
   const normalized = clamp(totalPoints, -3, 5);
 
   let tone: VerdictTone = 'neutral';
-  let label = 'Mixed';
+  // Investor-facing label: avoid uncertainty language like "Mixed".
+  let label = 'Balanced Strategy';
 
   if (normalized >= 4) {
     tone = 'positive';
@@ -126,7 +127,7 @@ export function buildVerdict(input: VerdictInput): VerdictOutput {
   const sentence =
     sentenceParts.length > 0
       ? `${label} on paper: ${sentenceParts.join(' · ')}.`
-      : `${label} based on available listing fields.`;
+      : `${label} opportunity based on rental and area indicators.`;
 
   return {
     label,

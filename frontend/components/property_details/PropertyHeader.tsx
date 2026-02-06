@@ -19,6 +19,7 @@ type HeaderProperty = {
 
 export default function PropertyHeader({ property }: { property: HeaderProperty }) {
   const description = typeof property.description === 'string' ? property.description.trim() : '';
+  const hasPrice = typeof property.price === 'number' && Number.isFinite(property.price) && property.price > 0;
 
   return (
     <>
@@ -54,12 +55,14 @@ export default function PropertyHeader({ property }: { property: HeaderProperty 
           </div>
 
           <div className="flex flex-col gap-3 lg:items-end">
-            <div className="text-left lg:text-right">
-              <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Price</div>
-              <div className="text-2xl sm:text-3xl font-bold text-brand-600 dark:text-brand-400">
-                £{(property.price ?? 0).toLocaleString()}
+            {hasPrice ? (
+              <div className="text-left lg:text-right">
+                <div className="text-xs text-slate-600 dark:text-slate-400 mb-1">Price</div>
+                <div className="text-2xl sm:text-3xl font-bold text-brand-600 dark:text-brand-400">
+                  £{property.price!.toLocaleString()}
+                </div>
               </div>
-            </div>
+            ) : null}
             {typeof property.yield_percent === 'number' && (
               <div className="flex items-center gap-2">
                 <FiTrendingUp className="w-5 h-5 text-emerald-500" />

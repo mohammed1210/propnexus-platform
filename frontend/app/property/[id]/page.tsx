@@ -214,6 +214,9 @@ export default function PropertyDetailsPage() {
         <div className="grid grid-cols-1 gap-6">
           {/* Main content - single column now since sidebar is floating */}
           <div className="space-y-6">
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              Showing the most relevant insights first
+            </div>
             {/* AI Deal Score - Always visible, gated for non-pro users */}
             <CollapsibleCard
               title="AI Deal Score"

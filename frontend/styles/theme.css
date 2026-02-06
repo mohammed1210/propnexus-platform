@@ -343,6 +343,7 @@ body {
   background: var(--pnx-pin-color, var(--accent-primary));
   border: 2px solid rgba(255, 255, 255, 0.95);
   box-shadow: 0 10px 18px rgba(15, 23, 42, 0.18);
+  transition: transform 120ms ease, outline-color 120ms ease;
 }
 
 .dark .pnx-map-pin {
@@ -372,4 +373,10 @@ body {
 
 .pnx-map-pin--other {
   --pnx-pin-color: var(--text-muted);
+}
+
+.pnx-map-pin--active {
+  transform: scale(1.25);
+  outline: 2px solid var(--border-primary);
+  outline-offset: 2px;
 }
