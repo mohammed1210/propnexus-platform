@@ -60,16 +60,20 @@ jobs:
 
           echo "🔄 Testing import with Ilford at $BACKEND_BASE/import/all..."
 
+          urlencode() {
+            python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$1"
+          }
+
+          ENC_LOCATION="$(urlencode "Ilford")"
+
           set -e
           RESPONSE=$(curl -s -f -X POST \
-            "${BACKEND_BASE}/import/all" \
-            -H "Content-Type: application/json" \
-            -H "x-api-key: ${OFF_MARKET_ADMIN_TOKEN}" \
-            -d '{"location": "Ilford"}')
+            "${BACKEND_BASE}/import/all?req=${ENC_LOCATION}" \
+            -H "x-admin-token: ${OFF_MARKET_ADMIN_TOKEN}")
 
           echo "Response: $RESPONSE"
 
-          COUNT=$(echo "$RESPONSE" | jq -r '.count // 0')
+          COUNT=$(echo "$RESPONSE" | jq -r '.total_imported // .count // 0')
 
           echo "📊 Import count: $COUNT"
 

@@ -79,6 +79,10 @@ jobs:
           IFS=',' read -ra LOCATIONS <<< "${{ steps.vars.outputs.locations }}"
           TOTAL_COUNT=0
 
+          urlencode() {
+            python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$1"
+          }
+
           echo "📥 Starting imports for locations..."
 
           for LOCATION in "${LOCATIONS[@]}"; do
@@ -86,15 +90,15 @@ jobs:
             echo ""
             echo "🔄 Importing: $LOCATION"
 
+            ENC_LOCATION="$(urlencode "$LOCATION")"
+
             RESPONSE=$(curl -s -X POST \
-              "${{ steps.vars.outputs.api_base }}/import/all" \
-              -H "Content-Type: application/json" \
-              -H "x-api-key: ${{ steps.vars.outputs.admin_key }}" \
-              -d "{\"location\": \"$LOCATION\"}")
+              "${{ steps.vars.outputs.api_base }}/import/all?req=${ENC_LOCATION}" \
+              -H "x-admin-token: ${{ steps.vars.outputs.admin_key }}")
 
             echo "Response: $RESPONSE"
 
-            COUNT=$(echo "$RESPONSE" | jq -r '.count // 0')
+            COUNT=$(echo "$RESPONSE" | jq -r '.total_imported // .count // 0')
             TOTAL_COUNT=$((TOTAL_COUNT + COUNT))
 
             echo "✅ Imported $COUNT properties from $LOCATION"
