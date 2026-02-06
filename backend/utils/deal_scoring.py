@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Tuple
 
@@ -61,11 +62,25 @@ def _to_int(value: Any) -> int | None:
 
 
 def _postcode_band(data: Dict[str, Any]) -> str | None:
-    pc = (
+    def _extract_outward(value: Any) -> str | None:
+        if value is None:
+            return None
+        s = str(value).upper()
+        # UK outward code (e.g., SW11, EC1V, W1, SE1, NW10)
+        m = re.search(r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\b", s)
+        return m.group(1) if m else None
+
+    full = (
         extract_postcode(data.get("postcode"))
         or extract_postcode(data.get("address"))
         or extract_postcode(data.get("location"))
         or extract_postcode(data.get("title"))
+    )
+    pc = (str(full).upper().split()[0] if full else None) or (
+        _extract_outward(data.get("postcode"))
+        or _extract_outward(data.get("address"))
+        or _extract_outward(data.get("location"))
+        or _extract_outward(data.get("title"))
     )
     if not pc:
         return None

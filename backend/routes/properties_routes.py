@@ -716,8 +716,13 @@ def backfill_property_scores(
     try:
         cols = [
             "id",
+            "title",
+            "location",
+            "address",
+            "postcode",
             "price",
             "asking_price",
+            "bedrooms",
             "yield_percent",
             "rental_yield_percent",
             "roi_percent",
@@ -725,6 +730,7 @@ def backfill_property_scores(
             "avg_rent",
             "crime_index",
             "schools_rating",
+            "data",
             "score",
             "score_updated_at",
         ]
@@ -952,12 +958,19 @@ def admin_score_sample(
             continue
         bd = r.get("score_breakdown")
         version = None
-        rent_source = None
+        inputs_out: dict[str, Any] = {}
         if isinstance(bd, dict):
             version = bd.get("version")
             inputs = bd.get("inputs")
             if isinstance(inputs, dict):
-                rent_source = inputs.get("rent_source")
+                for k in (
+                    "rent_source",
+                    "postcode_band",
+                    "rent_monthly",
+                    "cap_rate_proxy_percent",
+                ):
+                    if k in inputs:
+                        inputs_out[k] = inputs.get(k)
 
         items.append(
             {
@@ -969,11 +982,114 @@ def admin_score_sample(
                 "yield_percent": r.get("yield_percent"),
                 "roi_percent": r.get("roi_percent"),
                 "score": r.get("score"),
-                "score_breakdown": {"version": version, "inputs": {"rent_source": rent_source}},
+                "score_breakdown": {"version": version, "inputs": inputs_out},
             }
         )
 
     return {"items": items, "limit": limit, "offset": offset}
+
+
+@router.get("/properties/admin/score-debug-one")
+def admin_score_debug_one(
+    id: str = Query(..., min_length=1),
+    x_admin_token: str | None = Header(None),
+):
+    """Fetch one property row and compare stored vs computed deal score.
+
+    Useful when production shows `score_breakdown.version=v1.1` but
+    inputs indicate `rent_source=missing` unexpectedly.
+    """
+
+    _require_admin(x_admin_token)
+    sb = _get_supabase()
+
+    cols = [
+        "id",
+        "title",
+        "location",
+        "address",
+        "postcode",
+        "price",
+        "asking_price",
+        "bedrooms",
+        "yield_percent",
+        "rental_yield_percent",
+        "roi_percent",
+        "rent",
+        "avg_rent",
+        "crime_index",
+        "schools_rating",
+        "data",
+        "score",
+        "score_breakdown",
+        "score_updated_at",
+        "created_at",
+    ]
+
+    def _missing_col_from_api_error(err: APIError) -> str | None:
+        payload = err.args[0] if err.args else None
+        msg = payload.get("message") if isinstance(payload, dict) else str(err)
+        if not msg:
+            return None
+        m = re.search(r"column properties\.([a-zA-Z0-9_]+) does not exist", msg)
+        if not m:
+            return None
+        return m.group(1)
+
+    def _select_with_existing_cols(build_query):
+        nonlocal cols
+        for _ in range(10):
+            try:
+                select_cols = ",".join(cols)
+                return build_query(select_cols).execute()
+            except APIError as e:
+                missing = _missing_col_from_api_error(e)
+                if not missing:
+                    raise
+                if missing in cols and missing != "id":
+                    cols = [c for c in cols if c != missing]
+                    continue
+                raise
+        raise HTTPException(
+            status_code=500,
+            detail="Score debug failed: could not find a compatible column set",
+        )
+
+    res = _select_with_existing_cols(
+        lambda select_cols: sb.table("properties").select(select_cols).eq("id", id).maybe_single()
+    )
+    row = res.data
+    if not isinstance(row, dict):
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    computed_score, computed_breakdown = compute_deal_score(row)
+    stored_breakdown = (
+        row.get("score_breakdown") if isinstance(row.get("score_breakdown"), dict) else None
+    )
+
+    return {
+        "id": row.get("id"),
+        "stored": {
+            "score": row.get("score"),
+            "score_updated_at": row.get("score_updated_at"),
+            "breakdown": stored_breakdown,
+        },
+        "computed": {
+            "score": computed_score,
+            "breakdown": computed_breakdown,
+        },
+        "inputs": {
+            "title": row.get("title"),
+            "location": row.get("location"),
+            "address": row.get("address"),
+            "postcode": row.get("postcode"),
+            "bedrooms": row.get("bedrooms"),
+            "price": row.get("price") or row.get("asking_price"),
+            "yield_percent": row.get("yield_percent") or row.get("rental_yield_percent"),
+            "roi_percent": row.get("roi_percent"),
+            "rent": row.get("rent") or row.get("avg_rent"),
+        },
+    }
 
 
 @router.post("/properties/admin/backfill-postcodes")

@@ -20,3 +20,20 @@ def test_v1_1_proxy_rent_used_when_missing_yield_roi_and_rent():
     # Old behavior tended to cluster around ~16 with defaults.
     assert score != 16
     assert score > 16
+
+
+def test_v1_1_proxy_rent_used_for_outward_only_postcode():
+    score, breakdown = compute_deal_score(
+        {
+            "price": 650000,
+            "bedrooms": 2,
+            "postcode": "SW11",
+            "yield_percent": None,
+            "roi_percent": None,
+        }
+    )
+
+    assert breakdown["version"] == "v1.1"
+    assert breakdown.get("inputs", {}).get("postcode_band") in {"central", "outer", "other"}
+    assert breakdown.get("inputs", {}).get("rent_source") == "proxy"
+    assert score != 16
