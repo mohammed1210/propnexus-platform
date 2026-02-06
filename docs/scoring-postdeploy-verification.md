@@ -11,6 +11,19 @@ export ADMIN_TOKEN="<admin-token>"
 
 ## Force rescore recent rows
 
+## (Optional) Backfill postcodes first
+
+If you recently improved postcode extraction/backfill, run this once so older rows get a postcode district (e.g. SW11, W1K, EC1V):
+
+```bash
+curl -sS -X POST "$BASE/properties/admin/backfill-postcodes?limit=500&force=true" \
+  -H "x-admin-token: $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}' | jq
+```
+
+## Force rescore recent rows
+
 ```bash
 curl -sS -X POST "$BASE/properties/admin/backfill-scores?limit=500&force=true" \
   -H "x-admin-token: $ADMIN_TOKEN" \
@@ -30,3 +43,5 @@ Expected (for rows missing `rent/yield/roi`):
 - `ver` is `v1.2`
 - `band` is not null
 - `rent_source` is `proxy`
+
+For outward-only districts like `SW11`, `W1K`, `EC1V`, `E8`, you should also see `band` set (central/outer/other).

@@ -62,6 +62,14 @@ def _to_int(value: Any) -> int | None:
 
 
 def _postcode_band(data: Dict[str, Any]) -> str | None:
+    # Defensive: if postcode is already a clean outward (e.g., "SW11", "W1K"),
+    # accept it directly. This protects against future extractor regressions.
+    raw_pc = data.get("postcode")
+    if isinstance(raw_pc, str):
+        cleaned = re.sub(r"\s+", "", raw_pc.upper().strip())
+        if re.match(r"^[A-Z]{1,2}\d{1,2}[A-Z]?$", cleaned):
+            data = {**data, "postcode": cleaned}
+
     def _normalize_to_outward(code: Any) -> str | None:
         if code is None:
             return None

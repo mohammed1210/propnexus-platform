@@ -6,14 +6,70 @@ from typing import Any, Dict
 
 _POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
 
+# Outward-only district (e.g., SW11, EC1V, W1K, E8, EH7, G72, M1).
+# We deliberately avoid matching inside flat numbers like "1F2" / "3F2".
+_OUTWARD_RE = re.compile(r"(?<![A-Z0-9])[A-Z]{1,2}\d{1,2}[A-Z]?\b", re.I)
+
 
 def extract_postcode(text: Any) -> str | None:
     if not isinstance(text, str):
         return None
+
+    # 1) Prefer a full postcode when present.
     m = _POSTCODE_RE.search(text)
-    if not m:
+    if m:
+        return re.sub(r"\s+", "", m.group(0).upper())
+
+    # 2) Fallback to outward-only district.
+    # Use finditer + context scoring so we prefer tokens that look like real postcodes
+    # (surrounded by whitespace/punctuation) and avoid flat-number substrings.
+    best: str | None = None
+    best_score = -1
+    s = text
+
+    for mm in _OUTWARD_RE.finditer(s):
+        candidate = mm.group(0)
+        if not candidate:
+            continue
+
+        start = mm.start()
+        end = mm.end()
+
+        prev = s[start - 1] if start > 0 else ""
+        nxt = s[end] if end < len(s) else ""
+
+        # Hard guard: don't allow a match where the preceding character is a digit.
+        # This prevents "1F2" -> "F2" and similar patterns.
+        if prev.isdigit():
+            continue
+
+        # Soft guard: if surrounded by letters/digits, it's likely part of another token.
+        if prev and prev.isalnum():
+            continue
+        if nxt and nxt.isalnum():
+            continue
+
+        score = 0
+        if start == 0:
+            score += 1
+        if prev in (" ", "\t", "\n", ",", ";", ":", "(", "[", "{"):
+            score += 2
+        if (not nxt) or (
+            nxt in (" ", "\t", "\n", ".", ",", ";", ":", ")", "]", "}", "/", "\\", "-")
+        ):
+            score += 2
+
+        # Prefer longer outward codes (EC1V over E8) when equally plausible.
+        score += len(candidate)
+
+        if score > best_score:
+            best_score = score
+            best = candidate
+
+    if not best:
         return None
-    return re.sub(r"\s+", "", m.group(0).upper())
+
+    return re.sub(r"\s+", "", best.upper())
 
 
 def _coerce_int(v: Any) -> int | None:
