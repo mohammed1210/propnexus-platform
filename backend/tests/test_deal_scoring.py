@@ -13,7 +13,7 @@ def test_compute_deal_score_bounds_and_int():
     assert isinstance(score, int)
     assert 0 <= score <= 100
     assert isinstance(breakdown, dict)
-    assert breakdown.get("version") == "v1.0"
+    assert breakdown.get("version") == "v1.1"
     assert isinstance(breakdown.get("categories"), dict)
 
 
@@ -58,3 +58,28 @@ def test_compute_deal_score_accepts_yield_and_roi_variants():
     assert score > 0
     assert cats.get("yield", 0) > 0
     assert cats.get("roi", 0) > 0
+
+
+def test_compute_deal_score_postcode_proxy_changes_score_when_missing_yield_and_rent():
+    # With yield/roi/rent missing, postcode band should introduce score spread.
+    base = {
+        "price": 600000,
+        "bedrooms": 2,
+        "crime_index": 50,
+        "schools_rating": 3,
+    }
+
+    central_score, central_breakdown = compute_deal_score({**base, "postcode": "SW1A 1AA"})
+    outer_score, outer_breakdown = compute_deal_score({**base, "postcode": "E11 1AA"})
+
+    assert central_score != outer_score
+
+    central_cats = central_breakdown.get("categories") or {}
+    outer_cats = outer_breakdown.get("categories") or {}
+
+    assert central_cats.get("yield", 0) > 0
+    assert outer_cats.get("yield", 0) > 0
+    assert central_cats.get("price_to_rent", 0) > 0
+    assert outer_cats.get("price_to_rent", 0) > 0
+    assert central_cats.get("area_demand", 0) > 0
+    assert outer_cats.get("area_demand", 0) > 0
