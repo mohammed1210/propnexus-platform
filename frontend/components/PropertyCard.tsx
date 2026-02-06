@@ -6,6 +6,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiHeart } from 'react-icons/fi';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
+import { FF } from '@/lib/flags';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -29,7 +30,46 @@ type Property = {
   discount_percent?: number | null;
   imageurl?: string | null;
   image_urls?: string[] | null;
+  // Optional fields some feeds may include; used for “provided rent” detection.
+  rent?: number | null;
+  monthly_rent?: number | null;
+  rent_pcm?: number | null;
+  rent_per_month?: number | null;
 };
+
+type InsightsPayload = {
+  postcode?: string;
+  fetched_at?: string;
+  area?: any;
+  comps?: any;
+  error?: string;
+};
+
+type InsightsCacheEntry = {
+  fetchedAtMs: number;
+  postcode: string;
+  payload: InsightsPayload;
+};
+
+const insightsCache = new Map<string, InsightsCacheEntry>();
+
+function extractLikelyUkPostcode(text: string): string | null {
+  const t = String(text || '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!t) return null;
+
+  // Full postcode (very common in listing location strings). Store without spaces.
+  // Example: SW1A 1AA, M1 1AE, EC1V9LB
+  const full = t.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\s*(\d[A-Z]{2})\b/);
+  if (full) return `${full[1]}${full[2]}`;
+
+  // Outward-only fallback (e.g. SW11, E8, W1K). Avoid pure numbers.
+  const outward = t.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\b/);
+  return outward ? outward[1] : null;
+}
 
 /** Resolve the FastAPI base URL from public env (trim TRAILING slashes only) */
 function getBackendBase(): string {
@@ -58,7 +98,7 @@ async function postJSON<T>(
     const id = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
 
     try {
-      const res = await fetchWithRetry(url, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
@@ -135,6 +175,14 @@ export default function PropertyCard({ p }: { p: Property }) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const articleRef = useRef<HTMLElement | null>(null);
+  const [shouldLoadInsights, setShouldLoadInsights] = useState(false);
+
+  const [insights, setInsights] = useState<InsightsCacheEntry | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsErr, setInsightsErr] = useState<string | null>(null);
+  const [timeTick, setTimeTick] = useState(0);
+
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
@@ -143,6 +191,206 @@ export default function PropertyCard({ p }: { p: Property }) {
       }
     };
   }, []);
+
+  const postcodeKey = useMemo(() => {
+    const haystack = `${p.location ?? ''} ${p.title ?? ''} ${p.description ?? ''}`;
+    return extractLikelyUkPostcode(haystack);
+  }, [p.description, p.location, p.title]);
+
+  useEffect(() => {
+    // Only hydrate the insights payloads once the card is near the viewport.
+    if (shouldLoadInsights) return;
+    if (!(FF.AREA_INTEL || FF.COMPS)) return;
+
+    const el = articleRef.current;
+    if (!el) return;
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setShouldLoadInsights(true);
+      return;
+    }
+
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          setShouldLoadInsights(true);
+          obs.disconnect();
+        }
+      },
+      { rootMargin: '240px' },
+    );
+
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [shouldLoadInsights]);
+
+  useEffect(() => {
+    // Tick once a minute so “Updated Xm ago” stays trustworthy.
+    if (!insights) return;
+    const id = window.setInterval(() => setTimeTick((t) => t + 1), 60_000);
+    return () => window.clearInterval(id);
+  }, [insights]);
+
+  useEffect(() => {
+    if (!shouldLoadInsights) return;
+    if (!(FF.AREA_INTEL || FF.COMPS)) return;
+    if (!postcodeKey) {
+      setInsights(null);
+      setInsightsErr(null);
+      setInsightsLoading(false);
+      return;
+    }
+
+    const cached = insightsCache.get(postcodeKey);
+    if (cached) {
+      setInsights(cached);
+      setInsightsErr(null);
+      setInsightsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    const ctrl = new AbortController();
+    setInsightsLoading(true);
+    setInsightsErr(null);
+
+    (async () => {
+      try {
+        const qs = new URLSearchParams();
+        if (FF.AREA_INTEL) qs.set('area', '1');
+        if (FF.COMPS) qs.set('comps', '1');
+
+        const res = await fetch(`/api/insights/${encodeURIComponent(postcodeKey)}?${qs.toString()}`, {
+          method: 'GET',
+          cache: 'no-store',
+          signal: ctrl.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const payload = (await res.json()) as InsightsPayload;
+
+        const entry: InsightsCacheEntry = {
+          fetchedAtMs: Date.now(),
+          postcode: postcodeKey,
+          payload,
+        };
+        insightsCache.set(postcodeKey, entry);
+        if (!cancelled) setInsights(entry);
+      } catch (e: any) {
+        if (e?.name === 'AbortError') return;
+        if (!cancelled) {
+          setInsights(null);
+          setInsightsErr('Insights unavailable');
+        }
+      } finally {
+        if (!cancelled) setInsightsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+    };
+  }, [postcodeKey, shouldLoadInsights]);
+
+  const derived = useMemo(() => {
+    const out: {
+      rentMonthly?: number;
+      rentSource?: 'provided' | 'proxy';
+      grossYieldPct?: number;
+      priceToRent?: number;
+      crimeLabel?: 'Low' | 'Med' | 'High';
+      schoolsRating?: number;
+      compsMedianSold?: number;
+      compsCount?: number;
+      compsDateRange?: string;
+      freshnessText?: string;
+      cacheTag?: string;
+    } = {};
+
+    const price = typeof p.price === 'number' && p.price > 0 ? p.price : undefined;
+    const providedRent = [p.monthly_rent, p.rent_pcm, p.rent_per_month, p.rent]
+      .map((v) => (typeof v === 'number' ? v : undefined))
+      .find((v) => typeof v === 'number' && isFinite(v) && v > 0);
+
+    const area = insights?.payload?.area && !insights?.payload?.area?.error ? insights.payload.area : null;
+    const comps = insights?.payload?.comps && !insights?.payload?.comps?.error ? insights.payload.comps : null;
+
+    // Rent estimate
+    const compRents: number[] = Array.isArray(comps?.rents)
+      ? comps.rents
+          .map((r: any) => Number(r?.monthly_rent ?? r?.rent ?? r?.pcm ?? 0))
+          .filter((n: number) => Number.isFinite(n) && n > 0)
+      : [];
+    const compRentMedian = compRents.length ? median(compRents) : undefined;
+    const areaRent = typeof area?.avg_rent === 'number' && area.avg_rent > 0 ? area.avg_rent : undefined;
+
+    if (providedRent) {
+      out.rentMonthly = Math.round(providedRent);
+      out.rentSource = 'provided';
+    } else if (typeof compRentMedian === 'number') {
+      out.rentMonthly = Math.round(compRentMedian);
+      out.rentSource = 'proxy';
+    } else if (typeof areaRent === 'number') {
+      out.rentMonthly = Math.round(areaRent);
+      out.rentSource = 'proxy';
+    }
+
+    // Yield (prefer property yield; otherwise proxy)
+    const providedYield = typeof p.yield_percent === 'number' && isFinite(p.yield_percent) ? p.yield_percent : undefined;
+    if (typeof providedYield === 'number') out.grossYieldPct = providedYield;
+    else if (price && out.rentMonthly) out.grossYieldPct = (out.rentMonthly * 12 * 100) / price;
+
+    // Price-to-rent (annual)
+    if (price && out.rentMonthly) out.priceToRent = price / (out.rentMonthly * 12);
+
+    // Crime + schools
+    const crime = typeof area?.crime_index === 'number' ? area.crime_index : undefined;
+    if (typeof crime === 'number') {
+      out.crimeLabel = crime < 40 ? 'Low' : crime < 70 ? 'Med' : 'High';
+    }
+    if (typeof area?.schools_rating === 'number') out.schoolsRating = area.schools_rating;
+
+    // Comps: median sold + count + date range
+    const salesArr: any[] = Array.isArray(comps?.sales) ? comps.sales : [];
+    const salePrices: number[] = salesArr
+      .map((s) => Number(s?.price ?? s?.sold_price ?? s?.soldPrice ?? 0))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    const saleDates: number[] = salesArr
+      .map((s) => Date.parse(String(s?.date ?? s?.sold_date ?? s?.soldDate ?? s?.sold_at ?? '')))
+      .filter((t) => Number.isFinite(t) && t > 0);
+
+    out.compsCount = salePrices.length;
+    if (salePrices.length) out.compsMedianSold = median(salePrices);
+    if (saleDates.length) {
+      const min = new Date(Math.min(...saleDates));
+      const max = new Date(Math.max(...saleDates));
+      out.compsDateRange = `${min.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}–${max.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}`;
+    }
+
+    // Freshness + cache tag
+    if (insights?.fetchedAtMs) {
+      const mins = Math.max(0, Math.floor((Date.now() - insights.fetchedAtMs) / 60_000));
+      out.freshnessText = mins === 0 ? 'Updated just now' : `Updated ${mins}m ago`;
+
+      const areaSrc = insights.payload?.area?.source;
+      const compsSrc = insights.payload?.comps?.source;
+      const anyProvider = areaSrc === 'provider' || compsSrc === 'provider';
+      const anyCache = areaSrc === 'cache' || compsSrc === 'cache';
+      out.cacheTag = anyProvider ? 'Live' : anyCache ? 'Cached' : undefined;
+    }
+
+    // Touch timeTick to keep freshness recomputed.
+    void timeTick;
+    return out;
+  }, [insights, p.monthly_rent, p.price, p.rent, p.rent_pcm, p.rent_per_month, p.yield_percent, timeTick]);
+
+  function median(nums: number[]): number {
+    const a = [...nums].sort((x, y) => x - y);
+    const mid = Math.floor(a.length / 2);
+    if (!a.length) return NaN;
+    return a.length % 2 === 1 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+  }
 
   const priceText = useMemo(() => {
     const n = p.price ?? 0;
@@ -217,7 +465,12 @@ export default function PropertyCard({ p }: { p: Property }) {
   const verdict = useMemo(() => buildVerdict(p), [p]);
 
   return (
-    <article className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30">
+    <article
+      ref={(n) => {
+        articleRef.current = n;
+      }}
+      className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30"
+    >
       <Link
         href={href}
         className="block relative w-full h-48 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
@@ -359,6 +612,88 @@ export default function PropertyCard({ p }: { p: Property }) {
         </Link>
 
         <p className="text-sm text-zinc-600 dark:text-zinc-400">{p.location || '—'}</p>
+
+        {(FF.AREA_INTEL || FF.COMPS) && (
+          <div className="pt-3 border-t border-slate-200/80 dark:border-slate-700/80">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 tracking-wide uppercase">
+                Insights
+              </div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400">
+                {derived.freshnessText ? derived.freshnessText : ''}
+                {derived.cacheTag ? ` · ${derived.cacheTag}` : ''}
+              </div>
+            </div>
+
+            {postcodeKey ? (
+              <div className="mt-2">
+                {insightsLoading ? (
+                  <div className="space-y-1.5">
+                    <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                    <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded animate-pulse w-5/6" />
+                  </div>
+                ) : insightsErr ? (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">{insightsErr}</div>
+                ) : (
+                  <div className="space-y-1 text-[11px]">
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {typeof derived.rentMonthly === 'number' && (
+                        <span className="text-slate-700 dark:text-slate-200">
+                          Rent <span className="font-semibold">£{derived.rentMonthly.toLocaleString()}/mo</span>
+                          <span className="text-slate-500 dark:text-slate-400">
+                            {' '}
+                            ({derived.rentSource === 'provided' ? 'provided' : 'proxy'})
+                          </span>
+                        </span>
+                      )}
+                      {typeof derived.grossYieldPct === 'number' && isFinite(derived.grossYieldPct) && (
+                        <span className="text-slate-700 dark:text-slate-200">
+                          Yield <span className="font-semibold">{derived.grossYieldPct.toFixed(1)}%</span>
+                        </span>
+                      )}
+                      {typeof derived.priceToRent === 'number' && isFinite(derived.priceToRent) && (
+                        <span className="text-slate-700 dark:text-slate-200">
+                          P/R <span className="font-semibold">{derived.priceToRent.toFixed(1)}x</span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                      {derived.crimeLabel && (
+                        <span className="text-slate-700 dark:text-slate-200">
+                          Crime <span className="font-semibold">{derived.crimeLabel}</span>
+                        </span>
+                      )}
+                      {typeof derived.schoolsRating === 'number' && isFinite(derived.schoolsRating) && (
+                        <span className="text-slate-700 dark:text-slate-200">
+                          Schools <span className="font-semibold">{derived.schoolsRating.toFixed(1)}/5</span>
+                        </span>
+                      )}
+                      {FF.COMPS && typeof derived.compsCount === 'number' && (
+                        <span className="text-slate-700 dark:text-slate-200">
+                          Comps{' '}
+                          <span className="font-semibold">
+                            {typeof derived.compsMedianSold === 'number'
+                              ? `£${Math.round(derived.compsMedianSold).toLocaleString()}`
+                              : '—'}
+                          </span>
+                          <span className="text-slate-500 dark:text-slate-400">
+                            {' '}
+                            ({derived.compsCount}){derived.compsDateRange ? ` · ${derived.compsDateRange}` : ''}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                Add postcode to load insights.
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-2">
           <span

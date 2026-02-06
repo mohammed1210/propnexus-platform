@@ -12,33 +12,46 @@ export const API_BASE =
 
 export const BASE = API_BASE; // ✅ legacy alias for older imports
 
-/** Simple fetch with consistent error handling */
+/** Fetch with small retry; returns a Response (like native fetch). */
+export const fetchWithRetry = async (
+  url: string,
+  options: RequestInit = {},
+  retries = 2,
+  delay = 500,
+): Promise<Response> => {
+  const retryable = new Set([408, 429, 500, 502, 503, 504]);
+  let attempt = 0;
+  let lastErr: unknown;
+
+  while (attempt <= retries) {
+    try {
+      const res = await fetch(url, { cache: 'no-store', ...options });
+      if (!res.ok && retryable.has(res.status) && attempt < retries) {
+        attempt += 1;
+        await new Promise((r) => setTimeout(r, delay * Math.pow(2, attempt - 1)));
+        continue;
+      }
+      return res;
+    } catch (err) {
+      lastErr = err;
+      if (attempt >= retries) break;
+      attempt += 1;
+      await new Promise((r) => setTimeout(r, delay * Math.pow(2, attempt - 1)));
+    }
+  }
+
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+};
+
+/** Simple JSON fetch with consistent error handling */
 export async function safeFetch<T = any>(url: string, opts?: RequestInit): Promise<T> {
-  const res = await fetch(url, { cache: 'no-store', ...opts });
+  const res = await fetchWithRetry(url, opts);
   if (!res.ok) {
     const msg = await res.text().catch(() => '');
     throw new Error(`[API ${res.status}] ${msg || res.statusText}`);
   }
   return (await res.json()) as T;
 }
-
-/** ✅ Legacy alias for safeFetch (keeps older components working) */
-export const fetchWithRetry = async <T = any>(
-  url: string,
-  options: RequestInit = {},
-  retries = 2,
-  delay = 500,
-): Promise<T> => {
-  try {
-    return await safeFetch<T>(url, options);
-  } catch (err) {
-    if (retries > 0) {
-      await new Promise((r) => setTimeout(r, delay));
-      return fetchWithRetry(url, options, retries - 1, delay * 2);
-    }
-    throw err;
-  }
-};
 
 /** ✅ Legacy POST helper */
 export async function apiPost<T = any>(path: string, body: any): Promise<T> {
