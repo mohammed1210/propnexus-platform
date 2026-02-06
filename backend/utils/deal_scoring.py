@@ -6,7 +6,7 @@ from typing import Any, Dict, Tuple
 
 from backend.utils.listing_keys import extract_postcode
 
-SCORE_VERSION = "v1.1"
+SCORE_VERSION = "v1.2"
 
 
 def _to_float(value: Any) -> float | None:
@@ -62,13 +62,48 @@ def _to_int(value: Any) -> int | None:
 
 
 def _postcode_band(data: Dict[str, Any]) -> str | None:
-    def _extract_outward(value: Any) -> str | None:
-        if value is None:
+    def _normalize_to_outward(code: Any) -> str | None:
+        if code is None:
             return None
-        s = str(value).upper()
-        # UK outward code (e.g., SW11, EC1V, W1, SE1, NW10)
-        m = re.search(r"\b([A-Z]{1,2}\d{1,2}[A-Z]?)\b", s)
-        return m.group(1) if m else None
+
+        s = str(code).upper().strip()
+        if not s:
+            return None
+
+        # If we already have something like "SW11" or "W1K", keep it.
+        # If we have a full postcode like "SW1A1AA" (no space) or "SW1A 1AA",
+        # extract the outward part so band heuristics work reliably.
+        s = re.sub(r"\s+", "", s)
+        m = re.match(r"^([A-Z]{1,2}\d{1,2}[A-Z]?)", s)
+        return m.group(1) if m else s
+
+    def _extract_outward_fallback(text: Any) -> str | None:
+        if text is None:
+            return None
+
+        s = str(text).upper().strip()
+        if not s:
+            return None
+
+        # Replace common punctuation with spaces so tokens like "(SW11)", "W1K," and
+        # "SW3/" become parseable.
+        s = re.sub(r"[,.()/\\]", " ", s)
+
+        tokens = s.split()
+        for tok in tokens:
+            tok = re.sub(r"^[^A-Z0-9]+|[^A-Z0-9]+$", "", tok)
+            if not tok:
+                continue
+
+            # Outward patterns we accept:
+            # - 1 letter + 1-2 digits (E8, W1)
+            # - 2 letters + 1-2 digits (SW11, EH7)
+            # - 1-2 letters + digit + letter (W1K, EC1V, WC1A)
+            outward = _normalize_to_outward(tok)
+            if outward and re.match(r"^[A-Z]{1,2}\d{1,2}[A-Z]?$", outward):
+                return outward
+
+        return None
 
     full = (
         extract_postcode(data.get("postcode"))
@@ -76,18 +111,36 @@ def _postcode_band(data: Dict[str, Any]) -> str | None:
         or extract_postcode(data.get("location"))
         or extract_postcode(data.get("title"))
     )
-    pc = (str(full).upper().split()[0] if full else None) or (
-        _extract_outward(data.get("postcode"))
-        or _extract_outward(data.get("address"))
-        or _extract_outward(data.get("location"))
-        or _extract_outward(data.get("title"))
+    pc = (_normalize_to_outward(full) if full else None) or (
+        _extract_outward_fallback(data.get("postcode"))
+        or _extract_outward_fallback(data.get("address"))
+        or _extract_outward_fallback(data.get("location"))
+        or _extract_outward_fallback(data.get("title"))
     )
     if not pc:
         return None
 
+    pc = _normalize_to_outward(pc) or pc
+
     # Central London heuristics (MVP): SW1/W1/WC1/EC1.
-    central_prefixes = ("SW1", "W1", "WC1", "EC1")
-    if pc.startswith(central_prefixes):
+    def _is_central_prefix(code: str) -> bool:
+        # Treat as central if the outward portion is one of:
+        # - SW1 or SW1<letter> (e.g., SW1A) but NOT SW11
+        # - W1 or W1<letter> (e.g., W1K) but NOT W11
+        # - WC1 or WC1<letter> (e.g., WC1A) but NOT WC11
+        # - EC1 or EC1<letter> (e.g., EC1V) but NOT EC11
+
+        if code.startswith("SW1"):
+            return len(code) == 3 or (len(code) == 4 and code[3].isalpha())
+        if code.startswith("W1"):
+            return len(code) == 2 or (len(code) == 3 and code[2].isalpha())
+        if code.startswith("WC1"):
+            return len(code) == 3 or (len(code) == 4 and code[3].isalpha())
+        if code.startswith("EC1"):
+            return len(code) == 3 or (len(code) == 4 and code[3].isalpha())
+        return False
+
+    if _is_central_prefix(pc):
         return "central"
 
     # Other common London area prefixes (very rough).

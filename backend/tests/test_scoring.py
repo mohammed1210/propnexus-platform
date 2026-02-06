@@ -33,7 +33,7 @@ def test_ai_score_basic():
     assert "yield" in data["categories"]
     assert "roi" in data["categories"]
     assert "version" in data
-    assert data["version"] == "v1.1"
+    assert data["version"] == "v1.2"
 
 
 def test_ai_score_empty_data():

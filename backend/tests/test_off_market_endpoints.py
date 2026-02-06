@@ -1,5 +1,7 @@
 import os
+import socket
 import uuid
+from urllib.parse import urlparse
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,10 +13,21 @@ client = TestClient(app)
 
 
 def _supabase_configured() -> bool:
-    return bool(
-        (os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL"))
-        and (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY"))
-    )
+    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+    if not (url and key):
+        return False
+
+    # Treat placeholder/unresolvable URLs as not configured for test purposes.
+    try:
+        host = urlparse(url).hostname
+        if not host:
+            return False
+        socket.gethostbyname(host)
+    except Exception:
+        return False
+
+    return True
 
 
 def _admin_headers():

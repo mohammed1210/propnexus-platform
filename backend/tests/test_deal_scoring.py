@@ -13,7 +13,7 @@ def test_compute_deal_score_bounds_and_int():
     assert isinstance(score, int)
     assert 0 <= score <= 100
     assert isinstance(breakdown, dict)
-    assert breakdown.get("version") == "v1.1"
+    assert breakdown.get("version") == "v1.2"
     assert isinstance(breakdown.get("categories"), dict)
 
 
