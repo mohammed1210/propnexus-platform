@@ -874,6 +874,108 @@ def admin_score_stats(x_admin_token: str | None = Header(None)):
     }
 
 
+@router.get("/properties/admin/score-sample")
+def admin_score_sample(
+    limit: int = Query(default=25, ge=1, le=200),
+    offset: int = Query(default=0, ge=0, le=10_000),
+    x_admin_token: str | None = Header(None),
+):
+    """Return a small sample of rows to validate scoring in production."""
+
+    _require_admin(x_admin_token)
+    sb = _get_supabase()
+
+    cols = [
+        "id",
+        "title",
+        "postcode",
+        "bedrooms",
+        "price",
+        "yield_percent",
+        "roi_percent",
+        "score",
+        "score_breakdown",
+        "created_at",
+    ]
+
+    def _missing_col_from_api_error(err: APIError) -> str | None:
+        payload = err.args[0] if err.args else None
+        msg = payload.get("message") if isinstance(payload, dict) else str(err)
+        if not msg:
+            return None
+        m = re.search(r"column properties\.([a-zA-Z0-9_]+) does not exist", msg)
+        if not m:
+            return None
+        return m.group(1)
+
+    def _select_with_existing_cols(build_query):
+        nonlocal cols
+        for _ in range(10):
+            try:
+                select_cols = ",".join(cols)
+                return build_query(select_cols).execute()
+            except APIError as e:
+                missing = _missing_col_from_api_error(e)
+                if not missing:
+                    raise
+                if missing in cols and missing != "id":
+                    cols = [c for c in cols if c != missing]
+                    continue
+                raise
+        raise HTTPException(
+            status_code=500, detail="Score sample failed: could not find a compatible column set"
+        )
+
+    res = _select_with_existing_cols(
+        lambda select_cols: (
+            _safe_order(
+                sb.table("properties")
+                .select(select_cols)
+                .range(int(offset), int(offset) + int(limit) - 1),
+                "created_at",
+                desc=True,
+            )
+            if "created_at" in cols
+            else sb.table("properties")
+            .select(select_cols)
+            .range(int(offset), int(offset) + int(limit) - 1)
+        )
+    )
+
+    rows = res.data or []
+    if not isinstance(rows, list):
+        rows = []
+
+    items = []
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        bd = r.get("score_breakdown")
+        version = None
+        rent_source = None
+        if isinstance(bd, dict):
+            version = bd.get("version")
+            inputs = bd.get("inputs")
+            if isinstance(inputs, dict):
+                rent_source = inputs.get("rent_source")
+
+        items.append(
+            {
+                "id": r.get("id"),
+                "title": r.get("title"),
+                "postcode": r.get("postcode"),
+                "bedrooms": r.get("bedrooms"),
+                "price": r.get("price"),
+                "yield_percent": r.get("yield_percent"),
+                "roi_percent": r.get("roi_percent"),
+                "score": r.get("score"),
+                "score_breakdown": {"version": version, "inputs": {"rent_source": rent_source}},
+            }
+        )
+
+    return {"items": items, "limit": limit, "offset": offset}
+
+
 @router.post("/properties/admin/backfill-postcodes")
 def backfill_property_postcodes(
     limit: int = Query(default=500, ge=1, le=2000),
