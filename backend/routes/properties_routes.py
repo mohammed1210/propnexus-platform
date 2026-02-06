@@ -693,9 +693,18 @@ def get_property(property_id: str, response: Response):
 def backfill_property_scores(
     limit: int = Query(default=200, ge=1, le=500),
     force: bool = Query(default=False),
+    recompute: bool = Query(default=False),
+    only_null: bool = Query(default=True),
     x_admin_token: str | None = Header(None),
 ):
-    """Backfill score for legacy rows (score is NULL/0).
+    """Backfill deal scores.
+
+    Default behavior is conservative: only rows where `score IS NULL` or `score <= 0`.
+
+    To rescore already-scored rows (useful after scoring-logic changes), pass one of:
+      - `force=true`
+      - `recompute=true`
+      - `only_null=false`
 
     Bounded by `limit` and best-effort; failures per-row do not abort the run.
     """
@@ -752,7 +761,9 @@ def backfill_property_scores(
                 status_code=500, detail="Backfill failed: could not find a compatible column set"
             )
 
-        if force:
+        force_all = bool(force or recompute or (not only_null))
+
+        if force_all:
             res_all = _select_with_existing_cols(
                 lambda select_cols: (
                     _safe_order(
@@ -816,9 +827,47 @@ def backfill_property_scores(
             except Exception:
                 logging.exception("Failed to backfill score for property %s", pid)
 
-        return {"attempted": attempted, "updated": updated}
+        return {"attempted": attempted, "updated": updated, "force": force_all}
     except HTTPException:
         raise
     except Exception as e:
         logging.exception("Backfill property scores failed")
         raise HTTPException(status_code=500, detail="Backfill failed") from e
+
+
+@router.get("/properties/admin/score-stats")
+def admin_score_stats(x_admin_token: str | None = Header(None)):
+    """Admin stats for diagnosing why scoring/backfill does (or doesn't) run."""
+
+    _require_admin(x_admin_token)
+    sb = _get_supabase()
+
+    def _count(build_query) -> int | None:
+        try:
+            res = build_query(sb.table("properties").select("id", count="exact").limit(1)).execute()
+            return getattr(res, "count", None)
+        except Exception:
+            return None
+
+    total = _count(lambda q: q)
+    score_null = _count(lambda q: q.is_("score", "null"))
+    score_le_zero = _count(lambda q: q.lte("score", 0))
+    score_updated_at_null = _count(lambda q: q.is_("score_updated_at", "null"))
+
+    yield_null = _count(lambda q: q.is_("yield_percent", "null"))
+    roi_null = _count(lambda q: q.is_("roi_percent", "null"))
+    postcode_null = _count(lambda q: q.is_("postcode", "null"))
+    lat_null = _count(lambda q: q.is_("latitude", "null"))
+    lng_null = _count(lambda q: q.is_("longitude", "null"))
+
+    return {
+        "total": total,
+        "score_null": score_null,
+        "score_le_zero": score_le_zero,
+        "score_updated_at_null": score_updated_at_null,
+        "yield_percent_null": yield_null,
+        "roi_percent_null": roi_null,
+        "postcode_null": postcode_null,
+        "latitude_null": lat_null,
+        "longitude_null": lng_null,
+    }
