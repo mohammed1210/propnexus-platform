@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
+from backend.utils.listing_keys import extract_postcode
 from supabase import create_client
 
 router = APIRouter(tags=["properties"])
@@ -871,3 +872,142 @@ def admin_score_stats(x_admin_token: str | None = Header(None)):
         "latitude_null": lat_null,
         "longitude_null": lng_null,
     }
+
+
+@router.post("/properties/admin/backfill-postcodes")
+def backfill_property_postcodes(
+    limit: int = Query(default=500, ge=1, le=2000),
+    force: bool = Query(default=False),
+    x_admin_token: str | None = Header(None),
+):
+    """Backfill missing UK postcodes from existing text fields.
+
+    - Default: only updates rows where `postcode` is NULL/empty.
+    - `force=true`: scans rows regardless of existing postcode (still only writes
+      when we can extract a postcode and it differs).
+
+    Repeatable + best-effort; per-row failures don't abort the run.
+    """
+
+    _require_admin(x_admin_token)
+    sb = _get_supabase()
+
+    cols = [
+        "id",
+        "postcode",
+        "title",
+        "location",
+        "address",
+        "created_at",
+    ]
+
+    def _missing_col_from_api_error(err: APIError) -> str | None:
+        payload = err.args[0] if err.args else None
+        msg = payload.get("message") if isinstance(payload, dict) else str(err)
+        if not msg:
+            return None
+        m = re.search(r"column properties\.([a-zA-Z0-9_]+) does not exist", msg)
+        if not m:
+            return None
+        return m.group(1)
+
+    def _select_with_existing_cols(build_query):
+        nonlocal cols
+        for _ in range(10):
+            try:
+                select_cols = ",".join(cols)
+                return build_query(select_cols).execute()
+            except APIError as e:
+                missing = _missing_col_from_api_error(e)
+                if not missing:
+                    raise
+                if missing in cols and missing != "id":
+                    cols = [c for c in cols if c != missing]
+                    continue
+                raise
+        raise HTTPException(
+            status_code=500, detail="Backfill failed: could not find a compatible column set"
+        )
+
+    try:
+        if force:
+            res = _select_with_existing_cols(
+                lambda select_cols: (
+                    _safe_order(
+                        sb.table("properties").select(select_cols).limit(int(limit)),
+                        "created_at",
+                        desc=True,
+                    )
+                    if "created_at" in cols
+                    else sb.table("properties").select(select_cols).limit(int(limit))
+                )
+            )
+            rows = res.data or []
+            if not isinstance(rows, list):
+                rows = []
+        else:
+            # Prefer a server-side NULL filter. If some rows use empty-string postcodes,
+            # we handle that client-side below.
+            res = _select_with_existing_cols(
+                lambda select_cols: (
+                    _safe_order(
+                        sb.table("properties")
+                        .select(select_cols)
+                        .is_("postcode", "null")
+                        .limit(int(limit)),
+                        "created_at",
+                        desc=True,
+                    )
+                    if "created_at" in cols
+                    else sb.table("properties")
+                    .select(select_cols)
+                    .is_("postcode", "null")
+                    .limit(int(limit))
+                )
+            )
+            rows = res.data or []
+            if not isinstance(rows, list):
+                rows = []
+
+        attempted = len(rows)
+        updated = 0
+
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            pid = r.get("id")
+            if not pid:
+                continue
+
+            existing_raw = r.get("postcode")
+            existing_norm = extract_postcode(existing_raw)
+
+            missing_pc = not (isinstance(existing_raw, str) and existing_raw.strip())
+            if (not force) and (not missing_pc):
+                continue
+
+            candidate = (
+                existing_norm
+                or extract_postcode(r.get("title"))
+                or extract_postcode(r.get("location"))
+                or extract_postcode(r.get("address"))
+            )
+            if not candidate:
+                continue
+
+            # Avoid unnecessary writes.
+            if existing_norm and existing_norm == candidate:
+                continue
+
+            try:
+                sb.table("properties").update({"postcode": candidate}).eq("id", str(pid)).execute()
+                updated += 1
+            except Exception:
+                logging.exception("Failed to backfill postcode for property %s", pid)
+
+        return {"attempted": attempted, "updated": updated, "force": force}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.exception("Backfill property postcodes failed")
+        raise HTTPException(status_code=500, detail="Backfill failed") from e
