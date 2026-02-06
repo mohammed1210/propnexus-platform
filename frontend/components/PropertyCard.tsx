@@ -170,7 +170,15 @@ function getSourceBadgeClasses(source: string | null | undefined): string {
   return 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700';
 }
 
-export default function PropertyCard({ p }: { p: Property }) {
+export default function PropertyCard({
+  p,
+  isHovered,
+  onHoverChange,
+}: {
+  p: Property;
+  isHovered?: boolean;
+  onHoverChange?: (hovered: boolean) => void;
+}) {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -469,7 +477,12 @@ export default function PropertyCard({ p }: { p: Property }) {
       ref={(n) => {
         articleRef.current = n;
       }}
-      className="card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30"
+      onMouseEnter={() => onHoverChange?.(true)}
+      onMouseLeave={() => onHoverChange?.(false)}
+      className={cx(
+        'card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30',
+        isHovered && 'ring-2 ring-brand-500/20 border-brand-500/30',
+      )}
     >
       <Link
         href={href}
@@ -499,8 +512,9 @@ export default function PropertyCard({ p }: { p: Property }) {
           className={cx(
             'absolute top-2 left-2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
+            'active:scale-[0.98]',
             saveSuccess
-              ? 'bg-green-600 text-white border-2 border-white shadow-lg save-animation'
+              ? 'bg-teal-600 text-white border-2 border-white shadow-lg save-animation'
               : 'bg-white/90 backdrop-blur-sm text-slate-900 border-2 border-white/50 hover:bg-white hover:border-white shadow-md',
             (saving || saveSuccess) && 'cursor-not-allowed',
           )}
@@ -508,11 +522,18 @@ export default function PropertyCard({ p }: { p: Property }) {
             saveSuccess ? 'Deal saved successfully' : saving ? 'Saving deal' : 'Save this property'
           }
           aria-pressed={saveSuccess}
-          title={saveSuccess ? 'Saved' : 'Save this property'}
+          title={saveSuccess ? 'Saved to Deals' : 'Save to Deals'}
         >
           {saveSuccess ? (
             <>
-              <FiHeart className="w-4 h-4 fill-current" />
+              <svg
+                aria-hidden
+                viewBox="0 0 24 24"
+                className="w-4 h-4"
+                fill="currentColor"
+              >
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
               <span className="text-xs font-semibold">Saved</span>
             </>
           ) : saving ? (
@@ -721,6 +742,73 @@ export default function PropertyCard({ p }: { p: Property }) {
             </span>
           </div>
         </div>
+
+        {/* Deal Pulse (micro row) */}
+        {(derived.rentMonthly || derived.crimeLabel || typeof derived.compsCount === 'number') && (
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-700 dark:text-slate-200">
+            {derived.rentMonthly ? (
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className={cx(
+                    'inline-block h-2 w-2 rounded-sm',
+                    derived.rentSource === 'proxy'
+                      ? 'bg-teal-500/70'
+                      : 'bg-slate-400/70 dark:bg-slate-500/60',
+                  )}
+                />
+                <span className="text-slate-600 dark:text-slate-400">
+                  {derived.rentSource === 'proxy' ? 'Yield proxy:' : 'Yield:'}
+                </span>
+                <span className="font-semibold">£{(derived.rentMonthly / 1000).toFixed(1)}k/mo</span>
+              </span>
+            ) : null}
+
+            {(() => {
+              const n = typeof derived.compsCount === 'number' ? derived.compsCount : undefined;
+              const schools = typeof derived.schoolsRating === 'number' ? derived.schoolsRating : undefined;
+              if (n == null && schools == null) return null;
+
+              let label: 'High' | 'Avg' | 'Low' = 'Avg';
+              if ((typeof n === 'number' && n >= 6) || (typeof schools === 'number' && schools >= 4.0)) label = 'High';
+              else if ((typeof n === 'number' && n <= 1) && (typeof schools === 'number' && schools < 3.0)) label = 'Low';
+
+              const dot =
+                label === 'High'
+                  ? 'bg-teal-500/70'
+                  : label === 'Avg'
+                    ? 'bg-amber-500/60'
+                    : 'bg-slate-400/70 dark:bg-slate-500/60';
+
+              return (
+                <span className="inline-flex items-center gap-1.5">
+                  <span aria-hidden className={cx('inline-block h-2 w-2 rounded-full', dot)} />
+                  <span className="text-slate-600 dark:text-slate-400">Area demand:</span>
+                  <span className="font-semibold">{label}</span>
+                </span>
+              );
+            })()}
+
+            {derived.crimeLabel ? (
+              (() => {
+                const label = derived.crimeLabel === 'Low' ? 'Good' : derived.crimeLabel === 'Med' ? 'Avg' : 'Risk';
+                const dot =
+                  label === 'Good'
+                    ? 'bg-teal-500/70'
+                    : label === 'Avg'
+                      ? 'bg-amber-500/60'
+                      : 'bg-slate-400/70 dark:bg-slate-500/60';
+                return (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span aria-hidden className={cx('inline-block h-2 w-2 rounded-sm', dot)} />
+                    <span className="text-slate-600 dark:text-slate-400">Safety:</span>
+                    <span className="font-semibold">{label}</span>
+                  </span>
+                );
+              })()
+            ) : null}
+          </div>
+        )}
       </div>
     </article>
   );

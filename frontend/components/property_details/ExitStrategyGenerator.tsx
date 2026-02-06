@@ -20,6 +20,16 @@ export default function ExitStrategyGenerator(props: Props) {
   const [error, setError] = useState<string | null>(null);
   const [strategies, setStrategies] = useState<Strategy[] | null>(null);
 
+  function horizonTag(s: Strategy): 'Short-term' | 'Medium-term' | 'Long-term' {
+    const hay = `${s?.title ?? ''} ${s?.rationale ?? ''}`.toLowerCase();
+
+    // Lightweight heuristics to avoid extra UI fields.
+    if (/flip|resale|sell|auction|quick|refurb\s*and\s*sell/.test(hay)) return 'Short-term';
+    if (/refinanc|brrr|brr|remortgage|stabiliz|stabilise/.test(hay)) return 'Medium-term';
+    if (/hold|btl|rent|hmo|long\s*term|portfolio|cashflow/.test(hay)) return 'Long-term';
+    return 'Medium-term';
+  }
+
   async function handleGenerate() {
     setLoading(true);
     setError(null);
@@ -51,7 +61,7 @@ export default function ExitStrategyGenerator(props: Props) {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div className="text-sm text-slate-600 dark:text-slate-400">
-          Generate a few realistic exit routes for this listing.
+          Common exit routes investors consider for similar properties.
         </div>
         <button
           onClick={handleGenerate}
@@ -95,6 +105,12 @@ export default function ExitStrategyGenerator(props: Props) {
                     {i + 1}
                   </span>
                   <h4 className="font-semibold text-slate-900 dark:text-white truncate">{s.title}</h4>
+                  <span
+                    className="inline-flex items-center rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/20 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200"
+                    aria-label="Strategy horizon"
+                  >
+                    {horizonTag(s)}
+                  </span>
                 </div>
               </div>
               <button

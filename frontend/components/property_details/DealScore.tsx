@@ -112,12 +112,28 @@ export default function DealScore({ property }: DealScoreProps) {
 
   return (
     <div ref={scoreRef}>
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <div className={`text-6xl font-bold ${getScoreColor(score)}`}>{Math.round(animatedScore)}</div>
-          <div className="text-gray-600 dark:text-neutral-400">
-            <div className="text-sm font-medium">AI Deal Score</div>
-            <div className="text-xs">Out of 100</div>
+      <div className="sticky top-3 z-10 -mx-2 px-2 py-2 mb-4 bg-white/80 dark:bg-slate-900/40 backdrop-blur rounded-lg">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`text-6xl font-bold ${getScoreColor(score)}`}>{Math.round(animatedScore)}</div>
+            <div className="text-gray-600 dark:text-neutral-400">
+              <div className="text-sm font-medium">AI Deal Score</div>
+              <div className="text-xs">Out of 100</div>
+            </div>
+          </div>
+          <div className="hidden sm:flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-green-500" />
+              Strong
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-yellow-500" />
+              Average
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className="h-2 w-2 rounded-full bg-red-500" />
+              Weak
+            </span>
           </div>
         </div>
       </div>

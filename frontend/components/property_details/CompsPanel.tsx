@@ -36,6 +36,7 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
   const [data, setData] = useState<CompsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState<'provider' | 'cache'>('provider');
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     if (!postcode) return;
@@ -88,13 +89,26 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
     ? rents.reduce((sum, r) => sum + r.price, 0) / rents.length
     : 0;
 
+  const salesLimit = showAll ? sales.length : 2;
+  const rentsLimit = showAll ? rents.length : 2;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-lg">Comparable Sales</h3>
-        <span className="text-xs text-gray-500 dark:text-neutral-500 px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded">
-          {source === 'cache' ? '📦 Cached' : '🔴 Live'}
-        </span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAll((v) => !v)}
+            className="text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline"
+            aria-label={showAll ? 'Collapse comparable sales' : 'View all comparable sales'}
+          >
+            {showAll ? 'Collapse comps' : 'View all comps'}
+          </button>
+          <span className="text-xs text-gray-500 dark:text-neutral-500 px-2 py-1 bg-gray-100 dark:bg-neutral-800 rounded">
+            {source === 'cache' ? '📦 Cached' : '🔴 Live'}
+          </span>
+        </div>
       </div>
 
       {/* Summary */}
@@ -121,15 +135,15 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
 
       {/* Sales list */}
       {sales.length > 0 && (
-        <div className="mb-6">
+        <div className="mb-5">
           <h4 className="text-sm font-semibold text-gray-700 dark:text-neutral-300 mb-2">
             Recent Sales
           </h4>
           <div className="space-y-2">
-            {sales.slice(0, 3).map((sale, idx) => (
+            {sales.slice(0, salesLimit).map((sale, idx) => (
               <div
                 key={idx}
-                className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-md text-sm"
+                className="p-2.5 bg-gray-50 dark:bg-neutral-800 rounded-md text-[13px]"
               >
                 <div className="flex justify-between items-start mb-1">
                   <span className="font-medium text-gray-900 dark:text-neutral-100">
@@ -139,7 +153,7 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
                     £{sale.price.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex gap-3 text-xs text-gray-600 dark:text-neutral-400">
+                <div className="flex gap-3 text-[11px] text-gray-600 dark:text-neutral-400 leading-snug">
                   <span>{sale.type}</span>
                   <span>{sale.date}</span>
                   <span>{sale.distance_km.toFixed(2)} km</span>
@@ -147,9 +161,9 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
               </div>
             ))}
           </div>
-          {sales.length > 3 && (
+          {!showAll && sales.length > salesLimit && (
             <div className="text-xs text-gray-500 dark:text-neutral-500 mt-2">
-              +{sales.length - 3} more sale{sales.length - 3 !== 1 ? 's' : ''}
+              +{sales.length - salesLimit} more sale{sales.length - salesLimit !== 1 ? 's' : ''}
             </div>
           )}
         </div>
@@ -162,10 +176,10 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
             Recent Rentals
           </h4>
           <div className="space-y-2">
-            {rents.slice(0, 3).map((rent, idx) => (
+            {rents.slice(0, rentsLimit).map((rent, idx) => (
               <div
                 key={idx}
-                className="p-3 bg-gray-50 dark:bg-neutral-800 rounded-md text-sm"
+                className="p-2.5 bg-gray-50 dark:bg-neutral-800 rounded-md text-[13px]"
               >
                 <div className="flex justify-between items-start mb-1">
                   <span className="font-medium text-gray-900 dark:text-neutral-100">
@@ -175,7 +189,7 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
                     £{rent.price.toLocaleString()}/mo
                   </span>
                 </div>
-                <div className="flex gap-3 text-xs text-gray-600 dark:text-neutral-400">
+                <div className="flex gap-3 text-[11px] text-gray-600 dark:text-neutral-400 leading-snug">
                   <span>{rent.type}</span>
                   <span>{rent.date}</span>
                   <span>{rent.distance_km.toFixed(2)} km</span>
@@ -183,9 +197,9 @@ export default function CompsPanel({ postcode }: CompsPanelProps) {
               </div>
             ))}
           </div>
-          {rents.length > 3 && (
+          {!showAll && rents.length > rentsLimit && (
             <div className="text-xs text-gray-500 dark:text-neutral-500 mt-2">
-              +{rents.length - 3} more rental{rents.length - 3 !== 1 ? 's' : ''}
+              +{rents.length - rentsLimit} more rental{rents.length - rentsLimit !== 1 ? 's' : ''}
             </div>
           )}
         </div>

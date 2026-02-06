@@ -181,10 +181,14 @@ function ClientMap({
   points,
   defaultCenter,
   heatmapEnabled = false,
+  hoveredId,
+  onHoverChange,
 }: {
   points: { id: string; title: string; lat: number; lng: number; price?: number; source?: string | null }[];
   defaultCenter: [number, number];
   heatmapEnabled?: boolean;
+  hoveredId?: string | null;
+  onHoverChange?: (id: string | null) => void;
 }) {
   const mapRef = useRef<LeafletMap | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -254,6 +258,24 @@ function ClientMap({
       other: mk('other'),
     } as const;
   }, [leafletLib]);
+
+  const iconFor = useCallback(
+    (src: unknown, active: boolean) => {
+      const L: any = leafletLib;
+      const key = sourceKey(src);
+      if (!active || !L?.divIcon) {
+        return markerIcons ? (markerIcons as any)[key] ?? (markerIcons as any).other : undefined;
+      }
+      return L.divIcon({
+        className: '',
+        html: `<div class="pnx-map-pin pnx-map-pin--${key} pnx-map-pin--active"></div>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+        popupAnchor: [0, -8],
+      });
+    },
+    [leafletLib, markerIcons, sourceKey],
+  );
 
   const fit = (m: LeafletMap, pts: { lat: number; lng: number }[]) => {
     if (!pts.length) return;
@@ -400,11 +422,13 @@ function ClientMap({
           <Marker
             key={p.id}
             position={{ lat: p.lat, lng: p.lng }}
-            icon={
-              markerIcons
-                ? (markerIcons as any)[sourceKey(p.source)] ?? (markerIcons as any).other
-                : undefined
-            }
+            icon={iconFor(p.source, hoveredId === p.id)}
+            zIndexOffset={hoveredId === p.id ? 1000 : 0}
+            opacity={hoveredId && hoveredId !== p.id ? 0.6 : 1}
+            eventHandlers={{
+              mouseover: () => onHoverChange?.(p.id),
+              mouseout: () => onHoverChange?.(null),
+            }}
           >
             <Popup>
               <div className="text-sm font-medium">{p.title}</div>
@@ -434,6 +458,7 @@ function ListingsInner() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mappableCount, setMappableCount] = useState<number | null>(null);
   const [mapRows, setMapRows] = useState<RawProperty[] | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   // Keep map toggle state in URL so it persists across pagination/filter changes.
   useEffect(() => {
@@ -1430,7 +1455,12 @@ function ListingsInner() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {typeFilteredRows.map((property) => (
-                    <PropertyCard key={property.id || Math.random()} p={property} />
+                  <PropertyCard
+                    key={property.id || Math.random()}
+                    p={property}
+                    isHovered={hoveredId === property.id}
+                    onHoverChange={(h) => setHoveredId(h ? property.id : null)}
+                  />
                 ))}
               </div>
             )}
@@ -1455,7 +1485,12 @@ function ListingsInner() {
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {typeFilteredRows.map((property) => (
-                    <PropertyCard key={property.id || Math.random()} p={property} />
+                    <PropertyCard
+                      key={property.id || Math.random()}
+                      p={property}
+                      isHovered={hoveredId === property.id}
+                      onHoverChange={(h) => setHoveredId(h ? property.id : null)}
+                    />
                   ))}
                 </div>
               )}
@@ -1471,7 +1506,13 @@ function ListingsInner() {
                       Map hidden — no listings in this result have coordinates yet
                     </div>
                   ) : (
-                    <ClientMap points={points} defaultCenter={[53.5, -2]} heatmapEnabled={false} />
+                    <ClientMap
+                      points={points}
+                      defaultCenter={[53.5, -2]}
+                      heatmapEnabled={false}
+                      hoveredId={hoveredId}
+                      onHoverChange={setHoveredId}
+                    />
                   )}
                 </div>
               </div>
