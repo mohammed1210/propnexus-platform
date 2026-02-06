@@ -49,13 +49,20 @@ jobs:
           NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
           OFF_MARKET_ADMIN_TOKEN: ${{ secrets.OFF_MARKET_ADMIN_TOKEN }}
         run: |
-          BACKEND_BASE="$API_BASE"
+          set -euo pipefail
+
+          BACKEND_BASE="${API_BASE:-}"
           if [ -z "$BACKEND_BASE" ]; then
-            BACKEND_BASE="$NEXT_PUBLIC_BACKEND_URL"
+            BACKEND_BASE="${NEXT_PUBLIC_BACKEND_URL:-}"
           fi
           if [ -z "${BACKEND_BASE}" ]; then
             echo "⚠️ BACKEND_BASE not configured – skipping import test (soft pass)."
             exit 0
+          fi
+
+          if [ -z "${OFF_MARKET_ADMIN_TOKEN:-}" ]; then
+            echo "❌ OFF_MARKET_ADMIN_TOKEN secret is missing/empty."
+            exit 1
           fi
 
           echo "🔄 Testing import with Ilford at $BACKEND_BASE/import/all..."
@@ -63,18 +70,26 @@ jobs:
           urlencode() {
             python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$1"
           }
-
           ENC_LOCATION="$(urlencode "Ilford")"
 
-          set -e
-          RESPONSE=$(curl -s -f -X POST \
+          # Capture status + body (don’t use -f so we can see the error body)
+          HTTP_STATUS=$(curl -sS -o /tmp/import_body.json -w "%{http_code}" -X POST \
             "${BACKEND_BASE}/import/all?req=${ENC_LOCATION}" \
-            -H "x-admin-token: ${OFF_MARKET_ADMIN_TOKEN}")
+            -H "x-admin-token: ${OFF_MARKET_ADMIN_TOKEN}" \
+            -H "Content-Type: application/json")
 
-          echo "Response: $RESPONSE"
+          echo "HTTP Status: $HTTP_STATUS"
+          echo "Body:"
+          cat /tmp/import_body.json
+          echo ""
 
-          COUNT=$(echo "$RESPONSE" | jq -r '.total_imported // .count // 0')
+          # Now enforce success
+          if [ "$HTTP_STATUS" -lt 200 ] || [ "$HTTP_STATUS" -ge 300 ]; then
+            echo "❌ Import endpoint failed (HTTP $HTTP_STATUS). Likely token mismatch if 401."
+            exit 1
+          fi
 
+          COUNT=$(jq -r '.total_imported // .count // 0' /tmp/import_body.json)
           echo "📊 Import count: $COUNT"
 
           if [ "$COUNT" -eq 0 ]; then
