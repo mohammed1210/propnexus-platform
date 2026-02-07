@@ -8,6 +8,7 @@ export const flag = (name: string, fallback = false): boolean => {
 export const FF = {
   AI_CHAT: flag("NEXT_PUBLIC_FEATURE_AI_CHATBOT", false),
   DEAL_SCORE: flag("NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE", false),
-  AREA_INTEL: flag("NEXT_PUBLIC_FEATURE_AREA_INTEL", false),
-  COMPS: flag("NEXT_PUBLIC_FEATURE_COMPS", false),
+  // Default-on: these panels are part of the core property details experience.
+  AREA_INTEL: flag("NEXT_PUBLIC_FEATURE_AREA_INTEL", true),
+  COMPS: flag("NEXT_PUBLIC_FEATURE_COMPS", true),
 };

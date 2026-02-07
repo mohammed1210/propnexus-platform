@@ -29,8 +29,9 @@ describe('Property Details Page - Feature Flags', () => {
 
       // All should default to false
       expect(FF.DEAL_SCORE).toBe(false);
-      expect(FF.AREA_INTEL).toBe(false);
-      expect(FF.COMPS).toBe(false);
+      // Area Intel + Comps are default-on (can be explicitly disabled via env)
+      expect(FF.AREA_INTEL).toBe(true);
+      expect(FF.COMPS).toBe(true);
       expect(FF.AI_CHAT).toBe(false);
     });
   });
@@ -126,8 +127,9 @@ describe('Property Details Page - Feature Flags', () => {
 
       // All should be false when undefined
       expect(FF.DEAL_SCORE).toBe(false);
-      expect(FF.AREA_INTEL).toBe(false);
-      expect(FF.COMPS).toBe(false);
+      // Area Intel + Comps default to true when undefined
+      expect(FF.AREA_INTEL).toBe(true);
+      expect(FF.COMPS).toBe(true);
       expect(FF.AI_CHAT).toBe(false);
     });
   });

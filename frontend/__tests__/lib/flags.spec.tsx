@@ -33,8 +33,9 @@ describe('Feature Flags', () => {
 
       expect(FF.AI_CHAT).toBe(false);
       expect(FF.DEAL_SCORE).toBe(false);
-      expect(FF.AREA_INTEL).toBe(false);
-      expect(FF.COMPS).toBe(false);
+      // Area Intel + Comps are default-on (can be explicitly disabled)
+      expect(FF.AREA_INTEL).toBe(true);
+      expect(FF.COMPS).toBe(true);
     });
   });
 
@@ -65,12 +66,16 @@ describe('Feature Flags', () => {
   it('should respect "false" value', () => {
     process.env.NEXT_PUBLIC_FEATURE_AI_CHATBOT = 'false';
     process.env.NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE = 'false';
+    process.env.NEXT_PUBLIC_FEATURE_AREA_INTEL = 'false';
+    process.env.NEXT_PUBLIC_FEATURE_COMPS = 'false';
 
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
 
       expect(FF.AI_CHAT).toBe(false);
       expect(FF.DEAL_SCORE).toBe(false);
+      expect(FF.AREA_INTEL).toBe(false);
+      expect(FF.COMPS).toBe(false);
     });
   });
 
