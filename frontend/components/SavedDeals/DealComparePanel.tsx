@@ -48,10 +48,15 @@ function clamp(n: number, min: number, max: number): number {
 function MiniBar({ value }: { value: number }) {
   const v = clamp(value, 0, 100);
   const tone =
-    'bg-gradient-to-r from-red-500 via-amber-500 to-green-500 dark:from-red-400 dark:via-amber-400 dark:to-green-400';
+    'bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 dark:from-red-400 dark:via-yellow-400 dark:to-green-400';
   return (
-    <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-      <div className={clsx('h-2 rounded-full', tone)} style={{ width: `${v}%` }} />
+    <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden relative">
+      <div aria-hidden className={clsx('absolute inset-0', tone)} />
+      <div
+        aria-hidden
+        className="absolute inset-y-0 right-0 bg-slate-200 dark:bg-slate-800 transition-[width] duration-300"
+        style={{ width: `${100 - v}%` }}
+      />
     </div>
   );
 }

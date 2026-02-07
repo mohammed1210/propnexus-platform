@@ -21,7 +21,7 @@ export default function AIScoreBars({
   const safe = (n: number) => Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0));
 
   const barGradient =
-    'bg-gradient-to-r from-red-500 via-amber-500 to-green-500 dark:from-red-400 dark:via-amber-400 dark:to-green-400';
+    'bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 dark:from-red-400 dark:via-yellow-400 dark:to-green-400';
 
   return (
     <section className={className}>
@@ -37,11 +37,15 @@ export default function AIScoreBars({
       {/* Overall pill */}
       <div className="mb-3">
         <div className="text-sm text-neutral-600 dark:text-neutral-300 mb-1">Overall</div>
-        <div className="h-2 w-full rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+        <div
+          className="h-2 w-full rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative"
+          aria-label={`Overall score ${safe(overall)} out of 100`}
+        >
+          <div aria-hidden className={`absolute inset-0 ${barGradient}`} />
           <div
-            className={`h-full ${barGradient} transition-[width] duration-500`}
-            style={{ width: `${safe(overall)}%` }}
-            aria-label={`Overall score ${safe(overall)} out of 100`}
+            aria-hidden
+            className="absolute inset-y-0 right-0 bg-neutral-200 dark:bg-neutral-800 transition-[width] duration-500"
+            style={{ width: `${100 - safe(overall)}%` }}
           />
         </div>
         <div className="text-xs text-neutral-500 mt-1">{safe(overall)} / 100</div>
@@ -55,11 +59,12 @@ export default function AIScoreBars({
               <span className="text-neutral-700 dark:text-neutral-200">{it.label}</span>
               <span className="text-neutral-500">{safe(it.value)}%</span>
             </div>
-            <div className="h-2 w-full rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+            <div className="h-2 w-full rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative">
+              <div aria-hidden className={`absolute inset-0 ${barGradient}`} />
               <div
-                className={`h-full ${barGradient} transition-[width] duration-500`}
-                style={{ width: `${safe(it.value)}%` }}
                 aria-hidden
+                className="absolute inset-y-0 right-0 bg-neutral-200 dark:bg-neutral-800 transition-[width] duration-500"
+                style={{ width: `${100 - safe(it.value)}%` }}
               />
             </div>
           </li>

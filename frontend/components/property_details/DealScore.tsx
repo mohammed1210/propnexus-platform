@@ -105,7 +105,7 @@ export default function DealScore({ property }: DealScoreProps) {
   const { score, categories, version } = scoreData;
 
   const barGradient =
-    'bg-gradient-to-r from-red-500 via-amber-500 to-green-500 dark:from-red-400 dark:via-amber-400 dark:to-green-400';
+    'bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 dark:from-red-400 dark:via-yellow-400 dark:to-green-400';
 
   const getScoreColor = (s: number) => {
     if (s >= 75) return 'text-green-600 dark:text-green-400';
@@ -158,13 +158,18 @@ export default function DealScore({ property }: DealScoreProps) {
                       {value.toFixed(1)}/{max}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-neutral-700 rounded-full h-2 overflow-hidden">
+                  <div className="w-full bg-gray-200 dark:bg-neutral-700 rounded-full h-2 overflow-hidden relative">
                     <div
-                      className={`h-full rounded-full transition-all duration-1000 ease-out ${
-                        isVisible ? 'score-bar score-bar-glow' : ''
-                      } ${barGradient}`}
+                      aria-hidden
+                      className={`absolute inset-0 ${barGradient} ${isVisible ? 'score-bar-glow' : ''}`}
+                    />
+                    <div
+                      aria-hidden
+                      className="absolute inset-y-0 right-0 bg-gray-200 dark:bg-neutral-700 transition-[width] duration-1000 ease-out"
                       style={{
-                        width: isVisible ? `${Math.max(0, Math.min(100, percentage))}%` : '0%',
+                        width: isVisible
+                          ? `${100 - Math.max(0, Math.min(100, percentage))}%`
+                          : '100%',
                       }}
                     />
                   </div>

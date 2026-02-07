@@ -23,14 +23,21 @@ function Bar({ label, value }: { label: string; value: number }) {
         <span className="text-slate-600 dark:text-slate-300">{label}</span>
         <span className="font-medium">{v}%</span>
       </div>
-      <div className="h-2 w-full rounded bg-slate-200 dark:bg-slate-800 overflow-hidden">
+      <div
+        className="h-2 w-full rounded bg-slate-200 dark:bg-slate-800 overflow-hidden relative"
+        aria-valuenow={v}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        role="progressbar"
+      >
         <div
-          className="h-2 rounded bg-gradient-to-r from-red-500 via-amber-500 to-green-500 dark:from-red-400 dark:via-amber-400 dark:to-green-400 transition-[width]"
-          style={{ width: `${v}%` }}
-          aria-valuenow={v}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          role="progressbar"
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 dark:from-red-400 dark:via-yellow-400 dark:to-green-400"
+        />
+        <div
+          aria-hidden
+          className="absolute inset-y-0 right-0 bg-slate-200 dark:bg-slate-800 transition-[width]"
+          style={{ width: `${100 - v}%` }}
         />
       </div>
     </div>
