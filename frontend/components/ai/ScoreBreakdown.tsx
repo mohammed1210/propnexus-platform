@@ -25,7 +25,7 @@ function Bar({ label, value }: { label: string; value: number }) {
       </div>
       <div className="h-2 w-full rounded bg-slate-200 dark:bg-slate-800 overflow-hidden">
         <div
-          className="h-2 rounded bg-indigo-500 transition-[width]"
+          className="h-2 rounded bg-gradient-to-r from-red-500 via-amber-500 to-green-500 dark:from-red-400 dark:via-amber-400 dark:to-green-400 transition-[width]"
           style={{ width: `${v}%` }}
           aria-valuenow={v}
           aria-valuemin={0}

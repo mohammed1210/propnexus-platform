@@ -47,7 +47,8 @@ function clamp(n: number, min: number, max: number): number {
 
 function MiniBar({ value }: { value: number }) {
   const v = clamp(value, 0, 100);
-  const tone = v >= 70 ? 'bg-emerald-500' : v >= 50 ? 'bg-amber-500' : 'bg-slate-400';
+  const tone =
+    'bg-gradient-to-r from-red-500 via-amber-500 to-green-500 dark:from-red-400 dark:via-amber-400 dark:to-green-400';
   return (
     <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
       <div className={clsx('h-2 rounded-full', tone)} style={{ width: `${v}%` }} />

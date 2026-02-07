@@ -104,16 +104,13 @@ export default function DealScore({ property }: DealScoreProps) {
 
   const { score, categories, version } = scoreData;
 
+  const barGradient =
+    'bg-gradient-to-r from-red-500 via-amber-500 to-green-500 dark:from-red-400 dark:via-amber-400 dark:to-green-400';
+
   const getScoreColor = (s: number) => {
     if (s >= 75) return 'text-green-600 dark:text-green-400';
     if (s >= 50) return 'text-yellow-600 dark:text-yellow-400';
     return 'text-red-600 dark:text-red-400';
-  };
-
-  const getBarColor = (pct: number) => {
-    if (pct >= 75) return 'bg-green-500 dark:bg-green-400';
-    if (pct >= 50) return 'bg-yellow-500 dark:bg-yellow-400';
-    return 'bg-red-500 dark:bg-red-400';
   };
 
   return (
@@ -165,7 +162,7 @@ export default function DealScore({ property }: DealScoreProps) {
                     <div
                       className={`h-full rounded-full transition-all duration-1000 ease-out ${
                         isVisible ? 'score-bar score-bar-glow' : ''
-                      } ${getBarColor(Math.max(0, Math.min(100, percentage)))}`}
+                      } ${barGradient}`}
                       style={{
                         width: isVisible ? `${Math.max(0, Math.min(100, percentage))}%` : '0%',
                       }}

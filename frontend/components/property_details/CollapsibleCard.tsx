@@ -5,7 +5,9 @@ import { FiChevronDown } from 'react-icons/fi';
 
 interface CollapsibleCardProps {
   title: string;
+  subtitle?: string;
   icon?: ReactNode;
+  headerRight?: ReactNode;
   children: ReactNode;
   defaultExpanded?: boolean;
   className?: string;
@@ -13,7 +15,9 @@ interface CollapsibleCardProps {
 
 export default function CollapsibleCard({
   title,
+  subtitle,
   icon,
+  headerRight,
   children,
   defaultExpanded = true,
   className = '',
@@ -40,9 +44,11 @@ export default function CollapsibleCard({
             {title}
           </span>
           <span className="block text-xs text-slate-600 dark:text-slate-400">
-            {isExpanded ? 'Click to collapse' : 'Click to expand'}
+            {subtitle ?? (isExpanded ? 'Click to collapse' : 'Click to expand')}
           </span>
         </span>
+
+        {headerRight ? <span className="shrink-0 flex items-center gap-2">{headerRight}</span> : null}
 
         <span
           className={

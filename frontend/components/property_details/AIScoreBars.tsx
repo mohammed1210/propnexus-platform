@@ -20,6 +20,9 @@ export default function AIScoreBars({
 }) {
   const safe = (n: number) => Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0));
 
+  const barGradient =
+    'bg-gradient-to-r from-red-500 via-amber-500 to-green-500 dark:from-red-400 dark:via-amber-400 dark:to-green-400';
+
   return (
     <section className={className}>
       {showHeader && (
@@ -36,7 +39,7 @@ export default function AIScoreBars({
         <div className="text-sm text-neutral-600 dark:text-neutral-300 mb-1">Overall</div>
         <div className="h-2 w-full rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-[width] duration-500"
+            className={`h-full ${barGradient} transition-[width] duration-500`}
             style={{ width: `${safe(overall)}%` }}
             aria-label={`Overall score ${safe(overall)} out of 100`}
           />
@@ -54,7 +57,7 @@ export default function AIScoreBars({
             </div>
             <div className="h-2 w-full rounded bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
               <div
-                className="h-full bg-neutral-600 dark:bg-neutral-400 transition-[width] duration-500"
+                className={`h-full ${barGradient} transition-[width] duration-500`}
                 style={{ width: `${safe(it.value)}%` }}
                 aria-hidden
               />

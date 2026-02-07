@@ -8,7 +8,6 @@ import {
   FiTool,
   FiFileText,
   FiBarChart2,
-  FiRepeat,
   FiGitBranch,
   FiEdit3,
   FiMap,
@@ -18,8 +17,7 @@ import QuickStatsActions from '@/components/property_details/QuickStatsActions';
 import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
 import DealScore from '@/components/property_details/DealScore';
-import AreaIntelPanel from '@/components/property_details/AreaIntelPanel';
-import CompsPanel from '@/components/property_details/CompsPanel';
+import AreaInsights from '@/components/property_details/AreaInsights';
 import GatedPanel from '@/components/property_details/GatedPanel';
 import InvestmentCalculator from '@/components/property_details/InvestmentCalculator';
 import CollapsibleCard from '@/components/property_details/CollapsibleCard';
@@ -29,7 +27,6 @@ import TradesmenList from '@/components/tradesmen/TradesmenList';
 
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
-import { FF } from '@/lib/flags';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 
 /** ---- Client-only widgets (no SSR) ---- */
@@ -284,46 +281,16 @@ export default function PropertyDetailsPage() {
               <InvestmentSummary property={property as any} />
             </CollapsibleCard>
 
-            {/* Area Intelligence - Always visible, gated for non-pro users */}
-            <CollapsibleCard
-              title="Area Intelligence"
-              icon={
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
-                  <FiBarChart2 className="w-5 h-5 text-white" />
-                </div>
-              }
+            <AreaInsights
+              areaKey={property.location || ''}
+              postcode={property.location || ''}
+              rentSource={(property as any)?.score_breakdown?.inputs?.rent_source}
+              version={(property as any)?.score_breakdown?.version}
               defaultExpanded={false}
-            >
-              <GatedPanel
-                title="Area Intelligence"
-                requiredPlan="pro"
-                featureEnabled={true}
-              >
-                <AreaIntelPanel areaKey={property.location || ''} />
-              </GatedPanel>
-            </CollapsibleCard>
-
-            {/* Comparable Sales - Always visible, gated for non-pro users */}
-            <CollapsibleCard
-              title="Comparable Sales"
-              icon={
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
-                  <FiRepeat className="w-5 h-5 text-white" />
-                </div>
-              }
-              defaultExpanded={false}
-            >
-              <GatedPanel
-                title="Comparable Sales"
-                requiredPlan="pro"
-                featureEnabled={true}
-              >
-                <CompsPanel postcode={property.location || ''} />
-              </GatedPanel>
-            </CollapsibleCard>
+            />
 
             {/* Local Tradesmen & Services */}
-            {property.latitude && property.longitude && (
+            {typeof property.latitude === 'number' && typeof property.longitude === 'number' && (
               <CollapsibleCard
                 title="Local Tradesmen & Services"
                 icon={
