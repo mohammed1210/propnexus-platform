@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FiHeart, FiShare2, FiDownload, FiCopy, FiCheck } from 'react-icons/fi';
 import { toast } from 'sonner';
+import { fetchWithRetry } from '@/lib/api';
 
 type QuickActionsProps = {
   propertyId: string;
@@ -23,15 +24,55 @@ export default function QuickActions({
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await fetchWithRetry(`/api/saved-deals?property_id=${encodeURIComponent(propertyId)}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+
+        const json: any = await res.json().catch(() => null);
+        const items = Array.isArray(json) ? json : json?.data;
+        if (cancelled) return;
+        if (Array.isArray(items) && items.length > 0) setSaved(true);
+      } catch {
+        // ignore
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [propertyId]);
+
   const handleSave = async () => {
-    setSaving(true);
-    // TODO: Integrate with actual save API
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      setSaving(true);
+      const res = await fetchWithRetry('/api/save-deal', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ property_id: propertyId }),
+      });
+
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          toast.error('Please sign in to save deals.');
+          return;
+        }
+        const msg = await res.text().catch(() => '');
+        throw new Error(msg || `Save failed (${res.status})`);
+      }
+
       setSaved(true);
-      toast.success('Deal saved successfully!');
-      setTimeout(() => setSaved(false), 2000);
-    }, 500);
+      toast.success('Saved to Deals');
+    } catch (err) {
+      console.error(err);
+      toast.error('Could not save this deal.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleShare = async () => {
@@ -99,7 +140,14 @@ export default function QuickActions({
             >
               {saved ? (
                 <>
-                  <FiCheck className="w-4 h-4" aria-hidden="true" />
+                  <svg
+                    aria-hidden
+                    viewBox="0 0 24 24"
+                    className="w-4 h-4 text-red-300"
+                    fill="currentColor"
+                  >
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                  </svg>
                   <span>Saved</span>
                 </>
               ) : (
@@ -159,7 +207,18 @@ export default function QuickActions({
             aria-label={saved ? 'Deal saved' : 'Save this deal'}
             aria-pressed={saved}
           >
-            <FiHeart className="w-4 h-4" aria-hidden="true" />
+            {saved ? (
+              <svg
+                aria-hidden
+                viewBox="0 0 24 24"
+                className="w-4 h-4 text-red-300"
+                fill="currentColor"
+              >
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+            ) : (
+              <FiHeart className="w-4 h-4" aria-hidden="true" />
+            )}
             <span className="text-sm">{saved ? 'Saved' : 'Save'}</span>
           </button>
           <button

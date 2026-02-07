@@ -71,19 +71,6 @@ function extractLikelyUkPostcode(text: string): string | null {
   return outward ? outward[1] : null;
 }
 
-/** Resolve the FastAPI base URL from public env (trim TRAILING slashes only) */
-function getBackendBase(): string {
-  const raw = (process.env.NEXT_PUBLIC_API_URL ||
-    process.env.NEXT_PUBLIC_BACKEND_URL ||
-    '') as string;
-
-  if (!raw) {
-    throw new Error('NEXT_PUBLIC_API_URL (or NEXT_PUBLIC_BACKEND_URL) is not set');
-  }
-  // Keep https:// and path segments intact; only strip trailing slashes.
-  return raw.replace(/\/+$/, '');
-}
-
 /** JSON POST with timeout + small retry for resilience */
 async function postJSON<T>(
   url: string,
@@ -126,9 +113,6 @@ async function postJSON<T>(
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
-
-// Duration in milliseconds to show the "Saved" success state
-const SAVE_SUCCESS_DURATION_MS = 1500;
 
 // Badge color thresholds for yield and ROI percentages
 const YIELD_THRESHOLD_EXCELLENT = 6; // >= 6% is green
@@ -181,7 +165,6 @@ export default function PropertyCard({
 }) {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const successTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const articleRef = useRef<HTMLElement | null>(null);
   const [shouldLoadInsights, setShouldLoadInsights] = useState(false);
@@ -190,15 +173,6 @@ export default function PropertyCard({
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsErr, setInsightsErr] = useState<string | null>(null);
   const [timeTick, setTimeTick] = useState(0);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (successTimeoutRef.current) {
-        clearTimeout(successTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const postcodeKey = useMemo(() => {
     const haystack = `${p.location ?? ''} ${p.title ?? ''} ${p.description ?? ''}`;
@@ -436,17 +410,10 @@ export default function PropertyCard({
   const handleSaveDeal = useCallback(async () => {
     try {
       setSaving(true);
-      const base = getBackendBase();
-      await postJSON<{ ok: boolean }>(`${base}/save-deal`, {
+      await postJSON<{ ok: boolean }>(`/api/save-deal`, {
         property_id: p.id,
       });
       setSaveSuccess(true);
-      // Clear any existing timeout
-      if (successTimeoutRef.current) {
-        clearTimeout(successTimeoutRef.current);
-      }
-      // Revert success state after 1.5s
-      successTimeoutRef.current = setTimeout(() => setSaveSuccess(false), SAVE_SUCCESS_DURATION_MS);
     } catch (e) {
       console.error(e);
       alert('Could not save this deal.');
@@ -514,7 +481,7 @@ export default function PropertyCard({
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
             'active:scale-[0.98]',
             saveSuccess
-              ? 'bg-teal-600 text-white border-2 border-white shadow-lg save-animation'
+              ? 'bg-white/95 backdrop-blur-sm text-red-600 dark:text-red-400 border-2 border-white/60 hover:bg-white hover:border-white shadow-md'
               : 'bg-white/90 backdrop-blur-sm text-slate-900 border-2 border-white/50 hover:bg-white hover:border-white shadow-md',
             (saving || saveSuccess) && 'cursor-not-allowed',
           )}

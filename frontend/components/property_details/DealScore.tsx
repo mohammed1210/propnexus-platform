@@ -110,6 +110,12 @@ export default function DealScore({ property }: DealScoreProps) {
     return 'text-red-600 dark:text-red-400';
   };
 
+  const getBarColor = (pct: number) => {
+    if (pct >= 75) return 'bg-green-500 dark:bg-green-400';
+    if (pct >= 50) return 'bg-yellow-500 dark:bg-yellow-400';
+    return 'bg-red-500 dark:bg-red-400';
+  };
+
   return (
     <div ref={scoreRef}>
       <div className="sticky top-3 z-10 -mx-2 px-2 py-2 mb-4 bg-white/80 dark:bg-slate-900/40 backdrop-blur rounded-lg">
@@ -159,10 +165,9 @@ export default function DealScore({ property }: DealScoreProps) {
                     <div
                       className={`h-full rounded-full transition-all duration-1000 ease-out ${
                         isVisible ? 'score-bar score-bar-glow' : ''
-                      }`}
+                      } ${getBarColor(Math.max(0, Math.min(100, percentage)))}`}
                       style={{
                         width: isVisible ? `${Math.max(0, Math.min(100, percentage))}%` : '0%',
-                        background: 'linear-gradient(90deg, #6ae0ff, #7c6cff)',
                       }}
                     />
                   </div>

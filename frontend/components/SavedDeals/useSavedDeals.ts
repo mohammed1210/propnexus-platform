@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { API_BASE, fetchWithRetry } from '@/lib/api';
+import { fetchWithRetry } from '@/lib/api';
 import type { SavedDeal } from './types';
 
 export type UseSavedDealsState = {
@@ -35,7 +35,7 @@ export function useSavedDeals(): UseSavedDealsState {
     setAuthRequired(false);
 
     try {
-      const res = await fetchWithRetry(`${API_BASE.replace(/\/+$/, '')}/saved-deals`, {
+      const res = await fetchWithRetry(`/api/saved-deals`, {
         cache: 'no-store',
       });
 
@@ -96,7 +96,7 @@ export function useSavedDeals(): UseSavedDealsState {
 
       try {
         const res = await fetchWithRetry(
-          `${API_BASE.replace(/\/+$/, '')}/saved-deals/${encodeURIComponent(savedDealId)}`,
+          `/api/saved-deals/${encodeURIComponent(savedDealId)}`,
           { method: 'DELETE' },
         );
         if (!res.ok) {
