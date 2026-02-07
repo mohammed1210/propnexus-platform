@@ -40,16 +40,37 @@ export default function AnalyticsPage() {
     let ignore = false;
     (async () => {
       setLoading(true);
-      const sb = getSupabase();
-      const { data, error } = await sb
-        .from('saved_deals')
-        .select('*')
-        .order('saved_at', { ascending: false });
 
-      if (!ignore) {
-        if (error) console.warn('load saved_deals', error);
-        setDeals((data as SavedDeal[]) ?? []);
-        setLoading(false);
+      const supabaseConfigured = Boolean(
+        process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      );
+
+      if (!supabaseConfigured) {
+        if (!ignore) {
+          setDeals([]);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const sb = getSupabase();
+        const { data, error } = await sb
+          .from('saved_deals')
+          .select('*')
+          .order('saved_at', { ascending: false });
+
+        if (!ignore) {
+          if (error) console.warn('load saved_deals', error);
+          setDeals((data as SavedDeal[]) ?? []);
+          setLoading(false);
+        }
+      } catch (e) {
+        if (!ignore) {
+          console.warn('load saved_deals failed', e);
+          setDeals([]);
+          setLoading(false);
+        }
       }
     })();
     return () => {
@@ -93,7 +114,7 @@ export default function AnalyticsPage() {
         <nav className="space-y-1">
           <NavItem href="/listings" label="Listings" emoji="🏠" />
           <NavItem href="/analytics" label="Analytics" emoji="📈" active />
-          <NavItem href="/saved-deals" label="Saved Deals" emoji="⭐" />
+          <NavItem href="/saved" label="Saved Deals" emoji="⭐" />
         </nav>
         <div className="mt-6 text-xs text-slate-300">
           Track portfolio metrics, AI scores and market signals here.

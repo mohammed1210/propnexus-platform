@@ -24,7 +24,7 @@ export default defineConfig({
       : `NEXT_PUBLIC_API_BASE="${API_BASE}" npx next build && npx next start -H ${HOST} -p ${PORT}`,
     url: isScreenshotTest ? 'http://localhost:3000' : BASE,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 240_000,
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });

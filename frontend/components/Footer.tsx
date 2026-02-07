@@ -41,7 +41,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="/saved-deals"
+                  href="/saved"
                   className="text-slate-600 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"
                 >
                   Saved Deals

@@ -16,8 +16,9 @@ function parseAdminEmails(raw: string | undefined): string[] {
 function handleRedirects(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (pathname === "/saved" || pathname === "/saved-deals-deals") {
-    return NextResponse.redirect(new URL("/saved-deals", req.url));
+  // Canonical Saved Deals route is `/saved`.
+  if (pathname === "/saved-deals" || pathname === "/saved-deals-deals") {
+    return NextResponse.redirect(new URL("/saved", req.url));
   }
   if (pathname === "/off-market-deals") {
     return NextResponse.redirect(new URL("/off-market", req.url));
@@ -29,6 +30,7 @@ function handleRedirects(req: NextRequest) {
 const isProtectedRoute = createRouteMatcher([
   "/listings(.*)",
   "/off-market(.*)",
+  "/saved(.*)",
   "/saved-deals(.*)",
   "/account(.*)",
   "/admin(.*)",
@@ -111,10 +113,12 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    "/((?!_next|.*\\..*).*)",
-    "/api/(.*)",
-    "/saved",
-    "/saved-deals-deals",
-    "/off-market-deals",
+    "/listings(.*)",
+    "/off-market(.*)",
+    "/saved(.*)",
+    "/saved-deals(.*)",
+    "/account(.*)",
+    "/admin(.*)",
+    "/api/admin(.*)",
   ],
 };

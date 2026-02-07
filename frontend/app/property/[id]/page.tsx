@@ -20,7 +20,6 @@ import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGen
 import DealScore from '@/components/property_details/DealScore';
 import AreaIntelPanel from '@/components/property_details/AreaIntelPanel';
 import CompsPanel from '@/components/property_details/CompsPanel';
-import MapSingle from '@/components/property_details/MapSingle';
 import GatedPanel from '@/components/property_details/GatedPanel';
 import InvestmentCalculator from '@/components/property_details/InvestmentCalculator';
 import CollapsibleCard from '@/components/property_details/CollapsibleCard';
@@ -46,6 +45,11 @@ const NotesFields = dynamic(
 
 const AIChatbot = dynamic(
   () => import('@/components/property_details/AIChatbot'),
+  { ssr: false }
+);
+
+const MapSingle = dynamic(
+  () => import('@/components/property_details/MapSingle'),
   { ssr: false }
 );
 

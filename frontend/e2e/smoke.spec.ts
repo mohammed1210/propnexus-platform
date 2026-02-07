@@ -25,14 +25,17 @@ test('off-market page renders a heading-ish element', async ({ page }) => {
   await expect(btn).toBeVisible();
 });
 
-test('saved deals page loads without hard console errors', async ({ page }) => {
+test('saved deals pages load without hard console errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (msg) => {
     if (msg.type() === 'error') errors.push(msg.text());
   });
 
-  const res = await page.goto('/saved-deals', { waitUntil: 'domcontentloaded' });
-  expect(res?.ok()).toBeTruthy();
+  const res1 = await page.goto('/saved', { waitUntil: 'domcontentloaded' });
+  expect(res1?.ok()).toBeTruthy();
+
+  const res2 = await page.goto('/saved-deals', { waitUntil: 'domcontentloaded' });
+  expect(res2?.ok()).toBeTruthy();
 
   // allow warnings; fail on common hard errors only
   expect(errors.join('\n')).not.toMatch(/TypeError|ReferenceError|Unhandled/i);

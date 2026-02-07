@@ -15,6 +15,7 @@ export default function Header() {
   const links = [
     { href: '/', label: 'Home' },
     { href: '/listings', label: 'Listings' },
+    { href: '/saved', label: 'Saved Deals' },
     { href: '/off-market', label: 'Off-Market' },
     { href: '/demo', label: 'Demo' },
     { href: '/pricing', label: 'Pricing' },
