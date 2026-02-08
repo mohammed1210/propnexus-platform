@@ -1228,7 +1228,25 @@ class BatchImportRequest(BaseModel):
     delay_min_s: float = 0.5
     delay_max_s: float = 1.5
     run_async: bool = True
-    per_city_timeout_s: float = 90.0
+    # Must exceed upstream scraper timeouts (SCRAPER_TIMEOUT_SECONDS/INGEST_TIMEOUT_SECONDS)
+    # otherwise the batch runner will time out cities before sources finish.
+    per_city_timeout_s: float = 210.0
+
+
+def _get_scrape_timeout_seconds() -> float:
+    """Best-effort: read the configured scraper timeout (seconds)."""
+
+    for k in ("INGEST_TIMEOUT_SECONDS", "SCRAPER_TIMEOUT_SECONDS"):
+        v = (os.getenv(k) or "").strip()
+        if not v:
+            continue
+        try:
+            f = float(v)
+            if f > 0:
+                return f
+        except Exception:
+            continue
+    return 20.0
 
 
 @router.post("/zoopla")
@@ -1511,6 +1529,11 @@ async def import_batch(
     # Safety cap: keep the endpoint bounded.
     cities = cities[:25]
 
+    # Ensure the batch wrapper timeout is never lower than the underlying scraper timeout.
+    # Otherwise, every city can fail with "timeout after Xs" even when scrapers are healthy.
+    per_city_timeout_s = float(req.per_city_timeout_s or 0)
+    per_city_timeout_s = max(per_city_timeout_s, _get_scrape_timeout_seconds() + 30.0, 60.0)
+
     if req.run_async:
         # Use scrape_runs.id as the batch_id so we persist a durable identifier.
         # If Supabase isn't configured, fall back to a UUID.
@@ -1567,7 +1590,7 @@ async def import_batch(
             max_pages=max_pages,
             delay_min_s=delay_min,
             delay_max_s=delay_max,
-            per_city_timeout_s=max(1.0, float(req.per_city_timeout_s or 0)),
+            per_city_timeout_s=per_city_timeout_s,
             enrich=bool(enrich),
             enrich_limit=int(enrich_limit),
         )
