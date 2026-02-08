@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 import os
 import random
@@ -274,12 +275,26 @@ def build_scraperapi_url(url: str, scraperapi_key: str, render: bool = False) ->
     Build a ScraperAPI proxy URL.
     Keeping this helper central makes the tests and scrapers consistent.
     """
-    base = (
-        f"https://api.scraperapi.com/?api_key={scraperapi_key}"
-        f"&url={url}"
-        f"&country_code=gb"
-        f"&keep_headers=true"
-    )
+    # NOTE: Keep this helper central and backwards compatible.
+    # ScraperAPI supports a number of optional query parameters; we only include
+    # those we explicitly opt into.
+    base = f"https://api.scraperapi.com/?api_key={scraperapi_key}&url={url}"
+
+    # Defaults for UK portals.
+    country_code = (os.getenv("SCRAPERAPI_COUNTRY_CODE") or "gb").strip() or "gb"
+    keep_headers_env = (os.getenv("SCRAPERAPI_KEEP_HEADERS") or "true").strip().lower()
+    keep_headers = keep_headers_env in ("1", "true", "yes")
+    base += f"&country_code={country_code}"
+    base += f"&keep_headers={'true' if keep_headers else 'false'}"
+
+    # Optional paid proxy pools.
+    premium_env = (os.getenv("SCRAPERAPI_PREMIUM") or "").strip().lower()
+    ultra_env = (os.getenv("SCRAPERAPI_ULTRA_PREMIUM") or "").strip().lower()
+    if premium_env in ("1", "true", "yes"):
+        base += "&premium=true"
+    if ultra_env in ("1", "true", "yes"):
+        base += "&ultra_premium=true"
+
     if render:
         base += "&render=true&device_type=desktop"
 
@@ -295,6 +310,287 @@ def build_scraperapi_url(url: str, scraperapi_key: str, render: bool = False) ->
         base += f"&session_number={random.randint(1, 999999)}"
 
     return base
+
+
+# ============================================================
+# Response sanity checks (blocked / partial pages)
+# ============================================================
+
+
+_BLOCK_KEYWORDS = (
+    "captcha",
+    "unusual traffic",
+    "enable javascript",
+    "access denied",
+    "blocked",
+    "robot",
+    "bot detection",
+    "are you a human",
+)
+
+_CONSENT_KEYWORDS = (
+    "consent",
+    "cookie",
+    "didomi",
+    "onetrust",
+    "privacy",
+    "cmp",
+    "sp-message",
+)
+
+_BLOCKED_TITLE_KEYWORDS = (
+    "access denied",
+    "blocked",
+    "robot",
+    "captcha",
+)
+
+
+def detect_blocked_or_partial(
+    html: Optional[str],
+    status: Optional[int],
+    *,
+    min_html_bytes: int = 30_000,
+) -> str | None:
+    """Return a reason string if the response looks blocked/partial."""
+
+    if status in (401, 403, 429, 503):
+        return f"http_{status}"
+
+    if not html or not isinstance(html, str):
+        return "empty_body"
+
+    s = html.strip()
+    if not s:
+        return "empty_body"
+
+    lowered = s.lower()
+    if any(k in lowered for k in _BLOCK_KEYWORDS):
+        return "block_keyword"
+    if any(k in lowered for k in _CONSENT_KEYWORDS):
+        # Consent walls frequently hide content; treat as partial so we can
+        # retry with JS render/premium pools.
+        return "consent_wall"
+
+    # Payload size heuristic: most UK portal detail pages are much larger.
+    if len(s.encode("utf-8", errors="ignore")) < int(min_html_bytes or 0):
+        # Avoid false positives for minimal but valid HTML.
+        if not is_valid_html(s):
+            return "small_payload_invalid"
+        return "small_payload"
+
+    # Title-based heuristics.
+    try:
+        m = re.search(r"<title[^>]*>(?P<t>.*?)</title>", s, flags=re.I | re.S)
+        if m:
+            t = re.sub(r"\s+", " ", (m.group("t") or "")).strip().lower()
+            if t and any(k in t for k in _BLOCKED_TITLE_KEYWORDS):
+                return "blocked_title"
+    except Exception:
+        pass
+
+    return None
+
+
+def build_scraperapi_url_detail(
+    url: str,
+    *,
+    scraperapi_key: str,
+    render: bool = True,
+    premium: bool | None = None,
+    ultra_premium: bool | None = None,
+    country_code: str = "gb",
+    keep_headers: bool = True,
+) -> str:
+    """Detail-page ScraperAPI URL builder (explicit args).
+
+    We keep this separate from build_scraperapi_url() so callers can control
+    paid proxy pools without relying on global env.
+    """
+
+    base = f"https://api.scraperapi.com/?api_key={scraperapi_key}&url={url}"
+    base += f"&country_code={(country_code or 'gb').strip() or 'gb'}"
+    base += f"&keep_headers={'true' if keep_headers else 'false'}"
+    if render:
+        base += "&render=true&device_type=desktop"
+    if premium is True:
+        base += "&premium=true"
+    if ultra_premium is True:
+        base += "&ultra_premium=true"
+
+    session_fixed = (os.getenv("SCRAPERAPI_SESSION_NUMBER") or "").strip()
+    session_random = (os.getenv("SCRAPERAPI_SESSION_RANDOM") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    if session_fixed:
+        base += f"&session_number={session_fixed}"
+    elif session_random:
+        base += f"&session_number={random.randint(1, 999999)}"
+    return base
+
+
+async def fetch_detail_html_with_diag(
+    session: aiohttp.ClientSession,
+    url: str,
+    *,
+    headers: dict,
+    timeout: int = 45,
+    country_code: str = "gb",
+    prefer_render: bool = True,
+    prefer_premium: bool = True,
+    max_retries: int = 2,
+) -> Tuple[Optional[int], Optional[str], Dict[str, Any]]:
+    """Fetch a detail page with production-grade fallbacks.
+
+    Strategy:
+    - ScraperAPI render (optionally premium) is preferred for detail pages.
+    - Detect blocked/partial payloads via detect_blocked_or_partial().
+    - Retry a small number of times with jitter and escalating proxy pools.
+    """
+
+    scraperapi_key = _get_scraperapi_key()
+    attempts: list[Dict[str, Any]] = []
+
+    try:
+        timeout_s = int((os.getenv("SCRAPER_DETAIL_TIMEOUT_SECONDS") or str(timeout)).strip())
+    except Exception:
+        timeout_s = int(timeout)
+
+    async def _attempt(
+        via: str, url_to_fetch: str, req_timeout: int
+    ) -> Tuple[int | None, str | None]:
+        try:
+            req = session.get(url_to_fetch, headers=headers, timeout=req_timeout)
+            req = await _maybe_await(req)
+            async with req as resp:
+                text = await _read_response_text(resp)
+                status = int(getattr(resp, "status", 200))
+                reason = detect_blocked_or_partial(text, status)
+                attempts.append(
+                    {
+                        "via": via,
+                        "status": status,
+                        "bytes": len(text or ""),
+                        "block_reason": reason,
+                        "markers": _marker_summary(text or ""),
+                        "snippet": _snippet_for_diag(text or "", max_chars=200 if reason else 0),
+                    }
+                )
+                return status, text
+        except Exception as e:
+            attempts.append(
+                {
+                    "via": via,
+                    "status": None,
+                    "bytes": 0,
+                    "block_reason": f"exception_{type(e).__name__}",
+                    "markers": {},
+                    "snippet": str(e),
+                }
+            )
+            return None, None
+
+    def _finalize(
+        status: Optional[int], text: Optional[str], via: str
+    ) -> Tuple[Optional[int], Optional[str], Dict[str, Any]]:
+        reason = detect_blocked_or_partial(text, status)
+        diag = {
+            "via": via,
+            "status": status,
+            "bytes": len(text or ""),
+            "block_reason": reason,
+            "attempts": attempts,
+        }
+        return status, text, diag
+
+    # If no ScraperAPI key is available, fall back to smart_fetch_html_with_diag (direct/smart mode).
+    if not scraperapi_key:
+        st, txt, diag = await smart_fetch_html_with_diag(session, url, headers, timeout=timeout_s)
+        diag = {**(diag or {}), "block_reason": detect_blocked_or_partial(txt, st)}
+        return st, txt, diag
+
+    # Escalation plan for detail pages.
+    # Prefer render=true first; if blocked/partial, retry with premium/ultra.
+    plan: list[tuple[str, dict[str, Any], int]] = []
+    if prefer_render:
+        plan.append(
+            (
+                "scraperapi-render",
+                {"render": True, "premium": False, "ultra": False},
+                max(60, timeout_s),
+            )
+        )
+        if prefer_premium:
+            plan.append(
+                (
+                    "scraperapi-render-premium",
+                    {"render": True, "premium": True, "ultra": False},
+                    max(75, timeout_s),
+                )
+            )
+            plan.append(
+                (
+                    "scraperapi-render-ultra",
+                    {"render": True, "premium": True, "ultra": True},
+                    max(90, timeout_s),
+                )
+            )
+    else:
+        plan.append(
+            (
+                "scraperapi-no-render",
+                {"render": False, "premium": False, "ultra": False},
+                max(45, timeout_s),
+            )
+        )
+        plan.append(
+            (
+                "scraperapi-render",
+                {"render": True, "premium": False, "ultra": False},
+                max(60, timeout_s),
+            )
+        )
+
+    # Also try a no-render pass at the end; some portals are more parseable without JS.
+    plan.append(
+        (
+            "scraperapi-no-render-final",
+            {"render": False, "premium": True, "ultra": False},
+            max(60, timeout_s),
+        )
+    )
+
+    for i, (via, opts, req_timeout) in enumerate(plan):
+        proxy_url = build_scraperapi_url_detail(
+            url,
+            scraperapi_key=scraperapi_key,
+            render=bool(opts.get("render")),
+            premium=bool(opts.get("premium")),
+            ultra_premium=bool(opts.get("ultra")),
+            country_code=country_code,
+            keep_headers=True,
+        )
+        status, text = await _attempt(via, proxy_url, req_timeout=req_timeout)
+        reason = detect_blocked_or_partial(text, status)
+        if not reason and is_valid_html(text):
+            return _finalize(status, text, via)
+
+        # If not blocked but HTML is valid, allow returning it (some pages are small).
+        if reason in (None, "small_payload") and is_valid_html(text):
+            return _finalize(status, text, via)
+
+        # Respect max_retries with jitter for transient failures.
+        if i < len(plan) - 1:
+            try:
+                await asyncio.sleep(random.uniform(0.4, 1.2))
+            except Exception:
+                pass
+
+    # All attempts failed/blocked.
+    last = attempts[-1] if attempts else {}
+    return _finalize(last.get("status"), None, str(last.get("via") or "scraperapi"))
 
 
 def _looks_blocked(html: str, status: int) -> bool:

@@ -164,8 +164,6 @@ export default function AreaInsights({
     [],
   );
 
-  if (!hasAny) return null;
-
   const pc = normStr(postcode);
   const rentSrc = normStr(rentSource).toLowerCase();
   const vLabel = fmtVersion(version);
@@ -177,6 +175,16 @@ export default function AreaInsights({
 
   useEffect(() => {
     let cancelled = false;
+
+    if (!hasAny) {
+      setIntelLoading(false);
+      setCompsLoading(false);
+      setIntel(null);
+      setComps(null);
+      return () => {
+        cancelled = true;
+      };
+    }
 
     if (!pc) {
       setIntelLoading(false);
@@ -223,7 +231,9 @@ export default function AreaInsights({
     return () => {
       cancelled = true;
     };
-  }, [pc, showIntel, showComps, areaKey]);
+  }, [pc, showIntel, showComps, areaKey, hasAny]);
+
+  if (!hasAny) return null;
 
   const sales = Array.isArray(comps?.sales) ? comps!.sales! : [];
   const rents = Array.isArray(comps?.rents) ? comps!.rents! : [];

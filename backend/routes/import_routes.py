@@ -6,16 +6,31 @@ import inspect
 import logging
 import os
 import random
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
+from urllib.parse import urlparse
 
+import aiohttp
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel
 
-from backend.scraper.utils import TARGET_CITIES
+try:
+    from postgrest.exceptions import APIError  # type: ignore
+except Exception:  # pragma: no cover
+    APIError = Exception  # type: ignore
+
+from backend.scraper.utils import TARGET_CITIES, fetch_detail_html_with_diag
 from backend.utils.deal_scoring import compute_deal_score
-from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
+from backend.utils.image_utils import (
+    dedupe_image_urls,
+    extract_image_urls_from_ld_json,
+    extract_image_urls_from_next_data,
+    extract_next_data_json,
+    normalize_image_url,
+    pick_cover_image,
+)
 
 # Scrapers (existing)
 from backend.utils.ingest import scrape_all_sources
@@ -115,6 +130,8 @@ def _queue_batch_job(
     delay_min_s: float,
     delay_max_s: float,
     per_city_timeout_s: float,
+    enrich: bool = False,
+    enrich_limit: int = 5,
 ) -> None:
     async def _runner() -> None:
         _update_batch_job(batch_id, {"status": "running"})
@@ -208,6 +225,13 @@ def _queue_batch_job(
                         ]
                         ok, db_error_local = _upsert_properties_rows(rows=db_rows)
                         imported_local = len(db_rows) if ok else 0
+                        if ok and enrich and imported_local > 0:
+                            asyncio.create_task(
+                                _enrich_rows_best_effort(
+                                    rows=db_rows,
+                                    max_items=int(enrich_limit),
+                                )
+                            )
                     return items_local, imported_local, db_error_local
 
                 items, imported, db_error = await asyncio.wait_for(
@@ -807,6 +831,263 @@ def _require_admin(x_admin_token: str | None = None) -> None:
         raise HTTPException(status_code=401, detail="Admin token required")
 
 
+def _missing_col_from_api_error(err: Exception) -> str | None:
+    payload = err.args[0] if getattr(err, "args", None) else None
+    msg = payload.get("message") if isinstance(payload, dict) else str(err)
+    if not msg:
+        return None
+    m = re.search(r"column properties\.([a-zA-Z0-9_]+) does not exist", msg)
+    if not m:
+        return None
+    return m.group(1)
+
+
+def _select_with_existing_cols(build_query, cols: list[str]) -> tuple[Any, list[str]]:
+    """Execute a select query, dropping unknown columns if needed."""
+
+    active_cols = list(cols)
+    for _ in range(10):
+        try:
+            select_cols = ",".join(active_cols)
+            return build_query(select_cols).execute(), active_cols
+        except Exception as e:
+            missing = _missing_col_from_api_error(e)
+            if not missing:
+                raise
+            if missing in active_cols and missing != "id":
+                active_cols = [c for c in active_cols if c != missing]
+                continue
+            raise
+    raise HTTPException(
+        status_code=500,
+        detail="Enrichment failed: could not find a compatible column set",
+    )
+
+
+def _image_count(value: Any) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, list):
+        return len([u for u in value if isinstance(u, str) and u.strip()])
+    return 0
+
+
+def _needs_enrichment(row: dict[str, Any]) -> bool:
+    img_missing = not (isinstance(row.get("imageurl"), str) and row["imageurl"].strip())
+    img_count = _image_count(row.get("image_urls"))
+    pc = extract_postcode(row.get("postcode"))
+    pc_missing = not (isinstance(pc, str) and pc.strip())
+
+    def _pos_int(v: Any) -> int:
+        try:
+            i = int(v)
+        except Exception:
+            return 0
+        return i if i > 0 else 0
+
+    beds_missing = _pos_int(row.get("bedrooms")) <= 0
+    baths_missing = _pos_int(row.get("bathrooms")) <= 0
+    price_missing = _pos_int(row.get("price")) <= 0
+
+    # Heuristic: allow single-photo records to be enriched (detail pages
+    # frequently have full galleries).
+    weak_images = img_missing or img_count < 2
+    return bool(weak_images or pc_missing or beds_missing or baths_missing or price_missing)
+
+
+def _extract_int_from_text(text: str, pattern: str) -> int | None:
+    if not text:
+        return None
+    m = re.search(pattern, text, flags=re.IGNORECASE)
+    if not m:
+        return None
+    try:
+        v = int(m.group(1))
+        return v if v > 0 else None
+    except Exception:
+        return None
+
+
+def _extract_price_from_text(text: str) -> int | None:
+    if not text:
+        return None
+    # Basic GBP formats: £450,000 / £450000 / 450,000
+    m = re.search(r"£\s*([0-9][0-9,]{3,})", text)
+    if not m:
+        m = re.search(r"\b([0-9][0-9,]{3,})\b", text)
+    if not m:
+        return None
+    digits = re.sub(r"[^0-9]", "", m.group(1) or "")
+    try:
+        v = int(digits)
+        return v if v > 0 else None
+    except Exception:
+        return None
+
+
+def _extract_images_from_html_attrs(html: str, *, base_url: str) -> list[str]:
+    if not html:
+        return []
+
+    out: list[str] = []
+
+    # srcset="url1 480w, url2 1024w"
+    for m in re.finditer(r"\ssrcset=\"(?P<v>[^\"]+)\"", html, flags=re.IGNORECASE):
+        v = (m.group("v") or "").strip()
+        if not v:
+            continue
+        parts = [p.strip() for p in v.split(",") if p.strip()]
+        for p in parts:
+            url_part = (p.split(" ", 1)[0] or "").strip()
+            if url_part:
+                out.append(url_part)
+
+    # lazy attrs
+    for attr in ("data-src", "data-lazy", "data-original", "data-hi-res-src", "src"):
+        for m in re.finditer(
+            rf"\s{attr}=\"(?P<u>[^\"]+)\"",
+            html,
+            flags=re.IGNORECASE,
+        ):
+            u = (m.group("u") or "").strip()
+            if u:
+                out.append(u)
+
+    normalized = []
+    for u in out:
+        nu = normalize_image_url(u, base_url=base_url)
+        if nu:
+            normalized.append(nu)
+    return dedupe_image_urls(normalized, base_url=base_url)
+
+
+def _merge_data(existing: Any, patch: dict[str, Any]) -> dict[str, Any]:
+    base: dict[str, Any] = existing if isinstance(existing, dict) else {}
+    out = dict(base)
+    enrich = out.get("enrich") if isinstance(out.get("enrich"), dict) else {}
+    enrich2 = dict(enrich)
+    enrich2.update(patch)
+    out["enrich"] = enrich2
+    return out
+
+
+async def _enrich_rows_best_effort(*, rows: list[dict[str, Any]], max_items: int) -> None:
+    """Best-effort enrichment for a bounded list of freshly ingested rows.
+
+    Writes improvements back via upsert on (source,external_id) to avoid requiring
+    DB primary keys.
+    """
+
+    try:
+        if not sb:
+            return
+        if not rows:
+            return
+
+        max_items = max(1, min(int(max_items or 0), len(rows)))
+        headers = {
+            "User-Agent": os.getenv(
+                "SCRAPER_USER_AGENT",
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+            )
+        }
+
+        sem = asyncio.Semaphore(max(1, min(5, int(os.getenv("ENRICH_CONCURRENCY", "3")))))
+
+        async with aiohttp.ClientSession() as session:
+            patches: list[dict[str, Any]] = []
+
+            async def _one(r: dict[str, Any]) -> None:
+                if not isinstance(r, dict):
+                    return
+                if not _needs_enrichment(r):
+                    return
+
+                url = r.get("url")
+                if not isinstance(url, str) or not url.strip():
+                    return
+                url = url.strip()
+                try:
+                    if (urlparse(url).scheme or "").lower() not in ("http", "https"):
+                        return
+                except Exception:
+                    return
+
+                async with sem:
+                    try:
+                        _status, html, _diag = await fetch_detail_html_with_diag(
+                            session,
+                            url,
+                            headers=headers,
+                            timeout=75,
+                            country_code=os.getenv("SCRAPERAPI_COUNTRY_CODE", "gb"),
+                            prefer_render=True,
+                            prefer_premium=True,
+                            max_retries=2,
+                        )
+                    except Exception:
+                        return
+
+                if not html or not isinstance(html, str) or not html.strip():
+                    return
+
+                imgs_ld = extract_image_urls_from_ld_json(html, base_url=url)
+                nd = extract_next_data_json(html)
+                imgs_next = extract_image_urls_from_next_data(nd, base_url=url) if nd else []
+                imgs_attr = _extract_images_from_html_attrs(html, base_url=url)
+                imgs = dedupe_image_urls([*imgs_ld, *imgs_next, *imgs_attr], base_url=url)
+
+                existing_imgs = r.get("image_urls") if isinstance(r.get("image_urls"), list) else []
+                merged_imgs = dedupe_image_urls([*imgs, *existing_imgs], base_url=url)
+                cover = pick_cover_image(merged_imgs) if merged_imgs else None
+
+                pc = (
+                    extract_postcode(r.get("postcode"))
+                    or extract_postcode(r.get("address"))
+                    or extract_postcode(r.get("location"))
+                    or extract_postcode(r.get("title"))
+                    or extract_postcode(html)
+                )
+
+                beds = _extract_int_from_text(html, r"\b(\d+)\s*(?:bed|bedroom)s?\b")
+                baths = _extract_int_from_text(html, r"\b(\d+)\s*(?:bath|bathroom)s?\b")
+                price = _extract_price_from_text(html)
+
+                patch: dict[str, Any] = {
+                    "source": r.get("source"),
+                    "external_id": r.get("external_id"),
+                    "url": r.get("url"),
+                }
+
+                if merged_imgs and _image_count(existing_imgs) < max(2, len(merged_imgs)):
+                    patch["image_urls"] = merged_imgs
+                if cover and not (
+                    isinstance(r.get("imageurl"), str) and str(r.get("imageurl")).strip()
+                ):
+                    patch["imageurl"] = cover
+                if pc and not (
+                    isinstance(r.get("postcode"), str) and str(r.get("postcode")).strip()
+                ):
+                    patch["postcode"] = pc
+                if beds and int(r.get("bedrooms") or 0) <= 0:
+                    patch["bedrooms"] = beds
+                if baths and int(r.get("bathrooms") or 0) <= 0:
+                    patch["bathrooms"] = baths
+                if price and int(r.get("price") or 0) <= 0:
+                    patch["price"] = price
+
+                patch = strip_empty_for_upsert(patch)
+                if len(patch.keys()) > 3:
+                    patches.append(patch)
+
+            await asyncio.gather(*[_one(r) for r in rows[:max_items] if isinstance(r, dict)])
+
+        if patches:
+            _upsert_properties_rows(rows=patches, on_conflict="source,external_id")
+    except Exception:
+        return
+
+
 def _scrape_zero_warning(location: str, sources: Dict[str, int] | None = None) -> str | None:
     """Return a human-readable warning when scrapers return 0 results.
 
@@ -845,6 +1126,16 @@ def _scrape_zero_warning(location: str, sources: Dict[str, int] | None = None) -
 @router.post("/all")
 async def import_all(
     req: str | None = Query(None, description="Location e.g. London"),
+    enrich: bool = Query(
+        False,
+        description="If true, queue bounded detail-page enrichment after import",
+    ),
+    enrich_limit: int = Query(
+        8,
+        ge=1,
+        le=50,
+        description="Max number of newly imported rows to enrich",
+    ),
     x_admin_token: str | None = Header(None),
 ):
     _require_admin(x_admin_token)
@@ -903,11 +1194,22 @@ async def import_all(
         logging.info("Import completed with 0 properties for location=%s", loc)
 
     warning = _scrape_zero_warning(loc, sources=sources)
+    # Optional: queue stage-2 enrichment for the just-imported rows.
+    enrich_queued = False
+    if enrich and inserted > 0:
+        max_items = max(1, min(int(enrich_limit or 0), inserted))
+
+        asyncio.create_task(_enrich_rows_best_effort(rows=db_rows, max_items=max_items))
+        enrich_queued = True
+
     payload = {
         "location": loc,
         "total_imported": inserted,
         "sources": sources,
     }
+    if enrich:
+        payload["enrich_queued"] = enrich_queued
+        payload["enrich_limit"] = int(enrich_limit)
     if warning:
         payload["warning"] = warning
     return payload
@@ -1167,6 +1469,16 @@ async def import_onthemarket(
 @router.post("/batch")
 async def import_batch(
     req: BatchImportRequest,
+    enrich: bool = Query(
+        False,
+        description="If true, queue bounded detail-page enrichment per city after import",
+    ),
+    enrich_limit: int = Query(
+        5,
+        ge=1,
+        le=50,
+        description="Max number of newly imported rows to enrich per city",
+    ),
     x_admin_token: str | None = Header(None),
 ):
     """Batch import across multiple UK cities.
@@ -1256,12 +1568,16 @@ async def import_batch(
             delay_min_s=delay_min,
             delay_max_s=delay_max,
             per_city_timeout_s=max(1.0, float(req.per_city_timeout_s or 0)),
+            enrich=bool(enrich),
+            enrich_limit=int(enrich_limit),
         )
 
         return {
             "queued": True,
             "batch_id": batch_id,
             "status_url": f"/import/batch/status/{batch_id}",
+            "enrich": bool(enrich),
+            "enrich_limit": int(enrich_limit),
         }
 
     run_id = create_scrape_run(source="batch", location=f"{len(cities)} cities")
@@ -1294,6 +1610,10 @@ async def import_batch(
                 if ok:
                     inserted = len(db_rows)
                     total_inserted += inserted
+                    if enrich and inserted > 0:
+                        asyncio.create_task(
+                            _enrich_rows_best_effort(rows=db_rows, max_items=int(enrich_limit))
+                        )
                 else:
                     db_error = e
 
@@ -1321,12 +1641,248 @@ async def import_batch(
         "total_scraped": total_items,
         "total_imported": total_inserted,
         "per_city": per_city,
+        "enrich": bool(enrich),
+        "enrich_limit": int(enrich_limit),
     }
     if scrape_error:
         payload["scrape_error"] = scrape_error
     if db_error:
         payload["db_error"] = db_error
     return payload
+
+
+@router.post("/enrich-missing")
+async def enrich_missing_properties(
+    limit: int = Query(20, ge=1, le=200, description="Max rows to enrich"),
+    scan_limit: int = Query(
+        400,
+        ge=50,
+        le=5000,
+        description="How many recent rows to scan for missing fields",
+    ),
+    dry_run: bool = Query(False, description="If true, do not write updates"),
+    x_admin_token: str | None = Header(None),
+):
+    """Stage-2 enrichment runner.
+
+    Scans recent properties for missing/weak fields and refetches detail pages to
+    backfill: gallery images, postcode, bedrooms, bathrooms, and price.
+
+    This is best-effort and safe to rerun; it only writes non-empty improvements.
+    """
+
+    _require_admin(x_admin_token)
+    if not sb:
+        raise HTTPException(status_code=500, detail="Supabase client not configured")
+
+    cols = [
+        "id",
+        "source",
+        "url",
+        "title",
+        "location",
+        "address",
+        "description",
+        "imageurl",
+        "image_urls",
+        "postcode",
+        "bedrooms",
+        "bathrooms",
+        "price",
+        "data",
+        "created_at",
+    ]
+
+    def _query(select_cols: str):
+        q = sb.table("properties").select(select_cols).limit(int(scan_limit))
+        # Prefer recency ordering when available.
+        if "created_at" in cols:
+            try:
+                q = q.order("created_at", desc=True)
+            except Exception:
+                pass
+        return q
+
+    try:
+        res, active_cols = _select_with_existing_cols(_query, cols)
+    except APIError as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=str(e))
+
+    rows = getattr(res, "data", None) or []
+    if not isinstance(rows, list):
+        rows = []
+
+    candidates: list[dict[str, Any]] = [r for r in rows if isinstance(r, dict) and r.get("id")]
+    candidates = [r for r in candidates if _needs_enrichment(r)]
+
+    attempted = 0
+    enriched = 0
+    skipped = 0
+    failures: list[dict[str, Any]] = []
+    updated_ids: list[str] = []
+
+    headers = {
+        "User-Agent": os.getenv(
+            "SCRAPER_USER_AGENT",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        )
+    }
+
+    async with aiohttp.ClientSession() as session:
+        for row in candidates[: int(limit)]:
+            attempted += 1
+            pid = row.get("id")
+            url = row.get("url")
+            if not isinstance(url, str) or not url.strip():
+                skipped += 1
+                continue
+            url = url.strip()
+
+            # Basic URL sanity
+            try:
+                if (urlparse(url).scheme or "").lower() not in ("http", "https"):
+                    skipped += 1
+                    continue
+            except Exception:
+                skipped += 1
+                continue
+
+            try:
+                status, html, diag = await fetch_detail_html_with_diag(
+                    session,
+                    url,
+                    headers=headers,
+                    timeout=75,
+                    country_code=os.getenv("SCRAPERAPI_COUNTRY_CODE", "gb"),
+                    prefer_render=True,
+                    prefer_premium=True,
+                    max_retries=2,
+                )
+            except Exception as e:
+                failures.append({"id": pid, "url": url, "error": str(e)})
+                continue
+
+            if not html or not isinstance(html, str) or not html.strip():
+                failures.append(
+                    {
+                        "id": pid,
+                        "url": url,
+                        "status": status,
+                        "error": "empty_html",
+                        "via": (diag or {}).get("via") if isinstance(diag, dict) else None,
+                    }
+                )
+                continue
+
+            # Extract images
+            imgs_ld = extract_image_urls_from_ld_json(html, base_url=url)
+            nd = extract_next_data_json(html)
+            imgs_next = extract_image_urls_from_next_data(nd, base_url=url) if nd else []
+            imgs_attr = _extract_images_from_html_attrs(html, base_url=url)
+            imgs = dedupe_image_urls([*imgs_ld, *imgs_next, *imgs_attr], base_url=url)
+
+            # Merge with existing gallery (don’t lose previous good data)
+            existing_imgs = row.get("image_urls") if isinstance(row.get("image_urls"), list) else []
+            merged_imgs = dedupe_image_urls([*imgs, *existing_imgs], base_url=url)
+            cover = pick_cover_image(merged_imgs) if merged_imgs else None
+
+            # Extract postcode
+            pc = (
+                extract_postcode(row.get("postcode"))
+                or extract_postcode(row.get("address"))
+                or extract_postcode(row.get("location"))
+                or extract_postcode(row.get("title"))
+                or extract_postcode(html)
+            )
+
+            # Extract beds/baths/price (very conservative)
+            beds = _extract_int_from_text(html, r"\b(\d+)\s*(?:bed|bedroom)s?\b")
+            baths = _extract_int_from_text(html, r"\b(\d+)\s*(?:bath|bathroom)s?\b")
+            price = _extract_price_from_text(html)
+
+            payload: dict[str, Any] = {"id": pid}
+            # Only fill missing/weak fields; avoid overwriting strong existing values.
+            if merged_imgs and _image_count(row.get("image_urls")) < max(2, len(merged_imgs)):
+                payload["image_urls"] = merged_imgs
+            if cover and not (isinstance(row.get("imageurl"), str) and row["imageurl"].strip()):
+                payload["imageurl"] = cover
+            if pc and not (isinstance(row.get("postcode"), str) and row["postcode"].strip()):
+                payload["postcode"] = pc
+            if beds and int(row.get("bedrooms") or 0) <= 0:
+                payload["bedrooms"] = beds
+            if baths and int(row.get("bathrooms") or 0) <= 0:
+                payload["bathrooms"] = baths
+            if price and int(row.get("price") or 0) <= 0:
+                payload["price"] = price
+
+            # Record enrichment diagnostics (best-effort; may be dropped if `data` column missing)
+            if "data" in active_cols and isinstance(diag, dict):
+                payload["data"] = _merge_data(
+                    row.get("data"),
+                    {
+                        "attempted_at": _now_iso(),
+                        "detail_url": url,
+                        "status": status,
+                        "via": diag.get("via"),
+                        "block_reason": diag.get("block_reason"),
+                        "bytes": diag.get("bytes"),
+                    },
+                )
+
+            # Compute and store score if we have at least one meaningful change.
+            stripped = strip_empty_for_upsert(payload)
+            # Keep `id` for update even though strip_empty may drop it.
+            stripped["id"] = pid
+
+            if len(stripped.keys()) <= 1:
+                skipped += 1
+                continue
+
+            # Best-effort: compute a refreshed score based on merged row.
+            merged_for_score = dict(row)
+            merged_for_score.update(stripped)
+            try:
+                score, breakdown = compute_deal_score(merged_for_score)
+                stripped["score"] = score
+                stripped["score_breakdown"] = breakdown
+                stripped["score_updated_at"] = _now_iso()
+            except Exception:
+                pass
+
+            if dry_run:
+                enriched += 1
+                updated_ids.append(str(pid))
+                continue
+
+            # Apply update; retry if optional columns are missing in older schemas.
+            try:
+                sb.table("properties").update(stripped).eq("id", str(pid)).execute()
+                enriched += 1
+                updated_ids.append(str(pid))
+            except Exception as e:
+                msg = str(e)
+                retry_payload = dict(stripped)
+                # Drop optional columns when schema cache lags.
+                for optional_col in ("data", "score", "score_breakdown", "score_updated_at"):
+                    if optional_col in msg and ("PGRST204" in msg or "Could not find" in msg):
+                        retry_payload.pop(optional_col, None)
+                try:
+                    sb.table("properties").update(retry_payload).eq("id", str(pid)).execute()
+                    enriched += 1
+                    updated_ids.append(str(pid))
+                except Exception as e2:
+                    failures.append({"id": pid, "url": url, "error": str(e2)})
+
+    return {
+        "scan_limit": int(scan_limit),
+        "candidate_count": len(candidates),
+        "attempted": attempted,
+        "enriched": enriched,
+        "skipped": skipped,
+        "dry_run": bool(dry_run),
+        "updated_ids": updated_ids,
+        "failures": failures[:50],
+    }
 
 
 @router.post("/spareroom")

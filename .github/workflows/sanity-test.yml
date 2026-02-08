@@ -95,7 +95,7 @@ jobs:
 
       - name: Ensure npm compatibility
         run: |
-          npm i -g npm@9
+          npm i -g npm@10.8.2
           echo "Using Node $(node -v) and npm $(npm -v)"
 
       - name: Install frontend deps
