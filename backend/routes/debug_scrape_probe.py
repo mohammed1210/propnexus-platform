@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
 
-from backend.scraper.utils import detect_blocked_or_partial
+from backend.scraper.utils import detect_blocked_or_partial, detect_blocked_or_partial_explain
 from backend.utils.render import PLAYWRIGHT_ENABLE
 
 router = APIRouter(tags=["debug"])
@@ -101,6 +101,24 @@ def _final_block_status(*, blocked_by_heuristic: bool, cards_found: int) -> tupl
     if blocked_by_heuristic:
         return True, "blocked"
     return False, "ok"
+
+
+def _extract_otm_property_ids_from_datalayer(html: str) -> set[str]:
+    if not html or not isinstance(html, str):
+        return set()
+    ids: set[str] = set()
+    for pat in (
+        r"\"property-ids\"\s*:\s*\[(?P<body>[^\]]{0,200000})\]",
+        r"\"property_ids\"\s*:\s*\[(?P<body>[^\]]{0,200000})\]",
+        r"\"propertyIds\"\s*:\s*\[(?P<body>[^\]]{0,200000})\]",
+    ):
+        for m in re.finditer(pat, html, flags=re.IGNORECASE | re.DOTALL):
+            body = (m.group("body") or "").strip()
+            if not body:
+                continue
+            for n in re.findall(r"\b\d{5,}\b", body):
+                ids.add(n)
+    return ids
 
 
 async def _fetch_text(
@@ -750,6 +768,7 @@ async def _probe_onthemarket(
     used_playwright = False
 
     playwright_attempted = False
+    playwright_error: str | None = None
     playwright_http_status = 0
     playwright_html_len = 0
     playwright_title: str | None = None
@@ -869,7 +888,6 @@ async def _probe_onthemarket(
             PW_ENABLED = False
             render_page_with_diag = None  # type: ignore
 
-        playwright_error: str | None = None
         if PW_ENABLED and render_page_with_diag is not None:
             playwright_attempted = True
             escalation_used = "playwright"
@@ -967,6 +985,12 @@ async def _probe_onthemarket(
         detail_urls = []
     detail_links_found = len(detail_urls)
 
+    property_ids_found = 0
+    try:
+        property_ids_found = len(_extract_otm_property_ids_from_datalayer(text or ""))
+    except Exception:
+        property_ids_found = 0
+
     items_found = max(len(cards), detail_links_found)
     blocked_final, classification = _final_block_status(
         blocked_by_heuristic=blocked_by_heuristic, cards_found=items_found
@@ -976,14 +1000,30 @@ async def _probe_onthemarket(
     if classification == "ok" and detail_links_found > 0 and len(cards) == 0:
         classification = "parsed_links_only"
 
-    block_reason = detect_blocked_or_partial(text, status, min_html_bytes=8_000)
+    raw_reason, raw_meta = detect_blocked_or_partial_explain(text, status, min_html_bytes=8_000)
+    blocked_meta: Dict[str, Any] = {}
+    try:
+        if isinstance(raw_meta, dict):
+            if raw_meta.get("block_keyword"):
+                blocked_meta["keyword"] = raw_meta.get("block_keyword")
+            if raw_meta.get("title_keyword"):
+                blocked_meta["title_keyword"] = raw_meta.get("title_keyword")
+    except Exception:
+        blocked_meta = {}
 
-    # Keep blocked + blocked_reason consistent.
-    # If block_keyword triggers on the final chosen HTML, treat as blocked unless Playwright switched us
-    # to unblocked HTML (in which case block_reason would be None).
+    block_reason = raw_reason
+
+    # OTM-specific refinement: only treat block_keyword as truly blocked when
+    # there are no real listing signals (no detail links and no dataLayer ids).
     if block_reason == "block_keyword":
-        blocked_final = True
-        classification = "blocked"
+        if detail_links_found == 0 and property_ids_found == 0:
+            kw = blocked_meta.get("keyword")
+            blocked_final = True
+            classification = "blocked"
+            block_reason = f"block_keyword:{kw}" if kw else "block_keyword"
+        else:
+            # Don't force blocked when we can see real data signals.
+            block_reason = None
 
     if not blocked_final:
         block_reason = None
@@ -1013,6 +1053,7 @@ async def _probe_onthemarket(
         "html_len": len(text or ""),
         "content_length_bytes": _content_length_bytes(text or ""),
         "blocked_reason": block_reason,
+        "blocked_meta": blocked_meta,
         "blocked_detected": bool(blocked_final),
         "consent_wall_detected": block_reason == "consent_wall",
         "timeout_hit": False,
@@ -1020,6 +1061,7 @@ async def _probe_onthemarket(
         "html_snippet": _sanitize_html_snippet(text or "", max_chars=2500),
         "cards_found": len(cards),
         "detail_links_found": detail_links_found,
+        "property_ids_found": property_ids_found,
         "detail_urls_sample": detail_urls[:3],
         "blocked_by_heuristic": blocked_by_heuristic,
         "blocked": blocked_final,

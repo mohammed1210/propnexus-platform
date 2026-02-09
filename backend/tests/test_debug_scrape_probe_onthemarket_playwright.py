@@ -45,3 +45,40 @@ async def test_probe_onthemarket_playwright_escalation_fields_present_when_block
     assert out.get("retry_mode_used") == "playwright_fallback"
     assert out.get("blocked") is False
     assert out.get("classification") in ("ok", "parsed_links_only", "fetched_no_cards")
+
+
+@pytest.mark.asyncio
+async def test_probe_onthemarket_does_not_mark_blocked_when_ids_or_links_exist_with_block_keyword():
+    """Regression: OTM listing pages may contain the word 'blocked' but still include real data signals."""
+
+    from backend.routes import debug_scrape_probe as probe
+
+    # Contains a generic block keyword, but also contains detail links and dataLayer ids.
+    html = (
+        "<html><head><title>blocked</title></head><body>"
+        "blocked "
+        "<script>window.dataLayer=window.dataLayer||[];"
+        'window.dataLayer.push({"property-ids":[123456,234567,345678]});'
+        "</script>"
+        "<a href='/details/123456/'>Details</a>"
+        "<a href='/details/234567/'>Details</a>" + ("x" * 9000) + "</body></html>"
+    )
+
+    async def fake_fetch_text(*args, **kwargs):
+        return 200, html
+
+    with patch.object(probe, "_fetch_text", new=AsyncMock(side_effect=fake_fetch_text)):
+        out = await probe._probe_onthemarket(  # type: ignore[attr-defined]
+            session=None,
+            location="London",
+            page=0,
+            timeout_seconds=10,
+            include_escalation=False,
+        )
+
+    assert out.get("property_ids_found") == 3
+    assert out.get("detail_links_found", 0) >= 2
+    assert isinstance(out.get("blocked_meta"), dict)
+    assert out.get("blocked_meta", {}).get("keyword") == "blocked"
+    assert out.get("blocked") is False
+    assert out.get("classification") in ("ok", "parsed_links_only", "fetched_no_cards")

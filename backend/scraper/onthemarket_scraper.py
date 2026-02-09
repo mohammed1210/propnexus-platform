@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 from bs4 import BeautifulSoup
 
-from backend.scraper.utils import detect_blocked_or_partial, normalize_image_urls
+from backend.scraper.utils import detect_blocked_or_partial_explain, normalize_image_urls
 from backend.utils.image_utils import (
     dedupe_image_urls,
     extract_image_urls_from_next_data,
@@ -30,7 +30,6 @@ from backend.utils.image_utils import (
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.render import (
     PLAYWRIGHT_ENABLE,
-    capture_debug_html,
     capture_debug_json,
     render_page,
     render_page_capture,
@@ -40,7 +39,6 @@ from backend.utils.runlog import RunLog
 from backend.utils.scraper_logger import (
     ScraperStats,
     log_fetch_diagnostics,
-    log_image_extraction,
     log_page_fetch_error,
     log_scrape_start,
     log_scraperapi_fallback,
@@ -73,13 +71,76 @@ def _has_listing_signals(html: str) -> bool:
     )
 
 
-def _blocked_by_heuristics(html: str, status: int | None) -> bool:
+_OTM_DATALAYER_IDS_PATTERNS = (
+    r"\"property-ids\"\s*:\s*\[(?P<body>[^\]]{0,200000})\]",
+    r"\"property_ids\"\s*:\s*\[(?P<body>[^\]]{0,200000})\]",
+    r"\"propertyIds\"\s*:\s*\[(?P<body>[^\]]{0,200000})\]",
+)
+
+
+def _extract_otm_property_ids_from_datalayer(html: str) -> set[str]:
+    """Best-effort extraction of OTM property IDs from window.dataLayer pushes.
+
+    We intentionally keep this lightweight (regex-only) to avoid JS parsing.
+    """
+
+    if not html or not isinstance(html, str):
+        return set()
+
+    ids: set[str] = set()
+    s = html
+    for pat in _OTM_DATALAYER_IDS_PATTERNS:
+        for m in re.finditer(pat, s, flags=re.IGNORECASE | re.DOTALL):
+            body = (m.group("body") or "").strip()
+            if not body:
+                continue
+            for n in re.findall(r"\b\d{5,}\b", body):
+                ids.add(n)
+    return ids
+
+
+def _count_otm_detail_links_in_html(html: str) -> int:
+    if not html or not isinstance(html, str):
+        return 0
+    # Prefer actual href patterns (not just string contains) to reduce false positives.
+    return len(
+        re.findall(
+            r"href=(?:\"[^\"]*?/details/\d+/?\"|'[^']*?/details/\d+/?')",
+            html,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def _blocked_by_heuristics_explain(html: str, status: int | None) -> tuple[bool, str | None]:
     s = html or ""
     st = int(status or 0)
     if _looks_blocked(s, st) or _has_cloudflare_marker(s) or not s.strip():
-        return True
-    reason = detect_blocked_or_partial(s, st if st > 0 else None, min_html_bytes=8_000)
-    return reason is not None
+        return True, "blocked_marker"
+
+    reason, meta = detect_blocked_or_partial_explain(
+        s, st if st > 0 else None, min_html_bytes=8_000
+    )
+    if reason is None:
+        return False, None
+
+    # OTM listing pages sometimes contain generic strings like "blocked" while still
+    # embedding real listing signals (detail links and/or dataLayer property ids).
+    if reason == "block_keyword":
+        detail_links = _count_otm_detail_links_in_html(s)
+        property_ids = len(_extract_otm_property_ids_from_datalayer(s))
+        if detail_links > 0 or property_ids > 0 or _has_listing_signals(s):
+            kw = meta.get("block_keyword")
+            return False, f"block_keyword_ignored:{kw}" if kw else "block_keyword_ignored"
+        kw = meta.get("block_keyword")
+        return True, f"block_keyword:{kw}" if kw else "block_keyword"
+
+    return True, reason
+
+
+def _blocked_by_heuristics(html: str, status: int | None) -> bool:
+    blocked, _ = _blocked_by_heuristics_explain(html, status)
+    return bool(blocked)
 
 
 # Rotate user agents for OTM only. Keep small list to reduce maintenance.
@@ -366,12 +427,168 @@ def _parse_otm_detail_page(
         except Exception:
             pass
 
-    location = fallback_location
+    # Parse structured data when present (JSON-LD / Next.js) to fill address/geo/beds.
+    address: str | None = None
+    postcode: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    bedrooms: int | None = None
+    bathrooms: int | None = None
+    property_type: str | None = None
+
+    def _deep_find_first(obj: Any, keys: tuple[str, ...], depth: int = 0) -> Any:
+        if depth > 12:
+            return None
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if str(k) in keys:
+                    return v
+            for v in obj.values():
+                found = _deep_find_first(v, keys, depth + 1)
+                if found is not None:
+                    return found
+        elif isinstance(obj, list):
+            for v in obj:
+                found = _deep_find_first(v, keys, depth + 1)
+                if found is not None:
+                    return found
+        return None
+
     try:
-        og_url = soup.find("meta", attrs={"property": "og:url"})
-        _ = og_url  # unused; keep for future
+        # JSON-LD can be a list or dict.
+        for script in soup.find_all(
+            "script", attrs={"type": re.compile("application/ld\\+json", re.I)}
+        ):
+            raw = script.get_text(" ", strip=True)
+            if not raw:
+                continue
+            try:
+                import json
+
+                data = json.loads(raw)
+            except Exception:
+                continue
+            candidates = data if isinstance(data, list) else [data]
+            for c in candidates:
+                if not isinstance(c, dict):
+                    continue
+                addr = c.get("address")
+                if isinstance(addr, str) and addr.strip():
+                    address = address or addr.strip()
+                elif isinstance(addr, dict):
+                    parts = [
+                        addr.get("streetAddress"),
+                        addr.get("addressLocality"),
+                        addr.get("addressRegion"),
+                        addr.get("postalCode"),
+                    ]
+                    parts_s = [
+                        str(p).strip()
+                        for p in parts
+                        if isinstance(p, (str, int)) and str(p).strip()
+                    ]
+                    if parts_s:
+                        address = address or ", ".join(parts_s)
+                    pc = addr.get("postalCode")
+                    if pc and isinstance(pc, str):
+                        postcode = postcode or pc.strip()
+
+                geo = c.get("geo")
+                if isinstance(geo, dict):
+                    lat = geo.get("latitude")
+                    lng = geo.get("longitude")
+                    try:
+                        if latitude is None and lat is not None:
+                            latitude = float(lat)
+                        if longitude is None and lng is not None:
+                            longitude = float(lng)
+                    except Exception:
+                        pass
+
+                # Beds/baths hints
+                for k in ("numberOfBedrooms", "bedrooms", "numBedrooms", "numberOfRooms"):
+                    if bedrooms is None and k in c:
+                        try:
+                            bedrooms = int(float(c.get(k)))
+                        except Exception:
+                            pass
+                for k in ("numberOfBathroomsTotal", "bathrooms", "numBathrooms"):
+                    if bathrooms is None and k in c:
+                        try:
+                            bathrooms = int(float(c.get(k)))
+                        except Exception:
+                            pass
+
+                pt = c.get("@type")
+                if property_type is None and isinstance(pt, str) and pt.strip():
+                    property_type = pt.strip()
     except Exception:
         pass
+
+    try:
+        next_data = extract_next_data_json(html)
+        if isinstance(next_data, dict):
+            if bedrooms is None:
+                v = _deep_find_first(next_data, ("bedrooms", "numBedrooms", "numberOfBedrooms"))
+                try:
+                    bedrooms = int(float(v)) if v is not None else bedrooms
+                except Exception:
+                    pass
+            if bathrooms is None:
+                v = _deep_find_first(next_data, ("bathrooms", "numBathrooms", "numberOfBathrooms"))
+                try:
+                    bathrooms = int(float(v)) if v is not None else bathrooms
+                except Exception:
+                    pass
+            if property_type is None:
+                v = _deep_find_first(next_data, ("propertyType", "property_type", "type"))
+                if isinstance(v, str) and v.strip():
+                    property_type = v.strip()
+            if postcode is None:
+                v = _deep_find_first(next_data, ("postalCode", "postcode", "postCode"))
+                if isinstance(v, str) and v.strip():
+                    postcode = v.strip()
+            if latitude is None:
+                v = _deep_find_first(next_data, ("latitude", "lat"))
+                try:
+                    latitude = float(v) if v is not None else latitude
+                except Exception:
+                    pass
+            if longitude is None:
+                v = _deep_find_first(next_data, ("longitude", "lng", "lon"))
+                try:
+                    longitude = float(v) if v is not None else longitude
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # Fallback property type from title text.
+    if property_type is None and title:
+        tl = title.lower()
+        for cand in (
+            "detached",
+            "semi-detached",
+            "terraced",
+            "bungalow",
+            "flat",
+            "apartment",
+            "maisonette",
+            "studio",
+        ):
+            if cand in tl:
+                property_type = cand
+                break
+
+    # Prefer a human-readable address/location when available.
+    location = address or fallback_location
+    if not postcode and location and isinstance(location, str):
+        try:
+            from backend.utils.listing_keys import extract_postcode
+
+            postcode = extract_postcode(location) or extract_postcode(title or "")
+        except Exception:
+            postcode = None
 
     image_urls: List[str] = []
     try:
@@ -404,15 +621,17 @@ def _parse_otm_detail_page(
         "external_id": f"ot-{external_id}",
         "title": title or f"OnTheMarket listing {external_id}",
         "location": location,
+        "address": address,
+        "postcode": postcode,
         "price": price,
-        "bedrooms": None,
-        "bathrooms": None,
-        "property_type": None,
+        "bedrooms": bedrooms,
+        "bathrooms": bathrooms,
+        "property_type": property_type,
         "image_url": image_url,
         "image_urls": image_urls,
         "imageurl": image_url,
-        "latitude": None,
-        "longitude": None,
+        "latitude": latitude,
+        "longitude": longitude,
         "source": "onthemarket",
         "raw_url": url,
         "listing_url": url,
@@ -728,8 +947,24 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
                     via=via or ("scraperapi" if mode == "scraperapi" else "direct"),
                 )
 
-                blocked = _blocked_by_heuristics(text, int(status))
+                blocked, blocked_reason = _blocked_by_heuristics_explain(text, int(status))
                 saw_blocked = saw_blocked or bool(blocked)
+
+                if blocked_reason and blocked_reason.startswith("block_keyword"):
+                    kw = None
+                    try:
+                        if ":" in blocked_reason:
+                            kw = blocked_reason.split(":", 1)[1].strip() or None
+                    except Exception:
+                        kw = None
+                    if kw:
+                        print(
+                            f"ℹ️ [onthemarket] blocked_meta.keyword={kw} reason={blocked_reason.split(':',1)[0]}"
+                        )
+                    else:
+                        print(
+                            f"ℹ️ [onthemarket] blocked_meta.keyword=<none> reason={blocked_reason}"
+                        )
 
                 hit = _captcha_hit_snippet(text)
                 if hit:
@@ -764,7 +999,22 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
                         via=via,
                     )
 
-                    blocked = _blocked_by_heuristics(text, int(status))
+                    blocked, blocked_reason = _blocked_by_heuristics_explain(text, int(status))
+                    if blocked_reason and blocked_reason.startswith("block_keyword"):
+                        kw = None
+                        try:
+                            if ":" in blocked_reason:
+                                kw = blocked_reason.split(":", 1)[1].strip() or None
+                        except Exception:
+                            kw = None
+                        if kw:
+                            print(
+                                f"ℹ️ [onthemarket] blocked_meta.keyword={kw} reason={blocked_reason.split(':',1)[0]}"
+                            )
+                        else:
+                            print(
+                                f"ℹ️ [onthemarket] blocked_meta.keyword=<none> reason={blocked_reason}"
+                            )
                     if not blocked:
                         return text
 
@@ -1048,299 +1298,161 @@ async def scrape_onthemarket_properties(
     ) as runlog:
         try:
             async with aiohttp.ClientSession() as session:
+                # Collect detail URLs from listing pages; detail pages are the canonical source.
+                collected_detail_urls: List[str] = []
+                collected_seen: set[str] = set()
+
+                default_max_detail_urls = max(40, int(limit or 0) * 4)
+                effective_max_detail_urls = int(
+                    os.getenv("OTM_MAX_DETAIL_URLS", str(default_max_detail_urls))
+                )
+                effective_max_detail_urls = max(
+                    int(limit or 1), min(300, effective_max_detail_urls)
+                )
+
+                detail_concurrency = int(os.getenv("OTM_DETAIL_CONCURRENCY", "4"))
+                detail_concurrency = max(1, min(8, detail_concurrency))
+                sem = asyncio.Semaphore(detail_concurrency)
+
+                async def _fetch_parse_one(detail_url: str) -> Optional[Dict[str, Any]]:
+                    async with sem:
+                        try:
+                            detail_html = await _fetch_html(session, detail_url)
+                        except OnTheMarketBlockedError:
+                            detail_html = None
+                        except Exception:
+                            detail_html = None
+
+                        if not detail_html or not (detail_html or "").strip():
+                            if PLAYWRIGHT_ENABLE:
+                                try:
+                                    detail_html = (
+                                        await render_page_capture(
+                                            detail_url,
+                                            selectors=[
+                                                "meta[property='og:title']",
+                                                "script[type='application/ld+json']",
+                                            ],
+                                            click_selectors=[
+                                                "#ccc-recommended-settings",
+                                                "#ccc-accept-settings",
+                                            ],
+                                        )
+                                    )[0]
+                                except Exception:
+                                    detail_html = None
+
+                        if not detail_html or not (detail_html or "").strip():
+                            return None
+
+                        # Reject obvious challenge pages.
+                        if _looks_blocked(detail_html, 200) or _has_cloudflare_marker(detail_html):
+                            return None
+
+                        parsed = _parse_otm_detail_page(
+                            detail_html, detail_url, fallback_location=location
+                        )
+                        if not parsed:
+                            return None
+
+                        should_insert, reason = should_insert_property(parsed)
+                        if not should_insert:
+                            stats.log_validation_failure(reason or "Unknown")
+                            return None
+
+                        stats.log_parse_success()
+                        return clean_property_data(parsed)
+
                 for page in range(effective_max_pages):
                     url = _build_search_url(location, page)
                     try:
                         html = await _fetch_html(session, url)
                     except OnTheMarketBlockedError:
-                        # If the very first listing page is blocked, treat this source as blocked.
-                        # For later pages, stop pagination.
                         if page == 0:
                             raise
                         log_page_fetch_error("onthemarket", page, "blocked")
                         break
+
                     if not html:
                         log_page_fetch_error("onthemarket", page, "blocked or empty")
                         continue
 
                     soup = BeautifulSoup(html, "html.parser")
-                    cards = _collect_cards(soup)
+                    page_detail_urls = _collect_detail_listing_urls(soup)
 
-                    if not cards:
-                        # Fallback: if card selectors fail, attempt to follow listing detail links.
-                        detail_urls = _collect_detail_listing_urls(soup)
-                        if detail_urls:
-                            max_details = min(
-                                len(detail_urls), max(3, min(12, limit - len(results)))
-                            )
-                            for detail_url in detail_urls[:max_details]:
-                                if len(results) >= limit:
-                                    break
-                                try:
-                                    detail_html = await _fetch_html(session, detail_url)
-                                except OnTheMarketBlockedError:
-                                    detail_html = None
-                                except Exception:
-                                    detail_html = None
-                                if detail_html and (
-                                    _looks_blocked(detail_html, 200)
-                                    or _has_cloudflare_marker(detail_html)
-                                    or not (detail_html or "").strip()
-                                ):
-                                    detail_html = None
-                                if not detail_html and PLAYWRIGHT_ENABLE:
-                                    try:
-                                        detail_html = (
-                                            await render_page_capture(
-                                                detail_url,
-                                                selectors=[
-                                                    "meta[property='og:title']",
-                                                    "script[type='application/ld+json']",
-                                                ],
-                                                click_selectors=[
-                                                    "#ccc-recommended-settings",
-                                                    "#ccc-accept-settings",
-                                                ],
-                                            )
-                                        )[0]
-                                    except Exception:
-                                        detail_html = None
-                                if not detail_html:
-                                    continue
-                                parsed = _parse_otm_detail_page(
-                                    detail_html, detail_url, fallback_location=location
-                                )
-                                if not parsed:
-                                    continue
-                                should_insert, reason = should_insert_property(parsed)
-                                if should_insert:
-                                    results.append(clean_property_data(parsed))
-                                    stats.log_parse_success()
-                                else:
-                                    stats.log_validation_failure(reason or "Unknown")
-
-                            if results:
-                                stats.log_summary()
-                                print(
-                                    f"✅ OnTheMarket detail-page fallback returned {len(results)} properties"
-                                )
-                                runlog.set_count(len(results))
-                                return results
-
-                        if PLAYWRIGHT_ENABLE:
-                            # Attempt network capture to extract JSON listing payloads
-                            rendered, payloads = await render_page_capture(
+                    # If we couldn't find detail links, try Playwright-rendered HTML (best-effort).
+                    if not page_detail_urls and PLAYWRIGHT_ENABLE:
+                        try:
+                            rendered, _payloads = await render_page_capture(
                                 url,
-                                selectors=[
-                                    ".property-card",
-                                    "[data-testid='property-card']",
-                                    ".listing-result",
-                                ],
+                                selectors=["a[href*='/details/']"],
                                 click_selectors=[
                                     "#ccc-recommended-settings",
                                     "#ccc-accept-settings",
                                 ],
                                 response_url_substrings=["/api/", "/search"],
-                                max_json=10,
+                                max_json=0,
                             )
                             if rendered:
-                                soup = BeautifulSoup(rendered, "html.parser")
-                                cards = _collect_cards(soup)
-                            if not cards and payloads:
-                                # Heuristic parse of JSON payloads
-                                extracted = _extract_from_otm_json(
-                                    payloads, limit - len(results), location
-                                )
-                                for item in extracted:
-                                    if item["external_id"] in seen_ids:
-                                        stats.log_duplicate_id(item["external_id"])
-                                        continue
-                                    seen_ids.add(item["external_id"])
-                                    should_insert, reason = should_insert_property(item)
-                                    if should_insert:
-                                        results.append(clean_property_data(item))
-                                        stats.log_parse_success()
-                                    else:
-                                        stats.log_validation_failure(reason or "Unknown")
-                                if extracted:
-                                    print(
-                                        f"✅ OnTheMarket JSON extracted {len(extracted)} properties"
-                                    )
-                            if not cards and not payloads:
-                                if rendered:
-                                    capture_debug_html(f"onthemarket_empty_{page}", rendered)
-                        if not cards and len(results) == 0:
-                            print(
-                                f"ℹ️ OnTheMarket: No cards/json found on page {page}; stopping pagination."
-                            )
+                                soup2 = BeautifulSoup(rendered, "html.parser")
+                                page_detail_urls = _collect_detail_listing_urls(soup2)
+                        except Exception:
+                            pass
+
+                    for du in page_detail_urls:
+                        if du in collected_seen:
+                            continue
+                        collected_seen.add(du)
+                        collected_detail_urls.append(du)
+                        if len(collected_detail_urls) >= effective_max_detail_urls:
                             break
 
-                    for card in cards:
-                        stats.log_card_found()
-                        if len(results) >= limit:
-                            break
-
-                        try:
-                            # Extract title
-                            title_el = (
-                                card.select_one("[data-testid='title']")
-                                or card.select_one("h2")
-                                or card.select_one(".title")
-                            )
-                            title = title_el.get_text(strip=True) if title_el else "Untitled"
-
-                            # Extract price
-                            price_el = (
-                                card.select_one("[data-testid='price']")
-                                or card.select_one(".price")
-                                or card.select_one(".otm-Price")
-                            )
-                            price = _parse_price(price_el.get_text(strip=True) if price_el else "")
-
-                            # Extract location/address
-                            loc_el = (
-                                card.select_one("[data-testid='address']")
-                                or card.select_one(".address")
-                                or card.select_one(".otm-Address")
-                            )
-                            location_text = loc_el.get_text(" ", strip=True) if loc_el else location
-
-                            # Extract bedrooms from summary text (e.g., "3 bed")
-                            summary_el = card.select_one(
-                                ".property-description"
-                            ) or card.select_one(".summary")
-                            summary_text = summary_el.get_text() if summary_el else ""
-                            bed_match = re.search(r"(\d+)\s*bed", summary_text, re.IGNORECASE)
-                            bedrooms = int(bed_match.group(1)) if bed_match else 0
-
-                            # Extract bathrooms from summary text (e.g., "2 bath")
-                            bath_match = re.search(r"(\d+)\s*bath", summary_text, re.IGNORECASE)
-                            bathrooms = int(bath_match.group(1)) if bath_match else 0
-
-                            # Extract all images
-                            image_urls = _extract_images(card)
-                            image_urls = normalize_image_urls(image_urls)
-                            filtered_urls = [u for u in image_urls if _is_otm_listing_photo_url(u)]
-                            image_urls = filtered_urls or image_urls
-                            try:
-                                image_urls = dedupe_image_urls(image_urls)
-                            except Exception:
-                                pass
-                            image_url = pick_cover_image(image_urls) if image_urls else None
-                            log_image_extraction("onthemarket", title, len(image_urls))
-
-                            # Extract description
-                            description = _extract_description(card)
-
-                            # Generate external ID
-                            external_id, listing_url = _extract_external_id_and_url(
-                                card, title, location_text
-                            )
-
-                            # Enrich images from the detail page (best-effort).
-                            # Keep this additive: only override if we actually find a gallery.
-                            if listing_url and len(image_urls) < 12:
-                                try:
-                                    detail_html = await _fetch_html(session, listing_url)
-                                except OnTheMarketBlockedError:
-                                    detail_html = None
-                                except Exception:
-                                    detail_html = None
-                                if detail_html and (
-                                    _looks_blocked(detail_html, 200)
-                                    or _has_cloudflare_marker(detail_html)
-                                    or not (detail_html or "").strip()
-                                ):
-                                    detail_html = None
-                                if not detail_html and PLAYWRIGHT_ENABLE:
-                                    try:
-                                        detail_html = (
-                                            await render_page_capture(
-                                                listing_url,
-                                                selectors=[
-                                                    "meta[property='og:title']",
-                                                    "script[type='application/ld+json']",
-                                                ],
-                                                click_selectors=[
-                                                    "#ccc-recommended-settings",
-                                                    "#ccc-accept-settings",
-                                                ],
-                                            )
-                                        )[0]
-                                    except Exception:
-                                        detail_html = None
-                                if detail_html:
-                                    try:
-                                        detail_imgs = _extract_otm_gallery_image_urls(
-                                            detail_html, listing_url
-                                        )
-                                        merged = normalize_image_urls([*detail_imgs, *image_urls])
-                                        filtered_merged = [
-                                            u for u in merged if _is_otm_listing_photo_url(u)
-                                        ]
-                                        merged = filtered_merged or merged
-                                        if merged:
-                                            image_urls = merged
-                                            image_url = merged[0]
-                                    except Exception:
-                                        pass
-
-                            # Deduplicate by external_id
-                            if external_id in seen_ids:
-                                stats.log_duplicate_id(external_id)
-                                continue
-                            seen_ids.add(external_id)
-
-                            # Enrich with coordinates
-                            coords = (
-                                await _enrich_coordinates(location_text)
-                                if _looks_like_postcode(location_text)
-                                else {"latitude": None, "longitude": None}
-                            )
-
-                            property_data = {
-                                "external_id": external_id,
-                                "title": title,
-                                "description": description,
-                                "location": location_text,
-                                "price": price,
-                                "bedrooms": bedrooms,
-                                "bathrooms": bathrooms,
-                                "image_url": image_url,
-                                "image_urls": image_urls,
-                                "imageurl": image_url,
-                                "latitude": coords["latitude"],
-                                "longitude": coords["longitude"],
-                                "source": "onthemarket",
-                                "raw_url": listing_url or url,
-                                "listing_url": listing_url,
-                            }
-
-                            # Track missing fields
-                            if not image_url:
-                                stats.log_missing_field("image_url", external_id)
-                            if not description:
-                                stats.log_missing_field("description", external_id)
-                            if not price:
-                                stats.log_missing_field("price", external_id)
-
-                            # Validate before adding
-                            should_insert, reason = should_insert_property(property_data)
-                            if should_insert:
-                                results.append(clean_property_data(property_data))
-                                stats.log_parse_success()
-                            else:
-                                stats.log_validation_failure(reason or "Unknown")
-
-                        except Exception as e:
-                            # Defensive: ignore parse exceptions
-                            stats.log_parse_failure(str(e))
-
-                    if len(results) >= limit:
+                    if not page_detail_urls and page == 0:
+                        # Old behavior preserved: if page 0 has no usable signals, stop.
+                        print(
+                            f"ℹ️ OnTheMarket: No detail links found on page {page}; stopping pagination."
+                        )
                         break
 
-                    # Polite delay between pages
+                    if len(collected_detail_urls) >= effective_max_detail_urls:
+                        break
+
                     await asyncio.sleep(OT_DELAY_MS / 1000.0)
+
+                if not collected_detail_urls:
+                    stats.log_summary()
+                    runlog.set_count(0)
+                    return []
+
+                # Fetch + parse detail pages with bounded concurrency.
+                tasks = [
+                    asyncio.create_task(_fetch_parse_one(u))
+                    for u in collected_detail_urls[:effective_max_detail_urls]
+                ]
+                stop_early = False
+                try:
+                    for fut in asyncio.as_completed(tasks):
+                        item = await fut
+                        if not item:
+                            continue
+                        ext = item.get("external_id")
+                        if ext and str(ext) in seen_ids:
+                            stats.log_duplicate_id(str(ext))
+                            continue
+                        if ext:
+                            seen_ids.add(str(ext))
+                        results.append(item)
+
+                        if len(results) >= limit:
+                            stop_early = True
+                            break
+                finally:
+                    if stop_early:
+                        for t in tasks:
+                            if not t.done():
+                                t.cancel()
+                    # Always await task completion/cancellation to avoid warnings.
+                    await asyncio.gather(*tasks, return_exceptions=True)
 
             stats.log_summary()
             print(f"✅ Scraped {len(results)} OnTheMarket properties for '{location}'")

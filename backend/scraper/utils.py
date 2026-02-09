@@ -392,6 +392,65 @@ def detect_blocked_or_partial(
     return None
 
 
+def detect_blocked_or_partial_explain(
+    html: Optional[str],
+    status: Optional[int],
+    *,
+    min_html_bytes: int = 30_000,
+) -> Tuple[str | None, Dict[str, Any]]:
+    """Like detect_blocked_or_partial(), but returns extra metadata.
+
+    This is intentionally additive so existing callers can keep using
+    detect_blocked_or_partial() unchanged.
+
+    Returns:
+        (reason, meta)
+        - reason: same reason string as detect_blocked_or_partial() or None
+        - meta: may include keys like 'block_keyword' or 'title_keyword'
+    """
+
+    meta: Dict[str, Any] = {}
+
+    if status in (401, 403, 429, 503):
+        return f"http_{status}", meta
+
+    if not html or not isinstance(html, str):
+        return "empty_body", meta
+
+    s = html.strip()
+    if not s:
+        return "empty_body", meta
+
+    lowered = s.lower()
+    for k in _BLOCK_KEYWORDS:
+        if k in lowered:
+            meta["block_keyword"] = k
+            return "block_keyword", meta
+
+    for k in _CONSENT_KEYWORDS:
+        if k in lowered:
+            return "consent_wall", meta
+
+    if len(s.encode("utf-8", errors="ignore")) < int(min_html_bytes or 0):
+        if not is_valid_html(s):
+            return "small_payload_invalid", meta
+        return "small_payload", meta
+
+    try:
+        m = re.search(r"<title[^>]*>(?P<t>.*?)</title>", s, flags=re.I | re.S)
+        if m:
+            t = re.sub(r"\s+", " ", (m.group("t") or "")).strip().lower()
+            if t:
+                for k in _BLOCKED_TITLE_KEYWORDS:
+                    if k in t:
+                        meta["title_keyword"] = k
+                        return "blocked_title", meta
+    except Exception:
+        pass
+
+    return None, meta
+
+
 def build_scraperapi_url_detail(
     url: str,
     *,
