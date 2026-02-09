@@ -33,9 +33,109 @@ async def render_page(
     if not PLAYWRIGHT_ENABLE:
         return None
     try:
-        from playwright.async_api import async_playwright  # type: ignore
+        pass  # type: ignore
     except Exception:
         return None
+
+
+async def render_page_with_diag(
+    url: str,
+    selectors: Sequence[str] | None = None,
+    click_selectors: Sequence[str] | None = None,
+) -> tuple[Optional[str], dict]:
+    """Like render_page, but returns a small diagnostic payload.
+
+    This is intended for debug/probe endpoints so we can see *why* Playwright
+    returned None (e.g. browsers not installed, missing system deps).
+    """
+
+    diag: dict = {
+        "enabled": bool(PLAYWRIGHT_ENABLE),
+        "browser": PLAYWRIGHT_BROWSER,
+        "timeout_ms": PLAYWRIGHT_TIMEOUT_MS,
+        "wait_selector_timeout_ms": PLAYWRIGHT_WAIT_SELECTOR_TIMEOUT_MS,
+        "scroll_steps": PLAYWRIGHT_SCROLL_STEPS,
+        "import_ok": False,
+        "launched": False,
+        "error": None,
+    }
+
+    if not PLAYWRIGHT_ENABLE:
+        diag["error"] = "playwright_disabled"
+        return None, diag
+
+    try:
+        from playwright.async_api import async_playwright  # type: ignore
+
+        diag["import_ok"] = True
+    except Exception as e:
+        diag["error"] = f"playwright_import_failed: {e}"
+        return None, diag
+
+    loop = asyncio.get_event_loop()
+    if not hasattr(loop, "_pw_browser"):
+        try:
+            pw = await async_playwright().start()
+            browser = await getattr(pw, PLAYWRIGHT_BROWSER).launch(headless=True)
+            context = await browser.new_context()
+            loop._pw_playwright = pw  # type: ignore
+            loop._pw_browser = browser  # type: ignore
+            loop._pw_context = context  # type: ignore
+            diag["launched"] = True
+        except Exception as e:
+            diag["error"] = f"playwright_launch_failed: {e}"
+            return None, diag
+    else:
+        diag["launched"] = True
+
+    context = loop._pw_context  # type: ignore
+    try:
+        page = await context.new_page()
+        await page.goto(url, timeout=PLAYWRIGHT_TIMEOUT_MS, wait_until="domcontentloaded")
+
+        if click_selectors:
+            for sel in click_selectors:
+                try:
+                    el = page.locator(sel).first
+                    if await el.count() > 0:
+                        await el.click(timeout=2000)
+                        await asyncio.sleep(0.2)
+                except Exception:
+                    continue
+
+        if selectors:
+            found = False
+            deadline = time.time() + (PLAYWRIGHT_WAIT_SELECTOR_TIMEOUT_MS / 1000.0)
+            while time.time() < deadline and not found:
+                for sel in selectors:
+                    try:
+                        el = await page.query_selector(sel)
+                        if el:
+                            found = True
+                            break
+                    except Exception:
+                        continue
+                if not found:
+                    await asyncio.sleep(0.25)
+
+        for _ in range(max(1, PLAYWRIGHT_SCROLL_STEPS)):
+            try:
+                await page.evaluate("window.scrollBy(0, window.innerHeight)")
+            except Exception:
+                break
+            await asyncio.sleep(0.35)
+
+        try:
+            await page.wait_for_load_state("networkidle", timeout=3000)
+        except Exception:
+            pass
+
+        html = await page.content()
+        await page.close()
+        return html, diag
+    except Exception as e:
+        diag["error"] = f"playwright_render_failed: {e}"
+        return None, diag
 
     # Simple singleton cache stored on the loop object
     loop = asyncio.get_event_loop()

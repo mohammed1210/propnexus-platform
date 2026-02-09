@@ -22,7 +22,8 @@ async def test_probe_onthemarket_playwright_escalation_fields_present_when_block
     with patch.object(probe, "_fetch_text", new=AsyncMock(side_effect=fake_fetch_text)):
         with patch("backend.utils.render.PLAYWRIGHT_ENABLE", True):
             with patch(
-                "backend.utils.render.render_page", new=AsyncMock(return_value=rendered_html)
+                "backend.utils.render.render_page_with_diag",
+                new=AsyncMock(return_value=(rendered_html, {"error": None})),
             ):
                 out = await probe._probe_onthemarket(  # type: ignore[attr-defined]
                     session=None,
@@ -37,6 +38,7 @@ async def test_probe_onthemarket_playwright_escalation_fields_present_when_block
     assert out.get("escalation_used") == "playwright"
     assert out.get("playwright_html_len", 0) > 0
     assert isinstance(out.get("playwright_html_snippet"), str)
+    assert out.get("playwright_error") in (None, "")
 
     # And it should switch to using the rendered HTML if it looks usable.
     assert out.get("fetch_via") == "playwright_fallback"

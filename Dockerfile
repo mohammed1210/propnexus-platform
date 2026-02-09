@@ -22,6 +22,10 @@ COPY . /app/.
 RUN python3 -m pip install --upgrade pip && \
     pip3 install -r backend/requirements.txt
 
+# Install Playwright browser binaries (Chromium) needed at runtime.
+# Note: this increases build time/size but is required for PLAYWRIGHT_ENABLE=true.
+RUN python3 -m playwright install --with-deps chromium
+
 # Frontend dependencies (Next.js app)
 RUN cd frontend && npm ci
 

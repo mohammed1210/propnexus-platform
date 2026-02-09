@@ -752,8 +752,11 @@ async def _probe_onthemarket(
     playwright_attempted = False
     playwright_http_status = 0
     playwright_html_len = 0
-    playwright_blocked: bool | None = None
+    playwright_title: str | None = None
+    playwright_blocked_detected: bool | None = None
+    playwright_blocked_reason: str | None = None
     playwright_cards_found: int | None = None
+    playwright_detail_links_found: int | None = None
     playwright_html_snippet: str | None = None
     escalation_used: str | None = None
     try:
@@ -861,17 +864,18 @@ async def _probe_onthemarket(
     if blocked_by_heuristic and include_escalation:
         try:
             from backend.utils.render import PLAYWRIGHT_ENABLE as PW_ENABLED
-            from backend.utils.render import render_page
+            from backend.utils.render import render_page_with_diag
         except Exception:
             PW_ENABLED = False
-            render_page = None  # type: ignore
+            render_page_with_diag = None  # type: ignore
 
-        if PW_ENABLED and render_page is not None:
+        playwright_error: str | None = None
+        if PW_ENABLED and render_page_with_diag is not None:
             playwright_attempted = True
             escalation_used = "playwright"
             rendered = None
             try:
-                rendered = await render_page(
+                rendered, diag = await render_page_with_diag(
                     target_url,
                     selectors=[
                         "a[href*='/details/']",
@@ -885,15 +889,51 @@ async def _probe_onthemarket(
                         "button:has-text('I agree')",
                     ],
                 )
-            except Exception:
+                playwright_error = str((diag or {}).get("error") or "") or None
+            except Exception as e:
                 rendered = None
+                playwright_error = str(e)
 
             used_playwright = bool(rendered)
             playwright_http_status = 200 if rendered else 0
             playwright_html_len = len(rendered or "")
-            playwright_blocked = _is_blocked(rendered or "", 200) if rendered else None
+            if rendered is not None:
+                try:
+                    m_title = re.search(
+                        r"<title[^>]*>(.*?)</title>",
+                        rendered or "",
+                        re.IGNORECASE | re.DOTALL,
+                    )
+                    if m_title:
+                        playwright_title = (
+                            re.sub(r"\s+", " ", (m_title.group(1) or "")).strip() or None
+                        )
+                except Exception:
+                    playwright_title = None
+
+            playwright_blocked_reason = (
+                detect_blocked_or_partial(rendered or "", 200, min_html_bytes=8_000)
+                if rendered
+                else None
+            )
+            playwright_blocked_detected = (
+                bool(_is_blocked(rendered or "", 200) or playwright_blocked_reason)
+                if rendered is not None
+                else None
+            )
             playwright_html_snippet = (
                 _sanitize_html_snippet(rendered or "", max_chars=2500) if rendered else None
+            )
+
+            attempts_meta.append(
+                {
+                    "via": "playwright_escalation",
+                    "target_url": target_url,
+                    "http_status": 200 if rendered else 0,
+                    "html_len": len(rendered or ""),
+                    "blocked": _is_blocked(rendered or "", 200) if rendered else None,
+                    "error": playwright_error,
+                }
             )
 
             if rendered is not None:
@@ -903,17 +943,13 @@ async def _probe_onthemarket(
                     p_cards = otm._collect_cards(p_soup)
                     playwright_cards_found = len(p_cards)
                 except Exception:
-                    playwright_cards_found = None
+                    playwright_cards_found = 0
 
-                attempts_meta.append(
-                    {
-                        "via": "playwright_escalation",
-                        "target_url": target_url,
-                        "http_status": 200,
-                        "html_len": len(rendered or ""),
-                        "blocked": _is_blocked(rendered or "", 200),
-                    }
-                )
+                try:
+                    p_detail_urls = otm._collect_detail_listing_urls(p_soup)
+                    playwright_detail_links_found = len(p_detail_urls or [])
+                except Exception:
+                    playwright_detail_links_found = 0
 
             if rendered and (not _is_blocked(rendered, 200)) and _has_listing_signals(rendered):
                 status, text = 200, rendered
@@ -941,6 +977,16 @@ async def _probe_onthemarket(
         classification = "parsed_links_only"
 
     block_reason = detect_blocked_or_partial(text, status, min_html_bytes=8_000)
+
+    # Keep blocked + blocked_reason consistent.
+    # If block_keyword triggers on the final chosen HTML, treat as blocked unless Playwright switched us
+    # to unblocked HTML (in which case block_reason would be None).
+    if block_reason == "block_keyword":
+        blocked_final = True
+        classification = "blocked"
+
+    if not blocked_final:
+        block_reason = None
     return {
         "target_url": target_url,
         "proxy_used": bool(proxy_used or fallback_used),
@@ -950,10 +996,14 @@ async def _probe_onthemarket(
         "escalation_used": escalation_used,
         "attempts": attempts_meta,
         "playwright_attempted": playwright_attempted,
+        "playwright_error": playwright_error,
         "playwright_http_status": playwright_http_status,
         "playwright_html_len": playwright_html_len,
-        "playwright_blocked": playwright_blocked,
+        "playwright_title": playwright_title,
+        "playwright_blocked_detected": playwright_blocked_detected,
+        "playwright_blocked_reason": playwright_blocked_reason,
         "playwright_cards_found": playwright_cards_found,
+        "playwright_detail_links_found": playwright_detail_links_found,
         "playwright_html_snippet": playwright_html_snippet,
         "initial_http_status": initial_status,
         "initial_html_len": initial_len,
@@ -963,7 +1013,7 @@ async def _probe_onthemarket(
         "html_len": len(text or ""),
         "content_length_bytes": _content_length_bytes(text or ""),
         "blocked_reason": block_reason,
-        "blocked_detected": bool(blocked_final or block_reason),
+        "blocked_detected": bool(blocked_final),
         "consent_wall_detected": block_reason == "consent_wall",
         "timeout_hit": False,
         "selector_version": getattr(otm, "SELECTOR_VERSION", "v1"),

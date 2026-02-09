@@ -5,7 +5,7 @@
 builder = "NIXPACKS"
 # Install backend deps and frontend deps during build.
 # Use npm ci instead of yarn to avoid relying on yarn being present.
-buildCommand = "pip3 install -r backend/requirements.txt && cd frontend && npm ci"
+buildCommand = "pip3 install -r backend/requirements.txt && python -m playwright install chromium && cd frontend && npm ci"
 
 [deploy]
 # Run FastAPI (backend.main:app) on the provided PORT

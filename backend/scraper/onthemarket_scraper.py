@@ -583,6 +583,10 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
     # Determine which URL to fetch based on SCRAPER_MODE
     mode = os.getenv("SCRAPER_MODE", "direct").lower()
 
+    def _truthy_env(name: str, default: str = "0") -> bool:
+        v = (os.getenv(name, default) or default).strip().lower()
+        return v in ("1", "true", "yes", "y", "on")
+
     def _basic_attempts() -> List[Dict[str, Any]]:
         if mode == "scraperapi":
             if not SCRAPERAPI_KEY:
@@ -656,6 +660,43 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
     last_status: int | None = None
     saw_blocked = False
     try:
+        # Optional: force Playwright as the primary strategy for OTM.
+        # ScraperAPI/direct remain as fallbacks if Playwright fails or looks blocked.
+        otm_force_playwright = _truthy_env("OTM_FORCE_PLAYWRIGHT", "0")
+        if otm_force_playwright and PLAYWRIGHT_ENABLE:
+            try:
+                rendered = await render_page(
+                    url,
+                    selectors=[
+                        "a[href*='/details/']",
+                        ".property-card",
+                        "[data-testid='property-card']",
+                    ],
+                    click_selectors=[
+                        "#ccc-recommended-settings",
+                        "#ccc-accept-settings",
+                        "button:has-text('Accept')",
+                        "button:has-text('I agree')",
+                    ],
+                )
+            except Exception:
+                rendered = None
+
+            if rendered:
+                last_text = rendered
+                last_status = 200
+                blocked = _blocked_by_heuristics(rendered, 200)
+                saw_blocked = saw_blocked or bool(blocked)
+                log_fetch_diagnostics(
+                    "onthemarket",
+                    url,
+                    status=200,
+                    text=rendered,
+                    via="playwright-primary",
+                )
+                if (not blocked) and _has_listing_signals(rendered):
+                    return rendered
+
         attempts = _basic_attempts()
         for idx, attempt in enumerate(attempts):
             via = str(attempt.get("via") or "")
@@ -729,13 +770,7 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
 
         # Playwright fallback (only if we actually looked blocked).
         # Controlled by env to manage costs/complexity in production.
-        otm_pw_fallback = (os.getenv("OTM_PLAYWRIGHT_FALLBACK", "1") or "1").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-            "y",
-            "on",
-        )
+        otm_pw_fallback = _truthy_env("OTM_PLAYWRIGHT_FALLBACK", "1")
         if saw_blocked and PLAYWRIGHT_ENABLE and otm_pw_fallback:
             try:
                 rendered = await render_page(
