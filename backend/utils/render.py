@@ -4,12 +4,19 @@ import time
 from pathlib import Path
 from typing import Optional, Sequence
 
-PLAYWRIGHT_ENABLE = os.getenv("PLAYWRIGHT_ENABLE", "0") == "1"
+
+def _truthy_env(name: str, default: str = "0") -> bool:
+    v = (os.getenv(name, default) or default).strip().lower()
+    return v in ("1", "true", "yes", "y", "on")
+
+
+# Backwards/ops-compatible: accept either PLAYWRIGHT_ENABLE or PLAYWRIGHT_ENABLED.
+PLAYWRIGHT_ENABLE = _truthy_env("PLAYWRIGHT_ENABLE", "0") or _truthy_env("PLAYWRIGHT_ENABLED", "0")
 PLAYWRIGHT_TIMEOUT_MS = int(os.getenv("PLAYWRIGHT_TIMEOUT_MS", "15000"))
 PLAYWRIGHT_BROWSER = os.getenv("PLAYWRIGHT_BROWSER", "chromium")
 PLAYWRIGHT_SCROLL_STEPS = int(os.getenv("PLAYWRIGHT_SCROLL_STEPS", "5"))
 PLAYWRIGHT_WAIT_SELECTOR_TIMEOUT_MS = int(os.getenv("PLAYWRIGHT_WAIT_SELECTOR_TIMEOUT_MS", "6000"))
-PLAYWRIGHT_DEBUG_CAPTURE = os.getenv("PLAYWRIGHT_DEBUG_CAPTURE", "0") == "1"
+PLAYWRIGHT_DEBUG_CAPTURE = _truthy_env("PLAYWRIGHT_DEBUG_CAPTURE", "0")
 _DEBUG_DIR = Path("backend/debug")
 
 

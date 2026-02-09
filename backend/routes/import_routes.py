@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
@@ -36,7 +37,7 @@ from backend.utils.image_utils import (
 from backend.utils.ingest import scrape_all_sources
 from backend.utils.listing_keys import ensure_external_id, extract_postcode, strip_empty_for_upsert
 from backend.utils.postcode import get_lat_lng_from_postcode
-from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run
+from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run, update_scrape_run_data
 
 # Shared Supabase client
 try:
@@ -62,6 +63,56 @@ admin_alias_router = APIRouter(tags=["import"])
 _BATCH_JOBS: dict[str, dict[str, Any]] = {}
 
 
+def _batch_snapshot(job: dict[str, Any]) -> dict[str, Any]:
+    """Return a JSON-serializable snapshot safe to persist."""
+
+    out: dict[str, Any] = {}
+    for k in (
+        "batch_id",
+        "status",
+        "cities",
+        "max_pages",
+        "delay_min_s",
+        "delay_max_s",
+        "total_scraped",
+        "total_imported",
+        "per_city",
+    ):
+        if k in job:
+            out[k] = job.get(k)
+    return out
+
+
+def _maybe_persist_batch_snapshot(batch_id: str, *, force: bool = False) -> None:
+    """Persist batch job state to scrape_runs.data best-effort.
+
+    Throttled so we don't spam writes.
+    """
+
+    if not sb:
+        return
+    job = _BATCH_JOBS.get(batch_id)
+    if not isinstance(job, dict):
+        return
+
+    now = time.monotonic()
+    last = float(job.get("_persisted_at_mono") or 0.0)
+    if (not force) and (now - last < 2.0):
+        return
+    job["_persisted_at_mono"] = now
+
+    try:
+        update_scrape_run_data(
+            run_id=batch_id,
+            data=_batch_snapshot(job),
+            status=str(job.get("status") or "running"),
+            count_inserted=int(job.get("total_imported") or 0),
+            error=None,
+        )
+    except Exception:
+        return
+
+
 def _update_city_source(batch_id: str, city: str, source: str, patch: dict[str, Any]) -> None:
     job = _BATCH_JOBS.get(batch_id)
     if not isinstance(job, dict):
@@ -82,6 +133,7 @@ def _update_city_source(batch_id: str, city: str, source: str, patch: dict[str, 
         s_entry = {}
         sources[source] = s_entry
     s_entry.update(patch)
+    _maybe_persist_batch_snapshot(batch_id)
 
 
 def _overall_batch_status(per_city: dict[str, dict[str, Any]]) -> str:
@@ -106,6 +158,7 @@ def _update_batch_job(batch_id: str, patch: dict[str, Any]) -> None:
     if not isinstance(job, dict):
         return
     job.update(patch)
+    _maybe_persist_batch_snapshot(batch_id)
 
 
 def _update_city(batch_id: str, city: str, patch: dict[str, Any]) -> None:
@@ -120,6 +173,7 @@ def _update_city(batch_id: str, city: str, patch: dict[str, Any]) -> None:
         entry = {}
         per_city[city] = entry
     entry.update(patch)
+    _maybe_persist_batch_snapshot(batch_id)
 
 
 def _queue_batch_job(
@@ -137,11 +191,7 @@ def _queue_batch_job(
         _update_batch_job(batch_id, {"status": "running"})
 
         # Best-effort: reflect on scrape_runs status while job is in flight.
-        try:
-            if sb:
-                sb.table("scrape_runs").update({"status": "running"}).eq("id", batch_id).execute()
-        except Exception:
-            pass
+        _maybe_persist_batch_snapshot(batch_id, force=True)
 
         total_scraped = 0
         total_imported = 0
@@ -177,9 +227,9 @@ def _queue_batch_job(
                             city_scraped_by_source[source] = scraped_local
 
                         normalized_status = (status or "success").lower()
-                        if normalized_status == "timeout":
+                        if normalized_status in ("timeout", "blocked"):
                             src_status = "error"
-                            src_error = error or "timeout"
+                            src_error = error or normalized_status
                         elif normalized_status == "error":
                             src_status = "error"
                             src_error = error or "error"
@@ -277,6 +327,7 @@ def _queue_batch_job(
                     batch_id,
                     {"total_scraped": total_scraped, "total_imported": total_imported},
                 )
+                _maybe_persist_batch_snapshot(batch_id, force=True)
             except asyncio.TimeoutError:
                 for source in ("rightmove", "zoopla", "onthemarket"):
                     _update_city_source(
@@ -299,6 +350,7 @@ def _queue_batch_job(
                     batch_id,
                     {"total_scraped": total_scraped, "total_imported": total_imported},
                 )
+                _maybe_persist_batch_snapshot(batch_id, force=True)
             except Exception as e:
                 for source in ("rightmove", "zoopla", "onthemarket"):
                     _update_city_source(
@@ -316,6 +368,7 @@ def _queue_batch_job(
                     batch_id,
                     {"total_scraped": total_scraped, "total_imported": total_imported},
                 )
+                _maybe_persist_batch_snapshot(batch_id, force=True)
 
             if i < len(cities) - 1:
                 await asyncio.sleep(random.uniform(delay_min_s, delay_max_s))
@@ -331,6 +384,8 @@ def _queue_batch_job(
                 "total_imported": total_imported,
             },
         )
+
+        _maybe_persist_batch_snapshot(batch_id, force=True)
 
         # Persist final status best-effort.
         try:
@@ -1997,21 +2052,48 @@ async def import_batch_status(
     # Fallback: if Supabase is configured, return scrape_runs status even if in-memory state was lost.
     try:
         if sb:
-            res = (
-                sb.table("scrape_runs")
-                .select("id,status,count_inserted,error")
-                .eq("id", batch_id)
-                .execute()
-            )
-            data = getattr(res, "data", None)
-            if isinstance(data, list) and data:
-                row = data[0]
+            row: dict[str, Any] | None = None
+            try:
+                res = (
+                    sb.table("scrape_runs")
+                    .select("id,status,count_inserted,error,data")
+                    .eq("id", batch_id)
+                    .execute()
+                )
+                data = getattr(res, "data", None)
+                if isinstance(data, list) and data and isinstance(data[0], dict):
+                    row = data[0]
+            except Exception:
+                res = (
+                    sb.table("scrape_runs")
+                    .select("id,status,count_inserted,error")
+                    .eq("id", batch_id)
+                    .execute()
+                )
+                data = getattr(res, "data", None)
+                if isinstance(data, list) and data and isinstance(data[0], dict):
+                    row = data[0]
+
+            if isinstance(row, dict):
+                snap = row.get("data") if isinstance(row.get("data"), dict) else None
+                if isinstance(snap, dict) and (snap.get("batch_id") == batch_id):
+                    out = {**snap}
+                    out["status"] = row.get("status") or out.get("status") or "unknown"
+                    out["total_imported"] = int(
+                        row.get("count_inserted") or out.get("total_imported") or 0
+                    )
+                    if row.get("error"):
+                        out["error"] = row.get("error")
+                    out["durable"] = True
+                    return out
+
                 return {
                     "batch_id": batch_id,
                     "status": (row.get("status") or "unknown"),
                     "total_imported": int(row.get("count_inserted") or 0),
                     "per_city": {},
                     "error": row.get("error"),
+                    "durable": True,
                 }
     except Exception:
         pass

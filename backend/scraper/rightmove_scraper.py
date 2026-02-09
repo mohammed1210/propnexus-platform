@@ -36,6 +36,9 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 )
 
+# Bump this when listing/detail selectors materially change.
+SELECTOR_VERSION = "v1"
+
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic", "bot detection"]
 
 

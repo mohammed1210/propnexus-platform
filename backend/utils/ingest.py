@@ -666,6 +666,9 @@ async def scrape_all_sources(
             out, status, error = await _collect_from(source, items)
             return source, out, status, error
         except Exception as e:
+            name = type(e).__name__
+            if source == "onthemarket" and name.lower().endswith("blockederror"):
+                return source, [], "blocked", str(e) or "blocked"
             return source, [], "error", str(e)
 
     # ---- Rightmove ----

@@ -529,6 +529,49 @@ def test_onthemarket_search_url_lowercases_location():
     )
 
 
+@pytest.mark.asyncio
+@patch.dict(os.environ, {"SCRAPER_MODE": "scraperapi", "SCRAPERAPI_KEY": "test-key"})
+async def test_onthemarket_blocked_triggers_premium_escalation_and_recovers():
+    """OTM: when the basic ScraperAPI fetch is blocked, we should escalate to premium and recover."""
+
+    from backend.scraper import onthemarket_scraper
+
+    with patch.object(onthemarket_scraper, "SCRAPERAPI_KEY", "test-key"):
+        mock_session = MagicMock()
+
+        blocked_html = "<html><body>captcha</body></html>"
+        ok_html = (
+            "<html><body>onthemarket "
+            + ("x" * 9000)
+            + " <a href='/details/123456/'>Details</a>"
+            + " <div class='property-card'>card</div>"
+            + "</body></html>"
+        )
+
+        first_response = AsyncMock()
+        first_response.text = AsyncMock(return_value=blocked_html)
+        first_response.status = 200
+
+        second_response = AsyncMock()
+        second_response.text = AsyncMock(return_value=ok_html)
+        second_response.status = 200
+
+        mock_session.get.return_value.__aenter__.side_effect = [
+            first_response,
+            second_response,
+        ]
+        mock_session.get.return_value.__aexit__.return_value = False
+
+        url = onthemarket_scraper._build_search_url("London", page=0)
+        html = await onthemarket_scraper._fetch_html_internal(mock_session, url)
+        assert html is not None
+        assert "/details/" in html
+
+        assert mock_session.get.call_count >= 2
+        called_urls = [c[0][0] for c in mock_session.get.call_args_list]
+        assert any("premium=true" in u for u in called_urls)
+
+
 def test_rightmove_caret_retry_targets_include_unescaped_first():
     """Regression: caret-unescape retry should exist for REGION%5E URLs."""
     from backend.scraper.rightmove_scraper import _rightmove_caret_url_variants

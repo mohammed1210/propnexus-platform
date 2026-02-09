@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 from bs4 import BeautifulSoup
 
-from backend.scraper.utils import normalize_image_urls
+from backend.scraper.utils import detect_blocked_or_partial, normalize_image_urls
 from backend.utils.image_utils import (
     dedupe_image_urls,
     extract_image_urls_from_next_data,
@@ -32,6 +32,7 @@ from backend.utils.render import (
     PLAYWRIGHT_ENABLE,
     capture_debug_html,
     capture_debug_json,
+    render_page,
     render_page_capture,
 )
 from backend.utils.retry import retry_async
@@ -50,6 +51,36 @@ USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 )
+
+# Bump this when listing/detail selectors materially change.
+SELECTOR_VERSION = "v1"
+
+
+class OnTheMarketBlockedError(RuntimeError):
+    """Raised when OnTheMarket appears blocked after all fallbacks."""
+
+
+def _has_listing_signals(html: str) -> bool:
+    lowered = (html or "").lower()
+    return any(
+        m in lowered
+        for m in (
+            "/details/",
+            "property-card",
+            'data-testid="property-card"',
+            "otm-propertycard",
+        )
+    )
+
+
+def _blocked_by_heuristics(html: str, status: int | None) -> bool:
+    s = html or ""
+    st = int(status or 0)
+    if _looks_blocked(s, st) or _has_cloudflare_marker(s) or not s.strip():
+        return True
+    reason = detect_blocked_or_partial(s, st if st > 0 else None, min_html_bytes=8_000)
+    return reason is not None
+
 
 # Rotate user agents for OTM only. Keep small list to reduce maintenance.
 _USER_AGENT_POOL = [
@@ -552,100 +583,80 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
     # Determine which URL to fetch based on SCRAPER_MODE
     mode = os.getenv("SCRAPER_MODE", "direct").lower()
 
-    # Build a progressive attempt chain. This is OTM-only and should not affect other scrapers.
-    attempts: List[Dict[str, Any]] = []
-    if mode == "scraperapi":
-        if not SCRAPERAPI_KEY:
-            print(
-                "⚠️ SCRAPER_MODE=scraperapi but SCRAPERAPI_KEY not set, falling back to direct fetch"
-            )
-            attempts.append({"via": "direct", "url": url, "timeout": 30})
-        else:
-            print(f"ℹ️ Using ScraperAPI for OnTheMarket HTML fetch: {url}")
-            attempts.extend(
-                [
-                    {
-                        "via": "scraperapi",
-                        "url": make_scraperapi_url(
-                            url, render=True, premium=False, keep_headers=True
-                        ),
-                        "timeout": 60,
-                    },
-                    {
-                        "via": "scraperapi-premium",
-                        "url": make_scraperapi_url(
-                            url,
-                            render=True,
-                            premium=True,
-                            keep_headers=True,
-                            session_number=str(random.randint(1, 999999)),
-                        ),
-                        "timeout": 75,
-                    },
-                    # Some sites behave better when ScraperAPI does not forward headers.
-                    {
-                        "via": "scraperapi-premium-noheaders",
-                        "url": make_scraperapi_url(
-                            url,
-                            render=True,
-                            premium=True,
-                            keep_headers=False,
-                            session_number=str(random.randint(1, 999999)),
-                        ),
-                        "timeout": 90,
-                    },
-                    {
-                        "via": "scraperapi-noheaders",
-                        "url": make_scraperapi_url(
-                            url,
-                            render=True,
-                            premium=False,
-                            keep_headers=False,
-                            session_number=str(random.randint(1, 999999)),
-                        ),
-                        "timeout": 90,
-                    },
-                ]
-            )
-    else:
-        attempts.append({"via": "direct", "url": url, "timeout": 30})
+    def _basic_attempts() -> List[Dict[str, Any]]:
+        if mode == "scraperapi":
+            if not SCRAPERAPI_KEY:
+                print(
+                    "⚠️ SCRAPER_MODE=scraperapi but SCRAPERAPI_KEY not set, falling back to direct fetch"
+                )
+                return [{"via": "direct", "url": url, "timeout": 30}]
+            print(f"ℹ️ Using ScraperAPI (basic) for OnTheMarket HTML fetch: {url}")
+            return [
+                {
+                    "via": "scraperapi-basic",
+                    "url": make_scraperapi_url(url, render=True, premium=False, keep_headers=True),
+                    "timeout": 60,
+                }
+            ]
+
+        # direct mode
+        attempts: List[Dict[str, Any]] = [{"via": "direct", "url": url, "timeout": 30}]
         if SCRAPERAPI_KEY:
-            attempts.extend(
-                [
-                    {
-                        "via": "scraperapi-fallback",
-                        "url": make_scraperapi_url(
-                            url, render=True, premium=False, keep_headers=True
-                        ),
-                        "timeout": 60,
-                    },
-                    {
-                        "via": "scraperapi-premium-fallback",
-                        "url": make_scraperapi_url(
-                            url,
-                            render=True,
-                            premium=True,
-                            keep_headers=True,
-                            session_number=str(random.randint(1, 999999)),
-                        ),
-                        "timeout": 75,
-                    },
-                    {
-                        "via": "scraperapi-premium-noheaders-fallback",
-                        "url": make_scraperapi_url(
-                            url,
-                            render=True,
-                            premium=True,
-                            keep_headers=False,
-                            session_number=str(random.randint(1, 999999)),
-                        ),
-                        "timeout": 90,
-                    },
-                ]
+            attempts.append(
+                {
+                    "via": "scraperapi-basic-fallback",
+                    "url": make_scraperapi_url(url, render=True, premium=False, keep_headers=True),
+                    "timeout": 60,
+                }
             )
+        return attempts
+
+    def _strong_attempts() -> List[Dict[str, Any]]:
+        if not SCRAPERAPI_KEY:
+            return []
+        # Only used when we detect blocking.
+        return [
+            {
+                "via": "scraperapi-render-premium",
+                "url": make_scraperapi_url(
+                    url,
+                    render=True,
+                    premium=True,
+                    keep_headers=True,
+                    session_number=str(random.randint(1, 999999)),
+                ),
+                "timeout": 80,
+            },
+            # Some sites behave better when ScraperAPI does not forward headers.
+            {
+                "via": "scraperapi-render-premium-noheaders",
+                "url": make_scraperapi_url(
+                    url,
+                    render=True,
+                    premium=True,
+                    keep_headers=False,
+                    session_number=str(random.randint(1, 999999)),
+                ),
+                "timeout": 90,
+            },
+            {
+                "via": "scraperapi-render-noheaders",
+                "url": make_scraperapi_url(
+                    url,
+                    render=True,
+                    premium=False,
+                    keep_headers=False,
+                    session_number=str(random.randint(1, 999999)),
+                ),
+                "timeout": 90,
+            },
+        ]
 
     last_text: Optional[str] = None
+    last_status: int | None = None
+    saw_blocked = False
     try:
+        attempts = _basic_attempts()
         for idx, attempt in enumerate(attempts):
             via = str(attempt.get("via") or "")
             url_to_fetch = str(attempt.get("url") or url)
@@ -667,6 +678,7 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
                 text = await resp.text()
                 status = getattr(resp, "status", 0)
                 last_text = text
+                last_status = int(status or 0)
                 log_fetch_diagnostics(
                     "onthemarket",
                     url,
@@ -675,11 +687,8 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
                     via=via or ("scraperapi" if mode == "scraperapi" else "direct"),
                 )
 
-                blocked = (
-                    _looks_blocked(text, int(status))
-                    or _has_cloudflare_marker(text)
-                    or not (text or "").strip()
-                )
+                blocked = _blocked_by_heuristics(text, int(status))
+                saw_blocked = saw_blocked or bool(blocked)
 
                 hit = _captcha_hit_snippet(text)
                 if hit:
@@ -688,8 +697,82 @@ async def _fetch_html_internal(session: "aiohttp_types.ClientSession", url: str)
                 if not blocked:
                     return text
 
-        # If it still looks blocked, return the last HTML anyway so downstream parsing
-        # + validation can decide whether there are usable cards.
+        # If basic path was blocked, escalate (costly) modes.
+        if saw_blocked:
+            for attempt in _strong_attempts():
+                via = str(attempt.get("via") or "")
+                url_to_fetch = str(attempt.get("url") or url)
+                timeout_value = int(attempt.get("timeout") or 90)
+                headers = _otm_headers()
+
+                await _otm_request_jitter()
+                req = session.get(url_to_fetch, headers=headers, timeout=timeout_value)
+                if inspect.isawaitable(req):
+                    req = await req
+
+                async with req as resp:
+                    text = await resp.text()
+                    status = getattr(resp, "status", 0)
+                    last_text = text
+                    last_status = int(status or 0)
+                    log_fetch_diagnostics(
+                        "onthemarket",
+                        url,
+                        status=int(status),
+                        text=text,
+                        via=via,
+                    )
+
+                    blocked = _blocked_by_heuristics(text, int(status))
+                    if not blocked:
+                        return text
+
+        # Playwright fallback (only if we actually looked blocked).
+        # Controlled by env to manage costs/complexity in production.
+        otm_pw_fallback = (os.getenv("OTM_PLAYWRIGHT_FALLBACK", "1") or "1").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "y",
+            "on",
+        )
+        if saw_blocked and PLAYWRIGHT_ENABLE and otm_pw_fallback:
+            try:
+                rendered = await render_page(
+                    url,
+                    selectors=[
+                        "a[href*='/details/']",
+                        ".property-card",
+                        "[data-testid='property-card']",
+                    ],
+                    click_selectors=[
+                        "#ccc-recommended-settings",
+                        "#ccc-accept-settings",
+                        "button:has-text('Accept')",
+                        "button:has-text('I agree')",
+                    ],
+                )
+            except Exception:
+                rendered = None
+
+            if (
+                rendered
+                and (not _blocked_by_heuristics(rendered, 200))
+                and _has_listing_signals(rendered)
+            ):
+                log_fetch_diagnostics(
+                    "onthemarket",
+                    url,
+                    status=200,
+                    text=rendered,
+                    via="playwright-fallback",
+                )
+                return rendered
+
+        # If it still looks blocked after escalation, surface it clearly.
+        if saw_blocked and _blocked_by_heuristics(last_text or "", last_status or 0):
+            raise OnTheMarketBlockedError("onthemarket blocked")
+
         return last_text
     except Exception as e:
         # On exception in scraperapi mode, we already tried ScraperAPI, so just fail
@@ -932,7 +1015,15 @@ async def scrape_onthemarket_properties(
             async with aiohttp.ClientSession() as session:
                 for page in range(effective_max_pages):
                     url = _build_search_url(location, page)
-                    html = await _fetch_html(session, url)
+                    try:
+                        html = await _fetch_html(session, url)
+                    except OnTheMarketBlockedError:
+                        # If the very first listing page is blocked, treat this source as blocked.
+                        # For later pages, stop pagination.
+                        if page == 0:
+                            raise
+                        log_page_fetch_error("onthemarket", page, "blocked")
+                        break
                     if not html:
                         log_page_fetch_error("onthemarket", page, "blocked or empty")
                         continue
@@ -952,6 +1043,8 @@ async def scrape_onthemarket_properties(
                                     break
                                 try:
                                     detail_html = await _fetch_html(session, detail_url)
+                                except OnTheMarketBlockedError:
+                                    detail_html = None
                                 except Exception:
                                     detail_html = None
                                 if detail_html and (
@@ -1114,6 +1207,8 @@ async def scrape_onthemarket_properties(
                             if listing_url and len(image_urls) < 12:
                                 try:
                                     detail_html = await _fetch_html(session, listing_url)
+                                except OnTheMarketBlockedError:
+                                    detail_html = None
                                 except Exception:
                                     detail_html = None
                                 if detail_html and (

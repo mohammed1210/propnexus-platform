@@ -28,6 +28,9 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 )
 
+# Bump this when selectors materially change.
+SELECTOR_VERSION = "v1"
+
 # NOTE: Avoid overly-broad markers like "robot" which cause false positives due to
 # common meta tags (e.g. <meta name="robots" ...>) on normal pages.
 CAPTCHA_KEYWORDS = [

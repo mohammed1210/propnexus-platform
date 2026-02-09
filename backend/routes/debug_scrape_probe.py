@@ -11,7 +11,42 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query
 
+from backend.scraper.utils import detect_blocked_or_partial
+from backend.utils.render import PLAYWRIGHT_ENABLE
+
 router = APIRouter(tags=["debug"])
+
+
+def _content_length_bytes(text: str) -> int:
+    try:
+        return len((text or "").encode("utf-8", errors="ignore"))
+    except Exception:
+        return len(text or "")
+
+
+def _sanitize_html_snippet(html: str, *, max_chars: int = 2500) -> str:
+    """Return a compact, sanitized, text-only snippet for debugging.
+
+    This intentionally strips tags/scripts/styles and redacts common sensitive tokens.
+    """
+
+    s = html or ""
+    try:
+        s = re.sub(r"(?is)<(script|style)[^>]*>.*?</\\1>", " ", s)
+        s = re.sub(r"(?is)<!--.*?-->", " ", s)
+        s = re.sub(r"(?is)<[^>]+>", " ", s)
+        s = re.sub(r"\s+", " ", s).strip()
+        # Redactions: emails, phone-ish blobs, long hex/base64-ish tokens.
+        s = re.sub(
+            r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}",
+            "<redacted_email>",
+            s,
+        )
+        s = re.sub(r"\b\+?\d[\d\s()\-]{8,}\b", "<redacted_phone>", s)
+        s = re.sub(r"\b[0-9a-f]{32,}\b", "<redacted_token>", s, flags=re.I)
+    except Exception:
+        s = (html or "")[:max_chars]
+    return s[: int(max_chars or 0)]
 
 
 def _require_admin(x_admin_token: str | None = None) -> None:
@@ -103,6 +138,7 @@ async def _probe_zoopla(
             "target_url": target_url,
             "proxy_used": proxy_used,
             "classification": "timeout",
+            "timeout_hit": True,
             "elapsed_ms": int((time.monotonic() - started) * 1000),
         }
 
@@ -247,6 +283,9 @@ async def _probe_zoopla(
     ):
         classification = "parsed_links_only"
 
+    block_reason = detect_blocked_or_partial(text, status, min_html_bytes=8_000)
+    consent_wall = block_reason == "consent_wall"
+
     return {
         "target_url": target_url,
         "proxy_used": bool(proxy_used or fallback_used),
@@ -256,6 +295,13 @@ async def _probe_zoopla(
         "proxy_fallback_used": fallback_used,
         "http_status": status,
         "html_len": len(text or ""),
+        "content_length_bytes": _content_length_bytes(text or ""),
+        "blocked_reason": block_reason,
+        "blocked_detected": bool(blocked_final or block_reason),
+        "consent_wall_detected": bool(consent_wall),
+        "timeout_hit": False,
+        "selector_version": getattr(zp, "SELECTOR_VERSION", "v1"),
+        "html_snippet": _sanitize_html_snippet(text or "", max_chars=2500),
         "cards_found": len(cards),
         "detail_links_found": detail_links_found,
         "detail_urls_sample": detail_urls_sample,
@@ -363,6 +409,7 @@ async def _probe_rightmove(
                 "target_url": api_url,
                 "proxy_used": mode == "scraperapi" and has_key,
                 "classification": "timeout",
+                "timeout_hit": True,
                 "elapsed_ms": int((time.monotonic() - api_started) * 1000),
             }
         except Exception as e:
@@ -371,6 +418,7 @@ async def _probe_rightmove(
                 "proxy_used": mode == "scraperapi" and has_key,
                 "classification": "error",
                 "error": str(e),
+                "timeout_hit": False,
                 "elapsed_ms": int((time.monotonic() - api_started) * 1000),
             }
 
@@ -393,6 +441,7 @@ async def _probe_rightmove(
             "target_url": html_target_url,
             "proxy_used": html_proxy_used,
             "classification": "timeout",
+            "timeout_hit": True,
             "elapsed_ms": int((time.monotonic() - html_started) * 1000),
         }
         return {"api": api_probe, "html": html_probe}
@@ -453,6 +502,16 @@ async def _probe_rightmove(
         "proxy_fallback_used": html_fallback_used,
         "http_status": html_status,
         "html_len": len(html_text or ""),
+        "content_length_bytes": _content_length_bytes(html_text or ""),
+        "blocked_reason": detect_blocked_or_partial(html_text, html_status, min_html_bytes=8_000),
+        "blocked_detected": bool(blocked),
+        "consent_wall_detected": detect_blocked_or_partial(
+            html_text, html_status, min_html_bytes=8_000
+        )
+        == "consent_wall",
+        "timeout_hit": False,
+        "selector_version": getattr(rm, "SELECTOR_VERSION", "v1"),
+        "html_snippet": _sanitize_html_snippet(html_text or "", max_chars=2500),
         "title": title,
         "next_data_present": bool(next_data_present),
         "property_card_present": bool(property_card_present),
@@ -650,7 +709,12 @@ async def _probe_rightmove(
 
 
 async def _probe_onthemarket(
-    session: Any, location: str, page: int, timeout_seconds: int
+    session: Any,
+    location: str,
+    page: int,
+    timeout_seconds: int,
+    *,
+    include_escalation: bool,
 ) -> Dict[str, Any]:
     from bs4 import BeautifulSoup
 
@@ -664,21 +728,58 @@ async def _probe_onthemarket(
 
     headers = {"User-Agent": otm.USER_AGENT, "Accept-Language": "en-GB,en;q=0.9"}
 
+    def _has_listing_signals(html: str) -> bool:
+        low = (html or "").lower()
+        return (
+            "/details/" in low
+            or "property-card" in low
+            or 'data-testid="property-card"' in low
+            or "data-testid='property-card'" in low
+        )
+
+    def _is_blocked(html: str, status_code: int) -> bool:
+        reason = detect_blocked_or_partial(html, status_code, min_html_bytes=8_000)
+        return bool(
+            otm._looks_blocked(html, status_code) or _generic_blocked_markers(html) or reason
+        )
+
     started = time.monotonic()
+    attempts_meta: List[Dict[str, Any]] = []
+    fetch_via = "scraperapi_basic" if proxy_used else "direct"
+    retry_mode_used: str | None = None
+    used_playwright = False
+
+    playwright_attempted = False
+    playwright_http_status = 0
+    playwright_html_len = 0
+    playwright_blocked: bool | None = None
+    playwright_cards_found: int | None = None
+    playwright_html_snippet: str | None = None
+    escalation_used: str | None = None
     try:
         fetch_url = otm.make_scraperapi_url(target_url, render=True) if proxy_used else target_url
         status, text = await _fetch_text(
             session, fetch_url, headers=headers, timeout_seconds=timeout_seconds
+        )
+        attempts_meta.append(
+            {
+                "via": fetch_via,
+                "target_url": target_url,
+                "http_status": status,
+                "html_len": len(text or ""),
+                "blocked": _is_blocked(text or "", int(status or 0)),
+            }
         )
     except asyncio.TimeoutError:
         return {
             "target_url": target_url,
             "proxy_used": proxy_used,
             "classification": "timeout",
+            "timeout_hit": True,
             "elapsed_ms": int((time.monotonic() - started) * 1000),
         }
 
-    initial_blocked = bool(otm._looks_blocked(text, status) or _generic_blocked_markers(text))
+    initial_blocked = bool(_is_blocked(text or "", int(status or 0)))
     initial_status = status
     initial_len = len(text or "")
 
@@ -690,29 +791,186 @@ async def _probe_onthemarket(
             status, text = await _fetch_text(
                 session, proxy_url, headers=headers, timeout_seconds=max(timeout_seconds, 60)
             )
+            fetch_via = "scraperapi_basic"
+            attempts_meta.append(
+                {
+                    "via": "scraperapi_basic",
+                    "target_url": target_url,
+                    "http_status": status,
+                    "html_len": len(text or ""),
+                    "blocked": _is_blocked(text or "", int(status or 0)),
+                }
+            )
         except Exception:
             status, text = initial_status, text
 
-    blocked_by_heuristic = bool(otm._looks_blocked(text, status) or _generic_blocked_markers(text))
+    blocked_by_heuristic = bool(_is_blocked(text or "", int(status or 0)))
+
+    # Blocked-only escalation (bounded cost): premium/noheaders ladder.
+    if has_key and blocked_by_heuristic:
+        for via, opts, tmo in (
+            (
+                "scraperapi_render_premium",
+                dict(
+                    render=True,
+                    premium=True,
+                    keep_headers=True,
+                    session_number=str(random.randint(1, 999999)),
+                ),
+                80,
+            ),
+            (
+                "scraperapi_render_premium_noheaders",
+                dict(
+                    render=True,
+                    premium=True,
+                    keep_headers=False,
+                    session_number=str(random.randint(1, 999999)),
+                ),
+                90,
+            ),
+        ):
+            try:
+                proxy_url = otm.make_scraperapi_url(target_url, **opts)
+                st2, tx2 = await _fetch_text(
+                    session,
+                    proxy_url,
+                    headers=headers,
+                    timeout_seconds=max(int(tmo), int(timeout_seconds or 0), 20),
+                )
+                attempts_meta.append(
+                    {
+                        "via": via,
+                        "target_url": target_url,
+                        "http_status": st2,
+                        "html_len": len(tx2 or ""),
+                        "blocked": _is_blocked(tx2 or "", int(st2 or 0)),
+                    }
+                )
+                if (not _is_blocked(tx2 or "", int(st2 or 0))) and _has_listing_signals(tx2 or ""):
+                    status, text = st2, tx2
+                    fetch_via = via
+                    retry_mode_used = via
+                    break
+            except Exception:
+                continue
+
+    blocked_by_heuristic = bool(_is_blocked(text or "", int(status or 0)))
+
+    # Playwright escalation when still blocked (explicitly gated by include_escalation).
+    if blocked_by_heuristic and include_escalation:
+        try:
+            from backend.utils.render import PLAYWRIGHT_ENABLE as PW_ENABLED
+            from backend.utils.render import render_page
+        except Exception:
+            PW_ENABLED = False
+            render_page = None  # type: ignore
+
+        if PW_ENABLED and render_page is not None:
+            playwright_attempted = True
+            escalation_used = "playwright"
+            rendered = None
+            try:
+                rendered = await render_page(
+                    target_url,
+                    selectors=[
+                        "a[href*='/details/']",
+                        ".property-card",
+                        "[data-testid='property-card']",
+                    ],
+                    click_selectors=[
+                        "#ccc-recommended-settings",
+                        "#ccc-accept-settings",
+                        "button:has-text('Accept')",
+                        "button:has-text('I agree')",
+                    ],
+                )
+            except Exception:
+                rendered = None
+
+            used_playwright = bool(rendered)
+            playwright_http_status = 200 if rendered else 0
+            playwright_html_len = len(rendered or "")
+            playwright_blocked = _is_blocked(rendered or "", 200) if rendered else None
+            playwright_html_snippet = (
+                _sanitize_html_snippet(rendered or "", max_chars=2500) if rendered else None
+            )
+
+            if rendered is not None:
+                # Re-parse cards using the existing scraper selectors.
+                try:
+                    p_soup = BeautifulSoup(rendered, "html.parser")
+                    p_cards = otm._collect_cards(p_soup)
+                    playwright_cards_found = len(p_cards)
+                except Exception:
+                    playwright_cards_found = None
+
+                attempts_meta.append(
+                    {
+                        "via": "playwright_escalation",
+                        "target_url": target_url,
+                        "http_status": 200,
+                        "html_len": len(rendered or ""),
+                        "blocked": _is_blocked(rendered or "", 200),
+                    }
+                )
+
+            if rendered and (not _is_blocked(rendered, 200)) and _has_listing_signals(rendered):
+                status, text = 200, rendered
+                fetch_via = "playwright_fallback"
+                retry_mode_used = "playwright_fallback"
+
+    blocked_by_heuristic = bool(_is_blocked(text or "", int(status or 0)))
     soup = BeautifulSoup(text, "html.parser")
     cards = otm._collect_cards(soup)
 
-    blocked_final, classification = _final_block_status(
-        blocked_by_heuristic=blocked_by_heuristic, cards_found=len(cards)
-    )
-    if classification == "ok" and len(cards) == 0:
-        classification = "fetched_no_cards"
+    detail_urls: List[str] = []
+    try:
+        detail_urls = otm._collect_detail_listing_urls(soup)
+    except Exception:
+        detail_urls = []
+    detail_links_found = len(detail_urls)
 
+    items_found = max(len(cards), detail_links_found)
+    blocked_final, classification = _final_block_status(
+        blocked_by_heuristic=blocked_by_heuristic, cards_found=items_found
+    )
+    if classification == "ok" and items_found == 0:
+        classification = "fetched_no_cards"
+    if classification == "ok" and detail_links_found > 0 and len(cards) == 0:
+        classification = "parsed_links_only"
+
+    block_reason = detect_blocked_or_partial(text, status, min_html_bytes=8_000)
     return {
         "target_url": target_url,
         "proxy_used": bool(proxy_used or fallback_used),
+        "fetch_via": fetch_via,
+        "retry_mode_used": retry_mode_used,
+        "fallback_used": bool(fallback_used or retry_mode_used or used_playwright),
+        "escalation_used": escalation_used,
+        "attempts": attempts_meta,
+        "playwright_attempted": playwright_attempted,
+        "playwright_http_status": playwright_http_status,
+        "playwright_html_len": playwright_html_len,
+        "playwright_blocked": playwright_blocked,
+        "playwright_cards_found": playwright_cards_found,
+        "playwright_html_snippet": playwright_html_snippet,
         "initial_http_status": initial_status,
         "initial_html_len": initial_len,
         "initial_blocked": initial_blocked,
         "proxy_fallback_used": fallback_used,
         "http_status": status,
         "html_len": len(text or ""),
+        "content_length_bytes": _content_length_bytes(text or ""),
+        "blocked_reason": block_reason,
+        "blocked_detected": bool(blocked_final or block_reason),
+        "consent_wall_detected": block_reason == "consent_wall",
+        "timeout_hit": False,
+        "selector_version": getattr(otm, "SELECTOR_VERSION", "v1"),
+        "html_snippet": _sanitize_html_snippet(text or "", max_chars=2500),
         "cards_found": len(cards),
+        "detail_links_found": detail_links_found,
+        "detail_urls_sample": detail_urls[:3],
         "blocked_by_heuristic": blocked_by_heuristic,
         "blocked": blocked_final,
         "classification": classification,
@@ -746,6 +1004,7 @@ async def _probe_spareroom(
             "target_url": target_url,
             "proxy_used": proxy_used,
             "classification": "timeout",
+            "timeout_hit": True,
             "elapsed_ms": int((time.monotonic() - started) * 1000),
         }
 
@@ -774,6 +1033,7 @@ async def _probe_spareroom(
     if classification == "ok" and len(cards) == 0:
         classification = "fetched_no_cards"
 
+    block_reason = detect_blocked_or_partial(text, status, min_html_bytes=8_000)
     return {
         "target_url": target_url,
         "proxy_used": bool(proxy_used or fallback_used),
@@ -783,6 +1043,13 @@ async def _probe_spareroom(
         "proxy_fallback_used": fallback_used,
         "http_status": status,
         "html_len": len(text or ""),
+        "content_length_bytes": _content_length_bytes(text or ""),
+        "blocked_reason": block_reason,
+        "blocked_detected": bool(blocked_final or block_reason),
+        "consent_wall_detected": block_reason == "consent_wall",
+        "timeout_hit": False,
+        "selector_version": getattr(sr, "SELECTOR_VERSION", "v1"),
+        "html_snippet": _sanitize_html_snippet(text or "", max_chars=2500),
         "cards_found": len(cards),
         "blocked_by_heuristic": blocked_by_heuristic,
         "blocked": blocked_final,
@@ -822,7 +1089,13 @@ async def _run_probe(
             )
         if "onthemarket" in sources:
             tasks["onthemarket"] = asyncio.create_task(
-                _probe_onthemarket(session, location, page, timeout_seconds)
+                _probe_onthemarket(
+                    session,
+                    location,
+                    page,
+                    timeout_seconds,
+                    include_escalation=include_escalation,
+                )
             )
         if "spareroom" in sources:
             tasks["spareroom"] = asyncio.create_task(
@@ -854,13 +1127,14 @@ async def debug_scrape_probe(
     ),
     include_escalation: bool = Query(
         False,
-        description="When true, runs an additional premium/ultra escalation ladder for Rightmove; can be slow",
+        description="When true, runs additional escalation (Rightmove ladder; and Playwright escalation for OnTheMarket when blocked); can be slow",
     ),
     x_admin_token: str | None = Header(None),
 ):
     """Probe each scraper source and report blocked vs parsed vs timeout.
 
-    Returns only metadata (status codes, lengths, counts). Never returns raw HTML.
+    Returns only metadata (status codes, lengths, counts) plus a small sanitized
+    text-only snippet for debugging. Never returns raw HTML.
     Protected by IMPORT_ADMIN_TOKEN when configured.
     """
     _require_admin(x_admin_token)
@@ -889,7 +1163,7 @@ async def debug_scrape_probe(
         "sources": selected,
         "scraper_mode": (os.getenv("SCRAPER_MODE") or "direct"),
         "scraperapi_enabled": bool((os.getenv("SCRAPERAPI_KEY") or "").strip()),
-        "playwright_enabled": (os.getenv("PLAYWRIGHT_ENABLE") or "0") == "1",
+        "playwright_enabled": bool(PLAYWRIGHT_ENABLE),
         "timeout_seconds": timeout_seconds,
         "include_escalation": include_escalation,
         "elapsed_ms": int((time.monotonic() - started) * 1000),

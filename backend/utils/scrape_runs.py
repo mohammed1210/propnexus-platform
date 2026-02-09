@@ -80,3 +80,45 @@ def finish_scrape_run(
         sb.table("scrape_runs").update(patch).eq("id", run_id).execute()
     except Exception:
         return
+
+
+def update_scrape_run_data(
+    *,
+    run_id: str | None,
+    data: Any,
+    status: str | None = None,
+    count_inserted: int | None = None,
+    error: str | None = None,
+) -> None:
+    """Best-effort patch to attach structured JSON data to a scrape_runs row.
+
+    Intended for durable progress/status snapshots (e.g. /import/batch async).
+    Safe no-op when Supabase isn't configured or the column doesn't exist.
+    """
+
+    if not run_id:
+        return
+
+    try:
+        from backend.db import sb  # type: ignore
+    except Exception:
+        sb = None
+
+    if not sb:
+        return
+
+    patch: dict[str, Any] = {
+        "data": data,
+        "updated_at": _now_iso(),
+    }
+    if status is not None:
+        patch["status"] = (status or "").strip().lower() or "unknown"
+    if count_inserted is not None:
+        patch["count_inserted"] = int(count_inserted or 0)
+    if error is not None:
+        patch["error"] = error
+
+    try:
+        sb.table("scrape_runs").update(patch).eq("id", run_id).execute()
+    except Exception:
+        return

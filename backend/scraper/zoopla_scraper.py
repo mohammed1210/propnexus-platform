@@ -33,6 +33,9 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 )
 
+# Bump this when listing/detail selectors materially change.
+SELECTOR_VERSION = "v1"
+
 SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 ZP_MAX_PAGES = int(os.getenv("ZP_MAX_PAGES", "1"))
