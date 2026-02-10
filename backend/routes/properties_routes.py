@@ -357,7 +357,7 @@ def list_properties(
     sort: str = Query(
         default="created_at_desc",
         description=(
-            "Sort order. Preferred values: created_at_desc, price_asc, price_desc, "
+            "Sort order. Preferred values: recommended, created_at_desc, price_asc, price_desc, "
             "yield_desc, roi_desc. Backwards compatible: you may also pass a column "
             "name and use dir=asc|desc."
         ),
@@ -431,6 +431,8 @@ def list_properties(
         # Sorting
         sort_key = (sort or "").strip().lower()
         sort_map = {
+            "recommended": ("score", True),
+            "best_deals": ("score", True),
             "created_at_desc": ("created_at", True),
             "price_asc": ("price", False),
             "price_desc": ("price", True),

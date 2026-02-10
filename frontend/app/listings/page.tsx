@@ -126,7 +126,14 @@ const Popup = nextDynamic(() => import('react-leaflet').then((m) => m.Popup), { 
  */
 const useMap = () => require('react-leaflet').useMap();
 
-const SORTABLE = ['created_at_desc', 'price_asc', 'price_desc', 'yield_desc', 'roi_desc'] as const;
+const SORTABLE = [
+  'recommended',
+  'created_at_desc',
+  'price_asc',
+  'price_desc',
+  'yield_desc',
+  'roi_desc',
+] as const;
 type SortKey = (typeof SORTABLE)[number];
 
 const INVESTMENT_TYPES = ['HMO', 'BTL', 'SA', 'BRR', 'Flip', 'Commercial'] as const;
@@ -514,7 +521,7 @@ function ListingsInner() {
     if (legacy === 'yield_percent') return 'yield_desc';
     if (legacy === 'roi_percent') return 'roi_desc';
 
-    return 'created_at_desc';
+    return 'recommended';
   })();
 
   const limit = ((): number => {
@@ -1303,6 +1310,7 @@ function ListingsInner() {
                 style={{ height: 40, padding: '0.5rem 0.75rem' }}
                 aria-label="Sort"
               >
+                <option value="recommended">Recommended (Top deals)</option>
                 <option value="created_at_desc">Most recent</option>
                 <option value="price_asc">Price: low to high</option>
                 <option value="price_desc">Price: high to low</option>

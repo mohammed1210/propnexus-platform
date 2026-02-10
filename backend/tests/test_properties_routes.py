@@ -163,6 +163,32 @@ def test_list_properties_invalid_sort(mock_create_client, client):
 
 
 @patch("backend.routes.properties_routes.create_client")
+def test_list_properties_recommended_sort_orders_by_score_then_created_at(
+    mock_create_client, client
+):
+    """Recommended sort should order by score desc (NULLS LAST) then created_at desc."""
+
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+    mock_query.execute.return_value = Mock(data=[], count=0)
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"sort": "recommended"})
+    assert response.status_code == 200
+
+    assert mock_query.order.call_count >= 2
+    first = mock_query.order.call_args_list[0]
+    second = mock_query.order.call_args_list[1]
+    assert first[0][0] == "score"
+    assert second[0][0] == "created_at"
+
+
+@patch("backend.routes.properties_routes.create_client")
 def test_list_properties_price_desc_returns_items_with_null_or_invalid_price(
     mock_create_client, client
 ):
