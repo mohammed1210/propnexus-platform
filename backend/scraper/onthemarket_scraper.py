@@ -112,11 +112,52 @@ def _count_otm_detail_links_in_html(html: str) -> int:
     )
 
 
+def _has_otm_detail_signals(html: str) -> bool:
+    """Detect whether a page looks like a real OTM detail page.
+
+    Used to avoid false "blocked" classifications when the HTML contains generic
+    keywords (e.g. "captcha") but still embeds the canonical metadata.
+    """
+
+    s = html or ""
+    if not s.strip():
+        return False
+    lowered = s.lower()
+
+    # Real property pages typically include OpenGraph metadata.
+    if re.search(
+        r"meta\s+property=(?:\"|')og:title(?:\"|')\s+content=(?:\"|')[^\"']{5,}(?:\"|')",
+        s,
+        re.I,
+    ):
+        return True
+    if re.search(
+        r"meta\s+property=(?:\"|')og:description(?:\"|')\s+content=(?:\"|')[^\"']{5,}(?:\"|')",
+        s,
+        re.I,
+    ):
+        return True
+    if re.search(
+        r"meta\s+property=(?:\"|')og:url(?:\"|')\s+content=(?:\"|')https?://[^\"']+/details/\d+/?(?:\"|')",
+        s,
+        re.I,
+    ):
+        return True
+
+    # Backup: presence of JSON-LD is a decent indicator for real pages.
+    if "application/ld+json" in lowered:
+        return True
+
+    return False
+
+
 def _blocked_by_heuristics_explain(html: str, status: int | None) -> tuple[bool, str | None]:
     s = html or ""
     st = int(status or 0)
-    if _looks_blocked(s, st) or _has_cloudflare_marker(s) or not s.strip():
-        return True, "blocked_marker"
+    if not s.strip():
+        return True, "empty_body"
+    if _has_cloudflare_marker(s):
+        return True, "cloudflare_marker"
 
     reason, meta = detect_blocked_or_partial_explain(
         s, st if st > 0 else None, min_html_bytes=8_000
@@ -124,12 +165,29 @@ def _blocked_by_heuristics_explain(html: str, status: int | None) -> tuple[bool,
     if reason is None:
         return False, None
 
-    # OTM listing pages sometimes contain generic strings like "blocked" while still
-    # embedding real listing signals (detail links and/or dataLayer property ids).
+    # Small-but-valid HTML is common in tests and can also happen in production.
+    # Only treat it as blocked when we have no positive signals.
+    if reason == "small_payload":
+        if (
+            _count_otm_detail_links_in_html(s) > 0
+            or len(_extract_otm_property_ids_from_datalayer(s)) > 0
+            or _has_listing_signals(s)
+            or _has_otm_detail_signals(s)
+        ):
+            return False, "small_payload_ignored"
+        return True, reason
+
+    # OTM pages sometimes contain generic strings like "captcha"/"blocked" while still
+    # embedding real listing/detail signals.
     if reason == "block_keyword":
         detail_links = _count_otm_detail_links_in_html(s)
         property_ids = len(_extract_otm_property_ids_from_datalayer(s))
-        if detail_links > 0 or property_ids > 0 or _has_listing_signals(s):
+        if (
+            detail_links > 0
+            or property_ids > 0
+            or _has_listing_signals(s)
+            or _has_otm_detail_signals(s)
+        ):
             kw = meta.get("block_keyword")
             return False, f"block_keyword_ignored:{kw}" if kw else "block_keyword_ignored"
         kw = meta.get("block_keyword")
@@ -1345,8 +1403,10 @@ async def scrape_onthemarket_properties(
                         if not detail_html or not (detail_html or "").strip():
                             return None
 
-                        # Reject obvious challenge pages.
-                        if _looks_blocked(detail_html, 200) or _has_cloudflare_marker(detail_html):
+                        blocked_detail, _blocked_reason = _blocked_by_heuristics_explain(
+                            detail_html, 200
+                        )
+                        if blocked_detail:
                             return None
 
                         parsed = _parse_otm_detail_page(
