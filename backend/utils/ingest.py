@@ -186,6 +186,7 @@ def pick_first(d: Dict[str, Any], keys: Iterable[str]) -> Any:
 _MEDIA_SLOT_RE = re.compile(r"/(image|floor\-plan)\-(\d+)\-", re.IGNORECASE)
 _FULL_POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b", re.I)
 _OUTWARD_POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d[A-Z\d]?)\b", re.I)
+_OUTWARD_POSTCODE_FULL_RE = re.compile(r"^[A-Z]{1,2}\d[A-Z\d]?$", re.I)
 
 
 def normalize_media_urls(urls: list[str] | None) -> dict[str, Any]:
@@ -276,6 +277,32 @@ def extract_postcode_from_text(text: str | None) -> str | None:
         outward = re.sub(r"\s+", "", m2.group(1)).upper()
         return outward or None
     return None
+
+
+def postcode_band(postcode: str | None) -> str | None:
+    """Derive an outward (district) postcode from a postcode string.
+
+    Examples:
+      - "SW1A 1AA" -> "SW1A"
+      - "N22" -> "N22"
+    """
+
+    if not postcode or not isinstance(postcode, str):
+        return None
+    raw = postcode.strip()
+    if not raw:
+        return None
+
+    norm = extract_postcode_from_text(raw) or re.sub(r"\s+", " ", raw).strip().upper()
+    if not norm:
+        return None
+
+    outward = (norm.split(" ", 1)[0] or "").strip().upper()
+    if not outward:
+        return None
+    if not _OUTWARD_POSTCODE_FULL_RE.fullmatch(outward):
+        return None
+    return outward
 
 
 # ----------------------------

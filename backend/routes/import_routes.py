@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import re
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
@@ -37,6 +38,7 @@ from backend.utils.image_utils import (
 from backend.utils.ingest import (
     extract_postcode_from_text,
     normalize_media_urls,
+    postcode_band,
     scrape_all_sources,
 )
 from backend.utils.listing_keys import ensure_external_id, extract_postcode, strip_empty_for_upsert
@@ -61,16 +63,6 @@ router = APIRouter(prefix="/import", tags=["import"])
 # Backwards-compatible alias router (no prefix)
 admin_alias_router = APIRouter(tags=["import"])
 
-
-# In-memory batch job state for /import/batch async mode.
-# Note: this is best-effort and not durable across deploys/restarts.
-_BATCH_JOBS: dict[str, dict[str, Any]] = {}
-
-# Keep strong references to background tasks so they are not GC'd.
-_BATCH_TASKS: dict[str, asyncio.Task[None]] = {}
-
-# Concurrency guard for _BATCH_JOBS and _BATCH_TASKS.
-_BATCH_LOCK = asyncio.Lock()
 
 _batch_logger = logging.getLogger(__name__)
 
@@ -106,134 +98,31 @@ def _create_durable_batch_run(*, cities: list[str]) -> str:
         raise HTTPException(status_code=500, detail="Failed to create durable batch run")
 
 
-def _batch_snapshot(job: dict[str, Any]) -> dict[str, Any]:
-    """Return a JSON-serializable snapshot safe to persist."""
+async def _persist_batch_snapshot(
+    batch_id: str,
+    snapshot: dict[str, Any],
+    *,
+    status: str,
+    error: str | None = None,
+) -> None:
+    """Persist batch job snapshot to scrape_runs.data.
 
-    out: dict[str, Any] = {}
-    for k in (
-        "batch_id",
-        "status",
-        "request",
-        "cities",
-        "sources",
-        "max_pages",
-        "delay_min_s",
-        "delay_max_s",
-        "total_scraped",
-        "total_imported",
-        "per_city",
-    ):
-        if k in job:
-            out[k] = job.get(k)
-    return out
-
-
-def _schedule_persist_batch_snapshot(batch_id: str, *, force: bool = False) -> None:
-    """Persist batch job state to scrape_runs.data best-effort.
-
-    This MUST NOT block the event loop (Supabase client is sync).
+    This must never block the event loop (Supabase client is sync), so it runs in a thread.
     """
 
     if not sb:
         return
-
-    async def _persist() -> None:
-        try:
-            async with _BATCH_LOCK:
-                job = _BATCH_JOBS.get(batch_id)
-                if not isinstance(job, dict):
-                    return
-
-                now = time.monotonic()
-                last = float(job.get("_persisted_at_mono") or 0.0)
-                if (not force) and (now - last < 2.0):
-                    return
-                job["_persisted_at_mono"] = now
-                snap = _batch_snapshot(job)
-                status = str(job.get("status") or "running")
-                count_inserted = int(job.get("total_imported") or 0)
-
-            await asyncio.to_thread(
-                update_scrape_run_data,
-                run_id=batch_id,
-                data=snap,
-                status=status,
-                count_inserted=count_inserted,
-                error=None,
-            )
-        except Exception:
-            return
-
     try:
-        asyncio.create_task(_persist())
+        await asyncio.to_thread(
+            update_scrape_run_data,
+            run_id=batch_id,
+            data=snapshot,
+            status=status,
+            count_inserted=int(snapshot.get("total_imported") or 0),
+            error=error,
+        )
     except Exception:
         return
-
-
-async def _update_city_source(batch_id: str, city: str, source: str, patch: dict[str, Any]) -> None:
-    async with _BATCH_LOCK:
-        job = _BATCH_JOBS.get(batch_id)
-        if not isinstance(job, dict):
-            return
-        per_city = job.get("per_city")
-        if not isinstance(per_city, dict):
-            return
-        entry = per_city.get(city)
-        if not isinstance(entry, dict):
-            entry = {}
-            per_city[city] = entry
-        sources = entry.get("sources")
-        if not isinstance(sources, dict):
-            sources = {}
-            entry["sources"] = sources
-        s_entry = sources.get(source)
-        if not isinstance(s_entry, dict):
-            s_entry = {}
-            sources[source] = s_entry
-        s_entry.update(patch)
-    _schedule_persist_batch_snapshot(batch_id)
-
-
-def _overall_batch_status(per_city: dict[str, dict[str, Any]]) -> str:
-    statuses = [str(v.get("status") or "queued").lower() for v in (per_city or {}).values()]
-    if not statuses:
-        return "queued"
-    if any(s == "running" for s in statuses):
-        return "running"
-    ok = sum(1 for s in statuses if s == "success")
-    err = sum(1 for s in statuses if s == "error")
-    if ok == len(statuses):
-        return "success"
-    if err == len(statuses):
-        return "error"
-    if ok > 0 and err > 0:
-        return "partial"
-    return statuses[0]
-
-
-async def _update_batch_job(batch_id: str, patch: dict[str, Any]) -> None:
-    async with _BATCH_LOCK:
-        job = _BATCH_JOBS.get(batch_id)
-        if not isinstance(job, dict):
-            return
-        job.update(patch)
-    _schedule_persist_batch_snapshot(batch_id)
-
-
-async def _update_city(batch_id: str, city: str, patch: dict[str, Any]) -> None:
-    async with _BATCH_LOCK:
-        job = _BATCH_JOBS.get(batch_id)
-        if not isinstance(job, dict):
-            return
-        per_city = job.get("per_city")
-        if not isinstance(per_city, dict):
-            return
-        entry = per_city.get(city)
-        if not isinstance(entry, dict):
-            entry = {}
-            per_city[city] = entry
-        entry.update(patch)
-    _schedule_persist_batch_snapshot(batch_id)
 
 
 def _queue_batch_job(
@@ -247,6 +136,7 @@ def _queue_batch_job(
     per_city_timeout_s: float,
     enrich: bool = False,
     enrich_limit: int = 5,
+    initial_snapshot: dict[str, Any] | None = None,
 ) -> None:
     async def _runner() -> None:
         started_mono = time.monotonic()
@@ -258,23 +148,35 @@ def _queue_batch_job(
             float(per_city_timeout_s or 0),
         )
 
-        await _update_batch_job(batch_id, {"status": "running"})
-        _schedule_persist_batch_snapshot(batch_id, force=True)
+        snapshot: dict[str, Any] = dict(initial_snapshot or {})
+        snapshot["batch_id"] = batch_id
+        snapshot["status"] = "running"
+        await _persist_batch_snapshot(batch_id, snapshot, status="running")
 
         total_scraped = 0
         total_imported = 0
+        had_error = False
+        had_timeout = False
         for i, city in enumerate(cities):
-            # Pre-seed per-source status so the status endpoint can show progress.
+            per_city = snapshot.get("per_city")
+            if not isinstance(per_city, dict):
+                per_city = {}
+                snapshot["per_city"] = per_city
+
+            entry = per_city.get(city)
+            if not isinstance(entry, dict):
+                entry = {}
+                per_city[city] = entry
+
+            entry.update({"status": "running", "scraped": 0, "imported": 0, "error": None})
+            src_map = entry.get("sources")
+            if not isinstance(src_map, dict):
+                src_map = {}
+                entry["sources"] = src_map
             for source in sources:
-                await _update_city_source(
-                    batch_id,
-                    city,
-                    source,
-                    {"status": "running", "scraped": 0, "imported": 0, "error": None},
-                )
-            await _update_city(
-                batch_id, city, {"status": "running", "scraped": 0, "imported": 0, "error": None}
-            )
+                src_map[source] = {"status": "running", "scraped": 0, "imported": 0, "error": None}
+
+            await _persist_batch_snapshot(batch_id, snapshot, status="running")
 
             city_started = time.monotonic()
             _batch_logger.info(
@@ -354,19 +256,16 @@ def _queue_batch_job(
                                 and int(telemetry.get("detail_fetch_timed_out") or 0) > 0
                             )
 
-                        await _update_city_source(
-                            batch_id,
-                            city,
-                            source,
-                            patch,
-                        )
-                        await _update_city(
-                            batch_id,
-                            city,
-                            {
-                                "scraped": sum(city_scraped_by_source.values()),
-                            },
-                        )
+                        per_city_local = snapshot.get("per_city")
+                        if isinstance(per_city_local, dict):
+                            ce = per_city_local.get(city)
+                            if isinstance(ce, dict):
+                                srcs_local = ce.get("sources")
+                                if isinstance(srcs_local, dict):
+                                    srcs_local[source] = patch
+                                ce["scraped"] = sum(city_scraped_by_source.values())
+
+                        await _persist_batch_snapshot(batch_id, snapshot, status="running")
 
                         _batch_logger.info(
                             "batch_source_done batch_id=%s city=%s source=%s status=%s scraped=%s error=%s elapsed_s=%.2f",
@@ -380,17 +279,20 @@ def _queue_batch_job(
                         )
 
                     raw = await _maybe_await(
-                        scrape_all_sources(
-                            city,
-                            sources=sources,
-                            zoopla_max_pages=max_pages,
-                            onthemarket_max_pages=max_pages,
-                            timeout_s=(
-                                float(per_city_timeout_s)
-                                if float(per_city_timeout_s or 0) > 0
-                                else None
+                        asyncio.wait_for(
+                            scrape_all_sources(
+                                city,
+                                sources=sources,
+                                zoopla_max_pages=max_pages,
+                                onthemarket_max_pages=max_pages,
+                                timeout_s=(
+                                    float(per_city_timeout_s)
+                                    if float(per_city_timeout_s or 0) > 0
+                                    else None
+                                ),
+                                on_source_complete=_on_source_complete,
                             ),
-                            on_source_complete=_on_source_complete,
+                            timeout=max(1.0, float(per_city_timeout_s or 0)),
                         )
                     )
                     items_local: list[Any] = raw if isinstance(raw, list) else []
@@ -421,36 +323,28 @@ def _queue_batch_job(
                 db_upsert_ok = db_error is None
                 total_imported += int(imported or 0)
 
-                # City-level status reflects completion; per-source status captures errors/timeouts.
-                if db_upsert_ok and int(imported or 0) > 0:
-                    city_status = "success"
-                    city_error = None
-                elif db_upsert_ok and int(imported or 0) == 0:
-                    # Allow "0 results" to be a successful completion (not a timeout).
-                    city_status = "success"
-                    city_error = None
-                else:
-                    city_status = "error"
-                    city_error = db_error
+                city_status = "success" if db_upsert_ok else "error"
+                city_error = None if db_upsert_ok else db_error
+                if city_status == "error":
+                    had_error = True
+                    if city_error and str(city_error).lower().startswith("timeout"):
+                        had_timeout = True
 
-                await _update_city(
-                    batch_id,
-                    city,
-                    {
-                        "scraped": scraped,
-                        "imported": imported,
-                        "status": city_status,
-                        "error": city_error,
-                    },
-                )
-
-                # Keep overall totals fresh while job is running.
-                await _update_batch_job(
-                    batch_id,
-                    {"total_scraped": total_scraped, "total_imported": total_imported},
-                )
-
-                _schedule_persist_batch_snapshot(batch_id, force=True)
+                per_city_local = snapshot.get("per_city")
+                if isinstance(per_city_local, dict):
+                    ce = per_city_local.get(city)
+                    if isinstance(ce, dict):
+                        ce.update(
+                            {
+                                "scraped": scraped,
+                                "imported": int(imported or 0),
+                                "status": city_status,
+                                "error": city_error,
+                            }
+                        )
+                snapshot["total_scraped"] = total_scraped
+                snapshot["total_imported"] = total_imported
+                await _persist_batch_snapshot(batch_id, snapshot, status="running")
 
                 _batch_logger.info(
                     "batch_city_done batch_id=%s city=%s status=%s scraped=%s imported=%s elapsed_s=%.2f",
@@ -462,28 +356,25 @@ def _queue_batch_job(
                     time.monotonic() - city_started,
                 )
             except asyncio.TimeoutError:
-                for source in sources:
-                    await _update_city_source(
-                        batch_id,
-                        city,
-                        source,
-                        {"status": "error", "error": f"timeout after {per_city_timeout_s}s"},
-                    )
-                await _update_city(
-                    batch_id,
-                    city,
-                    {
-                        "scraped": 0,
-                        "imported": 0,
-                        "status": "error",
-                        "error": f"timeout after {per_city_timeout_s}s",
-                    },
-                )
-                await _update_batch_job(
-                    batch_id,
-                    {"total_scraped": total_scraped, "total_imported": total_imported},
-                )
-                _schedule_persist_batch_snapshot(batch_id, force=True)
+                had_error = True
+                had_timeout = True
+                per_city_local = snapshot.get("per_city")
+                if isinstance(per_city_local, dict):
+                    ce = per_city_local.get(city)
+                    if isinstance(ce, dict):
+                        ce.update(
+                            {"scraped": 0, "imported": 0, "status": "error", "error": "timeout"}
+                        )
+                        srcs_local = ce.get("sources")
+                        if isinstance(srcs_local, dict):
+                            for src in list(srcs_local.keys()):
+                                se = srcs_local.get(src)
+                                if isinstance(se, dict):
+                                    se["status"] = "error"
+                                    se["error"] = "timeout"
+                snapshot["total_scraped"] = total_scraped
+                snapshot["total_imported"] = total_imported
+                await _persist_batch_snapshot(batch_id, snapshot, status="running", error="timeout")
                 _batch_logger.warning(
                     "batch_city_timeout batch_id=%s city=%s per_city_timeout_s=%.1f elapsed_s=%.2f",
                     batch_id,
@@ -493,40 +384,50 @@ def _queue_batch_job(
                 )
             except asyncio.CancelledError:
                 # Surface cancellation cleanly; this can happen during shutdown.
-                for source in sources:
-                    await _update_city_source(
-                        batch_id,
-                        city,
-                        source,
-                        {"status": "error", "error": "CancelledError"},
-                    )
-                await _update_city(
-                    batch_id,
-                    city,
-                    {"scraped": 0, "imported": 0, "status": "error", "error": "CancelledError"},
+                had_error = True
+                per_city_local = snapshot.get("per_city")
+                if isinstance(per_city_local, dict):
+                    ce = per_city_local.get(city)
+                    if isinstance(ce, dict):
+                        ce.update(
+                            {
+                                "scraped": 0,
+                                "imported": 0,
+                                "status": "error",
+                                "error": "CancelledError",
+                            }
+                        )
+                        srcs_local = ce.get("sources")
+                        if isinstance(srcs_local, dict):
+                            for src in list(srcs_local.keys()):
+                                se = srcs_local.get(src)
+                                if isinstance(se, dict):
+                                    se["status"] = "error"
+                                    se["error"] = "CancelledError"
+                snapshot["status"] = "error"
+                snapshot["error"] = "CancelledError"
+                await _persist_batch_snapshot(
+                    batch_id, snapshot, status="error", error="CancelledError"
                 )
-                await _update_batch_job(batch_id, {"status": "error", "error": "CancelledError"})
-                _schedule_persist_batch_snapshot(batch_id, force=True)
                 raise
             except Exception as e:
+                had_error = True
                 err_s = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
-                for source in sources:
-                    await _update_city_source(
-                        batch_id,
-                        city,
-                        source,
-                        {"status": "error", "error": err_s},
-                    )
-                await _update_city(
-                    batch_id,
-                    city,
-                    {"scraped": 0, "imported": 0, "status": "error", "error": err_s},
-                )
-                await _update_batch_job(
-                    batch_id,
-                    {"total_scraped": total_scraped, "total_imported": total_imported},
-                )
-                _schedule_persist_batch_snapshot(batch_id, force=True)
+                per_city_local = snapshot.get("per_city")
+                if isinstance(per_city_local, dict):
+                    ce = per_city_local.get(city)
+                    if isinstance(ce, dict):
+                        ce.update({"scraped": 0, "imported": 0, "status": "error", "error": err_s})
+                        srcs_local = ce.get("sources")
+                        if isinstance(srcs_local, dict):
+                            for src in list(srcs_local.keys()):
+                                se = srcs_local.get(src)
+                                if isinstance(se, dict):
+                                    se["status"] = "error"
+                                    se["error"] = err_s
+                snapshot["total_scraped"] = total_scraped
+                snapshot["total_imported"] = total_imported
+                await _persist_batch_snapshot(batch_id, snapshot, status="running", error=err_s)
                 _batch_logger.exception(
                     "batch_city_error batch_id=%s city=%s elapsed_s=%.2f",
                     batch_id,
@@ -536,22 +437,15 @@ def _queue_batch_job(
 
             if i < len(cities) - 1:
                 await asyncio.sleep(random.uniform(delay_min_s, delay_max_s))
-
-        async with _BATCH_LOCK:
-            job = _BATCH_JOBS.get(batch_id) or {}
-            per_city = job.get("per_city") if isinstance(job, dict) else {}
-            overall = _overall_batch_status(per_city if isinstance(per_city, dict) else {})
-
-        await _update_batch_job(
-            batch_id,
-            {
-                "status": overall,
-                "total_scraped": total_scraped,
-                "total_imported": total_imported,
-            },
+        overall = "error" if had_error else "success"
+        snapshot["status"] = overall
+        snapshot["total_scraped"] = total_scraped
+        snapshot["total_imported"] = total_imported
+        if had_timeout:
+            snapshot["error"] = "timeout"
+        await _persist_batch_snapshot(
+            batch_id, snapshot, status=overall, error=snapshot.get("error")
         )
-
-        _schedule_persist_batch_snapshot(batch_id, force=True)
 
         # Persist final status best-effort (offload sync client).
         try:
@@ -560,7 +454,7 @@ def _queue_batch_job(
                 run_id=batch_id,
                 status=overall,
                 count_inserted=total_imported,
-                error=None,
+                error=snapshot.get("error"),
             )
         except Exception:
             pass
@@ -574,16 +468,25 @@ def _queue_batch_job(
             time.monotonic() - started_mono,
         )
 
-    task = asyncio.create_task(_runner())
+    _start_background_batch_runner(_runner())
 
-    def _cleanup(_t: asyncio.Task[None]) -> None:
+
+def _start_background_batch_runner(coro: Any) -> None:
+    """Run a coroutine in a dedicated daemon thread.
+
+    FastAPI's TestClient can starve background tasks scheduled on the request loop.
+    Using a dedicated thread makes batch execution independent from request handling.
+    """
+
+    def _run() -> None:
         try:
-            _BATCH_TASKS.pop(batch_id, None)
+            asyncio.run(coro)
         except Exception:
+            # Best-effort: runner failures are persisted by the runner itself.
             return
 
-    task.add_done_callback(_cleanup)
-    _BATCH_TASKS[batch_id] = task
+    t = threading.Thread(target=_run, name="import-batch-runner", daemon=True)
+    t.start()
 
 
 async def _maybe_await(result: Any) -> Any:
@@ -956,7 +859,22 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
                     pc = found
                     break
         if pc:
+            if isinstance(pc, str):
+                compact = re.sub(r"\s+", "", pc).upper()
+                if len(compact) >= 5 and re.search(r"\d[A-Z]{2}$", compact):
+                    pc = f"{compact[:-3]} {compact[-3:]}"
+                else:
+                    pc = compact
             row["postcode"] = pc
+
+        # Store outward postcode (district) for downstream scoring/filters.
+        if not (isinstance(row.get("postcode_band"), str) and row["postcode_band"].strip()):
+            try:
+                band = postcode_band(row.get("postcode"))
+                if band:
+                    row["postcode_band"] = band
+            except Exception:
+                pass
 
     if row.get("price") in (None, 0, 0.0, ""):
         raw_price = _pick_raw(["price", "displayPrice", "display_price"])
@@ -1080,6 +998,14 @@ def _upsert_properties_rows(
         if "last_seen_at" in msg and ("PGRST204" in msg or "Could not find" in msg):
             try:
                 stripped = _strip_field(prepared, "last_seen_at")
+                sb.table("properties").upsert(stripped, on_conflict=on_conflict).execute()
+                return True, None
+            except Exception as e2:
+                return False, str(e2)
+
+        if "postcode_band" in msg and ("PGRST204" in msg or "Could not find" in msg):
+            try:
+                stripped = _strip_field(prepared, "postcode_band")
                 sb.table("properties").upsert(stripped, on_conflict=on_conflict).execute()
                 return True, None
             except Exception as e2:
@@ -1865,64 +1791,54 @@ async def import_batch(
         requested_sources = list(allowed_sources)
 
     if req.run_async:
-        batch_id = _create_durable_batch_run(cities=cities)
-
-        async with _BATCH_LOCK:
-            request_payload = {
-                "cities": cities,
-                "sources": requested_sources,
-                "max_pages": max_pages,
-                "delay_min_s": delay_min,
-                "delay_max_s": delay_max,
-                "per_city_timeout_s": float(per_city_timeout_s or 0),
-                "enrich": bool(enrich),
-                "enrich_limit": int(enrich_limit),
-            }
-            _BATCH_JOBS[batch_id] = {
-                "batch_id": batch_id,
-                "status": "queued",
-                "request": request_payload,
-                "cities": cities,
-                "sources": requested_sources,
-                "max_pages": max_pages,
-                "delay_min_s": delay_min,
-                "delay_max_s": delay_max,
-                "total_scraped": 0,
-                "total_imported": 0,
-                "per_city": {
-                    c: {
-                        "scraped": 0,
-                        "imported": 0,
-                        "status": "queued",
-                        "sources": {
-                            s: {
-                                "status": "queued",
-                                "scraped": 0,
-                                "imported": 0,
-                                "error": None,
-                            }
-                            for s in requested_sources
-                        },
-                    }
-                    for c in cities
-                },
-            }
-
-            initial_snap = _batch_snapshot(_BATCH_JOBS[batch_id])
-
-        try:
-            await asyncio.to_thread(
-                update_scrape_run_data,
-                run_id=batch_id,
-                data=initial_snap,
-                status="queued",
-                count_inserted=0,
-                error=None,
+        if not sb:
+            raise HTTPException(
+                status_code=500,
+                detail="Async batch requires Supabase (SUPABASE_URL/keys) for durable status",
             )
-        except Exception:
-            pass
+        batch_id = _create_durable_batch_run(cities=cities)
+        request_payload = {
+            "cities": cities,
+            "sources": requested_sources,
+            "max_pages": max_pages,
+            "delay_min_s": delay_min,
+            "delay_max_s": delay_max,
+            "per_city_timeout_s": float(per_city_timeout_s or 0),
+            "enrich": bool(enrich),
+            "enrich_limit": int(enrich_limit),
+        }
 
-        _schedule_persist_batch_snapshot(batch_id, force=True)
+        initial_snap: dict[str, Any] = {
+            "batch_id": batch_id,
+            "status": "queued",
+            "request": request_payload,
+            "cities": cities,
+            "sources": requested_sources,
+            "max_pages": max_pages,
+            "delay_min_s": delay_min,
+            "delay_max_s": delay_max,
+            "total_scraped": 0,
+            "total_imported": 0,
+            "per_city": {
+                c: {
+                    "scraped": 0,
+                    "imported": 0,
+                    "status": "queued",
+                    "sources": {
+                        s: {
+                            "status": "queued",
+                            "scraped": 0,
+                            "imported": 0,
+                            "error": None,
+                        }
+                        for s in requested_sources
+                    },
+                }
+                for c in cities
+            },
+        }
+
+        await _persist_batch_snapshot(batch_id, initial_snap, status="queued")
 
         _queue_batch_job(
             batch_id=batch_id,
@@ -1934,6 +1850,7 @@ async def import_batch(
             per_city_timeout_s=per_city_timeout_s,
             enrich=bool(enrich),
             enrich_limit=int(enrich_limit),
+            initial_snapshot=initial_snap,
         )
 
         return {
@@ -2320,109 +2237,36 @@ async def import_batch_status(
 ):
     _require_admin(x_admin_token)
 
-    # DB-backed status first when Supabase is configured.
+    if not sb:
+        raise HTTPException(
+            status_code=500,
+            detail="Supabase client not configured; async batch status is DB-backed only",
+        )
+
     try:
-        if sb:
-            row: dict[str, Any] | None = None
-            try:
-                res = (
-                    sb.table("scrape_runs")
-                    .select("id,status,count_inserted,error,data")
-                    .eq("id", batch_id)
-                    .execute()
-                )
-                data = getattr(res, "data", None)
-                if isinstance(data, list) and data and isinstance(data[0], dict):
-                    row = data[0]
-            except Exception:
-                res = (
-                    sb.table("scrape_runs")
-                    .select("id,status,count_inserted,error")
-                    .eq("id", batch_id)
-                    .execute()
-                )
-                data = getattr(res, "data", None)
-                if isinstance(data, list) and data and isinstance(data[0], dict):
-                    row = data[0]
+        res = (
+            sb.table("scrape_runs")
+            .select("id,status,count_inserted,error,data")
+            .eq("id", batch_id)
+            .execute()
+        )
+    except Exception as e:  # pragma: no cover
+        raise HTTPException(status_code=500, detail=str(e))
 
-            if isinstance(row, dict):
-                snap = row.get("data") if isinstance(row.get("data"), dict) else None
-                if isinstance(snap, dict) and (snap.get("batch_id") == batch_id):
-                    out = {**snap}
-                    out["status"] = row.get("status") or out.get("status") or "unknown"
-                    out["total_imported"] = int(
-                        row.get("count_inserted") or out.get("total_imported") or 0
-                    )
-                    if row.get("error"):
-                        out["error"] = row.get("error")
-                    out["durable"] = True
-                    return out
+    rows = getattr(res, "data", None) or []
+    if not (isinstance(rows, list) and rows and isinstance(rows[0], dict)):
+        raise HTTPException(status_code=404, detail="batch_id not found")
 
-                # Row exists but snapshot isn't available yet (or column missing).
-                # Prefer in-memory state for full response shape.
-                job_snapshot: dict[str, Any] | None = None
-                async with _BATCH_LOCK:
-                    job = _BATCH_JOBS.get(batch_id)
-                    if isinstance(job, dict):
-                        per_city = (
-                            job.get("per_city") if isinstance(job.get("per_city"), dict) else {}
-                        )
-                        overall = _overall_batch_status(per_city)
-                        job["status"] = overall
-                        job_snapshot = {
-                            "batch_id": batch_id,
-                            "status": row.get("status") or overall,
-                            "cities": list(job.get("cities") or []),
-                            "sources": list(job.get("sources") or []),
-                            "max_pages": job.get("max_pages") or 1,
-                            "total_scraped": job.get("total_scraped") or 0,
-                            "total_imported": int(
-                                row.get("count_inserted") or job.get("total_imported") or 0
-                            ),
-                            "per_city": per_city,
-                            "error": row.get("error") or job.get("error"),
-                            "durable": True,
-                        }
-
-                if isinstance(job_snapshot, dict):
-                    return job_snapshot
-
-                return {
-                    "batch_id": batch_id,
-                    "status": (row.get("status") or "unknown"),
-                    "total_imported": int(row.get("count_inserted") or 0),
-                    "per_city": {},
-                    "error": row.get("error"),
-                    "durable": True,
-                }
-    except Exception:
-        pass
-
-    # Local/dev fallback: in-memory state.
-    job_snapshot: dict[str, Any] | None = None
-    async with _BATCH_LOCK:
-        job = _BATCH_JOBS.get(batch_id)
-        if isinstance(job, dict):
-            per_city = job.get("per_city") if isinstance(job.get("per_city"), dict) else {}
-            overall = _overall_batch_status(per_city)
-            job["status"] = overall
-            job_snapshot = {
-                "batch_id": batch_id,
-                "status": overall,
-                "cities": list(job.get("cities") or []),
-                "sources": list(job.get("sources") or []),
-                "max_pages": job.get("max_pages") or 1,
-                "total_scraped": job.get("total_scraped") or 0,
-                "total_imported": job.get("total_imported") or 0,
-                "per_city": per_city,
-                "error": job.get("error"),
-                "durable": False,
-            }
-
-    if isinstance(job_snapshot, dict):
-        return job_snapshot
-
-    raise HTTPException(status_code=404, detail="Unknown batch_id")
+    row = rows[0]
+    snap = row.get("data") if isinstance(row.get("data"), dict) else {}
+    out: dict[str, Any] = {**snap} if isinstance(snap, dict) else {}
+    out["batch_id"] = batch_id
+    out["status"] = row.get("status") or out.get("status") or "unknown"
+    out["total_imported"] = int(row.get("count_inserted") or out.get("total_imported") or 0)
+    if row.get("error"):
+        out["error"] = row.get("error")
+    out["durable"] = True
+    return out
 
 
 # ---------------- backwards-compatible alias ----------------

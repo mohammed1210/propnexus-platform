@@ -58,3 +58,31 @@ def test_clean_row_maps_image_url_field_name_to_imageurl():
 
     assert "image_url" not in row
     assert row["imageurl"] == "https://cdn.example.com/x.jpg"
+
+
+def test_clean_row_sets_postcode_band_from_full_or_outward_postcode():
+    now_iso = "2026-01-01T00:00:00Z"
+
+    row1 = _clean_row(
+        {
+            "title": "Nice place, London, SW1A 1AA",
+            "source": "onthemarket",
+            "external_id": "a",
+            "postcode": None,
+        },
+        now_iso,
+    )
+    assert row1.get("postcode") == "SW1A 1AA"
+    assert row1.get("postcode_band") == "SW1A"
+
+    row2 = _clean_row(
+        {
+            "title": "Battersea flat (SW11)",
+            "source": "onthemarket",
+            "external_id": "b",
+            "postcode": None,
+        },
+        now_iso,
+    )
+    assert row2.get("postcode") == "SW11"
+    assert row2.get("postcode_band") == "SW11"

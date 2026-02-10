@@ -96,8 +96,6 @@ def test_import_batch_async_returns_immediately_with_status_url(client, monkeypa
 
     store: dict[str, dict] = {}
     import_routes.sb = _FakeSB(store)
-    import_routes._BATCH_JOBS.clear()
-    import_routes._BATCH_TASKS.clear()
 
     async def _fake_scrape_all_sources(_loc: str, **_kwargs):
         return [
@@ -184,8 +182,6 @@ def test_import_batch_async_city_error_does_not_crash_job(client, monkeypatch):
 
     store: dict[str, dict] = {}
     import_routes.sb = _FakeSB(store)
-    import_routes._BATCH_JOBS.clear()
-    import_routes._BATCH_TASKS.clear()
 
     async def _fake_scrape_all_sources(loc: str, **_kwargs):
         if loc == "BadCity":
@@ -254,8 +250,6 @@ def test_import_batch_async_persists_and_completes(client, monkeypatch):
 
     store: dict[str, dict] = {}
     import_routes.sb = _FakeSB(store)
-    import_routes._BATCH_JOBS.clear()
-    import_routes._BATCH_TASKS.clear()
 
     async def _fake_scrape_all_sources(loc: str, **kwargs):
         on_source_complete = kwargs.get("on_source_complete")
@@ -350,8 +344,6 @@ def test_import_batch_async_zero_results_is_not_timeout(client, monkeypatch):
 
     store: dict[str, dict] = {}
     import_routes.sb = _FakeSB(store)
-    import_routes._BATCH_JOBS.clear()
-    import_routes._BATCH_TASKS.clear()
 
     async def _fake_scrape_all_sources(_loc: str, **kwargs):
         on_source_complete = kwargs.get("on_source_complete")
@@ -428,8 +420,6 @@ def test_import_batch_accepts_locations_alias_and_sources_filter(client, monkeyp
 
     store: dict[str, dict] = {}
     import_routes.sb = _FakeSB(store)
-    import_routes._BATCH_JOBS.clear()
-    import_routes._BATCH_TASKS.clear()
 
     async def _fake_scrape_all_sources(_loc: str, **_kwargs):
         return []
