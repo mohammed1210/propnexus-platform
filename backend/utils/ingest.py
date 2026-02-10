@@ -591,6 +591,7 @@ def ingest(
 async def scrape_all_sources(
     location: str,
     *,
+    sources: list[str] | None = None,
     zoopla_max_pages: int | None = None,
     onthemarket_max_pages: int | None = None,
     on_source_complete: Any | None = None,
@@ -635,6 +636,12 @@ async def scrape_all_sources(
     if not loc:
         return []
 
+    selected: set[str] | None = None
+    if sources is not None:
+        selected = {str(s).strip().lower() for s in sources if str(s).strip()}
+        if not selected:
+            return []
+
     async def _collect_from(
         source: str, items: Any
     ) -> tuple[List[Dict[str, Any]], str, str | None]:
@@ -672,60 +679,65 @@ async def scrape_all_sources(
             return source, [], "error", str(e)
 
     # ---- Rightmove ----
-    try:
+    if selected is None or "rightmove" in selected:
         try:
-            from backend.scraper.rightmove_scraper import (  # type: ignore
-                scrape_rightmove_properties,
-            )
-        except Exception:
-            from scraper.rightmove_scraper import scrape_rightmove_properties  # type: ignore
+            try:
+                from backend.scraper.rightmove_scraper import (  # type: ignore
+                    scrape_rightmove_properties,
+                )
+            except Exception:
+                from scraper.rightmove_scraper import scrape_rightmove_properties  # type: ignore
 
-        if inspect.iscoroutinefunction(scrape_rightmove_properties):
-            items = scrape_rightmove_properties(loc)
-        else:
-            items = asyncio.to_thread(scrape_rightmove_properties, loc)
-        tasks.append(asyncio.create_task(_run_source("rightmove", items)))
-    except Exception as e:
-        warn(f"Rightmove scrape skipped/failed: {e}")
+            if inspect.iscoroutinefunction(scrape_rightmove_properties):
+                items = scrape_rightmove_properties(loc)
+            else:
+                items = asyncio.to_thread(scrape_rightmove_properties, loc)
+            tasks.append(asyncio.create_task(_run_source("rightmove", items)))
+        except Exception as e:
+            warn(f"Rightmove scrape skipped/failed: {e}")
 
     # ---- Zoopla ----
-    try:
+    if selected is None or "zoopla" in selected:
         try:
-            from backend.scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
-        except Exception:
-            from scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
+            try:
+                from backend.scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
+            except Exception:
+                from scraper.zoopla_scraper import scrape_zoopla_properties  # type: ignore
 
-        if inspect.iscoroutinefunction(scrape_zoopla_properties):
-            items = scrape_zoopla_properties(loc, max_pages=zoopla_max_pages)
-        else:
-            items = asyncio.to_thread(scrape_zoopla_properties, loc, max_pages=zoopla_max_pages)
-        tasks.append(asyncio.create_task(_run_source("zoopla", items)))
-    except Exception as e:
-        warn(f"Zoopla scrape skipped/failed: {e}")
+            if inspect.iscoroutinefunction(scrape_zoopla_properties):
+                items = scrape_zoopla_properties(loc, max_pages=zoopla_max_pages)
+            else:
+                items = asyncio.to_thread(scrape_zoopla_properties, loc, max_pages=zoopla_max_pages)
+            tasks.append(asyncio.create_task(_run_source("zoopla", items)))
+        except Exception as e:
+            warn(f"Zoopla scrape skipped/failed: {e}")
 
     # ---- OnTheMarket ----
-    try:
+    if selected is None or "onthemarket" in selected:
         try:
-            from backend.scraper.onthemarket_scraper import (  # type: ignore
-                scrape_onthemarket_properties,
-            )
-        except Exception:
-            from scraper.onthemarket_scraper import scrape_onthemarket_properties  # type: ignore
+            try:
+                from backend.scraper.onthemarket_scraper import (  # type: ignore
+                    scrape_onthemarket_properties,
+                )
+            except Exception:
+                from scraper.onthemarket_scraper import (
+                    scrape_onthemarket_properties,  # type: ignore
+                )
 
-        if inspect.iscoroutinefunction(scrape_onthemarket_properties):
-            items = scrape_onthemarket_properties(loc, max_pages=onthemarket_max_pages)
-        else:
-            items = asyncio.to_thread(
-                scrape_onthemarket_properties,
-                loc,
-                max_pages=onthemarket_max_pages,
-            )
-        tasks.append(asyncio.create_task(_run_source("onthemarket", items)))
-    except Exception as e:
-        warn(f"OnTheMarket scrape skipped/failed: {e}")
+            if inspect.iscoroutinefunction(scrape_onthemarket_properties):
+                items = scrape_onthemarket_properties(loc, max_pages=onthemarket_max_pages)
+            else:
+                items = asyncio.to_thread(
+                    scrape_onthemarket_properties,
+                    loc,
+                    max_pages=onthemarket_max_pages,
+                )
+            tasks.append(asyncio.create_task(_run_source("onthemarket", items)))
+        except Exception as e:
+            warn(f"OnTheMarket scrape skipped/failed: {e}")
 
     # ---- SpareRoom (rentals/rooms; disabled for production sales) ----
-    if skip_spareroom:
+    if (selected is not None and "spareroom" not in selected) or skip_spareroom:
         log(
             "INFO: spareroom skipped (disabled for production sales pipeline; set ENABLE_SPAREROOM_SALES=true to override)"
         )

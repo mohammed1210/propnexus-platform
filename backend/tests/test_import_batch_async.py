@@ -118,3 +118,44 @@ def test_import_batch_async_city_error_does_not_crash_job(client, monkeypatch):
         assert set(entry["sources"].keys()) == {"rightmove", "zoopla", "onthemarket"}
     # One city may still be queued/running, but the status endpoint must be readable.
     assert s.get("status") in {"queued", "running", "success", "partial", "error"}
+
+
+def test_import_batch_accepts_locations_alias_and_sources_filter(client, monkeypatch):
+    monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
+
+    import backend.routes.import_routes as import_routes
+
+    async def _fake_scrape_all_sources(_loc: str, **_kwargs):
+        return []
+
+    # Avoid any real scraping/DB work in tests.
+    monkeypatch.setattr(import_routes, "scrape_all_sources", _fake_scrape_all_sources, raising=True)
+    monkeypatch.setattr(
+        import_routes, "_upsert_properties_rows", lambda **_kw: (True, None), raising=True
+    )
+    monkeypatch.setattr(
+        import_routes, "create_scrape_run", lambda **_kw: "batch-test-3", raising=True
+    )
+    monkeypatch.setattr(import_routes, "finish_scrape_run", lambda **_kw: None, raising=True)
+
+    resp = client.post(
+        "/import/batch",
+        json={
+            "locations": ["London"],
+            "sources": ["onthemarket"],
+            "max_pages": 1,
+            "delay_min_s": 0,
+            "delay_max_s": 0,
+        },
+        headers={"x-admin-token": "secret"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    status = client.get(data["status_url"], headers={"x-admin-token": "secret"})
+    assert status.status_code == 200
+    s = status.json()
+    assert s.get("cities") == ["London"]
+    assert s.get("sources") == ["onthemarket"]
+    assert set(s["per_city"].keys()) == {"London"}
+    entry = s["per_city"]["London"]
+    assert set(entry["sources"].keys()) == {"onthemarket"}

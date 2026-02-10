@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 
 import aiohttp
 from fastapi import APIRouter, Header, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 try:
     from postgrest.exceptions import APIError  # type: ignore
@@ -71,6 +71,7 @@ def _batch_snapshot(job: dict[str, Any]) -> dict[str, Any]:
         "batch_id",
         "status",
         "cities",
+        "sources",
         "max_pages",
         "delay_min_s",
         "delay_max_s",
@@ -180,6 +181,7 @@ def _queue_batch_job(
     *,
     batch_id: str,
     cities: list[str],
+    sources: list[str],
     max_pages: int,
     delay_min_s: float,
     delay_max_s: float,
@@ -197,7 +199,7 @@ def _queue_batch_job(
         total_imported = 0
         for i, city in enumerate(cities):
             # Pre-seed per-source status so the status endpoint can show progress.
-            for source in ("rightmove", "zoopla", "onthemarket"):
+            for source in sources:
                 _update_city_source(
                     batch_id,
                     city,
@@ -210,11 +212,7 @@ def _queue_batch_job(
             try:
 
                 async def _do_city() -> tuple[list[Any], int, str | None]:
-                    city_scraped_by_source: dict[str, int] = {
-                        "rightmove": 0,
-                        "zoopla": 0,
-                        "onthemarket": 0,
-                    }
+                    city_scraped_by_source: dict[str, int] = {s: 0 for s in sources}
 
                     async def _on_source_complete(
                         source: str,
@@ -259,6 +257,7 @@ def _queue_batch_job(
                     raw = await _maybe_await(
                         scrape_all_sources(
                             city,
+                            sources=sources,
                             zoopla_max_pages=max_pages,
                             onthemarket_max_pages=max_pages,
                             on_source_complete=_on_source_complete,
@@ -329,7 +328,7 @@ def _queue_batch_job(
                 )
                 _maybe_persist_batch_snapshot(batch_id, force=True)
             except asyncio.TimeoutError:
-                for source in ("rightmove", "zoopla", "onthemarket"):
+                for source in sources:
                     _update_city_source(
                         batch_id,
                         city,
@@ -352,7 +351,7 @@ def _queue_batch_job(
                 )
                 _maybe_persist_batch_snapshot(batch_id, force=True)
             except Exception as e:
-                for source in ("rightmove", "zoopla", "onthemarket"):
+                for source in sources:
                     _update_city_source(
                         batch_id,
                         city,
@@ -1278,7 +1277,17 @@ class ImportRequest(BaseModel):
 
 
 class BatchImportRequest(BaseModel):
-    cities: List[str] | None = None
+    model_config = ConfigDict(populate_by_name=True)
+
+    cities: List[str] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("cities", "locations"),
+        description="List of cities/locations to import (accepts 'cities' or legacy 'locations')",
+    )
+    sources: List[str] | None = Field(
+        default=None,
+        description="Optional source filter (e.g. ['onthemarket']). Defaults to all supported sources.",
+    )
     max_pages: int = 1
     delay_min_s: float = 0.5
     delay_max_s: float = 1.5
@@ -1589,6 +1598,28 @@ async def import_batch(
     per_city_timeout_s = float(req.per_city_timeout_s or 0)
     per_city_timeout_s = max(per_city_timeout_s, _get_scrape_timeout_seconds() + 30.0, 60.0)
 
+    allowed_sources = ("rightmove", "zoopla", "onthemarket")
+    if req.sources:
+        requested_sources: List[str] = []
+        seen_src: set[str] = set()
+        for s in req.sources:
+            key = (s or "").strip().lower()
+            if not key:
+                continue
+            if key not in allowed_sources:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid source '{s}'. Allowed: {list(allowed_sources)}",
+                )
+            if key in seen_src:
+                continue
+            seen_src.add(key)
+            requested_sources.append(key)
+        if not requested_sources:
+            raise HTTPException(status_code=400, detail="No valid sources provided")
+    else:
+        requested_sources = list(allowed_sources)
+
     if req.run_async:
         # Use scrape_runs.id as the batch_id so we persist a durable identifier.
         # If Supabase isn't configured, fall back to a UUID.
@@ -1604,6 +1635,7 @@ async def import_batch(
             "batch_id": batch_id,
             "status": "queued",
             "cities": cities,
+            "sources": requested_sources,
             "max_pages": max_pages,
             "delay_min_s": delay_min,
             "delay_max_s": delay_max,
@@ -1615,24 +1647,13 @@ async def import_batch(
                     "imported": 0,
                     "status": "queued",
                     "sources": {
-                        "rightmove": {
+                        s: {
                             "status": "queued",
                             "scraped": 0,
                             "imported": 0,
                             "error": None,
-                        },
-                        "zoopla": {
-                            "status": "queued",
-                            "scraped": 0,
-                            "imported": 0,
-                            "error": None,
-                        },
-                        "onthemarket": {
-                            "status": "queued",
-                            "scraped": 0,
-                            "imported": 0,
-                            "error": None,
-                        },
+                        }
+                        for s in requested_sources
                     },
                 }
                 for c in cities
@@ -1642,6 +1663,7 @@ async def import_batch(
         _queue_batch_job(
             batch_id=batch_id,
             cities=cities,
+            sources=requested_sources,
             max_pages=max_pages,
             delay_min_s=delay_min,
             delay_max_s=delay_max,
@@ -1671,6 +1693,7 @@ async def import_batch(
             items = await _maybe_await(
                 scrape_all_sources(
                     city,
+                    sources=requested_sources,
                     zoopla_max_pages=max_pages,
                     onthemarket_max_pages=max_pages,
                 )
@@ -2042,6 +2065,7 @@ async def import_batch_status(
             "batch_id": batch_id,
             "status": overall,
             "cities": job.get("cities") or [],
+            "sources": job.get("sources") or [],
             "max_pages": job.get("max_pages") or 1,
             "total_scraped": job.get("total_scraped") or 0,
             "total_imported": job.get("total_imported") or 0,
