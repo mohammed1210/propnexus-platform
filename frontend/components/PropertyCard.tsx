@@ -29,6 +29,8 @@ type Property = {
   score?: number | null;
   recommended_score?: number | null;
   deal_reasons?: string[];
+  deal_signals?: string[];
+  discount_estimate_pct?: number | null;
   discount_percent?: number | null;
   imageurl?: string | null;
   image_urls?: string[] | null;
@@ -182,6 +184,18 @@ export default function PropertyCard({
     const haystack = `${p.location ?? ''} ${p.title ?? ''} ${p.description ?? ''}`;
     return extractLikelyUkPostcode(haystack);
   }, [p.description, p.location, p.title]);
+
+  const dealChipText = useMemo(() => {
+    if (!Array.isArray(p.deal_reasons) || !p.deal_reasons[0]) return null;
+
+    const sigs = Array.isArray(p.deal_signals) ? p.deal_signals : [];
+    const hasReduced = sigs.some((s) => String(s).toLowerCase() === 'reduced');
+    const disc = typeof p.discount_estimate_pct === 'number' ? p.discount_estimate_pct : null;
+    if (hasReduced && disc !== null && isFinite(disc) && disc > 0) {
+      return `~${Math.round(disc)}% below prior ask`;
+    }
+    return p.deal_reasons[0];
+  }, [p.deal_reasons, p.deal_signals, p.discount_estimate_pct]);
 
   useEffect(() => {
     // Only hydrate the insights payloads once the card is near the viewport.
@@ -617,7 +631,7 @@ export default function PropertyCard({
               </div>
             </div>
 
-            {showDealReasonChip && Array.isArray(p.deal_reasons) && p.deal_reasons[0] && (
+            {showDealReasonChip && dealChipText && Array.isArray(p.deal_reasons) && p.deal_reasons[0] && (
               <div className="mt-2">
                 <span
                   className={cx(
@@ -625,10 +639,10 @@ export default function PropertyCard({
                     'border-slate-200 text-slate-700 bg-slate-50',
                     'dark:border-slate-700 dark:text-slate-200 dark:bg-slate-800/60',
                   )}
-                  aria-label={`Deal reason: ${p.deal_reasons[0]}`}
+                  aria-label={`Deal reason: ${dealChipText}`}
                   title={p.deal_reasons.slice(0, 3).join(' • ')}
                 >
-                  {p.deal_reasons[0]}
+                  {dealChipText}
                 </span>
               </div>
             )}

@@ -143,3 +143,29 @@ def test_rerank_recommended_tiebreaks_by_created_at_newer_first():
 
     ranked = rerank_recommended([a, b], deal_type="balanced", min_tier2=1)
     assert ranked[0]["id"] == "b"
+
+
+def test_rerank_recommended_boosts_reduced_signal():
+    base = _row(
+        "base",
+        created_at="2025-02-01T00:00:00Z",
+        score=70,
+        categories={
+            "yield": 12.0,
+            "roi": 12.0,
+            "price_to_rent": 10.0,
+            "area_demand": 10.0,
+            "crime_index_inverse": 10.0,
+            "schools_access": 10.0,
+        },
+        rent_source="provided",
+    )
+    reduced = dict(base)
+    reduced["id"] = "reduced"
+    reduced["deal_signals"] = ["reduced"]
+    reduced["title"] = "Price reduced"
+
+    ranked = rerank_recommended([base, reduced], deal_type="balanced", min_tier2=1)
+    assert ranked[0]["id"] == "reduced"
+    assert isinstance(ranked[0].get("deal_reasons"), list)
+    assert isinstance(ranked[0].get("deal_signals"), list)

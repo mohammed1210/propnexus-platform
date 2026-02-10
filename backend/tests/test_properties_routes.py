@@ -199,9 +199,10 @@ def test_list_properties_recommended_includes_deal_reasons(mock_create_client, c
     mock_properties = [
         {
             "id": "p1",
-            "title": "Deal",
+            "title": "Price reduced deal",
             "location": "London",
             "price": 250000,
+            "description": "Was £200,000 now £180,000",
             "score": 80,
             "created_at": "2025-01-02T00:00:00Z",
             "score_breakdown": {
@@ -236,6 +237,50 @@ def test_list_properties_recommended_includes_deal_reasons(mock_create_client, c
     assert "recommended_score" in item
     assert "deal_reasons" in item
     assert isinstance(item["deal_reasons"], list)
+    assert "deal_signals" in item
+    assert isinstance(item["deal_signals"], list)
+    assert "discount_estimate_pct" in item
+
+
+@patch("backend.routes.properties_routes.create_client")
+def test_list_properties_deal_filter_auction_only(mock_create_client, client):
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+
+    mock_properties = [
+        {
+            "id": "p1",
+            "title": "Auction listing",
+            "location": "London",
+            "price": 250000,
+            "deal_signals": ["auction"],
+            "created_at": "2025-01-02T00:00:00Z",
+        },
+        {
+            "id": "p2",
+            "title": "Normal listing",
+            "location": "London",
+            "price": 260000,
+            "deal_signals": [],
+            "created_at": "2025-01-03T00:00:00Z",
+        },
+    ]
+    mock_query.execute.return_value = Mock(data=mock_properties, count=2)
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"auction_only": "1"})
+    assert response.status_code == 200
+
+    data = response.json()
+    assert isinstance(data, dict)
+    items = data.get("items") or []
+    assert len(items) == 1
+    assert items[0]["id"] == "p1"
 
 
 @patch("backend.routes.properties_routes.create_client")

@@ -25,6 +25,7 @@ except Exception:  # pragma: no cover
 
 from backend.scraper.utils import TARGET_CITIES, fetch_detail_html_with_diag
 from backend.utils.deal_scoring import compute_deal_score
+from backend.utils.deal_signals import extract_deal_signals
 from backend.utils.image_utils import (
     dedupe_image_urls,
     extract_image_urls_from_ld_json,
@@ -988,6 +989,30 @@ def _upsert_properties_rows(
             # Never fail ingestion due to scoring.
             pass
 
+        # Deal signals (investor-first feed): best-effort, additive.
+        try:
+            extracted = extract_deal_signals(cleaned)
+            cleaned["deal_signals"] = (
+                extracted.get("signals") if isinstance(extracted, dict) else []
+            )
+            cleaned["deal_reasons"] = (
+                extracted.get("reasons") if isinstance(extracted, dict) else []
+            )
+            cleaned["discount_estimate_pct"] = (
+                extracted.get("discount_estimate_pct") if isinstance(extracted, dict) else None
+            )
+            cleaned["deal_signals_meta"] = (
+                {
+                    "confidence": extracted.get("confidence"),
+                    "matched_terms": extracted.get("matched_terms"),
+                }
+                if isinstance(extracted, dict)
+                else None
+            )
+        except Exception:
+            # Never fail ingestion due to signals.
+            pass
+
         prepared.append(cleaned)
 
     try:
@@ -1021,6 +1046,48 @@ def _upsert_properties_rows(
                 return True, None
             except Exception as e3:
                 return False, str(e3)
+
+        # Deal signal fields may not exist yet; embed into data JSON as a fallback.
+        if ("deal_signals" in msg or "deal_reasons" in msg or "deal_signals_meta" in msg) and (
+            "PGRST204" in msg or "Could not find" in msg
+        ):
+            try:
+                stripped = _strip_fields(
+                    prepared,
+                    [
+                        "deal_signals",
+                        "deal_reasons",
+                        "deal_signals_meta",
+                        "discount_estimate_pct",
+                    ],
+                )
+
+                # Embed the deal fields into `data` to keep them available without a migration.
+                embedded: list[Dict[str, Any]] = []
+                for original, row in zip(prepared, stripped, strict=False):
+                    if not isinstance(row, dict):
+                        continue
+                    deal_signals = original.get("deal_signals")
+                    deal_reasons = original.get("deal_reasons")
+                    deal_meta = original.get("deal_signals_meta")
+                    discount_est = original.get("discount_estimate_pct")
+
+                    data_obj = row.get("data")
+                    if not isinstance(data_obj, dict):
+                        data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+
+                    data_obj["deal_signals"] = deal_signals
+                    data_obj["deal_reasons"] = deal_reasons
+                    data_obj["deal_signals_meta"] = deal_meta
+                    data_obj["discount_estimate_pct"] = discount_est
+
+                    row["data"] = data_obj
+                    embedded.append(row)
+
+                sb.table("properties").upsert(embedded, on_conflict=on_conflict).execute()
+                return True, None
+            except Exception as e4:
+                return False, str(e4)
         return False, msg
 
 

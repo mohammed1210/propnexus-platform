@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Literal, Optional, Tuple
 
 from backend.utils.deal_scoring import compute_deal_score
+from backend.utils.deal_signals import extract_deal_signals
 
 DealType = Literal["balanced", "cashflow", "growth"]
 
@@ -100,6 +101,8 @@ class RecommendedMeta:
     score: float
     reasons: List[str]
     tier: int
+    deal_signals: List[str]
+    discount_estimate_pct: float | None
 
 
 def _get_breakdown(row: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
@@ -208,6 +211,75 @@ def _discount_boost(discount_percent: Any) -> float:
         return 0.0
     # modest boost (cap to avoid dominating)
     return _clamp(dp * 0.2, 0.0, 5.0)
+
+
+def _signal_adjustment(
+    row: Dict[str, Any],
+    *,
+    deal_type: DealType,
+) -> tuple[float, List[str], List[str], float | None]:
+    """Return (delta_score, signal_reasons, signals, discount_estimate_pct)."""
+
+    extracted = extract_deal_signals(row)
+    signals = extracted.get("signals")
+    if not isinstance(signals, list):
+        signals = []
+    signals_s: List[str] = [str(s) for s in signals if isinstance(s, str)]
+
+    signal_reasons = extracted.get("reasons")
+    if not isinstance(signal_reasons, list):
+        signal_reasons = []
+    signal_reasons_s: List[str] = [str(r) for r in signal_reasons if isinstance(r, str) and r]
+
+    conf = extracted.get("confidence")
+    try:
+        conf_f = float(conf)
+    except Exception:
+        conf_f = 0.0
+    conf_f = _clamp(conf_f, 0.0, 1.0)
+
+    discount_est = extracted.get("discount_estimate_pct")
+    discount_pct: float | None
+    try:
+        discount_pct = float(discount_est) if discount_est is not None else None
+    except Exception:
+        discount_pct = None
+    if discount_pct is not None:
+        discount_pct = _clamp(discount_pct, 0.0, 80.0)
+
+    # Confidence multiplier (avoid zeroing the boost; keep deterministic).
+    mult = 0.5 + 0.5 * conf_f
+
+    delta = 0.0
+
+    sigset = set(s.lower() for s in signals_s)
+
+    # Boosts
+    if "reduced" in sigset:
+        base = 3.0
+        extra = _clamp(((discount_pct or 0.0) * 0.2), 0.0, 5.0)
+        delta += _clamp(base + extra, 3.0, 8.0) * mult
+
+    if "needs_refurb" in sigset:
+        delta += _clamp(2.0 + 3.0 * conf_f, 2.0, 5.0)
+
+    if "chain_free" in sigset:
+        delta += _clamp(1.0 + 2.0 * conf_f, 1.0, 3.0)
+
+    if "auction" in sigset:
+        delta += _clamp(1.0 + 2.0 * conf_f, 1.0, 3.0)
+
+    # Penalties
+    if "cash_buyers" in sigset:
+        # We don't have a dedicated flip persona yet; penalize more for cashflow.
+        lo, hi = (8.0, 12.0) if deal_type == "cashflow" else (5.0, 9.0)
+        delta -= _clamp(lo + (hi - lo) * conf_f, lo, hi)
+
+    # If auction + cash-buyers-only, penalize a bit for cashflow.
+    if deal_type == "cashflow" and ("auction" in sigset) and ("cash_buyers" in sigset):
+        delta -= 3.0
+
+    return float(delta), signal_reasons_s, sorted(sigset), discount_pct
 
 
 def _extract_reasons(
@@ -320,6 +392,10 @@ def compute_recommended_meta(
     )
     rec += _discount_boost(row.get("discount_percent"))
 
+    # Deal signals (bargain / risk / liquidity)
+    sig_delta, sig_reasons, sigs, discount_est_pct = _signal_adjustment(row, deal_type=deal_type)
+    rec += sig_delta
+
     # Guardrail: missing/invalid price should not float to the top.
     price = _to_float(row.get("price"))
     if price is None or price <= 0:
@@ -340,7 +416,21 @@ def compute_recommended_meta(
 
     reasons = _extract_reasons(row=row, categories=categories, inputs=inputs, deal_type=deal_type)
 
-    return RecommendedMeta(score=rec, reasons=reasons, tier=tier)
+    # If both exist, prioritize "deal" reasons first.
+    merged_reasons: List[str] = []
+    for r in list(sig_reasons) + list(reasons):
+        if r and r not in merged_reasons:
+            merged_reasons.append(r)
+        if len(merged_reasons) >= 3:
+            break
+
+    return RecommendedMeta(
+        score=rec,
+        reasons=merged_reasons,
+        tier=tier,
+        deal_signals=sigs,
+        discount_estimate_pct=discount_est_pct,
+    )
 
 
 def rerank_recommended(
@@ -367,6 +457,8 @@ def rerank_recommended(
         out = dict(it)
         out["recommended_score"] = round(float(meta.score), 2)
         out["deal_reasons"] = list(meta.reasons)
+        out["deal_signals"] = list(meta.deal_signals)
+        out["discount_estimate_pct"] = meta.discount_estimate_pct
         enriched.append((meta, out))
 
     # Fallback relax: if we have very few tier2, treat tier1 as tier2 for ordering.

@@ -33,6 +33,12 @@ function parseNonNegativeInt(value: string): number | undefined {
   return Math.floor(num);
 }
 
+function parseBoolParam(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const s = value.trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 't' || s === 'yes' || s === 'on';
+}
+
 /**
  * Sanitize search query to prevent special character issues.
  * Escapes %, comma, and other special chars that could interfere with ilike queries.
@@ -170,6 +176,8 @@ type RawProperty = {
   score?: number | null;
   recommended_score?: number | null;
   deal_reasons?: string[];
+  deal_signals?: string[];
+  discount_estimate_pct?: number | null;
   imageurl?: string | null;
   source?: string | null;
   latitude?: number | null;
@@ -511,6 +519,13 @@ function ListingsInner() {
   const typesRaw = searchParams?.get('types') ?? '';
   const types = useMemo(() => (typesRaw ? typesRaw.split(',').filter(Boolean) : []), [typesRaw]);
 
+  const dealsOnlyUrl = parseBoolParam(searchParams?.get('deals_only'));
+  const auctionOnlyUrl = parseBoolParam(searchParams?.get('auction_only'));
+  const reducedOnlyUrl = parseBoolParam(searchParams?.get('reduced_only'));
+  const needsRefurbOnlyUrl = parseBoolParam(searchParams?.get('needs_refurb_only'));
+  const chainFreeOnlyUrl = parseBoolParam(searchParams?.get('chain_free_only'));
+  const tenantedOnlyUrl = parseBoolParam(searchParams?.get('tenanted_only'));
+
   const dir: 'asc' | 'desc' = searchParams?.get('dir') === 'asc' ? 'asc' : 'desc';
 
   const sort = ((): SortKey => {
@@ -551,6 +566,12 @@ function ListingsInner() {
   const [bedsInput, setBedsInput] = useState(urlBeds);
   const [bathsInput, setBathsInput] = useState(urlBaths);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(types);
+  const [dealsOnly, setDealsOnly] = useState(dealsOnlyUrl);
+  const [auctionOnly, setAuctionOnly] = useState(auctionOnlyUrl);
+  const [reducedOnly, setReducedOnly] = useState(reducedOnlyUrl);
+  const [needsRefurbOnly, setNeedsRefurbOnly] = useState(needsRefurbOnlyUrl);
+  const [chainFreeOnly, setChainFreeOnly] = useState(chainFreeOnlyUrl);
+  const [tenantedOnly, setTenantedOnly] = useState(tenantedOnlyUrl);
 
   const lastUrlInputsRef = useRef({
     q: qRaw,
@@ -586,6 +607,22 @@ function ListingsInner() {
   useEffect(() => {
     setSelectedTypes(types);
   }, [types]);
+
+  useEffect(() => {
+    setDealsOnly(dealsOnlyUrl);
+    setAuctionOnly(auctionOnlyUrl);
+    setReducedOnly(reducedOnlyUrl);
+    setNeedsRefurbOnly(needsRefurbOnlyUrl);
+    setChainFreeOnly(chainFreeOnlyUrl);
+    setTenantedOnly(tenantedOnlyUrl);
+  }, [
+    dealsOnlyUrl,
+    auctionOnlyUrl,
+    reducedOnlyUrl,
+    needsRefurbOnlyUrl,
+    chainFreeOnlyUrl,
+    tenantedOnlyUrl,
+  ]);
 
   const [rows, setRows] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
@@ -663,6 +700,13 @@ function ListingsInner() {
         params.set('limit', String(limit));
         params.set('offset', String(offset));
 
+        if (dealsOnlyUrl) params.set('deals_only', '1');
+        if (auctionOnlyUrl) params.set('auction_only', '1');
+        if (reducedOnlyUrl) params.set('reduced_only', '1');
+        if (needsRefurbOnlyUrl) params.set('needs_refurb_only', '1');
+        if (chainFreeOnlyUrl) params.set('chain_free_only', '1');
+        if (tenantedOnlyUrl) params.set('tenanted_only', '1');
+
         // When the map is enabled, request full-result points so pins reflect ALL
         // matching properties (not just the current paged list).
         if (showMap) {
@@ -708,6 +752,11 @@ function ListingsInner() {
           yield_percent: prop.yield_percent,
           roi_percent: prop.roi_percent,
           ai_score: prop.ai_score,
+          recommended_score: prop.recommended_score,
+          deal_reasons: Array.isArray(prop.deal_reasons) ? prop.deal_reasons : undefined,
+          deal_signals: Array.isArray(prop.deal_signals) ? prop.deal_signals : undefined,
+          discount_estimate_pct:
+            typeof prop.discount_estimate_pct === 'number' ? prop.discount_estimate_pct : null,
           imageurl: prop.imageurl,
           source: prop.source,
           latitude: prop.latitude ?? prop.lat,
@@ -730,6 +779,11 @@ function ListingsInner() {
                 yield_percent: prop.yield_percent,
                 roi_percent: prop.roi_percent,
                 ai_score: prop.ai_score,
+                recommended_score: prop.recommended_score,
+                deal_reasons: Array.isArray(prop.deal_reasons) ? prop.deal_reasons : undefined,
+                deal_signals: Array.isArray(prop.deal_signals) ? prop.deal_signals : undefined,
+                discount_estimate_pct:
+                  typeof prop.discount_estimate_pct === 'number' ? prop.discount_estimate_pct : null,
                 imageurl: prop.imageurl,
                 source: prop.source,
                 latitude: prop.latitude ?? prop.lat,
@@ -759,7 +813,24 @@ function ListingsInner() {
     return () => {
       cancelled = true;
     };
-  }, [q, minP, maxP, beds, baths, sort, limit, offset, refreshNonce, showMap]);
+  }, [
+    q,
+    minP,
+    maxP,
+    beds,
+    baths,
+    sort,
+    limit,
+    offset,
+    refreshNonce,
+    showMap,
+    dealsOnlyUrl,
+    auctionOnlyUrl,
+    reducedOnlyUrl,
+    needsRefurbOnlyUrl,
+    chainFreeOnlyUrl,
+    tenantedOnlyUrl,
+  ]);
 
   type InvestmentType = (typeof INVESTMENT_TYPES)[number];
 
@@ -898,6 +969,19 @@ function ListingsInner() {
     else p.delete('baths');
     if (selectedTypes.length > 0) p.set('types', selectedTypes.join(','));
     else p.delete('types');
+
+    if (dealsOnly) p.set('deals_only', '1');
+    else p.delete('deals_only');
+    if (auctionOnly) p.set('auction_only', '1');
+    else p.delete('auction_only');
+    if (reducedOnly) p.set('reduced_only', '1');
+    else p.delete('reduced_only');
+    if (needsRefurbOnly) p.set('needs_refurb_only', '1');
+    else p.delete('needs_refurb_only');
+    if (chainFreeOnly) p.set('chain_free_only', '1');
+    else p.delete('chain_free_only');
+    if (tenantedOnly) p.set('tenanted_only', '1');
+    else p.delete('tenanted_only');
     if (sort) p.set('sort', sort);
     p.set('limit', String(limit));
     p.set('offset', '0');
@@ -956,6 +1040,12 @@ function ListingsInner() {
     setBedsInput('');
     setBathsInput('');
     setSelectedTypes([]);
+    setDealsOnly(false);
+    setAuctionOnly(false);
+    setReducedOnly(false);
+    setNeedsRefurbOnly(false);
+    setChainFreeOnly(false);
+    setTenantedOnly(false);
     pushParams((p) => {
       p.delete('q');
       p.delete('min');
@@ -963,6 +1053,12 @@ function ListingsInner() {
       p.delete('beds');
       p.delete('baths');
       p.delete('types');
+      p.delete('deals_only');
+      p.delete('auction_only');
+      p.delete('reduced_only');
+      p.delete('needs_refurb_only');
+      p.delete('chain_free_only');
+      p.delete('tenanted_only');
       p.set('offset', '0');
     });
     setShowFilters(false);
@@ -1000,6 +1096,16 @@ function ListingsInner() {
   if (beds) activeFilters.push({ key: 'beds', label: `${beds}+ beds`, value: String(beds) });
   if (baths) activeFilters.push({ key: 'baths', label: `${baths}+ baths`, value: String(baths) });
   types.forEach((type) => activeFilters.push({ key: 'types', label: type, value: type }));
+
+  if (dealsOnlyUrl) activeFilters.push({ key: 'deals_only', label: 'Deals only', value: '1' });
+  if (auctionOnlyUrl) activeFilters.push({ key: 'auction_only', label: 'Auction only', value: '1' });
+  if (reducedOnlyUrl) activeFilters.push({ key: 'reduced_only', label: 'Reduced only', value: '1' });
+  if (needsRefurbOnlyUrl)
+    activeFilters.push({ key: 'needs_refurb_only', label: 'Needs work only', value: '1' });
+  if (chainFreeOnlyUrl)
+    activeFilters.push({ key: 'chain_free_only', label: 'Chain-free only', value: '1' });
+  if (tenantedOnlyUrl)
+    activeFilters.push({ key: 'tenanted_only', label: 'Tenanted only', value: '1' });
 
   const totalPages = total > 0 ? Math.max(1, Math.ceil(total / limit)) : 1;
   const currentPage = total > 0 ? Math.min(totalPages, Math.floor(offset / limit) + 1) : 1;
@@ -1242,6 +1348,66 @@ function ListingsInner() {
             Investment type matching is improving — showing closest results when available.
           </div>
         )}
+      </div>
+
+      <div className="mb-3">
+        <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">Deal signals</label>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={dealsOnly}
+              onChange={(e) => setDealsOnly(e.target.checked)}
+            />
+            Deals only
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={auctionOnly}
+              onChange={(e) => setAuctionOnly(e.target.checked)}
+            />
+            Auction only
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={reducedOnly}
+              onChange={(e) => setReducedOnly(e.target.checked)}
+            />
+            Reduced only
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={needsRefurbOnly}
+              onChange={(e) => setNeedsRefurbOnly(e.target.checked)}
+            />
+            Needs work only
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={chainFreeOnly}
+              onChange={(e) => setChainFreeOnly(e.target.checked)}
+            />
+            Chain-free only
+          </label>
+          <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              className="h-4 w-4"
+              checked={tenantedOnly}
+              onChange={(e) => setTenantedOnly(e.target.checked)}
+            />
+            Tenanted only
+          </label>
+        </div>
       </div>
 
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">

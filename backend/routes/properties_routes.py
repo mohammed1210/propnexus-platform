@@ -14,6 +14,7 @@ from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
 from backend.utils.deal_scoring import compute_deal_score
+from backend.utils.deal_signals import extract_deal_signals
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from backend.utils.listing_keys import extract_postcode
 from backend.utils.recommended_ranker import normalize_deal_type, rerank_recommended
@@ -179,6 +180,21 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
         else:
             raw_obj = data_obj
 
+        # Deal signals may be stored as explicit columns or embedded into `data`.
+        if out.get("deal_signals") is None and isinstance(data_obj.get("deal_signals"), list):
+            out["deal_signals"] = data_obj.get("deal_signals")
+        if out.get("deal_reasons") is None and isinstance(data_obj.get("deal_reasons"), list):
+            out["deal_reasons"] = data_obj.get("deal_reasons")
+        if out.get("deal_signals_meta") is None and isinstance(
+            data_obj.get("deal_signals_meta"), dict
+        ):
+            out["deal_signals_meta"] = data_obj.get("deal_signals_meta")
+        if (
+            out.get("discount_estimate_pct") is None
+            and data_obj.get("discount_estimate_pct") is not None
+        ):
+            out["discount_estimate_pct"] = data_obj.get("discount_estimate_pct")
+
     def _pick_raw(keys: List[str]) -> Any:
         for k in keys:
             v = raw_obj.get(k)
@@ -333,7 +349,106 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
     elif lng_now == 0.0 and lat_now is None:
         out["longitude"] = None
 
+    # Ensure deal fields are well-typed for frontend.
+    if isinstance(out.get("deal_signals"), str):
+        out["deal_signals"] = [s.strip() for s in out["deal_signals"].split(",") if s.strip()]
+    if out.get("deal_signals") is not None and not isinstance(out.get("deal_signals"), list):
+        out["deal_signals"] = []
+    if isinstance(out.get("deal_signals"), list):
+        out["deal_signals"] = [
+            str(s) for s in out["deal_signals"] if isinstance(s, str) and s.strip()
+        ]
+
+    if out.get("deal_reasons") is not None and not isinstance(out.get("deal_reasons"), list):
+        out["deal_reasons"] = []
+    if isinstance(out.get("deal_reasons"), list):
+        out["deal_reasons"] = [
+            str(s) for s in out["deal_reasons"] if isinstance(s, str) and s.strip()
+        ]
+
+    if out.get("discount_estimate_pct") is not None and not isinstance(
+        out.get("discount_estimate_pct"), (int, float)
+    ):
+        try:
+            out["discount_estimate_pct"] = float(out.get("discount_estimate_pct"))
+        except Exception:
+            out["discount_estimate_pct"] = None
+
     return out
+
+
+def _parse_bool(v: Any) -> bool:
+    if v is None:
+        return False
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)):
+        return bool(v)
+    s = str(v).strip().lower()
+    return s in {"1", "true", "t", "yes", "y", "on"}
+
+
+def _ensure_deal_fields(item: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(item, dict):
+        return item
+
+    # If deal_signals already present (column or normalized from data), trust it.
+    if isinstance(item.get("deal_signals"), list):
+        if not isinstance(item.get("deal_reasons"), list):
+            item["deal_reasons"] = []
+        return item
+
+    try:
+        extracted = extract_deal_signals(item)
+    except Exception:
+        extracted = None
+
+    if not isinstance(extracted, dict):
+        item.setdefault("deal_signals", [])
+        item.setdefault("deal_reasons", [])
+        item.setdefault("discount_estimate_pct", None)
+        return item
+
+    item["deal_signals"] = (
+        extracted.get("signals") if isinstance(extracted.get("signals"), list) else []
+    )
+    item["deal_reasons"] = (
+        extracted.get("reasons") if isinstance(extracted.get("reasons"), list) else []
+    )
+    if item.get("discount_estimate_pct") is None:
+        item["discount_estimate_pct"] = extracted.get("discount_estimate_pct")
+
+    # Embed into data payload (in-memory only) so other code paths can use it.
+    data_obj = item.get("data")
+    if not isinstance(data_obj, dict):
+        data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+    data_obj.setdefault("deal_signals", item.get("deal_signals"))
+    data_obj.setdefault("deal_reasons", item.get("deal_reasons"))
+    if extracted.get("discount_estimate_pct") is not None:
+        data_obj.setdefault("discount_estimate_pct", extracted.get("discount_estimate_pct"))
+    item["data"] = data_obj
+    return item
+
+
+def _matches_deal_filters(
+    deal_signals: Any,
+    *,
+    deals_only: bool,
+    required_signals: List[str],
+) -> bool:
+    sigs: List[str] = []
+    if isinstance(deal_signals, str):
+        sigs = [s.strip().lower() for s in deal_signals.split(",") if s.strip()]
+    elif isinstance(deal_signals, list):
+        sigs = [str(s).strip().lower() for s in deal_signals if isinstance(s, str) and s.strip()]
+
+    sigset = set(sigs)
+    if deals_only and not sigset:
+        return False
+    for s in required_signals:
+        if s not in sigset:
+            return False
+    return True
 
 
 @router.get(
@@ -356,6 +471,21 @@ def list_properties(
     beds: Optional[int] = Query(default=None),
     baths: Optional[int] = Query(default=None),
     types: Optional[str] = Query(default=None, description="Comma-separated investment types"),
+    deals_only: bool = Query(
+        default=False, description="Only return listings with any deal signal"
+    ),
+    auction_only: bool = Query(default=False),
+    reduced_only: bool = Query(default=False),
+    needs_refurb_only: bool = Query(default=False),
+    chain_free_only: bool = Query(default=False),
+    tenanted_only: bool = Query(default=False),
+    cash_buyers_only: bool = Query(default=False),
+    short_lease_only: bool = Query(default=False),
+    below_market_only: bool = Query(default=False),
+    signals: Optional[str] = Query(
+        default=None,
+        description="Comma-separated deal signals to require (e.g. reduced,auction)",
+    ),
     deal_type: str = Query(
         default="balanced",
         description="Persona for recommended ranking: balanced|cashflow|growth (only used with sort=recommended)",
@@ -387,6 +517,28 @@ def list_properties(
             include_points = bool(getattr(include_points, "default", False))
         if isinstance(points_limit, Param):
             points_limit = int(getattr(points_limit, "default", 2000))
+
+        # When called directly (unit tests), bool Query params may be Param objects too.
+        if isinstance(deals_only, Param):
+            deals_only = _parse_bool(getattr(deals_only, "default", False))
+        if isinstance(auction_only, Param):
+            auction_only = _parse_bool(getattr(auction_only, "default", False))
+        if isinstance(reduced_only, Param):
+            reduced_only = _parse_bool(getattr(reduced_only, "default", False))
+        if isinstance(needs_refurb_only, Param):
+            needs_refurb_only = _parse_bool(getattr(needs_refurb_only, "default", False))
+        if isinstance(chain_free_only, Param):
+            chain_free_only = _parse_bool(getattr(chain_free_only, "default", False))
+        if isinstance(tenanted_only, Param):
+            tenanted_only = _parse_bool(getattr(tenanted_only, "default", False))
+        if isinstance(cash_buyers_only, Param):
+            cash_buyers_only = _parse_bool(getattr(cash_buyers_only, "default", False))
+        if isinstance(short_lease_only, Param):
+            short_lease_only = _parse_bool(getattr(short_lease_only, "default", False))
+        if isinstance(below_market_only, Param):
+            below_market_only = _parse_bool(getattr(below_market_only, "default", False))
+        if isinstance(signals, Param):
+            signals = getattr(signals, "default", None)
 
         response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
 
@@ -468,12 +620,36 @@ def list_properties(
         start = offset
         end = offset + limit - 1
 
+        required_signals: List[str] = []
+        if auction_only:
+            required_signals.append("auction")
+        if reduced_only:
+            required_signals.append("reduced")
+        if needs_refurb_only:
+            required_signals.append("needs_refurb")
+        if chain_free_only:
+            required_signals.append("chain_free")
+        if tenanted_only:
+            required_signals.append("tenanted")
+        if cash_buyers_only:
+            required_signals.append("cash_buyers")
+        if short_lease_only:
+            required_signals.append("short_lease")
+        if below_market_only:
+            required_signals.append("below_market")
+        if signals:
+            required_signals.extend(
+                [s.strip().lower() for s in str(signals).split(",") if s.strip()]
+            )
+
+        any_deal_filter = bool(deals_only or required_signals)
+
         # For recommended ranking, we fetch a larger candidate pool from the top of the result set,
         # rerank in Python (guardrails/persona), then slice. This keeps top pages consistent while
         # remaining additive and DB-schema-free.
         fetched_pool_from_zero = False
-        if is_recommended:
-            pool_size = builtins.min(builtins.max(offset + limit, limit * 5), 200)
+        if is_recommended or any_deal_filter:
+            pool_size = builtins.min(builtins.max(offset + limit, limit * 8), 500)
             if (offset + limit) <= pool_size:
                 query = query.range(0, pool_size - 1)
                 fetched_pool_from_zero = True
@@ -504,6 +680,24 @@ def list_properties(
 
         items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
 
+        if (is_recommended or any_deal_filter) and items:
+            items = [_ensure_deal_fields(it) for it in items if isinstance(it, dict)]
+
+            if any_deal_filter:
+                items = [
+                    it
+                    for it in items
+                    if _matches_deal_filters(
+                        it.get("deal_signals"),
+                        deals_only=deals_only,
+                        required_signals=required_signals,
+                    )
+                ]
+
+                # When filtering within a pool, the DB count is no longer meaningful.
+                if fetched_pool_from_zero:
+                    total_int = len(items)
+
         if is_recommended and items:
             # Enrich + rerank deterministically. We still return the same page size.
             ranked = rerank_recommended(
@@ -516,14 +710,19 @@ def list_properties(
                 items = ranked[offset : offset + limit]
             else:
                 items = ranked
+        elif fetched_pool_from_zero and any_deal_filter:
+            # Non-recommended + deal filters: slice after filtering.
+            items = items[offset : offset + limit]
 
         points: Optional[List[Dict[str, Any]]] = None
         if include_points:
             # Minimal payload for map pinning. We intentionally do not include images/raw payload.
             def _build_points_query():
-                q0 = sb.table("properties").select(
-                    "id,title,location,price,bedrooms,investment_type,latitude,longitude,source,created_at"
-                )
+                cols = "id,title,location,price,bedrooms,investment_type,latitude,longitude,source,created_at"
+                if any_deal_filter:
+                    cols = cols + ",deal_signals,data"
+
+                q0 = sb.table("properties").select(cols)
 
                 if source is not None:
                     src = str(source).strip().lower()
@@ -608,6 +807,17 @@ def list_properties(
             for r in points_rows:
                 if not isinstance(r, dict):
                     continue
+
+                if any_deal_filter:
+                    deal_sigs = r.get("deal_signals")
+                    if deal_sigs is None and isinstance(r.get("data"), dict):
+                        deal_sigs = r["data"].get("deal_signals")
+                    if not _matches_deal_filters(
+                        deal_sigs,
+                        deals_only=deals_only,
+                        required_signals=required_signals,
+                    ):
+                        continue
 
                 lat = _coerce_float(
                     r.get("latitude") if r.get("latitude") is not None else r.get("lat")

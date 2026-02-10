@@ -32,6 +32,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
+from backend.utils.deal_signals import extract_deal_signals
 from supabase import Client, create_client
 
 load_dotenv()
@@ -512,6 +513,20 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
         normalized["investment_type"] = _classify_investment_type(
             normalized.get("title"), normalized.get("description")
         )
+
+    # Deal signals (investor feed): best-effort, additive.
+    try:
+        extracted = extract_deal_signals(normalized)
+        if isinstance(extracted, dict):
+            normalized["deal_signals"] = extracted.get("signals")
+            normalized["deal_reasons"] = extracted.get("reasons")
+            normalized["discount_estimate_pct"] = extracted.get("discount_estimate_pct")
+            normalized["deal_signals_meta"] = {
+                "confidence": extracted.get("confidence"),
+                "matched_terms": extracted.get("matched_terms"),
+            }
+    except Exception:
+        pass
 
     # Remove nulls so we don't overwrite good data with null
     return {k: v for k, v in normalized.items() if v is not None}
