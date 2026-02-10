@@ -644,39 +644,61 @@ async def scrape_all_sources(
 
     async def _collect_from(
         source: str, items: Any
-    ) -> tuple[List[Dict[str, Any]], str, str | None]:
+    ) -> tuple[List[Dict[str, Any]], str, str | None, dict[str, Any] | None]:
         if inspect.isawaitable(items):
             try:
-                items = await asyncio.wait_for(items, timeout=timeout_s)
+                # OTM has its own per-detail timeouts; allow longer here so partial
+                # success isn't cut off by the aggregator.
+                effective_timeout = timeout_s
+                if (source or "").lower() == "onthemarket":
+                    effective_timeout = max(
+                        float(timeout_s),
+                        float(os.getenv("OTM_SOURCE_TIMEOUT_S", "180")),
+                    )
+                items = await asyncio.wait_for(items, timeout=float(effective_timeout))
             except asyncio.TimeoutError:
-                log(f"INFO: {source} timed out after {timeout_s}s for location={loc}")
-                return [], "timeout", None
+                log(f"INFO: {source} timed out after {effective_timeout}s for location={loc}")
+                return [], "timeout", None, None
+
+        telemetry: dict[str, Any] | None = None
+        # Some scrapers may optionally return (items, telemetry).
+        if (
+            isinstance(items, tuple)
+            and len(items) == 2
+            and isinstance(items[0], list)
+            and isinstance(items[1], dict)
+        ):
+            telemetry = items[1]
+            items = items[0]
+
         if not isinstance(items, list):
-            return [], "error", "non-list result"
+            return [], "error", "non-list result", telemetry
 
         if len(items) == 0:
             log(f"INFO: {source} returned 0 properties for location={loc}")
-            return [], "empty", None
+            return [], "empty", None, telemetry
 
         out: List[Dict[str, Any]] = []
         for raw in items:
             if isinstance(raw, dict):
                 out.append(normalize_record(raw, source=source))
-        return out, "success", None
+        return out, "success", None, telemetry
 
-    tasks: List[asyncio.Task[tuple[str, List[Dict[str, Any]], str, str | None]]] = []
+    tasks: List[
+        asyncio.Task[tuple[str, List[Dict[str, Any]], str, str | None, dict[str, Any] | None]]
+    ] = []
 
     async def _run_source(
         source: str, items: Any
-    ) -> tuple[str, List[Dict[str, Any]], str, str | None]:
+    ) -> tuple[str, List[Dict[str, Any]], str, str | None, dict[str, Any] | None]:
         try:
-            out, status, error = await _collect_from(source, items)
-            return source, out, status, error
+            out, status, error, telemetry = await _collect_from(source, items)
+            return source, out, status, error, telemetry
         except Exception as e:
             name = type(e).__name__
             if source == "onthemarket" and name.lower().endswith("blockederror"):
-                return source, [], "blocked", str(e) or "blocked"
-            return source, [], "error", str(e)
+                return source, [], "blocked", str(e) or "blocked", None
+            return source, [], "error", str(e), None
 
     # ---- Rightmove ----
     if selected is None or "rightmove" in selected:
@@ -725,7 +747,9 @@ async def scrape_all_sources(
                 )
 
             if inspect.iscoroutinefunction(scrape_onthemarket_properties):
-                items = scrape_onthemarket_properties(loc, max_pages=onthemarket_max_pages)
+                items = scrape_onthemarket_properties(
+                    loc, max_pages=onthemarket_max_pages, return_telemetry=True
+                )
             else:
                 items = asyncio.to_thread(
                     scrape_onthemarket_properties,
@@ -763,14 +787,17 @@ async def scrape_all_sources(
         # Stream results as sources finish so callers can surface progress.
         for fut in asyncio.as_completed(tasks):
             try:
-                source, chunk, status, error = await fut
+                source, chunk, status, error, telemetry = await fut
             except Exception as e:
                 warn(f"Scrape task failed: {e}")
                 continue
 
             if on_source_complete:
                 try:
-                    maybe = on_source_complete(source, chunk, status, error)
+                    try:
+                        maybe = on_source_complete(source, chunk, status, error, telemetry)
+                    except TypeError:
+                        maybe = on_source_complete(source, chunk, status, error)
                     if inspect.isawaitable(maybe):
                         await maybe
                 except Exception as e:

@@ -733,6 +733,7 @@ async def _probe_onthemarket(
     timeout_seconds: int,
     *,
     include_escalation: bool,
+    detail_sample: bool = False,
 ) -> Dict[str, Any]:
     from bs4 import BeautifulSoup
 
@@ -1027,6 +1028,31 @@ async def _probe_onthemarket(
 
     if not blocked_final:
         block_reason = None
+
+    # Optional: mini detail-phase sample for OTM only (kept off by default).
+    detail_sample_attempted = 0
+    detail_sample_succeeded = 0
+    detail_sample_timed_out = 0
+    detail_sample_failed = 0
+    if detail_sample and detail_urls:
+        try:
+            _items, telem = await otm._otm_fetch_detail_pages_with_telemetry(
+                session=session,
+                detail_urls=detail_urls,
+                fallback_location=location,
+                # Use the same timeout/concurrency config as the scraper.
+                limit=1,
+                concurrency=int(getattr(otm, "OTM_DETAIL_CONCURRENCY", 6)),
+                timeout_s=float(getattr(otm, "OTM_DETAIL_TIMEOUT_S", 12.0)),
+                max_attempts=3,
+            )
+            detail_sample_attempted = int(telem.get("detail_fetch_attempted") or 0)
+            detail_sample_succeeded = int(telem.get("detail_fetch_succeeded") or 0)
+            detail_sample_timed_out = int(telem.get("detail_fetch_timed_out") or 0)
+            detail_sample_failed = int(telem.get("detail_fetch_failed") or 0)
+        except Exception:
+            # Keep probe resilient; sample is best-effort.
+            detail_sample_failed = max(1, detail_sample_failed)
     return {
         "target_url": target_url,
         "proxy_used": bool(proxy_used or fallback_used),
@@ -1063,6 +1089,10 @@ async def _probe_onthemarket(
         "detail_links_found": detail_links_found,
         "property_ids_found": property_ids_found,
         "detail_urls_sample": detail_urls[:3],
+        "detail_sample_attempted": detail_sample_attempted,
+        "detail_sample_succeeded": detail_sample_succeeded,
+        "detail_sample_timed_out": detail_sample_timed_out,
+        "detail_sample_failed": detail_sample_failed,
         "blocked_by_heuristic": blocked_by_heuristic,
         "blocked": blocked_final,
         "classification": classification,
@@ -1157,6 +1187,7 @@ async def _run_probe(
     page: int,
     timeout_seconds: int,
     include_escalation: bool,
+    detail_sample: bool = False,
 ) -> Dict[str, Any]:
     import aiohttp
 
@@ -1187,6 +1218,7 @@ async def _run_probe(
                     page,
                     timeout_seconds,
                     include_escalation=include_escalation,
+                    detail_sample=detail_sample,
                 )
             )
         if "spareroom" in sources:
@@ -1221,6 +1253,12 @@ async def debug_scrape_probe(
         False,
         description="When true, runs additional escalation (Rightmove ladder; and Playwright escalation for OnTheMarket when blocked); can be slow",
     ),
+    detail_sample: int = Query(
+        0,
+        ge=0,
+        le=1,
+        description="OTM only: when 1, attempts up to 3 detail pages and reports detail-phase counters",
+    ),
     x_admin_token: str | None = Header(None),
 ):
     """Probe each scraper source and report blocked vs parsed vs timeout.
@@ -1246,6 +1284,7 @@ async def debug_scrape_probe(
         page=page,
         timeout_seconds=timeout_seconds,
         include_escalation=include_escalation,
+        detail_sample=bool(detail_sample),
     )
 
     return {
@@ -1258,6 +1297,7 @@ async def debug_scrape_probe(
         "playwright_enabled": bool(PLAYWRIGHT_ENABLE),
         "timeout_seconds": timeout_seconds,
         "include_escalation": include_escalation,
+        "detail_sample": bool(detail_sample),
         "elapsed_ms": int((time.monotonic() - started) * 1000),
         "results": results,
     }

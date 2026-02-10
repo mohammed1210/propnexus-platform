@@ -6,6 +6,7 @@ import inspect
 import os
 import random
 import re
+import time
 from html import unescape
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlencode, urljoin, urlparse
@@ -701,6 +702,25 @@ SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 OT_MAX_PAGES = int(os.getenv("OT_MAX_PAGES", "1"))
 OT_DELAY_MS = int(os.getenv("OT_DELAY_MS", "900"))  # delay between pages (ms)
 
+# -----------------------------
+# Detail-phase limits/timeouts
+# -----------------------------
+# Hard cap how many detail pages we attempt per city run.
+OTM_DETAIL_FETCH_CAP = int(os.getenv("OTM_DETAIL_FETCH_CAP", "40"))
+OTM_DETAIL_FETCH_CAP = max(1, OTM_DETAIL_FETCH_CAP)
+
+# Attempted detail pages = min(detail_links_found, max(limit * multiplier, 10), cap)
+OTM_DETAIL_FETCH_MULTIPLIER = int(os.getenv("OTM_DETAIL_FETCH_MULTIPLIER", "2"))
+OTM_DETAIL_FETCH_MULTIPLIER = max(1, OTM_DETAIL_FETCH_MULTIPLIER)
+
+# Per-detail fetch+parse timeout (seconds).
+OTM_DETAIL_TIMEOUT_S = float(os.getenv("OTM_DETAIL_TIMEOUT_S", "12"))
+OTM_DETAIL_TIMEOUT_S = max(0.01, float(OTM_DETAIL_TIMEOUT_S))
+
+# Bounded concurrency for detail phase.
+OTM_DETAIL_CONCURRENCY = int(os.getenv("OTM_DETAIL_CONCURRENCY", "6"))
+OTM_DETAIL_CONCURRENCY = max(1, min(32, OTM_DETAIL_CONCURRENCY))
+
 # OTM-only request pacing. Keep modest by default.
 OTM_MIN_REQUEST_DELAY_MS = int(os.getenv("OTM_MIN_REQUEST_DELAY_MS", "250"))
 OTM_MAX_REQUEST_DELAY_MS = int(os.getenv("OTM_MAX_REQUEST_DELAY_MS", "900"))
@@ -728,6 +748,152 @@ def _otm_headers() -> Dict[str, str]:
         "Referer": "https://www.onthemarket.com/",
         "DNT": "1",
     }
+
+
+def _detail_attempt_count(*, limit: int, detail_links_found: int) -> int:
+    lim = max(1, int(limit or 0))
+    found = max(0, int(detail_links_found or 0))
+    # attempt = min(found, max(lim * multiplier, 10), cap)
+    floor = max(lim * int(OTM_DETAIL_FETCH_MULTIPLIER), 10)
+    attempt = min(found, floor, int(OTM_DETAIL_FETCH_CAP))
+    return max(0, int(attempt))
+
+
+async def _otm_fetch_detail_pages_with_telemetry(
+    *,
+    session: "aiohttp_types.ClientSession",
+    detail_urls: list[str],
+    fallback_location: str,
+    limit: int,
+    concurrency: int | None = None,
+    timeout_s: float | None = None,
+    max_attempts: int | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Fetch + parse OTM detail pages with bounded concurrency + per-detail timeout.
+
+    Returns (items, telemetry). Never raises for individual detail failures.
+    """
+
+    started = time.monotonic()
+    detail_links_found = len(detail_urls or [])
+
+    tmo = float(timeout_s if timeout_s is not None else OTM_DETAIL_TIMEOUT_S)
+    tmo = max(0.01, tmo)
+    conc = int(concurrency if concurrency is not None else OTM_DETAIL_CONCURRENCY)
+    conc = max(1, conc)
+
+    if max_attempts is not None:
+        attempt = max(0, int(max_attempts))
+        selected_urls = (detail_urls or [])[: min(detail_links_found, attempt)]
+        cap_applied = bool(detail_links_found > len(selected_urls))
+    else:
+        attempt = _detail_attempt_count(limit=limit, detail_links_found=detail_links_found)
+        selected_urls = (detail_urls or [])[:attempt]
+        cap_applied = bool(detail_links_found > len(selected_urls))
+
+    telemetry: dict[str, Any] = {
+        "detail_links_found": int(detail_links_found),
+        "detail_fetch_attempted": int(len(selected_urls)),
+        "detail_fetch_succeeded": 0,
+        "detail_fetch_timed_out": 0,
+        "detail_fetch_failed": 0,
+        "detail_fetch_elapsed_ms": 0,
+        "detail_fetch_cap_applied": bool(cap_applied),
+        "detail_fetch_concurrency": int(conc),
+    }
+
+    if not selected_urls:
+        telemetry["detail_fetch_elapsed_ms"] = int((time.monotonic() - started) * 1000)
+        return [], telemetry
+
+    sem = asyncio.Semaphore(conc)
+
+    async def _fetch_parse_one(detail_url: str) -> dict[str, Any] | None:
+        async with sem:
+            try:
+
+                async def _do() -> dict[str, Any] | None:
+                    try:
+                        detail_html = await _fetch_html(session, detail_url)
+                    except OnTheMarketBlockedError:
+                        detail_html = None
+                    except Exception:
+                        detail_html = None
+
+                    if not detail_html or not (detail_html or "").strip():
+                        if PLAYWRIGHT_ENABLE:
+                            try:
+                                detail_html = (
+                                    await render_page_capture(
+                                        detail_url,
+                                        selectors=[
+                                            "meta[property='og:title']",
+                                            "script[type='application/ld+json']",
+                                        ],
+                                        click_selectors=[
+                                            "#ccc-recommended-settings",
+                                            "#ccc-accept-settings",
+                                        ],
+                                    )
+                                )[0]
+                            except Exception:
+                                detail_html = None
+
+                    if not detail_html or not (detail_html or "").strip():
+                        return None
+
+                    blocked_detail, _blocked_reason = _blocked_by_heuristics_explain(
+                        detail_html, 200
+                    )
+                    if blocked_detail:
+                        return None
+
+                    parsed = _parse_otm_detail_page(
+                        detail_html, detail_url, fallback_location=fallback_location
+                    )
+                    if not parsed:
+                        return None
+
+                    should_insert, _reason = should_insert_property(parsed)
+                    if not should_insert:
+                        return None
+
+                    return clean_property_data(parsed)
+
+                out = await asyncio.wait_for(_do(), timeout=tmo)
+                if out is None:
+                    telemetry["detail_fetch_failed"] += 1
+                return out
+            except asyncio.TimeoutError:
+                telemetry["detail_fetch_timed_out"] += 1
+                return None
+            except Exception:
+                telemetry["detail_fetch_failed"] += 1
+                return None
+
+    tasks = [asyncio.create_task(_fetch_parse_one(u)) for u in selected_urls]
+    items: list[dict[str, Any]] = []
+    try:
+        for fut in asyncio.as_completed(tasks):
+            try:
+                item = await fut
+            except Exception:
+                telemetry["detail_fetch_failed"] += 1
+                continue
+            if not item:
+                continue
+            telemetry["detail_fetch_succeeded"] += 1
+            items.append(item)
+    finally:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    telemetry["detail_fetch_elapsed_ms"] = int((time.monotonic() - started) * 1000)
+    if (
+        int(telemetry.get("detail_fetch_attempted") or 0) > 0
+        and int(telemetry.get("detail_fetch_succeeded") or 0) == 0
+    ):
+        telemetry["detail_fetch_error"] = "no results after detail fetch"
+    return items, telemetry
 
 
 async def _otm_request_jitter() -> None:
@@ -1320,8 +1486,12 @@ def _extract_external_id_and_url(
 
 
 async def scrape_onthemarket_properties(
-    location: str, limit: int = 50, *, max_pages: int | None = None
-) -> List[Dict[str, Any]]:
+    location: str,
+    limit: int = 50,
+    *,
+    max_pages: int | None = None,
+    return_telemetry: bool = False,
+) -> List[Dict[str, Any]] | tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     Scrape OnTheMarket properties for a given location.
 
@@ -1340,6 +1510,20 @@ async def scrape_onthemarket_properties(
     stats = ScraperStats("onthemarket", location)
     results: List[Dict[str, Any]] = []
     seen_ids = set()
+
+    limit_i = max(1, int(limit or 0))
+
+    telemetry: dict[str, Any] = {
+        "detail_links_found": 0,
+        "property_ids_found": 0,
+        "detail_fetch_attempted": 0,
+        "detail_fetch_succeeded": 0,
+        "detail_fetch_timed_out": 0,
+        "detail_fetch_failed": 0,
+        "detail_fetch_elapsed_ms": 0,
+        "detail_fetch_cap_applied": False,
+        "detail_fetch_concurrency": int(OTM_DETAIL_CONCURRENCY),
+    }
 
     effective_max_pages = (
         int(max_pages)
@@ -1360,68 +1544,7 @@ async def scrape_onthemarket_properties(
                 collected_detail_urls: List[str] = []
                 collected_seen: set[str] = set()
 
-                default_max_detail_urls = max(40, int(limit or 0) * 4)
-                effective_max_detail_urls = int(
-                    os.getenv("OTM_MAX_DETAIL_URLS", str(default_max_detail_urls))
-                )
-                effective_max_detail_urls = max(
-                    int(limit or 1), min(300, effective_max_detail_urls)
-                )
-
-                detail_concurrency = int(os.getenv("OTM_DETAIL_CONCURRENCY", "4"))
-                detail_concurrency = max(1, min(8, detail_concurrency))
-                sem = asyncio.Semaphore(detail_concurrency)
-
-                async def _fetch_parse_one(detail_url: str) -> Optional[Dict[str, Any]]:
-                    async with sem:
-                        try:
-                            detail_html = await _fetch_html(session, detail_url)
-                        except OnTheMarketBlockedError:
-                            detail_html = None
-                        except Exception:
-                            detail_html = None
-
-                        if not detail_html or not (detail_html or "").strip():
-                            if PLAYWRIGHT_ENABLE:
-                                try:
-                                    detail_html = (
-                                        await render_page_capture(
-                                            detail_url,
-                                            selectors=[
-                                                "meta[property='og:title']",
-                                                "script[type='application/ld+json']",
-                                            ],
-                                            click_selectors=[
-                                                "#ccc-recommended-settings",
-                                                "#ccc-accept-settings",
-                                            ],
-                                        )
-                                    )[0]
-                                except Exception:
-                                    detail_html = None
-
-                        if not detail_html or not (detail_html or "").strip():
-                            return None
-
-                        blocked_detail, _blocked_reason = _blocked_by_heuristics_explain(
-                            detail_html, 200
-                        )
-                        if blocked_detail:
-                            return None
-
-                        parsed = _parse_otm_detail_page(
-                            detail_html, detail_url, fallback_location=location
-                        )
-                        if not parsed:
-                            return None
-
-                        should_insert, reason = should_insert_property(parsed)
-                        if not should_insert:
-                            stats.log_validation_failure(reason or "Unknown")
-                            return None
-
-                        stats.log_parse_success()
-                        return clean_property_data(parsed)
+                property_ids: set[str] = set()
 
                 for page in range(effective_max_pages):
                     url = _build_search_url(location, page)
@@ -1436,6 +1559,11 @@ async def scrape_onthemarket_properties(
                     if not html:
                         log_page_fetch_error("onthemarket", page, "blocked or empty")
                         continue
+
+                    try:
+                        property_ids |= _extract_otm_property_ids_from_datalayer(html)
+                    except Exception:
+                        pass
 
                     soup = BeautifulSoup(html, "html.parser")
                     page_detail_urls = _collect_detail_listing_urls(soup)
@@ -1464,8 +1592,6 @@ async def scrape_onthemarket_properties(
                             continue
                         collected_seen.add(du)
                         collected_detail_urls.append(du)
-                        if len(collected_detail_urls) >= effective_max_detail_urls:
-                            break
 
                     if not page_detail_urls and page == 0:
                         # Old behavior preserved: if page 0 has no usable signals, stop.
@@ -1474,49 +1600,80 @@ async def scrape_onthemarket_properties(
                         )
                         break
 
-                    if len(collected_detail_urls) >= effective_max_detail_urls:
-                        break
-
                     await asyncio.sleep(OT_DELAY_MS / 1000.0)
 
                 if not collected_detail_urls:
                     stats.log_summary()
                     runlog.set_count(0)
+                    if return_telemetry:
+                        telemetry["detail_links_found"] = 0
+                        telemetry["property_ids_found"] = int(len(property_ids))
+                        return [], telemetry
                     return []
 
-                # Fetch + parse detail pages with bounded concurrency.
-                tasks = [
-                    asyncio.create_task(_fetch_parse_one(u))
-                    for u in collected_detail_urls[:effective_max_detail_urls]
-                ]
-                stop_early = False
-                try:
-                    for fut in asyncio.as_completed(tasks):
-                        item = await fut
-                        if not item:
-                            continue
-                        ext = item.get("external_id")
-                        if ext and str(ext) in seen_ids:
-                            stats.log_duplicate_id(str(ext))
-                            continue
-                        if ext:
-                            seen_ids.add(str(ext))
-                        results.append(item)
+                telemetry["detail_links_found"] = int(len(collected_detail_urls))
+                telemetry["property_ids_found"] = int(len(property_ids))
 
-                        if len(results) >= limit:
-                            stop_early = True
-                            break
-                finally:
-                    if stop_early:
-                        for t in tasks:
-                            if not t.done():
-                                t.cancel()
-                    # Always await task completion/cancellation to avoid warnings.
-                    await asyncio.gather(*tasks, return_exceptions=True)
+                attempt = _detail_attempt_count(
+                    limit=int(limit_i), detail_links_found=int(len(collected_detail_urls))
+                )
+                cap_applied = bool(len(collected_detail_urls) > attempt)
+                telemetry["detail_fetch_cap_applied"] = bool(cap_applied)
+
+                print(
+                    f"[onthemarket] listing harvested {len(collected_detail_urls)} detail links, "
+                    f"attempting {attempt} (cap applied: {cap_applied})",
+                    flush=True,
+                )
+
+                detail_items, detail_telem = await _otm_fetch_detail_pages_with_telemetry(
+                    session=session,
+                    detail_urls=collected_detail_urls,
+                    fallback_location=location,
+                    limit=int(limit_i),
+                    concurrency=int(OTM_DETAIL_CONCURRENCY),
+                    timeout_s=float(OTM_DETAIL_TIMEOUT_S),
+                )
+                # Merge detail telemetry into top-level telemetry.
+                for k in (
+                    "detail_fetch_attempted",
+                    "detail_fetch_succeeded",
+                    "detail_fetch_timed_out",
+                    "detail_fetch_failed",
+                    "detail_fetch_elapsed_ms",
+                    "detail_fetch_cap_applied",
+                    "detail_fetch_concurrency",
+                ):
+                    if k in detail_telem:
+                        telemetry[k] = detail_telem.get(k)
+
+                # Dedup + cap final results to requested limit.
+                for item in detail_items:
+                    ext = item.get("external_id") if isinstance(item, dict) else None
+                    if ext and str(ext) in seen_ids:
+                        stats.log_duplicate_id(str(ext))
+                        continue
+                    if ext:
+                        seen_ids.add(str(ext))
+                    results.append(item)
+
+                if len(results) > limit_i:
+                    results = results[:limit_i]
+
+                print(
+                    f"[onthemarket] detail phase succeeded {telemetry.get('detail_fetch_succeeded', 0)}/"
+                    f"{telemetry.get('detail_fetch_attempted', 0)}, timed out "
+                    f"{telemetry.get('detail_fetch_timed_out', 0)}, failed "
+                    f"{telemetry.get('detail_fetch_failed', 0)}, elapsed ms "
+                    f"{telemetry.get('detail_fetch_elapsed_ms', 0)}",
+                    flush=True,
+                )
 
             stats.log_summary()
             print(f"✅ Scraped {len(results)} OnTheMarket properties for '{location}'")
             runlog.set_count(len(results))
+            if return_telemetry:
+                return results, telemetry
             return results
         except Exception as e:
             # Let RunLog handle the error in __exit__

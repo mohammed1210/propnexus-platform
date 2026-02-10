@@ -119,6 +119,98 @@ def test_import_batch_async_city_error_does_not_crash_job(client, monkeypatch):
     # One city may still be queued/running, but the status endpoint must be readable.
     assert s.get("status") in {"queued", "running", "success", "partial", "error"}
 
+    def test_import_batch_async_completes_with_results(monkeypatch, client):
+        from backend.utils import ingest as ingest_mod
+
+        async def _fake_scrape_all_sources(*args, **kwargs):
+            on_source_complete = kwargs.get("on_source_complete")
+            assert callable(on_source_complete)
+            # Mimic a single source finishing successfully.
+            await on_source_complete(
+                "london",
+                "onthemarket",
+                2,
+                None,
+                {"detail_fetch_succeeded": 2, "detail_fetch_attempted": 2},
+            )
+
+        monkeypatch.setattr(ingest_mod, "scrape_all_sources", _fake_scrape_all_sources)
+
+        resp = client.post(
+            "/import/batch",
+            json={
+                "cities": ["london"],
+                "sources": ["onthemarket"],
+                "max_pages": 1,
+                "run_async": True,
+                "per_city_timeout_s": 1,
+            },
+            headers={"x-admin-token": "test"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["queued"] is True
+        batch_id = body["batch_id"]
+
+        # Poll until completion (background task runs on event loop).
+        for _ in range(50):
+            status = client.get(
+                f"/import/batch/status/{batch_id}", headers={"x-admin-token": "test"}
+            )
+            assert status.status_code == 200
+            payload = status.json()
+            if payload["status"] in ("completed", "partial_success", "failed"):
+                break
+        else:
+            pytest.fail("Async batch did not finish in time")
+
+        assert payload["status"] in ("completed", "partial_success")
+        assert payload["total_scraped"] == 2
+        assert payload["error"] in (None, "")
+
+    def test_import_batch_async_zero_results_is_not_timeout(monkeypatch, client):
+        from backend.utils import ingest as ingest_mod
+
+        async def _fake_scrape_all_sources(*args, **kwargs):
+            on_source_complete = kwargs.get("on_source_complete")
+            assert callable(on_source_complete)
+            # Source completes successfully but finds no results.
+            await on_source_complete(
+                "london", "onthemarket", 0, None, {"detail_fetch_attempted": 0}
+            )
+
+        monkeypatch.setattr(ingest_mod, "scrape_all_sources", _fake_scrape_all_sources)
+
+        resp = client.post(
+            "/import/batch",
+            json={
+                "cities": ["london"],
+                "sources": ["onthemarket"],
+                "max_pages": 1,
+                "run_async": True,
+                "per_city_timeout_s": 1,
+            },
+            headers={"x-admin-token": "test"},
+        )
+        assert resp.status_code == 200
+        batch_id = resp.json()["batch_id"]
+
+        for _ in range(50):
+            status = client.get(
+                f"/import/batch/status/{batch_id}", headers={"x-admin-token": "test"}
+            )
+            assert status.status_code == 200
+            payload = status.json()
+            if payload["status"] in ("completed", "partial_success", "failed"):
+                break
+        else:
+            pytest.fail("Async batch did not finish in time")
+
+        # Zero results should still be a completion, not a timeout.
+        assert payload["status"] == "completed"
+        assert payload["total_scraped"] == 0
+        assert payload.get("error") not in ("timeout", "no results")
+
 
 def test_import_batch_accepts_locations_alias_and_sources_filter(client, monkeypatch):
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
