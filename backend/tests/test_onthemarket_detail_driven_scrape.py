@@ -191,3 +191,24 @@ async def test_onthemarket_detail_phase_cap_behavior(monkeypatch):
     assert int(telem.get("detail_fetch_attempted") or 0) <= int(otm.OTM_DETAIL_FETCH_CAP)
     assert telem.get("detail_fetch_cap_applied") is True
     assert len(called_detail_urls) == int(telem.get("detail_fetch_attempted") or 0)
+
+
+def test_otm_media_normalization_and_outward_postcode_extraction():
+    from backend.utils.ingest import extract_postcode_from_text, normalize_media_urls
+
+    urls = [
+        "https://media.onthemarket.com/properties/1/1/image-0-1024x1024.webp",
+        "https://media.onthemarket.com/properties/1/1/image-0-1024x1024.jpg",
+        "https://media.onthemarket.com/properties/1/1/image-1-1024x1024.webp",
+        "https://media.onthemarket.com/properties/1/1/floor-plan-0-1024x1024.webp",
+        "https://media.onthemarket.com/properties/1/1/floor-plan-0-1024x1024.jpg",
+    ]
+
+    out = normalize_media_urls(urls)
+    assert out["imageurl"].endswith("/image-0-1024x1024.webp")
+    assert all("/floor-plan-" not in u for u in out["image_urls"])
+    assert any("/floor-plan-" in u for u in out["floorplan_urls"])
+    # Logical slot dedupe: image-0 webp/jpg should collapse to one.
+    assert sum(1 for u in out["image_urls"] if "/image-0-" in u) == 1
+
+    assert extract_postcode_from_text("London, N22 - 2 bed flat") == "N22"

@@ -181,6 +181,104 @@ def pick_first(d: Dict[str, Any], keys: Iterable[str]) -> Any:
 
 
 # ----------------------------
+# Media + postcode helpers
+# ----------------------------
+_MEDIA_SLOT_RE = re.compile(r"/(image|floor\-plan)\-(\d+)\-", re.IGNORECASE)
+_FULL_POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b", re.I)
+_OUTWARD_POSTCODE_RE = re.compile(r"\b([A-Z]{1,2}\d[A-Z\d]?)\b", re.I)
+
+
+def normalize_media_urls(urls: list[str] | None) -> dict[str, Any]:
+    """Normalize media URL lists for frontend performance.
+
+    - Dedupe logical photo slots: /image-0-*.webp and /image-0-*.jpg count as same slot.
+    - Split photos vs floorplans.
+    - Choose a stable hero image (never a floorplan).
+    """
+
+    if not urls:
+        return {"imageurl": None, "image_urls": [], "floorplan_urls": []}
+
+    photos: list[str] = []
+    floorplans: list[str] = []
+
+    seen_photo_slots: set[str] = set()
+    seen_floor_slots: set[str] = set()
+
+    for u in urls:
+        if not isinstance(u, str):
+            continue
+        s = u.strip()
+        if not s:
+            continue
+
+        is_photo = "/image-" in s
+        is_floor = "/floor-plan-" in s
+        if not (is_photo or is_floor):
+            continue
+
+        m = _MEDIA_SLOT_RE.search(s)
+        slot = None
+        if m:
+            slot = f"{m.group(1).lower()}-{m.group(2)}"
+
+        if is_photo:
+            key = slot or s
+            if key in seen_photo_slots:
+                continue
+            seen_photo_slots.add(key)
+            photos.append(s)
+        elif is_floor:
+            key = slot or s
+            if key in seen_floor_slots:
+                continue
+            seen_floor_slots.add(key)
+            floorplans.append(s)
+
+    hero = None
+    if photos:
+        hero = next(
+            (u for u in photos if "/image-0-" in u and u.lower().endswith(".webp")),
+            None,
+        )
+        if not hero:
+            hero = next(
+                (u for u in photos if "/image-0-" in u and u.lower().endswith(".jpg")),
+                None,
+            )
+        hero = hero or photos[0]
+
+    return {"imageurl": hero, "image_urls": photos, "floorplan_urls": floorplans}
+
+
+def extract_postcode_from_text(text: str | None) -> str | None:
+    """Extract a UK postcode (full or outward) from free text.
+
+    - Full postcode example: "SW1A 1AA" (normalizes spacing)
+    - Outward example: "N22", "SW3", "E14", "WC2"
+    """
+
+    if not text or not isinstance(text, str):
+        return None
+    t = text.strip()
+    if not t:
+        return None
+
+    m = _FULL_POSTCODE_RE.search(t)
+    if m:
+        compact = re.sub(r"\s+", "", m.group(1)).upper()
+        if len(compact) >= 5:
+            return f"{compact[:-3]} {compact[-3:]}"
+        return compact
+
+    m2 = _OUTWARD_POSTCODE_RE.search(t)
+    if m2:
+        outward = re.sub(r"\s+", "", m2.group(1)).upper()
+        return outward or None
+    return None
+
+
+# ----------------------------
 # external_id extraction (fix)
 # ----------------------------
 RIGHTMOVE_ID_RE = re.compile(r"/properties/(\d+)")
@@ -594,6 +692,7 @@ async def scrape_all_sources(
     sources: list[str] | None = None,
     zoopla_max_pages: int | None = None,
     onthemarket_max_pages: int | None = None,
+    timeout_s: float | None = None,
     on_source_complete: Any | None = None,
 ) -> List[Dict[str, Any]]:
     """Backwards-compatible async aggregator.
@@ -607,8 +706,10 @@ async def scrape_all_sources(
 
     import inspect
 
-    timeout_s = float(
-        os.getenv("INGEST_TIMEOUT_SECONDS", os.getenv("SCRAPER_TIMEOUT_SECONDS", "20"))
+    base_timeout_s = (
+        float(timeout_s)
+        if timeout_s is not None
+        else float(os.getenv("INGEST_TIMEOUT_SECONDS", os.getenv("SCRAPER_TIMEOUT_SECONDS", "20")))
     )
 
     # SpareRoom is rentals/rooms, not sales listings. Keep the code available for
@@ -649,10 +750,10 @@ async def scrape_all_sources(
             try:
                 # OTM has its own per-detail timeouts; allow longer here so partial
                 # success isn't cut off by the aggregator.
-                effective_timeout = timeout_s
+                effective_timeout = base_timeout_s
                 if (source or "").lower() == "onthemarket":
                     effective_timeout = max(
-                        float(timeout_s),
+                        float(base_timeout_s),
                         float(os.getenv("OTM_SOURCE_TIMEOUT_S", "180")),
                     )
                 items = await asyncio.wait_for(items, timeout=float(effective_timeout))

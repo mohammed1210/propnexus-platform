@@ -34,7 +34,11 @@ from backend.utils.image_utils import (
 )
 
 # Scrapers (existing)
-from backend.utils.ingest import scrape_all_sources
+from backend.utils.ingest import (
+    extract_postcode_from_text,
+    normalize_media_urls,
+    scrape_all_sources,
+)
 from backend.utils.listing_keys import ensure_external_id, extract_postcode, strip_empty_for_upsert
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run, update_scrape_run_data
@@ -71,6 +75,37 @@ _BATCH_LOCK = asyncio.Lock()
 _batch_logger = logging.getLogger(__name__)
 
 
+def _create_durable_batch_run(*, cities: list[str]) -> str:
+    """Create a durable batch id in Supabase (scrape_runs).
+
+    If Supabase is configured but the row cannot be created, fail fast so we never
+    return a batch_id that later becomes "Unknown batch_id".
+    """
+
+    batch_id = str(uuid.uuid4())
+    if not sb:
+        return batch_id
+
+    payload: dict[str, Any] = {
+        "id": batch_id,
+        "source": "batch",
+        "location": f"{len(cities)} cities",
+        "status": "queued",
+        "started_at": _now_iso(),
+    }
+    try:
+        sb.table("scrape_runs").insert(payload).execute()
+        return batch_id
+    except Exception:
+        # Fall back to helper (may return server-generated id)
+        run_id = create_scrape_run(
+            source="batch", location=f"{len(cities)} cities", status="queued"
+        )
+        if run_id:
+            return str(run_id)
+        raise HTTPException(status_code=500, detail="Failed to create durable batch run")
+
+
 def _batch_snapshot(job: dict[str, Any]) -> dict[str, Any]:
     """Return a JSON-serializable snapshot safe to persist."""
 
@@ -78,6 +113,7 @@ def _batch_snapshot(job: dict[str, Any]) -> dict[str, Any]:
     for k in (
         "batch_id",
         "status",
+        "request",
         "cities",
         "sources",
         "max_pages",
@@ -349,6 +385,11 @@ def _queue_batch_job(
                             sources=sources,
                             zoopla_max_pages=max_pages,
                             onthemarket_max_pages=max_pages,
+                            timeout_s=(
+                                float(per_city_timeout_s)
+                                if float(per_city_timeout_s or 0) > 0
+                                else None
+                            ),
                             on_source_complete=_on_source_complete,
                         )
                     )
@@ -372,10 +413,7 @@ def _queue_batch_job(
                             )
                     return items_local, imported_local, db_error_local
 
-                items, imported, db_error = await asyncio.wait_for(
-                    _do_city(),
-                    timeout=max(1.0, float(per_city_timeout_s or 0)),
-                )
+                items, imported, db_error = await _do_city()
 
                 scraped = len(items)
                 total_scraped += scraped
@@ -383,18 +421,14 @@ def _queue_batch_job(
                 db_upsert_ok = db_error is None
                 total_imported += int(imported or 0)
 
-                # City-level success should mean we actually got listings.
-                # If everything returns 0 (common when blocked), treat that as an error.
-                if scraped <= 0:
-                    city_status = "error"
-                    city_error = "no results"
-                elif db_upsert_ok and int(imported or 0) > 0:
+                # City-level status reflects completion; per-source status captures errors/timeouts.
+                if db_upsert_ok and int(imported or 0) > 0:
                     city_status = "success"
                     city_error = None
                 elif db_upsert_ok and int(imported or 0) == 0:
-                    # Scraped something but wrote nothing (unexpected)
-                    city_status = "error"
-                    city_error = "scraped results but imported 0"
+                    # Allow "0 results" to be a successful completion (not a timeout).
+                    city_status = "success"
+                    city_error = None
                 else:
                     city_status = "error"
                     city_error = db_error
@@ -835,6 +869,40 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
 
     # Strip site chrome from image_urls, and prefer a real photo for imageurl.
     if isinstance(row.get("image_urls"), list):
+        # OTM gallery can be huge and include floorplans + webp/jpg duplicates.
+        try:
+            media = normalize_media_urls(row.get("image_urls") or [])
+            if isinstance(media, dict):
+                photos = (
+                    media.get("image_urls") if isinstance(media.get("image_urls"), list) else []
+                )
+                floorplans = (
+                    media.get("floorplan_urls")
+                    if isinstance(media.get("floorplan_urls"), list)
+                    else []
+                )
+                hero = media.get("imageurl") if isinstance(media.get("imageurl"), str) else None
+
+                if photos:
+                    row["image_urls"] = photos
+
+                if floorplans:
+                    data_obj = row.get("data")
+                    if not isinstance(data_obj, dict):
+                        data_obj = {}
+                    # Backward-compatible: store floorplans under JSON data to avoid DB column mismatches.
+                    data_obj["floorplan_urls"] = floorplans
+                    row["data"] = data_obj
+
+                if hero:
+                    current = row.get("imageurl")
+                    if not (isinstance(current, str) and current.strip()) or (
+                        isinstance(current, str) and "/floor-plan-" in current
+                    ):
+                        row["imageurl"] = hero
+        except Exception:
+            pass
+
         filtered = _filter_junk_image_urls([u for u in row["image_urls"] if isinstance(u, str)])
         if filtered:
             row["image_urls"] = filtered
@@ -865,6 +933,30 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
         row["location"] = _pick_raw(["location", "displayAddress", "display_address"])
     if not row.get("address"):
         row["address"] = _pick_raw(["address", "displayAddress", "display_address", "location"])
+
+    # Fill postcode if missing (support outward codes like N22).
+    if not (
+        isinstance(row.get("postcode"), str) and row.get("postcode") and row["postcode"].strip()
+    ):
+        pc = None
+        try:
+            pc = (
+                extract_postcode(row.get("postcode"))
+                or extract_postcode(row.get("address"))
+                or extract_postcode(row.get("location"))
+                or extract_postcode(row.get("title"))
+                or extract_postcode(row.get("url"))
+            )
+        except Exception:
+            pc = None
+        if not pc:
+            for cand in (row.get("address"), row.get("title"), row.get("url")):
+                found = extract_postcode_from_text(str(cand)) if cand else None
+                if found:
+                    pc = found
+                    break
+        if pc:
+            row["postcode"] = pc
 
     if row.get("price") in (None, 0, 0.0, ""):
         raw_price = _pick_raw(["price", "displayPrice", "display_price"])
@@ -1773,20 +1865,23 @@ async def import_batch(
         requested_sources = list(allowed_sources)
 
     if req.run_async:
-        # Use scrape_runs.id as the batch_id so we persist a durable identifier.
-        # If Supabase isn't configured, fall back to a UUID.
-        batch_id = create_scrape_run(
-            source="batch",
-            location=f"{len(cities)} cities",
-            status="queued",
-        )
-        if not batch_id:
-            batch_id = str(uuid.uuid4())
+        batch_id = _create_durable_batch_run(cities=cities)
 
         async with _BATCH_LOCK:
+            request_payload = {
+                "cities": cities,
+                "sources": requested_sources,
+                "max_pages": max_pages,
+                "delay_min_s": delay_min,
+                "delay_max_s": delay_max,
+                "per_city_timeout_s": float(per_city_timeout_s or 0),
+                "enrich": bool(enrich),
+                "enrich_limit": int(enrich_limit),
+            }
             _BATCH_JOBS[batch_id] = {
                 "batch_id": batch_id,
                 "status": "queued",
+                "request": request_payload,
                 "cities": cities,
                 "sources": requested_sources,
                 "max_pages": max_pages,
@@ -1812,6 +1907,22 @@ async def import_batch(
                     for c in cities
                 },
             }
+
+            initial_snap = _batch_snapshot(_BATCH_JOBS[batch_id])
+
+        try:
+            await asyncio.to_thread(
+                update_scrape_run_data,
+                run_id=batch_id,
+                data=initial_snap,
+                status="queued",
+                count_inserted=0,
+                error=None,
+            )
+        except Exception:
+            pass
+
+        _schedule_persist_batch_snapshot(batch_id, force=True)
 
         _queue_batch_job(
             batch_id=batch_id,
@@ -2209,30 +2320,7 @@ async def import_batch_status(
 ):
     _require_admin(x_admin_token)
 
-    job_snapshot: dict[str, Any] | None = None
-    async with _BATCH_LOCK:
-        job = _BATCH_JOBS.get(batch_id)
-        if isinstance(job, dict):
-            per_city = job.get("per_city") if isinstance(job.get("per_city"), dict) else {}
-            overall = _overall_batch_status(per_city)
-            # Keep in-memory status consistent, but don't mutate nested structures in the response.
-            job["status"] = overall
-            job_snapshot = {
-                "batch_id": batch_id,
-                "status": overall,
-                "cities": list(job.get("cities") or []),
-                "sources": list(job.get("sources") or []),
-                "max_pages": job.get("max_pages") or 1,
-                "total_scraped": job.get("total_scraped") or 0,
-                "total_imported": job.get("total_imported") or 0,
-                "per_city": per_city,
-                "error": job.get("error"),
-            }
-
-    if isinstance(job_snapshot, dict):
-        return job_snapshot
-
-    # Fallback: if Supabase is configured, return scrape_runs status even if in-memory state was lost.
+    # DB-backed status first when Supabase is configured.
     try:
         if sb:
             row: dict[str, Any] | None = None
@@ -2270,6 +2358,35 @@ async def import_batch_status(
                     out["durable"] = True
                     return out
 
+                # Row exists but snapshot isn't available yet (or column missing).
+                # Prefer in-memory state for full response shape.
+                job_snapshot: dict[str, Any] | None = None
+                async with _BATCH_LOCK:
+                    job = _BATCH_JOBS.get(batch_id)
+                    if isinstance(job, dict):
+                        per_city = (
+                            job.get("per_city") if isinstance(job.get("per_city"), dict) else {}
+                        )
+                        overall = _overall_batch_status(per_city)
+                        job["status"] = overall
+                        job_snapshot = {
+                            "batch_id": batch_id,
+                            "status": row.get("status") or overall,
+                            "cities": list(job.get("cities") or []),
+                            "sources": list(job.get("sources") or []),
+                            "max_pages": job.get("max_pages") or 1,
+                            "total_scraped": job.get("total_scraped") or 0,
+                            "total_imported": int(
+                                row.get("count_inserted") or job.get("total_imported") or 0
+                            ),
+                            "per_city": per_city,
+                            "error": row.get("error") or job.get("error"),
+                            "durable": True,
+                        }
+
+                if isinstance(job_snapshot, dict):
+                    return job_snapshot
+
                 return {
                     "batch_id": batch_id,
                     "status": (row.get("status") or "unknown"),
@@ -2280,6 +2397,30 @@ async def import_batch_status(
                 }
     except Exception:
         pass
+
+    # Local/dev fallback: in-memory state.
+    job_snapshot: dict[str, Any] | None = None
+    async with _BATCH_LOCK:
+        job = _BATCH_JOBS.get(batch_id)
+        if isinstance(job, dict):
+            per_city = job.get("per_city") if isinstance(job.get("per_city"), dict) else {}
+            overall = _overall_batch_status(per_city)
+            job["status"] = overall
+            job_snapshot = {
+                "batch_id": batch_id,
+                "status": overall,
+                "cities": list(job.get("cities") or []),
+                "sources": list(job.get("sources") or []),
+                "max_pages": job.get("max_pages") or 1,
+                "total_scraped": job.get("total_scraped") or 0,
+                "total_imported": job.get("total_imported") or 0,
+                "per_city": per_city,
+                "error": job.get("error"),
+                "durable": False,
+            }
+
+    if isinstance(job_snapshot, dict):
+        return job_snapshot
 
     raise HTTPException(status_code=404, detail="Unknown batch_id")
 
