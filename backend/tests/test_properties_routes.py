@@ -189,6 +189,56 @@ def test_list_properties_recommended_sort_orders_by_score_then_created_at(
 
 
 @patch("backend.routes.properties_routes.create_client")
+def test_list_properties_recommended_includes_deal_reasons(mock_create_client, client):
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+
+    mock_properties = [
+        {
+            "id": "p1",
+            "title": "Deal",
+            "location": "London",
+            "price": 250000,
+            "score": 80,
+            "created_at": "2025-01-02T00:00:00Z",
+            "score_breakdown": {
+                "version": "test",
+                "score": 80,
+                "categories": {
+                    "yield": 18.0,
+                    "roi": 16.0,
+                    "price_to_rent": 12.0,
+                    "area_demand": 10.0,
+                    "crime_index_inverse": 10.0,
+                    "schools_access": 10.0,
+                },
+                "inputs": {"rent_source": "provided"},
+            },
+        }
+    ]
+    mock_query.execute.return_value = Mock(data=mock_properties, count=1)
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"sort": "recommended"})
+    assert response.status_code == 200
+
+    data = response.json()
+    assert isinstance(data, dict)
+    assert isinstance(data.get("items"), list)
+    assert len(data["items"]) == 1
+
+    item = data["items"][0]
+    assert "recommended_score" in item
+    assert "deal_reasons" in item
+    assert isinstance(item["deal_reasons"], list)
+
+
+@patch("backend.routes.properties_routes.create_client")
 def test_list_properties_price_desc_returns_items_with_null_or_invalid_price(
     mock_create_client, client
 ):

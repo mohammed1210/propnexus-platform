@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import json
 import logging
 import os
@@ -15,6 +16,7 @@ from pydantic import BaseModel, Field
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from backend.utils.listing_keys import extract_postcode
+from backend.utils.recommended_ranker import normalize_deal_type, rerank_recommended
 from supabase import create_client
 
 router = APIRouter(tags=["properties"])
@@ -354,6 +356,10 @@ def list_properties(
     beds: Optional[int] = Query(default=None),
     baths: Optional[int] = Query(default=None),
     types: Optional[str] = Query(default=None, description="Comma-separated investment types"),
+    deal_type: str = Query(
+        default="balanced",
+        description="Persona for recommended ranking: balanced|cashflow|growth (only used with sort=recommended)",
+    ),
     sort: str = Query(
         default="created_at_desc",
         description=(
@@ -428,8 +434,11 @@ def list_properties(
 
         query = _build_base_query()
 
+        deal_type_norm = normalize_deal_type(deal_type)
+
         # Sorting
         sort_key = (sort or "").strip().lower()
+        is_recommended = sort_key in {"recommended", "best_deals"}
         sort_map = {
             "recommended": ("score", True),
             "best_deals": ("score", True),
@@ -458,7 +467,20 @@ def list_properties(
         # Pagination
         start = offset
         end = offset + limit - 1
-        query = query.range(start, end)
+
+        # For recommended ranking, we fetch a larger candidate pool from the top of the result set,
+        # rerank in Python (guardrails/persona), then slice. This keeps top pages consistent while
+        # remaining additive and DB-schema-free.
+        fetched_pool_from_zero = False
+        if is_recommended:
+            pool_size = builtins.min(builtins.max(offset + limit, limit * 5), 200)
+            if (offset + limit) <= pool_size:
+                query = query.range(0, pool_size - 1)
+                fetched_pool_from_zero = True
+            else:
+                query = query.range(start, end)
+        else:
+            query = query.range(start, end)
 
         fallback_sort = sort_key in {"price_asc", "price_desc", "yield_desc", "roi_desc"}
         try:
@@ -481,6 +503,19 @@ def list_properties(
         total_int = int(total) if isinstance(total, (int, float)) else 0
 
         items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
+
+        if is_recommended and items:
+            # Enrich + rerank deterministically. We still return the same page size.
+            ranked = rerank_recommended(
+                items,
+                deal_type=deal_type_norm,
+                min_tier2=builtins.max(5, int(limit // 3)),
+                query_text=q,
+            )
+            if fetched_pool_from_zero:
+                items = ranked[offset : offset + limit]
+            else:
+                items = ranked
 
         points: Optional[List[Dict[str, Any]]] = None
         if include_points:

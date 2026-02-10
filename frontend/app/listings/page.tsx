@@ -167,6 +167,9 @@ type RawProperty = {
   yield_percent?: number | null;
   roi_percent?: number | null;
   ai_score?: number | null;
+  score?: number | null;
+  recommended_score?: number | null;
+  deal_reasons?: string[];
   imageurl?: string | null;
   source?: string | null;
   latitude?: number | null;
@@ -607,6 +610,24 @@ function ListingsInner() {
     },
     [router, searchParams]
   );
+
+  // Ensure the default sort is explicit in the URL (so links/bookmarks are stable).
+  useEffect(() => {
+    const raw = (searchParams?.get('sort') ?? '').toLowerCase();
+    const hasSort = !!raw;
+
+    const isValid = (SORTABLE as readonly string[]).includes(raw);
+    const isLegacy = raw === 'created_at' || raw === 'price' || raw === 'yield_percent' || raw === 'roi_percent';
+
+    if (!hasSort || (!isValid && !isLegacy)) {
+      pushParams(
+        (p) => {
+          p.set('sort', 'recommended');
+        },
+        { replace: true },
+      );
+    }
+  }, [pushParams, searchParams]);
 
   const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || '')
     .split(',')
@@ -1310,7 +1331,7 @@ function ListingsInner() {
                 style={{ height: 40, padding: '0.5rem 0.75rem' }}
                 aria-label="Sort"
               >
-                <option value="recommended">Recommended (Top deals)</option>
+                <option value="recommended">Top deals (Recommended)</option>
                 <option value="created_at_desc">Most recent</option>
                 <option value="price_asc">Price: low to high</option>
                 <option value="price_desc">Price: high to low</option>
@@ -1466,6 +1487,7 @@ function ListingsInner() {
                   <PropertyCard
                     key={property.id || Math.random()}
                     p={property}
+                    showDealReasonChip={sort === 'recommended'}
                     isHovered={hoveredId === property.id}
                     onHoverChange={(h) => setHoveredId(h ? property.id : null)}
                   />
@@ -1496,6 +1518,7 @@ function ListingsInner() {
                     <PropertyCard
                       key={property.id || Math.random()}
                       p={property}
+                      showDealReasonChip={sort === 'recommended'}
                       isHovered={hoveredId === property.id}
                       onHoverChange={(h) => setHoveredId(h ? property.id : null)}
                     />

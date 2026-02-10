@@ -27,6 +27,8 @@ type Property = {
   roi_percent?: number | null;
   ai_score?: number | null;
   score?: number | null;
+  recommended_score?: number | null;
+  deal_reasons?: string[];
   discount_percent?: number | null;
   imageurl?: string | null;
   image_urls?: string[] | null;
@@ -156,10 +158,12 @@ function getSourceBadgeClasses(source: string | null | undefined): string {
 
 export default function PropertyCard({
   p,
+  showDealReasonChip,
   isHovered,
   onHoverChange,
 }: {
   p: Property;
+  showDealReasonChip?: boolean;
   isHovered?: boolean;
   onHoverChange?: (hovered: boolean) => void;
 }) {
@@ -612,6 +616,22 @@ export default function PropertyCard({
                 {derived.cacheTag ? ` · ${derived.cacheTag}` : ''}
               </div>
             </div>
+
+            {showDealReasonChip && Array.isArray(p.deal_reasons) && p.deal_reasons[0] && (
+              <div className="mt-2">
+                <span
+                  className={cx(
+                    'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                    'border-slate-200 text-slate-700 bg-slate-50',
+                    'dark:border-slate-700 dark:text-slate-200 dark:bg-slate-800/60',
+                  )}
+                  aria-label={`Deal reason: ${p.deal_reasons[0]}`}
+                  title={p.deal_reasons.slice(0, 3).join(' • ')}
+                >
+                  {p.deal_reasons[0]}
+                </span>
+              </div>
+            )}
 
             {postcodeKey ? (
               <div className="mt-2">
