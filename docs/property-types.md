@@ -1,4 +1,3 @@
-````markdown
 # Property Types: Canonical classification + API filtering
 
 This project uses a deterministic classifier to normalize messy source labels and free-text into a stable, canonical `property_type`.
@@ -75,4 +74,3 @@ Response includes:
 - `sample_updates` (first few ids + computed types)
 
 Run repeatedly with increasing `offset` to process more rows.
-````
