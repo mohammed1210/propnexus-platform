@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.deal_signals import extract_deal_signals
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
+from backend.utils.investment_type_classifier import classify_investment_types
 from backend.utils.listing_keys import extract_postcode
 from backend.utils.property_type_classifier import (
     classify_property_type,
@@ -616,6 +617,14 @@ def list_properties(
         if isinstance(signals, Param):
             signals = getattr(signals, "default", None)
 
+        # When called directly (unit tests), string Query params may also be Param objects.
+        if isinstance(types, Param):
+            types = getattr(types, "default", None)
+        if isinstance(investment_type, Param):
+            investment_type = getattr(investment_type, "default", None)
+        if isinstance(property_type, Param):
+            property_type = getattr(property_type, "default", None)
+
         response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
 
         sb = _get_supabase()
@@ -636,6 +645,34 @@ def list_properties(
             raw_pt_values = [
                 str(p).strip() for p in str(property_type).split(",") if str(p).strip()
             ]
+
+        # Normalize investment_type filter values once for deterministic tagging/filtering.
+        raw_inv_values: List[str] = []
+        if investment_type is not None and str(investment_type).strip():
+            raw_inv_values = [
+                str(p).strip() for p in str(investment_type).split(",") if str(p).strip()
+            ]
+
+        inv_synonyms: dict[str, str] = {
+            "hmo": "HMO",
+            "btl": "BTL",
+            "sa": "SA",
+            "serviced accommodation": "SA",
+            "serviced_accommodation": "SA",
+            "brr": "BRR",
+            "brrrr": "BRR",
+            "flip": "Flip",
+            "commercial": "Commercial",
+        }
+
+        investment_type_filter: List[str] = []
+        seen_inv: set[str] = set()
+        for v in raw_inv_values:
+            key = v.strip().lower()
+            canon = inv_synonyms.get(key, v.strip())
+            if canon and canon not in seen_inv:
+                seen_inv.add(canon)
+                investment_type_filter.append(canon)
 
         property_type_filter: List[str] = []
         seen_pt: set[str] = set()
@@ -727,11 +764,6 @@ def list_properties(
                 if type_list:
                     q0 = q0.in_("investment_type", type_list)
 
-            # Investment type filter (case-insensitive exact match; supports comma-separated OR)
-            inv_list = _parse_csv(investment_type)
-            if inv_list:
-                q0 = _or_ilike("investment_type", inv_list)
-
             # Property type filter (future use; safe/additive)
             if property_type_filter and property_type_db_value:
                 try:
@@ -805,13 +837,22 @@ def list_properties(
         # rerank in Python (guardrails/persona), then slice. This keeps top pages consistent while
         # remaining additive and DB-schema-free.
         fetched_pool_from_zero = False
+        inv_filter_active = bool(investment_type_filter)
+        needs_pool_from_zero = False
+        pool_size = 0
         if is_recommended or any_deal_filter:
             pool_size = builtins.min(builtins.max(offset + limit, limit * 8), 500)
-            if (offset + limit) <= pool_size:
-                query = query.range(0, pool_size - 1)
-                fetched_pool_from_zero = True
-            else:
-                query = query.range(start, end)
+            # Only fetch from zero if the requested page fits in the capped pool.
+            needs_pool_from_zero = (offset + limit) <= pool_size
+
+        if inv_filter_active:
+            inv_pool = builtins.min(builtins.max(limit * 10, 200), 500)
+            pool_size = builtins.max(pool_size, inv_pool)
+            needs_pool_from_zero = needs_pool_from_zero or ((offset + limit) <= pool_size)
+
+        if needs_pool_from_zero and pool_size > 0:
+            query = query.range(0, int(pool_size) - 1)
+            fetched_pool_from_zero = True
         else:
             query = query.range(start, end)
 
@@ -864,6 +905,24 @@ def list_properties(
 
         items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
 
+        # Add deterministic investment tags for debugging / future UI, and optionally filter.
+        if items:
+            for it in items:
+                try:
+                    it["investment_types"] = sorted(classify_investment_types(it))
+                except Exception:
+                    it["investment_types"] = []
+
+            if inv_filter_active:
+                requested = set(investment_type_filter)
+                items = [
+                    it
+                    for it in items
+                    if requested.intersection(set(it.get("investment_types") or []))
+                ]
+                if fetched_pool_from_zero:
+                    total_int = len(items)
+
         if property_type_filter and not python_filter_property_type:
             # Even with DB filtering, ensure output is normalized for legacy rows.
             pass
@@ -907,9 +966,11 @@ def list_properties(
         elif fetched_pool_from_zero and any_deal_filter:
             # Non-recommended + deal filters: slice after filtering.
             items = items[offset : offset + limit]
-
-        # If we python-filtered property_type, we must slice after filtering.
-        if property_type_filter and python_filter_property_type and fetched_pool_from_zero:
+        elif fetched_pool_from_zero and property_type_filter and python_filter_property_type:
+            # Non-recommended + python property_type filtering: slice after filtering.
+            items = items[offset : offset + limit]
+        elif fetched_pool_from_zero and inv_filter_active:
+            # Non-recommended + investment type filtering: slice after filtering.
             items = items[offset : offset + limit]
 
         points: Optional[List[Dict[str, Any]]] = None
@@ -919,6 +980,19 @@ def list_properties(
                 cols = "id,title,location,price,bedrooms,investment_type,latitude,longitude,source,created_at"
                 if any_deal_filter:
                     cols = cols + ",deal_signals,data"
+
+                if inv_filter_active:
+                    # Deterministic investment tagging needs text + discount/signals + type.
+                    if "property_type" not in cols:
+                        cols = cols + ",property_type"
+                    if "description" not in cols:
+                        cols = cols + ",description"
+                    if "deal_signals" not in cols:
+                        cols = cols + ",deal_signals"
+                    if "discount_estimate_pct" not in cols:
+                        cols = cols + ",discount_estimate_pct"
+                    if "data" not in cols:
+                        cols = cols + ",data"
 
                 # Include data so we can compute property_type consistently if needed.
                 if property_type_filter and "data" not in cols:
@@ -958,20 +1032,9 @@ def list_properties(
                         q0 = q0.in_("investment_type", type_list)
 
                 # Investment type filter (new param)
-                inv_list: List[str] = []
-                try:
-                    inv_list = [
-                        s.strip()
-                        for s in str(investment_type).split(",")
-                        if isinstance(investment_type, str) and s.strip()
-                    ]
-                except Exception:
-                    inv_list = []
-                if inv_list:
-                    try:
-                        q0 = q0.in_("investment_type", inv_list)
-                    except Exception:
-                        pass
+                # NOTE: we intentionally do NOT push investment_type down to the DB here.
+                # The API applies a deterministic Python-side tag filter so results are
+                # consistent even when the DB column is missing/incorrect.
 
                 # Property type filter (DB-side when possible)
                 if property_type_filter and property_type_db_value:
@@ -1047,6 +1110,26 @@ def list_properties(
             for r in points_rows:
                 if not isinstance(r, dict):
                     continue
+
+                if inv_filter_active:
+                    try:
+                        # Ensure property_type is present for HMO soft-signal (beds + house types).
+                        if not (
+                            isinstance(r.get("property_type"), str)
+                            and r.get("property_type").strip()
+                        ):
+                            pt, _raw = classify_property_type(
+                                r.get("title"),
+                                r.get("description"),
+                                None,
+                                extra=r.get("data") if isinstance(r.get("data"), dict) else None,
+                            )
+                            r["property_type"] = pt
+                        tags = classify_investment_types(r)
+                        if not tags.intersection(set(investment_type_filter)):
+                            continue
+                    except Exception:
+                        continue
 
                 if property_type_filter and python_filter_property_type:
                     try:

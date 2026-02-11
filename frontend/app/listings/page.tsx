@@ -144,20 +144,45 @@ type SortKey = (typeof SORTABLE)[number];
 
 const INVESTMENT_TYPES = ['HMO', 'BTL', 'SA', 'BRR', 'Flip', 'Commercial'] as const;
 
-const PROPERTY_TYPES = [
-  '',
-  'Terraced',
-  'Semi-detached',
-  'Detached',
-  'Flat/Apartment',
-  'Studio',
-  'Maisonette',
-  'Bungalow',
-  'Land',
-  'Commercial',
-  'HMO/Block',
-  'Other',
+const PROPERTY_TYPE_OPTIONS = [
+  { value: '', label: 'Any' },
+  { value: 'flat', label: 'Flat' },
+  { value: 'studio', label: 'Studio' },
+  { value: 'maisonette', label: 'Maisonette' },
+  { value: 'terraced', label: 'Terraced' },
+  { value: 'semi-detached', label: 'Semi-detached' },
+  { value: 'detached', label: 'Detached' },
+  { value: 'bungalow', label: 'Bungalow' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'land', label: 'Land' },
+  { value: 'other', label: 'Other' },
 ] as const;
+
+function normalizePropertyTypeParam(value: string): string {
+  const raw = (value ?? '').trim();
+  if (!raw) return '';
+  const key = raw.toLowerCase();
+  const map: Record<string, string> = {
+    // New keys (already correct)
+    flat: 'flat',
+    studio: 'studio',
+    maisonette: 'maisonette',
+    terraced: 'terraced',
+    'semi-detached': 'semi-detached',
+    detached: 'detached',
+    bungalow: 'bungalow',
+    commercial: 'commercial',
+    land: 'land',
+    other: 'other',
+
+    // Back-compat: canonical labels previously used as values
+    'flat/apartment': 'flat',
+    apartment: 'flat',
+    terrace: 'terraced',
+    'semi detached': 'semi-detached',
+  };
+  return map[key] ?? raw;
+}
 
 const PRICE_RANGES = [
   { key: 'any', label: 'Any', min: undefined, max: undefined },
@@ -536,7 +561,7 @@ function ListingsInner() {
   const types = useMemo(() => (typesRaw ? typesRaw.split(',').filter(Boolean) : []), [typesRaw]);
   const investmentTypeUrlRaw = (searchParams?.get('investment_type') ?? '').trim();
   const investmentTypeUrl = investmentTypeUrlRaw || (types[0] ? String(types[0]).trim() : '');
-  const propertyTypeUrl = (searchParams?.get('property_type') ?? '').trim();
+  const propertyTypeUrl = normalizePropertyTypeParam((searchParams?.get('property_type') ?? '').trim());
 
   const dealsOnlyUrl = parseBoolParam(searchParams?.get('deals_only'));
   const auctionOnlyUrl = parseBoolParam(searchParams?.get('auction_only'));
@@ -1373,9 +1398,9 @@ function ListingsInner() {
             style={{ height: 40, padding: '0.5rem 0.75rem' }}
             aria-label="Property type"
           >
-            {PROPERTY_TYPES.map((t) => (
-              <option key={t || 'any'} value={t}>
-                {t ? t : 'Any'}
+            {PROPERTY_TYPE_OPTIONS.map((t) => (
+              <option key={t.value || 'any'} value={t.value}>
+                {t.label}
               </option>
             ))}
           </select>

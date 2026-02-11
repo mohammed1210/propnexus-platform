@@ -369,62 +369,86 @@ def test_list_properties_deal_filter_short_lease_only(mock_create_client, client
 
 
 @patch("backend.routes.properties_routes.create_client")
-def test_list_properties_investment_type_single_uses_ilike(mock_create_client, client):
+def test_list_properties_investment_type_hmo_filters_python_side(mock_create_client, client):
     mock_sb = Mock()
     mock_query = Mock()
     mock_query.select.return_value = mock_query
     mock_query.range.return_value = mock_query
     mock_query.order.return_value = mock_query
-    mock_query.ilike.return_value = mock_query
-    mock_query.execute.return_value = Mock(data=[], count=0)
+
+    fake_rows = [
+        {
+            "id": "p1",
+            "title": "Licensed HMO investment",
+            "description": "Great HMO near uni",
+            "property_type": "Terraced",
+            "bedrooms": 6,
+        },
+        {
+            "id": "p2",
+            "title": "Normal flat",
+            "description": "Nice flat",
+            "property_type": "Flat/Apartment",
+            "bedrooms": 2,
+        },
+    ]
+    mock_query.execute.return_value = Mock(data=fake_rows, count=len(fake_rows))
 
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
 
-    response = client.get("/properties", params={"investment_type": "HMO"})
+    response = client.get(
+        "/properties", params={"investment_type": "HMO", "limit": 50, "offset": 0}
+    )
     assert response.status_code == 200
-    mock_query.ilike.assert_called_once_with("investment_type", "HMO")
+    data = response.json()
+    items = data.get("items") or []
+    assert len(items) == 1
+    assert "investment_types" in items[0]
+    assert "HMO" in (items[0].get("investment_types") or [])
+    assert data.get("total") == 1
 
 
 @patch("backend.routes.properties_routes.create_client")
-def test_list_properties_investment_type_csv_builds_or_expression(mock_create_client, client):
+def test_list_properties_investment_type_brr_filters_python_side(mock_create_client, client):
     mock_sb = Mock()
     mock_query = Mock()
     mock_query.select.return_value = mock_query
     mock_query.range.return_value = mock_query
     mock_query.order.return_value = mock_query
-    mock_query.or_.return_value = mock_query
-    mock_query.execute.return_value = Mock(data=[], count=0)
+
+    fake_rows = [
+        {
+            "id": "p1",
+            "title": "Renovation project - reduced",
+            "description": "Needs refurbishment",
+            "property_type": "Terraced",
+            "deal_signals": ["needs_refurb", "reduced"],
+            "discount_estimate_pct": 12.0,
+            "bedrooms": 3,
+        },
+        {
+            "id": "p2",
+            "title": "Clean BTL",
+            "description": "Ready to let",
+            "property_type": "Flat/Apartment",
+            "bedrooms": 2,
+        },
+    ]
+    mock_query.execute.return_value = Mock(data=fake_rows, count=len(fake_rows))
 
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
 
-    response = client.get("/properties", params={"investment_type": "HMO,BTL"})
+    response = client.get(
+        "/properties", params={"investment_type": "BRR", "limit": 50, "offset": 0}
+    )
     assert response.status_code == 200
-    assert mock_query.or_.call_count >= 1
-    arg = mock_query.or_.call_args[0][0]
-    assert "investment_type.ilike.HMO" in arg
-    assert "investment_type.ilike.BTL" in arg
-
-
-@patch("backend.routes.properties_routes.create_client")
-def test_list_properties_investment_type_empty_is_ignored(mock_create_client, client):
-    mock_sb = Mock()
-    mock_query = Mock()
-    mock_query.select.return_value = mock_query
-    mock_query.range.return_value = mock_query
-    mock_query.order.return_value = mock_query
-    mock_query.ilike.return_value = mock_query
-    mock_query.or_.return_value = mock_query
-    mock_query.execute.return_value = Mock(data=[], count=0)
-
-    mock_sb.table.return_value = mock_query
-    mock_create_client.return_value = mock_sb
-
-    response = client.get("/properties", params={"investment_type": "   "})
-    assert response.status_code == 200
-    assert mock_query.ilike.call_count == 0
-    assert mock_query.or_.call_count == 0
+    data = response.json()
+    items = data.get("items") or []
+    assert len(items) == 1
+    assert "BRR" in (items[0].get("investment_types") or [])
+    assert data.get("total") == 1
 
 
 @patch("backend.routes.properties_routes.create_client")
@@ -443,6 +467,24 @@ def test_list_properties_property_type_single_uses_in(mock_create_client, client
     response = client.get("/properties", params={"property_type": "Terraced"})
     assert response.status_code == 200
     mock_query.in_.assert_called_once_with("property_type", ["Terraced"])
+
+
+@patch("backend.routes.properties_routes.create_client")
+def test_list_properties_property_type_csv_normalizes_and_uses_in(mock_create_client, client):
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+    mock_query.in_.return_value = mock_query
+    mock_query.execute.return_value = Mock(data=[], count=0)
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"property_type": "flat,terraced"})
+    assert response.status_code == 200
+    mock_query.in_.assert_called_once_with("property_type", ["Flat/Apartment", "Terraced"])
 
 
 @patch("backend.routes.properties_routes.create_client")
