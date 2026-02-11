@@ -33,6 +33,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from dotenv import load_dotenv
 
 from backend.utils.deal_signals import extract_deal_signals
+from backend.utils.property_type_classifier import classify_property_type
 from supabase import Client, create_client
 
 load_dotenv()
@@ -384,9 +385,20 @@ SAFE_COLUMNS = {
     "image_urls",
     "investment_type",
     "created_at",
+    # JSONB payload for additive fields / schema drift.
+    "data",
 }
 
-OPTIONAL_COLUMNS = {"external_id", "source", "listing_url", "url", "updated_at"}
+OPTIONAL_COLUMNS = {
+    "external_id",
+    "source",
+    "listing_url",
+    "url",
+    "updated_at",
+    # Optional columns (may not exist in all schemas).
+    "property_type",
+    "raw_property_type",
+}
 
 
 def _classify_investment_type(title: str | None, description: str | None) -> str:
@@ -502,6 +514,44 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
         # DB schema uses `url`; keep it in sync with listing_url.
         "url": listing_url,
     }
+
+    # Property type classification: deterministic + additive.
+    # We always embed into `data` (safe fallback). If DB columns exist, we also
+    # populate top-level property_type/raw_property_type.
+    try:
+        raw_type_candidate = pick_first(
+            raw,
+            [
+                "raw_property_type",
+                "property_type",
+                "propertyType",
+                "propertyTypeLabel",
+                "propertySubType",
+                "type",
+                "typeLabel",
+            ],
+        )
+        raw_type_s = raw_type_candidate if isinstance(raw_type_candidate, str) else None
+        prop_type, raw_type_best = classify_property_type(
+            normalized.get("title"),
+            normalized.get("description"),
+            raw_type_s,
+            extra=raw,
+        )
+
+        normalized["property_type"] = prop_type
+        if raw_type_best:
+            normalized["raw_property_type"] = raw_type_best
+
+        data_obj = normalized.get("data")
+        if not isinstance(data_obj, dict):
+            data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+        data_obj["property_type"] = prop_type
+        if raw_type_best:
+            data_obj["raw_property_type"] = raw_type_best
+        normalized["data"] = data_obj
+    except Exception:
+        pass
 
     # If imageurl is missing, promote a cover from image_urls.
     if not normalized.get("imageurl") and image_urls:

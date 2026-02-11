@@ -17,6 +17,10 @@ from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.deal_signals import extract_deal_signals
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from backend.utils.listing_keys import extract_postcode
+from backend.utils.property_type_classifier import (
+    classify_property_type,
+    normalize_property_type_value,
+)
 from backend.utils.recommended_ranker import normalize_deal_type, rerank_recommended
 from supabase import create_client
 
@@ -195,12 +199,68 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
         ):
             out["discount_estimate_pct"] = data_obj.get("discount_estimate_pct")
 
+        # Property types may be stored in optional columns or embedded in data.
+        if out.get("property_type") in (None, "") and isinstance(
+            data_obj.get("property_type"), str
+        ):
+            out["property_type"] = data_obj.get("property_type")
+        if out.get("raw_property_type") in (None, "") and isinstance(
+            data_obj.get("raw_property_type"), str
+        ):
+            out["raw_property_type"] = data_obj.get("raw_property_type")
+
     def _pick_raw(keys: List[str]) -> Any:
         for k in keys:
             v = raw_obj.get(k)
             if v not in (None, "", [], {}):
                 return v
         return None
+
+    # Ensure property_type is always present in API response (canonical, deterministic).
+    # - Prefer DB column
+    # - Else embedded data
+    # - Else classify on the fly (do not write to DB here)
+    try:
+        if not (isinstance(out.get("property_type"), str) and out.get("property_type").strip()):
+            raw_candidate = _pick_raw(
+                [
+                    "propertyType",
+                    "property_type",
+                    "propertyTypeLabel",
+                    "property_type_label",
+                    "propertySubType",
+                    "type",
+                ]
+            )
+            raw_s: str | None = raw_candidate.strip() if isinstance(raw_candidate, str) else None
+            pt, raw_best = classify_property_type(
+                out.get("title"),
+                out.get("description"),
+                raw_s,
+                extra=data_obj if isinstance(data_obj, dict) else None,
+            )
+            out["property_type"] = pt
+            if raw_best and not (
+                isinstance(out.get("raw_property_type"), str)
+                and out.get("raw_property_type").strip()
+            ):
+                out["raw_property_type"] = raw_best
+
+            # Keep embedded data consistent for frontend consumers (response-only).
+            if isinstance(data_obj, dict):
+                data_obj.setdefault("property_type", pt)
+                if raw_best:
+                    data_obj.setdefault("raw_property_type", raw_best)
+                out["data"] = data_obj
+
+        # Avoid returning empty-string raw types.
+        if (
+            isinstance(out.get("raw_property_type"), str)
+            and not out.get("raw_property_type").strip()
+        ):
+            out.pop("raw_property_type", None)
+    except Exception:
+        pass
 
     def _is_junk_image_url(u: Any) -> bool:
         s = (u or "").strip().lower() if isinstance(u, str) else ""
@@ -560,6 +620,37 @@ def list_properties(
 
         sb = _get_supabase()
 
+        def _missing_col_from_api_error(err: Exception) -> str | None:
+            payload = err.args[0] if getattr(err, "args", None) else None
+            msg = payload.get("message") if isinstance(payload, dict) else str(err)
+            if not msg:
+                return None
+            m = re.search(r"column properties\.([a-zA-Z0-9_]+) does not exist", msg)
+            if not m:
+                return None
+            return m.group(1)
+
+        # Normalize property_type filter values once so we can re-use for points + python fallback.
+        raw_pt_values: List[str] = []
+        if property_type is not None and str(property_type).strip():
+            raw_pt_values = [
+                str(p).strip() for p in str(property_type).split(",") if str(p).strip()
+            ]
+
+        property_type_filter: List[str] = []
+        seen_pt: set[str] = set()
+        for v in raw_pt_values:
+            canon = normalize_property_type_value(v)
+            if canon and canon not in seen_pt:
+                seen_pt.add(canon)
+                property_type_filter.append(canon)
+
+        # We try DB filtering first; if the column doesn't exist, fall back to python filtering.
+        property_type_db_value: str | None = (
+            str(property_type) if property_type is not None else None
+        )
+        python_filter_property_type = False
+
         def _build_base_query():
             q0 = sb.table("properties").select("*", count="exact")
 
@@ -642,9 +733,11 @@ def list_properties(
                 q0 = _or_ilike("investment_type", inv_list)
 
             # Property type filter (future use; safe/additive)
-            pt_list = _parse_csv(property_type)
-            if pt_list:
-                q0 = _or_ilike("property_type", pt_list)
+            if property_type_filter and property_type_db_value:
+                try:
+                    q0 = q0.in_("property_type", property_type_filter)
+                except Exception:
+                    pass
 
             return q0
 
@@ -725,6 +818,33 @@ def list_properties(
         fallback_sort = sort_key in {"price_asc", "price_desc", "yield_desc", "roi_desc"}
         try:
             res = query.execute()
+        except APIError as e:
+            missing = _missing_col_from_api_error(e)
+            if missing == "property_type" and property_type_filter:
+                python_filter_property_type = True
+                property_type_db_value = None
+                query = _build_base_query()
+                # Preserve sorting behavior.
+                if sort_key in sort_map:
+                    sort_col, desc = sort_map[sort_key]
+                    query = _safe_order(query, sort_col, desc=desc, nulls_last=True)
+                    if sort_col != "created_at":
+                        query = _safe_order(query, "created_at", desc=True, nulls_last=True)
+                else:
+                    sort_col = sort_key if (sort_key in ALLOWED_SORT_COLS) else "created_at"
+                    ascending = (dir or "").lower() == "asc"
+                    query = _safe_order(query, sort_col, desc=not ascending, nulls_last=True)
+                    if sort_col != "created_at":
+                        query = _safe_order(query, "created_at", desc=True, nulls_last=True)
+
+                # If we're going to python-filter, fetch a candidate pool from zero.
+                pool_size = builtins.min(builtins.max(offset + limit, limit * 8), 500)
+                query = query.range(0, pool_size - 1)
+                fetched_pool_from_zero = True
+
+                res = query.execute()
+            else:
+                raise
         except Exception:
             # If PostgREST/supabase cannot order/cast cleanly (e.g. mixed/legacy data),
             # fall back to a safe server-side sort based on normalized values.
@@ -743,6 +863,16 @@ def list_properties(
         total_int = int(total) if isinstance(total, (int, float)) else 0
 
         items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
+
+        if property_type_filter and not python_filter_property_type:
+            # Even with DB filtering, ensure output is normalized for legacy rows.
+            pass
+
+        if property_type_filter and python_filter_property_type and items:
+            allowed = set(property_type_filter)
+            items = [it for it in items if it.get("property_type") in allowed]
+            if fetched_pool_from_zero:
+                total_int = len(items)
 
         if (is_recommended or any_deal_filter) and items:
             items = [_ensure_deal_fields(it) for it in items if isinstance(it, dict)]
@@ -778,6 +908,10 @@ def list_properties(
             # Non-recommended + deal filters: slice after filtering.
             items = items[offset : offset + limit]
 
+        # If we python-filtered property_type, we must slice after filtering.
+        if property_type_filter and python_filter_property_type and fetched_pool_from_zero:
+            items = items[offset : offset + limit]
+
         points: Optional[List[Dict[str, Any]]] = None
         if include_points:
             # Minimal payload for map pinning. We intentionally do not include images/raw payload.
@@ -785,6 +919,12 @@ def list_properties(
                 cols = "id,title,location,price,bedrooms,investment_type,latitude,longitude,source,created_at"
                 if any_deal_filter:
                     cols = cols + ",deal_signals,data"
+
+                # Include data so we can compute property_type consistently if needed.
+                if property_type_filter and "data" not in cols:
+                    cols = cols + ",data"
+                if property_type_filter and "description" not in cols:
+                    cols = cols + ",description"
 
                 q0 = sb.table("properties").select(cols)
 
@@ -817,6 +957,29 @@ def list_properties(
                     if type_list:
                         q0 = q0.in_("investment_type", type_list)
 
+                # Investment type filter (new param)
+                inv_list: List[str] = []
+                try:
+                    inv_list = [
+                        s.strip()
+                        for s in str(investment_type).split(",")
+                        if isinstance(investment_type, str) and s.strip()
+                    ]
+                except Exception:
+                    inv_list = []
+                if inv_list:
+                    try:
+                        q0 = q0.in_("investment_type", inv_list)
+                    except Exception:
+                        pass
+
+                # Property type filter (DB-side when possible)
+                if property_type_filter and property_type_db_value:
+                    try:
+                        q0 = q0.in_("property_type", property_type_filter)
+                    except Exception:
+                        pass
+
                 return q0
 
             points_q = _build_points_query()
@@ -824,7 +987,20 @@ def list_properties(
             points_q = _safe_order(points_q, "created_at", desc=True, nulls_last=True)
             points_q = points_q.range(0, points_limit - 1)
 
-            points_res = points_q.execute()
+            try:
+                points_res = points_q.execute()
+            except APIError as e:
+                missing = _missing_col_from_api_error(e)
+                if missing == "property_type" and property_type_filter:
+                    # Rebuild without DB property_type filtering; python-filter below.
+                    property_type_db_value = None
+                    python_filter_property_type = True
+                    points_q = _build_points_query()
+                    points_q = _safe_order(points_q, "created_at", desc=True, nulls_last=True)
+                    points_q = points_q.range(0, points_limit - 1)
+                    points_res = points_q.execute()
+                else:
+                    raise
             points_rows = points_res.data or []
             if not isinstance(points_rows, list):
                 points_rows = []
@@ -871,6 +1047,19 @@ def list_properties(
             for r in points_rows:
                 if not isinstance(r, dict):
                     continue
+
+                if property_type_filter and python_filter_property_type:
+                    try:
+                        pt, _raw = classify_property_type(
+                            r.get("title"),
+                            r.get("description"),
+                            None,
+                            extra=r.get("data") if isinstance(r.get("data"), dict) else None,
+                        )
+                        if pt not in set(property_type_filter):
+                            continue
+                    except Exception:
+                        continue
 
                 if any_deal_filter:
                     deal_sigs = r.get("deal_signals")
@@ -977,6 +1166,148 @@ def list_properties(
     except Exception as e:
         # Never 500 silently: return message for debugging
         raise HTTPException(status_code=500, detail=f"properties list failed: {e}")
+
+
+@router.post("/properties/admin/backfill-property-types")
+def backfill_property_types(
+    limit: int = Query(default=500, ge=1, le=500),
+    offset: int = Query(default=0, ge=0, le=100_000),
+    x_admin_token: str | None = Header(None),
+):
+    """Backfill canonical property_type/raw_property_type.
+
+    Safe + repeatable:
+    - Computes type from title/description/data
+    - Writes to columns when available, otherwise embeds into data JSON
+    """
+
+    _require_admin(x_admin_token)
+    sb = _get_supabase()
+
+    cols = [
+        "id",
+        "title",
+        "description",
+        "data",
+        "created_at",
+        "property_type",
+        "raw_property_type",
+    ]
+
+    def _missing_col_from_api_error(err: APIError) -> str | None:
+        payload = err.args[0] if err.args else None
+        msg = payload.get("message") if isinstance(payload, dict) else str(err)
+        if not msg:
+            return None
+        m = re.search(r"column properties\.([a-zA-Z0-9_]+) does not exist", msg)
+        if not m:
+            return None
+        return m.group(1)
+
+    def _select_with_existing_cols(build_query):
+        nonlocal cols
+        for _ in range(10):
+            try:
+                select_cols = ",".join(cols)
+                return build_query(select_cols).execute()
+            except APIError as e:
+                missing = _missing_col_from_api_error(e)
+                if not missing:
+                    raise
+                if missing in cols and missing != "id":
+                    cols = [c for c in cols if c != missing]
+                    continue
+                raise
+        raise HTTPException(
+            status_code=500,
+            detail="Backfill failed: could not find a compatible column set",
+        )
+
+    try:
+        res = _select_with_existing_cols(
+            lambda select_cols: (
+                _safe_order(
+                    sb.table("properties")
+                    .select(select_cols)
+                    .range(int(offset), int(offset) + int(limit) - 1),
+                    "created_at",
+                    desc=True,
+                )
+                if "created_at" in cols
+                else sb.table("properties")
+                .select(select_cols)
+                .range(int(offset), int(offset) + int(limit) - 1)
+            )
+        )
+        rows = res.data or []
+        if not isinstance(rows, list):
+            rows = []
+
+        processed = 0
+        updated = 0
+        sample_updates: list[dict[str, Any]] = []
+
+        for r in rows:
+            if not isinstance(r, dict) or not r.get("id"):
+                continue
+            processed += 1
+            pid = str(r.get("id"))
+
+            data_obj = r.get("data")
+            if not isinstance(data_obj, dict):
+                data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+
+            existing = r.get("property_type")
+            if not (isinstance(existing, str) and existing.strip()):
+                existing = data_obj.get("property_type")
+
+            if isinstance(existing, str) and existing.strip():
+                continue
+
+            pt, raw_best = classify_property_type(
+                r.get("title"),
+                r.get("description"),
+                None,
+                extra=data_obj,
+            )
+
+            data_obj["property_type"] = pt
+            if raw_best:
+                data_obj["raw_property_type"] = raw_best
+
+            payload: dict[str, Any] = {"data": data_obj, "property_type": pt}
+            if raw_best:
+                payload["raw_property_type"] = raw_best
+
+            try:
+                sb.table("properties").update(payload).eq("id", pid).execute()
+                updated += 1
+            except APIError as e:
+                missing = _missing_col_from_api_error(e)
+                if missing in {"property_type", "raw_property_type"}:
+                    retry_payload = {"data": data_obj}
+                    sb.table("properties").update(retry_payload).eq("id", pid).execute()
+                    updated += 1
+                else:
+                    logging.exception("Failed to backfill property_type for %s", pid)
+
+            if len(sample_updates) < 5:
+                sample_updates.append(
+                    {"id": pid, "property_type": pt, "raw_property_type": raw_best}
+                )
+
+        return {
+            "processed_count": processed,
+            "updated_count": updated,
+            "limit": limit,
+            "offset": offset,
+            "sample_updates": sample_updates,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.exception("Backfill property types failed")
+        raise HTTPException(status_code=500, detail="Backfill failed") from e
 
 
 @router.get("/properties/{property_id}")

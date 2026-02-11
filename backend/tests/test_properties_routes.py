@@ -428,6 +428,105 @@ def test_list_properties_investment_type_empty_is_ignored(mock_create_client, cl
 
 
 @patch("backend.routes.properties_routes.create_client")
+def test_list_properties_property_type_single_uses_in(mock_create_client, client):
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+    mock_query.in_.return_value = mock_query
+    mock_query.execute.return_value = Mock(data=[], count=0)
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"property_type": "Terraced"})
+    assert response.status_code == 200
+    mock_query.in_.assert_called_once_with("property_type", ["Terraced"])
+
+
+@patch("backend.routes.properties_routes.create_client")
+def test_list_properties_includes_property_type_when_missing(mock_create_client, client):
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+
+    mock_query.execute.return_value = Mock(
+        data=[{"id": "p1", "title": "3 bed terraced house", "location": "London"}],
+        count=1,
+    )
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties")
+    assert response.status_code == 200
+    data = response.json()
+    assert isinstance(data, dict)
+    assert len(data.get("items") or []) == 1
+    assert data["items"][0].get("property_type") == "Terraced"
+
+
+@patch("backend.routes.properties_routes.create_client")
+def test_admin_backfill_property_types_requires_token_when_configured(
+    mock_create_client, client, monkeypatch
+):
+    monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
+    mock_create_client.return_value = Mock()
+
+    res = client.post("/properties/admin/backfill-property-types")
+    assert res.status_code == 401
+
+
+@patch("backend.routes.properties_routes.create_client")
+def test_admin_backfill_property_types_updates_missing(mock_create_client, client, monkeypatch):
+    monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
+
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+    mock_query.update.return_value = mock_query
+    mock_query.eq.return_value = mock_query
+
+    # First execute => select rows, second execute => update
+    mock_query.execute.side_effect = [
+        Mock(
+            data=[
+                {
+                    "id": "p1",
+                    "title": "Commercial unit",
+                    "description": "Retail unit",
+                    "data": {},
+                }
+            ]
+        ),
+        Mock(data={}),
+    ]
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    res = client.post(
+        "/properties/admin/backfill-property-types?limit=1&offset=0",
+        headers={"x-admin-token": "secret"},
+    )
+    assert res.status_code == 200
+    payload = res.json()
+    assert payload.get("processed_count") == 1
+    assert payload.get("updated_count") == 1
+
+    # Ensure we attempted an update including canonical type.
+    called_payload = mock_query.update.call_args[0][0]
+    assert called_payload.get("property_type") == "Commercial"
+    assert isinstance(called_payload.get("data"), dict)
+    assert called_payload["data"].get("property_type") == "Commercial"
+
+
+@patch("backend.routes.properties_routes.create_client")
 def test_list_properties_price_desc_returns_items_with_null_or_invalid_price(
     mock_create_client, client
 ):

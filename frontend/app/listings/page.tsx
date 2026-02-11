@@ -144,6 +144,21 @@ type SortKey = (typeof SORTABLE)[number];
 
 const INVESTMENT_TYPES = ['HMO', 'BTL', 'SA', 'BRR', 'Flip', 'Commercial'] as const;
 
+const PROPERTY_TYPES = [
+  '',
+  'Terraced',
+  'Semi-detached',
+  'Detached',
+  'Flat/Apartment',
+  'Studio',
+  'Maisonette',
+  'Bungalow',
+  'Land',
+  'Commercial',
+  'HMO/Block',
+  'Other',
+] as const;
+
 const PRICE_RANGES = [
   { key: 'any', label: 'Any', min: undefined, max: undefined },
   { key: '0-150', label: '0–150k', min: 0, max: 150000 },
@@ -184,6 +199,7 @@ type RawProperty = {
   longitude?: number | null;
   created_at?: string | null;
   investment_type?: string | null;
+  property_type?: string | null;
 };
 
 export default function ListingsPage() {
@@ -520,6 +536,7 @@ function ListingsInner() {
   const types = useMemo(() => (typesRaw ? typesRaw.split(',').filter(Boolean) : []), [typesRaw]);
   const investmentTypeUrlRaw = (searchParams?.get('investment_type') ?? '').trim();
   const investmentTypeUrl = investmentTypeUrlRaw || (types[0] ? String(types[0]).trim() : '');
+  const propertyTypeUrl = (searchParams?.get('property_type') ?? '').trim();
 
   const dealsOnlyUrl = parseBoolParam(searchParams?.get('deals_only'));
   const auctionOnlyUrl = parseBoolParam(searchParams?.get('auction_only'));
@@ -570,6 +587,7 @@ function ListingsInner() {
   const [bedsInput, setBedsInput] = useState(urlBeds);
   const [bathsInput, setBathsInput] = useState(urlBaths);
   const [selectedInvestmentType, setSelectedInvestmentType] = useState<string>(investmentTypeUrl);
+  const [selectedPropertyType, setSelectedPropertyType] = useState<string>(propertyTypeUrl);
   const [dealsOnly, setDealsOnly] = useState(dealsOnlyUrl);
   const [auctionOnly, setAuctionOnly] = useState(auctionOnlyUrl);
   const [reducedOnly, setReducedOnly] = useState(reducedOnlyUrl);
@@ -613,6 +631,10 @@ function ListingsInner() {
   useEffect(() => {
     setSelectedInvestmentType(investmentTypeUrl);
   }, [investmentTypeUrl]);
+
+  useEffect(() => {
+    setSelectedPropertyType(propertyTypeUrl);
+  }, [propertyTypeUrl]);
 
   useEffect(() => {
     setDealsOnly(dealsOnlyUrl);
@@ -719,6 +741,7 @@ function ListingsInner() {
         if (cashBuyersOnlyUrl) params.set('cash_buyers_only', 'true');
         if (shortLeaseOnlyUrl) params.set('short_lease_only', 'true');
         if (investmentTypeUrl) params.set('investment_type', investmentTypeUrl);
+        if (propertyTypeUrl) params.set('property_type', propertyTypeUrl);
 
         // When the map is enabled, request full-result points so pins reflect ALL
         // matching properties (not just the current paged list).
@@ -776,6 +799,7 @@ function ListingsInner() {
           longitude: prop.longitude ?? prop.lng ?? prop.lon,
           created_at: prop.created_at,
           investment_type: prop.investment_type,
+          property_type: prop.property_type,
         }));
 
         const mappedPoints: RawProperty[] | null = rawPoints
@@ -803,6 +827,7 @@ function ListingsInner() {
                 longitude: prop.longitude ?? prop.lng ?? prop.lon,
                 created_at: prop.created_at,
                 investment_type: prop.investment_type,
+                property_type: prop.property_type,
               }))
           : null;
 
@@ -846,6 +871,7 @@ function ListingsInner() {
     cashBuyersOnlyUrl,
     shortLeaseOnlyUrl,
     investmentTypeUrl,
+    propertyTypeUrl,
   ]);
 
   type InvestmentType = (typeof INVESTMENT_TYPES)[number];
@@ -986,6 +1012,9 @@ function ListingsInner() {
     // Investment type filter (single select)
     if (selectedInvestmentType) p.set('investment_type', selectedInvestmentType);
     else p.delete('investment_type');
+    // Property type filter
+    if (selectedPropertyType) p.set('property_type', selectedPropertyType);
+    else p.delete('property_type');
     // Legacy param (kept for back-compat, but no longer written)
     p.delete('types');
 
@@ -1063,6 +1092,7 @@ function ListingsInner() {
     setBedsInput('');
     setBathsInput('');
     setSelectedInvestmentType('');
+    setSelectedPropertyType('');
     setDealsOnly(false);
     setAuctionOnly(false);
     setReducedOnly(false);
@@ -1079,6 +1109,7 @@ function ListingsInner() {
       p.delete('baths');
       p.delete('investment_type');
       p.delete('types');
+      p.delete('property_type');
       p.delete('deals_only');
       p.delete('auction_only');
       p.delete('reduced_only');
@@ -1118,6 +1149,8 @@ function ListingsInner() {
   if (baths) activeFilters.push({ key: 'baths', label: `${baths}+ baths`, value: String(baths) });
   if (investmentTypeUrl)
     activeFilters.push({ key: 'investment_type', label: investmentTypeUrl, value: investmentTypeUrl });
+  if (propertyTypeUrl)
+    activeFilters.push({ key: 'property_type', label: propertyTypeUrl, value: propertyTypeUrl });
 
   if (dealsOnlyUrl) activeFilters.push({ key: 'deals_only', label: 'Deals only', value: '1' });
   if (auctionOnlyUrl) activeFilters.push({ key: 'auction_only', label: 'Auction only', value: '1' });
@@ -1329,24 +1362,24 @@ function ListingsInner() {
           </select>
         </div>
 
-        {/* COMING SOON: Property type filter (hidden until backend + UI are ready) */}
-        {false && (
-          <div className="col-span-2 md:col-span-4">
-            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
-              Property type
-            </label>
-            <select
-              value=""
-              disabled
-              className="input-field w-full opacity-70 cursor-not-allowed"
-              style={{ height: 40, padding: '0.5rem 0.75rem' }}
-              aria-label="Property type (soon)"
-              title="Property type filtering is not supported by backend yet"
-            >
-              <option value="">Any (coming soon)</option>
-            </select>
-          </div>
-        )}
+        <div className="col-span-2 md:col-span-4">
+          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+            Property type
+          </label>
+          <select
+            value={selectedPropertyType}
+            onChange={(e) => setSelectedPropertyType(e.target.value)}
+            className="input-field w-full"
+            style={{ height: 40, padding: '0.5rem 0.75rem' }}
+            aria-label="Property type"
+          >
+            {PROPERTY_TYPES.map((t) => (
+              <option key={t || 'any'} value={t}>
+                {t ? t : 'Any'}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="mb-3">

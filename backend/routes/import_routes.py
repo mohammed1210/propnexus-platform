@@ -44,6 +44,7 @@ from backend.utils.ingest import (
 )
 from backend.utils.listing_keys import ensure_external_id, extract_postcode, strip_empty_for_upsert
 from backend.utils.postcode import get_lat_lng_from_postcode
+from backend.utils.property_type_classifier import classify_property_type
 from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run, update_scrape_run_data
 
 # Shared Supabase client
@@ -1024,6 +1025,56 @@ def _upsert_properties_rows(
             # Never fail ingestion due to signals.
             pass
 
+        # Property type classification: deterministic + additive.
+        # We always embed into `data` (safe fallback, no migration). If DB columns exist,
+        # we also write top-level property_type/raw_property_type.
+        try:
+            data_obj = cleaned.get("data")
+            if not isinstance(data_obj, dict):
+                data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+
+            raw_candidate: Any = (
+                cleaned.get("raw_property_type")
+                or cleaned.get("property_type")
+                or cleaned.get("propertyType")
+                or cleaned.get("propertySubType")
+                or cleaned.get("property_type_label")
+                or cleaned.get("type")
+            )
+            if not raw_candidate:
+                raw_candidate = (
+                    data_obj.get("raw_property_type")
+                    or data_obj.get("property_type")
+                    or data_obj.get("propertyType")
+                    or data_obj.get("propertyTypeLabel")
+                    or data_obj.get("property_type_label")
+                    or data_obj.get("propertySubType")
+                    or data_obj.get("type")
+                )
+
+            raw_s: str | None = None
+            if isinstance(raw_candidate, str) and raw_candidate.strip():
+                raw_s = raw_candidate.strip()
+
+            normalized_pt, raw_pt = classify_property_type(
+                cleaned.get("title"),
+                cleaned.get("description"),
+                raw_s,
+                extra=data_obj,
+            )
+
+            cleaned["property_type"] = normalized_pt
+            if raw_pt:
+                cleaned["raw_property_type"] = raw_pt
+
+            data_obj["property_type"] = normalized_pt
+            if raw_pt:
+                data_obj["raw_property_type"] = raw_pt
+            cleaned["data"] = data_obj
+        except Exception:
+            # Never fail ingestion due to property-type classification.
+            pass
+
         prepared.append(cleaned)
 
     try:
@@ -1105,6 +1156,17 @@ def _upsert_properties_rows(
                 return True, None
             except Exception as e4:
                 return False, str(e4)
+
+        # Property type columns may not exist; we already embed into `data`.
+        if ("property_type" in msg or "raw_property_type" in msg) and (
+            "PGRST204" in msg or "Could not find" in msg
+        ):
+            try:
+                stripped = _strip_fields(prepared, ["property_type", "raw_property_type"])
+                sb.table("properties").upsert(stripped, on_conflict=on_conflict).execute()
+                return True, None
+            except Exception as e5:
+                return False, str(e5)
         return False, msg
 
 
