@@ -21,7 +21,7 @@ function isClerkServerEnabled(): boolean {
 async function getBearerTokenOrNull(): Promise<{ userId: string | null; token: string | null }> {
   if (!isClerkServerEnabled()) return { userId: null, token: null };
 
-  const a: any = await auth();
+  const a = auth();
   const userId = (a?.userId as string | null) ?? null;
   if (!userId) return { userId: null, token: null };
 
@@ -42,7 +42,7 @@ export async function DELETE(_req: Request, ctx: any) {
 
     const { userId, token } = await getBearerTokenOrNull();
     if (isClerkServerEnabled() && !userId) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
     }
 
     const res = await fetch(`${getBackendBase()}/saved-deals/${encodeURIComponent(dealId)}`, {
@@ -65,8 +65,8 @@ export async function DELETE(_req: Request, ctx: any) {
     }
   } catch (err: any) {
     return NextResponse.json(
-      { ok: false, error: err?.message || 'Delete saved deal proxy error' },
-      { status: 502 },
+      { ok: false, error: err?.message || 'Internal error' },
+      { status: 500 },
     );
   }
 }

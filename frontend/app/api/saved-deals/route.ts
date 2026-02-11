@@ -21,7 +21,7 @@ function isClerkServerEnabled(): boolean {
 async function getBearerTokenOrNull(): Promise<{ userId: string | null; token: string | null }> {
   if (!isClerkServerEnabled()) return { userId: null, token: null };
 
-  const a: any = await auth();
+  const a = auth();
   const userId = (a?.userId as string | null) ?? null;
   if (!userId) return { userId: null, token: null };
 
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
   try {
     const { userId, token } = await getBearerTokenOrNull();
     if (isClerkServerEnabled() && !userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
     const url = new URL(req.url);
@@ -69,6 +69,6 @@ export async function GET(req: Request) {
       });
     }
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Proxy error' }, { status: 502 });
+    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
   }
 }

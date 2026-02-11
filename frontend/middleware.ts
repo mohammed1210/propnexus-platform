@@ -113,12 +113,7 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    "/listings(.*)",
-    "/off-market(.*)",
-    "/saved(.*)",
-    "/saved-deals(.*)",
-    "/account(.*)",
-    "/admin(.*)",
-    "/api/admin(.*)",
+    "/((?!_next|.*\\..*).*)",
+    "/api/(.*)",
   ],
 };
