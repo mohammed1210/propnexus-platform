@@ -31,6 +31,17 @@ curl -sS -X POST "$BASE/properties/admin/backfill-scores?limit=500&force=true" \
   -d '{}' | jq
 ```
 
+## (Optional) Backfill canonical property types
+
+See: `docs/property-types.md`
+
+```bash
+curl -sS -X POST "$BASE/properties/admin/backfill-property-types?limit=500&offset=0" \
+  -H "x-admin-token: $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{}' | jq
+```
+
 ## Spot-check derived band + rent source
 
 ```bash

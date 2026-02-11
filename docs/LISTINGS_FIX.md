@@ -108,6 +108,10 @@ curl http://localhost:8000/properties?limit=10
 
 Expected: JSON array with up to 10 properties
 
+### Property type filter
+
+Canonical property type classification + filtering is documented in `docs/property-types.md`.
+
 ### 2. Check Frontend
 1. Open the listings page: `http://localhost:3000/listings`
 2. Open browser DevTools (F12) → Network tab
