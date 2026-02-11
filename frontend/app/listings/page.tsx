@@ -518,6 +518,8 @@ function ListingsInner() {
   const baths = parsePositiveInt(searchParams?.get('baths') ?? '');
   const typesRaw = searchParams?.get('types') ?? '';
   const types = useMemo(() => (typesRaw ? typesRaw.split(',').filter(Boolean) : []), [typesRaw]);
+  const investmentTypeUrlRaw = (searchParams?.get('investment_type') ?? '').trim();
+  const investmentTypeUrl = investmentTypeUrlRaw || (types[0] ? String(types[0]).trim() : '');
 
   const dealsOnlyUrl = parseBoolParam(searchParams?.get('deals_only'));
   const auctionOnlyUrl = parseBoolParam(searchParams?.get('auction_only'));
@@ -567,7 +569,7 @@ function ListingsInner() {
   const [maxInput, setMaxInput] = useState(urlMax);
   const [bedsInput, setBedsInput] = useState(urlBeds);
   const [bathsInput, setBathsInput] = useState(urlBaths);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>(types);
+  const [selectedInvestmentType, setSelectedInvestmentType] = useState<string>(investmentTypeUrl);
   const [dealsOnly, setDealsOnly] = useState(dealsOnlyUrl);
   const [auctionOnly, setAuctionOnly] = useState(auctionOnlyUrl);
   const [reducedOnly, setReducedOnly] = useState(reducedOnlyUrl);
@@ -609,8 +611,8 @@ function ListingsInner() {
 
   // Keep local selection in sync with URL state (back/forward navigation).
   useEffect(() => {
-    setSelectedTypes(types);
-  }, [types]);
+    setSelectedInvestmentType(investmentTypeUrl);
+  }, [investmentTypeUrl]);
 
   useEffect(() => {
     setDealsOnly(dealsOnlyUrl);
@@ -716,6 +718,7 @@ function ListingsInner() {
         if (tenantedOnlyUrl) params.set('tenanted_only', '1');
         if (cashBuyersOnlyUrl) params.set('cash_buyers_only', 'true');
         if (shortLeaseOnlyUrl) params.set('short_lease_only', 'true');
+        if (investmentTypeUrl) params.set('investment_type', investmentTypeUrl);
 
         // When the map is enabled, request full-result points so pins reflect ALL
         // matching properties (not just the current paged list).
@@ -842,6 +845,7 @@ function ListingsInner() {
     tenantedOnlyUrl,
     cashBuyersOnlyUrl,
     shortLeaseOnlyUrl,
+    investmentTypeUrl,
   ]);
 
   type InvestmentType = (typeof INVESTMENT_TYPES)[number];
@@ -887,8 +891,8 @@ function ListingsInner() {
   );
 
   const typeFilteredRows = useMemo(() => {
-    if (!types.length) return rows;
-    const selected = new Set(types as InvestmentType[]);
+    if (!investmentTypeUrl) return rows;
+    const selected = new Set([investmentTypeUrl] as InvestmentType[]);
     const filtered = rows.filter((p) => {
       const inferred = inferredInvestmentTypes(p);
       for (const t of selected) {
@@ -899,13 +903,13 @@ function ListingsInner() {
 
     // Never blank the page due to investment-type chips.
     return filtered.length > 0 ? filtered : rows;
-  }, [inferredInvestmentTypes, rows, types]);
+  }, [inferredInvestmentTypes, investmentTypeUrl, rows]);
 
   const typeFilteredMapRows = useMemo(() => {
     if (!mapRows) return typeFilteredRows;
-    if (!types.length) return mapRows;
+    if (!investmentTypeUrl) return mapRows;
 
-    const selected = new Set(types as InvestmentType[]);
+    const selected = new Set([investmentTypeUrl] as InvestmentType[]);
     const filtered = mapRows.filter((p) => {
       const inferred = inferredInvestmentTypes(p);
       for (const t of selected) {
@@ -916,7 +920,7 @@ function ListingsInner() {
 
     // Never blank the map due to investment-type chips.
     return filtered.length > 0 ? filtered : mapRows;
-  }, [inferredInvestmentTypes, mapRows, typeFilteredRows, types]);
+  }, [inferredInvestmentTypes, investmentTypeUrl, mapRows, typeFilteredRows]);
 
   // ✅ robust points creation (no falsy checks, reject invalid/null-island)
   const points = useMemo(() => {
@@ -979,8 +983,11 @@ function ListingsInner() {
     else p.delete('beds');
     if (bathsInput) p.set('baths', bathsInput);
     else p.delete('baths');
-    if (selectedTypes.length > 0) p.set('types', selectedTypes.join(','));
-    else p.delete('types');
+    // Investment type filter (single select)
+    if (selectedInvestmentType) p.set('investment_type', selectedInvestmentType);
+    else p.delete('investment_type');
+    // Legacy param (kept for back-compat, but no longer written)
+    p.delete('types');
 
     if (dealsOnly) p.set('deals_only', '1');
     else p.delete('deals_only');
@@ -1055,7 +1062,7 @@ function ListingsInner() {
     setMaxInput('');
     setBedsInput('');
     setBathsInput('');
-    setSelectedTypes([]);
+    setSelectedInvestmentType('');
     setDealsOnly(false);
     setAuctionOnly(false);
     setReducedOnly(false);
@@ -1070,6 +1077,7 @@ function ListingsInner() {
       p.delete('max');
       p.delete('beds');
       p.delete('baths');
+      p.delete('investment_type');
       p.delete('types');
       p.delete('deals_only');
       p.delete('auction_only');
@@ -1086,14 +1094,7 @@ function ListingsInner() {
 
   const removeFilter = (key: string, value?: string) => {
     pushParams((p) => {
-      if (key === 'types' && value) {
-        const currentTypes = p.get('types')?.split(',').filter(Boolean) || [];
-        const newTypes = currentTypes.filter((t) => t !== value);
-        if (newTypes.length > 0) p.set('types', newTypes.join(','));
-        else p.delete('types');
-      } else {
-        p.delete(key);
-      }
+      p.delete(key);
       p.set('offset', '0');
     });
   };
@@ -1115,7 +1116,8 @@ function ListingsInner() {
   });
   if (beds) activeFilters.push({ key: 'beds', label: `${beds}+ beds`, value: String(beds) });
   if (baths) activeFilters.push({ key: 'baths', label: `${baths}+ baths`, value: String(baths) });
-  types.forEach((type) => activeFilters.push({ key: 'types', label: type, value: type }));
+  if (investmentTypeUrl)
+    activeFilters.push({ key: 'investment_type', label: investmentTypeUrl, value: investmentTypeUrl });
 
   if (dealsOnlyUrl) activeFilters.push({ key: 'deals_only', label: 'Deals only', value: '1' });
   if (auctionOnlyUrl) activeFilters.push({ key: 'auction_only', label: 'Auction only', value: '1' });
@@ -1327,32 +1329,37 @@ function ListingsInner() {
           </select>
         </div>
 
-        <div className="col-span-2 md:col-span-4">
-          <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">Property type</label>
-          <select
-            value=""
-            disabled
-            className="input-field w-full opacity-70 cursor-not-allowed"
-            style={{ height: 40, padding: '0.5rem 0.75rem' }}
-            aria-label="Property type (soon)"
-            title="Property type filtering is not supported by backend yet"
-          >
-            <option value="">Any (coming soon)</option>
-          </select>
-        </div>
+        {/* COMING SOON: Property type filter (hidden until backend + UI are ready) */}
+        {false && (
+          <div className="col-span-2 md:col-span-4">
+            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1">
+              Property type
+            </label>
+            <select
+              value=""
+              disabled
+              className="input-field w-full opacity-70 cursor-not-allowed"
+              style={{ height: 40, padding: '0.5rem 0.75rem' }}
+              aria-label="Property type (soon)"
+              title="Property type filtering is not supported by backend yet"
+            >
+              <option value="">Any (coming soon)</option>
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="mb-3">
         <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">Investment type</label>
         <div className="flex flex-wrap gap-2">
           {INVESTMENT_TYPES.map((type) => {
-            const isSelected = selectedTypes.includes(type);
+            const isSelected = selectedInvestmentType === type;
             return (
               <button
                 key={type}
                 onClick={() => {
-                  if (isSelected) setSelectedTypes(selectedTypes.filter((t) => t !== type));
-                  else setSelectedTypes([...selectedTypes, type]);
+                  if (isSelected) setSelectedInvestmentType('');
+                  else setSelectedInvestmentType(type);
                 }}
                 className={`px-3 py-1.5 rounded-full border text-sm font-semibold transition-colors ${
                   isSelected
@@ -1367,11 +1374,6 @@ function ListingsInner() {
             );
           })}
         </div>
-        {types.length > 0 && typeFilteredRows === rows && (
-          <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            Investment type matching is improving — showing closest results when available.
-          </div>
-        )}
       </div>
 
       <div className="mb-3">

@@ -477,6 +477,16 @@ def list_properties(
     beds: Optional[int] = Query(default=None),
     baths: Optional[int] = Query(default=None),
     types: Optional[str] = Query(default=None, description="Comma-separated investment types"),
+    investment_type: Optional[str] = Query(
+        default=None,
+        description=(
+            "Investment type filter (comma-separated). Values like: HMO,BTL,SA,BRR,Flip,Commercial"
+        ),
+    ),
+    property_type: Optional[str] = Query(
+        default=None,
+        description="Property type filter (comma-separated; future use)",
+    ),
     deals_only: bool = Query(
         default=False, description="Only return listings with any deal signal"
     ),
@@ -553,6 +563,44 @@ def list_properties(
         def _build_base_query():
             q0 = sb.table("properties").select("*", count="exact")
 
+            def _parse_csv(value: Any) -> List[str]:
+                if value is None:
+                    return []
+                s = str(value).strip()
+                if not s:
+                    return []
+                out: List[str] = []
+                for part in s.split(","):
+                    p = str(part or "").strip()
+                    if p:
+                        out.append(p)
+                return out
+
+            def _or_ilike(column: str, values: List[str]) -> Any:
+                # Exact, case-insensitive match; OR for multiple values.
+                vals = [v.strip() for v in values if isinstance(v, str) and v.strip()]
+                if not vals:
+                    return q0
+                if len(vals) == 1:
+                    try:
+                        return q0.ilike(column, vals[0])
+                    except Exception:
+                        return q0
+                # Supabase .or_ expects a comma-separated filter string.
+                # Values here are expected to be simple tokens (HMO/BTL/etc). If a value
+                # includes spaces, quote it.
+                parts: List[str] = []
+                for v in vals:
+                    v2 = v.replace('"', "")
+                    if any(ch.isspace() for ch in v2):
+                        parts.append(f'{column}.ilike."{v2}"')
+                    else:
+                        parts.append(f"{column}.ilike.{v2}")
+                try:
+                    return q0.or_(",".join(parts))
+                except Exception:
+                    return q0
+
             # Exact source filter (useful for verifying scraper inserts)
             if source is not None:
                 src = str(source).strip().lower()
@@ -587,6 +635,16 @@ def list_properties(
                 type_list: List[str] = [t.strip() for t in types.split(",") if t.strip()]
                 if type_list:
                     q0 = q0.in_("investment_type", type_list)
+
+            # Investment type filter (case-insensitive exact match; supports comma-separated OR)
+            inv_list = _parse_csv(investment_type)
+            if inv_list:
+                q0 = _or_ilike("investment_type", inv_list)
+
+            # Property type filter (future use; safe/additive)
+            pt_list = _parse_csv(property_type)
+            if pt_list:
+                q0 = _or_ilike("property_type", pt_list)
 
             return q0
 

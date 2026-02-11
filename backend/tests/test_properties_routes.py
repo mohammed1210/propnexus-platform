@@ -369,6 +369,65 @@ def test_list_properties_deal_filter_short_lease_only(mock_create_client, client
 
 
 @patch("backend.routes.properties_routes.create_client")
+def test_list_properties_investment_type_single_uses_ilike(mock_create_client, client):
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+    mock_query.ilike.return_value = mock_query
+    mock_query.execute.return_value = Mock(data=[], count=0)
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"investment_type": "HMO"})
+    assert response.status_code == 200
+    mock_query.ilike.assert_called_once_with("investment_type", "HMO")
+
+
+@patch("backend.routes.properties_routes.create_client")
+def test_list_properties_investment_type_csv_builds_or_expression(mock_create_client, client):
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+    mock_query.or_.return_value = mock_query
+    mock_query.execute.return_value = Mock(data=[], count=0)
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"investment_type": "HMO,BTL"})
+    assert response.status_code == 200
+    assert mock_query.or_.call_count >= 1
+    arg = mock_query.or_.call_args[0][0]
+    assert "investment_type.ilike.HMO" in arg
+    assert "investment_type.ilike.BTL" in arg
+
+
+@patch("backend.routes.properties_routes.create_client")
+def test_list_properties_investment_type_empty_is_ignored(mock_create_client, client):
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+    mock_query.ilike.return_value = mock_query
+    mock_query.or_.return_value = mock_query
+    mock_query.execute.return_value = Mock(data=[], count=0)
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"investment_type": "   "})
+    assert response.status_code == 200
+    assert mock_query.ilike.call_count == 0
+    assert mock_query.or_.call_count == 0
+
+
+@patch("backend.routes.properties_routes.create_client")
 def test_list_properties_price_desc_returns_items_with_null_or_invalid_price(
     mock_create_client, client
 ):
