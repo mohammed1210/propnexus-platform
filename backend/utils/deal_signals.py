@@ -39,9 +39,75 @@ _WAS_NOW_RE = re.compile(
 
 
 _SHORT_LEASE_RE = re.compile(
-    r"\b(?:lease\s*)?(\d{2,3})\s*years\s*(?:remaining|left)?\b",
+    r"\b(?:lease\s*(?:remaining|left)?\s*)?(\d{2,3})\s*(?:years|yrs)\s*(?:remaining|left)?\b",
     re.IGNORECASE,
 )
+
+SHORT_LEASE_THRESHOLD_YEARS = 85
+
+
+def detect_cash_buyers_only(property_dict: Dict[str, Any]) -> bool:
+    """Return True only on explicit cash-only / unmortgageable signals."""
+    raw_text, _fields = _collect_text(property_dict)
+    norm = normalize(raw_text)
+    if not norm:
+        return False
+
+    phrases = [
+        "cash buyers only",
+        "cash buyer only",
+        "cash only",
+        "no mortgage",
+        "not suitable for mortgage",
+        "not suitable for a mortgage",
+        "unmortgageable",
+        "non mortgageable",
+        "non-mortgageable",
+        "no mortgage finance",
+        "mortgage finance not available",
+        "no mortgage available",
+    ]
+    return any(p in norm for p in phrases)
+
+
+def detect_short_lease(
+    property_dict: Dict[str, Any], *, threshold_years: int = SHORT_LEASE_THRESHOLD_YEARS
+) -> Tuple[bool, Optional[int]]:
+    """Detect short lease.
+
+    Conservative semantics:
+    - If an explicit lease years figure is parsed: short iff years <= threshold_years.
+    - Otherwise, if strong keywords exist (short lease / lease extension required): short True with years None.
+    - If nothing found: False.
+    """
+    raw_text, _fields = _collect_text(property_dict)
+    norm = normalize(raw_text)
+    if not norm:
+        return False, None
+
+    years: Optional[int] = None
+    if "lease" in norm:
+        m = _SHORT_LEASE_RE.search(raw_text or "")
+        if m:
+            try:
+                years_i = int(m.group(1))
+            except Exception:
+                years_i = 0
+            if 0 < years_i < 1000:
+                years = years_i
+
+    if years is not None:
+        return years <= int(threshold_years), years
+
+    keyword_terms = [
+        "short lease",
+        "lease extension required",
+        "lease extension",
+    ]
+    if any(t in norm for t in keyword_terms):
+        return True, None
+
+    return False, None
 
 
 def _first_str(d: Dict[str, Any], keys: List[str]) -> Optional[str]:
@@ -205,32 +271,17 @@ def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
     if has("needs_refurb", refurb_terms):
         signals.append("needs_refurb")
 
-    # Cash buyers / unmortgageable
-    cash_terms = [
-        "cash buyers only",
-        "cash buyer only",
-        "cash only",
-        "unmortgageable",
-        "non mortgageable",
-        "non-mortgageable",
-    ]
-    if has("cash_buyers", cash_terms):
-        signals.append("cash_buyers")
+    # Cash buyers only / unmortgageable
+    if detect_cash_buyers_only(property_dict):
+        signals.append("cash_buyers_only")
+        matched_terms.setdefault("cash_buyers_only", []).append("cash-only")
 
     # Short lease
-    short_lease = False
-    if "lease" in norm:
-        m = _SHORT_LEASE_RE.search(raw_text or "")
-        if m:
-            try:
-                years = int(m.group(1))
-            except Exception:
-                years = 0
-            if 0 < years < 90:
-                short_lease = True
-                matched_terms.setdefault("short_lease", []).append(f"{years}y")
-    if short_lease:
+    is_short_lease, lease_years = detect_short_lease(property_dict)
+    if is_short_lease:
         signals.append("short_lease")
+        if isinstance(lease_years, int) and lease_years > 0:
+            matched_terms.setdefault("short_lease", []).append(f"{lease_years}y")
 
     # Below market (only literal)
     if has("below_market", ["below market value", "bmv"]):
@@ -245,7 +296,7 @@ def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
         "tenanted": "Tenant in situ",
         "chain_free": "Chain free",
         "motivated_seller": "Motivated seller",
-        "cash_buyers": "Cash buyers only",
+        "cash_buyers_only": "Cash buyers only",
         "short_lease": "Short lease",
         "guide_price": "Guide price / offers",
     }
@@ -257,7 +308,7 @@ def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
         "tenanted",
         "chain_free",
         "motivated_seller",
-        "cash_buyers",
+        "cash_buyers_only",
         "short_lease",
         "guide_price",
     ]
@@ -278,7 +329,7 @@ def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
             conf_parts.append(0.9)
         elif sig == "reduced":
             conf_parts.append(0.95 if discount_estimate_pct is not None else 0.75)
-        elif sig == "cash_buyers":
+        elif sig == "cash_buyers_only":
             conf_parts.append(0.85)
         elif sig == "needs_refurb":
             conf_parts.append(0.65)
@@ -305,6 +356,7 @@ def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
         "reasons": reasons,
         "confidence": round(float(confidence), 4),
         "matched_terms": matched_terms,
+        "lease_years_remaining": lease_years,
         "discount_estimate_pct": (
             round(float(discount_estimate_pct), 2)
             if isinstance(discount_estimate_pct, (int, float))

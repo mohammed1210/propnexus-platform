@@ -714,8 +714,8 @@ function ListingsInner() {
         if (needsRefurbOnlyUrl) params.set('needs_refurb_only', '1');
         if (chainFreeOnlyUrl) params.set('chain_free_only', '1');
         if (tenantedOnlyUrl) params.set('tenanted_only', '1');
-        if (cashBuyersOnlyUrl) params.set('cash_buyers_only', '1');
-        if (shortLeaseOnlyUrl) params.set('short_lease_only', '1');
+        if (cashBuyersOnlyUrl) params.set('cash_buyers_only', 'true');
+        if (shortLeaseOnlyUrl) params.set('short_lease_only', 'true');
 
         // When the map is enabled, request full-result points so pins reflect ALL
         // matching properties (not just the current paged list).
@@ -994,9 +994,9 @@ function ListingsInner() {
     else p.delete('chain_free_only');
     if (tenantedOnly) p.set('tenanted_only', '1');
     else p.delete('tenanted_only');
-    if (cashBuyersOnly) p.set('cash_buyers_only', '1');
+    if (cashBuyersOnly) p.set('cash_buyers_only', 'true');
     else p.delete('cash_buyers_only');
-    if (shortLeaseOnly) p.set('short_lease_only', '1');
+    if (shortLeaseOnly) p.set('short_lease_only', 'true');
     else p.delete('short_lease_only');
     if (sort) p.set('sort', sort);
     p.set('limit', String(limit));
@@ -1127,9 +1127,9 @@ function ListingsInner() {
   if (tenantedOnlyUrl)
     activeFilters.push({ key: 'tenanted_only', label: 'Tenanted only', value: '1' });
   if (cashBuyersOnlyUrl)
-    activeFilters.push({ key: 'cash_buyers_only', label: 'Cash buyers only', value: '1' });
+    activeFilters.push({ key: 'cash_buyers_only', label: 'Cash buyers only', value: 'true' });
   if (shortLeaseOnlyUrl)
-    activeFilters.push({ key: 'short_lease_only', label: 'Short lease only', value: '1' });
+    activeFilters.push({ key: 'short_lease_only', label: 'Short lease only', value: 'true' });
 
   const totalPages = total > 0 ? Math.max(1, Math.ceil(total / limit)) : 1;
   const currentPage = total > 0 ? Math.min(totalPages, Math.floor(offset / limit) + 1) : 1;

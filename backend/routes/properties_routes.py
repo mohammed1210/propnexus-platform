@@ -426,6 +426,8 @@ def _ensure_deal_fields(item: Dict[str, Any]) -> Dict[str, Any]:
     data_obj.setdefault("deal_reasons", item.get("deal_reasons"))
     if extracted.get("discount_estimate_pct") is not None:
         data_obj.setdefault("discount_estimate_pct", extracted.get("discount_estimate_pct"))
+    if extracted.get("lease_years_remaining") is not None:
+        data_obj.setdefault("lease_years_remaining", extracted.get("lease_years_remaining"))
     item["data"] = data_obj
     return item
 
@@ -443,6 +445,10 @@ def _matches_deal_filters(
         sigs = [str(s).strip().lower() for s in deal_signals if isinstance(s, str) and s.strip()]
 
     sigset = set(sigs)
+
+    # Back-compat aliasing: older rows used cash_buyers.
+    if "cash_buyers" in sigset and "cash_buyers_only" not in sigset:
+        sigset.add("cash_buyers_only")
     if deals_only and not sigset:
         return False
     for s in required_signals:
@@ -632,7 +638,7 @@ def list_properties(
         if tenanted_only:
             required_signals.append("tenanted")
         if cash_buyers_only:
-            required_signals.append("cash_buyers")
+            required_signals.append("cash_buyers_only")
         if short_lease_only:
             required_signals.append("short_lease")
         if below_market_only:

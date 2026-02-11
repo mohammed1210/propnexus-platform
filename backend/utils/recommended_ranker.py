@@ -270,13 +270,14 @@ def _signal_adjustment(
         delta += _clamp(1.0 + 2.0 * conf_f, 1.0, 3.0)
 
     # Penalties
-    if "cash_buyers" in sigset:
+    has_cash_only = ("cash_buyers_only" in sigset) or ("cash_buyers" in sigset)
+    if has_cash_only:
         # We don't have a dedicated flip persona yet; penalize more for cashflow.
         lo, hi = (8.0, 12.0) if deal_type == "cashflow" else (5.0, 9.0)
         delta -= _clamp(lo + (hi - lo) * conf_f, lo, hi)
 
     # If auction + cash-buyers-only, penalize a bit for cashflow.
-    if deal_type == "cashflow" and ("auction" in sigset) and ("cash_buyers" in sigset):
+    if deal_type == "cashflow" and ("auction" in sigset) and has_cash_only:
         delta -= 3.0
 
     return float(delta), signal_reasons_s, sorted(sigset), discount_pct

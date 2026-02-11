@@ -284,6 +284,91 @@ def test_list_properties_deal_filter_auction_only(mock_create_client, client):
 
 
 @patch("backend.routes.properties_routes.create_client")
+def test_list_properties_deal_filter_cash_buyers_only(mock_create_client, client):
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+
+    mock_properties = [
+        {
+            "id": "p1",
+            "title": "Unmortgageable project",
+            "location": "London",
+            "price": 250000,
+            "description": "Cash buyers only - no mortgage available.",
+            "created_at": "2025-01-02T00:00:00Z",
+        },
+        {
+            "id": "p2",
+            "title": "Normal listing",
+            "location": "London",
+            "price": 260000,
+            "description": "A nice home.",
+            "created_at": "2025-01-03T00:00:00Z",
+        },
+    ]
+    mock_query.execute.return_value = Mock(data=mock_properties, count=2)
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"cash_buyers_only": "true"})
+    assert response.status_code == 200
+
+    data = response.json()
+    items = data.get("items") or []
+    assert len(items) == 1
+    assert items[0]["id"] == "p1"
+    assert "cash_buyers_only" in (items[0].get("deal_signals") or [])
+
+
+@patch("backend.routes.properties_routes.create_client")
+def test_list_properties_deal_filter_short_lease_only(mock_create_client, client):
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.order.return_value = mock_query
+
+    mock_properties = [
+        {
+            "id": "p1",
+            "title": "Leasehold flat",
+            "location": "London",
+            "price": 250000,
+            "description": "Lease 83 years remaining.",
+            "created_at": "2025-01-02T00:00:00Z",
+        },
+        {
+            "id": "p2",
+            "title": "Long lease",
+            "location": "London",
+            "price": 260000,
+            "description": "Lease 125 years remaining.",
+            "created_at": "2025-01-03T00:00:00Z",
+        },
+    ]
+    mock_query.execute.return_value = Mock(data=mock_properties, count=2)
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    response = client.get("/properties", params={"short_lease_only": "true"})
+    assert response.status_code == 200
+
+    data = response.json()
+    items = data.get("items") or []
+    assert len(items) == 1
+    assert items[0]["id"] == "p1"
+    assert "short_lease" in (items[0].get("deal_signals") or [])
+    # lease_years_remaining is persisted into `data` when present
+    if isinstance(items[0].get("data"), dict):
+        assert items[0]["data"].get("lease_years_remaining") == 83
+
+
+@patch("backend.routes.properties_routes.create_client")
 def test_list_properties_price_desc_returns_items_with_null_or_invalid_price(
     mock_create_client, client
 ):

@@ -525,6 +525,14 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
                 "confidence": extracted.get("confidence"),
                 "matched_terms": extracted.get("matched_terms"),
             }
+
+            lease_years_remaining = extracted.get("lease_years_remaining")
+            if lease_years_remaining is not None:
+                data_obj = normalized.get("data")
+                if not isinstance(data_obj, dict):
+                    data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+                data_obj["lease_years_remaining"] = lease_years_remaining
+                normalized["data"] = data_obj
     except Exception:
         pass
 

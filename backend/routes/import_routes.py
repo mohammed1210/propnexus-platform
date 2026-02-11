@@ -1001,6 +1001,9 @@ def _upsert_properties_rows(
             cleaned["discount_estimate_pct"] = (
                 extracted.get("discount_estimate_pct") if isinstance(extracted, dict) else None
             )
+            lease_years_remaining = (
+                extracted.get("lease_years_remaining") if isinstance(extracted, dict) else None
+            )
             cleaned["deal_signals_meta"] = (
                 {
                     "confidence": extracted.get("confidence"),
@@ -1009,6 +1012,14 @@ def _upsert_properties_rows(
                 if isinstance(extracted, dict)
                 else None
             )
+
+            # Always embed lease years into `data` (no migration; stable storage).
+            if lease_years_remaining is not None:
+                data_obj = cleaned.get("data")
+                if not isinstance(data_obj, dict):
+                    data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+                data_obj["lease_years_remaining"] = lease_years_remaining
+                cleaned["data"] = data_obj
         except Exception:
             # Never fail ingestion due to signals.
             pass
@@ -1071,6 +1082,10 @@ def _upsert_properties_rows(
                     deal_reasons = original.get("deal_reasons")
                     deal_meta = original.get("deal_signals_meta")
                     discount_est = original.get("discount_estimate_pct")
+                    lease_years_remaining = None
+                    data_original = original.get("data")
+                    if isinstance(data_original, dict):
+                        lease_years_remaining = data_original.get("lease_years_remaining")
 
                     data_obj = row.get("data")
                     if not isinstance(data_obj, dict):
@@ -1080,6 +1095,8 @@ def _upsert_properties_rows(
                     data_obj["deal_reasons"] = deal_reasons
                     data_obj["deal_signals_meta"] = deal_meta
                     data_obj["discount_estimate_pct"] = discount_est
+                    if lease_years_remaining is not None:
+                        data_obj["lease_years_remaining"] = lease_years_remaining
 
                     row["data"] = data_obj
                     embedded.append(row)
