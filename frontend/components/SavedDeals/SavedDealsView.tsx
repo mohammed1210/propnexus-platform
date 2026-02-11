@@ -298,7 +298,7 @@ export default function SavedDealsView() {
             Sign in to view your saved deals.
           </div>
           <div className="mt-4">
-            <Link href="/sign-in" className="btn-primary px-5 py-2 inline-flex">
+            <Link href="/sign-in?redirect_url=/saved" className="btn-primary px-5 py-2 inline-flex">
               Sign in
             </Link>
           </div>

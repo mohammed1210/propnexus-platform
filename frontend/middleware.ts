@@ -113,7 +113,8 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    "/((?!_next|.*\\..*).*)",
+    // Skip Next.js internals and static files (including favicon)
+    "/((?!_next|.*\\.(?:css|js|json|png|jpg|jpeg|gif|svg|ico|webp|map)|favicon.ico).*)",
     "/api/(.*)",
   ],
 };
