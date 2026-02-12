@@ -37,6 +37,7 @@ export function useSavedDeals(): UseSavedDealsState {
     try {
       const res = await fetchWithRetry(`/api/saved-deals`, {
         cache: 'no-store',
+        credentials: 'include',
       });
 
       if (!res.ok) {

@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+} as const;
+
 function getBackendBase(): string {
   return (
     process.env.NEXT_PUBLIC_BACKEND_URL ||
@@ -37,7 +46,10 @@ export async function GET(req: Request) {
   try {
     const { userId, token } = await getBearerTokenOrNull();
     if (isClerkServerEnabled() && !userId) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Not authenticated' },
+        { status: 401, headers: { ...noStoreHeaders } },
+      );
     }
 
     const url = new URL(req.url);
@@ -58,17 +70,26 @@ export async function GET(req: Request) {
       if (propertyId && json && typeof json === 'object') {
         const items = Array.isArray((json as any)?.data) ? (json as any).data : [];
         const filtered = items.filter((d: any) => String(d?.property_id ?? '') === propertyId);
-        return NextResponse.json({ ...json, data: filtered }, { status: res.status });
+        return NextResponse.json(
+          { ...json, data: filtered },
+          { status: res.status, headers: { ...noStoreHeaders } },
+        );
       }
 
-      return NextResponse.json(json, { status: res.status });
+      return NextResponse.json(json, { status: res.status, headers: { ...noStoreHeaders } });
     } catch {
       return new NextResponse(text, {
         status: res.status,
-        headers: { 'content-type': res.headers.get('content-type') || 'text/plain' },
+        headers: {
+          ...noStoreHeaders,
+          'content-type': res.headers.get('content-type') || 'text/plain',
+        },
       });
     }
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Internal error' }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message || 'Internal error' },
+      { status: 500, headers: { ...noStoreHeaders } },
+    );
   }
 }
