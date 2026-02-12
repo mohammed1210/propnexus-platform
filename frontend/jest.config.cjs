@@ -5,7 +5,7 @@ module.exports = {
   // IMPORTANT: when this config sits in /frontend, <rootDir> is /frontend
   rootDir: '.',
 
-  testMatch: ['**/__tests__/**/*.(test|spec).tsx?', '**/*.spec.tsx'],
+  testMatch: ['**/__tests__/**/*.(test|spec).ts?(x)', '**/*.spec.ts?(x)'],
   testPathIgnorePatterns: [
     '<rootDir>/e2e/',
     '<rootDir>/tests/', // ignore Playwright tests (TransformStream error)
