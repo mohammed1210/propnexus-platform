@@ -45,8 +45,8 @@ export default clerkMiddleware(async (auth, req) => {
   const sk = (process.env.CLERK_SECRET_KEY ?? "").trim();
   const enabled = isAuthEnabled && hasValidClerkKey(pk) && Boolean(sk);
 
-  if (!enabled) return redirectRes;
-  if (!isProtectedRoute(req)) return redirectRes;
+  // If Clerk isn't enabled, fall back to plain Next.js middleware passthrough.
+  if (!enabled) return NextResponse.next();
 
   const adminToken =
     process.env.OFF_MARKET_ADMIN_TOKEN ||
@@ -57,18 +57,21 @@ export default clerkMiddleware(async (auth, req) => {
   if (req.nextUrl.pathname.startsWith("/api/admin")) {
     const tokenHeader = req.headers.get("x-admin-token") ?? "";
     if (adminToken && tokenHeader === adminToken) {
-      return redirectRes;
+      // Admin-token access bypasses Clerk; let the request continue.
+      return NextResponse.next();
     }
   }
 
-  const a = await auth();
-  if (!a.userId) {
-    const url = new URL("/sign-in", req.url);
-    url.searchParams.set("redirect_url", req.url);
-    return NextResponse.redirect(url);
-  }
+  // Only enforce sign-in / admin rules for protected routes.
+  if (isProtectedRoute(req)) {
+    const a = await auth();
+    if (!a.userId) {
+      const url = new URL("/sign-in", req.url);
+      url.searchParams.set("redirect_url", req.url);
+      return NextResponse.redirect(url);
+    }
 
-  if (req.nextUrl.pathname.startsWith("/admin") || req.nextUrl.pathname.startsWith("/api/admin")) {
+    if (req.nextUrl.pathname.startsWith("/admin") || req.nextUrl.pathname.startsWith("/api/admin")) {
     const adminEmails = Array.from(
       new Set([
         ...parseAdminEmails(process.env.ADMIN_EMAILS),
@@ -106,9 +109,13 @@ export default clerkMiddleware(async (auth, req) => {
     if (!normalized || !adminEmails.includes(normalized)) {
       return NextResponse.redirect(new URL("/account?forbidden=admin", req.url));
     }
+    }
   }
 
-  return redirectRes;
+  // IMPORTANT: don't return a manual NextResponse.next() here.
+  // Let `clerkMiddleware` produce the passthrough response so it can
+  // inject the auth headers that `auth()` reads inside route handlers.
+  return;
 });
 
 export const config = {
