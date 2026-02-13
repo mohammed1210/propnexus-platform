@@ -30,6 +30,7 @@ if SUPABASE_URL and SUPABASE_KEY:
 _SAVED_DEALS_HAS_CLERK_USER_ID: Optional[bool] = None
 _SAVED_DEALS_HAS_PROPERTY_ID: Optional[bool] = None
 _SAVED_DEALS_HAS_DATA: Optional[bool] = None
+_SAVED_DEALS_HAS_SAVED_AT: Optional[bool] = None
 
 
 def _require_supabase() -> Client:
@@ -95,6 +96,47 @@ def _saved_deals_has_data(sb: Client) -> bool:
     except Exception:
         _SAVED_DEALS_HAS_DATA = False
         return False
+
+
+def _saved_deals_has_saved_at(sb: Client) -> bool:
+    global _SAVED_DEALS_HAS_SAVED_AT
+    if _SAVED_DEALS_HAS_SAVED_AT is not None:
+        return _SAVED_DEALS_HAS_SAVED_AT
+
+    try:
+        sb.table("saved_deals").select("saved_at").limit(1).execute()
+        _SAVED_DEALS_HAS_SAVED_AT = True
+        return True
+    except Exception:
+        _SAVED_DEALS_HAS_SAVED_AT = False
+        return False
+
+
+def _is_unique_violation(err: Exception) -> bool:
+    msg = str(err).lower()
+    return "duplicate key" in msg or "unique constraint" in msg or "23505" in msg
+
+
+def _fetch_properties_by_ids(sb: Client, property_ids: list[str]) -> Dict[str, Dict[str, Any]]:
+    if not property_ids:
+        return {}
+    try:
+        res = (
+            sb.table("properties")
+            .select(
+                "id,title,location,postcode,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,source,property_type,investment_type,ai_score,score,score_breakdown"
+            )
+            .in_("id", property_ids)
+            .execute()
+        )
+        out: Dict[str, Dict[str, Any]] = {}
+        for r in res.data or []:
+            if isinstance(r, dict) and r.get("id") is not None:
+                out[str(r["id"])] = r
+        return out
+    except Exception:
+        # Joining is best-effort; never fail the whole endpoint.
+        return {}
 
 
 def _extract_clerk_user_id_from_header(x_clerk_user_id: Optional[str]) -> Optional[str]:
@@ -250,9 +292,11 @@ async def save_deal(
                 detail="saved_deals schema unsupported: missing property_id and data columns",
             )
 
-        # Timestamp: only set if the column exists; otherwise store in data.
-        # (Some installations rely on triggers/defaults instead.)
+        # Timestamp: use saved_at column if present; otherwise store in data.
         saved_at = _now_iso()
+        if _saved_deals_has_saved_at(sb):
+            record["saved_at"] = saved_at
+
         if _saved_deals_has_data(sb):
             record.setdefault("data", {})
             if isinstance(record.get("data"), dict):
@@ -263,10 +307,14 @@ async def save_deal(
                         continue
                     (record["data"]).setdefault(k, v)
 
-        # Insert with conflict tolerance (upsert requires a uniqueness constraint)
-        res = sb.table("saved_deals").insert(record, upsert=True).execute()
-
-        return {"ok": True, "data": res.data}
+        # Insert (idempotent on duplicates)
+        try:
+            res = sb.table("saved_deals").insert(record).execute()
+            return {"ok": True, "data": res.data}
+        except Exception as e:
+            if _is_unique_violation(e):
+                return {"ok": True, "duplicate": True}
+            raise
 
     except HTTPException:
         raise
@@ -311,9 +359,38 @@ async def list_saved_deals(
             res = query.execute()
 
         rows = res.data or []
+        merged_rows: list[Dict[str, Any]] = []
         if isinstance(rows, list):
-            rows = [_merge_data_payload(dict(r)) for r in rows if isinstance(r, dict)]
-        return {"data": rows}
+            merged_rows = [_merge_data_payload(dict(r)) for r in rows if isinstance(r, dict)]
+
+        # Best-effort join: pull property fields from properties table.
+        props_by_id: Dict[str, Dict[str, Any]] = {}
+        if _saved_deals_has_property_id(sb):
+            ids = [str(r.get("property_id")) for r in merged_rows if r.get("property_id")]
+            # de-dupe while preserving order
+            seen: set[str] = set()
+            uniq_ids: list[str] = []
+            for pid in ids:
+                if pid in seen:
+                    continue
+                seen.add(pid)
+                uniq_ids.append(pid)
+            props_by_id = _fetch_properties_by_ids(sb, uniq_ids)
+
+        if props_by_id:
+            for r in merged_rows:
+                pid = str(r.get("property_id")) if r.get("property_id") else ""
+                p = props_by_id.get(pid)
+                if not p:
+                    continue
+                # Merge property fields without clobbering explicitly saved deal data.
+                for k, v in p.items():
+                    if k == "id":
+                        continue
+                    if k not in r or r.get(k) is None:
+                        r[k] = v
+
+        return {"data": merged_rows}
     except Exception as e:
         print(f"[list-saved-deals-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
