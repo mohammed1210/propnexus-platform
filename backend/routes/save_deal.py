@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -26,6 +27,9 @@ if SUPABASE_URL and SUPABASE_KEY:
     supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
+_SAVED_DEALS_HAS_CLERK_USER_ID: Optional[bool] = None
+
+
 def _require_supabase() -> Client:
     if supabase is None:
         raise HTTPException(
@@ -37,6 +41,30 @@ def _require_supabase() -> Client:
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+_UUID_RE = re.compile(
+    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+)
+
+
+def _is_uuid(value: str) -> bool:
+    return bool(_UUID_RE.match(value))
+
+
+def _saved_deals_has_clerk_user_id(sb: Client) -> bool:
+    global _SAVED_DEALS_HAS_CLERK_USER_ID
+    if _SAVED_DEALS_HAS_CLERK_USER_ID is not None:
+        return _SAVED_DEALS_HAS_CLERK_USER_ID
+
+    try:
+        # If the column doesn't exist, PostgREST will raise.
+        sb.table("saved_deals").select("clerk_user_id").limit(1).execute()
+        _SAVED_DEALS_HAS_CLERK_USER_ID = True
+        return True
+    except Exception:
+        _SAVED_DEALS_HAS_CLERK_USER_ID = False
+        return False
 
 
 def _extract_user_id_from_token(authorization: Optional[str]) -> Optional[str]:
@@ -105,8 +133,9 @@ async def save_deal(
     """
     sb = _require_supabase()
 
-    # Extract user_id from JWT token
-    user_id = _extract_user_id_from_token(authorization)
+    # Extract JWT subject from Authorization token.
+    # For Clerk this is typically "user_..." (string); for Supabase Auth it's a UUID.
+    subject = _extract_user_id_from_token(authorization)
 
     try:
         payload = await request.json()
@@ -116,9 +145,25 @@ async def save_deal(
         # Timestamp
         payload.setdefault("saved_at", _now_iso())
 
-        # Attach user_id if we have one from the token
-        if user_id:
-            payload["user_id"] = user_id
+        # Normalize user identity fields.
+        # - If sub is UUID: keep using user_id (legacy Supabase Auth).
+        # - Otherwise: use clerk_user_id (Clerk user IDs are not UUIDs).
+        if subject:
+            if _is_uuid(subject):
+                payload.setdefault("user_id", subject)
+            else:
+                if not _saved_deals_has_clerk_user_id(sb):
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            "Database schema not migrated for Clerk saved deals. "
+                            "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
+                        ),
+                    )
+                payload.setdefault("clerk_user_id", subject)
+                # Avoid accidentally sending Clerk IDs into a UUID column.
+                if payload.get("user_id") == subject:
+                    payload.pop("user_id", None)
 
         # Defensive: ensure property_id is present
         if "property_id" not in payload:
@@ -147,18 +192,29 @@ async def list_saved_deals(authorization: Optional[str] = Header(None)) -> Dict[
     """
     sb = _require_supabase()
 
-    # Extract user_id from JWT token
-    user_id = _extract_user_id_from_token(authorization)
+    # Extract JWT subject from token (UUID for Supabase, string for Clerk)
+    subject = _extract_user_id_from_token(authorization)
 
-    # If no user_id, return empty list (don't expose all data)
-    if not user_id:
+    # If no subject, return empty list (don't expose all data)
+    if not subject:
         return {"data": []}
 
     try:
         query = sb.table("saved_deals").select("*").order("saved_at", desc=True)
 
-        # Filter by user_id (RLS will also enforce this)
-        query = query.eq("user_id", user_id)
+        # Filter by the appropriate identity column
+        if _is_uuid(subject):
+            query = query.eq("user_id", subject)
+        else:
+            if not _saved_deals_has_clerk_user_id(sb):
+                raise HTTPException(
+                    status_code=500,
+                    detail=(
+                        "Database schema not migrated for Clerk saved deals. "
+                        "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
+                    ),
+                )
+            query = query.eq("clerk_user_id", subject)
 
         res = query.execute()
         return {"data": res.data or []}
@@ -174,10 +230,21 @@ async def get_saved_deal(
     """Retrieve a specific saved deal."""
     sb = _require_supabase()
     try:
-        user_id = _extract_user_id_from_token(authorization)
+        subject = _extract_user_id_from_token(authorization)
         query = sb.table("saved_deals").select("*").eq("id", deal_id)
-        if user_id:
-            query = query.eq("user_id", user_id)
+        if subject:
+            if _is_uuid(subject):
+                query = query.eq("user_id", subject)
+            else:
+                if not _saved_deals_has_clerk_user_id(sb):
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            "Database schema not migrated for Clerk saved deals. "
+                            "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
+                        ),
+                    )
+                query = query.eq("clerk_user_id", subject)
         res = query.single().execute()
 
         if not res.data:
@@ -199,10 +266,21 @@ async def delete_saved_deal(
     """Delete a saved deal belonging to the user."""
     sb = _require_supabase()
     try:
-        user_id = _extract_user_id_from_token(authorization)
+        subject = _extract_user_id_from_token(authorization)
         query = sb.table("saved_deals").delete().eq("id", deal_id)
-        if user_id:
-            query = query.eq("user_id", user_id)
+        if subject:
+            if _is_uuid(subject):
+                query = query.eq("user_id", subject)
+            else:
+                if not _saved_deals_has_clerk_user_id(sb):
+                    raise HTTPException(
+                        status_code=500,
+                        detail=(
+                            "Database schema not migrated for Clerk saved deals. "
+                            "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
+                        ),
+                    )
+                query = query.eq("clerk_user_id", subject)
 
         res = query.execute()
         return {"ok": True, "deleted": True, "data": res.data}

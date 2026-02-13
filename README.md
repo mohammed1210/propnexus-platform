@@ -195,6 +195,10 @@ uvicorn main:app --reload
 
 ### Auth + Admin Ops (Sprint 11.4)
 
+**Saved Deals + Clerk migration note**
+
+If you enable Clerk authentication, note that Clerk user IDs look like `user_...` (text) and cannot be inserted into the legacy `saved_deals.user_id` UUID column. Apply the Supabase migration in `supabase/migrations/20260213_saved_deals_clerk_user_id.sql` to add `clerk_user_id` and make `user_id` nullable.
+
 **Clerk URL best-practice (use relative paths)**
 
 ```env

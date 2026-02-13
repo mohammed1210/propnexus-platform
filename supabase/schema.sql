@@ -69,7 +69,8 @@ comment on column public.subscriptions.price_id is 'References public.prices.str
 -- Saved deals table - user-saved property deals
 create table if not exists public.saved_deals (
   id uuid primary key default uuid_generate_v4(),
-  user_id uuid not null references auth.users(id) on delete cascade,
+  user_id uuid references auth.users(id) on delete cascade,
+  clerk_user_id text,
   data jsonb not null default '{}'::jsonb,
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
@@ -141,6 +142,7 @@ create index if not exists idx_properties_yield_percent on public.properties(yie
 create index if not exists idx_properties_roi_percent on public.properties(roi_percent);
 create index if not exists idx_properties_location on public.properties(location);
 create index if not exists idx_saved_deals_user on public.saved_deals(user_id);
+create index if not exists idx_saved_deals_clerk_user_id on public.saved_deals(clerk_user_id);
 
 -- Add column comments for documentation
 comment on column public.users.plan is 'Subscription plan: free, pro, investor';
