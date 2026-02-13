@@ -518,6 +518,7 @@ function ListingsInner() {
   const [showMap, setShowMap] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [controlsCollapsed, setControlsCollapsed] = useState(false);
   const [mappableCount, setMappableCount] = useState<number | null>(null);
   const [mapRows, setMapRows] = useState<RawProperty[] | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -531,9 +532,36 @@ function ListingsInner() {
   }, [searchParams?.get('map')]);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    let lastY = typeof window !== 'undefined' ? window.scrollY : 0;
+    const jitter = 10;
+    const collapseAfterY = 80;
+
+    const onScroll = () => {
+      const y = window.scrollY;
+      setIsScrolled(y > 20);
+
+      const dy = y - lastY;
+      if (Math.abs(dy) < jitter) {
+        lastY = y;
+        return;
+      }
+
+      // Scroll down -> collapse to just the search bar.
+      if (dy > 0 && y > collapseAfterY) {
+        setControlsCollapsed(true);
+        setShowFilters(false);
+      }
+
+      // Scroll up -> expand.
+      if (dy < 0) {
+        setControlsCollapsed(false);
+      }
+
+      lastY = y;
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   // Auto-dismiss filters dropdown on meaningful scroll.
@@ -902,79 +930,26 @@ function ListingsInner() {
     propertyTypeUrl,
   ]);
 
-  type InvestmentType = (typeof INVESTMENT_TYPES)[number];
-
-  const inferredInvestmentTypes = useCallback(
-    (p: RawProperty): Set<InvestmentType> => {
-      const out = new Set<InvestmentType>();
-
-      const invRaw = String(p.investment_type ?? '').trim();
-      if (invRaw) {
-        const normalized = invRaw.toLowerCase();
-        const match = INVESTMENT_TYPES.find((t) => t.toLowerCase() === normalized);
-        if (match) out.add(match);
-      }
-
-      const text = `${p.title ?? ''} ${p.location ?? ''} ${p.description ?? ''}`.toLowerCase();
-      const bedsN = typeof p.bedrooms === 'number' ? p.bedrooms : Number(p.bedrooms ?? 0);
-
-      if (/(^|\b)hmo(\b|$)|house\s+of\s+multiple\s+occupation|student\s+hous(e|ing)/i.test(text)) {
-        out.add('HMO');
-      }
-      if (Number.isFinite(bedsN) && bedsN >= 5) {
-        out.add('HMO');
-      }
-      if (/serviced\s+accommodation|short\s*let|air\s*bnb|airbnb|holiday\s+let/i.test(text)) {
-        out.add('SA');
-      }
-      if (/brr\b|brrrr\b|refurb|renovat|moderni[sz]e|needs\s+work|value\s+add/i.test(text)) {
-        out.add('BRR');
-      }
-      if (/flip\b|development\s+opportunity|cash\s+buyer|auction|motivated\s+seller/i.test(text)) {
-        out.add('Flip');
-      }
-      if (/commercial|retail|shop\b|office\b|warehouse|industrial/i.test(text)) {
-        out.add('Commercial');
-      }
-
-      // Default strategy: treat typical residential listings as BTL.
-      if (out.size === 0) out.add('BTL');
-      return out;
-    },
-    []
-  );
+  const normInv = useCallback((v: unknown): string => {
+    return String(v ?? '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[-_]/g, '');
+  }, []);
 
   const typeFilteredRows = useMemo(() => {
     if (!investmentTypeUrl) return rows;
-    const selected = new Set([investmentTypeUrl] as InvestmentType[]);
-    const filtered = rows.filter((p) => {
-      const inferred = inferredInvestmentTypes(p);
-      for (const t of selected) {
-        if (inferred.has(t)) return true;
-      }
-      return false;
-    });
-
-    // Never blank the page due to investment-type chips.
-    return filtered.length > 0 ? filtered : rows;
-  }, [inferredInvestmentTypes, investmentTypeUrl, rows]);
+    const selected = normInv(investmentTypeUrl);
+    return rows.filter((p) => normInv(p.investment_type) === selected);
+  }, [investmentTypeUrl, normInv, rows]);
 
   const typeFilteredMapRows = useMemo(() => {
     if (!mapRows) return typeFilteredRows;
     if (!investmentTypeUrl) return mapRows;
-
-    const selected = new Set([investmentTypeUrl] as InvestmentType[]);
-    const filtered = mapRows.filter((p) => {
-      const inferred = inferredInvestmentTypes(p);
-      for (const t of selected) {
-        if (inferred.has(t)) return true;
-      }
-      return false;
-    });
-
-    // Never blank the map due to investment-type chips.
-    return filtered.length > 0 ? filtered : mapRows;
-  }, [inferredInvestmentTypes, investmentTypeUrl, mapRows, typeFilteredRows]);
+    const selected = normInv(investmentTypeUrl);
+    return mapRows.filter((p) => normInv(p.investment_type) === selected);
+  }, [investmentTypeUrl, mapRows, normInv, typeFilteredRows]);
 
   // ✅ robust points creation (no falsy checks, reject invalid/null-island)
   const points = useMemo(() => {
@@ -1559,94 +1534,96 @@ function ListingsInner() {
             </div>
 
             {/* Right: controls */}
-            <div className="flex items-center gap-2 justify-between md:justify-end">
-              <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">
-                <FiMap className="w-4 h-4" />
-                <span className="hidden sm:inline">Map</span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={showMap && mapAvailable}
-                  onClick={() => {
-                    const next = !(showMap && mapAvailable);
-                    setShowMap(next);
-                    pushParams(
-                      (p) => {
-                        p.set('map', next && mapAvailable ? '1' : '0');
-                      },
-                      { replace: true }
-                    );
+            {!controlsCollapsed ? (
+              <div className="flex items-center gap-2 justify-between md:justify-end">
+                <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">
+                  <FiMap className="w-4 h-4" />
+                  <span className="hidden sm:inline">Map</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={showMap && mapAvailable}
+                    onClick={() => {
+                      const next = !(showMap && mapAvailable);
+                      setShowMap(next);
+                      pushParams(
+                        (p) => {
+                          p.set('map', next && mapAvailable ? '1' : '0');
+                        },
+                        { replace: true }
+                      );
+                    }}
+                    disabled={!mapAvailable}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      showMap && mapAvailable ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'
+                    } ${!mapAvailable ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    title={mapAvailable ? 'Toggle map' : 'Map unavailable (no coordinates)'}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                        showMap && mapAvailable ? 'translate-x-5' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </label>
+
+                <select
+                  value={sort}
+                  onChange={(e) => {
+                    pushParams((p) => {
+                      p.set('sort', e.target.value);
+                      p.delete('dir');
+                      p.set('offset', '0');
+                    });
                   }}
-                  disabled={!mapAvailable}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    showMap && mapAvailable ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'
-                  } ${!mapAvailable ? 'opacity-60 cursor-not-allowed' : ''}`}
-                  title={mapAvailable ? 'Toggle map' : 'Map unavailable (no coordinates)'}
+                  className="input-field"
+                  style={{ height: 40, padding: '0.5rem 0.75rem' }}
+                  aria-label="Sort"
                 >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                      showMap && mapAvailable ? 'translate-x-5' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </label>
+                  <option value="recommended">Top deals (Recommended)</option>
+                  <option value="created_at_desc">Most recent</option>
+                  <option value="price_asc">Price: low to high</option>
+                  <option value="price_desc">Price: high to low</option>
+                  <option value="yield_desc">Highest yield</option>
+                  <option value="roi_desc">Highest ROI</option>
+                </select>
 
-              <select
-                value={sort}
-                onChange={(e) => {
-                  pushParams((p) => {
-                    p.set('sort', e.target.value);
-                    p.delete('dir');
-                    p.set('offset', '0');
-                  });
-                }}
-                className="input-field"
-                style={{ height: 40, padding: '0.5rem 0.75rem' }}
-                aria-label="Sort"
-              >
-                <option value="recommended">Top deals (Recommended)</option>
-                <option value="created_at_desc">Most recent</option>
-                <option value="price_asc">Price: low to high</option>
-                <option value="price_desc">Price: high to low</option>
-                <option value="yield_desc">Highest yield</option>
-                <option value="roi_desc">Highest ROI</option>
-              </select>
-
-              <button
-                onClick={applyFilters}
-                className="h-10 px-3 md:px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold transition-all duration-200 flex items-center gap-2"
-                disabled={loading}
-              >
-                <FiSearch className="w-4 h-4" />
-                <span className="hidden sm:inline">Search</span>
-              </button>
-
-              <button
-                onClick={() => setShowFilters((v) => !v)}
-                className="h-10 px-3 md:px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
-                aria-expanded={showFilters}
-                aria-controls="listings-filters-popover"
-              >
-                <FiSliders className="w-4 h-4" />
-                <span className="hidden sm:inline">Filters</span>
-                {activeFilters.length > 0 && (
-                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-brand-500 text-white text-xs font-medium">
-                    {activeFilters.length}
-                  </span>
-                )}
-              </button>
-
-              {isLoaded && isAdmin && (
                 <button
-                  onClick={runScrape}
-                  className="h-10 px-3 md:px-4 rounded-lg border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-200"
-                  disabled={scrapeLoading}
-                  title="Admin: run scrapers and import fresh listings"
+                  onClick={applyFilters}
+                  className="h-10 px-3 md:px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold transition-all duration-200 flex items-center gap-2"
+                  disabled={loading}
                 >
-                  {scrapeLoading ? 'Running…' : 'Run Scrape'}
+                  <FiSearch className="w-4 h-4" />
+                  <span className="hidden sm:inline">Search</span>
                 </button>
-              )}
-            </div>
+
+                <button
+                  onClick={() => setShowFilters((v) => !v)}
+                  className="h-10 px-3 md:px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
+                  aria-expanded={showFilters}
+                  aria-controls="listings-filters-popover"
+                >
+                  <FiSliders className="w-4 h-4" />
+                  <span className="hidden sm:inline">Filters</span>
+                  {activeFilters.length > 0 && (
+                    <span className="inline-flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-brand-500 text-white text-xs font-medium">
+                      {activeFilters.length}
+                    </span>
+                  )}
+                </button>
+
+                {isLoaded && isAdmin && (
+                  <button
+                    onClick={runScrape}
+                    className="h-10 px-3 md:px-4 rounded-lg border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-200"
+                    disabled={scrapeLoading}
+                    title="Admin: run scrapers and import fresh listings"
+                  >
+                  {scrapeLoading ? 'Running…' : 'Run Scrape'}
+                  </button>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {!mapAvailable && !loading && rows.length > 0 && (

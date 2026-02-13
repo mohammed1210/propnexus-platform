@@ -153,7 +153,6 @@ export default function AreaInsights({
   const showComps = FF.COMPS;
 
   const hasAny = showIntel || showComps;
-  const gridCols = showIntel && showComps ? 'md:grid-cols-2' : 'md:grid-cols-1';
 
   const icon = useMemo(
     () => (
@@ -277,7 +276,7 @@ export default function AreaInsights({
       headerRight={headerRight}
       defaultExpanded={defaultExpanded}
     >
-      <div className={`grid grid-cols-1 ${gridCols} gap-4`}>
+      <div className="space-y-4">
         {showIntel ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 p-4">
             <GatedPanel title="Area Intelligence" requiredPlan="pro" featureEnabled={showIntel}>
@@ -352,7 +351,7 @@ export default function AreaInsights({
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Comps
+                    Comparable Sales
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
                     {countCaption(sales.length, rents.length)}
@@ -361,37 +360,52 @@ export default function AreaInsights({
 
                 {compsLoading ? (
                   <SkeletonLines />
-                ) : !usableComps ? (
+                ) : sales.length === 0 ? (
                   <div className="text-xs text-slate-600 dark:text-slate-400">{UI_TEXT.emptyComps}</div>
                 ) : (
-                  <div className="space-y-2">
-                    {[...sales.slice(0, 2).map((s) => ({ kind: 'sale' as const, line: s })),
-                      ...rents.slice(0, 2).map((r) => ({ kind: 'rent' as const, line: r }))]
-                      .slice(0, 4)
-                      .map(({ kind, line }, idx) => (
-                        <div
-                          key={`${kind}-${idx}`}
-                          className="flex justify-between gap-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 px-3 py-2"
-                        >
-                          <div className="min-w-0">
-                            <div className="text-xs font-medium text-slate-800 dark:text-slate-200 overflow-hidden text-ellipsis whitespace-nowrap">
-                              {line.address}
-                            </div>
-                            <div className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          <th className="text-left font-semibold py-2 pr-3">Address</th>
+                          <th className="text-left font-semibold py-2 pr-3 whitespace-nowrap">Date</th>
+                          <th className="text-right font-semibold py-2 pr-3 whitespace-nowrap">Price</th>
+                          <th className="text-right font-semibold py-2 whitespace-nowrap">Distance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sales.slice(0, 6).map((line, idx) => (
+                          <tr
+                            key={`sale-${idx}`}
+                            className="border-t border-slate-200 dark:border-slate-800"
+                          >
+                            <td className="py-2 pr-3 max-w-[420px]">
+                              <div className="text-slate-800 dark:text-slate-200 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
+                                {line.address}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400">{line.type}</div>
+                            </td>
+                            <td className="py-2 pr-3 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                               {line.date}
-                              {Number.isFinite(line.distance_km)
-                                ? ` • ${line.distance_km.toFixed(2)} km`
-                                : ''}
-                            </div>
-                          </div>
-                          <div className="min-w-[92px] text-right text-xs font-semibold text-slate-900 dark:text-slate-100">
-                            {Number.isFinite(line.price) && line.price > 0 ? fmtGBP(line.price) : '—'}
-                            {kind === 'rent' ? <span className="text-slate-500">/mo</span> : null}
-                          </div>
-                        </div>
-                      ))}
+                            </td>
+                            <td className="py-2 pr-3 text-right font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                              {Number.isFinite(line.price) && line.price > 0 ? fmtGBP(line.price) : '—'}
+                            </td>
+                            <td className="py-2 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {Number.isFinite(line.distance_km) ? `${line.distance_km.toFixed(2)} km` : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
+
+                {rents.length > 0 ? (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Also available: {rents.length} rental comparable{rents.length === 1 ? '' : 's'}
+                  </div>
+                ) : null}
               </div>
             </GatedPanel>
           </div>

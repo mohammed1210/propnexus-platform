@@ -10,12 +10,13 @@ type QuickStatsActionsProps = {
   price?: number;
   yieldPercent?: number;
   roiPercent?: number;
+  discountPercent?: number;
   aiScore?: number;
 };
 
 const formatValue = (value: number | undefined, format: 'currency' | 'percent' | 'score' = 'currency'): string => {
   if (value === undefined || value === null || isNaN(value)) {
-    return '—';
+    return 'N/A';
   }
 
   switch (format) {
@@ -39,6 +40,7 @@ export default function QuickStatsActions({
   price,
   yieldPercent,
   roiPercent,
+  discountPercent,
   aiScore,
 }: QuickStatsActionsProps) {
   const [saving, setSaving] = useState(false);
@@ -154,32 +156,45 @@ export default function QuickStatsActions({
             </h3>
 
             <div className="space-y-5">
-              {price !== undefined && (
-                <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Price</div>
-                  <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                    {formatValue(price, 'currency')}
-                  </div>
+              <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Price</div>
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {formatValue(price, 'currency')}
                 </div>
-              )}
+              </div>
 
-              {yieldPercent !== undefined && (
-                <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Rental Yield</div>
-                  <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                    {formatValue(yieldPercent, 'percent')}
-                  </div>
+              <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Rental Yield</div>
+                <div
+                  className={`text-2xl font-bold ${
+                    typeof yieldPercent === 'number' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {formatValue(yieldPercent, 'percent')}
                 </div>
-              )}
+              </div>
 
-              {roiPercent !== undefined && (
-                <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">ROI</div>
-                  <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {formatValue(roiPercent, 'percent')}
-                  </div>
+              <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">ROI</div>
+                <div
+                  className={`text-2xl font-bold ${
+                    typeof roiPercent === 'number' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {formatValue(roiPercent, 'percent')}
                 </div>
-              )}
+              </div>
+
+              <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Discount</div>
+                <div
+                  className={`text-2xl font-bold ${
+                    typeof discountPercent === 'number' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  {formatValue(discountPercent, 'percent')}
+                </div>
+              </div>
 
               {aiScore !== undefined && (
                 <div>

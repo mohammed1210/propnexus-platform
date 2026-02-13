@@ -57,10 +57,39 @@ type LooseProperty = Partial<Property> & {
   longitude?: number | null;
   imageurl?: string | null;
   image_urls?: unknown;
+  property_type?: string | null;
+  estimated_value?: number | null;
+  asking_price?: number | null;
+  discount_percent?: number | null;
+  discount_estimate_pct?: number | null;
+  monthly_rent?: number | null;
+  rent_pcm?: number | null;
+  rent_per_month?: number | null;
+  rent?: number | null;
 };
 
 const toNum = (v: unknown) =>
   typeof v === 'number' ? v : v == null || v === '' ? undefined : Number(v);
+
+const fmtGBP = (n: unknown): string => {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v) || v <= 0) return 'N/A';
+  try {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+      maximumFractionDigits: 0,
+    }).format(v);
+  } catch {
+    return `£${Math.round(v).toLocaleString('en-GB')}`;
+  }
+};
+
+const fmtPct = (n: unknown): string => {
+  const v = typeof n === 'number' ? n : Number(n);
+  if (!Number.isFinite(v)) return 'N/A';
+  return `${v.toFixed(1)}%`;
+};
 
 export default function PropertyDetailsPage() {
   const { id } = useParams() as { id: string };
@@ -121,6 +150,7 @@ export default function PropertyDetailsPage() {
               longitude: toNum((data as any).longitude) ?? null,
               // Map snake_case DB field to camelCase for frontend components
               investmentType: (data as any).investment_type,
+              propertyType: (data as any).property_type ?? (data as any).propertyType,
             }
           : null;
 
@@ -137,6 +167,72 @@ export default function PropertyDetailsPage() {
       cancelled = true;
     };
   }, [id, sb]);
+
+  const price = typeof (property as any)?.price === 'number' ? (property as any).price : 0;
+
+  const rentMonthly = useMemo((): number | undefined => {
+    if (!property) return undefined;
+    const candidates = [
+      (property as any)?.monthly_rent,
+      (property as any)?.rent_pcm,
+      (property as any)?.rent_per_month,
+      (property as any)?.rent,
+    ]
+      .map((x) => toNum(x))
+      .filter((n): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0);
+
+    return candidates[0];
+  }, [property]);
+
+  const yieldPercent = useMemo((): number | undefined => {
+    if (!property) return undefined;
+    const stored = toNum((property as any)?.yield_percent);
+    if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
+
+    const p = toNum((property as any)?.price);
+    if (typeof p === 'number' && p > 0 && typeof rentMonthly === 'number') {
+      return (rentMonthly * 12 * 100) / p;
+    }
+    return undefined;
+  }, [property, rentMonthly]);
+
+  const roiPercent = useMemo((): number | undefined => {
+    if (!property) return undefined;
+    const stored = toNum((property as any)?.roi_percent);
+    if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
+
+    const p = toNum((property as any)?.price);
+    if (typeof p === 'number' && p > 0 && typeof rentMonthly === 'number') {
+      // Fallback (requested): ROI ≈ (rent_estimate * 12) / price
+      return (rentMonthly * 12 * 100) / p;
+    }
+    return undefined;
+  }, [property, rentMonthly]);
+
+  const estValue = useMemo((): number | undefined => {
+    if (!property) return undefined;
+    const v = toNum((property as any)?.estimated_value);
+    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined;
+  }, [property]);
+
+  const discountPercent = useMemo((): number | undefined => {
+    if (!property) return undefined;
+    const direct = toNum((property as any)?.discount_percent ?? (property as any)?.discount_estimate_pct);
+    if (typeof direct === 'number' && Number.isFinite(direct)) return direct;
+
+    const p = toNum((property as any)?.asking_price ?? (property as any)?.price);
+    const v = toNum((property as any)?.estimated_value);
+    if (typeof p === 'number' && p > 0 && typeof v === 'number' && v > 0) {
+      return ((v - p) * 100) / v;
+    }
+    return undefined;
+  }, [property]);
+
+  const description = useMemo(() => {
+    if (!property) return '';
+    const d = (property as any)?.description;
+    return typeof d === 'string' ? d.trim() : '';
+  }, [property]);
 
   if (loading) {
     return (
@@ -173,14 +269,12 @@ export default function PropertyDetailsPage() {
     );
   }
 
-  const price = typeof property.price === 'number' ? property.price : 0;
-
   const tldr = buildVerdict({
-    yield_percent: (property as any).yield_percent,
-    roi_percent: (property as any).roi_percent,
+    yield_percent: yieldPercent,
+    roi_percent: roiPercent,
     ai_score: (property as any).ai_score,
     score: (property as any).score,
-    discount_percent: (property as any).discount_percent,
+    discount_percent: discountPercent,
     price: (property as any).price,
     asking_price: (property as any).asking_price,
     bedrooms: (property as any).bedrooms,
@@ -195,21 +289,46 @@ export default function PropertyDetailsPage() {
       <QuickStatsActions
         propertyId={String(property.id ?? id)}
         price={property.price ?? undefined}
-        yieldPercent={property.yield_percent ?? undefined}
-        roiPercent={property.roi_percent ?? undefined}
+        yieldPercent={yieldPercent}
+        roiPercent={roiPercent}
+        discountPercent={discountPercent}
       />
 
       <div className="max-w-7xl mx-auto px-4 py-8 lg:pr-72">{/* Add right padding on desktop for floating sidebar */}
         {/* Image-first (focal) carousel + details */}
         <div className="card mb-6 overflow-hidden">
-          <ImageGallery
-            imageUrls={imageUrls}
-            fallbackImageUrl={fallbackImageUrl}
-            placeholderSrc={PLACEHOLDER_IMG}
-            title={property.title ? String(property.title) : undefined}
+          <PropertyHeader
+            property={{
+              title: (property as any).title ?? null,
+              location: (property as any).location ?? null,
+              bedrooms: (property as any).bedrooms ?? null,
+              bathrooms: (property as any).bathrooms ?? null,
+              price: (property as any).price ?? null,
+              propertyType: (property as any).propertyType ?? null,
+            }}
           />
 
-          <PropertyHeader property={property as any} />
+          <div className="border-t border-slate-200 dark:border-slate-800">
+            <ImageGallery
+              imageUrls={imageUrls}
+              fallbackImageUrl={fallbackImageUrl}
+              placeholderSrc={PLACEHOLDER_IMG}
+              title={property.title ? String(property.title) : undefined}
+            />
+          </div>
+
+          {description ? (
+            <div className="p-6 pt-5 border-t border-slate-200 dark:border-slate-800">
+              <div className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Description</div>
+              <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed space-y-2">
+                {description.split(/\n{2,}/).map((para, idx) => {
+                  const t = para.trim();
+                  if (!t) return null;
+                  return <p key={idx}>{t}</p>;
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-6">
@@ -247,6 +366,95 @@ export default function PropertyDetailsPage() {
               }
               defaultExpanded={true}
             >
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Summary
+                    </div>
+                    <span
+                      className={`shrink-0 inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-semibold ${verdictToneClasses(
+                        tldr.tone,
+                      )}`}
+                      aria-label={`Verdict: ${tldr.label}`}
+                    >
+                      {tldr.label}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Price</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {fmtGBP(property.price)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Est. value</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {fmtGBP(estValue)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Discount</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {typeof discountPercent === 'number' ? `${discountPercent.toFixed(0)}%` : 'N/A'}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Yield</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {fmtPct(yieldPercent)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">ROI</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {fmtPct(roiPercent)}
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
+                      <div className="text-xs text-slate-500 dark:text-slate-400">Rent est.</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                        {typeof rentMonthly === 'number' ? `${fmtGBP(rentMonthly)}/mo` : 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 p-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                      <FiGitBranch className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Exit Strategy
+                    </div>
+                  </div>
+
+                  <div className="mt-3 text-sm text-slate-700 dark:text-slate-300">
+                    <ul className="space-y-1">
+                      <li>Typical hold: 3–5 years (market dependent)</li>
+                      <li>Option 1: Sell to realise uplift</li>
+                      <li>Option 2: Refinance after stabilising rent</li>
+                    </ul>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+                    <ExitStrategyGenerator
+                      title={String(property.title ?? '')}
+                      location={String(property.location ?? '')}
+                      price={typeof property.price === 'number' ? property.price : undefined}
+                      yield_percent={yieldPercent}
+                      roi_percent={roiPercent}
+                      propertyType={(property as any).propertyType ?? undefined}
+                      investmentType={(property as any).investmentType ?? undefined}
+                      description={(property as any).description ?? undefined}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="mb-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -257,14 +465,6 @@ export default function PropertyDetailsPage() {
                       {tldr.sentence}
                     </p>
                   </div>
-                  <span
-                    className={`shrink-0 inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-semibold ${verdictToneClasses(
-                      tldr.tone,
-                    )}`}
-                    aria-label={`Verdict: ${tldr.label}`}
-                  >
-                    {tldr.label}
-                  </span>
                 </div>
 
                 {tldr.bullets.length > 0 ? (
@@ -347,32 +547,6 @@ export default function PropertyDetailsPage() {
                 </div>
               </CollapsibleCard>
             )}
-
-            {/* Exit Strategies */}
-            <CollapsibleCard
-              title="Exit Strategies"
-              icon={
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
-                  <FiGitBranch className="w-5 h-5 text-white" />
-                </div>
-              }
-              defaultExpanded={false}
-            >
-              <ExitStrategyGenerator
-                title={String(property.title ?? '')}
-                location={String(property.location ?? '')}
-                price={typeof property.price === 'number' ? property.price : undefined}
-                yield_percent={
-                  typeof property.yield_percent === 'number' ? property.yield_percent : undefined
-                }
-                roi_percent={
-                  typeof property.roi_percent === 'number' ? property.roi_percent : undefined
-                }
-                propertyType={(property as any).propertyType ?? undefined}
-                investmentType={(property as any).investmentType ?? undefined}
-                description={(property as any).description ?? undefined}
-              />
-            </CollapsibleCard>
 
             {/* Investor Notes */}
             <CollapsibleCard
