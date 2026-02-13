@@ -28,6 +28,8 @@ if SUPABASE_URL and SUPABASE_KEY:
 
 
 _SAVED_DEALS_HAS_CLERK_USER_ID: Optional[bool] = None
+_SAVED_DEALS_HAS_PROPERTY_ID: Optional[bool] = None
+_SAVED_DEALS_HAS_DATA: Optional[bool] = None
 
 
 def _require_supabase() -> Client:
@@ -65,6 +67,88 @@ def _saved_deals_has_clerk_user_id(sb: Client) -> bool:
     except Exception:
         _SAVED_DEALS_HAS_CLERK_USER_ID = False
         return False
+
+
+def _saved_deals_has_property_id(sb: Client) -> bool:
+    global _SAVED_DEALS_HAS_PROPERTY_ID
+    if _SAVED_DEALS_HAS_PROPERTY_ID is not None:
+        return _SAVED_DEALS_HAS_PROPERTY_ID
+
+    try:
+        sb.table("saved_deals").select("property_id").limit(1).execute()
+        _SAVED_DEALS_HAS_PROPERTY_ID = True
+        return True
+    except Exception:
+        _SAVED_DEALS_HAS_PROPERTY_ID = False
+        return False
+
+
+def _saved_deals_has_data(sb: Client) -> bool:
+    global _SAVED_DEALS_HAS_DATA
+    if _SAVED_DEALS_HAS_DATA is not None:
+        return _SAVED_DEALS_HAS_DATA
+
+    try:
+        sb.table("saved_deals").select("data").limit(1).execute()
+        _SAVED_DEALS_HAS_DATA = True
+        return True
+    except Exception:
+        _SAVED_DEALS_HAS_DATA = False
+        return False
+
+
+def _extract_clerk_user_id_from_header(x_clerk_user_id: Optional[str]) -> Optional[str]:
+    if not x_clerk_user_id:
+        return None
+    v = str(x_clerk_user_id).strip()
+    if not v:
+        return None
+    # Simple sanity check per requirements
+    if not v.startswith("user_"):
+        return None
+    return v
+
+
+def _merge_data_payload(row: Dict[str, Any]) -> Dict[str, Any]:
+    data = row.get("data")
+    if not isinstance(data, dict):
+        return row
+    # Only backfill keys that are missing or None at top-level.
+    for k, v in data.items():
+        if k not in row or row.get(k) is None:
+            row[k] = v
+    return row
+
+
+def _identity_filter(sb: Client, subject: str, x_clerk_user_id: Optional[str] = None):
+    """Return (column, value) pair to filter saved_deals for the current user."""
+    clerk_id = _extract_clerk_user_id_from_header(x_clerk_user_id)
+    if clerk_id:
+        if not _saved_deals_has_clerk_user_id(sb):
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Database schema not migrated for Clerk saved deals. "
+                    "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
+                ),
+            )
+        return "clerk_user_id", clerk_id
+
+    if not subject:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if _is_uuid(subject):
+        return "user_id", subject
+
+    if not _saved_deals_has_clerk_user_id(sb):
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Database schema not migrated for Clerk saved deals. "
+                "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
+            ),
+        )
+    return "clerk_user_id", subject
 
 
 def _extract_user_id_from_token(authorization: Optional[str]) -> Optional[str]:
@@ -124,7 +208,9 @@ def _extract_user_id_from_token(authorization: Optional[str]) -> Optional[str]:
 
 @router.post("/save-deal")
 async def save_deal(
-    request: Request, authorization: Optional[str] = Header(None)
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
 ) -> Dict[str, Any]:
     """
     Insert one saved deal.
@@ -142,35 +228,43 @@ async def save_deal(
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="Body must be a JSON object")
 
-        # Timestamp
-        payload.setdefault("saved_at", _now_iso())
-
-        # Normalize user identity fields.
-        # - If sub is UUID: keep using user_id (legacy Supabase Auth).
-        # - Otherwise: use clerk_user_id (Clerk user IDs are not UUIDs).
-        if subject:
-            if _is_uuid(subject):
-                payload.setdefault("user_id", subject)
-            else:
-                if not _saved_deals_has_clerk_user_id(sb):
-                    raise HTTPException(
-                        status_code=500,
-                        detail=(
-                            "Database schema not migrated for Clerk saved deals. "
-                            "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
-                        ),
-                    )
-                payload.setdefault("clerk_user_id", subject)
-                # Avoid accidentally sending Clerk IDs into a UUID column.
-                if payload.get("user_id") == subject:
-                    payload.pop("user_id", None)
-
-        # Defensive: ensure property_id is present
-        if "property_id" not in payload:
+        # property_id is required (either as a column or stored in data json)
+        property_id = payload.get("property_id")
+        if not property_id:
             raise HTTPException(status_code=400, detail="Missing property_id")
 
-        # Insert with conflict tolerance (skip duplicate saves)
-        res = sb.table("saved_deals").insert(payload, upsert=True).execute()
+        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+
+        # Build insert record defensively based on schema.
+        # Prefer real columns when present; otherwise store in data jsonb.
+        record: Dict[str, Any] = {identity_col: identity_val}
+
+        # Attempt to store property_id as a real column when available.
+        if _saved_deals_has_property_id(sb):
+            record["property_id"] = property_id
+        elif _saved_deals_has_data(sb):
+            record["data"] = {"property_id": property_id}
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="saved_deals schema unsupported: missing property_id and data columns",
+            )
+
+        # Timestamp: only set if the column exists; otherwise store in data.
+        # (Some installations rely on triggers/defaults instead.)
+        saved_at = _now_iso()
+        if _saved_deals_has_data(sb):
+            record.setdefault("data", {})
+            if isinstance(record.get("data"), dict):
+                record["data"].setdefault("saved_at", saved_at)
+                # Preserve any caller-provided extra payload into data for forward compatibility.
+                for k, v in payload.items():
+                    if k in ("user_id", "clerk_user_id"):
+                        continue
+                    (record["data"]).setdefault(k, v)
+
+        # Insert with conflict tolerance (upsert requires a uniqueness constraint)
+        res = sb.table("saved_deals").insert(record, upsert=True).execute()
 
         return {"ok": True, "data": res.data}
 
@@ -182,7 +276,10 @@ async def save_deal(
 
 
 @router.get("/saved-deals")
-async def list_saved_deals(authorization: Optional[str] = Header(None)) -> Dict[str, Any]:
+async def list_saved_deals(
+    authorization: Optional[str] = Header(None),
+    x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
+) -> Dict[str, Any]:
     """
     Return saved deals for the current user (newest first).
     Filters by user_id from Authorization token if provided.
@@ -196,28 +293,27 @@ async def list_saved_deals(authorization: Optional[str] = Header(None)) -> Dict[
     subject = _extract_user_id_from_token(authorization)
 
     # If no subject, return empty list (don't expose all data)
-    if not subject:
+    # If no identity at all, return empty list (don't expose all data)
+    if not subject and not _extract_clerk_user_id_from_header(x_clerk_user_id):
         return {"data": []}
 
     try:
-        query = sb.table("saved_deals").select("*").order("saved_at", desc=True)
+        query = sb.table("saved_deals").select("*")
 
-        # Filter by the appropriate identity column
-        if _is_uuid(subject):
-            query = query.eq("user_id", subject)
-        else:
-            if not _saved_deals_has_clerk_user_id(sb):
-                raise HTTPException(
-                    status_code=500,
-                    detail=(
-                        "Database schema not migrated for Clerk saved deals. "
-                        "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
-                    ),
-                )
-            query = query.eq("clerk_user_id", subject)
+        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+        query = query.eq(identity_col, identity_val)
 
-        res = query.execute()
-        return {"data": res.data or []}
+        # Order by saved_at when present; if column is missing, PostgREST will error.
+        # We fall back to unordered results in that case.
+        try:
+            res = query.order("saved_at", desc=True).execute()
+        except Exception:
+            res = query.execute()
+
+        rows = res.data or []
+        if isinstance(rows, list):
+            rows = [_merge_data_payload(dict(r)) for r in rows if isinstance(r, dict)]
+        return {"data": rows}
     except Exception as e:
         print(f"[list-saved-deals-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
@@ -225,32 +321,28 @@ async def list_saved_deals(authorization: Optional[str] = Header(None)) -> Dict[
 
 @router.get("/saved-deals/{deal_id}")
 async def get_saved_deal(
-    deal_id: str, request: Request, authorization: Optional[str] = Header(None)
+    deal_id: str,
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
 ) -> Dict[str, Any]:
     """Retrieve a specific saved deal."""
     sb = _require_supabase()
     try:
         subject = _extract_user_id_from_token(authorization)
         query = sb.table("saved_deals").select("*").eq("id", deal_id)
-        if subject:
-            if _is_uuid(subject):
-                query = query.eq("user_id", subject)
-            else:
-                if not _saved_deals_has_clerk_user_id(sb):
-                    raise HTTPException(
-                        status_code=500,
-                        detail=(
-                            "Database schema not migrated for Clerk saved deals. "
-                            "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
-                        ),
-                    )
-                query = query.eq("clerk_user_id", subject)
+
+        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+        query = query.eq(identity_col, identity_val)
         res = query.single().execute()
 
         if not res.data:
             raise HTTPException(status_code=404, detail="Saved deal not found")
 
-        return {"ok": True, "data": res.data}
+        row = res.data
+        if isinstance(row, dict):
+            row = _merge_data_payload(dict(row))
+        return {"ok": True, "data": row}
 
     except HTTPException:
         raise
@@ -259,32 +351,55 @@ async def get_saved_deal(
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
 
 
-@router.delete("/saved-deals/{deal_id}")
+@router.delete("/saved-deals/{property_id}")
 async def delete_saved_deal(
-    deal_id: str, request: Request, authorization: Optional[str] = Header(None)
+    property_id: str,
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
 ) -> Dict[str, Any]:
-    """Delete a saved deal belonging to the user."""
+    """Delete a saved deal for the current user by property_id."""
     sb = _require_supabase()
     try:
         subject = _extract_user_id_from_token(authorization)
-        query = sb.table("saved_deals").delete().eq("id", deal_id)
-        if subject:
-            if _is_uuid(subject):
-                query = query.eq("user_id", subject)
-            else:
-                if not _saved_deals_has_clerk_user_id(sb):
-                    raise HTTPException(
-                        status_code=500,
-                        detail=(
-                            "Database schema not migrated for Clerk saved deals. "
-                            "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
-                        ),
-                    )
-                query = query.eq("clerk_user_id", subject)
+        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+
+        if not _saved_deals_has_property_id(sb):
+            raise HTTPException(
+                status_code=500,
+                detail="saved_deals schema unsupported: missing property_id column",
+            )
+
+        query = (
+            sb.table("saved_deals")
+            .delete()
+            .eq("property_id", property_id)
+            .eq(identity_col, identity_val)
+        )
 
         res = query.execute()
         return {"ok": True, "deleted": True, "data": res.data}
 
     except Exception as e:
         print(f"[delete-saved-deal-error] {e}")
+        raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
+
+
+@router.post("/saved-deals/clear")
+async def clear_saved_deals(
+    authorization: Optional[str] = Header(None),
+    x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
+) -> Dict[str, Any]:
+    """Clear all saved deals for the current user."""
+    sb = _require_supabase()
+    try:
+        subject = _extract_user_id_from_token(authorization)
+        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+
+        res = sb.table("saved_deals").delete().eq(identity_col, identity_val).execute()
+        return {"ok": True, "cleared": True, "data": res.data}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[clear-saved-deals-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e

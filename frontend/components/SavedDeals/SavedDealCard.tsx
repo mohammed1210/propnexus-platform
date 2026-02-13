@@ -21,7 +21,7 @@ function fmtGBP(n: unknown): string {
 
 function fmtPct(n: unknown): string {
   const v = typeof n === 'number' ? n : Number(n);
-  if (!Number.isFinite(v) || v <= 0) return 'N/A';
+  if (!Number.isFinite(v) || v <= 0) return '—';
   return `${v.toFixed(1)}%`;
 }
 
@@ -128,6 +128,7 @@ export default function SavedDealCard({
             onClick={onRemove}
             disabled={Boolean(removing)}
             aria-busy={Boolean(removing)}
+            aria-label="Remove saved deal"
           >
             {removing ? 'Removing…' : 'Remove'}
           </button>

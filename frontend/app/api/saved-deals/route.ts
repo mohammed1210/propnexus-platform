@@ -58,6 +58,7 @@ export async function GET(req: Request) {
     const res = await fetch(`${getBackendBase()}/saved-deals`, {
       method: 'GET',
       headers: {
+        ...(userId ? { 'x-clerk-user-id': userId } : {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
       cache: 'no-store',

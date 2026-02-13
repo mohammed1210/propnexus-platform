@@ -9,10 +9,14 @@ export type SavedDeal = {
   bathrooms?: number | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
+  score?: number | null;
+  ai_score?: number | null;
+  score_breakdown?: ScoreBreakdownLike | null;
   imageurl?: string | null;
   saved_at?: string | null;
   created_at?: string | null;
   investment_type?: string | null;
+  property_type?: string | null;
 };
 
 export type ScoreBreakdownLike = {

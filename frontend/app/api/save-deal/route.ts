@@ -51,6 +51,7 @@ export async function POST(req: Request) {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        ...(userId ? { 'x-clerk-user-id': userId } : {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(body),

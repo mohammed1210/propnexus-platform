@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+const noStoreHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+} as const;
+
 function getBackendBase(): string {
   return (
     process.env.NEXT_PUBLIC_BACKEND_URL ||
@@ -26,27 +35,25 @@ async function getBearerTokenOrNull(): Promise<{ userId: string | null; token: s
   if (!userId) return { userId: null, token: null };
 
   try {
-    const token = typeof a?.getToken === 'function' ? await a.getToken() : null;
+    const token = typeof (a as any)?.getToken === 'function' ? await (a as any).getToken() : null;
     return { userId, token: token ? String(token) : null };
   } catch {
     return { userId, token: null };
   }
 }
 
-export async function DELETE(_req: Request, ctx: any) {
+export async function POST() {
   try {
-    const dealId = String(ctx?.params?.dealId ?? '');
-    if (!dealId) {
-      return NextResponse.json({ ok: false, error: 'Missing dealId' }, { status: 400 });
-    }
-
     const { userId, token } = await getBearerTokenOrNull();
     if (isClerkServerEnabled() && !userId) {
-      return NextResponse.json({ ok: false, error: 'Not authenticated' }, { status: 401 });
+      return NextResponse.json(
+        { ok: false, error: 'Not authenticated' },
+        { status: 401, headers: { ...noStoreHeaders } },
+      );
     }
 
-    const res = await fetch(`${getBackendBase()}/saved-deals/${encodeURIComponent(dealId)}`, {
-      method: 'DELETE',
+    const res = await fetch(`${getBackendBase()}/saved-deals/clear`, {
+      method: 'POST',
       headers: {
         ...(userId ? { 'x-clerk-user-id': userId } : {}),
         ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -57,17 +64,20 @@ export async function DELETE(_req: Request, ctx: any) {
     const text = await res.text();
     try {
       const json = text ? JSON.parse(text) : null;
-      return NextResponse.json(json, { status: res.status });
+      return NextResponse.json(json, { status: res.status, headers: { ...noStoreHeaders } });
     } catch {
       return new NextResponse(text, {
         status: res.status,
-        headers: { 'content-type': res.headers.get('content-type') || 'text/plain' },
+        headers: {
+          ...noStoreHeaders,
+          'content-type': res.headers.get('content-type') || 'text/plain',
+        },
       });
     }
   } catch (err: any) {
     return NextResponse.json(
       { ok: false, error: err?.message || 'Internal error' },
-      { status: 500 },
+      { status: 500, headers: { ...noStoreHeaders } },
     );
   }
 }

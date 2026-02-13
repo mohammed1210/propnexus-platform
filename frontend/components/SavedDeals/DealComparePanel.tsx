@@ -114,32 +114,100 @@ export default function DealComparePanel({
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-sm font-semibold text-slate-900 dark:text-white">Deal comparison</div>
-          <div className="text-xs text-slate-500 dark:text-slate-400">Side-by-side for {cols} deals</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">Select 2–4 deals</div>
         </div>
         {onClear ? (
           <button
             type="button"
             className="text-xs font-semibold text-brand-700 dark:text-brand-300 hover:underline"
             onClick={onClear}
+            aria-label="Clear comparison selection"
           >
             Clear
           </button>
         ) : null}
       </div>
 
-      <div className="mt-3">
-        <div
-          className="grid"
-          style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-        >
-          {deals.map((d) => (
-            <div key={d.id} className="px-2">
-              <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">
+      {/* Mobile: stacked deal cards */}
+      <div className="mt-3 space-y-3 md:hidden">
+        {deals.map((d) => {
+          const { rentMonthly, rentSource } = getRentInputs(d);
+          const scoreRaw = d.ai_score ?? d.score;
+          const score =
+            scoreRaw == null
+              ? null
+              : (() => {
+                  const v = typeof scoreRaw === 'number' ? scoreRaw : Number(scoreRaw);
+                  return Number.isFinite(v) && v > 0 ? Math.round(v) : null;
+                })();
+
+          return (
+            <div key={d.id} className="rounded-xl border border-slate-200 dark:border-slate-800 p-3">
+              <div className="text-sm font-semibold text-slate-900 dark:text-white truncate">
                 {d.title ?? '—'}
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+              <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 {d.postcode || d.location || '—'}
               </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                <div className="text-slate-600 dark:text-slate-300">Price</div>
+                <div className="text-right font-semibold text-slate-900 dark:text-white">{fmtGBP(d.price)}</div>
+
+                <div className="text-slate-600 dark:text-slate-300">Beds/Baths</div>
+                <div className="text-right text-slate-900 dark:text-white">
+                  {fmtInt(d.bedrooms)}/{fmtInt(d.bathrooms)}
+                </div>
+
+                <div className="text-slate-600 dark:text-slate-300">Yield</div>
+                <div className="text-right text-slate-900 dark:text-white">{fmtPct(d.yield_percent)}</div>
+
+                <div className="text-slate-600 dark:text-slate-300">ROI</div>
+                <div className="text-right text-slate-900 dark:text-white">{fmtPct(d.roi_percent)}</div>
+
+                <div className="text-slate-600 dark:text-slate-300">Rent/mo</div>
+                <div className="text-right text-slate-900 dark:text-white">
+                  {typeof rentMonthly === 'number' && rentMonthly > 0 ? fmtGBP(rentMonthly) : '—'}
+                </div>
+
+                <div className="text-slate-600 dark:text-slate-300">Score</div>
+                <div className="text-right text-slate-900 dark:text-white">
+                  {score == null ? '—' : (
+                    <>
+                      {score}<span className="text-slate-400">/100</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-3 text-xs">
+                {(() => {
+                  const label = rentSource === 'proxy' ? 'Proxy' : rentSource ? 'Provided' : 'Missing';
+                  const tone =
+                    rentSource === 'proxy'
+                      ? 'bg-teal-50 text-teal-700 dark:bg-teal-900/20 dark:text-teal-200'
+                      : rentSource
+                        ? 'bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-200'
+                        : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-200';
+                  return (
+                    <span className={clsx('inline-flex rounded-md px-2 py-1 font-semibold', tone)}>
+                      Rent source: {label}
+                    </span>
+                  );
+                })()}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop: side-by-side grid */}
+      <div className="mt-3 hidden md:block">
+        <div className="grid" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+          {deals.map((d) => (
+            <div key={d.id} className="px-2">
+              <div className="text-xs font-semibold text-slate-900 dark:text-white truncate">{d.title ?? '—'}</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{d.postcode || d.location || '—'}</div>
             </div>
           ))}
         </div>
@@ -180,17 +248,13 @@ export default function DealComparePanel({
 
         <Row label="Yield">
           {deals.map((d) => (
-            <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">
-              {fmtPct(d.yield_percent)}
-            </div>
+            <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">{fmtPct(d.yield_percent)}</div>
           ))}
         </Row>
 
         <Row label="ROI">
           {deals.map((d) => (
-            <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">
-              {fmtPct(d.roi_percent)}
-            </div>
+            <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">{fmtPct(d.roi_percent)}</div>
           ))}
         </Row>
 
@@ -199,9 +263,7 @@ export default function DealComparePanel({
             const { rentMonthly } = getRentInputs(d);
             return (
               <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">
-                {typeof rentMonthly === 'number' && rentMonthly > 0
-                  ? fmtGBP(rentMonthly)
-                  : '—'}
+                {typeof rentMonthly === 'number' && rentMonthly > 0 ? fmtGBP(rentMonthly) : '—'}
               </div>
             );
           })}
@@ -220,9 +282,7 @@ export default function DealComparePanel({
 
             return (
               <div key={d.id} className="px-2">
-                <span className={clsx('inline-flex rounded-md px-2 py-1 text-xs font-semibold', tone)}>
-                  {label}
-                </span>
+                <span className={clsx('inline-flex rounded-md px-2 py-1 text-xs font-semibold', tone)}>{label}</span>
               </div>
             );
           })}
@@ -230,28 +290,17 @@ export default function DealComparePanel({
 
         {hasCategories ? (
           <div className="mt-3 rounded-lg border border-slate-200 dark:border-slate-800 p-3">
-            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-              Score breakdown
-            </div>
+            <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Score breakdown</div>
             <div className="mt-2 space-y-2">
               {categoryRows.map((row) => (
                 <div key={row.key} className="grid grid-cols-[120px,1fr] gap-3 items-center">
-                  <div className="text-[11px] text-slate-600 dark:text-slate-400">
-                    {row.label}
-                  </div>
-                  <div
-                    className="grid gap-2"
-                    style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
-                  >
+                  <div className="text-[11px] text-slate-600 dark:text-slate-400">{row.label}</div>
+                  <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
                     {deals.map((d) => {
                       const cats = (d.score_breakdown as any)?.categories ?? {};
                       const raw = cats[row.key];
                       const v = typeof raw === 'number' ? raw : NaN;
-                      return (
-                        <div key={d.id} className="px-2">
-                          {Number.isFinite(v) ? <MiniBar value={v} /> : <div className="h-2" />}
-                        </div>
-                      );
+                      return <div key={d.id} className="px-2">{Number.isFinite(v) ? <MiniBar value={v} /> : <div className="h-2" />}</div>;
                     })}
                   </div>
                 </div>

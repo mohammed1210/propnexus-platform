@@ -184,8 +184,19 @@ async function fetchComparableDealsByIdsViaBackend(propertyIds: string[]): Promi
 }
 
 export default function SavedDealsView() {
-  const { deals, loading, error, authRequired, selectedPropertyIds, toggleSelect, clearSelection, removeSaved, maxHint } =
-    useSavedDeals();
+  const {
+    deals,
+    loading,
+    error,
+    authRequired,
+    selectedPropertyIds,
+    toggleSelect,
+    clearSelection,
+    removeSaved,
+    clearAll,
+    refresh,
+    maxHint,
+  } = useSavedDeals();
 
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -244,16 +255,26 @@ export default function SavedDealsView() {
     };
   }, [cache, selectedPropertyIds]);
 
-  const handleRemove = async (savedDealId: string) => {
+  const handleRemove = async (propertyId: string) => {
     if (!window.confirm('Remove this saved deal?')) return;
     try {
-      setRemovingId(savedDealId);
-      await removeSaved(savedDealId);
+      setRemovingId(propertyId);
+      await removeSaved(propertyId);
       toast.success('Removed from Saved Deals');
     } catch {
       toast.error('Could not remove saved deal');
     } finally {
       setRemovingId(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    if (!window.confirm('Clear all saved deals?')) return;
+    try {
+      await clearAll();
+      toast.success('Cleared Saved Deals');
+    } catch {
+      toast.error('Could not clear saved deals');
     }
   };
 
@@ -304,12 +325,28 @@ export default function SavedDealsView() {
           </div>
         </div>
       ) : loading ? (
-        <div className="p-4">Loading…</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="card p-0 overflow-hidden">
+              <div className="aspect-[16/9] bg-slate-200 dark:bg-slate-800 animate-pulse" />
+              <div className="p-4 space-y-3">
+                <div className="h-4 w-2/3 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                <div className="h-3 w-1/2 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+                <div className="h-8 w-full bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
       ) : error ? (
         <div className="card p-6">
           <div className="text-sm font-semibold text-rose-700 dark:text-rose-300">{error}</div>
           <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Try refreshing the page.
+            Please try again.
+          </div>
+          <div className="mt-4">
+            <button type="button" className="btn-primary px-5 py-2 inline-flex" onClick={refresh}>
+              Retry
+            </button>
           </div>
         </div>
       ) : deals.length === 0 ? (
@@ -328,6 +365,19 @@ export default function SavedDealsView() {
         <div className="grid grid-cols-1 md:grid-cols-[1fr,360px] gap-6">
           {/* Left: saved deals list */}
           <div>
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="text-sm text-slate-600 dark:text-slate-300">
+                {deals.length} saved
+              </div>
+              <button
+                type="button"
+                className="text-sm font-semibold text-rose-700 dark:text-rose-300 hover:underline"
+                onClick={handleClearAll}
+                aria-label="Clear all saved deals"
+              >
+                Clear all
+              </button>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
               {deals.map((d) => (
                 <SavedDealCard
@@ -336,8 +386,8 @@ export default function SavedDealsView() {
                   selected={Boolean(d.property_id && selectedPropertyIds.includes(d.property_id))}
                   disabled={!d.property_id}
                   onToggle={() => (d.property_id ? toggleSelect(d.property_id) : undefined)}
-                  onRemove={() => handleRemove(d.id)}
-                  removing={removingId === d.id}
+                  onRemove={() => (d.property_id ? handleRemove(d.property_id) : undefined)}
+                  removing={Boolean(d.property_id && removingId === d.property_id)}
                 />
               ))}
             </div>
