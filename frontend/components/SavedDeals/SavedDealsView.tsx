@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import Section from '@/components/ui/Section';
@@ -43,6 +43,12 @@ type SavedDeal = {
   created_at?: string | null;
   saved_at?: string | null;
   property: Property | null;
+};
+
+type Toast = {
+  id: string;
+  type: 'success' | 'error' | 'info';
+  message: string;
 };
 
 const FALLBACK_IMAGE = '/images/fallback-property.png';
@@ -107,6 +113,15 @@ export default function SavedDealsView() {
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [busyRemove, setBusyRemove] = useState<Record<string, boolean>>({});
   const [busyClearAll, setBusyClearAll] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const pushToast = useCallback((type: Toast['type'], message: string) => {
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setToasts((prev) => [...prev, { id, type, message }]);
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3200);
+  }, []);
 
   const selectedIds = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected]);
 
@@ -154,7 +169,10 @@ export default function SavedDealsView() {
 
       if (!currently) {
         const count = Object.values(next).filter(Boolean).length;
-        if (count >= 4) return prev;
+        if (count >= 4) {
+          pushToast('info', 'You can compare up to 4 deals.');
+          return prev;
+        }
       }
 
       next[propertyId] = !currently;
@@ -164,6 +182,7 @@ export default function SavedDealsView() {
 
   function clearCompare() {
     setSelected({});
+    pushToast('info', 'Compare selection cleared.');
   }
 
   async function removeDeal(d: SavedDeal) {
@@ -187,9 +206,12 @@ export default function SavedDealsView() {
         const t = await r.text().catch(() => '');
         throw new Error(t || 'Could not remove this deal.');
       }
+
+      pushToast('success', 'Removed from Saved Deals.');
     } catch (e: any) {
       setDeals(prevDeals);
       setError(e?.message || 'Could not remove this deal.');
+      pushToast('error', e?.message || 'Could not remove this deal.');
     } finally {
       setBusyRemove((p) => ({ ...p, [pid]: false }));
     }
@@ -208,41 +230,44 @@ export default function SavedDealsView() {
       }
       setDeals([]);
       setSelected({});
+      pushToast('success', 'Cleared all saved deals.');
     } catch (e: any) {
       setError(e?.message || 'Could not clear saved deals.');
+      pushToast('error', e?.message || 'Could not clear saved deals.');
     } finally {
       setBusyClearAll(false);
     }
   }
 
   return (
-    <Section>
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <div>
-          <SectionTitle>Saved Deals</SectionTitle>
-          <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Select 2–4 deals to compare side-by-side.
+    <>
+      <Section>
+        <div className="flex items-start justify-between gap-4 mb-4">
+          <div>
+            <SectionTitle>Saved Deals</SectionTitle>
+            <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              Select 2–4 deals to compare side-by-side.
+            </div>
+            {!loading && !error && !authRequired ? (
+              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{deals.length} saved</div>
+            ) : null}
           </div>
-          {!loading && !error && !authRequired ? (
-            <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{deals.length} saved</div>
-          ) : null}
-        </div>
 
-        <div className="flex items-center gap-2">
-          {selectedIds.length > 0 ? (
-            <button
-              type="button"
-              className="rounded-md border border-slate-300 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
-              onClick={clearCompare}
-            >
-              Clear compare ({selectedIds.length})
+          <div className="flex items-center gap-2">
+            {selectedIds.length > 0 ? (
+              <button
+                type="button"
+                className="rounded-md border border-slate-300 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
+                onClick={clearCompare}
+              >
+                Clear compare ({selectedIds.length})
+              </button>
+            ) : null}
+            <button type="button" className="btn-primary px-4 py-2 text-sm" onClick={load}>
+              Refresh
             </button>
-          ) : null}
-          <button type="button" className="btn-primary px-4 py-2 text-sm" onClick={load}>
-            Refresh
-          </button>
+          </div>
         </div>
-      </div>
 
       {authRequired ? (
         <div className="card p-6">
@@ -520,6 +545,35 @@ export default function SavedDealsView() {
           ) : null}
         </>
       )}
-    </Section>
+      </Section>
+
+      <ToastStack toasts={toasts} />
+    </>
+  );
+}
+
+function ToastStack({ toasts }: { toasts: Toast[] }) {
+  if (!toasts.length) return null;
+
+  return (
+    <div className="fixed right-4 bottom-4 z-50 flex flex-col gap-2" aria-live="polite" aria-relevant="additions">
+      {toasts.map((t) => {
+        const tone =
+          t.type === 'success'
+            ? 'border-emerald-200 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200'
+            : t.type === 'error'
+              ? 'border-rose-200 dark:border-rose-900/40 text-rose-800 dark:text-rose-200'
+              : 'border-blue-200 dark:border-blue-900/40 text-blue-800 dark:text-blue-200';
+
+        return (
+          <div
+            key={t.id}
+            className={`max-w-sm rounded-xl border bg-white/95 dark:bg-slate-900/90 px-4 py-3 text-sm font-semibold shadow-sm ${tone}`}
+          >
+            {t.message}
+          </div>
+        );
+      })}
+    </div>
   );
 }
