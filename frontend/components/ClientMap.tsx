@@ -117,27 +117,31 @@ export default function ClientMap({
       style={{ height: '100%', width: '100%' }}
     >
       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-      {points.map((p) => (
-        <Marker
-          key={p.id}
-          position={{ lat: p.lat, lng: p.lng }}
-          icon={
-            markerIcons ? (markerIcons as any)[sourceKey(p.source)] ?? (markerIcons as any).other : undefined
-          }
-        >
-          <Popup>
-            <div className="text-sm font-medium">{p.title}</div>
-            {typeof p.price === 'number' && (
-              <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
-            )}
-            <div className="mt-1">
-              <a href={`/property/${p.id}`} className="underline text-xs">
-                View details
-              </a>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+      {points.map((p) => {
+        const icon = markerIcons
+          ? (markerIcons as any)[sourceKey(p.source)] ?? (markerIcons as any).other
+          : null;
+
+        return (
+          <Marker
+            key={p.id}
+            position={{ lat: p.lat, lng: p.lng }}
+            {...(icon ? { icon } : {})}
+          >
+            <Popup>
+              <div className="text-sm font-medium">{p.title}</div>
+              {typeof p.price === 'number' && (
+                <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
+              )}
+              <div className="mt-1">
+                <a href={`/property/${p.id}`} className="underline text-xs">
+                  View details
+                </a>
+              </div>
+            </Popup>
+          </Marker>
+        );
+      })}
     </MapContainer>
   );
 }

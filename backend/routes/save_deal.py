@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Header, HTTPException, Request, status
-from jose import JWTError, jwt
 
 from supabase import Client, create_client
 
@@ -73,19 +74,23 @@ def _extract_user_id_from_token(authorization: Optional[str]) -> Optional[str]:
     token = parts[1]
 
     try:
-        # Decode JWT without verification to extract claims
-        # Supabase tokens have user_id in the 'sub' field
-        payload = jwt.decode(
-            token, options={"verify_signature": False, "verify_aud": False}, algorithms=["HS256"]
-        )
+        # Decode JWT payload without verification to extract claims.
+        # This intentionally avoids enforcing/assuming a signing algorithm
+        # (Clerk tokens are commonly RS256, Supabase tokens may vary).
+        jwt_parts = token.split(".")
+        if len(jwt_parts) < 2:
+            return None
 
-        # Extract user_id from 'sub' field (Supabase standard)
-        return payload.get("sub")
-    except JWTError:
-        # JWT decode failed - invalid token format
-        return None
+        payload_b64 = jwt_parts[1]
+        # Base64url decode with padding
+        payload_b64 += "=" * (-len(payload_b64) % 4)
+        payload_raw = base64.urlsafe_b64decode(payload_b64.encode("utf-8"))
+        payload = json.loads(payload_raw.decode("utf-8"))
+
+        # Extract user_id from 'sub' field (JWT standard)
+        sub = payload.get("sub")
+        return str(sub) if sub else None
     except Exception:
-        # Unexpected error during token processing
         return None
 
 

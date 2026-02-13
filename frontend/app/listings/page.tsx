@@ -477,31 +477,34 @@ function ClientMap({
           zoomOffset={0}
         />
 
-        {points.map((p) => (
-          <Marker
-            key={p.id}
-            position={{ lat: p.lat, lng: p.lng }}
-            icon={iconFor(p.source, hoveredId === p.id)}
-            zIndexOffset={hoveredId === p.id ? 1000 : 0}
-            opacity={hoveredId && hoveredId !== p.id ? 0.6 : 1}
-            eventHandlers={{
-              mouseover: () => onHoverChange?.(p.id),
-              mouseout: () => onHoverChange?.(null),
-            }}
-          >
-            <Popup>
-              <div className="text-sm font-medium">{p.title}</div>
-              {typeof p.price === 'number' && (
-                <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
-              )}
-              <div className="mt-1">
-                <Link href={`/property/${p.id}`} className="underline text-xs">
-                  View details
-                </Link>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {points.map((p) => {
+          const icon = iconFor(p.source, hoveredId === p.id);
+          return (
+            <Marker
+              key={p.id}
+              position={{ lat: p.lat, lng: p.lng }}
+              {...(icon ? { icon } : {})}
+              zIndexOffset={hoveredId === p.id ? 1000 : 0}
+              opacity={hoveredId && hoveredId !== p.id ? 0.6 : 1}
+              eventHandlers={{
+                mouseover: () => onHoverChange?.(p.id),
+                mouseout: () => onHoverChange?.(null),
+              }}
+            >
+              <Popup>
+                <div className="text-sm font-medium">{p.title}</div>
+                {typeof p.price === 'number' && (
+                  <div className="text-xs opacity-70">£{p.price.toLocaleString()}</div>
+                )}
+                <div className="mt-1">
+                  <Link href={`/property/${p.id}`} className="underline text-xs">
+                    View details
+                  </Link>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
       </MapContainer>
     </div>
   );
