@@ -1,284 +1,219 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+/* eslint-disable @next/next/no-img-element */
+
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { toast } from 'sonner';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
-import { getSupabase } from '@/lib/supabaseClient';
-import { safeFetch, API_BASE } from '@/lib/api';
 
-import SavedDealCard from './SavedDealCard';
-import DealComparePanel from './DealComparePanel';
-import { useSavedDeals } from './useSavedDeals';
-import type { ComparableDeal, SavedDeal } from './types';
+type Property = {
+  id?: string;
+  uuid?: string;
 
-type DealMap = Map<string, ComparableDeal>;
+  title?: string | null;
+  location?: string | null;
+  postcode?: string | null;
 
-function pickComparableFromSaved(deal: SavedDeal): ComparableDeal {
-  return {
-    id: String(deal.property_id ?? deal.id),
-    source: 'saved',
-    title: deal.title ?? null,
-    location: deal.location ?? null,
-    postcode: deal.postcode ?? null,
-    price: deal.price ?? null,
-    bedrooms: deal.bedrooms ?? null,
-    bathrooms: deal.bathrooms ?? null,
-    yield_percent: deal.yield_percent ?? null,
-    roi_percent: deal.roi_percent ?? null,
-    imageurl: deal.imageurl ?? null,
-    investment_type: deal.investment_type ?? null,
-    score: null,
-    score_breakdown: null,
-  };
+  price?: number | string | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+
+  yield_percent?: number | null;
+  roi_percent?: number | null;
+
+  monthly_rent_estimate?: number | null;
+  rent_estimate?: number | null;
+
+  ai_score?: number | null;
+
+  imageurl?: string | null;
+  image_url?: string | null;
+  image?: string | null;
+
+  source?: string | null;
+  area_key?: string | null;
+  area?: string | null;
+};
+
+type SavedDeal = {
+  id: string;
+  property_id: string;
+  created_at?: string | null;
+  saved_at?: string | null;
+  property: Property | null;
+};
+
+const FALLBACK_IMAGE = '/images/fallback-property.png';
+
+function isValidHttpUrl(maybe: string | null | undefined) {
+  if (!maybe) return false;
+  try {
+    const u = new URL(maybe);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
-async function fetchComparableDealsByIds(propertyIds: string[]): Promise<ComparableDeal[]> {
-  const supabaseConfigured = Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  );
+function safeImgSrc(raw: unknown): string {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  if (!s) return FALLBACK_IMAGE;
+  if (s.startsWith('/')) return s;
 
-  if (supabaseConfigured) {
-    try {
-      const sb = getSupabase();
-
-      const { data, error } = await sb
-        .from('properties')
-        .select(
-          [
-            'id',
-            'title',
-            'location',
-            'postcode',
-            'price',
-            'bedrooms',
-            'bathrooms',
-            'yield_percent',
-            'roi_percent',
-            'score',
-            'ai_score',
-            'imageurl',
-            'investment_type',
-            'score_breakdown',
-          ].join(','),
-        )
-        .in('id', propertyIds);
-
-      if (error) throw error;
-      if (!Array.isArray(data)) return [];
-
-      const fromSupabase: ComparableDeal[] = data.map((row: any) => ({
-        id: String(row.id),
-        source: 'supabase' as const,
-        title: row.title ?? null,
-        location: row.location ?? null,
-        postcode: row.postcode ?? null,
-        price: typeof row.price === 'number' ? row.price : row.price == null ? null : Number(row.price),
-        bedrooms:
-          typeof row.bedrooms === 'number'
-            ? row.bedrooms
-            : row.bedrooms == null
-              ? null
-              : Number(row.bedrooms),
-        bathrooms:
-          typeof row.bathrooms === 'number'
-            ? row.bathrooms
-            : row.bathrooms == null
-              ? null
-              : Number(row.bathrooms),
-        yield_percent:
-          typeof row.yield_percent === 'number'
-            ? row.yield_percent
-            : row.yield_percent == null
-              ? null
-              : Number(row.yield_percent),
-        roi_percent:
-          typeof row.roi_percent === 'number'
-            ? row.roi_percent
-            : row.roi_percent == null
-              ? null
-              : Number(row.roi_percent),
-        score: typeof row.score === 'number' ? row.score : row.score == null ? null : Number(row.score),
-        ai_score:
-          typeof row.ai_score === 'number' ? row.ai_score : row.ai_score == null ? null : Number(row.ai_score),
-        imageurl: row.imageurl ?? null,
-        investment_type: row.investment_type ?? null,
-        score_breakdown: (row.score_breakdown ?? null) as any,
-      }));
-
-      const have = new Set(fromSupabase.map((d) => d.id));
-      const missing = propertyIds.filter((id) => !have.has(id));
-
-      if (missing.length === 0) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.debug('[saved] compare enrichment', {
-            requested: propertyIds.length,
-            supabase: fromSupabase.length,
-            backend: 0,
-          });
-        }
-        return fromSupabase;
-      }
-
-      const fromBackend = await fetchComparableDealsByIdsViaBackend(missing);
-
-      if (process.env.NODE_ENV !== 'production') {
-        console.debug('[saved] compare enrichment', {
-          requested: propertyIds.length,
-          supabase: fromSupabase.length,
-          backend: fromBackend.length,
-          backfilled: missing.length,
-        });
-      }
-
-      return [...fromSupabase, ...fromBackend];
-    } catch {
-      // continue to backend fallback
-    }
-  }
-
-  const fromBackend = await fetchComparableDealsByIdsViaBackend(propertyIds);
-  if (process.env.NODE_ENV !== 'production') {
-    console.debug('[saved] compare enrichment', {
-      requested: propertyIds.length,
-      supabase: 0,
-      backend: fromBackend.length,
-    });
-  }
-  return fromBackend;
+  // Try to normalize common bad URLs (spaces) without breaking already-encoded URLs.
+  const normalized = s.includes(' ') ? s.replace(/\s/g, '%20') : s;
+  return isValidHttpUrl(normalized) ? normalized : FALLBACK_IMAGE;
 }
 
-async function fetchComparableDealsByIdsViaBackend(propertyIds: string[]): Promise<ComparableDeal[]> {
-  // Backend fallback (small N: selection is 2–4).
-  const base = API_BASE.replace(/\/+$/, '');
-  const out: ComparableDeal[] = [];
-  await Promise.all(
-    propertyIds.map(async (id) => {
-      try {
-        const p = await safeFetch<any>(`${base}/properties/${encodeURIComponent(id)}`);
-        out.push({
-          id: String(p?.id ?? id),
-          source: 'backend' as const,
-          title: p?.title ?? null,
-          location: p?.location ?? null,
-          postcode: p?.postcode ?? null,
-          price: p?.price ?? null,
-          bedrooms: p?.bedrooms ?? null,
-          bathrooms: p?.bathrooms ?? null,
-          yield_percent: p?.yield_percent ?? null,
-          roi_percent: p?.roi_percent ?? null,
-          score: p?.score ?? null,
-          ai_score: p?.ai_score ?? null,
-          imageurl: p?.imageurl ?? null,
-          investment_type: p?.investment_type ?? null,
-          score_breakdown: p?.score_breakdown ?? null,
-        });
-      } catch {
-        // ignore individual failures
-      }
-    }),
-  );
-  return out;
+function moneyGBP(value: any) {
+  const n = typeof value === 'string' ? Number(value.replace(/[^\d.-]/g, '')) : Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return n.toLocaleString('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    maximumFractionDigits: 0,
+  });
+}
+
+function formatPercent(n: any) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  return `${v.toFixed(1)}%`;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-GB');
+}
+
+function areaLabel(p: Property | null): string {
+  if (!p) return '—';
+  if (p.area_key) return String(p.area_key);
+  if (p.area) return String(p.area);
+  const pc = (p.postcode ?? '').toString().trim();
+  if (!pc) return '—';
+  return pc.split(/\s+/)[0] ?? '—';
 }
 
 export default function SavedDealsView() {
-  const {
-    deals,
-    loading,
-    error,
-    authRequired,
-    selectedPropertyIds,
-    toggleSelect,
-    clearSelection,
-    removeSaved,
-    clearAll,
-    refresh,
-    maxHint,
-  } = useSavedDeals();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [deals, setDeals] = useState<SavedDeal[]>([]);
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
+  const [busyRemove, setBusyRemove] = useState<Record<string, boolean>>({});
+  const [busyClearAll, setBusyClearAll] = useState(false);
 
-  const [removingId, setRemovingId] = useState<string | null>(null);
-
-  const [compareOpen, setCompareOpen] = useState(false);
-  const [compareLoading, setCompareLoading] = useState(false);
-  const [cache, setCache] = useState<DealMap>(() => new Map());
-
-  const lastHintRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!maxHint) return;
-    if (lastHintRef.current === maxHint) return;
-    lastHintRef.current = maxHint;
-    toast.info(maxHint);
-  }, [maxHint]);
+  const selectedIds = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected]);
 
   const selectedDeals = useMemo(() => {
-    const byProp = new Map<string, SavedDeal>();
-    for (const d of deals) {
-      if (d.property_id) byProp.set(d.property_id, d);
-    }
+    const map = new Map(deals.map((d) => [d.property_id, d]));
+    return selectedIds.map((id) => map.get(id)).filter(Boolean) as SavedDeal[];
+  }, [selectedIds, deals]);
 
-    return selectedPropertyIds.map((pid) => {
-      const cached = cache.get(pid);
-      if (cached) return cached;
-      const fromSaved = byProp.get(pid);
-      return fromSaved ? pickComparableFromSaved(fromSaved) : ({ id: pid } as ComparableDeal);
-    });
-  }, [cache, deals, selectedPropertyIds]);
+  async function load() {
+    setLoading(true);
+    setError(null);
+    setAuthRequired(false);
 
-  // Fetch property details only when selected (2–4) and missing from cache.
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      if (selectedPropertyIds.length === 0) return;
-      const missing = selectedPropertyIds.filter((id) => !cache.has(id));
-      if (missing.length === 0) return;
-
-      setCompareLoading(true);
-      try {
-        const fetched = await fetchComparableDealsByIds(missing);
-        if (cancelled) return;
-
-        setCache((prev) => {
-          const next = new Map(prev);
-          for (const d of fetched) next.set(d.id, d);
-          return next;
-        });
-      } finally {
-        if (!cancelled) setCompareLoading(false);
+    try {
+      const r = await fetch('/api/saved-deals', { cache: 'no-store' });
+      if (r.status === 401) {
+        setDeals([]);
+        setAuthRequired(true);
+        setLoading(false);
+        return;
       }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [cache, selectedPropertyIds]);
-
-  const handleRemove = async (propertyId: string) => {
-    if (!window.confirm('Remove this saved deal?')) return;
-    try {
-      setRemovingId(propertyId);
-      await removeSaved(propertyId);
-      toast.success('Removed from Saved Deals');
-    } catch {
-      toast.error('Could not remove saved deal');
+      if (!r.ok) {
+        const t = await r.text().catch(() => '');
+        throw new Error(t || `Failed to load saved deals (${r.status})`);
+      }
+      const data = await r.json().catch(() => ({}));
+      const list: SavedDeal[] = Array.isArray((data as any)?.deals) ? (data as any).deals : [];
+      setDeals(list);
+    } catch (e: any) {
+      setDeals([]);
+      setError(e?.message || 'Failed to load saved deals.');
     } finally {
-      setRemovingId(null);
+      setLoading(false);
     }
-  };
+  }
 
-  const handleClearAll = async () => {
-    if (!window.confirm('Clear all saved deals?')) return;
+  useEffect(() => {
+    void load();
+  }, []);
+
+  function toggleCompare(propertyId: string) {
+    setSelected((prev) => {
+      const next = { ...prev };
+      const currently = !!next[propertyId];
+
+      if (!currently) {
+        const count = Object.values(next).filter(Boolean).length;
+        if (count >= 4) return prev;
+      }
+
+      next[propertyId] = !currently;
+      return next;
+    });
+  }
+
+  function clearCompare() {
+    setSelected({});
+  }
+
+  async function removeDeal(d: SavedDeal) {
+    const pid = d.property_id;
+    if (!pid) return;
+    setBusyRemove((p) => ({ ...p, [pid]: true }));
+
+    const prevDeals = deals;
+    setDeals((cur) => cur.filter((x) => x.property_id !== pid));
+    setSelected((cur) => {
+      const next = { ...cur };
+      delete next[pid];
+      return next;
+    });
+
     try {
-      await clearAll();
-      toast.success('Cleared Saved Deals');
-    } catch {
-      toast.error('Could not clear saved deals');
+      const url = new URL('/api/saved-deals', window.location.origin);
+      url.searchParams.set('property_id', pid);
+      const r = await fetch(url.toString(), { method: 'DELETE' });
+      if (!r.ok) {
+        const t = await r.text().catch(() => '');
+        throw new Error(t || 'Could not remove this deal.');
+      }
+    } catch (e: any) {
+      setDeals(prevDeals);
+      setError(e?.message || 'Could not remove this deal.');
+    } finally {
+      setBusyRemove((p) => ({ ...p, [pid]: false }));
     }
-  };
+  }
 
-  const canCompare = selectedPropertyIds.length >= 2;
+  async function clearAll() {
+    if (!window.confirm('Clear all saved deals?')) return;
+    setBusyClearAll(true);
+    setError(null);
+
+    try {
+      const r = await fetch('/api/saved-deals/clear', { method: 'POST' });
+      if (!r.ok) {
+        const t = await r.text().catch(() => '');
+        throw new Error(t || 'Could not clear saved deals.');
+      }
+      setDeals([]);
+      setSelected({});
+    } catch (e: any) {
+      setError(e?.message || 'Could not clear saved deals.');
+    } finally {
+      setBusyClearAll(false);
+    }
+  }
 
   return (
     <Section>
@@ -288,26 +223,23 @@ export default function SavedDealsView() {
           <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             Select 2–4 deals to compare side-by-side.
           </div>
-          {maxHint ? (
-            <div className="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-300">
-              {maxHint}
-            </div>
+          {!loading && !error && !authRequired ? (
+            <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{deals.length} saved</div>
           ) : null}
         </div>
 
-        {/* Mobile compare button */}
-        <div className="md:hidden">
-          <button
-            type="button"
-            className={
-              canCompare
-                ? 'btn-primary text-sm px-4 py-2'
-                : 'rounded-md border border-slate-300 dark:border-slate-700 px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 opacity-60'
-            }
-            onClick={() => setCompareOpen(true)}
-            disabled={!canCompare}
-          >
-            Compare ({selectedPropertyIds.length})
+        <div className="flex items-center gap-2">
+          {selectedIds.length > 0 ? (
+            <button
+              type="button"
+              className="rounded-md border border-slate-300 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200"
+              onClick={clearCompare}
+            >
+              Clear compare ({selectedIds.length})
+            </button>
+          ) : null}
+          <button type="button" className="btn-primary px-4 py-2 text-sm" onClick={load}>
+            Refresh
           </button>
         </div>
       </div>
@@ -339,12 +271,10 @@ export default function SavedDealsView() {
         </div>
       ) : error ? (
         <div className="card p-6">
-          <div className="text-sm font-semibold text-rose-700 dark:text-rose-300">{error}</div>
-          <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Please try again.
-          </div>
+          <div className="text-sm font-semibold text-rose-700 dark:text-rose-300">Saved Deals unavailable</div>
+          <div className="mt-2 text-sm text-slate-600 dark:text-slate-300">{error}</div>
           <div className="mt-4">
-            <button type="button" className="btn-primary px-5 py-2 inline-flex" onClick={refresh}>
+            <button type="button" className="btn-primary px-5 py-2 inline-flex" onClick={load}>
               Retry
             </button>
           </div>
@@ -362,79 +292,233 @@ export default function SavedDealsView() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-[1fr,360px] gap-6">
-          {/* Left: saved deals list */}
-          <div>
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="text-sm text-slate-600 dark:text-slate-300">
-                {deals.length} saved
+        <>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="text-sm text-slate-600 dark:text-slate-300">{deals.length} saved</div>
+            <button
+              type="button"
+              className="text-sm font-semibold text-rose-700 dark:text-rose-300 hover:underline disabled:opacity-60"
+              onClick={clearAll}
+              disabled={busyClearAll}
+            >
+              {busyClearAll ? 'Clearing…' : 'Clear all'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+            {deals.map((d) => {
+              const p = d.property;
+              const pid = d.property_id;
+
+              const title =
+                (p?.title && p.title.trim()) ||
+                (p?.location ? `Property in ${p.location}` : '') ||
+                (p?.postcode ? `Property in ${p.postcode}` : '') ||
+                'Saved property';
+
+              const loc = [p?.postcode, p?.location].filter(Boolean).join(' • ') || '—';
+              const price = moneyGBP(p?.price);
+              const beds = Number.isFinite(Number(p?.bedrooms)) ? String(p?.bedrooms) : '—';
+              const baths = Number.isFinite(Number(p?.bathrooms)) ? String(p?.bathrooms) : '—';
+              const y = formatPercent(p?.yield_percent);
+              const roi = formatPercent(p?.roi_percent);
+              const savedOn = formatDate(d.saved_at ?? d.created_at ?? null);
+              const scoreRaw = Number(p?.ai_score);
+              const score = Number.isFinite(scoreRaw) ? scoreRaw : 60;
+              const rentMonthly = p?.monthly_rent_estimate ?? p?.rent_estimate;
+              const rent = moneyGBP(rentMonthly);
+              const area = areaLabel(p);
+
+              const selectedOn = !!selected[pid];
+              const compareDisabled = !selectedOn && selectedIds.length >= 4;
+
+              return (
+                <div key={pid} className="card p-0 overflow-hidden">
+                  <div className="relative">
+                    <div className="aspect-[16/9] bg-slate-100 dark:bg-slate-800">
+                      <img
+                        src={safeImgSrc(p?.imageurl || p?.image_url || p?.image)}
+                        alt={title}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (img.src.endsWith(FALLBACK_IMAGE)) return;
+                          img.src = FALLBACK_IMAGE;
+                        }}
+                      />
+                    </div>
+
+                    <label className="absolute top-3 left-3 inline-flex items-center gap-2 rounded-xl bg-white/90 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={selectedOn}
+                        disabled={compareDisabled}
+                        onChange={() => toggleCompare(pid)}
+                        aria-label="Select deal for comparison"
+                      />
+                      Compare
+                      {compareDisabled ? <span className="text-xs opacity-60">(max 4)</span> : null}
+                    </label>
+                  </div>
+
+                  <div className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{title}</div>
+                        <div className="mt-1 text-xs text-slate-600 dark:text-slate-300 truncate">{loc}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-extrabold text-slate-900 dark:text-white whitespace-nowrap">{price}</div>
+                        {savedOn ? <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Saved {savedOn}</div> : null}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap gap-2 items-center text-xs text-slate-700 dark:text-slate-200">
+                      <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-1 font-semibold">
+                        {beds} beds • {baths} baths
+                      </span>
+                      <span className="rounded-full bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 font-semibold text-emerald-700 dark:text-emerald-200">
+                        Yield {y}
+                      </span>
+                      <span className="rounded-full bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 font-semibold text-blue-700 dark:text-blue-200">
+                        ROI {roi}
+                      </span>
+                    </div>
+
+                    <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                      <span className="font-semibold">Score:</span> {Math.round(score)}/100 ·{' '}
+                      <span className="font-semibold">Rent/mo:</span> {rent} ·{' '}
+                      <span className="font-semibold">Area:</span> {area}
+                    </div>
+
+                    {!p ? (
+                      <div className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                        Property details couldn’t be loaded for this saved item.
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 flex gap-2">
+                      <Link
+                        href={`/property/${encodeURIComponent(pid)}`}
+                        className="flex-1 text-center rounded-md border border-slate-300 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-900 dark:text-white"
+                      >
+                        View
+                      </Link>
+                      <button
+                        type="button"
+                        className="flex-1 text-center rounded-md border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-900/20 px-3 py-2 text-sm font-semibold text-rose-700 dark:text-rose-200 disabled:opacity-60"
+                        onClick={() => removeDeal(d)}
+                        disabled={!!busyRemove[pid]}
+                        aria-label="Remove saved deal"
+                      >
+                        {busyRemove[pid] ? 'Removing…' : 'Remove'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {selectedDeals.length >= 2 ? (
+            <div className="mt-6 card p-0 overflow-hidden">
+              <div className="p-4 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white">Deal comparison</div>
+                  <div className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    Side-by-side for {selectedDeals.length} deals
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="text-sm font-semibold text-brand-700 dark:text-brand-300 hover:underline"
+                  onClick={clearCompare}
+                >
+                  Clear
+                </button>
               </div>
-              <button
-                type="button"
-                className="text-sm font-semibold text-rose-700 dark:text-rose-300 hover:underline"
-                onClick={handleClearAll}
-                aria-label="Clear all saved deals"
-              >
-                Clear all
-              </button>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
-              {deals.map((d) => (
-                <SavedDealCard
-                  key={d.id}
-                  deal={d}
-                  selected={Boolean(d.property_id && selectedPropertyIds.includes(d.property_id))}
-                  disabled={!d.property_id}
-                  onToggle={() => (d.property_id ? toggleSelect(d.property_id) : undefined)}
-                  onRemove={() => (d.property_id ? handleRemove(d.property_id) : undefined)}
-                  removing={Boolean(d.property_id && removingId === d.property_id)}
-                />
-              ))}
-            </div>
-          </div>
 
-          {/* Right: sticky compare panel (desktop) */}
-          <aside className="hidden md:block md:sticky md:top-20 h-fit md:pb-24">
-            {compareLoading ? (
-              <div className="card p-4 text-sm text-slate-600 dark:text-slate-300">Loading comparison…</div>
-            ) : (
-              <DealComparePanel deals={selectedDeals} onClear={clearSelection} />
-            )}
-          </aside>
-        </div>
-      )}
-
-      {/* Mobile modal drawer */}
-      {compareOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Deal comparison"
-          className="fixed inset-0 z-50 bg-black/40 p-4 flex items-end md:hidden"
-          onClick={() => setCompareOpen(false)}
-        >
-          <div
-            className="w-full rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl p-4 max-h-[80vh] overflow-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div className="text-sm font-semibold text-slate-900 dark:text-white">Compare</div>
-              <button
-                type="button"
-                className="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:underline"
-                onClick={() => setCompareOpen(false)}
-              >
-                Close
-              </button>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] border-t border-slate-200 dark:border-slate-800">
+                  <thead>
+                    <tr className="text-left">
+                      <th className="p-3 text-xs font-semibold text-slate-600 dark:text-slate-300">Metric</th>
+                      {selectedDeals.map((d) => {
+                        const p = d.property;
+                        const name =
+                          (p?.title && p.title.trim()) ||
+                          (p?.postcode ? `Property • ${p.postcode}` : '') ||
+                          d.property_id.slice(0, 8);
+                        const sub = [p?.postcode, p?.location].filter(Boolean).join(' • ') || '—';
+                        return (
+                          <th key={d.property_id} className="p-3 align-top">
+                            <div className="text-xs font-semibold text-slate-900 dark:text-white">{name}</div>
+                            <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{sub}</div>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(
+                      [
+                        {
+                          label: 'Price',
+                          get: (p: Property | null) => moneyGBP(p?.price),
+                        },
+                        {
+                          label: 'Beds / Baths',
+                          get: (p: Property | null) => {
+                            const b = Number.isFinite(Number(p?.bedrooms)) ? p?.bedrooms : '—';
+                            const ba = Number.isFinite(Number(p?.bathrooms)) ? p?.bathrooms : '—';
+                            return `${b}/${ba}`;
+                          },
+                        },
+                        {
+                          label: 'Score',
+                          get: (p: Property | null) => {
+                            const s = Number(p?.ai_score);
+                            const v = Number.isFinite(s) ? s : 60;
+                            return `${Math.round(v)}/100`;
+                          },
+                        },
+                        {
+                          label: 'Yield',
+                          get: (p: Property | null) => formatPercent(p?.yield_percent),
+                        },
+                        {
+                          label: 'ROI',
+                          get: (p: Property | null) => formatPercent(p?.roi_percent),
+                        },
+                        {
+                          label: 'Rent / mo',
+                          get: (p: Property | null) => {
+                            const r = p?.monthly_rent_estimate ?? p?.rent_estimate;
+                            return moneyGBP(r);
+                          },
+                        },
+                        {
+                          label: 'Area',
+                          get: (p: Property | null) => areaLabel(p),
+                        },
+                      ] as const
+                    ).map((row) => (
+                      <tr key={row.label} className="border-t border-slate-200 dark:border-slate-800">
+                        <td className="p-3 text-sm font-semibold text-slate-700 dark:text-slate-200">{row.label}</td>
+                        {selectedDeals.map((d) => (
+                          <td key={`${d.property_id}-${row.label}`} className="p-3 text-sm text-slate-700 dark:text-slate-200">
+                            {row.get(d.property)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-
-            {compareLoading ? (
-              <div className="text-sm text-slate-600 dark:text-slate-300">Loading comparison…</div>
-            ) : (
-              <DealComparePanel deals={selectedDeals} onClear={clearSelection} />
-            )}
-          </div>
-        </div>
+          ) : null}
+        </>
       )}
     </Section>
   );

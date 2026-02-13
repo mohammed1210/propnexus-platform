@@ -30,6 +30,9 @@ describe("/api/saved-deals unauth", () => {
     expect(res.status).toBe(401);
 
     const json = await res.json();
-    expect(json).toEqual({ error: "Not authenticated" });
+    expect(json).toEqual({
+      error: "unauthorized",
+      message: "You must be signed in to view saved deals.",
+    });
   });
 });
