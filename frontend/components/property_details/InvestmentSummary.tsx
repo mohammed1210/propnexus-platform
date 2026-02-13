@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { postAiSummary } from '@/lib/api';
 import type { SummaryRequest, SummaryResponse } from '@/types/ai';
+import { normalizeProperty } from '@/lib/normalizeProperty';
 
 type Props = {
   property: {
@@ -27,6 +28,10 @@ export default function InvestmentSummary({ property }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<SummaryResponse | null>(null);
 
+  const { title, location, price, bedrooms, bathrooms, propertyType, investmentType, description } = property;
+
+  const normalized = useMemo(() => normalizeProperty(property as any), [property]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -35,16 +40,16 @@ export default function InvestmentSummary({ property }: Props) {
       setError(null);
       try {
         const payload: SummaryRequest = {
-          title: property.title,
-          location: String(property.location ?? ''),
-          price: numOrUndef(property.price), // ✅ narrowed
-          bedrooms: numOrUndef(property.bedrooms), // ✅ narrowed
-          bathrooms: numOrUndef(property.bathrooms), // ✅ narrowed
-          yield_percent: numOrUndef(property.yield_percent),
-          roi_percent: numOrUndef(property.roi_percent),
-          propertyType: property.propertyType ?? undefined,
-          investmentType: property.investmentType ?? undefined,
-          description: property.description ?? undefined,
+          title,
+          location: String(location ?? ''),
+          price: numOrUndef(price), // ✅ narrowed
+          bedrooms: numOrUndef(bedrooms), // ✅ narrowed
+          bathrooms: numOrUndef(bathrooms), // ✅ narrowed
+          yield_percent: normalized.yieldPct ?? undefined,
+          roi_percent: normalized.roiPct ?? undefined,
+          propertyType: propertyType ?? undefined,
+          investmentType: investmentType ?? undefined,
+          description: description ?? undefined,
         };
 
         const res = await postAiSummary(payload);
@@ -61,16 +66,16 @@ export default function InvestmentSummary({ property }: Props) {
       cancelled = true;
     };
   }, [
-    property.title,
-    property.location,
-    property.price,
-    property.bedrooms,
-    property.bathrooms,
-    property.yield_percent,
-    property.roi_percent,
-    property.propertyType,
-    property.investmentType,
-    property.description,
+    title,
+    location,
+    price,
+    bedrooms,
+    bathrooms,
+    propertyType,
+    investmentType,
+    description,
+    normalized.yieldPct,
+    normalized.roiPct,
   ]);
 
   if (loading)

@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FiHeart, FiShare2, FiDownload, FiCopy, FiCheck } from 'react-icons/fi';
 import { toast } from 'sonner';
 import { fetchWithRetry } from '@/lib/api';
+import { normalizeProperty } from '@/lib/normalizeProperty';
 
 type QuickStatsActionsProps = {
   propertyId: string;
+  property?: Record<string, any> | null;
   price?: number;
   yieldPercent?: number;
   roiPercent?: number;
@@ -37,6 +39,7 @@ const formatValue = (value: number | undefined, format: 'currency' | 'percent' |
 
 export default function QuickStatsActions({
   propertyId,
+  property,
   price,
   yieldPercent,
   roiPercent,
@@ -46,6 +49,22 @@ export default function QuickStatsActions({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const normalized = useMemo(() => {
+    // Merge in existing props as fallbacks so this stays compatible
+    // with callers that only pass primitives.
+    return normalizeProperty({
+      ...(property ?? {}),
+      id: propertyId,
+      price,
+      yield_percent: yieldPercent,
+      roi_percent: roiPercent,
+    });
+  }, [property, propertyId, price, yieldPercent, roiPercent]);
+
+  const displayPrice = typeof price === 'number' ? price : normalized.price ?? undefined;
+  const displayYield = typeof yieldPercent === 'number' ? yieldPercent : normalized.yieldPct ?? undefined;
+  const displayRoi = typeof roiPercent === 'number' ? roiPercent : normalized.roiPct ?? undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -159,7 +178,7 @@ export default function QuickStatsActions({
               <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
                 <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Price</div>
                 <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-                  {formatValue(price, 'currency')}
+                  {formatValue(displayPrice, 'currency')}
                 </div>
               </div>
 
@@ -167,10 +186,10 @@ export default function QuickStatsActions({
                 <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Rental Yield</div>
                 <div
                   className={`text-2xl font-bold ${
-                    typeof yieldPercent === 'number' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'
+                    typeof displayYield === 'number' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  {formatValue(yieldPercent, 'percent')}
+                  {formatValue(displayYield, 'percent')}
                 </div>
               </div>
 
@@ -178,10 +197,10 @@ export default function QuickStatsActions({
                 <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">ROI</div>
                 <div
                   className={`text-2xl font-bold ${
-                    typeof roiPercent === 'number' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'
+                    typeof displayRoi === 'number' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  {formatValue(roiPercent, 'percent')}
+                  {formatValue(displayRoi, 'percent')}
                 </div>
               </div>
 

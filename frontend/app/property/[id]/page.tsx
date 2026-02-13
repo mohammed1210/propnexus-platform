@@ -28,6 +28,7 @@ import TradesmenList from '@/components/tradesmen/TradesmenList';
 import type { Property } from '@/types';
 import { getSupabase } from '@/lib/supabaseClient';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
+import { normalizeProperty } from '@/lib/normalizeProperty';
 
 /** ---- Client-only widgets (no SSR) ---- */
 const StampDutyCalculator = dynamic(
@@ -170,6 +171,8 @@ export default function PropertyDetailsPage() {
 
   const price = typeof (property as any)?.price === 'number' ? (property as any).price : 0;
 
+  const normalized = useMemo(() => (property ? normalizeProperty(property as any) : null), [property]);
+
   const rentMonthly = useMemo((): number | undefined => {
     if (!property) return undefined;
     const candidates = [
@@ -186,7 +189,7 @@ export default function PropertyDetailsPage() {
 
   const yieldPercent = useMemo((): number | undefined => {
     if (!property) return undefined;
-    const stored = toNum((property as any)?.yield_percent);
+    const stored = normalized?.yieldPct;
     if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
 
     const p = toNum((property as any)?.price);
@@ -194,11 +197,11 @@ export default function PropertyDetailsPage() {
       return (rentMonthly * 12 * 100) / p;
     }
     return undefined;
-  }, [property, rentMonthly]);
+  }, [normalized, property, rentMonthly]);
 
   const roiPercent = useMemo((): number | undefined => {
     if (!property) return undefined;
-    const stored = toNum((property as any)?.roi_percent);
+    const stored = normalized?.roiPct;
     if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
 
     const p = toNum((property as any)?.price);
@@ -207,7 +210,7 @@ export default function PropertyDetailsPage() {
       return (rentMonthly * 12 * 100) / p;
     }
     return undefined;
-  }, [property, rentMonthly]);
+  }, [normalized, property, rentMonthly]);
 
   const estValue = useMemo((): number | undefined => {
     if (!property) return undefined;
@@ -288,6 +291,7 @@ export default function PropertyDetailsPage() {
       {/* Floating Stats & Actions Sidebar */}
       <QuickStatsActions
         propertyId={String(property.id ?? id)}
+        property={property}
         price={property.price ?? undefined}
         yieldPercent={yieldPercent}
         roiPercent={roiPercent}
