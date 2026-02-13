@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  const a = auth();
+  const a = await auth();
   const h = await headers();
   const c = await cookies();
 

@@ -30,7 +30,7 @@ function isClerkServerEnabled(): boolean {
 async function getBearerTokenOrNull(): Promise<{ userId: string | null; token: string | null }> {
   if (!isClerkServerEnabled()) return { userId: null, token: null };
 
-  const a = auth();
+  const a = await auth();
   const userId = (a?.userId as string | null) ?? null;
   if (!userId) return { userId: null, token: null };
 
