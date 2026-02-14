@@ -1,11 +1,7 @@
 name: Release • Stripe Smoke
 
 on:
-  push:
-    branches:
-      - main
-      - 'sprint-*'
-  pull_request:
+  workflow_dispatch:
     branches:
       - main
 

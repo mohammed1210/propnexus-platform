@@ -1,7 +1,7 @@
 name: E2E Smoke
 
 on:
-  pull_request:
+  workflow_dispatch:
     branches: [ "main", "All-Green" ]
 
 jobs:

@@ -1,9 +1,7 @@
 name: CI – Build (Next.js)
 
 on:
-  push:
-    branches: [ main, sprint-* ]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   next_build:

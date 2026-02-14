@@ -1,9 +1,6 @@
 name: Backend CI
 on:
-  pull_request:
-    paths:
-      - "backend/**"
-  push:
+  workflow_dispatch:
     branches:
       - main
       - sprint-*

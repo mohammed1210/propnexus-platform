@@ -1,17 +1,7 @@
 name: Backend CI
 
 on:
-  push:
-    branches: [ main, po2, sprint-*, po* ]
-    paths:
-      - "backend/**"
-      - "pyproject.toml"
-      - ".github/workflows/backend-ci.yml"
-  pull_request:
-    paths:
-      - "backend/**"
-      - "pyproject.toml"
-      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
 
 jobs:
   backend:

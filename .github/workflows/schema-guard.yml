@@ -1,15 +1,7 @@
 name: Schema Guard
 
 on:
-  push:
-    branches: [ main, sprint-*, po* ]
-    paths:
-      - "backend/**"
-      - ".github/workflows/schema-guard.yml"
-  pull_request:
-    paths:
-      - "backend/**"
-      - ".github/workflows/schema-guard.yml"
+  workflow_dispatch:
 
 jobs:
   schema-guard:

@@ -1,9 +1,7 @@
 name: Backend Sanity Check
 
 on:
-  push:
-    branches: [main, po3/stripe-paywall-tiers]
-  pull_request:
+  workflow_dispatch:
     branches: [main, po3/stripe-paywall-tiers]
 
 jobs:

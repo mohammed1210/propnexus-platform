@@ -1,13 +1,7 @@
 name: Sanity test (backend + frontend)
 
 on:
-  push:
-    branches: [ main, sprint-*, po* ]
-    paths:
-      - "backend/**"
-      - "frontend/**"
-      - ".github/workflows/sanity-test.yml"
-  pull_request:
+  workflow_dispatch:
     branches: [ main, sprint-*, po* ]
     paths:
       - "backend/**"

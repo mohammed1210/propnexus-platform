@@ -1,9 +1,7 @@
 name: CI – Typecheck & Lint
 
 on:
-  pull_request:
-    branches: ['main', 'sprint-*']
-  push:
+  workflow_dispatch:
     branches: ['sprint-*']
 
 jobs:

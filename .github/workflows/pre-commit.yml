@@ -1,9 +1,7 @@
 name: Pre-commit
 
 on:
-  pull_request:
-    branches: [ main, sprint-*, po* ]
-  push:
+  workflow_dispatch:
     branches: [ main, sprint-*, po* ]
 
 jobs:

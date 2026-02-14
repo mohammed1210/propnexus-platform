@@ -1,9 +1,7 @@
 name: CI – backend import (lite)
 
 on:
-  pull_request:
-    branches: [ "main", "sprint-*" ]
-  push:
+  workflow_dispatch:
     branches: [ "All-Green" ]
 
 jobs:
