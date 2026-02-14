@@ -32,6 +32,7 @@ jest.mock("next/navigation", () => {
 
 // Mock Clerk for Jest/unit tests only (do NOT affect runtime)
 jest.mock("@clerk/nextjs", () => ({
-  useUser: () => ({ user: null, isLoaded: true }),
+  useUser: () => ({ user: null, isLoaded: true, isSignedIn: false }),
+  useAuth: () => ({ isLoaded: true, isSignedIn: false, userId: null }),
   ClerkProvider: ({ children }: any) => children,
 }));

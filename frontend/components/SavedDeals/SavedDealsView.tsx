@@ -4,6 +4,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@clerk/nextjs';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
@@ -109,7 +110,10 @@ function areaLabel(p: Property | null): string {
 }
 
 export default function SavedDealsView() {
+  const { isLoaded, isSignedIn, userId } = useAuth();
+
   const [loading, setLoading] = useState(true);
+  const [loadedOnce, setLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [deals, setDeals] = useState<SavedDeal[]>([]);
@@ -142,17 +146,39 @@ export default function SavedDealsView() {
     [selectedDeals],
   );
 
-  async function load() {
+  const load = useCallback(async () => {
+    // Don’t fetch until Clerk finishes hydrating.
+    if (!isLoaded) return;
+
+    // If Clerk is loaded and the user is signed out, do not show a false empty state.
+    if (!isSignedIn || !userId) {
+      setDeals([]);
+      setError(null);
+      setAuthRequired(true);
+      setLoading(false);
+      setLoadedOnce(true);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setAuthRequired(false);
 
     try {
-      const r = await fetch('/api/saved-deals', { cache: 'no-store' });
+      const url = new URL('/api/saved-deals', window.location.origin);
+      // Cache-buster to avoid stale empty results in production.
+      url.searchParams.set('t', String(Date.now()));
+
+      const r = await fetch(url.toString(), {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
+
       if (r.status === 401) {
         setDeals([]);
         setAuthRequired(true);
-        setLoading(false);
         return;
       }
       if (!r.ok) {
@@ -167,12 +193,14 @@ export default function SavedDealsView() {
       setError(e?.message || 'Failed to load saved deals.');
     } finally {
       setLoading(false);
+      setLoadedOnce(true);
     }
-  }
+  }, [isLoaded, isSignedIn, userId]);
 
   useEffect(() => {
+    // KEY FIX: refetch when userId becomes available after Clerk hydrates.
     void load();
-  }, []);
+  }, [load]);
 
   function toggleCompare(propertyId: string) {
     setSelected((prev) => {
@@ -213,7 +241,14 @@ export default function SavedDealsView() {
     try {
       const url = new URL('/api/saved-deals', window.location.origin);
       url.searchParams.set('property_id', pid);
-      const r = await fetch(url.toString(), { method: 'DELETE' });
+      url.searchParams.set('t', String(Date.now()));
+      const r = await fetch(url.toString(), {
+        method: 'DELETE',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
       if (!r.ok) {
         const t = await r.text().catch(() => '');
         throw new Error(t || 'Could not remove this deal.');
@@ -235,7 +270,15 @@ export default function SavedDealsView() {
     setError(null);
 
     try {
-      const r = await fetch('/api/saved-deals/clear', { method: 'POST' });
+      const url = new URL('/api/saved-deals/clear', window.location.origin);
+      url.searchParams.set('t', String(Date.now()));
+      const r = await fetch(url.toString(), {
+        method: 'POST',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-store',
+        },
+      });
       if (!r.ok) {
         const t = await r.text().catch(() => '');
         throw new Error(t || 'Could not clear saved deals.');
@@ -316,7 +359,7 @@ export default function SavedDealsView() {
             </button>
           </div>
         </div>
-      ) : deals.length === 0 ? (
+      ) : loadedOnce && deals.length === 0 ? (
         <div className="card p-6">
           <div className="text-lg font-semibold text-slate-900 dark:text-white">No saved deals yet</div>
           <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
