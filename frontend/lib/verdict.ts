@@ -1,4 +1,5 @@
 import { fmtGBP, fmtPct } from '@/lib/format';
+import { normalizeProperty } from '@/lib/normalizeProperty';
 
 export type VerdictTone = 'positive' | 'neutral' | 'caution';
 
@@ -63,14 +64,15 @@ function discountBucket(discountPct: number): { points: number; label: string } 
 }
 
 export function buildVerdict(input: VerdictInput): VerdictOutput {
-  const yieldPct = toNum(input.yield_percent);
-  const roiPct = toNum(input.roi_percent);
+  const normProp = normalizeProperty(input as any);
+  const yieldPct = typeof normProp.yieldPct === 'number' ? normProp.yieldPct : toNum(input.yield_percent);
+  const roiPct = typeof normProp.roiPct === 'number' ? normProp.roiPct : toNum(input.roi_percent);
   const score = toNum(input.ai_score ?? input.score);
   const discountPct = toNum(input.discount_percent);
 
-  const price = toNum(input.asking_price ?? input.price);
-  const bedrooms = toNum(input.bedrooms);
-  const bathrooms = toNum(input.bathrooms);
+  const price = toNum(input.asking_price ?? input.price ?? normProp.price);
+  const bedrooms = toNum(input.bedrooms ?? normProp.bedrooms);
+  const bathrooms = toNum(input.bathrooms ?? normProp.bathrooms);
 
   const signals: Array<{ points: number; label: string }> = [];
   if (typeof yieldPct === 'number') signals.push(yieldBucket(yieldPct));

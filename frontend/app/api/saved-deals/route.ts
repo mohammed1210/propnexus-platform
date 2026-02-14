@@ -55,7 +55,7 @@ export async function GET() {
   }
 
   try {
-    const dealsRes = await backendFetch('/saved-deals', {
+    const dealsRes = await backendFetch(`/saved-deals?user_id=${encodeURIComponent(userId)}`, {
       method: 'GET',
       headers: {
         'content-type': 'application/json',
@@ -102,7 +102,10 @@ export async function GET() {
 
         const propRes = await backendFetch(`/properties/${encodeURIComponent(propertyId)}`, {
           method: 'GET',
-          headers: { 'content-type': 'application/json' },
+          headers: {
+            'content-type': 'application/json',
+            'x-clerk-user-id': userId,
+          },
         });
 
         if (!propRes.ok) {
@@ -165,13 +168,36 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    const res = await backendFetch(`/saved-deals/${encodeURIComponent(identifier)}`, {
-      method: 'DELETE',
-      headers: {
-        'content-type': 'application/json',
-        'x-clerk-user-id': userId,
+    const baseHeaders = {
+      'content-type': 'application/json',
+      'x-clerk-user-id': userId,
+    };
+
+    // Preferred (per contract): DELETE /save-deal?user_id=<clerkId>&property_id=<uuid>
+    let res = await backendFetch(
+      `/save-deal?user_id=${encodeURIComponent(userId)}&property_id=${encodeURIComponent(identifier)}`,
+      {
+        method: 'DELETE',
+        headers: baseHeaders,
       },
-    });
+    );
+
+    // Fallbacks for existing backend routes.
+    if (!res.ok) {
+      res = await backendFetch(
+        `/saved-deal?user_id=${encodeURIComponent(userId)}&property_id=${encodeURIComponent(identifier)}`,
+        {
+          method: 'DELETE',
+          headers: baseHeaders,
+        },
+      );
+    }
+    if (!res.ok) {
+      res = await backendFetch(`/saved-deals/${encodeURIComponent(identifier)}`, {
+        method: 'DELETE',
+        headers: baseHeaders,
+      });
+    }
 
     if (res.ok) {
       const data = await res.json().catch(() => ({}));

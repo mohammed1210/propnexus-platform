@@ -7,6 +7,7 @@ import Link from 'next/link';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
+import { normalizeProperty } from '@/lib/normalizeProperty';
 
 type Property = {
   id?: string;
@@ -74,6 +75,7 @@ function safeImgSrc(raw: unknown): string {
 }
 
 function moneyGBP(value: any) {
+  if (value === null || value === undefined || value === '') return '—';
   const n = typeof value === 'string' ? Number(value.replace(/[^\d.-]/g, '')) : Number(value);
   if (!Number.isFinite(n)) return '—';
   return n.toLocaleString('en-GB', {
@@ -84,6 +86,7 @@ function moneyGBP(value: any) {
 }
 
 function formatPercent(n: any) {
+  if (n === null || n === undefined || n === '') return '—';
   const v = Number(n);
   if (!Number.isFinite(v)) return '—';
   return `${v.toFixed(1)}%`;
@@ -129,6 +132,15 @@ export default function SavedDealsView() {
     const map = new Map(deals.map((d) => [d.property_id, d]));
     return selectedIds.map((id) => map.get(id)).filter(Boolean) as SavedDeal[];
   }, [selectedIds, deals]);
+
+  const selectedNorms = useMemo(
+    () =>
+      selectedDeals.map((d) => ({
+        deal: d,
+        norm: normalizeProperty({ ...(d.property ?? {}), id: d.property_id }),
+      })),
+    [selectedDeals],
+  );
 
   async function load() {
     setLoading(true);
@@ -335,24 +347,24 @@ export default function SavedDealsView() {
               const p = d.property;
               const pid = d.property_id;
 
+              const norm = normalizeProperty({ ...(p ?? {}), id: pid });
+
               const title =
-                (p?.title && p.title.trim()) ||
-                (p?.location ? `Property in ${p.location}` : '') ||
-                (p?.postcode ? `Property in ${p.postcode}` : '') ||
+                (norm.title && norm.title.trim()) ||
+                (norm.location ? `Property in ${norm.location}` : '') ||
                 'Saved property';
 
-              const loc = [p?.postcode, p?.location].filter(Boolean).join(' • ') || '—';
-              const price = moneyGBP(p?.price);
-              const beds = Number.isFinite(Number(p?.bedrooms)) ? String(p?.bedrooms) : '—';
-              const baths = Number.isFinite(Number(p?.bathrooms)) ? String(p?.bathrooms) : '—';
-              const y = formatPercent(p?.yield_percent);
-              const roi = formatPercent(p?.roi_percent);
+              const loc = norm.location ? norm.location : '—';
+              const price = moneyGBP(norm.price);
+              const beds = typeof norm.bedrooms === 'number' ? String(norm.bedrooms) : '—';
+              const baths = typeof norm.bathrooms === 'number' ? String(norm.bathrooms) : '—';
+              const y = formatPercent(norm.yieldPct);
+              const roi = formatPercent(norm.roiPct);
               const savedOn = formatDate(d.saved_at ?? d.created_at ?? null);
-              const scoreRaw = Number(p?.ai_score);
+              const scoreRaw = Number((p as any)?.ai_score ?? (p as any)?.score);
               const score = Number.isFinite(scoreRaw) ? scoreRaw : 60;
-              const rentMonthly = p?.monthly_rent_estimate ?? p?.rent_estimate;
-              const rent = moneyGBP(rentMonthly);
-              const area = areaLabel(p);
+              const rent = moneyGBP(norm.rentPcm);
+              const area = norm.areaLabel || areaLabel(p);
 
               const selectedOn = !!selected[pid];
               const compareDisabled = !selectedOn && selectedIds.length >= 4;
@@ -362,7 +374,7 @@ export default function SavedDealsView() {
                   <div className="relative">
                     <div className="aspect-[16/9] bg-slate-100 dark:bg-slate-800">
                       <img
-                        src={safeImgSrc(p?.imageurl || p?.image_url || p?.image)}
+                        src={safeImgSrc(norm.imageUrl)}
                         alt={title}
                         className="w-full h-full object-cover"
                         loading="lazy"
@@ -469,15 +481,13 @@ export default function SavedDealsView() {
                   <thead>
                     <tr className="text-left">
                       <th className="p-3 text-xs font-semibold text-slate-600 dark:text-slate-300">Metric</th>
-                      {selectedDeals.map((d) => {
-                        const p = d.property;
+                      {selectedNorms.map(({ deal, norm }) => {
                         const name =
-                          (p?.title && p.title.trim()) ||
-                          (p?.postcode ? `Property • ${p.postcode}` : '') ||
-                          d.property_id.slice(0, 8);
-                        const sub = [p?.postcode, p?.location].filter(Boolean).join(' • ') || '—';
+                          (norm.title && norm.title.trim()) ||
+                          (deal.property_id ? deal.property_id.slice(0, 8) : 'Property');
+                        const sub = norm.location ? norm.location : '—';
                         return (
-                          <th key={d.property_id} className="p-3 align-top">
+                          <th key={deal.property_id} className="p-3 align-top">
                             <div className="text-xs font-semibold text-slate-900 dark:text-white">{name}</div>
                             <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{sub}</div>
                           </th>
@@ -490,50 +500,47 @@ export default function SavedDealsView() {
                       [
                         {
                           label: 'Price',
-                          get: (p: Property | null) => moneyGBP(p?.price),
+                          get: (p: ReturnType<typeof normalizeProperty>) => moneyGBP(p.price),
                         },
                         {
                           label: 'Beds / Baths',
-                          get: (p: Property | null) => {
-                            const b = Number.isFinite(Number(p?.bedrooms)) ? p?.bedrooms : '—';
-                            const ba = Number.isFinite(Number(p?.bathrooms)) ? p?.bathrooms : '—';
+                          get: (p: ReturnType<typeof normalizeProperty>) => {
+                            const b = typeof p.bedrooms === 'number' ? p.bedrooms : '—';
+                            const ba = typeof p.bathrooms === 'number' ? p.bathrooms : '—';
                             return `${b}/${ba}`;
                           },
                         },
                         {
                           label: 'Score',
-                          get: (p: Property | null) => {
-                            const s = Number(p?.ai_score);
+                          get: (p: ReturnType<typeof normalizeProperty>) => {
+                            const s = Number(p.raw?.ai_score ?? p.raw?.score);
                             const v = Number.isFinite(s) ? s : 60;
                             return `${Math.round(v)}/100`;
                           },
                         },
                         {
                           label: 'Yield',
-                          get: (p: Property | null) => formatPercent(p?.yield_percent),
+                          get: (p: ReturnType<typeof normalizeProperty>) => formatPercent(p.yieldPct),
                         },
                         {
                           label: 'ROI',
-                          get: (p: Property | null) => formatPercent(p?.roi_percent),
+                          get: (p: ReturnType<typeof normalizeProperty>) => formatPercent(p.roiPct),
                         },
                         {
                           label: 'Rent / mo',
-                          get: (p: Property | null) => {
-                            const r = p?.monthly_rent_estimate ?? p?.rent_estimate;
-                            return moneyGBP(r);
-                          },
+                          get: (p: ReturnType<typeof normalizeProperty>) => moneyGBP(p.rentPcm),
                         },
                         {
                           label: 'Area',
-                          get: (p: Property | null) => areaLabel(p),
+                          get: (p: ReturnType<typeof normalizeProperty>) => p.areaLabel || '—',
                         },
                       ] as const
                     ).map((row) => (
                       <tr key={row.label} className="border-t border-slate-200 dark:border-slate-800">
                         <td className="p-3 text-sm font-semibold text-slate-700 dark:text-slate-200">{row.label}</td>
-                        {selectedDeals.map((d) => (
-                          <td key={`${d.property_id}-${row.label}`} className="p-3 text-sm text-slate-700 dark:text-slate-200">
-                            {row.get(d.property)}
+                        {selectedNorms.map(({ deal, norm }) => (
+                          <td key={`${deal.property_id}-${row.label}`} className="p-3 text-sm text-slate-700 dark:text-slate-200">
+                            {row.get(norm)}
                           </td>
                         ))}
                       </tr>
