@@ -6,7 +6,7 @@ from typing import Any, Dict, Tuple
 
 from backend.utils.listing_keys import extract_postcode
 
-SCORE_VERSION = "v1.2"
+SCORE_VERSION = "v1.3"
 
 
 def _to_float(value: Any) -> float | None:
@@ -195,10 +195,16 @@ def compute_deal_score(property_row: Dict[str, Any]) -> Tuple[int, Dict[str, Any
         [
             "yield",
             "yield_percent",
+            "yield_pct",
+            "yield_percentage",
             "rental_yield_percent",
             "rental_yield",
             "gross_yield",
+            "gross_yield_percent",
+            "rentalYield",
+            "rentalYieldPercent",
             "yieldPercent",
+            "yieldPct",
         ],
     )
     roi_pct_raw = _first_float(
@@ -206,8 +212,11 @@ def compute_deal_score(property_row: Dict[str, Any]) -> Tuple[int, Dict[str, Any
         [
             "roi",
             "roi_percent",
+            "roi_pct",
+            "roi_percentage",
             "annual_roi",
             "roiPercent",
+            "roiPct",
         ],
     )
     price = (
@@ -228,7 +237,21 @@ def compute_deal_score(property_row: Dict[str, Any]) -> Tuple[int, Dict[str, Any
         or _to_int(data.get("num_bedrooms"))
         or 0
     )
-    rent_raw = _first_float(data, ["rent", "avg_rent"]) or 0.0
+    rent_raw = (
+        _first_float(
+            data,
+            [
+                "rent",
+                "avg_rent",
+                "rent_monthly",
+                "rent_pcm",
+                "rent_per_month",
+                "rentMonthly",
+                "rentPcm",
+            ],
+        )
+        or 0.0
+    )
 
     # Preserve explicit 0 values; only default on None.
     crime_raw = _to_float(data.get("crime_index"))
@@ -252,7 +275,17 @@ def compute_deal_score(property_row: Dict[str, Any]) -> Tuple[int, Dict[str, Any
     if yield_pct is None:
         yield_pct = 0.0
 
-    roi_pct = roi_pct_raw if roi_pct_raw is not None else 0.0
+    roi_source = "missing"
+    if roi_pct_raw is not None and roi_pct_raw > 0.0:
+        roi_pct = float(roi_pct_raw)
+        roi_source = "provided"
+    elif yield_pct > 0.0:
+        # ROI is frequently missing in scraped feeds. When that happens, proxy it from
+        # (possibly computed) yield so the ROI category isn't artificially pinned at 0/20.
+        roi_pct = float(yield_pct)
+        roi_source = "proxy_yield"
+    else:
+        roi_pct = 0.0
 
     price_to_rent_ratio = (price / (rent * 12.0)) if (rent and price) else 0.0
 
@@ -323,6 +356,9 @@ def compute_deal_score(property_row: Dict[str, Any]) -> Tuple[int, Dict[str, Any
             "price": round(price, 2),
             "bedrooms": int(bedrooms),
             "postcode_band": band,
+            "yield_percent": round(float(yield_pct), 2),
+            "roi_percent": round(float(roi_pct), 2),
+            "roi_source": roi_source,
             "rent_monthly": round(rent, 2),
             "rent_source": (
                 "provided" if rent_raw > 0.0 else ("proxy" if rent_proxy > 0.0 else "missing")

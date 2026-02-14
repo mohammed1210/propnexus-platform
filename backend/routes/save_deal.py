@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
+from backend.utils.deal_scoring import compute_deal_score
 from supabase import Client, create_client
 
 load_dotenv()
@@ -121,14 +122,17 @@ def _fetch_properties_by_ids(sb: Client, property_ids: list[str]) -> Dict[str, D
     if not property_ids:
         return {}
     try:
-        res = (
-            sb.table("properties")
-            .select(
-                "id,title,location,postcode,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,source,property_type,investment_type,ai_score,score,score_breakdown"
-            )
-            .in_("id", property_ids)
-            .execute()
+        base_cols = (
+            "id,title,location,postcode,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,"
+            "source,property_type,investment_type,ai_score,score,score_breakdown"
         )
+        extended_cols = base_cols + ",rent,avg_rent"
+
+        try:
+            res = sb.table("properties").select(extended_cols).in_("id", property_ids).execute()
+        except Exception:
+            res = sb.table("properties").select(base_cols).in_("id", property_ids).execute()
+
         out: Dict[str, Dict[str, Any]] = {}
         for r in res.data or []:
             if isinstance(r, dict) and r.get("id") is not None:
@@ -137,6 +141,53 @@ def _fetch_properties_by_ids(sb: Client, property_ids: list[str]) -> Dict[str, D
     except Exception:
         # Joining is best-effort; never fail the whole endpoint.
         return {}
+
+
+def _fetch_property_snapshot(sb: Client, property_id: str) -> Optional[Dict[str, Any]]:
+    """Fetch a minimal property row for save-time metric stamping.
+
+    Best-effort: handles missing columns by retrying with a reduced select list.
+    """
+
+    cols = [
+        "id",
+        "title",
+        "location",
+        "address",
+        "postcode",
+        "price",
+        "asking_price",
+        "bedrooms",
+        "bathrooms",
+        "yield_percent",
+        "rental_yield_percent",
+        "roi_percent",
+        "rent",
+        "avg_rent",
+    ]
+
+    def _missing_col(err: Exception) -> Optional[str]:
+        msg = str(err)
+        m = re.search(r"column properties\.([a-zA-Z0-9_]+) does not exist", msg)
+        return m.group(1) if m else None
+
+    for _ in range(10):
+        try:
+            res = (
+                sb.table("properties")
+                .select(",".join(cols))
+                .eq("id", property_id)
+                .maybe_single()
+                .execute()
+            )
+            return res.data if isinstance(res.data, dict) else None
+        except Exception as e:
+            missing = _missing_col(e)
+            if missing and missing in cols and missing != "id":
+                cols = [c for c in cols if c != missing]
+                continue
+            return None
+    return None
 
 
 def _extract_clerk_user_id_from_header(x_clerk_user_id: Optional[str]) -> Optional[str]:
@@ -306,6 +357,35 @@ async def save_deal(
                     if k in ("user_id", "clerk_user_id"):
                         continue
                     (record["data"]).setdefault(k, v)
+
+        # Compute and stamp yield/ROI at save-time (best-effort).
+        # This improves Saved Deals reliability when property enrichment is unavailable.
+        if _saved_deals_has_data(sb) and isinstance(record.get("data"), dict):
+            try:
+                snapshot = _fetch_property_snapshot(sb, str(property_id))
+                if isinstance(snapshot, dict):
+                    score, breakdown = compute_deal_score(snapshot)
+                    inputs = breakdown.get("inputs") if isinstance(breakdown, dict) else None
+                    if isinstance(inputs, dict):
+                        y = inputs.get("yield_percent")
+                        r = inputs.get("roi_percent")
+                        rent_m = inputs.get("rent_monthly")
+                        price_v = inputs.get("price")
+
+                        if isinstance(y, (int, float)) and y > 0:
+                            record["data"].setdefault("yield_percent", float(y))
+                        if isinstance(r, (int, float)) and r > 0:
+                            record["data"].setdefault("roi_percent", float(r))
+                        if isinstance(rent_m, (int, float)) and rent_m > 0:
+                            record["data"].setdefault("rent_monthly", float(rent_m))
+                        if isinstance(price_v, (int, float)) and price_v > 0:
+                            record["data"].setdefault("price", float(price_v))
+                        # Store the computed score as a snapshot if the caller didn't provide one.
+                        if isinstance(score, int) and score > 0:
+                            record["data"].setdefault("score", score)
+            except Exception:
+                # Never fail the save on snapshot/enrichment issues.
+                pass
 
         # Insert (idempotent on duplicates)
         try:

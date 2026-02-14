@@ -1,4 +1,4 @@
-from backend.utils.deal_scoring import compute_deal_score
+from backend.utils.deal_scoring import SCORE_VERSION, compute_deal_score
 
 
 def test_v1_1_proxy_rent_used_when_missing_yield_roi_and_rent():
@@ -13,7 +13,7 @@ def test_v1_1_proxy_rent_used_when_missing_yield_roi_and_rent():
         }
     )
 
-    assert breakdown["version"] == "v1.2"
+    assert breakdown["version"] == SCORE_VERSION
     assert breakdown.get("inputs", {}).get("rent_source") in {"proxy", "provided"}
     assert breakdown.get("inputs", {}).get("rent_source") != "missing"
 
@@ -33,7 +33,7 @@ def test_v1_1_proxy_rent_used_for_outward_only_postcode():
         }
     )
 
-    assert breakdown["version"] == "v1.2"
+    assert breakdown["version"] == SCORE_VERSION
     assert breakdown.get("inputs", {}).get("postcode_band") in {"central", "outer", "other"}
     assert breakdown.get("inputs", {}).get("rent_source") == "proxy"
     assert score != 16

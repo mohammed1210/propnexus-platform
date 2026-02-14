@@ -132,13 +132,16 @@ export default function InvestmentInsights({
     'Model conservative rent and 2–3 week voids.',
   ];
 
-  if ((yield_percent ?? 0) >= 6) upsides.push('Strong gross yield vs typical 4–6% band.');
-  if ((roi_percent ?? 0) >= 12) upsides.push('Healthy ROI potential on current assumptions.');
+  if (typeof yield_percent === 'number' && yield_percent >= 6)
+    upsides.push('Strong gross yield vs typical 4–6% band.');
+  if (typeof roi_percent === 'number' && roi_percent >= 12)
+    upsides.push('Healthy ROI potential on current assumptions.');
   if (avgRent) upsides.push(`Local median rent around £${avgRent.toLocaleString()}.`);
 
-  if ((yield_percent ?? 0) < 4)
+  if (typeof yield_percent === 'number' && yield_percent < 4)
     risks.push('Below-average gross yield — pressure-test rent or price.');
-  if ((roi_percent ?? 0) < 8) risks.push('ROI looks light — review refurb scope and exit options.');
+  if (typeof roi_percent === 'number' && roi_percent < 8)
+    risks.push('ROI looks light — review refurb scope and exit options.');
   if (salesCount + rentsCount < 4 && postcode)
     risks.push('Limited nearby comps — validate pricing with local agents.');
 

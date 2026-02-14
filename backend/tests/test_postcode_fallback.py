@@ -1,4 +1,4 @@
-from backend.utils.deal_scoring import _postcode_band, compute_deal_score
+from backend.utils.deal_scoring import SCORE_VERSION, _postcode_band, compute_deal_score
 
 
 def test_postcode_band_fallback_detects_outward_codes_with_punctuation():
@@ -27,7 +27,7 @@ def test_compute_deal_score_uses_proxy_rent_when_band_present_in_text_fields():
         }
     )
 
-    assert breakdown["version"] == "v1.2"
+    assert breakdown["version"] == SCORE_VERSION
     assert breakdown.get("inputs", {}).get("postcode_band") == "central"
     assert breakdown.get("inputs", {}).get("rent_source") == "proxy"
     assert score != 16

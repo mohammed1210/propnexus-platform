@@ -1,4 +1,4 @@
-from backend.utils.deal_scoring import compute_deal_score
+from backend.utils.deal_scoring import SCORE_VERSION, compute_deal_score
 
 
 def test_compute_deal_score_bounds_and_int():
@@ -13,7 +13,7 @@ def test_compute_deal_score_bounds_and_int():
     assert isinstance(score, int)
     assert 0 <= score <= 100
     assert isinstance(breakdown, dict)
-    assert breakdown.get("version") == "v1.2"
+    assert breakdown.get("version") == SCORE_VERSION
     assert isinstance(breakdown.get("categories"), dict)
 
 
@@ -58,6 +58,24 @@ def test_compute_deal_score_accepts_yield_and_roi_variants():
     assert score > 0
     assert cats.get("yield", 0) > 0
     assert cats.get("roi", 0) > 0
+
+
+def test_compute_deal_score_proxies_roi_from_yield_when_missing_roi():
+    score, breakdown = compute_deal_score(
+        {
+            "price": 250000,
+            "yield_percent": 5.0,
+            "rent": 1200,
+            "roi_percent": None,
+        }
+    )
+    assert score > 0
+    cats = breakdown.get("categories") or {}
+    assert cats.get("yield", 0) > 0
+    assert cats.get("roi", 0) > 0
+
+    inputs = breakdown.get("inputs") or {}
+    assert inputs.get("roi_source") == "proxy_yield"
 
 
 def test_compute_deal_score_postcode_proxy_changes_score_when_missing_yield_and_rent():
