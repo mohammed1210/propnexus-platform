@@ -117,7 +117,11 @@ def upsert_property_enrichment_cache(
     except APIError as e:
         payload0 = e.args[0] if e.args else None
         msg = payload0.get("message") if isinstance(payload0, dict) else str(e)
-        if msg and 'relation "public.property_enrichment_cache" does not exist' in msg:
+        if msg and (
+            'relation "public.property_enrichment_cache" does not exist' in msg
+            or 'relation "property_enrichment_cache" does not exist' in msg
+            or ("property_enrichment_cache" in msg and "does not exist" in msg)
+        ):
             raise
         return
     except Exception:
