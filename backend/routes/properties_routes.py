@@ -123,6 +123,7 @@ def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
         cache_payload.get("derived") if isinstance(cache_payload.get("derived"), dict) else None
     )
     if isinstance(derived, dict):
+        metrics_overridden = False
         roi_is_proxy = bool(item.get("roi_is_proxy"))
         rent_source = (item.get("rent_source") or "").lower()
         rent_is_proxy = rent_source == "proxy"
@@ -137,6 +138,7 @@ def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
             try:
                 item["roi_percent"] = float(d_roi)
                 item["roi_is_proxy"] = False
+                metrics_overridden = True
             except Exception:
                 pass
 
@@ -145,6 +147,7 @@ def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
         ):
             try:
                 item["yield_percent"] = float(d_yield)
+                metrics_overridden = True
             except Exception:
                 pass
 
@@ -154,6 +157,16 @@ def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
             try:
                 item["rent_monthly"] = float(d_rent)
                 item["rent_source"] = derived.get("rent_source") or "enriched"
+                metrics_overridden = True
+            except Exception:
+                pass
+
+        # If we changed financial inputs, recompute score for this response object.
+        if metrics_overridden:
+            try:
+                score, breakdown = compute_deal_score(item)
+                item["score"] = score
+                item["score_breakdown"] = breakdown
             except Exception:
                 pass
 
