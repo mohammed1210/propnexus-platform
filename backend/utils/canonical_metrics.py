@@ -6,6 +6,20 @@ from typing import Any, Dict, Iterable
 _NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
 
 
+def _get_by_path(obj: Any, path: str) -> Any:
+    """Get a value from nested dicts using dot-paths (e.g., 'data.raw.rent_pcm')."""
+
+    if not path:
+        return None
+
+    cur: Any = obj
+    for part in path.split("."):
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(part)
+    return cur
+
+
 def _first_number(value: Any) -> float | None:
     if value is None or isinstance(value, bool):
         return None
@@ -71,10 +85,9 @@ def _parse_percent(value: Any) -> float | None:
 
 def _get_first(obj: Dict[str, Any], keys: Iterable[str]) -> Any:
     for k in keys:
-        if k in obj:
-            v = obj.get(k)
-            if v not in (None, "", [], {}):
-                return v
+        v = obj.get(k) if (isinstance(k, str) and k in obj) else _get_by_path(obj, k)
+        if v not in (None, "", [], {}):
+            return v
     return None
 
 
@@ -105,6 +118,9 @@ def derive_canonical_metrics(row: Dict[str, Any]) -> Dict[str, Any]:
                 "list_price",
                 "askingPrice",
                 "data.price",
+                "data.raw.price",
+                "data.raw.displayPrice",
+                "data.raw.display_price",
             ],
         )
     )
@@ -122,6 +138,11 @@ def derive_canonical_metrics(row: Dict[str, Any]) -> Dict[str, Any]:
                 "yield",
                 "yieldPct",
                 "yieldPercent",
+                "data.yield_percent",
+                "data.rental_yield_percent",
+                "data.raw.yield_percent",
+                "data.raw.rental_yield_percent",
+                "data.raw.gross_yield",
             ],
         )
     )
@@ -134,6 +155,9 @@ def derive_canonical_metrics(row: Dict[str, Any]) -> Dict[str, Any]:
                 "roi",
                 "roiPct",
                 "roiPercent",
+                "data.roi_percent",
+                "data.raw.roi_percent",
+                "data.raw.annual_roi",
             ],
         )
     )
@@ -149,6 +173,16 @@ def derive_canonical_metrics(row: Dict[str, Any]) -> Dict[str, Any]:
                 "rent",
                 "rentMonthly",
                 "rentPcm",
+                "data.rent_monthly",
+                "data.rent_pcm",
+                "data.avg_rent",
+                "data.rent",
+                "data.raw.rent_monthly",
+                "data.raw.rent_pcm",
+                "data.raw.avg_rent",
+                "data.raw.rent",
+                "data.raw.rentMonthly",
+                "data.raw.rentPcm",
             ],
         )
     )
