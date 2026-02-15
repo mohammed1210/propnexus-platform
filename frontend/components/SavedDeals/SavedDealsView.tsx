@@ -462,7 +462,7 @@ export default function SavedDealsView() {
                         Yield {y}
                       </span>
                       <span className="rounded-full bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 font-semibold text-blue-700 dark:text-blue-200">
-                        ROI {roi}
+                        ROI{norm.roiIsProxy ? ' (proxy)' : ''} {roi}
                       </span>
                     </div>
 

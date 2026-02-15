@@ -10,6 +10,7 @@ export type PropertyNormalized = {
   bathrooms: number | null;
   yieldPercent: number | null;
   roiPercent: number | null;
+  roiIsProxy: boolean;
   imageUrl: string | null;
   area: string | null;
 
@@ -22,6 +23,46 @@ export type PropertyNormalized = {
 
   raw: AnyObj;
 };
+
+type RoiAssumptions = {
+  ltv: number;
+  interestRate: number;
+  opexRatio: number;
+  purchaseCostRatio: number;
+  clampLow: number;
+  clampHigh: number;
+};
+
+const DEFAULT_ROI_ASSUMPTIONS: RoiAssumptions = {
+  ltv: 0.75,
+  interestRate: 0.055,
+  opexRatio: 0.25,
+  purchaseCostRatio: 0.03,
+  clampLow: -50,
+  clampHigh: 50,
+};
+
+function clamp(n: number, low: number, high: number) {
+  return Math.max(low, Math.min(high, n));
+}
+
+function computeCashOnCashRoiPercent(price: number, rentMonthly: number, a: RoiAssumptions = DEFAULT_ROI_ASSUMPTIONS): number | null {
+  if (!Number.isFinite(price) || !Number.isFinite(rentMonthly) || price <= 0 || rentMonthly <= 0) return null;
+  if (!(a.ltv > 0 && a.ltv < 1)) return null;
+
+  const loan = price * a.ltv;
+  const cashIn = price * (1 - a.ltv) + price * a.purchaseCostRatio;
+  if (!(cashIn > 0)) return null;
+
+  const annualRent = rentMonthly * 12;
+  const annualOpex = annualRent * a.opexRatio;
+  const annualInterest = loan * a.interestRate;
+  const annualNetCashflow = annualRent - annualOpex - annualInterest;
+
+  const roi = (annualNetCashflow / cashIn) * 100;
+  if (!Number.isFinite(roi)) return null;
+  return clamp(roi, a.clampLow, a.clampHigh);
+}
 
 function isFiniteNumber(v: any): v is number {
   return typeof v === 'number' && Number.isFinite(v);
@@ -181,7 +222,9 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
     parsePercent(p?.rental_yield_pct) ??
     null;
 
-  const roiPercent =
+  const roiFlag = Boolean(p?.roi_is_proxy ?? p?.roiIsProxy);
+
+  let roiPercent =
     parsePercent(p?.roi_percent) ??
     parsePercent(p?.roiPercent) ??
     parsePercent(p?.roiPct) ??
@@ -228,6 +271,16 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
     yieldPercent = (rentMonthly * 12 * 100) / price;
   }
 
+  // ROI is NOT yield. If missing, compute a cash-on-cash proxy (mortgage + opex assumptions).
+  let roiIsProxy = roiFlag;
+  if (roiPercent == null && typeof price === 'number' && price > 0 && typeof rentMonthly === 'number' && rentMonthly > 0) {
+    const proxy = computeCashOnCashRoiPercent(price, rentMonthly);
+    if (typeof proxy === 'number') {
+      roiPercent = proxy;
+      roiIsProxy = true;
+    }
+  }
+
   const yieldPct = yieldPercent;
   const roiPct = roiPercent;
   const rentPcm = rentMonthly;
@@ -242,6 +295,7 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
     bathrooms,
     yieldPercent,
     roiPercent,
+    roiIsProxy,
     imageUrl: imageUrl ? String(imageUrl) : null,
     area: area ? String(area) : null,
 

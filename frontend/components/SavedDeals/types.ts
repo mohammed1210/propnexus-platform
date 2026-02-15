@@ -9,6 +9,8 @@ export type SavedDeal = {
   bathrooms?: number | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
+  rent_monthly?: number | null;
+  roi_is_proxy?: boolean | null;
   score?: number | null;
   ai_score?: number | null;
   score_breakdown?: ScoreBreakdownLike | null;
@@ -41,6 +43,8 @@ export type ComparableDeal = {
   bathrooms?: number | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
+  rent_monthly?: number | null;
+  roi_is_proxy?: boolean | null;
   score?: number | null;
   ai_score?: number | null;
   imageurl?: string | null;

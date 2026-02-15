@@ -65,6 +65,7 @@ export default function QuickStatsActions({
   const displayPrice = typeof price === 'number' ? price : normalized.price ?? undefined;
   const displayYield = typeof yieldPercent === 'number' ? yieldPercent : normalized.yieldPercent ?? undefined;
   const displayRoi = typeof roiPercent === 'number' ? roiPercent : normalized.roiPercent ?? undefined;
+  const displayRoiIsProxy = typeof roiPercent === 'number' ? false : normalized.roiIsProxy;
 
   useEffect(() => {
     let cancelled = false;
@@ -194,7 +195,9 @@ export default function QuickStatsActions({
               </div>
 
               <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">ROI</div>
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                  ROI{displayRoiIsProxy && typeof displayRoi === 'number' ? ' (proxy)' : ''}
+                </div>
                 <div
                   className={`text-2xl font-bold ${
                     typeof displayRoi === 'number' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'

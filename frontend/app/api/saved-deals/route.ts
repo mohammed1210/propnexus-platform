@@ -143,6 +143,7 @@ export async function GET() {
 
         const canonicalKeys = [
           'price',
+          'roi_is_proxy',
           'rent_monthly',
           'rent_pcm',
           'yield_percent',

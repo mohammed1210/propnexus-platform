@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import clsx from 'clsx';
 import type { SavedDeal } from './types';
+import { normalizeProperty } from '@/lib/normalizeProperty';
 
 function fmtGBP(n: unknown): string {
   const v = typeof n === 'number' ? n : Number(n);
@@ -49,6 +50,7 @@ export default function SavedDealCard({
   onRemove: () => void;
   removing?: boolean;
 }) {
+  const norm = normalizeProperty(deal as any);
   const href = deal.property_id ? `/property/${encodeURIComponent(deal.property_id)}` : '#';
   const imageSrc = deal.imageurl || 'https://placehold.co/640x360?text=PropNexus';
 
@@ -101,13 +103,13 @@ export default function SavedDealCard({
         <div className="text-sm text-slate-600 dark:text-slate-300">{deal.location ?? '—'}</div>
 
         <div className="flex items-center justify-between pt-1">
-          <div className="font-semibold text-slate-900 dark:text-white">{fmtGBP(deal.price)}</div>
+          <div className="font-semibold text-slate-900 dark:text-white">{fmtGBP(norm.price ?? deal.price)}</div>
           <div className="flex gap-2 text-xs">
             <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
-              Yield {fmtPct(deal.yield_percent)}
+              Yield {fmtPct(norm.yieldPercent ?? deal.yield_percent)}
             </span>
             <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
-              ROI {fmtPct(deal.roi_percent)}
+              ROI{norm.roiIsProxy ? ' (proxy)' : ''} {fmtPct(norm.roiPercent ?? deal.roi_percent)}
             </span>
           </div>
         </div>
