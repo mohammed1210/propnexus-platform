@@ -185,6 +185,9 @@ export default function PropertyDetailsPage() {
   const rentMonthly = normalized?.rentMonthly ?? undefined;
   const yieldPercent = normalized?.yieldPercent ?? undefined;
   const roiPercent = normalized?.roiPercent ?? undefined;
+  const roiProxyPercent = normalized?.roiProxyPercent ?? undefined;
+  const roiDisplay = roiPercent ?? roiProxyPercent;
+  const roiDisplayIsProxy = typeof roiPercent !== 'number' && typeof roiProxyPercent === 'number';
 
   const estValue = useMemo((): number | undefined => {
     if (!property) return undefined;
@@ -388,7 +391,7 @@ export default function PropertyDetailsPage() {
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
                       <div className="text-xs text-slate-500 dark:text-slate-400">ROI</div>
                       <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {fmtPct(roiPercent)}
+                        {fmtPct(roiDisplay)}{roiDisplayIsProxy && typeof roiDisplay === 'number' ? ' (proxy)' : ''}
                       </div>
                     </div>
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
@@ -424,7 +427,7 @@ export default function PropertyDetailsPage() {
                       location={String(property.location ?? '')}
                       price={typeof property.price === 'number' ? property.price : undefined}
                       yield_percent={yieldPercent}
-                      roi_percent={roiPercent}
+                        roi_percent={roiPercent}
                       propertyType={(property as any).propertyType ?? undefined}
                       investmentType={(property as any).investmentType ?? undefined}
                       description={(property as any).description ?? undefined}

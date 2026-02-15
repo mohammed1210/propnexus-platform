@@ -54,6 +54,11 @@ export default function SavedDealCard({
   const href = deal.property_id ? `/property/${encodeURIComponent(deal.property_id)}` : '#';
   const imageSrc = deal.imageurl || 'https://placehold.co/640x360?text=PropNexus';
 
+  const roiReal = norm.roiPercent ?? (typeof (deal as any).roi_percent === 'number' ? (deal as any).roi_percent : null);
+  const roiProxy = norm.roiProxyPercent;
+  const roiDisplay = roiReal ?? roiProxy;
+  const roiIsProxyDisplay = norm.roiIsProxy || (roiReal == null && roiProxy != null);
+
   return (
     <article
       className={clsx(
@@ -109,7 +114,7 @@ export default function SavedDealCard({
               Yield {fmtPct(norm.yieldPercent ?? deal.yield_percent)}
             </span>
             <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
-              ROI{norm.roiIsProxy ? ' (proxy)' : ''} {fmtPct(norm.roiPercent ?? deal.roi_percent)}
+              ROI{roiIsProxyDisplay ? ' (proxy)' : ''} {fmtPct(roiDisplay)}
             </span>
           </div>
         </div>

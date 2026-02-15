@@ -66,8 +66,10 @@ function discountBucket(discountPct: number): { points: number; label: string } 
 export function buildVerdict(input: VerdictInput): VerdictOutput {
   const normProp = normalizeProperty(input as any);
   const yieldPct = typeof normProp.yieldPercent === 'number' ? normProp.yieldPercent : toNum(input.yield_percent);
-  const roiPct = typeof normProp.roiPercent === 'number' ? normProp.roiPercent : toNum(input.roi_percent);
-  const usedRoiProxy = Boolean((normProp as any).roiIsProxy);
+  const roiReal = typeof normProp.roiPercent === 'number' ? normProp.roiPercent : toNum(input.roi_percent);
+  const roiProxy = typeof normProp.roiProxyPercent === 'number' ? normProp.roiProxyPercent : undefined;
+  const roiPct = typeof roiReal === 'number' ? roiReal : roiProxy;
+  const usedRoiProxy = Boolean(normProp.roiIsProxy || (typeof roiReal !== 'number' && typeof roiProxy === 'number'));
   const score = toNum(input.ai_score ?? input.score);
   const discountPct = toNum(input.discount_percent);
 
@@ -107,7 +109,7 @@ export function buildVerdict(input: VerdictInput): VerdictOutput {
 
   const bullets: string[] = [];
   if (typeof yieldPct === 'number') bullets.push(`Yield: ${fmtPct(yieldPct)} (rule-based)`);
-  if (typeof roiPct === 'number') bullets.push(`ROI: ${fmtPct(roiPct)} (${usedRoiProxy ? 'cash-on-cash proxy' : 'rule-based'})`);
+  if (typeof roiPct === 'number') bullets.push(`ROI: ${fmtPct(roiPct)} (${usedRoiProxy ? 'proxy' : 'rule-based'})`);
   if (typeof discountPct === 'number') bullets.push(`Discount: ${discountPct.toFixed(0)}% (if estimated value is accurate)`);
   if (typeof score === 'number') bullets.push(`Stored score: ${Math.round(score)}/100`);
 

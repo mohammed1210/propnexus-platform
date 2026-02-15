@@ -578,15 +578,18 @@ export default function PropertyCard({
               {p.yield_percent.toFixed(1)}% Yield
             </span>
           )}
-          {typeof p.roi_percent === 'number' && (
+          {(typeof p.roi_percent === 'number' || typeof p.yield_percent === 'number') && (
             <span
               className={cx(
                 'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
-                getBadgeColor('roi', p.roi_percent),
+                getBadgeColor('roi', (typeof p.roi_percent === 'number' ? p.roi_percent : (p.yield_percent as number)) as number),
               )}
-              aria-label={`ROI percentage: ${p.roi_percent.toFixed(1)}%`}
+              aria-label={`ROI percentage: ${(
+                typeof p.roi_percent === 'number' ? p.roi_percent : (p.yield_percent as number)
+              ).toFixed(1)}%${typeof p.roi_percent === 'number' ? '' : ' (proxy)'}`}
             >
-              {p.roi_percent.toFixed(1)}% ROI
+              {(typeof p.roi_percent === 'number' ? p.roi_percent : (p.yield_percent as number)).toFixed(1)}% ROI
+              {typeof p.roi_percent === 'number' ? '' : ' (proxy)'}
             </span>
           )}
         </div>

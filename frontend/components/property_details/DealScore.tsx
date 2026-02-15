@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { normalizeProperty } from '@/lib/normalizeProperty';
 
 interface PropertyData {
   score?: number | null;
@@ -34,8 +35,16 @@ const CATEGORY_LABELS: Record<string, string> = {
   schools_access: 'Schools Access',
 };
 
+function percentToScore20(pct: number) {
+  // 0% => 0 points, 10%+ => 20 points
+  const clamped = Math.max(0, Math.min(10, pct));
+  return (clamped / 10) * 20;
+}
+
 export default function DealScore({ property }: DealScoreProps) {
   const scoreRef = useRef<HTMLDivElement>(null);
+
+  const normalized = useMemo(() => normalizeProperty(property as any), [property]);
 
   const scoreData = useMemo(() => {
     const score = property?.score;
@@ -47,6 +56,20 @@ export default function DealScore({ property }: DealScoreProps) {
 
     return { score, categories: categories ?? undefined, version: version ?? undefined };
   }, [property]);
+
+  const derivedCategories = useMemo(() => {
+    const categories = scoreData?.categories;
+    if (!categories) return categories;
+
+    const roiPctForScore = normalized.roiPercent ?? normalized.roiProxyPercent ?? 0;
+    const roiScoreFallback = percentToScore20(roiPctForScore);
+    const current = typeof categories.roi === 'number' ? categories.roi : 0;
+
+    return {
+      ...categories,
+      roi: current > 0 ? current : roiScoreFallback,
+    };
+  }, [scoreData?.categories, normalized.roiPercent, normalized.roiProxyPercent]);
 
   // Animation state (kept from prior UX)
   const [isVisible, setIsVisible] = useState(false);
@@ -104,6 +127,8 @@ export default function DealScore({ property }: DealScoreProps) {
 
   const { score, categories, version } = scoreData;
 
+  void categories;
+
   const barGradient =
     'bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 dark:from-red-400 dark:via-yellow-400 dark:to-green-400';
 
@@ -141,9 +166,9 @@ export default function DealScore({ property }: DealScoreProps) {
         </div>
       </div>
 
-      {categories && (
+      {derivedCategories && (
         <div className="space-y-3 mb-4">
-          {Object.entries(categories)
+          {Object.entries(derivedCategories)
             .filter(([k, v]) => typeof v === 'number' && typeof MAX_POINTS[k] === 'number')
             .map(([key, value]) => {
               const max = MAX_POINTS[key];

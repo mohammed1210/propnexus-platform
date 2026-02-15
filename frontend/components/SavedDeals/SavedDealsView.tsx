@@ -402,7 +402,10 @@ export default function SavedDealsView() {
               const beds = typeof norm.bedrooms === 'number' ? String(norm.bedrooms) : '—';
               const baths = typeof norm.bathrooms === 'number' ? String(norm.bathrooms) : '—';
               const y = formatPercent(norm.yieldPercent);
-              const roi = formatPercent(norm.roiPercent);
+              const roiReal = norm.roiPercent;
+              const roiProxy = norm.roiProxyPercent;
+              const roi = formatPercent(roiReal ?? roiProxy);
+              const roiIsProxyDisplay = norm.roiIsProxy || (roiReal == null && roiProxy != null);
               const savedOn = formatDate(d.saved_at ?? d.created_at ?? null);
               const scoreRaw = Number((p as any)?.ai_score ?? (p as any)?.score);
               const score = Number.isFinite(scoreRaw) ? scoreRaw : 60;
@@ -462,7 +465,7 @@ export default function SavedDealsView() {
                         Yield {y}
                       </span>
                       <span className="rounded-full bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 font-semibold text-blue-700 dark:text-blue-200">
-                        ROI{norm.roiIsProxy ? ' (proxy)' : ''} {roi}
+                        ROI{roiIsProxyDisplay ? ' (proxy)' : ''} {roi}
                       </span>
                     </div>
 
@@ -569,7 +572,7 @@ export default function SavedDealsView() {
                         {
                           label: 'ROI',
                           get: (p: ReturnType<typeof normalizeProperty>) =>
-                            formatPercent(p.roiPercent ?? p.roiPct),
+                            formatPercent(p.roiPercent ?? p.roiProxyPercent ?? p.roiPct),
                         },
                         {
                           label: 'Rent / mo',

@@ -64,8 +64,13 @@ export default function QuickStatsActions({
 
   const displayPrice = typeof price === 'number' ? price : normalized.price ?? undefined;
   const displayYield = typeof yieldPercent === 'number' ? yieldPercent : normalized.yieldPercent ?? undefined;
-  const displayRoi = typeof roiPercent === 'number' ? roiPercent : normalized.roiPercent ?? undefined;
-  const displayRoiIsProxy = typeof roiPercent === 'number' ? false : normalized.roiIsProxy;
+  const realRoi = normalized.roiPercent ?? undefined;
+  const proxyRoi = normalized.roiProxyPercent ?? undefined;
+  const displayRoi = typeof roiPercent === 'number' ? roiPercent : realRoi ?? proxyRoi;
+  const displayRoiIsProxy =
+    typeof roiPercent === 'number'
+      ? false
+      : normalized.roiIsProxy || (realRoi == null && typeof proxyRoi === 'number');
 
   useEffect(() => {
     let cancelled = false;
