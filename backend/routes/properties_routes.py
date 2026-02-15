@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import builtins
 import json
 import logging
 import os
 import re
+import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -16,6 +18,11 @@ from pydantic import BaseModel, Field
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.deal_signals import extract_deal_signals
+from backend.utils.enrichment import build_property_enrichment
+from backend.utils.enrichment_store import (
+    get_property_enrichment_cache,
+    upsert_property_enrichment_cache,
+)
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from backend.utils.investment_type_classifier import classify_investment_types
 from backend.utils.listing_keys import extract_postcode
@@ -27,6 +34,93 @@ from backend.utils.recommended_ranker import normalize_deal_type, rerank_recomme
 from supabase import create_client
 
 router = APIRouter(tags=["properties"])
+
+
+def _start_enrichment_thread(property_id: str) -> None:
+    pid = (property_id or "").strip()
+    if not pid:
+        return
+
+    def _worker() -> None:
+        try:
+            sb2 = _get_supabase()
+            res = (
+                sb2.table("properties").select("*").eq("id", pid).limit(1).maybe_single().execute()
+            )
+            row = res.data if isinstance(res.data, dict) else None
+            if not row:
+                return
+
+            payload = asyncio.run(build_property_enrichment(sb=sb2, property_row=row))
+            fetched_at_iso = datetime.now(timezone.utc).isoformat()
+            upsert_property_enrichment_cache(
+                sb2,
+                property_id=pid,
+                postcode=row.get("postcode") if isinstance(row, dict) else None,
+                payload=payload,
+                fetched_at_iso=fetched_at_iso,
+            )
+        except Exception:
+            return
+
+    try:
+        t = threading.Thread(target=_worker, daemon=True)
+        t.start()
+    except Exception:
+        return
+
+
+def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
+    if not isinstance(item, dict) or not isinstance(cache_payload, dict):
+        return
+
+    geo = cache_payload.get("geo") if isinstance(cache_payload.get("geo"), dict) else None
+    if isinstance(geo, dict):
+        if item.get("latitude") in (None, 0, 0.0, "") and geo.get("latitude") is not None:
+            item["latitude"] = geo.get("latitude")
+        if item.get("longitude") in (None, 0, 0.0, "") and geo.get("longitude") is not None:
+            item["longitude"] = geo.get("longitude")
+
+    # Attach nested intel objects if not already present.
+    if item.get("area_intel") is None and isinstance(cache_payload.get("area_intel"), dict):
+        item["area_intel"] = cache_payload.get("area_intel")
+    if item.get("comps") is None and isinstance(cache_payload.get("comps"), dict):
+        item["comps"] = cache_payload.get("comps")
+
+    derived = (
+        cache_payload.get("derived") if isinstance(cache_payload.get("derived"), dict) else None
+    )
+    if isinstance(derived, dict):
+        if item.get("rent_monthly") is None and derived.get("rent_estimate_monthly") is not None:
+            item["rent_monthly"] = derived.get("rent_estimate_monthly")
+        if item.get("yield_percent") is None and derived.get("yield_percent") is not None:
+            item["yield_percent"] = derived.get("yield_percent")
+        if item.get("roi_percent") is None and derived.get("roi_percent") is not None:
+            item["roi_percent"] = derived.get("roi_percent")
+
+
+def _attach_enrichment_from_cache(sb: Any, items: List[Dict[str, Any]]) -> List[str]:
+    if not items:
+        return []
+
+    missing_ids: List[str] = []
+
+    # Best-effort: per-row lookup (keeps implementation compatible across supabase client versions).
+    # If this becomes too slow, we can switch to a batched IN(...) query.
+    for it in items:
+        pid = it.get("id")
+        if not isinstance(pid, str) or not pid.strip():
+            continue
+        try:
+            cached = get_property_enrichment_cache(sb, pid)
+            if not cached:
+                missing_ids.append(pid)
+            payload = cached.get("payload") if isinstance(cached, dict) else None
+            _attach_cached_enrichment(it, payload)
+        except Exception:
+            continue
+
+    return missing_ids
 
 
 def _require_admin(x_admin_token: str | None = None) -> None:
@@ -950,6 +1044,17 @@ def list_properties(
 
         items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
 
+        # Attach cached enrichment (geo/crime/comps/derived) where available.
+        try:
+            missing_ids = _attach_enrichment_from_cache(sb, items)
+
+            if (os.getenv("ENRICH_ON_READ_LIST") or "0") == "1":
+                max_kicks = int(os.getenv("ENRICH_ON_READ_LIST_LIMIT", "3"))
+                for pid in (missing_ids or [])[: max(0, max_kicks)]:
+                    _start_enrichment_thread(pid)
+        except Exception:
+            pass
+
         # Add deterministic investment tags for debugging / future UI, and optionally filter.
         if items:
             for it in items:
@@ -1451,7 +1556,17 @@ def get_property(property_id: str, response: Response):
             raise HTTPException(status_code=404, detail="Property not found")
 
         if isinstance(res.data, dict):
-            return _normalize_property_row(res.data)
+            out = _normalize_property_row(res.data)
+            try:
+                cached = get_property_enrichment_cache(sb, property_id)
+                payload = cached.get("payload") if isinstance(cached, dict) else None
+                _attach_cached_enrichment(out, payload)
+
+                if not cached and (os.getenv("ENRICH_ON_READ_DETAIL") or "0") == "1":
+                    _start_enrichment_thread(property_id)
+            except Exception:
+                pass
+            return out
         return res.data
 
     except HTTPException:

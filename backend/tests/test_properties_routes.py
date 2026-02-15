@@ -107,7 +107,12 @@ def test_list_properties_with_filters(mock_create_client, client):
     assert len(data.get("items") or []) == 1
 
     # Verify filters were applied
-    mock_query.eq.assert_called_once()  # source filter
+    # Source filter should be applied (other .eq calls may occur, e.g. enrichment cache lookup)
+    assert any(
+        (c.args[0] == "source" and c.args[1] == "zoopla")
+        for c in mock_query.eq.call_args_list
+        if getattr(c, "args", None)
+    )
     mock_query.or_.assert_called_once()
     assert mock_query.gte.call_count >= 2  # price and bedrooms filters
     mock_query.lte.assert_called_once()  # max price filter
