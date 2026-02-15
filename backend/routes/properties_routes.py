@@ -13,6 +13,7 @@ from fastapi.params import Param
 from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
+from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.deal_signals import extract_deal_signals
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
@@ -434,6 +435,13 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
             out["discount_estimate_pct"] = float(out.get("discount_estimate_pct"))
         except Exception:
             out["discount_estimate_pct"] = None
+
+    # Canonical metrics backfill for frontend normalizers.
+    # Adds/derives: price, rent_monthly, yield_percent, roi_percent.
+    try:
+        out = apply_canonical_metrics(out)
+    except Exception:
+        pass
 
     return out
 

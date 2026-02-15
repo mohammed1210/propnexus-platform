@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
+from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
 from supabase import Client, create_client
 
@@ -469,6 +470,16 @@ async def list_saved_deals(
                         continue
                     if k not in r or r.get(k) is None:
                         r[k] = v
+
+        # Canonical metrics backfill (price, rent_monthly, yield_percent, roi_percent).
+        # This makes Saved Deals reliably render Yield/ROI when source fields exist.
+        for r in merged_rows:
+            if not isinstance(r, dict):
+                continue
+            try:
+                apply_canonical_metrics(r)
+            except Exception:
+                pass
 
         return {"data": merged_rows}
     except Exception as e:
