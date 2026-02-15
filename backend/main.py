@@ -32,6 +32,7 @@ from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
 from backend.routes.debug_properties import router as debug_properties_router
 from backend.routes.debug_scrape_probe import router as debug_scrape_probe_router
+from backend.routes.enrichment_queue_routes import router as enrichment_queue_router
 from backend.routes.enrichment_routes import router as enrichment_router
 from backend.routes.gpt_routes import router as gpt_router
 from backend.routes.import_routes import admin_alias_router
@@ -56,6 +57,9 @@ except Exception as e:
     logger.warning(f"Sentry initialization failed: {e}")
 
 app = FastAPI()
+
+
+_enrichment_worker = None
 
 # Attach rate limiter to app state
 app.state.limiter = limiter
@@ -220,6 +224,38 @@ def root():
     return {"ok": True, "service": "propnexus-backend"}
 
 
+@app.on_event("startup")
+def _startup_worker():
+    global _enrichment_worker
+    try:
+        if (os.getenv("ENRICH_WORKER_ENABLE") or "0") != "1":
+            return
+
+        from backend.utils.supabase_client import get_supabase
+        from backend.workers.enrichment_worker import EnrichmentWorker
+
+        sb = get_supabase()
+        if not sb:
+            return
+
+        poll_sec = float(os.getenv("ENRICH_POLL_SEC", "2.0"))
+
+        _enrichment_worker = EnrichmentWorker(sb, poll_interval_sec=poll_sec)
+        _enrichment_worker.start()
+    except Exception as e:
+        logger.warning(f"Enrichment worker failed to start: {e}")
+
+
+@app.on_event("shutdown")
+def _shutdown_worker():
+    global _enrichment_worker
+    try:
+        if _enrichment_worker is not None:
+            _enrichment_worker.stop()
+    except Exception:
+        pass
+
+
 # ======================
 # 🔌 Routers
 # ======================
@@ -232,6 +268,7 @@ app.include_router(gpt_router)
 app.include_router(import_router)
 app.include_router(admin_alias_router)
 app.include_router(enrichment_router)
+app.include_router(enrichment_queue_router)
 app.include_router(admin_scrape_runs_router)
 app.include_router(notes_router)
 app.include_router(off_market_router)

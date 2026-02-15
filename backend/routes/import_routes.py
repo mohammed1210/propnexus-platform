@@ -26,6 +26,7 @@ except Exception:  # pragma: no cover
 from backend.scraper.utils import TARGET_CITIES, fetch_detail_html_with_diag
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.deal_signals import extract_deal_signals
+from backend.utils.enrichment_queue import enqueue_job
 from backend.utils.image_utils import (
     dedupe_image_urls,
     extract_image_urls_from_ld_json,
@@ -1170,6 +1171,71 @@ def _upsert_properties_rows(
         return False, msg
 
 
+def _enqueue_enrichment_for_rows(*, source: str, rows: list[Dict[str, Any]]) -> int:
+    """Best-effort: enqueue enrichment jobs for rows just upserted.
+
+    Resolves property UUIDs via (source, external_id) because upsert does not
+    reliably return inserted IDs across supabase client versions.
+    """
+
+    if not sb:
+        return 0
+    if (os.getenv("ENRICH_AUTO_ENQUEUE_ON_IMPORT") or "0") != "1":
+        return 0
+
+    src = (source or "").strip().lower()
+    if not src:
+        return 0
+
+    external_ids: list[str] = []
+    seen: set[str] = set()
+    for r in rows or []:
+        if not isinstance(r, dict):
+            continue
+        eid = r.get("external_id")
+        if not isinstance(eid, str) or not eid.strip():
+            continue
+        e = eid.strip()
+        if e not in seen:
+            seen.add(e)
+            external_ids.append(e)
+
+    if not external_ids:
+        return 0
+
+    property_ids: list[str] = []
+    batch_size = 50
+    for i in range(0, len(external_ids), batch_size):
+        batch = external_ids[i : i + batch_size]
+        try:
+            res = (
+                sb.table("properties")
+                .select("id")
+                .eq("source", src)
+                .in_("external_id", batch)
+                .execute()
+            )
+            data = res.data or []
+            if isinstance(data, list):
+                for row in data:
+                    if (
+                        isinstance(row, dict)
+                        and isinstance(row.get("id"), str)
+                        and row["id"].strip()
+                    ):
+                        property_ids.append(row["id"].strip())
+        except Exception:
+            continue
+
+    for j, pid in enumerate(property_ids):
+        try:
+            enqueue_job(sb, pid, delay_seconds=j)
+        except Exception:
+            continue
+
+    return len(property_ids)
+
+
 def _dedupe(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Dedupe across sources by (source, external_id) if available,
@@ -1673,11 +1739,14 @@ async def import_zoopla(
         items = []
     db_upsert_ok = False
     db_error: str | None = None
+    enqueued = 0
     if items:
         now_iso = _now_iso()
         db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
         await _fill_missing_coords_from_postcode(db_rows)
         db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
+        if db_upsert_ok:
+            enqueued = _enqueue_enrichment_for_rows(source="zoopla", rows=db_rows)
 
     if db_upsert_ok:
         finish_scrape_run(run_id=run_id, status="success", count_inserted=len(items))
@@ -1690,6 +1759,8 @@ async def import_zoopla(
         )
 
     payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
+    if enqueued:
+        payload["enrich_enqueued"] = enqueued
     if scrape_error:
         payload["scrape_error"] = scrape_error
     if db_error:
@@ -1760,6 +1831,7 @@ async def import_rightmove(
         items = []
     db_upsert_ok = False
     db_error: str | None = None
+    enqueued = 0
     if not sb:
         db_error = "Supabase client not configured (missing SUPABASE_URL/keys)"
     elif items:
@@ -1771,10 +1843,14 @@ async def import_rightmove(
                 rows=db_rows,
                 on_conflict="source,external_id",
             )
+            if db_upsert_ok:
+                enqueued = _enqueue_enrichment_for_rows(source="rightmove", rows=db_rows)
         except Exception as e:
             db_error = str(e)
 
     payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
+    if enqueued:
+        payload["enrich_enqueued"] = enqueued
     if db_error:
         payload["db_error"] = db_error
 
@@ -1837,11 +1913,14 @@ async def import_onthemarket(
         items = []
     db_upsert_ok = False
     db_error: str | None = None
+    enqueued = 0
     if items:
         now_iso = _now_iso()
         db_rows = [_clean_row(p, now_iso) for p in items if isinstance(p, dict)]
         await _fill_missing_coords_from_postcode(db_rows)
         db_upsert_ok, db_error = _upsert_properties_rows(rows=db_rows)
+        if db_upsert_ok:
+            enqueued = _enqueue_enrichment_for_rows(source="onthemarket", rows=db_rows)
 
     if db_upsert_ok:
         finish_scrape_run(run_id=run_id, status="success", count_inserted=len(items))
@@ -1854,6 +1933,8 @@ async def import_onthemarket(
         )
 
     payload: Dict[str, Any] = {"count": len(items), "db_upsert_ok": db_upsert_ok}
+    if enqueued:
+        payload["enrich_enqueued"] = enqueued
     if scrape_error:
         payload["scrape_error"] = scrape_error
     if db_error:

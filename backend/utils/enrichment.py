@@ -10,6 +10,9 @@ import httpx
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.listing_keys import extract_postcode
 from backend.utils.ppd_comps import get_sold_comps_summary
+from backend.utils.rate_limiter import AsyncRateLimiter
+
+_external_limiter = AsyncRateLimiter(min_interval_sec=float(os.getenv("ENRICH_RATE_SEC", "1.0")))
 
 
 def _utcnow() -> datetime:
@@ -62,11 +65,15 @@ async def geocode_postcode(
     provider = (os.getenv("GEO_PROVIDER") or "postcodes.io").strip().lower()
     timeout = float(os.getenv("GEO_TIMEOUT_SECONDS", "10"))
 
-    async with httpx.AsyncClient(
-        timeout=timeout, headers={"User-Agent": os.getenv("GEO_USER_AGENT", "propnexus-backend")}
-    ) as client:
+    user_agent = os.getenv(
+        "GEO_USER_AGENT",
+        "PropNexus/1.0 (contact: support@propnexus.ai)",
+    )
+
+    async with httpx.AsyncClient(timeout=timeout, headers={"User-Agent": user_agent}) as client:
         if provider == "nominatim":
             # Nominatim usage policy requires a valid User-Agent.
+            await _external_limiter.wait()
             url = "https://nominatim.openstreetmap.org/search"
             params = {"q": pc, "format": "json", "limit": 1}
             r = await client.get(url, params=params)
@@ -80,6 +87,7 @@ async def geocode_postcode(
 
         # postcodes.io
         url = f"https://api.postcodes.io/postcodes/{quote(pc)}"
+        await _external_limiter.wait()
         r = await client.get(url)
         r.raise_for_status()
         payload = r.json()
@@ -100,9 +108,13 @@ async def fetch_crime_police_uk(*, latitude: float, longitude: float) -> Dict[st
     month = _last_complete_month()
     timeout = float(os.getenv("CRIME_TIMEOUT_SECONDS", "12"))
 
-    async with httpx.AsyncClient(
-        timeout=timeout, headers={"User-Agent": os.getenv("CRIME_USER_AGENT", "propnexus-backend")}
-    ) as client:
+    user_agent = os.getenv(
+        "CRIME_USER_AGENT",
+        "PropNexus/1.0 (contact: support@propnexus.ai)",
+    )
+
+    async with httpx.AsyncClient(timeout=timeout, headers={"User-Agent": user_agent}) as client:
+        await _external_limiter.wait()
         url = "https://data.police.uk/api/crimes-street/all-crime"
         params = {"lat": f"{lat:.6f}", "lng": f"{lng:.6f}", "date": month}
         r = await client.get(url, params=params)
