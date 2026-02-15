@@ -26,7 +26,6 @@ import PropertyHeader from '@/components/property_details/PropertyHeader';
 import TradesmenList from '@/components/tradesmen/TradesmenList';
 
 import type { Property } from '@/types';
-import { getSupabase } from '@/lib/supabaseClient';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { normalizeProperty } from '@/lib/normalizeProperty';
 
@@ -94,7 +93,6 @@ const fmtPct = (n: unknown): string => {
 
 export default function PropertyDetailsPage() {
   const { id } = useParams() as { id: string };
-  const sb = useMemo(() => getSupabase(), []);
   const [property, setProperty] = useState<LooseProperty | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -136,8 +134,20 @@ export default function PropertyDetailsPage() {
       setLoading(true);
       setError(null);
       try {
-        const { data, error } = await sb.from('properties').select('*').eq('id', id).single();
-        if (error) throw error;
+        const res = await fetch(`/api/properties/${encodeURIComponent(id)}`, {
+          method: 'GET',
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-store',
+          },
+        });
+
+        if (!res.ok) {
+          const t = await res.text().catch(() => '');
+          throw new Error(t || `Failed to load property (${res.status})`);
+        }
+
+        const data = await res.json().catch(() => null);
 
         const p: LooseProperty | null = data
           ? {
@@ -167,7 +177,7 @@ export default function PropertyDetailsPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, sb]);
+  }, [id]);
 
   const normalized = useMemo(() => (property ? normalizeProperty(property as any) : null), [property]);
 

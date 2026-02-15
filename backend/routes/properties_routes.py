@@ -443,6 +443,43 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         pass
 
+    # If rent/yield/roi are still missing, try a best-effort proxy via deal scoring.
+    # IMPORTANT: never write 0 placeholders; only backfill when proxy is > 0.
+    try:
+        needs_proxy = any(
+            out.get(k) is None for k in ("rent_monthly", "yield_percent", "roi_percent")
+        )
+        if (
+            needs_proxy
+            and isinstance(out.get("price"), (int, float))
+            and float(out.get("price") or 0) > 0
+        ):
+            _score, breakdown = compute_deal_score(out)
+            inputs = breakdown.get("inputs") if isinstance(breakdown, dict) else None
+            if isinstance(inputs, dict):
+                rent_v = inputs.get("rent_monthly")
+                rent_src = inputs.get("rent_source")
+                y_v = inputs.get("yield_percent")
+                roi_v = inputs.get("roi_percent")
+                roi_src = inputs.get("roi_source")
+
+                if (
+                    out.get("rent_monthly") is None
+                    and isinstance(rent_v, (int, float))
+                    and rent_v > 0
+                ):
+                    if rent_src in {"provided", "proxy"}:
+                        out["rent_monthly"] = round(float(rent_v), 2)
+
+                if out.get("yield_percent") is None and isinstance(y_v, (int, float)) and y_v > 0:
+                    out["yield_percent"] = round(float(y_v), 2)
+
+                if out.get("roi_percent") is None and isinstance(roi_v, (int, float)) and roi_v > 0:
+                    if roi_src != "missing":
+                        out["roi_percent"] = round(float(roi_v), 2)
+    except Exception:
+        pass
+
     return out
 
 

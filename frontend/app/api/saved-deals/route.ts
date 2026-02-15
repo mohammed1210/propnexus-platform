@@ -45,6 +45,21 @@ function getPropertyId(row: SavedDealRow): string | null {
   return nested || null;
 }
 
+function isPlainObject(v: unknown): v is Record<string, any> {
+  return !!v && typeof v === 'object' && !Array.isArray(v);
+}
+
+function mergeMissing(target: Record<string, any>, source: Record<string, any>, keys: string[]) {
+  for (const k of keys) {
+    if (target[k] === undefined || target[k] === null || target[k] === '') {
+      const sv = source[k];
+      if (sv !== undefined && sv !== null && sv !== '') {
+        target[k] = sv;
+      }
+    }
+  }
+}
+
 export async function GET() {
   const { userId } = await auth();
   if (!userId) {
@@ -118,11 +133,38 @@ export async function GET() {
         }
 
         const property = await propRes.json().catch(() => null);
+
+        // IMPORTANT: Saved deals often store a metric snapshot in `data` at save-time.
+        // Merge those canonical fields into the property payload so the UI can render
+        // Yield/ROI even when the properties table is missing rent/yield/roi.
+        const propObj: Record<string, any> = isPlainObject(property) ? property : {};
+        const dealObj: Record<string, any> = isPlainObject(d as any) ? (d as any) : {};
+        const dataObj: Record<string, any> = isPlainObject((d as any)?.data) ? ((d as any).data as any) : {};
+
+        const canonicalKeys = [
+          'price',
+          'rent_monthly',
+          'rent_pcm',
+          'yield_percent',
+          'rental_yield_percent',
+          'roi_percent',
+          'bedrooms',
+          'bathrooms',
+          'postcode',
+          'location',
+          'title',
+          'imageurl',
+          'image_url',
+        ];
+
+        mergeMissing(propObj, dealObj, canonicalKeys);
+        mergeMissing(propObj, dataObj, canonicalKeys);
+
         return {
           id: String(d.id),
           property_id: propertyId,
           saved_at: (d.saved_at ?? d.created_at ?? null) as string | null,
-          property,
+          property: propObj,
         };
       }),
     );
