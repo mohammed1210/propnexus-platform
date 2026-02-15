@@ -114,6 +114,12 @@ def upsert_property_enrichment_cache(
     }
     try:
         sb.table("property_enrichment_cache").upsert(row).execute()
+    except APIError as e:
+        payload0 = e.args[0] if e.args else None
+        msg = payload0.get("message") if isinstance(payload0, dict) else str(e)
+        if msg and 'relation "public.property_enrichment_cache" does not exist' in msg:
+            raise
+        return
     except Exception:
         return
 
