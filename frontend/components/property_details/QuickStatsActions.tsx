@@ -63,8 +63,8 @@ export default function QuickStatsActions({
   }, [property, propertyId, price, yieldPercent, roiPercent]);
 
   const displayPrice = typeof price === 'number' ? price : normalized.price ?? undefined;
-  const displayYield = typeof yieldPercent === 'number' ? yieldPercent : normalized.yieldPct ?? undefined;
-  const displayRoi = typeof roiPercent === 'number' ? roiPercent : normalized.roiPct ?? undefined;
+  const displayYield = typeof yieldPercent === 'number' ? yieldPercent : normalized.yieldPercent ?? undefined;
+  const displayRoi = typeof roiPercent === 'number' ? roiPercent : normalized.roiPercent ?? undefined;
 
   useEffect(() => {
     let cancelled = false;

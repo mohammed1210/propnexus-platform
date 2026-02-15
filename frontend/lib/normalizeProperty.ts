@@ -4,19 +4,21 @@ export type PropertyNormalized = {
   id: string;
   title: string;
   location: string;
-  areaLabel: string; // e.g., UB6
   price: number | null;
-
+  rentMonthly: number | null;
   bedrooms: number | null;
   bathrooms: number | null;
+  yieldPercent: number | null;
+  roiPercent: number | null;
+  imageUrl: string | null;
+  area: string | null;
 
+  /** Legacy aliases kept for compatibility across the codebase. */
+  areaLabel: string;
   yieldPct: number | null;
   roiPct: number | null;
-
   rentPcm: number | null;
   rentSource: string | null;
-
-  imageUrl: string | null;
 
   raw: AnyObj;
 };
@@ -25,13 +27,72 @@ function isFiniteNumber(v: any): v is number {
   return typeof v === 'number' && Number.isFinite(v);
 }
 
-function parseNumber(v: any): number | null {
-  if (v === null || v === undefined) return null;
-  if (isFiniteNumber(v)) return v;
-  const s = String(v).replace(/[,£$]/g, '').trim();
+function firstNumberFromString(raw: string): number | null {
+  const s = String(raw)
+    .replace(/\u00A0/g, ' ')
+    .replace(/[,]/g, '')
+    .trim();
   if (!s) return null;
-  const n = Number(s);
+  const m = s.match(/-?\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const n = Number(m[0]);
   return Number.isFinite(n) ? n : null;
+}
+
+function normalizeFractionalPercent(n: number, source: unknown): number {
+  // Heuristic: scraped feeds sometimes store 0.089 instead of 8.9.
+  // If the value looks fractional and there's no explicit % in the source, treat as a fraction.
+  const src = typeof source === 'string' ? source : '';
+  if (n > 0 && n < 1 && !src.includes('%')) return n * 100;
+  return n;
+}
+
+export function parseMoney(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (isFiniteNumber(value)) return value;
+  if (typeof value === 'string') {
+    const cleaned = value
+      .replace(/\b(price|asking|list(?:ing)?|rent|pcm|per\s*month|per\s*week|pw|pa)\b/gi, ' ')
+      .replace(/[£$€]/g, ' ')
+      .replace(/\s+/g, ' ');
+    return firstNumberFromString(cleaned);
+  }
+  return null;
+}
+
+export function parsePercent(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (isFiniteNumber(value)) return normalizeFractionalPercent(value, value);
+  if (typeof value === 'string') {
+    const cleaned = value
+      .replace(/\b(yield|roi|return|gross|net)\b/gi, ' ')
+      .replace(/[%]/g, ' ')
+      .replace(/\s+/g, ' ');
+    const n = firstNumberFromString(cleaned);
+    return n == null ? null : normalizeFractionalPercent(n, value);
+  }
+  return null;
+}
+
+export function parseRent(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (isFiniteNumber(value)) return value;
+  if (typeof value === 'string') {
+    const lower = value.toLowerCase();
+    const n = parseMoney(value);
+    if (n == null) return null;
+    if (/(\bpw\b|per\s*week)/.test(lower)) return (n * 52) / 12;
+    if (/(\bpa\b|per\s*annum|per\s*year)/.test(lower)) return n / 12;
+    return n;
+  }
+  return parseMoney(value);
+}
+
+function parseCount(value: unknown): number | null {
+  const n = value == null ? null : isFiniteNumber(value) ? value : typeof value === 'string' ? firstNumberFromString(value) : null;
+  if (n == null) return null;
+  const rounded = Math.round(n);
+  return Number.isFinite(rounded) ? rounded : null;
 }
 
 function getAreaFromLocation(location: string) {
@@ -75,75 +136,120 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
     getAreaFromLocation(location) ||
     '';
 
+  const area =
+    (typeof p?.area_key === 'string' && p.area_key.trim()) ||
+    (typeof p?.area === 'string' && p.area.trim()) ||
+    (areaLabel ? String(areaLabel) : null);
+
   const price =
-    parseNumber(p?.price) ??
-    parseNumber(p?.price_gbp) ??
-    parseNumber(p?.asking_price) ??
+    parseMoney(p?.price) ??
+    parseMoney(p?.price_gbp) ??
+    parseMoney(p?.asking_price) ??
+    parseMoney(p?.askingPrice) ??
+    parseMoney(p?.listing_price) ??
+    parseMoney(p?.listingPrice) ??
     null;
 
   const bedrooms =
-    parseNumber(p?.bedrooms) ??
-    parseNumber(p?.beds) ??
-    parseNumber(p?.num_bedrooms) ??
+    parseCount(p?.bedrooms) ??
+    parseCount(p?.beds) ??
+    parseCount(p?.bed_count) ??
+    parseCount(p?.bedCount) ??
+    parseCount(p?.num_bedrooms) ??
     null;
 
   const bathrooms =
-    parseNumber(p?.bathrooms) ??
-    parseNumber(p?.baths) ??
-    parseNumber(p?.num_bathrooms) ??
+    parseCount(p?.bathrooms) ??
+    parseCount(p?.baths) ??
+    parseCount(p?.bath_count) ??
+    parseCount(p?.bathCount) ??
+    parseCount(p?.num_bathrooms) ??
     null;
 
-  const yieldPct =
-    parseNumber(p?.yield_percent) ??
-    parseNumber(p?.yieldPct) ??
-    parseNumber(p?.yield) ??
-    parseNumber(p?.rental_yield) ??
-    parseNumber(p?.rentalYield) ??
-    parseNumber(p?.rental_yield_percent) ??
+  let yieldPercent =
+    parsePercent(p?.yield_percent) ??
+    parsePercent(p?.yieldPercent) ??
+    parsePercent(p?.yieldPct) ??
+    parsePercent(p?.yield) ??
+    parsePercent(p?.yield_percent_gross) ??
+    parsePercent(p?.gross_yield) ??
+    parsePercent(p?.grossYield) ??
+    parsePercent(p?.rental_yield) ??
+    parsePercent(p?.rentalYield) ??
+    parsePercent(p?.rental_yield_percent) ??
+    parsePercent(p?.rentalYieldPercent) ??
+    parsePercent(p?.rental_yield_pct) ??
     null;
 
-  const roiPct =
-    parseNumber(p?.roi_percent) ??
-    parseNumber(p?.roiPct) ??
-    parseNumber(p?.roi) ??
-    parseNumber(p?.roi_pct) ??
-    parseNumber(p?.roiPercent) ??
-    parseNumber(p?.roi_percentage) ??
+  const roiPercent =
+    parsePercent(p?.roi_percent) ??
+    parsePercent(p?.roiPercent) ??
+    parsePercent(p?.roiPct) ??
+    parsePercent(p?.roi) ??
+    parsePercent(p?.roi_pct) ??
+    parsePercent(p?.roi_percentage) ??
+    parsePercent(p?.roiPercentage) ??
     null;
 
-  const rentPcm =
-    parseNumber(p?.rent_pcm) ??
-    parseNumber(p?.rent_per_month) ??
-    parseNumber(p?.rent_monthly) ??
-    parseNumber(p?.rent_estimate) ??
-    parseNumber(p?.rent) ??
+  const rentMonthly =
+    parseRent(p?.rent) ??
+    parseRent(p?.rent_pcm) ??
+    parseRent(p?.rentPcm) ??
+    parseRent(p?.rent_per_month) ??
+    parseRent(p?.rentPerMonth) ??
+    parseRent(p?.rent_monthly) ??
+    parseRent(p?.rentMonthly) ??
+    parseRent(p?.monthly_rent) ??
+    parseRent(p?.monthlyRent) ??
+    parseRent(p?.monthly_rent_estimate) ??
+    parseRent(p?.monthlyRentEstimate) ??
+    parseRent(p?.estimated_rent) ??
+    parseRent(p?.rent_estimate) ??
+    parseRent(p?.rentEstimate) ??
     null;
 
   const rentSource =
     p?.rent_source ||
     p?.rentSource ||
-    (rentPcm ? 'Proxy' : null);
+    (rentMonthly ? 'Proxy' : null);
 
   const imageUrl =
     p?.imageurl ||
+    p?.imageUrl ||
     p?.image_url ||
+    p?.thumbnail ||
     p?.image ||
     (Array.isArray(p?.images) && p.images.length ? p.images[0] : null) ||
+    (Array.isArray(p?.photos) && p.photos.length ? p.photos[0] : null) ||
     null;
+
+  // Fallback yield calculation (only if missing and rent+price exist)
+  if (yieldPercent == null && typeof rentMonthly === 'number' && rentMonthly > 0 && typeof price === 'number' && price > 0) {
+    yieldPercent = (rentMonthly * 12 * 100) / price;
+  }
+
+  const yieldPct = yieldPercent;
+  const roiPct = roiPercent;
+  const rentPcm = rentMonthly;
 
   return {
     id,
     title: String(title),
     location: String(location),
-    areaLabel: String(areaLabel),
     price,
+    rentMonthly,
     bedrooms,
     bathrooms,
+    yieldPercent,
+    roiPercent,
+    imageUrl: imageUrl ? String(imageUrl) : null,
+    area: area ? String(area) : null,
+
+    areaLabel: String(areaLabel),
     yieldPct,
     roiPct,
     rentPcm,
     rentSource: rentSource ? String(rentSource) : null,
-    imageUrl: imageUrl ? String(imageUrl) : null,
     raw: p,
   };
 }

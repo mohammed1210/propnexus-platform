@@ -401,13 +401,13 @@ export default function SavedDealsView() {
               const price = moneyGBP(norm.price);
               const beds = typeof norm.bedrooms === 'number' ? String(norm.bedrooms) : '—';
               const baths = typeof norm.bathrooms === 'number' ? String(norm.bathrooms) : '—';
-              const y = formatPercent(norm.yieldPct);
-              const roi = formatPercent(norm.roiPct);
+              const y = formatPercent(norm.yieldPercent);
+              const roi = formatPercent(norm.roiPercent);
               const savedOn = formatDate(d.saved_at ?? d.created_at ?? null);
               const scoreRaw = Number((p as any)?.ai_score ?? (p as any)?.score);
               const score = Number.isFinite(scoreRaw) ? scoreRaw : 60;
-              const rent = moneyGBP(norm.rentPcm);
-              const area = norm.areaLabel || areaLabel(p);
+              const rent = moneyGBP(norm.rentMonthly);
+              const area = norm.area || norm.areaLabel || areaLabel(p);
 
               const selectedOn = !!selected[pid];
               const compareDisabled = !selectedOn && selectedIds.length >= 4;
@@ -563,19 +563,23 @@ export default function SavedDealsView() {
                         },
                         {
                           label: 'Yield',
-                          get: (p: ReturnType<typeof normalizeProperty>) => formatPercent(p.yieldPct),
+                          get: (p: ReturnType<typeof normalizeProperty>) =>
+                            formatPercent(p.yieldPercent ?? p.yieldPct),
                         },
                         {
                           label: 'ROI',
-                          get: (p: ReturnType<typeof normalizeProperty>) => formatPercent(p.roiPct),
+                          get: (p: ReturnType<typeof normalizeProperty>) =>
+                            formatPercent(p.roiPercent ?? p.roiPct),
                         },
                         {
                           label: 'Rent / mo',
-                          get: (p: ReturnType<typeof normalizeProperty>) => moneyGBP(p.rentPcm),
+                          get: (p: ReturnType<typeof normalizeProperty>) =>
+                            moneyGBP(p.rentMonthly ?? p.rentPcm),
                         },
                         {
                           label: 'Area',
-                          get: (p: ReturnType<typeof normalizeProperty>) => p.areaLabel || '—',
+                          get: (p: ReturnType<typeof normalizeProperty>) =>
+                            p.area || p.areaLabel || '—',
                         },
                       ] as const
                     ).map((row) => (

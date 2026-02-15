@@ -169,48 +169,12 @@ export default function PropertyDetailsPage() {
     };
   }, [id, sb]);
 
-  const price = typeof (property as any)?.price === 'number' ? (property as any).price : 0;
-
   const normalized = useMemo(() => (property ? normalizeProperty(property as any) : null), [property]);
 
-  const rentMonthly = useMemo((): number | undefined => {
-    if (!property) return undefined;
-    const candidates = [
-      (property as any)?.monthly_rent,
-      (property as any)?.rent_pcm,
-      (property as any)?.rent_per_month,
-      (property as any)?.rent,
-    ]
-      .map((x) => toNum(x))
-      .filter((n): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0);
-
-    return candidates[0];
-  }, [property]);
-
-  const yieldPercent = useMemo((): number | undefined => {
-    if (!property) return undefined;
-    const stored = normalized?.yieldPct;
-    if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
-
-    const p = toNum((property as any)?.price);
-    if (typeof p === 'number' && p > 0 && typeof rentMonthly === 'number') {
-      return (rentMonthly * 12 * 100) / p;
-    }
-    return undefined;
-  }, [normalized, property, rentMonthly]);
-
-  const roiPercent = useMemo((): number | undefined => {
-    if (!property) return undefined;
-    const stored = normalized?.roiPct;
-    if (typeof stored === 'number' && Number.isFinite(stored)) return stored;
-
-    const p = toNum((property as any)?.price);
-    if (typeof p === 'number' && p > 0 && typeof rentMonthly === 'number') {
-      // Fallback (requested): ROI ≈ (rent_estimate * 12) / price
-      return (rentMonthly * 12 * 100) / p;
-    }
-    return undefined;
-  }, [normalized, property, rentMonthly]);
+  const price = normalized?.price ?? 0;
+  const rentMonthly = normalized?.rentMonthly ?? undefined;
+  const yieldPercent = normalized?.yieldPercent ?? undefined;
+  const roiPercent = normalized?.roiPercent ?? undefined;
 
   const estValue = useMemo((): number | undefined => {
     if (!property) return undefined;
@@ -292,7 +256,7 @@ export default function PropertyDetailsPage() {
       <QuickStatsActions
         propertyId={String(property.id ?? id)}
         property={property}
-        price={property.price ?? undefined}
+        price={normalized?.price ?? undefined}
         yieldPercent={yieldPercent}
         roiPercent={roiPercent}
         discountPercent={discountPercent}

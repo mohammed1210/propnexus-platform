@@ -65,8 +65,14 @@ function discountBucket(discountPct: number): { points: number; label: string } 
 
 export function buildVerdict(input: VerdictInput): VerdictOutput {
   const normProp = normalizeProperty(input as any);
-  const yieldPct = typeof normProp.yieldPct === 'number' ? normProp.yieldPct : toNum(input.yield_percent);
-  const roiPct = typeof normProp.roiPct === 'number' ? normProp.roiPct : toNum(input.roi_percent);
+  const yieldPct = typeof normProp.yieldPercent === 'number' ? normProp.yieldPercent : toNum(input.yield_percent);
+  const directRoiPct = typeof normProp.roiPercent === 'number' ? normProp.roiPercent : toNum(input.roi_percent);
+  const proxyRoiPct =
+    directRoiPct == null && typeof yieldPct === 'number'
+      ? clamp(yieldPct * 1.2, 0, 25)
+      : undefined;
+  const roiPct = directRoiPct ?? proxyRoiPct;
+  const usedRoiProxy = directRoiPct == null && typeof proxyRoiPct === 'number';
   const score = toNum(input.ai_score ?? input.score);
   const discountPct = toNum(input.discount_percent);
 
@@ -100,13 +106,13 @@ export function buildVerdict(input: VerdictInput): VerdictOutput {
 
   const highlights: string[] = [];
   if (typeof yieldPct === 'number') highlights.push(`${fmtPct(yieldPct)} yield`);
-  if (typeof roiPct === 'number') highlights.push(`${fmtPct(roiPct)} ROI`);
+  if (typeof roiPct === 'number') highlights.push(`${fmtPct(roiPct)} ${usedRoiProxy ? 'ROI (proxy)' : 'ROI'}`);
   if (typeof discountPct === 'number') highlights.push(`${discountPct.toFixed(0)}% discount`);
   if (typeof score === 'number') highlights.push(`${Math.round(score)}/100 score`);
 
   const bullets: string[] = [];
   if (typeof yieldPct === 'number') bullets.push(`Yield: ${fmtPct(yieldPct)} (rule-based)`);
-  if (typeof roiPct === 'number') bullets.push(`ROI: ${fmtPct(roiPct)} (rule-based)`);
+  if (typeof roiPct === 'number') bullets.push(`ROI: ${fmtPct(roiPct)} (${usedRoiProxy ? 'proxy from yield' : 'rule-based'})`);
   if (typeof discountPct === 'number') bullets.push(`Discount: ${discountPct.toFixed(0)}% (if estimated value is accurate)`);
   if (typeof score === 'number') bullets.push(`Stored score: ${Math.round(score)}/100`);
 
@@ -123,7 +129,7 @@ export function buildVerdict(input: VerdictInput): VerdictOutput {
 
   const sentenceParts: string[] = [];
   if (typeof yieldPct === 'number') sentenceParts.push(`~${fmtPct(yieldPct)} yield`);
-  if (typeof roiPct === 'number') sentenceParts.push(`~${fmtPct(roiPct)} ROI`);
+  if (typeof roiPct === 'number') sentenceParts.push(`~${fmtPct(roiPct)} ${usedRoiProxy ? 'ROI (proxy)' : 'ROI'}`);
   if (typeof discountPct === 'number') sentenceParts.push(`~${discountPct.toFixed(0)}% discount`);
 
   const sentence =
