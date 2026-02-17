@@ -12,8 +12,10 @@ from typing import Any, Dict, Optional
 from dotenv import load_dotenv
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
+from backend.routes.properties_routes import _attach_cached_enrichment
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
+from backend.utils.enrichment_store import get_property_enrichment_cache
 from supabase import Client, create_client
 
 load_dotenv()
@@ -479,6 +481,22 @@ async def list_saved_deals(
             try:
                 apply_canonical_metrics(r)
             except Exception:
+                pass
+
+        # Best-effort: attach cached enrichment and let it override stale/proxy metrics.
+        # This mirrors /properties/{id} behavior and conditionally recomputes score in-memory.
+        for r in merged_rows:
+            if not isinstance(r, dict):
+                continue
+            pid = r.get("property_id")
+            if not pid:
+                continue
+            try:
+                cached = get_property_enrichment_cache(sb, str(pid))
+                payload = cached.get("payload") if isinstance(cached, dict) else None
+                _attach_cached_enrichment(r, payload)
+            except Exception:
+                # Fail silently if cache table is missing/unavailable.
                 pass
 
         return {"data": merged_rows}

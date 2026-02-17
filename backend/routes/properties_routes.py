@@ -49,15 +49,47 @@ def _coord_missing(lat: Optional[float], lng: Optional[float]) -> bool:
     return lat is None or lng is None or _is_zero_coord(lat, lng)
 
 
-def _should_override_metric(existing: Optional[float], *, is_proxy: bool) -> bool:
+def _should_override_metric(
+    existing: Optional[float], *, is_proxy: bool, derived_value: Any | None = None
+) -> bool:
+    # Override if missing/unparseable.
     if existing is None:
         return True
+
+    # Override if existing was marked as proxy.
+    if bool(is_proxy):
+        return True
+
     try:
-        if float(existing) == 0.0:
+        existing_f = float(existing)
+    except Exception:
+        return True
+
+    # Override zero placeholders.
+    try:
+        if existing_f == 0.0:
             return True
     except Exception:
         return True
-    return bool(is_proxy)
+
+    # If we have a derived value, override when it differs materially.
+    if derived_value is not None:
+        try:
+            derived_f = float(derived_value)
+
+            # Heuristic: percentage metrics are typically small (single/double digits),
+            # whereas rent_monthly is usually in the hundreds/thousands.
+            threshold = 1.0
+            if abs(existing_f) > 50 or abs(derived_f) > 50:
+                threshold = 100.0
+
+            if abs(existing_f - derived_f) > threshold:
+                return True
+        except Exception:
+            # If derived can't be parsed, do not force override on diff.
+            pass
+
+    return False
 
 
 def _start_enrichment_thread(property_id: str) -> None:
@@ -133,7 +165,7 @@ def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
         d_roi = derived.get("roi_percent")
 
         if d_roi is not None and _should_override_metric(
-            item.get("roi_percent"), is_proxy=roi_is_proxy
+            item.get("roi_percent"), is_proxy=roi_is_proxy, derived_value=d_roi
         ):
             try:
                 item["roi_percent"] = float(d_roi)
@@ -143,7 +175,7 @@ def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
                 pass
 
         if d_yield is not None and _should_override_metric(
-            item.get("yield_percent"), is_proxy=False
+            item.get("yield_percent"), is_proxy=False, derived_value=d_yield
         ):
             try:
                 item["yield_percent"] = float(d_yield)
@@ -152,7 +184,7 @@ def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
                 pass
 
         if d_rent is not None and _should_override_metric(
-            item.get("rent_monthly"), is_proxy=rent_is_proxy
+            item.get("rent_monthly"), is_proxy=rent_is_proxy, derived_value=d_rent
         ):
             try:
                 item["rent_monthly"] = float(d_rent)
