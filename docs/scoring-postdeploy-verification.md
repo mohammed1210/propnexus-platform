@@ -11,6 +11,13 @@ export ADMIN_TOKEN="<admin-token>"
 
 ## Force rescore recent rows
 
+## Enqueue newest daily enrichment (cron)
+
+```bash
+curl -X POST "$BACKEND_URL/enrich/queue/enqueue-newest-daily?limit=100&hours=24" \
+  -H "x-admin-token: $IMPORT_ADMIN_TOKEN"
+```
+
 ## (Optional) Backfill postcodes first
 
 If you recently improved postcode extraction/backfill, run this once so older rows get a postcode district (e.g. SW11, W1K, EC1V):

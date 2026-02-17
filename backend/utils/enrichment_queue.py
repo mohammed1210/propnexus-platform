@@ -174,6 +174,187 @@ def enqueue_property_ids(
     return {"requested": requested, "attempted": attempted, "enqueued": int(enq)}
 
 
+def _is_missing_table_error(exc: Exception, table_name: str) -> bool:
+    name = (table_name or "").strip()
+    if not name:
+        return False
+
+    msg = str(exc) or ""
+    if not msg:
+        payload = exc.args[0] if getattr(exc, "args", None) else None
+        msg = payload.get("message") if isinstance(payload, dict) else ""
+    msg = msg or ""
+
+    # PostgREST/Supabase commonly formats missing-table errors this way.
+    return "does not exist" in msg and (
+        f"public.{name}" in msg or f'"{name}"' in msg or name in msg
+    )
+
+
+def list_newest_property_ids_needing_enrichment(
+    limit: int = 100,
+    hours: int = 24,
+    *,
+    sb: Any | None = None,
+    now: datetime | None = None,
+) -> Dict[str, Any]:
+    """Select newest property IDs that likely need enrichment.
+
+    Excludes rows that were enriched recently (property_enrichment_cache.fetched_at)
+    or that are already in the queue recently (enrichment_jobs pending/processing).
+
+    Returns a dict shaped for easy API responses:
+      { ok, scanned, eligible, ids?, error? }
+
+    Safe behavior:
+    - If Supabase isn't configured or required tables are missing, returns ok=False.
+    """
+
+    try:
+        lim = int(limit or 0)
+    except Exception:
+        lim = 100
+    lim = max(1, min(lim, 200))
+
+    try:
+        hrs = int(hours or 0)
+    except Exception:
+        hrs = 24
+    hrs = max(1, min(hrs, 24 * 14))
+
+    client = sb or _get_supabase_from_env()
+    if not client:
+        return {
+            "ok": False,
+            "scanned": 0,
+            "eligible": 0,
+            "ids": [],
+            "error": "Supabase not configured",
+        }
+
+    anchor = now.astimezone(timezone.utc) if isinstance(now, datetime) else _now_utc()
+    cutoff_iso = (anchor - timedelta(hours=hrs)).isoformat()
+
+    # Scan newest within window; overscan to allow exclusions.
+    scan_limit = min(2000, max(200, lim * 10))
+
+    try:
+        res = (
+            client.table("properties")
+            .select("id,created_at")
+            .gte("created_at", cutoff_iso)
+            .order("created_at", desc=True)
+            .limit(int(scan_limit))
+            .execute()
+        )
+        rows = getattr(res, "data", None) or []
+    except Exception as e:
+        return {
+            "ok": False,
+            "scanned": 0,
+            "eligible": 0,
+            "ids": [],
+            "error": f"Failed to query properties: {e}",
+        }
+
+    candidate_ids: list[str] = []
+    if isinstance(rows, list):
+        for r in rows:
+            if not isinstance(r, dict):
+                continue
+            pid = r.get("id")
+            if isinstance(pid, str) and pid.strip():
+                candidate_ids.append(pid.strip())
+
+    scanned = len(candidate_ids)
+    if scanned == 0:
+        return {"ok": True, "scanned": 0, "eligible": 0, "ids": []}
+
+    # Exclude recently enriched.
+    try:
+        cache_res = (
+            client.table("property_enrichment_cache")
+            .select("property_id,fetched_at")
+            .in_("property_id", candidate_ids)
+            .gte("fetched_at", cutoff_iso)
+            .execute()
+        )
+        cache_rows = getattr(cache_res, "data", None) or []
+    except Exception as e:
+        if _is_missing_table_error(e, "property_enrichment_cache"):
+            return {
+                "ok": False,
+                "scanned": scanned,
+                "eligible": 0,
+                "ids": [],
+                "error": "Missing table 'public.property_enrichment_cache'",
+            }
+        return {
+            "ok": False,
+            "scanned": scanned,
+            "eligible": 0,
+            "ids": [],
+            "error": f"Failed to query property_enrichment_cache: {e}",
+        }
+
+    enriched_recently: set[str] = set()
+    if isinstance(cache_rows, list):
+        for r in cache_rows:
+            if isinstance(r, dict) and isinstance(r.get("property_id"), str):
+                enriched_recently.add(r["property_id"].strip())
+
+    # Exclude recently enqueued pending/processing.
+    try:
+        jobs_res = (
+            client.table("enrichment_jobs")
+            .select("property_id,status,updated_at")
+            .in_("property_id", candidate_ids)
+            .in_("status", ["pending", "processing"])
+            .gte("updated_at", cutoff_iso)
+            .execute()
+        )
+        jobs_rows = getattr(jobs_res, "data", None) or []
+    except Exception as e:
+        if _is_missing_table_error(e, "enrichment_jobs") or _is_missing_queue_table_error(e):
+            return {
+                "ok": False,
+                "scanned": scanned,
+                "eligible": 0,
+                "ids": [],
+                "error": "Missing table 'public.enrichment_jobs'",
+            }
+        return {
+            "ok": False,
+            "scanned": scanned,
+            "eligible": 0,
+            "ids": [],
+            "error": f"Failed to query enrichment_jobs: {e}",
+        }
+
+    enqueued_recently: set[str] = set()
+    if isinstance(jobs_rows, list):
+        for r in jobs_rows:
+            if isinstance(r, dict) and isinstance(r.get("property_id"), str):
+                enqueued_recently.add(r["property_id"].strip())
+
+    eligible_ids: list[str] = []
+    for pid in candidate_ids:
+        if pid in enriched_recently:
+            continue
+        if pid in enqueued_recently:
+            continue
+        eligible_ids.append(pid)
+        if len(eligible_ids) >= lim:
+            break
+
+    return {
+        "ok": True,
+        "scanned": scanned,
+        "eligible": len(eligible_ids),
+        "ids": eligible_ids,
+    }
+
+
 def fetch_next_job(supabase: Any) -> Optional[Dict[str, Any]]:
     res = (
         supabase.table("enrichment_jobs")

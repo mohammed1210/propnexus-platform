@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 
-from backend.utils.enrichment_queue import enqueue_job, queue_stats
+from backend.utils.enrichment_queue import (
+    enqueue_job,
+    list_newest_property_ids_needing_enrichment,
+    queue_stats,
+)
 from backend.utils.supabase_client import get_supabase
 
 try:
@@ -13,6 +18,12 @@ except Exception:  # pragma: no cover
     APIError = Exception  # type: ignore
 
 router = APIRouter(prefix="/enrich/queue", tags=["enrich"])
+
+
+def _require_admin(x_admin_token: str | None = None) -> None:
+    required = os.getenv("IMPORT_ADMIN_TOKEN")
+    if required and x_admin_token != required:
+        raise HTTPException(status_code=401, detail="Admin token required")
 
 
 def _raise_if_queue_table_missing(exc: Exception) -> None:
@@ -105,3 +116,77 @@ def enqueue_newest(limit: int = Query(default=25, ge=1, le=200)) -> Dict[str, An
     except Exception as e:
         _raise_if_queue_table_missing(e)
         raise
+
+
+@router.post("/enqueue-newest-daily")
+def enqueue_newest_daily(
+    limit: int = Query(default=100, ge=1, le=200),
+    hours: int = Query(default=24, ge=1, le=24 * 14),
+    x_admin_token: str | None = Header(None),
+) -> Dict[str, Any]:
+    """Cron-style endpoint: enqueue newest properties needing enrichment.
+
+    Production safety:
+    - Admin protected (x-admin-token).
+    - Idempotent-ish: excludes recently enriched and recently queued items.
+    - Safe if required tables are missing (returns ok=false, does not crash).
+    """
+
+    _require_admin(x_admin_token)
+
+    sb = get_supabase()
+    if not sb:
+        return {
+            "ok": False,
+            "scanned": 0,
+            "eligible": 0,
+            "enqueued": 0,
+            "error": "Supabase not configured",
+        }
+
+    res = list_newest_property_ids_needing_enrichment(limit=int(limit), hours=int(hours), sb=sb)
+    if not bool(res.get("ok")):
+        return {
+            "ok": False,
+            "scanned": int(res.get("scanned") or 0),
+            "eligible": int(res.get("eligible") or 0),
+            "enqueued": 0,
+            **({"error": res.get("error")} if res.get("error") else {}),
+        }
+
+    ids = res.get("ids") if isinstance(res, dict) else None
+    ids_list: List[str] = (
+        [s for s in ids if isinstance(s, str) and s.strip()] if isinstance(ids, list) else []
+    )
+
+    enqueued = 0
+    for i, pid in enumerate(ids_list):
+        try:
+            enqueue_job(sb, pid, delay_seconds=i)
+            enqueued += 1
+        except Exception as e:
+            # If the queue table is missing, surface a clean ok=false response.
+            try:
+                _raise_if_queue_table_missing(e)
+            except HTTPException as he:
+                return {
+                    "ok": False,
+                    "scanned": int(res.get("scanned") or 0),
+                    "eligible": int(res.get("eligible") or 0),
+                    "enqueued": int(enqueued),
+                    "error": str(he.detail),
+                }
+            return {
+                "ok": False,
+                "scanned": int(res.get("scanned") or 0),
+                "eligible": int(res.get("eligible") or 0),
+                "enqueued": int(enqueued),
+                "error": f"Enqueue failed: {e}",
+            }
+
+    return {
+        "ok": True,
+        "scanned": int(res.get("scanned") or 0),
+        "eligible": int(res.get("eligible") or 0),
+        "enqueued": int(enqueued),
+    }

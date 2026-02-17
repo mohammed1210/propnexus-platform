@@ -1,0 +1,60 @@
+name: Enrich newest daily
+
+on:
+  schedule:
+    - cron: "15 3 * * *" # 03:15 UTC daily
+  workflow_dispatch:
+
+jobs:
+  enqueue:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enqueue newest needing enrichment
+        env:
+          BACKEND_URL: ${{ secrets.BACKEND_URL }}
+          IMPORT_ADMIN_TOKEN: ${{ secrets.IMPORT_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${BACKEND_URL:-}" ]]; then
+            echo "Missing BACKEND_URL secret" >&2
+            exit 1
+          fi
+          if [[ -z "${IMPORT_ADMIN_TOKEN:-}" ]]; then
+            echo "Missing IMPORT_ADMIN_TOKEN secret" >&2
+            exit 1
+          fi
+
+          url="${BACKEND_URL%/}/enrich/queue/enqueue-newest-daily?limit=100&hours=24"
+          echo "POST $url"
+
+          resp="$(curl -fsS -X POST "$url" \
+            -H "x-admin-token: $IMPORT_ADMIN_TOKEN" \
+            -H "Content-Type: application/json")"
+
+          echo "$resp"
+
+          echo "$resp" | python - <<'PY'
+          import json
+          import sys
+
+          try:
+              data = json.load(sys.stdin)
+          except Exception as e:
+              print(f"Invalid JSON response: {e}", file=sys.stderr)
+              sys.exit(1)
+
+          if not isinstance(data, dict):
+              print("Response is not a JSON object", file=sys.stderr)
+              sys.exit(1)
+
+          if "error" in data:
+              print(f"Endpoint returned error: {data.get('error')}", file=sys.stderr)
+              sys.exit(1)
+
+          if data.get("ok") is not True:
+              print(f"Endpoint ok != true: {data.get('ok')}", file=sys.stderr)
+              sys.exit(1)
+
+          sys.exit(0)
+          PY
