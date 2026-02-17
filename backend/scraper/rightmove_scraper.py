@@ -86,6 +86,13 @@ RIGHTMOVE_API_BASE = "https://www.rightmove.co.uk/api/_search"
 SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 
 
+def _should_render_with_scraperapi(target_url: str) -> bool:
+    """Rightmove search pages often need JS rendering for cards to exist."""
+
+    u = (target_url or "").lower()
+    return "rightmove.co.uk/property-for-sale/find.html" in u
+
+
 def _extract_balanced_json_object(text: str, start_index: int) -> Optional[str]:
     """Extract a balanced JSON object starting at start_index (which must point at '{')."""
     if start_index < 0 or start_index >= len(text) or text[start_index] != "{":
@@ -887,8 +894,8 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             )
             url_to_fetch = url
         else:
-            # Rightmove typically includes embedded state in the HTML; rendering increases latency.
-            url_to_fetch = make_scraperapi_url(url, render=False)
+            # Rightmove listing pages frequently require JS rendering for property cards.
+            url_to_fetch = make_scraperapi_url(url, render=_should_render_with_scraperapi(url))
             print(f"ℹ️ Using ScraperAPI for Rightmove HTML fetch: {url}")
     else:
         # Direct mode - use original URL
@@ -920,7 +927,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 try:
                     retry_url = make_scraperapi_url(
                         url,
-                        render=False,
+                        render=_should_render_with_scraperapi(url),
                         premium=_has_challenge_marker(text)
                         or any(k in (text or "").lower() for k in CAPTCHA_KEYWORDS),
                         ultra_premium=False,
@@ -964,7 +971,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         (
                             "rightmove-minimal-url-retry",
                             dict(
-                                render=False,
+                                render=_should_render_with_scraperapi(minimal_target),
                                 premium=False,
                                 ultra_premium=False,
                                 country_code=None,
@@ -977,7 +984,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         (
                             "rightmove-minimal-url-retry-gb",
                             dict(
-                                render=False,
+                                render=_should_render_with_scraperapi(minimal_target),
                                 premium=False,
                                 ultra_premium=False,
                                 country_code="gb",
@@ -990,7 +997,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         (
                             "rightmove-minimal-url-retry-uk",
                             dict(
-                                render=False,
+                                render=_should_render_with_scraperapi(minimal_target),
                                 premium=False,
                                 ultra_premium=False,
                                 country_code="uk",
@@ -1003,7 +1010,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         (
                             "rightmove-minimal-url-premium-retry",
                             dict(
-                                render=False,
+                                render=_should_render_with_scraperapi(minimal_target),
                                 premium=True,
                                 ultra_premium=False,
                                 country_code=None,
@@ -1029,7 +1036,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         (
                             "rightmove-minimal-url-ultra-premium-retry",
                             dict(
-                                render=False,
+                                render=_should_render_with_scraperapi(minimal_target),
                                 premium=False,
                                 ultra_premium=True,
                                 country_code=None,
@@ -1070,7 +1077,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                     attempts = [
                         (
                             "scraperapi-premium-retry",
-                            dict(premium=True, ultra_premium=False, render=False),
+                            dict(premium=True, ultra_premium=False, render=True),
                             90,
                         ),
                         (
@@ -1080,7 +1087,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         ),
                         (
                             "scraperapi-ultra-premium-retry",
-                            dict(premium=False, ultra_premium=True, render=False),
+                            dict(premium=False, ultra_premium=True, render=True),
                             90,
                         ),
                         (
@@ -1125,7 +1132,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             # If direct mode and we detect blocking, try ScraperAPI as fallback
             if mode == "direct" and _looks_blocked(text, resp.status) and SCRAPERAPI_KEY:
                 log_scraperapi_fallback("rightmove", url)
-                proxy_url = make_scraperapi_url(url, render=False)
+                proxy_url = make_scraperapi_url(url, render=_should_render_with_scraperapi(url))
                 print(f"ℹ️ Fallback to ScraperAPI for blocked URL: {url}")
                 try:
                     async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
@@ -1158,7 +1165,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
         if SCRAPERAPI_KEY:
             print(f"⚠️ Direct fetch failed, trying ScraperAPI fallback: {e}")
             try:
-                proxy_url = make_scraperapi_url(url, render=False)
+                proxy_url = make_scraperapi_url(url, render=_should_render_with_scraperapi(url))
                 async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
                     p_text = await p_resp.text()
                     log_fetch_diagnostics(
@@ -1453,36 +1460,8 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
     with RunLog.start(source="rightmove", mode=SCRAPER_MODE, location=location) as run_log:
         try:
             async with aiohttp.ClientSession() as session:
-                # 1. Attempt JSON API first for efficiency & reliability
-                loc_key = (location or "").strip().lower()
-                region_id = _LOCATION_IDENTIFIER.get(loc_key)
-                api_results: List[Dict[str, Any]] = []
-                if region_id:
-                    try:
-                        api_results = await _fetch_api_properties(session, region_id, limit)
-                        if api_results:
-                            print(
-                                f"✅ Rightmove API returned {len(api_results)} properties for '{location}'"
-                            )
-                            # Validate and clean API results
-                            validated_results = []
-                            for prop in api_results:
-                                should_insert, reason = should_insert_property(prop)
-                                if should_insert:
-                                    validated_results.append(clean_property_data(prop))
-                                else:
-                                    stats.log_validation_failure(reason or "Unknown")
-                            stats.successful_parses = len(validated_results)
-                            stats.log_summary()
-                            results = validated_results[:limit]
-                            run_log.set_count(len(results))
-                            return results
-                        else:
-                            print(
-                                "ℹ️ Rightmove API returned zero properties; falling back to HTML scraping."
-                            )
-                    except Exception as e:
-                        print(f"⚠️ Rightmove API fetch error: {e}; falling back to HTML scraping.")
+                # NOTE: Do not use Rightmove JSON endpoints in production.
+                # They are frequently blocked/404. Always prefer search HTML.
                 for page in range(RM_MAX_PAGES):
                     url = _build_search_url(location, page)
                     html = await _fetch_html(session, url)
@@ -1791,7 +1770,12 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 "longitude": coords["longitude"],
                                 "source": "rightmove",
                                 "raw_url": listing_url or url,
-                                "listing_url": listing_url,
+                                "url": listing_url
+                                or (
+                                    f"https://www.rightmove.co.uk/properties/{external_id}"
+                                    if str(external_id).isdigit()
+                                    else None
+                                ),
                             }
 
                             # Track missing fields
