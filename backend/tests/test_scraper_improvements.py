@@ -424,7 +424,7 @@ async def test_rightmove_place_not_found_retries_minimal_url_plain_scraperapi():
 @pytest.mark.asyncio
 @patch.dict(os.environ, {"SCRAPER_MODE": "scraperapi", "SCRAPERAPI_KEY": "test-key"})
 async def test_zoopla_5xx_retries_premium_once_and_parses_next_data():
-    """Regression: Zoopla 5xx from ScraperAPI should log+retry once with premium=true."""
+    """Regression: Zoopla uses premium=true and escalates to ultra_premium on 5xx."""
     from backend.scraper import zoopla_scraper
 
     # Force key presence for the retry path.
@@ -473,10 +473,12 @@ async def test_zoopla_5xx_retries_premium_once_and_parses_next_data():
         )
         assert html is not None
 
-        # Ensure the premium retry happened exactly once.
+        # Ensure we did a single escalation from premium -> ultra_premium.
         assert mock_session.get.call_count == 2
+        first_call_url = mock_session.get.call_args_list[0][0][0]
         second_call_url = mock_session.get.call_args_list[1][0][0]
-        assert "premium=true" in second_call_url
+        assert "premium=true" in first_call_url
+        assert "ultra_premium=true" in second_call_url
 
         soup = BeautifulSoup(html, "html.parser")
         extracted = zoopla_scraper._extract_next_data(soup)
@@ -497,18 +499,17 @@ def test_zoopla_search_url_slugified():
 
 
 def test_rightmove_search_url_includes_index_page0():
-    """Regression: Rightmove HTML URL should be keyword-based and include index=0 for page 0."""
+    """Regression: Rightmove HTML URL must include locationIdentifier and index=0."""
     from backend.scraper.rightmove_scraper import _build_search_url
 
     url0 = _build_search_url("London", page=0)
-    assert "keywords=London" in url0
+    assert "locationIdentifier=REGION%5E87490" in url0
     assert "index=0" in url0
     assert "includeSSTC=false" in url0
-    assert "locationIdentifier=" not in url0
 
 
 def test_rightmove_search_url_increments_pagination_index():
-    """Regression: page=1 must request index=24 (offset pagination)."""
+    """Regression: page=1 must request index=24 (Rightmove page size=24)."""
     from backend.scraper.rightmove_scraper import _build_search_url
 
     url1 = _build_search_url("London", page=1)

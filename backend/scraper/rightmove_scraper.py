@@ -29,6 +29,7 @@ from backend.utils.scraper_logger import (
     log_scrape_start,
     log_scraperapi_fallback,
 )
+from backend.utils.scraperapi_client import fetch_json_via_scraperapi, fetch_via_scraperapi
 from backend.utils.validation import clean_property_data, should_insert_property
 
 USER_AGENT = (
@@ -84,6 +85,140 @@ _LOCATION_IDENTIFIER = {
 }
 RIGHTMOVE_API_BASE = "https://www.rightmove.co.uk/api/_search"
 SCRAPERAPI_BASE = "https://api.scraperapi.com/"
+
+
+_RM_TYPEAHEAD_CACHE: Dict[str, str] = {}
+
+
+_RIGHTMOVE_TYPEAHEAD_ALLOWED_TYPES = {
+    "region",
+    "postcode",
+    "street",
+    "town",
+    "city",
+}
+
+
+def _pick_location_identifier_from_typeahead(payload: Any) -> Optional[str]:
+    """Pick the first usable locationIdentifier from Rightmove typeahead JSON."""
+
+    if not payload:
+        return None
+
+    items: List[Dict[str, Any]] = []
+    if isinstance(payload, list):
+        items = [x for x in payload if isinstance(x, dict)]
+    elif isinstance(payload, dict):
+        for k in ("locations", "results", "matches", "suggestions"):
+            v = payload.get(k)
+            if isinstance(v, list):
+                items = [x for x in v if isinstance(x, dict)]
+                break
+
+    for it in items:
+        ident = (
+            it.get("locationIdentifier") or it.get("location_identifier") or it.get("identifier")
+        )
+        if not ident or not isinstance(ident, str):
+            continue
+        t = (it.get("type") or it.get("locationType") or it.get("location_type") or "").strip()
+        if t and isinstance(t, str):
+            if t.lower() not in _RIGHTMOVE_TYPEAHEAD_ALLOWED_TYPES:
+                continue
+        return ident.strip()
+
+    # As a tolerant fallback, accept any dict containing locationIdentifier.
+    for it in items:
+        ident = it.get("locationIdentifier")
+        if isinstance(ident, str) and ident.strip():
+            return ident.strip()
+
+    return None
+
+
+def _slugify_location(location: str) -> str:
+    s = (location or "").strip().lower()
+    if not s:
+        return ""
+    s = s.replace("'", "").replace("’", "")
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return s.strip("-")
+
+
+def _build_rightmove_find_url(location_identifier: str, index: int = 0) -> str:
+    base_url = "https://www.rightmove.co.uk/property-for-sale/find.html"
+    params: Dict[str, Any] = {
+        "locationIdentifier": (location_identifier or "").strip(),
+        "sortType": 2,
+        "index": max(0, int(index or 0)),
+        "propertyTypes": "",
+        "includeSSTC": "false",
+    }
+    return f"{base_url}?{urlencode(params)}"
+
+
+def _build_rightmove_slug_fallback_url(location: str) -> str:
+    slug = _slugify_location(location)
+    return f"https://www.rightmove.co.uk/property-for-sale/{slug}.html" if slug else ""
+
+
+def _extract_location_identifier_from_html_links(html: str) -> Optional[str]:
+    if not html:
+        return None
+    m = re.search(r"locationIdentifier=([^&\"'> ]+)", html)
+    if not m:
+        return None
+    return (m.group(1) or "").strip() or None
+
+
+async def resolve_rightmove_location_identifier(
+    session: aiohttp.ClientSession, location: str
+) -> Optional[str]:
+    q = (location or "").strip()
+    if not q:
+        return None
+
+    key = q.lower()
+    if key in _RM_TYPEAHEAD_CACHE:
+        return _RM_TYPEAHEAD_CACHE[key]
+
+    # Hard fallback mapping for known-safe cases (kept for resilience).
+    if key in _LOCATION_IDENTIFIER:
+        ident = _LOCATION_IDENTIFIER[key].replace("%5E", "^")
+        _RM_TYPEAHEAD_CACHE[key] = ident
+        return ident
+
+    url = f"https://www.rightmove.co.uk/typeAhead/uknostreet?{urlencode({'q': q})}"
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/json, text/plain, */*",
+        "Referer": "https://www.rightmove.co.uk/",
+    }
+
+    try:
+        if SCRAPERAPI_KEY:
+            payload = await fetch_json_via_scraperapi(
+                session,
+                url,
+                headers=headers,
+                premium=True,
+                ultra_premium=False,
+                render=False,
+                timeout_seconds=120,
+                debug_label="rightmove-typeahead",
+            )
+        else:
+            async with session.get(
+                url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
+                payload = await resp.json(content_type=None)
+    except Exception:
+        payload = None
+
+    ident = _pick_location_identifier_from_typeahead(payload)
+    if ident:
+        _RM_TYPEAHEAD_CACHE[key] = ident
+    return ident
 
 
 def _should_render_with_scraperapi(target_url: str) -> bool:
@@ -833,36 +968,22 @@ def _build_minimal_region_find_url(location_identifier: str, page: int) -> str:
     )
 
 
-def build_rightmove_search_url(location: str, index: int = 0) -> str:
-    """Build a stable Rightmove HTML search URL.
+def _build_search_url(
+    location: str, page: int = 0, *, location_identifier: Optional[str] = None
+) -> str:
+    """Build a Rightmove search URL.
 
-    Rightmove's REGION-based `locationIdentifier` values are fragile and can 404 or
-    return deceptive 'we couldn't find' pages. Keyword-based searches remain more
-    stable for production ingestion.
-
-    Args:
-        location: Free-text location (e.g. "London", "St Albans")
-        index: Result offset (0, 24, 48, ...)
+    Primary path: use a resolved `locationIdentifier` (via typeahead).
+    Fallback: use the legacy hardcoded mapping when available.
     """
 
-    base_url = "https://www.rightmove.co.uk/property-for-sale/find.html"
-    params: Dict[str, Any] = {
-        "keywords": (location or "").strip(),
-        "sortType": 2,
-        "index": max(0, int(index or 0)),
-        "includeSSTC": "false",
-    }
-    return f"{base_url}?{urlencode(params)}"
-
-
-def _build_search_url(location: str, page: int = 0) -> str:
-    """Compatibility wrapper.
-
-    The scraper paginates by page number; Rightmove uses `index` offsets.
-    """
-
-    # Rightmove uses offset pagination for keyword searches: 0, 24, 48, ...
-    return build_rightmove_search_url(location, index=int(page) * 24)
+    ident = (location_identifier or "").strip()
+    if not ident:
+        ident = _LOCATION_IDENTIFIER.get((location or "").strip().lower(), "").replace("%5E", "^")
+    if not ident:
+        # As a last resort, return the slug fallback (single-page scrape).
+        return _build_rightmove_slug_fallback_url(location)
+    return _build_rightmove_find_url(ident, index=int(page) * 24)
 
 
 async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Optional[str]:
@@ -1451,10 +1572,16 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
     with RunLog.start(source="rightmove", mode=SCRAPER_MODE, location=location) as run_log:
         try:
             async with aiohttp.ClientSession() as session:
+                location_identifier = await resolve_rightmove_location_identifier(session, location)
+                if location_identifier:
+                    print(
+                        f"[rightmove] resolved locationIdentifier={location_identifier} for query={location}"
+                    )
+
                 # NOTE: Do not use Rightmove JSON endpoints in production.
                 # They are frequently blocked/404. Always prefer search HTML.
                 for page in range(RM_MAX_PAGES):
-                    url = _build_search_url(location, page)
+                    url = _build_search_url(location, page, location_identifier=location_identifier)
                     html = await _fetch_html(session, url)
                     # Playwright fallback if enabled and static HTML yielded no cards later
                     if not html:
@@ -1481,6 +1608,42 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         print(
                             "⚠️ [rightmove] location returned 'place not found' page; treating as failure"
                         )
+                        # If we couldn't resolve a valid identifier, attempt the slug fallback once.
+                        if not location_identifier:
+                            slug_url = _build_rightmove_slug_fallback_url(location)
+                            if slug_url:
+                                try:
+                                    if SCRAPER_MODE == "scraperapi" and SCRAPERAPI_KEY:
+                                        r = await fetch_via_scraperapi(
+                                            session,
+                                            slug_url,
+                                            headers={"User-Agent": USER_AGENT},
+                                            premium=True,
+                                            ultra_premium=False,
+                                            render=True,
+                                            timeout_seconds=120,
+                                            country_code="gb",
+                                            debug_label="rightmove-slug",
+                                        )
+                                        slug_html = r.text
+                                    else:
+                                        async with session.get(
+                                            slug_url,
+                                            headers={"User-Agent": USER_AGENT},
+                                            timeout=aiohttp.ClientTimeout(total=45),
+                                        ) as resp:
+                                            slug_html = await resp.text()
+                                    maybe_ident = _extract_location_identifier_from_html_links(
+                                        slug_html
+                                    )
+                                    if maybe_ident:
+                                        print(
+                                            f"[rightmove] slug fallback extracted locationIdentifier={maybe_ident}"
+                                        )
+                                        location_identifier = maybe_ident
+                                        continue
+                                except Exception:
+                                    pass
                         run_log.set_count(0)
                         return []
 

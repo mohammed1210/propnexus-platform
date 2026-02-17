@@ -442,7 +442,12 @@ async def _probe_rightmove(
 
     # 2) Probe HTML listing page and run selector-based card detection.
     html_started = time.monotonic()
-    html_target_url = rm._build_search_url(location, page=page)
+    try:
+        resolved = await rm.resolve_rightmove_location_identifier(session, location)
+    except Exception:
+        resolved = None
+
+    html_target_url = rm._build_search_url(location, page=page, location_identifier=resolved)
     html_proxy_used = mode == "scraperapi" and has_key
     html_fetch_url = (
         rm.make_scraperapi_url(html_target_url, render=True) if html_proxy_used else html_target_url
