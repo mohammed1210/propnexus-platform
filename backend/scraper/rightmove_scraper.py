@@ -833,45 +833,36 @@ def _build_minimal_region_find_url(location_identifier: str, page: int) -> str:
     )
 
 
+def build_rightmove_search_url(location: str, index: int = 0) -> str:
+    """Build a stable Rightmove HTML search URL.
+
+    Rightmove's REGION-based `locationIdentifier` values are fragile and can 404 or
+    return deceptive 'we couldn't find' pages. Keyword-based searches remain more
+    stable for production ingestion.
+
+    Args:
+        location: Free-text location (e.g. "London", "St Albans")
+        index: Result offset (0, 24, 48, ...)
+    """
+
+    base_url = "https://www.rightmove.co.uk/property-for-sale/find.html"
+    params: Dict[str, Any] = {
+        "keywords": (location or "").strip(),
+        "sortType": 2,
+        "index": max(0, int(index or 0)),
+        "includeSSTC": "false",
+    }
+    return f"{base_url}?{urlencode(params)}"
+
+
 def _build_search_url(location: str, page: int = 0) -> str:
-    """
-    Rightmove listing pages use paginationIndex (offset). locationIdentifier can be derived
-    via an initial search API call; for a generic free-text we rely on searchLocation.
-    NOTE: For higher accuracy you may resolve locationIdentifier separately.
-    """
-    encoded = location.strip()
-    loc_key = encoded.lower()
-    base = "https://www.rightmove.co.uk/property-for-sale/find.html"
+    """Compatibility wrapper.
 
-    # Pragmatic reliability fix: London is known-good via REGION identifier.
-    # Avoid free-text searchLocation flows which can vary and omit embedded state.
-    if loc_key == "london":
-        params = [
-            "locationIdentifier=REGION%5E87490",
-            "sortType=2",
-            "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
-            "furnishTypes=&keywords=",
-            "includeSSTC=false",
-            # Rightmove HTML pagination uses paginationIndex=0,1,2... for listings pages.
-            f"paginationIndex={int(page)}",
-        ]
-        return f"{base}?{'&'.join(params)}"
+    The scraper paginates by page number; Rightmove uses `index` offsets.
+    """
 
-    params = [
-        # Prefer region identifier when known; improves reliability
-        (
-            f"locationIdentifier={_LOCATION_IDENTIFIER.get(loc_key, '')}"
-            if loc_key in _LOCATION_IDENTIFIER
-            else f"searchLocation={encoded}"
-        ),
-        "sortType=2",
-        "propertyTypes=&mustHave=&dontShow=houseShare%2Cretirement%2CsharedOwnership",
-        "furnishTypes=&keywords=",
-        # Prefer paginationIndex for the HTML listing pages.
-        # Keep index-based pagination for free-text searches, which can still accept index offsets.
-        f"paginationIndex={int(page)}" if loc_key in _LOCATION_IDENTIFIER else f"index={page * 24}",
-    ]
-    return f"{base}?{'&'.join(params)}"
+    # Rightmove uses offset pagination for keyword searches: 0, 24, 48, ...
+    return build_rightmove_search_url(location, index=int(page) * 24)
 
 
 async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Optional[str]:
@@ -1484,6 +1475,15 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         else:
                             log_page_fetch_error("rightmove", page, "blocked or empty")
                             continue
+                    # Explicitly detect Rightmove 'place not found' soft-error pages.
+                    if _is_place_not_found_variant(html):
+                        capture_debug_html(f"rightmove_place_not_found_{page}", html)
+                        print(
+                            "⚠️ [rightmove] location returned 'place not found' page; treating as failure"
+                        )
+                        run_log.set_count(0)
+                        return []
+
                     soup = BeautifulSoup(html, "html.parser")
 
                     # 1) Prefer Next.js JSON payload when present.

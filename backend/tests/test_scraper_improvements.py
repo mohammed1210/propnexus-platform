@@ -497,22 +497,22 @@ def test_zoopla_search_url_slugified():
 
 
 def test_rightmove_search_url_includes_index_page0():
-    """Regression: Rightmove HTML URL must include paginationIndex=0 for page 0."""
+    """Regression: Rightmove HTML URL should be keyword-based and include index=0 for page 0."""
     from backend.scraper.rightmove_scraper import _build_search_url
 
     url0 = _build_search_url("London", page=0)
-    assert "paginationIndex=0" in url0
-    assert "locationIdentifier=REGION%5E87490" in url0
-    assert "channel=BUY" not in url0
+    assert "keywords=London" in url0
+    assert "index=0" in url0
+    assert "includeSSTC=false" in url0
+    assert "locationIdentifier=" not in url0
 
 
 def test_rightmove_search_url_increments_pagination_index():
-    """Regression: page=1 must request paginationIndex=1 (not index=24)."""
+    """Regression: page=1 must request index=24 (offset pagination)."""
     from backend.scraper.rightmove_scraper import _build_search_url
 
     url1 = _build_search_url("London", page=1)
-    assert "paginationIndex=1" in url1
-    assert "index=24" not in url1
+    assert "index=24" in url1
 
 
 def test_onthemarket_search_url_lowercases_location():
