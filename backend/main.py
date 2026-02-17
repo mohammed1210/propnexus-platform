@@ -26,6 +26,7 @@ from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.rate_limit import limiter
 from backend.middleware.security import SecurityHeadersMiddleware
 from backend.routes import admin_schedule
+from backend.routes.admin_ingestion import router as admin_ingestion_router
 from backend.routes.admin_scrape_runs import router as admin_scrape_runs_router
 from backend.routes.ai import router as ai_router
 from backend.routes.area_intel_routes import router as area_intel_router
@@ -269,6 +270,7 @@ app.include_router(import_router)
 app.include_router(admin_alias_router)
 app.include_router(enrichment_router)
 app.include_router(enrichment_queue_router)
+app.include_router(admin_ingestion_router)
 app.include_router(admin_scrape_runs_router)
 app.include_router(notes_router)
 app.include_router(off_market_router)
