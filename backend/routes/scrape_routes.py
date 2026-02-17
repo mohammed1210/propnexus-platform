@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from backend.utils.deal_scoring import compute_deal_score
+from backend.utils.enrichment_queue import enqueue_property_ids
 
 try:
     from fastapi import APIRouter, HTTPException  # type: ignore
@@ -157,6 +158,76 @@ async def scrape_endpoint(req: ScrapeRequest):
                     total_failed += len(batch)
 
             logging.info("Scrape DB write summary: ok=%s failed=%s", total_written, total_failed)
+
+            # Auto-enqueue enrichment jobs for this scrape run (best-effort, bounded).
+            try:
+                ids = [
+                    str(r.get("id")).strip()
+                    for r in db_rows
+                    if isinstance(r, dict)
+                    and isinstance(r.get("id"), str)
+                    and str(r.get("id") or "").strip()
+                ]
+                enq = 0
+                if ids:
+                    enq = int(enqueue_property_ids(ids, reason="post_scrape").get("enqueued") or 0)
+                else:
+                    # Fallback: resolve UUIDs via (source, external_id) for rows written.
+                    by_source: dict[str, list[str]] = {}
+                    for r in db_rows:
+                        if not isinstance(r, dict):
+                            continue
+                        src = str(r.get("source") or "").strip().lower()
+                        eid = r.get("external_id")
+                        if not src or not isinstance(eid, str) or not eid.strip():
+                            continue
+                        by_source.setdefault(src, []).append(eid.strip())
+
+                    property_ids: list[str] = []
+                    for src, eids in by_source.items():
+                        seen: set[str] = set()
+                        uniq: list[str] = []
+                        for e in eids:
+                            if e in seen:
+                                continue
+                            seen.add(e)
+                            uniq.append(e)
+                        uniq = uniq[:200]
+                        for i in range(0, len(uniq), 50):
+                            batch = uniq[i : i + 50]
+                            try:
+                                res = (
+                                    supabase.table("properties")
+                                    .select("id")
+                                    .eq("source", src)
+                                    .in_("external_id", batch)
+                                    .execute()
+                                )
+                                data = res.data or []
+                                if isinstance(data, list):
+                                    for row in data:
+                                        if (
+                                            isinstance(row, dict)
+                                            and isinstance(row.get("id"), str)
+                                            and row["id"].strip()
+                                        ):
+                                            property_ids.append(row["id"].strip())
+                            except Exception:
+                                continue
+
+                    if property_ids:
+                        enq = int(
+                            enqueue_property_ids(property_ids, reason="post_scrape").get("enqueued")
+                            or 0
+                        )
+
+                if enq:
+                    logging.info(
+                        "enrich_auto_enqueue route=scrape reason=post_scrape enqueued=%s",
+                        enq,
+                    )
+            except Exception:
+                pass
 
         preview = normalized[:10]
         return {"count": count, "preview": preview}

@@ -26,7 +26,7 @@ except Exception:  # pragma: no cover
 from backend.scraper.utils import TARGET_CITIES, fetch_detail_html_with_diag
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.deal_signals import extract_deal_signals
-from backend.utils.enrichment_queue import enqueue_job
+from backend.utils.enrichment_queue import enqueue_job, enqueue_property_ids
 from backend.utils.image_utils import (
     dedupe_image_urls,
     extract_image_urls_from_ld_json,
@@ -309,6 +309,47 @@ def _queue_batch_job(
                         ]
                         ok, db_error_local = _upsert_properties_rows(rows=db_rows)
                         imported_local = len(db_rows) if ok else 0
+                        if ok and imported_local > 0:
+                            # Auto-enqueue enrichment jobs (best-effort; never fail batch).
+                            try:
+                                ids = [
+                                    str(r.get("id")).strip()
+                                    for r in db_rows
+                                    if isinstance(r, dict)
+                                    and isinstance(r.get("id"), str)
+                                    and str(r.get("id") or "").strip()
+                                ]
+                                enq = 0
+                                if ids:
+                                    enq = int(
+                                        enqueue_property_ids(
+                                            ids,
+                                            reason=f"post_import:batch_async:{city}",
+                                        ).get("enqueued")
+                                        or 0
+                                    )
+                                else:
+                                    by_source: dict[str, list[dict[str, Any]]] = {}
+                                    for r in db_rows:
+                                        if not isinstance(r, dict):
+                                            continue
+                                        src = str(r.get("source") or "").strip().lower()
+                                        if not src:
+                                            continue
+                                        by_source.setdefault(src, []).append(r)
+                                    for src, src_rows in by_source.items():
+                                        enq += _enqueue_enrichment_for_rows(
+                                            source=src, rows=src_rows
+                                        )
+
+                                if enq:
+                                    _batch_logger.info(
+                                        "enrich_auto_enqueue route=import_batch_async reason=post_import:batch_async city=%s enqueued=%s",
+                                        city,
+                                        enq,
+                                    )
+                            except Exception:
+                                pass
                         if ok and enrich and imported_local > 0:
                             asyncio.create_task(
                                 _enrich_rows_best_effort(
@@ -1180,8 +1221,6 @@ def _enqueue_enrichment_for_rows(*, source: str, rows: list[Dict[str, Any]]) -> 
 
     if not sb:
         return 0
-    if (os.getenv("ENRICH_AUTO_ENQUEUE_ON_IMPORT") or "0") != "1":
-        return 0
 
     src = (source or "").strip().lower()
     if not src:
@@ -1202,6 +1241,9 @@ def _enqueue_enrichment_for_rows(*, source: str, rows: list[Dict[str, Any]]) -> 
 
     if not external_ids:
         return 0
+
+    # Safety cap: keep post-import enqueue bounded.
+    external_ids = external_ids[:200]
 
     property_ids: list[str] = []
     batch_size = 50
@@ -1227,13 +1269,17 @@ def _enqueue_enrichment_for_rows(*, source: str, rows: list[Dict[str, Any]]) -> 
         except Exception:
             continue
 
-    for j, pid in enumerate(property_ids):
-        try:
-            enqueue_job(sb, pid, delay_seconds=j)
-        except Exception:
-            continue
-
-    return len(property_ids)
+    try:
+        res = enqueue_property_ids(property_ids, reason=f"post_import:{src}")
+        return int(res.get("enqueued") or 0)
+    except Exception:
+        # Best-effort fallback: preserve prior behavior.
+        for j, pid in enumerate(property_ids):
+            try:
+                enqueue_job(sb, pid, delay_seconds=j)
+            except Exception:
+                continue
+        return len(property_ids)
 
 
 def _dedupe(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -1620,6 +1666,39 @@ async def import_all(
         ok, err = _upsert_properties_rows(rows=db_rows, on_conflict="source,external_id")
         if ok:
             inserted = len(db_rows)
+            # Auto-enqueue enrichment jobs (best-effort; never fail import).
+            try:
+                ids = [
+                    str(r.get("id")).strip()
+                    for r in db_rows
+                    if isinstance(r, dict)
+                    and isinstance(r.get("id"), str)
+                    and str(r.get("id") or "").strip()
+                ]
+                enq = 0
+                if ids:
+                    enq = int(
+                        enqueue_property_ids(ids, reason="post_import:all").get("enqueued") or 0
+                    )
+                else:
+                    by_source: dict[str, list[dict[str, Any]]] = {}
+                    for r in db_rows:
+                        if not isinstance(r, dict):
+                            continue
+                        src = str(r.get("source") or "").strip().lower()
+                        if not src:
+                            continue
+                        by_source.setdefault(src, []).append(r)
+                    for src, src_rows in by_source.items():
+                        enq += _enqueue_enrichment_for_rows(source=src, rows=src_rows)
+
+                if enq:
+                    logging.info(
+                        "enrich_auto_enqueue route=import_all reason=post_import:all enqueued=%s",
+                        enq,
+                    )
+            except Exception:
+                pass
         else:
             finish_scrape_run(run_id=run_id, status="error", count_inserted=0, error=str(err))
             raise HTTPException(status_code=500, detail=f"DB upsert failed: {err}")
@@ -2119,6 +2198,43 @@ async def import_batch(
                 if ok:
                     inserted = len(db_rows)
                     total_inserted += inserted
+                    # Auto-enqueue enrichment jobs (best-effort; never fail import).
+                    try:
+                        ids = [
+                            str(r.get("id")).strip()
+                            for r in db_rows
+                            if isinstance(r, dict)
+                            and isinstance(r.get("id"), str)
+                            and str(r.get("id") or "").strip()
+                        ]
+                        enq = 0
+                        if ids:
+                            enq = int(
+                                enqueue_property_ids(ids, reason="post_import:batch").get(
+                                    "enqueued"
+                                )
+                                or 0
+                            )
+                        else:
+                            by_source: dict[str, list[dict[str, Any]]] = {}
+                            for r in db_rows:
+                                if not isinstance(r, dict):
+                                    continue
+                                src = str(r.get("source") or "").strip().lower()
+                                if not src:
+                                    continue
+                                by_source.setdefault(src, []).append(r)
+                            for src, src_rows in by_source.items():
+                                enq += _enqueue_enrichment_for_rows(source=src, rows=src_rows)
+
+                        if enq:
+                            logging.info(
+                                "enrich_auto_enqueue route=import_batch reason=post_import:batch city=%s enqueued=%s",
+                                city,
+                                enq,
+                            )
+                    except Exception:
+                        pass
                     if enrich and inserted > 0:
                         asyncio.create_task(
                             _enrich_rows_best_effort(rows=db_rows, max_items=int(enrich_limit))
