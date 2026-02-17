@@ -16,7 +16,7 @@ def test_normalize_record_preserves_image_urls_and_maps_raw_url_to_url_fields():
 
     out = normalize_record(raw, source="rightmove")
 
-    assert out.get("listing_url") == "https://www.rightmove.co.uk/properties/123456789"
+    assert out.get("listing_url") is None
     assert out.get("url") == "https://www.rightmove.co.uk/properties/123456789"
 
     assert out.get("image_urls") == [

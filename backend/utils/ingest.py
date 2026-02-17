@@ -4,7 +4,7 @@ ingest.py — normalize scraped property records and upsert into Supabase.
 
 ✅ Handles Rightmove + Zoopla external_id extraction (fixes Zoopla regression)
 ✅ Normalizes common fields (price/bed/bath/lat/lng/yield/roi)
-✅ Safe upsert with fallback if your DB does NOT have external_id/source/listing_url columns
+✅ Safe upsert with fallback if your DB does NOT have external_id/source/url columns
 ✅ Batch upsert with basic retry + helpful logging
 
 USAGE
@@ -392,7 +392,6 @@ SAFE_COLUMNS = {
 OPTIONAL_COLUMNS = {
     "external_id",
     "source",
-    "listing_url",
     "url",
     "updated_at",
     # Optional columns (may not exist in all schemas).
@@ -510,8 +509,7 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
         # optional
         "external_id": extract_external_id(source=source, listing_url=listing_url, raw=raw),
         "source": clean_str(source),
-        "listing_url": listing_url,
-        # DB schema uses `url`; keep it in sync with listing_url.
+        # DB schema uses `url`; prefer it as the single canonical field.
         "url": listing_url,
     }
 
@@ -761,7 +759,7 @@ def ingest(
 
         if e and is_unknown_column_error(e):
             warn(
-                "DB rejected optional columns (external_id/source/listing_url). Retrying with SAFE_COLUMNS only…"
+                "DB rejected optional columns (external_id/source/url). Retrying with SAFE_COLUMNS only…"
             )
             plan_b = build_upsert_plan(prefer_optional=False)
             payload_b = filter_payload(batch, plan_b.allowed_columns)
