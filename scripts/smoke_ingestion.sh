@@ -1,53 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BACKEND_URL="${BACKEND_URL:-${BACKEND_BASE_URL:-https://propnexus-backend-production.up.railway.app}}"
-TOKEN_FILE="${TOKEN_FILE:-.admin_token}"
+BASE_URL="${BASE_URL:-${BACKEND_URL:-http://localhost:8000}}"
+ADMIN_TOKEN="${ADMIN_TOKEN:-${X_ADMIN_TOKEN:-}}"
 
-if [[ ! -f "$TOKEN_FILE" ]]; then
-  echo "Token file not found: $TOKEN_FILE" >&2
-  echo "Create one (no newline preferred): echo -n '...token...' > .admin_token" >&2
-  exit 1
-fi
-
-ADMIN_TOKEN="$(cat "$TOKEN_FILE" | tr -d '\r\n')"
-if [[ -z "$ADMIN_TOKEN" ]]; then
-  echo "Admin token is empty (file: $TOKEN_FILE)" >&2
-  exit 1
-fi
-
-PAYLOAD="${PAYLOAD:-{"location":"Manchester","mode":"scraperapi","limit":5}}"
-
-call() {
-  local label="$1"
-  shift
-
-  local tmp
-  tmp="$(mktemp)"
-  local code
-
-  echo "==> $label"
-  code=$(curl -sS -o "$tmp" -w "%{http_code}" \
-    -X POST "$BACKEND_URL/admin/run-ingestion" \
-    -H "Content-Type: application/json" \
-    "$@" \
-    --data "$PAYLOAD" \
-  )
-
-  cat "$tmp"
-  echo
-  rm -f "$tmp"
-
-  if [[ "$code" -lt 200 || "$code" -ge 300 ]]; then
-    echo "Request failed: HTTP $code" >&2
-    exit 1
+if [ -z "${ADMIN_TOKEN}" ]; then
+  if [ -f ".admin_token" ]; then
+    ADMIN_TOKEN="$(cat .admin_token | tr -d '\r\n')"
   fi
-}
+fi
 
-call "Auth via X-Admin-Token" \
-  -H "X-Admin-Token: $ADMIN_TOKEN"
+if [ -z "${ADMIN_TOKEN}" ]; then
+  echo "ERROR: ADMIN_TOKEN not set and .admin_token not found" >&2
+  exit 1
+fi
 
-call "Auth via Authorization: Bearer" \
-  -H "Authorization: Bearer $ADMIN_TOKEN"
+AUTH_STYLE="${AUTH_STYLE:-bearer}" # bearer or x-admin
+if [ "$AUTH_STYLE" = "x-admin" ]; then
+  AUTH_HEADER="X-Admin-Token: ${ADMIN_TOKEN}"
+else
+  AUTH_HEADER="Authorization: Bearer ${ADMIN_TOKEN}"
+fi
+
+tmp="$(mktemp)"
+code=$(curl -sS -i -o "$tmp" -w "%{http_code}" \
+  -X POST "$BASE_URL/admin/run-ingestion" \
+  -H "Content-Type: application/json" \
+  -H "$AUTH_HEADER" \
+  -d "${PAYLOAD:-{\"location\":\"London\",\"mode\":\"scraperapi\",\"limit\":5}}" \
+)
+
+cat "$tmp"
+echo
+rm -f "$tmp"
+
+if [[ "$code" -lt 200 || "$code" -ge 300 ]]; then
+  echo "Request failed: HTTP $code" >&2
+  exit 1
+fi
 
 echo "OK"
