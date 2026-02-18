@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import os
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 
+from backend.utils.admin_auth import require_admin
 from backend.utils.enrichment_queue import (
     enqueue_job,
     list_newest_property_ids_needing_enrichment,
@@ -18,12 +18,6 @@ except Exception:  # pragma: no cover
     APIError = Exception  # type: ignore
 
 router = APIRouter(prefix="/enrich/queue", tags=["enrich"])
-
-
-def _require_admin(x_admin_token: str | None = None) -> None:
-    required = os.getenv("IMPORT_ADMIN_TOKEN")
-    if required and x_admin_token != required:
-        raise HTTPException(status_code=401, detail="Admin token required")
 
 
 def _raise_if_queue_table_missing(exc: Exception) -> None:
@@ -120,6 +114,7 @@ def enqueue_newest(limit: int = Query(default=25, ge=1, le=200)) -> Dict[str, An
 
 @router.post("/enqueue-newest-daily")
 def enqueue_newest_daily(
+    request: Request,
     limit: int = Query(default=100, ge=1, le=200),
     hours: int = Query(default=24, ge=1, le=24 * 14),
     x_admin_token: str | None = Header(None),
@@ -132,7 +127,7 @@ def enqueue_newest_daily(
     - Safe if required tables are missing (returns ok=false, does not crash).
     """
 
-    _require_admin(x_admin_token)
+    require_admin(request)
 
     sb = get_supabase()
     if not sb:

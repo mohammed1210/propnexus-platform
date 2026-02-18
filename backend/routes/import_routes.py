@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Tuple
 from urllib.parse import urlparse
 
 import aiohttp
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 try:
@@ -24,6 +24,7 @@ except Exception:  # pragma: no cover
     APIError = Exception  # type: ignore
 
 from backend.scraper.utils import TARGET_CITIES, fetch_detail_html_with_diag
+from backend.utils.admin_auth import require_admin
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.deal_signals import extract_deal_signals
 from backend.utils.enrichment_queue import enqueue_job, enqueue_property_ids
@@ -1368,12 +1369,6 @@ def _dedupe(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
-def _require_admin(x_admin_token: str | None = None) -> None:
-    required = os.getenv("IMPORT_ADMIN_TOKEN")
-    if required and x_admin_token != required:
-        raise HTTPException(status_code=401, detail="Admin token required")
-
-
 def _missing_col_from_api_error(err: Exception) -> str | None:
     payload = err.args[0] if getattr(err, "args", None) else None
     msg = payload.get("message") if isinstance(payload, dict) else str(err)
@@ -1668,6 +1663,7 @@ def _scrape_zero_warning(location: str, sources: Dict[str, int] | None = None) -
 
 @router.post("/all")
 async def import_all(
+    request: Request,
     req: str | None = Query(None, description="Location e.g. London"),
     enrich: bool = Query(
         False,
@@ -1681,7 +1677,7 @@ async def import_all(
     ),
     x_admin_token: str | None = Header(None),
 ):
-    _require_admin(x_admin_token)
+    require_admin(request)
 
     # Prefer query param
     loc = (req or "").strip()
@@ -1837,6 +1833,7 @@ def _get_scrape_timeout_seconds() -> float:
 
 @router.post("/zoopla")
 async def import_zoopla(
+    request: Request,
     req: ImportRequest,
     x_admin_token: str | None = Header(None),
     run_async: bool = Query(
@@ -1853,7 +1850,7 @@ async def import_zoopla(
 ):
     # Optionally protect import endpoints in production.
     # If IMPORT_ADMIN_TOKEN is unset, this is a no-op.
-    _require_admin(x_admin_token)
+    require_admin(request)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -1939,6 +1936,7 @@ async def import_zoopla_get(
 
 @router.post("/rightmove")
 async def import_rightmove(
+    request: Request,
     req: ImportRequest,
     x_admin_token: str | None = Header(None),
     run_async: bool = Query(
@@ -1947,7 +1945,7 @@ async def import_rightmove(
         description="If true, queue scrape/upsert in background and return immediately",
     ),
 ):
-    _require_admin(x_admin_token)
+    require_admin(request)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -2011,6 +2009,7 @@ async def import_rightmove(
 
 @router.post("/onthemarket")
 async def import_onthemarket(
+    request: Request,
     req: ImportRequest,
     x_admin_token: str | None = Header(None),
     run_async: bool = Query(
@@ -2025,7 +2024,7 @@ async def import_onthemarket(
         description="Max pages to paginate (capped at 5)",
     ),
 ):
-    _require_admin(x_admin_token)
+    require_admin(request)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -2087,6 +2086,7 @@ async def import_onthemarket(
 
 @router.post("/batch")
 async def import_batch(
+    request: Request,
     req: BatchImportRequest,
     enrich: bool = Query(
         False,
@@ -2105,7 +2105,7 @@ async def import_batch(
     This is intentionally sequential with small delays to reduce rate-limit risk.
     """
 
-    _require_admin(x_admin_token)
+    require_admin(request)
 
     max_pages = max(1, min(5, int(req.max_pages or 1)))
     delay_min = max(0.0, float(req.delay_min_s))
@@ -2339,6 +2339,7 @@ async def import_batch(
 
 @router.post("/enrich-missing")
 async def enrich_missing_properties(
+    request: Request,
     limit: int = Query(20, ge=1, le=200, description="Max rows to enrich"),
     scan_limit: int = Query(
         400,
@@ -2357,7 +2358,7 @@ async def enrich_missing_properties(
     This is best-effort and safe to rerun; it only writes non-empty improvements.
     """
 
-    _require_admin(x_admin_token)
+    require_admin(request)
     if not sb:
         raise HTTPException(status_code=500, detail="Supabase client not configured")
 
@@ -2573,6 +2574,7 @@ async def enrich_missing_properties(
 
 @router.post("/spareroom")
 async def import_spareroom(
+    request: Request,
     req: ImportRequest,
     x_admin_token: str | None = Header(None),
     run_async: bool = Query(
@@ -2581,7 +2583,7 @@ async def import_spareroom(
         description="If true, queue scrape/upsert in background and return immediately",
     ),
 ):
-    _require_admin(x_admin_token)
+    require_admin(request)
     loc = (req.location or "").strip()
     if not loc:
         raise HTTPException(status_code=400, detail="Location is required")
@@ -2636,10 +2638,11 @@ async def import_spareroom(
 
 @router.get("/batch/status/{batch_id}")
 async def import_batch_status(
+    request: Request,
     batch_id: str,
     x_admin_token: str | None = Header(None),
 ):
-    _require_admin(x_admin_token)
+    require_admin(request)
 
     if not sb:
         raise HTTPException(
@@ -2681,8 +2684,12 @@ router = admin_alias_router
 
 
 @router.post("/admin/import-all")
-async def admin_import_all(req: str, x_admin_token: str = Header(None)):
-    return await import_all(req=req, x_admin_token=x_admin_token)
+async def admin_import_all(
+    request: Request,
+    req: str,
+    x_admin_token: str | None = Header(None),
+):
+    return await import_all(req=req, x_admin_token=x_admin_token, request=request)
 
 
 router = _import_router

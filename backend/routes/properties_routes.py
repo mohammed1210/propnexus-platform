@@ -10,11 +10,12 @@ import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query, Response
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.params import Param
 from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
+from backend.utils.admin_auth import require_admin
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.deal_signals import extract_deal_signals
@@ -225,12 +226,6 @@ def _attach_enrichment_from_cache(sb: Any, items: List[Dict[str, Any]]) -> List[
             continue
 
     return missing_ids
-
-
-def _require_admin(x_admin_token: str | None = None) -> None:
-    required = os.getenv("IMPORT_ADMIN_TOKEN")
-    if required and x_admin_token != required:
-        raise HTTPException(status_code=401, detail="Admin token required")
 
 
 # Allowed sort columns (tests expect invalid -> fallback, not 500)
@@ -1511,6 +1506,7 @@ def list_properties(
 
 @router.post("/properties/admin/backfill-property-types")
 def backfill_property_types(
+    request: Request,
     limit: int = Query(default=500, ge=1, le=500),
     offset: int = Query(default=0, ge=0, le=100_000),
     x_admin_token: str | None = Header(None),
@@ -1522,7 +1518,7 @@ def backfill_property_types(
     - Writes to columns when available, otherwise embeds into data JSON
     """
 
-    _require_admin(x_admin_token)
+    require_admin(request)
     sb = _get_supabase()
 
     cols = [
@@ -1685,6 +1681,7 @@ def get_property(property_id: str, response: Response):
 
 @router.post("/properties/admin/backfill-scores")
 def backfill_property_scores(
+    request: Request,
     limit: int = Query(default=200, ge=1, le=500),
     force: bool = Query(default=False),
     recompute: bool = Query(default=False),
@@ -1703,7 +1700,7 @@ def backfill_property_scores(
     Bounded by `limit` and best-effort; failures per-row do not abort the run.
     """
 
-    _require_admin(x_admin_token)
+    require_admin(request)
 
     sb = _get_supabase()
     try:
@@ -1836,10 +1833,10 @@ def backfill_property_scores(
 
 
 @router.get("/properties/admin/score-stats")
-def admin_score_stats(x_admin_token: str | None = Header(None)):
+def admin_score_stats(request: Request, x_admin_token: str | None = Header(None)):
     """Admin stats for diagnosing why scoring/backfill does (or doesn't) run."""
 
-    _require_admin(x_admin_token)
+    require_admin(request)
     sb = _get_supabase()
 
     def _count(build_query) -> int | None:
@@ -1875,13 +1872,14 @@ def admin_score_stats(x_admin_token: str | None = Header(None)):
 
 @router.get("/properties/admin/score-sample")
 def admin_score_sample(
+    request: Request,
     limit: int = Query(default=25, ge=1, le=200),
     offset: int = Query(default=0, ge=0, le=10_000),
     x_admin_token: str | None = Header(None),
 ):
     """Return a small sample of rows to validate scoring in production."""
 
-    _require_admin(x_admin_token)
+    require_admin(request)
     sb = _get_supabase()
 
     cols = [
@@ -1984,6 +1982,7 @@ def admin_score_sample(
 
 @router.get("/properties/admin/score-debug-one")
 def admin_score_debug_one(
+    request: Request,
     id: str = Query(..., min_length=1),
     x_admin_token: str | None = Header(None),
 ):
@@ -1993,7 +1992,7 @@ def admin_score_debug_one(
     inputs indicate `rent_source=missing` unexpectedly.
     """
 
-    _require_admin(x_admin_token)
+    require_admin(request)
     sb = _get_supabase()
 
     cols = [
@@ -2087,6 +2086,7 @@ def admin_score_debug_one(
 
 @router.post("/properties/admin/backfill-postcodes")
 def backfill_property_postcodes(
+    request: Request,
     limit: int = Query(default=500, ge=1, le=2000),
     force: bool = Query(default=False),
     x_admin_token: str | None = Header(None),
@@ -2100,7 +2100,7 @@ def backfill_property_postcodes(
     Repeatable + best-effort; per-row failures don't abort the run.
     """
 
-    _require_admin(x_admin_token)
+    require_admin(request)
     sb = _get_supabase()
 
     cols = [

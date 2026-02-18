@@ -9,9 +9,10 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 
 from backend.scraper.utils import detect_blocked_or_partial, detect_blocked_or_partial_explain
+from backend.utils.admin_auth import require_admin
 from backend.utils.render import PLAYWRIGHT_ENABLE
 
 router = APIRouter(tags=["debug"])
@@ -47,18 +48,6 @@ def _sanitize_html_snippet(html: str, *, max_chars: int = 2500) -> str:
     except Exception:
         s = (html or "")[:max_chars]
     return s[: int(max_chars or 0)]
-
-
-def _require_admin(x_admin_token: str | None = None) -> None:
-    """Reuse the same admin gate as /import/*.
-
-    This endpoint can trigger outbound scraping requests, so it must be protected
-    when IMPORT_ADMIN_TOKEN is configured.
-    """
-
-    required = os.getenv("IMPORT_ADMIN_TOKEN")
-    if required and x_admin_token != required:
-        raise HTTPException(status_code=401, detail="Admin token required")
 
 
 def _now_iso() -> str:
@@ -1242,6 +1231,7 @@ async def _run_probe(
 
 @router.get("/debug/scrape-probe")
 async def debug_scrape_probe(
+    request: Request,
     location: str = Query(..., description="Location e.g. London"),
     sources: str | None = Query(
         None,
@@ -1272,7 +1262,7 @@ async def debug_scrape_probe(
     text-only snippet for debugging. Never returns raw HTML.
     Protected by IMPORT_ADMIN_TOKEN when configured.
     """
-    _require_admin(x_admin_token)
+    require_admin(request)
 
     loc = (location or "").strip()
     if not loc:

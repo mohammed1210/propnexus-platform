@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Tuple
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, HTTPException, Query, Request
+
+from backend.utils.admin_auth import require_admin
 
 try:
     from backend.db import sb  # type: ignore
@@ -12,12 +13,6 @@ except Exception:
     sb = None
 
 router = APIRouter(prefix="/admin", tags=["admin"])
-
-
-def _require_admin(x_admin_token: str | None = None) -> None:
-    required = os.getenv("IMPORT_ADMIN_TOKEN")
-    if required and x_admin_token != required:
-        raise HTTPException(status_code=401, detail="Admin token required")
 
 
 def _parse_ts(v: Any) -> datetime | None:
@@ -32,12 +27,13 @@ def _parse_ts(v: Any) -> datetime | None:
 
 @router.get("/scrape-runs")
 def get_scrape_runs(
+    request: Request,
     days: int = Query(7, ge=1, le=365),
-    x_admin_token: str | None = Header(None),
+    _x_admin_token: str | None = Header(None),
 ):
     """Return daily totals per source and recent raw runs."""
 
-    _require_admin(x_admin_token)
+    require_admin(request)
 
     if not sb:
         raise HTTPException(status_code=503, detail="Supabase client not configured")

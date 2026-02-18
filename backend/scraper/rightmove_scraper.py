@@ -5,7 +5,7 @@ import os
 import random
 import re
 from typing import Any, Dict, List, Optional
-from urllib.parse import parse_qs, urlencode, urljoin, urlparse
+from urllib.parse import parse_qs, unquote, urlencode, urljoin, urlparse
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -80,8 +80,8 @@ SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 RM_MAX_PAGES = int(os.getenv("RM_MAX_PAGES", "1"))
 RM_DELAY_MS = int(os.getenv("RM_DELAY_MS", "800"))  # delay between pages (ms)
 _LOCATION_IDENTIFIER = {
-    # Common region codes; extend as needed (URL-encoded caret)
-    "london": "REGION%5E87490",
+    # Common region codes; extend as needed.
+    "london": "REGION^87490",
 }
 RIGHTMOVE_API_BASE = "https://www.rightmove.co.uk/api/_search"
 SCRAPERAPI_BASE = "https://api.scraperapi.com/"
@@ -145,16 +145,39 @@ def _slugify_location(location: str) -> str:
     return s.strip("-")
 
 
+def _normalize_rightmove_location_identifier(location_identifier: str) -> str:
+    """Normalize a Rightmove locationIdentifier to raw form (e.g. REGION^87490).
+
+    Identifiers can sometimes be URL-encoded (REGION%5E...) or double-encoded
+    (REGION%255E...). We normalize early to avoid double-encoding and to keep
+    URL construction deterministic.
+    """
+
+    s = (location_identifier or "").strip()
+    if not s:
+        return ""
+
+    for _ in range(2):
+        if "%" not in s:
+            break
+        nxt = unquote(s)
+        if nxt == s:
+            break
+        s = nxt
+    return s
+
+
 def _build_rightmove_find_url(location_identifier: str, index: int = 0) -> str:
     base_url = "https://www.rightmove.co.uk/property-for-sale/find.html"
+    normalized_ident = _normalize_rightmove_location_identifier(location_identifier)
     params: Dict[str, Any] = {
-        "locationIdentifier": (location_identifier or "").strip(),
+        "locationIdentifier": normalized_ident,
         "sortType": 2,
         "index": max(0, int(index or 0)),
         "propertyTypes": "",
         "includeSSTC": "false",
     }
-    return f"{base_url}?{urlencode(params)}"
+    return f"{base_url}?{urlencode(params, safe='^')}"
 
 
 def _build_rightmove_slug_fallback_url(location: str) -> str:
@@ -184,7 +207,7 @@ async def resolve_rightmove_location_identifier(
 
     # Hard fallback mapping for known-safe cases (kept for resilience).
     if key in _LOCATION_IDENTIFIER:
-        ident = _LOCATION_IDENTIFIER[key].replace("%5E", "^")
+        ident = _normalize_rightmove_location_identifier(_LOCATION_IDENTIFIER[key])
         _RM_TYPEAHEAD_CACHE[key] = ident
         return ident
 
@@ -217,8 +240,11 @@ async def resolve_rightmove_location_identifier(
 
     ident = _pick_location_identifier_from_typeahead(payload)
     if ident:
-        _RM_TYPEAHEAD_CACHE[key] = ident
-    return ident
+        normalized = _normalize_rightmove_location_identifier(ident)
+        if normalized:
+            _RM_TYPEAHEAD_CACHE[key] = normalized
+            return normalized
+        return None
 
 
 def _should_render_with_scraperapi(target_url: str) -> bool:
@@ -1638,6 +1664,9 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                         slug_html
                                     )
                                     if maybe_ident:
+                                        maybe_ident = _normalize_rightmove_location_identifier(
+                                            maybe_ident
+                                        )
                                         print(
                                             f"[rightmove] slug fallback extracted locationIdentifier={maybe_ident}"
                                         )

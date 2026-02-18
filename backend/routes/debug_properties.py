@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Header, Query, Request
+
+from backend.utils.admin_auth import require_admin
 
 try:
     from backend.db import sb  # type: ignore
@@ -13,14 +14,6 @@ except Exception:  # pragma: no cover
 
 
 router = APIRouter(tags=["debug"])
-
-
-def _require_admin(x_admin_token: str | None = None) -> None:
-    """Protect sensitive debug endpoints when IMPORT_ADMIN_TOKEN is configured."""
-
-    required = os.getenv("IMPORT_ADMIN_TOKEN")
-    if required and x_admin_token != required:
-        raise HTTPException(status_code=401, detail="Admin token required")
 
 
 def _image_count(value: Any) -> int:
@@ -60,8 +53,9 @@ def properties_count():
 
 @router.get("/debug/properties-with-multiple-images")
 def properties_with_multiple_images(
+    request: Request,
     limit: int = Query(10, ge=1, le=50),
-    x_admin_token: str | None = Header(None),
+    _x_admin_token: str | None = Header(None),
 ):
     """Proof endpoint: return properties that have multiple image URLs.
 
@@ -71,7 +65,7 @@ def properties_with_multiple_images(
       - image_count
     """
 
-    _require_admin(x_admin_token)
+    require_admin(request)
 
     if not sb:
         return {"items": []}

@@ -30,7 +30,7 @@ def test_rightmove_find_url_builds_index_offsets():
     url0 = _build_rightmove_find_url("REGION^12345", index=0)
     url1 = _build_rightmove_find_url("REGION^12345", index=24)
 
-    assert "locationIdentifier=REGION%5E12345" in url0
+    assert "locationIdentifier=REGION%5E12345" in url0 or "locationIdentifier=REGION^12345" in url0
     assert "index=0" in url0
     assert "index=24" in url1
     assert "includeSSTC=false" in url0
