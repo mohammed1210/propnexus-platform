@@ -145,7 +145,7 @@ def _slugify_location(location: str) -> str:
     return s.strip("-")
 
 
-def _normalize_rightmove_location_identifier(location_identifier: str) -> str:
+def normalize_location_identifier(raw: str) -> str:
     """Normalize a Rightmove locationIdentifier to raw form (e.g. REGION^87490).
 
     Identifiers can sometimes be URL-encoded (REGION%5E...) or double-encoded
@@ -153,7 +153,7 @@ def _normalize_rightmove_location_identifier(location_identifier: str) -> str:
     URL construction deterministic.
     """
 
-    s = (location_identifier or "").strip()
+    s = (raw or "").strip()
     if not s:
         return ""
 
@@ -167,9 +167,14 @@ def _normalize_rightmove_location_identifier(location_identifier: str) -> str:
     return s
 
 
+# Backwards-compatible alias (older internal calls).
+def _normalize_rightmove_location_identifier(location_identifier: str) -> str:
+    return normalize_location_identifier(location_identifier)
+
+
 def _build_rightmove_find_url(location_identifier: str, index: int = 0) -> str:
     base_url = "https://www.rightmove.co.uk/property-for-sale/find.html"
-    normalized_ident = _normalize_rightmove_location_identifier(location_identifier)
+    normalized_ident = normalize_location_identifier(location_identifier)
     params: Dict[str, Any] = {
         "locationIdentifier": normalized_ident,
         "sortType": 2,
@@ -207,7 +212,7 @@ async def resolve_rightmove_location_identifier(
 
     # Hard fallback mapping for known-safe cases (kept for resilience).
     if key in _LOCATION_IDENTIFIER:
-        ident = _normalize_rightmove_location_identifier(_LOCATION_IDENTIFIER[key])
+        ident = normalize_location_identifier(_LOCATION_IDENTIFIER[key])
         _RM_TYPEAHEAD_CACHE[key] = ident
         return ident
 
@@ -240,7 +245,7 @@ async def resolve_rightmove_location_identifier(
 
     ident = _pick_location_identifier_from_typeahead(payload)
     if ident:
-        normalized = _normalize_rightmove_location_identifier(ident)
+        normalized = normalize_location_identifier(ident)
         if normalized:
             _RM_TYPEAHEAD_CACHE[key] = normalized
             return normalized

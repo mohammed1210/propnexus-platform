@@ -151,7 +151,9 @@ async def scrape_endpoint(req: ScrapeRequest):
                     pass
 
                 # Final guardrail: never send columns not present in Supabase schema.
-                row = {k: v for k, v in row.items() if k in allowed_columns}
+                from backend.utils.supabase_sanitize import sanitize_property_payload
+
+                row = sanitize_property_payload(row, allowed_columns)
                 db_rows.append(row)
 
         # Upsert in chunks (if Supabase configured)

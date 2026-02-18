@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:8000}"
+BACKEND_URL="${BACKEND_URL:-${BACKEND_BASE_URL:-https://propnexus-backend-production.up.railway.app}}"
 TOKEN_FILE="${TOKEN_FILE:-.admin_token}"
 
 if [[ ! -f "$TOKEN_FILE" ]]; then
@@ -28,7 +28,7 @@ call() {
 
   echo "==> $label"
   code=$(curl -sS -o "$tmp" -w "%{http_code}" \
-    -X POST "$BASE_URL/admin/run-ingestion" \
+    -X POST "$BACKEND_URL/admin/run-ingestion" \
     -H "Content-Type: application/json" \
     "$@" \
     --data "$PAYLOAD" \

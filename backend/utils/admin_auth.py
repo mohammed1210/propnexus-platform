@@ -5,11 +5,7 @@ import os
 from fastapi import HTTPException, Request
 
 
-def get_expected_admin_token() -> str | None:
-    return (os.getenv("IMPORT_ADMIN_TOKEN") or os.getenv("ADMIN_TOKEN") or "").strip() or None
-
-
-def extract_bearer(authorization: str | None) -> str | None:
+def _extract_bearer(authorization: str | None) -> str | None:
     v = (authorization or "").strip()
     if not v:
         return None
@@ -20,23 +16,39 @@ def extract_bearer(authorization: str | None) -> str | None:
     return None
 
 
-def require_admin(request: Request) -> None:
-    """Require a valid admin token.
+def get_admin_token_from_request(request: Request) -> str | None:
+    """Extract an admin token from a request.
 
-    Accepts either:
-      - Authorization: Bearer <token>
-      - X-Admin-Token: <token>
-
-    Token is compared to IMPORT_ADMIN_TOKEN (preferred) or ADMIN_TOKEN.
+    Order matters (spec):
+      1) Header: X-Admin-Token
+      2) Header: Authorization: Bearer <token>
+      3) Query param: ?admin_token=<token>
     """
 
-    expected = get_expected_admin_token()
-    if not expected:
-        raise HTTPException(status_code=401, detail="Admin token required")
+    if not request:
+        return None
 
-    auth_header = request.headers.get("authorization")
-    x_admin = request.headers.get("x-admin-token")
+    x_admin = (request.headers.get("x-admin-token") or "").strip()
+    if x_admin:
+        return x_admin
 
-    provided = extract_bearer(auth_header) or ((x_admin or "").strip() or None)
-    if not provided or provided != expected:
+    bearer = _extract_bearer(request.headers.get("authorization"))
+    if bearer:
+        return bearer
+
+    qp = request.query_params.get("admin_token") if hasattr(request, "query_params") else None
+    qp_s = (qp or "").strip() if isinstance(qp, str) else ""
+    return qp_s or None
+
+
+def _get_expected_admin_token() -> str | None:
+    # Spec: prefer ADMIN_TOKEN; fallback IMPORT_ADMIN_TOKEN.
+    return (os.getenv("ADMIN_TOKEN") or os.getenv("IMPORT_ADMIN_TOKEN") or "").strip() or None
+
+
+def require_admin(request: Request) -> None:
+    expected = _get_expected_admin_token()
+    provided = get_admin_token_from_request(request)
+
+    if not expected or not provided or provided != expected:
         raise HTTPException(status_code=401, detail="Admin token required")

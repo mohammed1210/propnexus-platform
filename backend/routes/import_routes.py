@@ -1158,7 +1158,9 @@ def _upsert_properties_rows(
     for row in prepared:
         if not isinstance(row, dict):
             continue
-        db_row = {k: v for k, v in row.items() if k in allowed_columns}
+        from backend.utils.supabase_sanitize import sanitize_property_payload
+
+        db_row = sanitize_property_payload(row, allowed_columns)
 
         # Preserve deal signals in `data` (stable JSONB column) even when top-level
         # columns don't exist in the DB.

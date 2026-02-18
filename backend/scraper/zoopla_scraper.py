@@ -827,7 +827,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                     headers=headers,
                     country_code="gb",
                     render=render_js,
-                    premium=False,
+                    premium=True,
                     ultra_premium=True,
                     timeout_seconds=120,
                     debug_label="zoopla-ultra",
@@ -900,7 +900,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             headers=headers,
                             country_code="gb",
                             render=render_js,
-                            premium=False,
+                            premium=True,
                             ultra_premium=True,
                             timeout_seconds=120,
                             debug_label="zoopla-ultra",
@@ -957,7 +957,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                             headers=headers,
                             country_code="gb",
                             render=render_js,
-                            premium=False,
+                            premium=True,
                             ultra_premium=True,
                             timeout_seconds=120,
                             debug_label="zoopla-ultra",
@@ -999,7 +999,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
         if SCRAPERAPI_KEY:
             print(f"⚠️ Direct fetch failed, trying ScraperAPI fallback: {e}")
             try:
-                proxy_url = make_scraperapi_url(url, render=render_js)
+                proxy_url = make_scraperapi_url(url, render=render_js, premium=True)
                 p_req = session.get(proxy_url, headers=headers, timeout=60)
                 if inspect.isawaitable(p_req):
                     p_req = await p_req

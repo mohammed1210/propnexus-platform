@@ -20,7 +20,7 @@ import logging
 import os
 import time
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 try:
     # Load environment variables from .env and .env.local at repo root if present
@@ -62,11 +62,20 @@ def _chunk(items, size=100):
     return [items[i : i + size] for i in range(0, len(items), size)]
 
 
-async def _ingest_location(location: str) -> int:
+async def _ingest_location(location: str, *, limit: Optional[int] = None) -> int:
     """Scrape+upsert for a single location. Returns count of rows processed."""
     start = time.time()
     try:
         normalized = await scrape_all_sources(location)
+
+        if limit is not None:
+            try:
+                lim = int(limit)
+                if lim > 0:
+                    normalized = normalized[:lim]
+            except Exception:
+                pass
+
         count = len(normalized)
         if sb and normalized:
             for batch in _chunk(normalized):
@@ -117,7 +126,9 @@ async def _ingest_location(location: str) -> int:
                                 "score_updated_at",
                                 "score_breakdown",
                             }
-                            row = {k: v for k, v in row.items() if k in allowed_columns}
+                            from backend.utils.supabase_sanitize import sanitize_property_payload
+
+                            row = sanitize_property_payload(row, allowed_columns)
                             db_batch.append(row)
 
                     # Ensure upsert resolves on (source,external_id) as a single param value
