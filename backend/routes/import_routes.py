@@ -1119,6 +1119,67 @@ def _upsert_properties_rows(
 
         prepared.append(cleaned)
 
+    # Final guardrail: never send columns not present in Supabase schema.
+    # Keep a small set of useful computed fields by embedding them into `data`.
+    allowed_columns = {
+        "id",
+        "external_id",
+        "source_id",
+        "title",
+        "description",
+        "price",
+        "bedrooms",
+        "bathrooms",
+        "property_type",
+        "address",
+        "postcode",
+        "latitude",
+        "longitude",
+        "source",
+        "url",
+        "image_urls",
+        "data",
+        "yield_percent",
+        "roi_percent",
+        "investment_type",
+        "bmv",
+        "location",
+        "imageurl",
+        "last_seen_at",
+        "created_at",
+        "updated_at",
+        "score",
+        "score_updated_at",
+        "score_breakdown",
+    }
+
+    db_prepared: list[Dict[str, Any]] = []
+    for row in prepared:
+        if not isinstance(row, dict):
+            continue
+        db_row = {k: v for k, v in row.items() if k in allowed_columns}
+
+        # Preserve deal signals in `data` (stable JSONB column) even when top-level
+        # columns don't exist in the DB.
+        deal_fields = (
+            "deal_signals",
+            "deal_reasons",
+            "deal_signals_meta",
+            "discount_estimate_pct",
+        )
+        if any(f in row for f in deal_fields):
+            data_obj = db_row.get("data")
+            if not isinstance(data_obj, dict):
+                data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+            for f in deal_fields:
+                if f in row:
+                    data_obj[f] = row.get(f)
+            db_row["data"] = data_obj
+
+        db_prepared.append(db_row)
+
+    prepared = db_prepared
+
     try:
         sb.table("properties").upsert(prepared, on_conflict=on_conflict).execute()
         return True, None

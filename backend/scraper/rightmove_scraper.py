@@ -1015,9 +1015,8 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
 
     # Fetch the URL (either direct or via ScraperAPI)
     try:
-        async with session.get(
-            url_to_fetch, headers=headers, timeout=60 if mode == "scraperapi" else 30
-        ) as resp:
+        # Spec: keep Rightmove fetches bounded and predictable.
+        async with session.get(url_to_fetch, headers=headers, timeout=45) as resp:
             text = await resp.text()
             log_fetch_diagnostics(
                 "rightmove",
@@ -1045,7 +1044,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         ultra_premium=False,
                         session_number=str(random.randint(1, 999999)),
                     )
-                    async with session.get(retry_url, headers=headers, timeout=75) as r_resp:
+                    async with session.get(retry_url, headers=headers, timeout=45) as r_resp:
                         r_text = await r_resp.text()
                         log_fetch_diagnostics(
                             "rightmove",
@@ -1247,7 +1246,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 proxy_url = make_scraperapi_url(url, render=_should_render_with_scraperapi(url))
                 print(f"ℹ️ Fallback to ScraperAPI for blocked URL: {url}")
                 try:
-                    async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
+                    async with session.get(proxy_url, headers=headers, timeout=45) as p_resp:
                         p_text = await p_resp.text()
                         log_fetch_diagnostics(
                             "rightmove",
@@ -1278,7 +1277,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
             print(f"⚠️ Direct fetch failed, trying ScraperAPI fallback: {e}")
             try:
                 proxy_url = make_scraperapi_url(url, render=_should_render_with_scraperapi(url))
-                async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
+                async with session.get(proxy_url, headers=headers, timeout=45) as p_resp:
                     p_text = await p_resp.text()
                     log_fetch_diagnostics(
                         "rightmove",
@@ -1582,6 +1581,8 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                 # They are frequently blocked/404. Always prefer search HTML.
                 for page in range(RM_MAX_PAGES):
                     url = _build_search_url(location, page, location_identifier=location_identifier)
+                    # Spec: log the final Rightmove find.html URL being fetched (do not log ScraperAPI proxy URLs).
+                    print(f"[rightmove] search_url={url}")
                     html = await _fetch_html(session, url)
                     # Playwright fallback if enabled and static HTML yielded no cards later
                     if not html:
@@ -1933,12 +1934,8 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 "longitude": coords["longitude"],
                                 "source": "rightmove",
                                 "raw_url": listing_url or url,
-                                "url": listing_url
-                                or (
-                                    f"https://www.rightmove.co.uk/properties/{external_id}"
-                                    if str(external_id).isdigit()
-                                    else None
-                                ),
+                                # Spec: do not construct /properties/{id} as a fallback entrypoint.
+                                "url": listing_url,
                             }
 
                             # Track missing fields

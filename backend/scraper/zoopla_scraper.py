@@ -795,7 +795,7 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
 
     if mode == "scraperapi" and SCRAPERAPI_KEY:
         # Zoopla is consistently protected; always use premium=true and allow a single
-        # escalation to ultra_premium=true on 5xx/empty.
+        # escalation to ultra_premium=true specifically on 403/captcha/challenge markers.
         try:
             r = await fetch_via_scraperapi(
                 session,
@@ -817,6 +817,30 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                 text=text,
                 via="scraperapi-ultra" if r.ultra_premium else "scraperapi-premium",
             )
+
+            blocked_premium = _looks_blocked(text, status) or _has_cloudflare_marker(text)
+            if (status == 403 or blocked_premium) and not r.ultra_premium:
+                print("[zoopla] premium blocked/403; retrying ultra_premium")
+                r2 = await fetch_via_scraperapi(
+                    session,
+                    url,
+                    headers=headers,
+                    country_code="gb",
+                    render=render_js,
+                    premium=False,
+                    ultra_premium=True,
+                    timeout_seconds=120,
+                    debug_label="zoopla-ultra",
+                )
+                text = r2.text
+                status = int(r2.status)
+                log_fetch_diagnostics(
+                    "zoopla",
+                    url,
+                    status=status,
+                    text=text,
+                    via="scraperapi-ultra" if r2.ultra_premium else "scraperapi-premium",
+                )
 
             blocked = (
                 _looks_blocked(text, status)
@@ -864,6 +888,23 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         timeout_seconds=120,
                         debug_label="zoopla",
                     )
+                    if (
+                        int(r.status) == 403
+                        or _looks_blocked(r.text, int(r.status))
+                        or _has_cloudflare_marker(r.text)
+                    ):
+                        print("[zoopla] premium blocked/403 on fallback; retrying ultra_premium")
+                        r = await fetch_via_scraperapi(
+                            session,
+                            url,
+                            headers=headers,
+                            country_code="gb",
+                            render=render_js,
+                            premium=False,
+                            ultra_premium=True,
+                            timeout_seconds=120,
+                            debug_label="zoopla-ultra",
+                        )
                     log_fetch_diagnostics(
                         "zoopla",
                         url,
@@ -904,6 +945,23 @@ async def _fetch_html_internal(session: aiohttp.ClientSession, url: str) -> Opti
                         timeout_seconds=120,
                         debug_label="zoopla",
                     )
+                    if (
+                        int(r.status) == 403
+                        or _looks_blocked(r.text, int(r.status))
+                        or _has_cloudflare_marker(r.text)
+                    ):
+                        print("[zoopla] premium blocked/403; retrying ultra_premium")
+                        r = await fetch_via_scraperapi(
+                            session,
+                            url,
+                            headers=headers,
+                            country_code="gb",
+                            render=render_js,
+                            premium=False,
+                            ultra_premium=True,
+                            timeout_seconds=120,
+                            debug_label="zoopla-ultra",
+                        )
                     log_fetch_diagnostics(
                         "zoopla",
                         url,

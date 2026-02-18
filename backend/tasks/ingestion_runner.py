@@ -84,6 +84,40 @@ async def _ingest_location(location: str) -> int:
                                 row["score_updated_at"] = datetime.now(timezone.utc).isoformat()
                             except Exception:
                                 pass
+
+                            # Final guardrail: never send columns not present in Supabase schema.
+                            allowed_columns = {
+                                "id",
+                                "external_id",
+                                "source_id",
+                                "title",
+                                "description",
+                                "price",
+                                "bedrooms",
+                                "bathrooms",
+                                "property_type",
+                                "address",
+                                "postcode",
+                                "latitude",
+                                "longitude",
+                                "source",
+                                "url",
+                                "image_urls",
+                                "data",
+                                "yield_percent",
+                                "roi_percent",
+                                "investment_type",
+                                "bmv",
+                                "location",
+                                "imageurl",
+                                "last_seen_at",
+                                "created_at",
+                                "updated_at",
+                                "score",
+                                "score_updated_at",
+                                "score_breakdown",
+                            }
+                            row = {k: v for k, v in row.items() if k in allowed_columns}
                             db_batch.append(row)
 
                     # Ensure upsert resolves on (source,external_id) as a single param value

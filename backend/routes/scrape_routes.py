@@ -99,6 +99,37 @@ async def scrape_endpoint(req: ScrapeRequest):
 
         # Safeguard: keep ai_ready for internal logic/preview, but don't send it to DB.
         db_rows: List[Dict[str, Any]] = []
+        allowed_columns = {
+            "id",
+            "external_id",
+            "source_id",
+            "title",
+            "description",
+            "price",
+            "bedrooms",
+            "bathrooms",
+            "property_type",
+            "address",
+            "postcode",
+            "latitude",
+            "longitude",
+            "source",
+            "url",
+            "image_urls",
+            "data",
+            "yield_percent",
+            "roi_percent",
+            "investment_type",
+            "bmv",
+            "location",
+            "imageurl",
+            "last_seen_at",
+            "created_at",
+            "updated_at",
+            "score",
+            "score_updated_at",
+            "score_breakdown",
+        }
         for p in normalized:
             if isinstance(p, dict):
                 row = dict(p)
@@ -119,6 +150,8 @@ async def scrape_endpoint(req: ScrapeRequest):
                 except Exception:
                     pass
 
+                # Final guardrail: never send columns not present in Supabase schema.
+                row = {k: v for k, v in row.items() if k in allowed_columns}
                 db_rows.append(row)
 
         # Upsert in chunks (if Supabase configured)
