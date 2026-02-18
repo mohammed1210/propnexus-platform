@@ -90,6 +90,7 @@ def client(monkeypatch):
 
 
 def test_import_batch_async_returns_immediately_with_status_url(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
 
     import backend.routes.import_routes as import_routes
@@ -176,6 +177,7 @@ def test_import_batch_async_returns_immediately_with_status_url(client, monkeypa
 
 
 def test_import_batch_async_city_error_does_not_crash_job(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
 
     import backend.routes.import_routes as import_routes
@@ -244,6 +246,7 @@ def test_import_batch_async_city_error_does_not_crash_job(client, monkeypatch):
 
 
 def test_import_batch_async_persists_and_completes(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
 
     import backend.routes.import_routes as import_routes
@@ -338,6 +341,7 @@ def test_import_batch_async_persists_and_completes(client, monkeypatch):
 
 
 def test_import_batch_async_zero_results_is_not_timeout(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
 
     import backend.routes.import_routes as import_routes
@@ -414,6 +418,7 @@ def test_import_batch_async_zero_results_is_not_timeout(client, monkeypatch):
 
 
 def test_import_batch_accepts_locations_alias_and_sources_filter(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
 
     import backend.routes.import_routes as import_routes

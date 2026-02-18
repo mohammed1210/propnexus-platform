@@ -124,6 +124,7 @@ def client(monkeypatch):
 
 
 def test_enqueue_newest_daily_ok_and_capped(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
 
     import backend.routes.enrichment_queue_routes as routes

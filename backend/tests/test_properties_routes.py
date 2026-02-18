@@ -520,6 +520,7 @@ def test_list_properties_includes_property_type_when_missing(mock_create_client,
 def test_admin_backfill_property_types_requires_token_when_configured(
     mock_create_client, client, monkeypatch
 ):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
     mock_create_client.return_value = Mock()
 
@@ -529,6 +530,7 @@ def test_admin_backfill_property_types_requires_token_when_configured(
 
 @patch("backend.routes.properties_routes.create_client")
 def test_admin_backfill_property_types_updates_missing(mock_create_client, client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
 
     mock_sb = Mock()

@@ -1912,6 +1912,7 @@ async def import_zoopla(
 
 @router.get("/zoopla")
 async def import_zoopla_get(
+    request: Request,
     location: str = Query(..., description="Location to scrape"),
     x_admin_token: str | None = Header(None),
     run_async: bool = Query(
@@ -1929,6 +1930,7 @@ async def import_zoopla_get(
     # Keep backwards compatibility with operational curl usage:
     # `GET /import/zoopla?location=London`
     return await import_zoopla(
+        request,
         ImportRequest(location=location),
         x_admin_token=x_admin_token,
         run_async=run_async,

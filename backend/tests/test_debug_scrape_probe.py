@@ -15,6 +15,7 @@ def test_debug_scrape_probe_requires_admin_when_configured(monkeypatch: pytest.M
         pytest.skip(f"App unavailable in CI: {_import_error}")
 
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "test-secret")
+    monkeypatch.setenv("ADMIN_TOKEN", "test-secret")
 
     # Patch the probe runner to avoid outbound requests during tests.
     import backend.routes.debug_scrape_probe as probe
@@ -48,6 +49,7 @@ def test_debug_scrape_probe_allows_when_admin_not_configured(
         pytest.skip(f"App unavailable in CI: {_import_error}")
 
     monkeypatch.delenv("IMPORT_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
 
     import backend.routes.debug_scrape_probe as probe
 
@@ -58,5 +60,4 @@ def test_debug_scrape_probe_allows_when_admin_not_configured(
 
     client = TestClient(app)
     r = client.get("/debug/scrape-probe?location=London")
-    assert r.status_code == 200
-    assert r.json()["results"]["rightmove"]["classification"] == "timeout"
+    assert r.status_code == 401

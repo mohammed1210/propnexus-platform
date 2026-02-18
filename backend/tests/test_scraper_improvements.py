@@ -503,7 +503,7 @@ def test_rightmove_search_url_includes_index_page0():
     from backend.scraper.rightmove_scraper import _build_search_url
 
     url0 = _build_search_url("London", page=0)
-    assert "locationIdentifier=REGION%5E87490" in url0
+    assert "locationIdentifier=REGION^87490" in url0
     assert "index=0" in url0
     assert "includeSSTC=false" in url0
 

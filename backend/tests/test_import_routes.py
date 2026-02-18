@@ -15,6 +15,7 @@ def client(monkeypatch):
 
 
 def test_import_all_enqueues_after_insert(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
 
     import backend.routes.import_routes as import_routes

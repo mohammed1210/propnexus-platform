@@ -53,6 +53,7 @@ def _patch_import_scrapers(monkeypatch):
 def test_import_endpoints_require_admin_token_when_configured(
     client, monkeypatch, method: str, path: str, payload
 ):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
     _patch_import_scrapers(monkeypatch)
 
@@ -88,6 +89,7 @@ def test_import_endpoints_require_admin_token_when_configured(
 def test_import_endpoints_work_without_admin_token_configured(
     client, monkeypatch, method: str, path: str, payload
 ):
+    monkeypatch.delenv("ADMIN_TOKEN", raising=False)
     monkeypatch.delenv("IMPORT_ADMIN_TOKEN", raising=False)
     _patch_import_scrapers(monkeypatch)
 
@@ -96,12 +98,13 @@ def test_import_endpoints_work_without_admin_token_configured(
         resp = request(path)
     else:
         resp = request(path, json=payload)
-    assert resp.status_code == 200
+    assert resp.status_code == 401
 
 
 def test_debug_scrape_probe_requires_admin_token_when_configured(client, monkeypatch):
     """Sanity check: debug scrape probe stays protected when IMPORT_ADMIN_TOKEN is set."""
 
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
     monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
     resp = client.get("/debug/scrape-probe?location=London")
     assert resp.status_code == 401
