@@ -13,7 +13,6 @@ if [ -z "${ADMIN_TOKEN}" ]; then
   exit 1
 fi
 
-AUTH_STYLE="${AUTH_STYLE:-bearer}" # bearer or x-admin
 AUTH_STYLE="${AUTH_STYLE:-bearer}" # bearer | x-admin
 if [ "${AUTH_STYLE}" = "x-admin" ]; then
   AUTH_HEADER="X-Admin-Token: ${ADMIN_TOKEN}"
