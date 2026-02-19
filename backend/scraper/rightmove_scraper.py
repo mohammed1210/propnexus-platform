@@ -56,6 +56,121 @@ CONSENT_MARKERS = [
 
 _POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
 
+# Rightmove media URLs can appear in different shapes across payloads; we keep
+# a schema-agnostic fallback that only activates when structured extraction
+# yields no images.
+_RM_MEDIA_IMG_RE = re.compile(
+    r"(?:https?:)?//media\.rightmove\.co\.uk/[^\"'<>\\\s]+?\.(?:jpe?g|png|webp)(?:\?[^\"'<>\\\s]*)?",
+    re.IGNORECASE,
+)
+_RM_MEDIA_IMG_NO_SCHEME_RE = re.compile(
+    r"(?<!//)media\.rightmove\.co\.uk/[^\"'<>\\\s]+?\.(?:jpe?g|png|webp)(?:\?[^\"'<>\\\s]*)?",
+    re.IGNORECASE,
+)
+
+
+def _normalize_rightmove_media_url(u: str | None) -> str | None:
+    if not u or not isinstance(u, str):
+        return None
+    s = u.strip()
+    if not s:
+        return None
+    if s.startswith("//"):
+        return "https:" + s
+    if re.match(r"^https?://", s, re.IGNORECASE):
+        # Prefer https for consistency.
+        return re.sub(r"^http://", "https://", s, flags=re.IGNORECASE)
+    if re.match(r"^media\.rightmove\.co\.uk/", s, re.IGNORECASE):
+        return "https://" + s
+    return s
+
+
+def _collect_rightmove_image_urls(obj: Any, out: List[str], *, depth: int = 0) -> None:
+    # Bounded recursion to keep this production-safe.
+    if obj is None:
+        return
+    if len(out) >= 200:
+        return
+    if depth > 12:
+        return
+
+    if isinstance(obj, str):
+        s = obj.strip()
+        if not s:
+            return
+        out.extend(_RM_MEDIA_IMG_RE.findall(s))
+        out.extend(_RM_MEDIA_IMG_NO_SCHEME_RE.findall(s))
+        return
+
+    if isinstance(obj, dict):
+        for v in obj.values():
+            _collect_rightmove_image_urls(v, out, depth=depth + 1)
+        return
+
+    if isinstance(obj, list):
+        for v in obj:
+            _collect_rightmove_image_urls(v, out, depth=depth + 1)
+
+
+def _fallback_rightmove_image_urls_from_next_obj(obj: Any, *, limit: int = 15) -> List[str]:
+    """Schema-agnostic Rightmove image URL extraction.
+
+    Only returns URLs from the Rightmove media host and only when they look
+    like image assets. Intended as a fallback when structured extraction yields
+    no images.
+    """
+
+    if limit <= 0:
+        return []
+
+    deep: List[str] = []
+    try:
+        _collect_rightmove_image_urls(obj, deep)
+    except Exception:
+        deep = []
+
+    if not deep:
+        return []
+
+    allowed_exts = (".jpg", ".jpeg", ".png", ".webp")
+    exclude_tokens = (
+        "brand_logo",
+        "/assets/",
+        "/dir/customer/",
+        "industry-affiliation",
+        "_flp_",
+        "_epc_",
+    )
+
+    out: List[str] = []
+    seen: set[str] = set()
+
+    for raw in deep:
+        u = _normalize_rightmove_media_url(raw)
+        if not u:
+            continue
+        ul = u.lower()
+        if "media.rightmove.co.uk" not in ul:
+            continue
+        if any(t in ul for t in exclude_tokens):
+            continue
+        try:
+            p = urlparse(u)
+        except Exception:
+            continue
+        if (p.netloc or "").lower() != "media.rightmove.co.uk":
+            continue
+        path = (p.path or "").lower()
+        if not path.endswith(allowed_exts):
+            continue
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+            if len(out) >= limit:
+                break
+
+    return out
+
 
 def _looks_like_postcode(s: str) -> bool:
     return bool(s and _POSTCODE_RE.search(s))
@@ -797,11 +912,25 @@ def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             # Some variants include a direct string mainImageSrc.
             _add_img(prop_imgs.get("mainImageSrc"))
 
-        image_urls = normalize_image_urls(image_urls)
+        # If structured extraction yields nothing, do a schema-agnostic deep scan
+        # against the same parsed __NEXT_DATA__ object (the per-property dict).
+        if not image_urls:
+            try:
+                image_urls = _fallback_rightmove_image_urls_from_next_obj(p, limit=20)
+            except Exception:
+                image_urls = []
+
+        # Normalize + de-dupe/cap.
+        if image_urls:
+            try:
+                image_urls = normalize_image_urls(image_urls) or image_urls
+            except Exception:
+                pass
         try:
             image_urls = dedupe_image_urls(image_urls, base_url="https://www.rightmove.co.uk/")
         except Exception:
             pass
+        image_urls = (image_urls or [])[:20]
         img = pick_cover_image(image_urls) if image_urls else None
 
         loc_text = title

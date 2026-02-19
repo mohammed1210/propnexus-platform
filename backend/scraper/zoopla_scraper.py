@@ -41,6 +41,7 @@ SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
 SCRAPERAPI_KEY = os.getenv("SCRAPERAPI_KEY", "").strip()
 ZP_MAX_PAGES = int(os.getenv("ZP_MAX_PAGES", "1"))
 ZP_DELAY_MS = int(os.getenv("ZP_DELAY_MS", "900"))
+ZP_MAX_IMAGES = int(os.getenv("ZP_MAX_IMAGES", "12"))
 SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 
 CAPTCHA_KEYWORDS = ["captcha", "access denied", "unusual traffic"]
@@ -1506,6 +1507,7 @@ async def scrape_zoopla_properties(
                             # Extract all images
                             image_urls = _extract_images(card)
                             image_urls = normalize_image_urls(image_urls)
+                            image_urls = image_urls[: max(0, int(ZP_MAX_IMAGES))]
                             image_url = image_urls[0] if image_urls else None
                             log_image_extraction("zoopla", title, len(image_urls))
 
@@ -1531,7 +1533,7 @@ async def scrape_zoopla_properties(
                                         )
                                         merged = normalize_image_urls([*detail_imgs, *image_urls])
                                         if merged:
-                                            image_urls = merged
+                                            image_urls = merged[: max(0, int(ZP_MAX_IMAGES))]
                                             image_url = merged[0]
                                     except Exception:
                                         pass

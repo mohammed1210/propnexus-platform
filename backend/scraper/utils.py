@@ -69,8 +69,10 @@ def normalize_image_urls(urls: list[str]) -> list[str]:
         if not path.endswith(_allowed_exts):
             return False
 
-        # Zoopla photos live on lid.zoocdn.com.
-        if "lid.zoocdn.com" in host:
+        # Zoopla photos live on Zoopla CDN hosts under *.zoocdn.com.
+        # Keep this broader than just lid.zoocdn.com to avoid missing gallery
+        # images when Zoopla changes subdomains.
+        if host.endswith("zoocdn.com"):
             return True
 
         # OnTheMarket listing photos are on media.onthemarket.com under /properties/.

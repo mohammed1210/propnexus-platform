@@ -52,3 +52,27 @@ def test_rightmove_property_dict_normalizes_protocol_relative_image_urls():
     assert out.get("image_urls") and out["image_urls"][0].startswith(
         "https://media.rightmove.co.uk/"
     )
+
+
+def test_rightmove_schema_agnostic_fallback_extracts_nested_media_urls():
+    p = {
+        "id": 166973110,
+        "displayAddress": "Somewhere, Manchester",
+        "price": {"amount": 300000},
+        "bedrooms": 2,
+        "bathrooms": 1,
+        # No images/media/propertyImages keys.
+        "weird": {
+            "deep": [
+                {
+                    "text": "hero=//media.rightmove.co.uk/dir/crop/10:9-16:9/1k/2/166973110/TS109_IMG_00_0000_max_476x317.jpeg",
+                }
+            ]
+        },
+    }
+
+    out = _rm_property_from_api_dict(p)
+    assert out is not None
+    assert out.get("image_urls")
+    assert out["image_urls"][0].startswith("https://media.rightmove.co.uk/")
+    assert out.get("imageurl") == out["image_urls"][0]
