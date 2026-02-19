@@ -7,7 +7,6 @@ from urllib.parse import quote
 
 import httpx
 
-from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.listing_keys import extract_postcode
 from backend.utils.ppd_comps import get_sold_comps_summary
 from backend.utils.rate_limiter import AsyncRateLimiter
@@ -166,24 +165,15 @@ def derive_rent_yield_roi(*, property_row: Dict[str, Any]) -> Dict[str, Any]:
     price = _coerce_int(property_row.get("price") or property_row.get("asking_price"))
     rent_monthly: float | None = None
 
+    # IMPORTANT: Do not invent rent via heuristics/assumptions.
+    # Prefer an explicitly stored/provided rent value if present.
+    rv = property_row.get("rent_monthly")
     try:
-        _score, breakdown = compute_deal_score(property_row)
-        inputs = breakdown.get("inputs") if isinstance(breakdown, dict) else None
-        if isinstance(inputs, dict):
-            rv = inputs.get("rent_monthly")
-            try:
-                rf = float(rv)
-                if rf > 0:
-                    rent_monthly = rf
-            except Exception:
-                pass
+        rf = float(rv) if rv is not None else None
+        if rf is not None and rf > 0:
+            rent_monthly = rf
     except Exception:
-        pass
-
-    if rent_monthly is None and price:
-        # Conservative fallback if scoring didn't produce rent.
-        assumed_yield = float(os.getenv("ENRICH_ASSUMED_YIELD_PCT", "6.0"))
-        rent_monthly = price * (assumed_yield / 100.0) / 12.0
+        rent_monthly = None
 
     yield_percent: float | None = None
     if price and rent_monthly and price > 0:

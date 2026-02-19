@@ -751,17 +751,45 @@ def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         bathrooms = p.get("bathrooms") or p.get("numBathrooms") or 0
 
         image_urls: List[str] = []
+
+        def _add_img(u: Any) -> None:
+            if not u or not isinstance(u, str):
+                return
+            s = u.strip()
+            if not s:
+                return
+            # Rightmove search payload often provides absolute srcUrl; keep it.
+            if s.startswith("http://") or s.startswith("https://"):
+                image_urls.append(s)
+                return
+            # Some payloads include a relative media path like `69k/...jpeg`.
+            image_urls.append(f"https://media.rightmove.co.uk/{s.lstrip('/')}")
+
+        # Legacy API-ish structure.
         media = p.get("media") or []
         if isinstance(media, list) and media:
             for m in media:
                 if isinstance(m, dict):
-                    img = m.get("url") or m.get("mediaUrl")
-                    if img and isinstance(img, str):
-                        image_urls.append(img)
+                    _add_img(m.get("url") or m.get("mediaUrl"))
 
-        image_urls = normalize_image_urls(
-            [urljoin("https://www.rightmove.co.uk/", u) for u in image_urls if isinstance(u, str)]
-        )
+        # Next.js search payload structure.
+        imgs = p.get("images")
+        if isinstance(imgs, list) and imgs:
+            for im in imgs:
+                if isinstance(im, dict):
+                    _add_img(im.get("srcUrl") or im.get("url"))
+
+        prop_imgs = p.get("propertyImages")
+        if isinstance(prop_imgs, dict):
+            imgs2 = prop_imgs.get("images")
+            if isinstance(imgs2, list) and imgs2:
+                for im in imgs2:
+                    if isinstance(im, dict):
+                        _add_img(im.get("srcUrl") or im.get("url"))
+            # Some variants include a direct string mainImageSrc.
+            _add_img(prop_imgs.get("mainImageSrc"))
+
+        image_urls = normalize_image_urls(image_urls)
         try:
             image_urls = dedupe_image_urls(image_urls, base_url="https://www.rightmove.co.uk/")
         except Exception:
@@ -917,31 +945,29 @@ def _is_place_not_found_variant(html: str) -> bool:
 
 
 def _rightmove_caret_url_variants(url: str) -> List[str]:
-    """Return retry targets that include both '^' and '%5E' caret variants.
+    """Return retry targets with a caret-safe (unescaped) locationIdentifier.
 
-    Rightmove region identifiers commonly appear as `REGION^12345` or `REGION%5E12345`.
-    We've seen the HTML response vary (including the deceptive "place not found" variant)
-    depending on whether the caret is percent-encoded, so ensure we try both.
+    Rightmove region identifiers are expected as `REGION^12345`. Percent-encoded carets
+    (e.g. `REGION%5E12345`) can intermittently trigger a "place not found" variant, so
+    we normalize all retries to the unescaped caret form.
     """
 
     url = url or ""
     variants: List[str] = []
 
-    # Prefer unescaped caret first.
-    if "%5e" in url.lower():
-        unescaped = re.sub(r"%5e", "^", url, flags=re.IGNORECASE)
-        if unescaped and unescaped != url:
-            variants.append(unescaped)
+    if not url:
+        return []
 
-    # Original always included.
-    if url:
+    # Always prefer a caret-safe variant.
+    caret_safe = re.sub(r"%5e", "^", url, flags=re.IGNORECASE)
+    caret_safe = re.sub(r"%255e", "^", caret_safe, flags=re.IGNORECASE)
+    caret_safe = caret_safe.replace("%255E", "^")
+    if caret_safe:
+        variants.append(caret_safe)
+
+    # If the input was already caret-safe, keep it (dedupe below).
+    if "^" in url and url not in variants:
         variants.append(url)
-
-    # Also try the encoded form when the URL contains a caret.
-    if "^" in url:
-        encoded = url.replace("^", "%5E")
-        if encoded and encoded != url:
-            variants.append(encoded)
 
     # De-dup while preserving order.
     out: List[str] = []
@@ -989,14 +1015,16 @@ def _is_region_location_identifier(loc: Optional[str]) -> bool:
 
 
 def _build_minimal_region_find_url(location_identifier: str, page: int) -> str:
-    # Ensure we match the support-confirmed minimal format (encoded caret, no extra filters).
-    li = str(location_identifier)
-    li = re.sub(r"%5e", "%5E", li, flags=re.IGNORECASE)
-    li = li.replace("^", "%5E")
+    # Minimal format, but keep caret unescaped to avoid intermittent Rightmove "place not found".
+    li = normalize_location_identifier(str(location_identifier))
     base = "https://www.rightmove.co.uk/property-for-sale/find.html"
-    return (
-        f"{base}?locationIdentifier={li}&sortType=2&includeSSTC=false&paginationIndex={int(page)}"
-    )
+    params: Dict[str, Any] = {
+        "locationIdentifier": li,
+        "sortType": 2,
+        "includeSSTC": "false",
+        "paginationIndex": int(page),
+    }
+    return f"{base}?{urlencode(params, safe='^')}"
 
 
 def _build_search_url(
