@@ -758,6 +758,14 @@ def _rm_property_from_api_dict(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             s = u.strip()
             if not s:
                 return
+            # Rightmove sometimes returns protocol-relative URLs.
+            if s.startswith("//"):
+                image_urls.append("https:" + s)
+                return
+            # Sometimes we see host/path without scheme.
+            if re.match(r"^media\.rightmove\.co\.uk/", s, re.IGNORECASE):
+                image_urls.append("https://" + s)
+                return
             # Rightmove search payload often provides absolute srcUrl; keep it.
             if s.startswith("http://") or s.startswith("https://"):
                 image_urls.append(s)
