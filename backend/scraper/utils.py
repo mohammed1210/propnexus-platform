@@ -101,7 +101,7 @@ def normalize_image_urls(urls: list[str]) -> list[str]:
         path = p.path or ""
 
         # Zoopla format: /u/<w>/<h>/...ext
-        if "lid.zoocdn.com" in host:
+        if host.endswith("zoocdn.com"):
             m = re.search(r"/u/(?P<w>\d{2,5})/(?P<h>\d{2,5})/", path)
             if m:
                 try:
@@ -132,7 +132,7 @@ def normalize_image_urls(urls: list[str]) -> list[str]:
         host = (p.netloc or "").lower()
         path = p.path or ""
 
-        if "lid.zoocdn.com" in host:
+        if host.endswith("zoocdn.com"):
             # Deduplicate across size variants by the hashed filename.
             filename = (path.rsplit("/", 1)[-1] or "").lower()
             filename = re.sub(r"\.(?:jpe?g|png|webp)$", "", filename, flags=re.I)
