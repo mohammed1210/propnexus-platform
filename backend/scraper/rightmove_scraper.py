@@ -69,6 +69,76 @@ _RM_MEDIA_IMG_NO_SCHEME_RE = re.compile(
 )
 
 
+def _looks_like_html_document(text: str | None) -> bool:
+    s = (text or "").lstrip()
+    if not s:
+        return False
+    if s.startswith("<") and ("<html" in s[:500].lower() or "<!doctype" in s[:500].lower()):
+        return True
+    lowered = s[:1500].lower()
+    return "<html" in lowered and "</html" in lowered
+
+
+def _extract_properties_from_rightmove_api_payload(payload: Any) -> List[Dict[str, Any]]:
+    """Extract a Rightmove 'properties' list from varied API JSON shapes."""
+
+    if not isinstance(payload, dict):
+        return []
+
+    def _get_path(obj: Any, path: tuple[str, ...]) -> Any:
+        cur = obj
+        for k in path:
+            if not isinstance(cur, dict) or k not in cur:
+                return None
+            cur = cur.get(k)
+        return cur
+
+    # Known/common shapes.
+    for path in (
+        ("properties",),
+        ("searchResults", "properties"),
+        ("propertySearch", "properties"),
+        ("results", "properties"),
+        ("data", "properties"),
+    ):
+        v = _get_path(payload, path)
+        if isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
+            return v
+
+    # Fallback: bounded deep scan for a plausible list-of-dicts.
+    preferred_keys = ("properties", "propertyList", "results", "searchResults", "listings")
+
+    def _looks_like_property_dict(d: Any) -> bool:
+        if not isinstance(d, dict):
+            return False
+        has_id = any(k in d for k in ("id", "propertyId", "listingId", "identifier"))
+        has_addr = any(k in d for k in ("displayAddress", "address", "summary"))
+        has_price = "price" in d or "priceAmount" in d
+        return bool(has_id and (has_addr or has_price))
+
+    def _scan(obj: Any, depth: int = 0) -> Optional[List[Dict[str, Any]]]:
+        if depth > 8:
+            return None
+        if isinstance(obj, dict):
+            for k in preferred_keys:
+                v = obj.get(k)
+                if isinstance(v, list) and v and all(isinstance(x, dict) for x in v):
+                    if sum(1 for x in v if _looks_like_property_dict(x)) >= max(1, len(v) // 4):
+                        return v  # type: ignore[return-value]
+            for v in obj.values():
+                found = _scan(v, depth + 1)
+                if found:
+                    return found
+        elif isinstance(obj, list):
+            for v in obj:
+                found = _scan(v, depth + 1)
+                if found:
+                    return found
+        return None
+
+    return _scan(payload) or []
+
+
 def _normalize_rightmove_media_url(u: str | None) -> str | None:
     if not u or not isinstance(u, str):
         return None
@@ -2037,6 +2107,45 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 if not cards:
                                     capture_debug_html(f"rightmove_empty_{page}", rendered)
                         if not cards:
+                            # Last-resort fallback: when the HTML path is stuck behind a consent wall
+                            # (common in production even with ScraperAPI rendering), attempt the JSON
+                            # search API via ScraperAPI. Keep this bounded and only use it when the
+                            # HTML produced no viable listing signals.
+                            if (
+                                location_identifier
+                                and SCRAPERAPI_KEY
+                                and (
+                                    _has_consent_marker(html)
+                                    or (not _has_listings_signals(html))
+                                    or _has_challenge_marker(html)
+                                )
+                            ):
+                                try:
+                                    api_props = await _fetch_api_properties(
+                                        session, location_identifier, limit
+                                    )
+                                except Exception:
+                                    api_props = []
+                                if api_props:
+                                    cleaned: List[Dict[str, Any]] = []
+                                    for item in api_props:
+                                        should_insert, reason = should_insert_property(item)
+                                        if should_insert:
+                                            cleaned.append(clean_property_data(item))
+                                            stats.log_parse_success()
+                                        else:
+                                            stats.log_validation_failure(reason or "Unknown")
+                                    if cleaned:
+                                        await _enrich_rightmove_results_with_detail_images(
+                                            session, cleaned
+                                        )
+                                        stats.log_summary()
+                                        print(
+                                            f"✅ Rightmove JSON API fallback returned {len(cleaned)} properties for '{location}'"
+                                        )
+                                        run_log.set_count(len(cleaned))
+                                        return cleaned
+
                             print("ℹ️ No cards found; stopping pagination.")
                             break
 
@@ -2194,64 +2303,110 @@ async def _fetch_api_properties(
     out: List[Dict[str, Any]] = []
     page_size = 24
     index = 0
-    while len(out) < limit:
-        params = [
-            f"locationIdentifier={region_id}",
-            f"numberOfPropertiesPerPage={page_size}",
-            "sortType=2",
-            f"index={index}",
-            "channel=BUY",
-        ]
-        url = f"{RIGHTMOVE_API_BASE}?{'&'.join(params)}"
-        try:
-            async with session.get(url, headers=headers, timeout=35) as resp:
-                raw = await resp.text()
-                log_fetch_diagnostics(
-                    "rightmove",
-                    url,
-                    status=resp.status,
-                    text=raw,
-                    via="direct-json",
-                )
 
-                if resp.status != 200:
-                    # Production hosts frequently get blocked on this endpoint.
-                    # If configured, retry through ScraperAPI for UK targeting consistency.
-                    if not SCRAPERAPI_KEY:
-                        break
-                    try:
-                        proxy_url = make_scraperapi_url(url, render=False)
-                        async with session.get(proxy_url, headers=headers, timeout=60) as p_resp:
-                            p_raw = await p_resp.text()
-                            log_fetch_diagnostics(
-                                "rightmove",
-                                url,
-                                status=p_resp.status,
-                                text=p_raw,
-                                via="scraperapi-json",
-                            )
-                            if p_resp.status != 200:
-                                break
-                            data = json.loads(p_raw)
-                    except Exception:
-                        break
-                else:
+    def _location_identifier_variants(ident: str) -> List[str]:
+        s = (ident or "").strip()
+        if not s:
+            return []
+        variants: List[str] = []
+        variants.append(s)
+        # Some Rightmove endpoints appear to tolerate either caret or %5E.
+        if "^" in s:
+            variants.append(s.replace("^", "%5E"))
+        if "%5e" in s.lower():
+            variants.append(re.sub(r"%5e", "^", s, flags=re.IGNORECASE))
+        # De-dupe while preserving order.
+        seen: set[str] = set()
+        outv: List[str] = []
+        for v in variants:
+            if v not in seen:
+                seen.add(v)
+                outv.append(v)
+        return outv
+
+    use_proxy_first = (os.getenv("SCRAPER_MODE", "direct").lower() == "scraperapi") and bool(
+        SCRAPERAPI_KEY
+    )
+
+    while len(out) < limit:
+        # Try a couple of locationIdentifier encodings to increase robustness.
+        page_props: List[Dict[str, Any]] = []
+        last_payload: Any = None
+        for loc_ident in _location_identifier_variants(region_id):
+            params = [
+                f"locationIdentifier={loc_ident}",
+                f"numberOfPropertiesPerPage={page_size}",
+                "sortType=2",
+                f"index={index}",
+                "channel=BUY",
+            ]
+            url = f"{RIGHTMOVE_API_BASE}?{'&'.join(params)}"
+
+            async def _fetch_once(fetch_url: str, *, via: str, timeout_s: int) -> tuple[int, str]:
+                async with session.get(fetch_url, headers=headers, timeout=timeout_s) as resp:
+                    raw_text = await resp.text()
+                    log_fetch_diagnostics(
+                        "rightmove",
+                        url,
+                        status=resp.status,
+                        text=raw_text,
+                        via=via,
+                    )
+                    return resp.status, raw_text
+
+            try:
+                # In ScraperAPI mode, go straight to proxy.
+                direct_status: int | None = None
+                direct_raw: str | None = None
+
+                if not use_proxy_first:
+                    direct_status, direct_raw = await _fetch_once(
+                        url, via="direct-json", timeout_s=35
+                    )
+
+                candidates: List[tuple[str, int, str]] = []
+                if direct_status is not None and direct_raw is not None:
+                    candidates.append(("direct-json", direct_status, direct_raw))
+
+                if SCRAPERAPI_KEY:
+                    proxy_url = make_scraperapi_url(url, render=False)
+                    p_status, p_raw = await _fetch_once(
+                        proxy_url, via="scraperapi-json", timeout_s=60
+                    )
+                    candidates.append(("scraperapi-json", p_status, p_raw))
+
+                data: Any = None
+                for via, st, raw in candidates:
+                    if st != 200 or not (raw or "").strip():
+                        continue
+                    if _looks_like_html_document(raw):
+                        # Some blocks masquerade as 200 HTML.
+                        continue
                     try:
                         data = json.loads(raw)
                     except Exception:
+                        continue
+
+                    props = _extract_properties_from_rightmove_api_payload(data)
+                    if props:
+                        page_props = props
+                        last_payload = data
                         break
-        except Exception:
+                    last_payload = data
+
+                if page_props:
+                    break
+            except Exception:
+                continue
+
+        if not page_props:
+            if last_payload is not None:
+                capture_debug_json(
+                    f"rightmove_api_empty_{index}",
+                    last_payload if isinstance(last_payload, dict) else {"raw": str(last_payload)},
+                )
             break
-        if not data or "properties" not in data:
-            capture_debug_json(
-                f"rightmove_api_empty_{index}",
-                data if isinstance(data, dict) else {"raw": str(data)},
-            )
-            break
-        props = data.get("properties", [])
-        if not props:
-            break
-        for p in props:
+        for p in page_props:
             if len(out) >= limit:
                 break
             try:
@@ -2319,6 +2474,7 @@ async def _fetch_api_properties(
                         "property_type": property_type,
                         "image_url": img,
                         "image_urls": image_urls,
+                        "imageurl": img,
                         "latitude": coords["latitude"],
                         "longitude": coords["longitude"],
                         "source": "rightmove",
@@ -2328,7 +2484,7 @@ async def _fetch_api_properties(
             except Exception:
                 continue
         # If fewer than page_size returned, stop early
-        if len(props) < page_size:
+        if len(page_props) < page_size:
             break
         index += page_size
         # Polite pacing

@@ -387,12 +387,17 @@ async def _probe_rightmove(
 
             props = []
             if isinstance(data, dict):
-                props = data.get("properties") or []
+                props = rm._extract_properties_from_rightmove_api_payload(data)
 
-            blocked = bool(
-                api_status in (403, 503)
-                or (isinstance(data, str) and _generic_blocked_markers(data))
+            response_is_html = bool(
+                isinstance(data, str)
+                and (rm._looks_like_html_document(data) or _generic_blocked_markers(data))
             )
+            api_html_snippet = (
+                _sanitize_html_snippet(data, max_chars=1800) if response_is_html else None
+            )
+
+            blocked = bool(api_status in (403, 503) or response_is_html)
             api_probe = {
                 "target_url": api_url,
                 "proxy_used": bool(proxy_used or fallback_used),
@@ -400,6 +405,14 @@ async def _probe_rightmove(
                 "http_status": api_status,
                 "properties_found": len(props) if isinstance(props, list) else 0,
                 "blocked": blocked,
+                "response_is_html": response_is_html,
+                "html_snippet": api_html_snippet,
+                "payload_type": (
+                    "dict"
+                    if isinstance(data, dict)
+                    else "str" if isinstance(data, str) else type(data).__name__
+                ),
+                "payload_keys_sample": (list(data.keys())[:30] if isinstance(data, dict) else None),
                 "classification": (
                     "blocked"
                     if blocked
