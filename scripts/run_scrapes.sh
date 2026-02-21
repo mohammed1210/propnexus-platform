@@ -1,97 +1,77 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ===========================
-# PropNexus scrape runner
-# ===========================
-# Usage:
-#   BASE_URL="https://YOUR-RAILWAY-APP.up.railway.app" LOCATION="London" ./scripts/run_scrapes.sh
-#
-# Auth:
-#   These /import/* endpoints require an admin token.
-#   Provide one of:
-#     - ADMIN_TOKEN env var
-#     - .admin_token file in repo root
-#
-# Notes:
-#   This repo's scrape endpoints are:
-#     - POST /import/rightmove
-#     - POST /import/zoopla
-#   (Not /scrape-rightmove or /scrape-zoopla.)
-
-BASE_URL="${BASE_URL:-http://localhost:8000}"
+BASE_URL="${BASE_URL:-https://propnexus-backend-production.up.railway.app}"
 BASE_URL="${BASE_URL%/}"
-LOCATION="${LOCATION:-London}"
 
-# Optional: control Zoopla pagination (API caps at 5).
+LOCATION="${LOCATION:-UB10}"
 MAX_PAGES="${MAX_PAGES:-1}"
 
-# Optional: if you have a separate API key gateway, you can set API_KEY and
-# uncomment the header below.
-API_KEY="${API_KEY:-}"
+# Auth:
+# - Provide IMPORT_ADMIN_TOKEN (preferred) or ADMIN_TOKEN
+# - Or create a .admin_token file at repo root (auto-loaded)
 
-# Load admin token from file if not provided.
-if [[ -z "${ADMIN_TOKEN:-}" ]] && [[ -f ".admin_token" ]]; then
-  ADMIN_TOKEN="$(cat .admin_token)"
-  export ADMIN_TOKEN
+if [[ -z "${IMPORT_ADMIN_TOKEN:-}" ]] && [[ -z "${ADMIN_TOKEN:-}" ]] && [[ -f ".admin_token" ]]; then
+  IMPORT_ADMIN_TOKEN="$(cat .admin_token)"
+  export IMPORT_ADMIN_TOKEN
 fi
 
-if [[ -z "${ADMIN_TOKEN:-}" ]]; then
-  echo "ERROR: ADMIN_TOKEN not set and .admin_token missing" >&2
+TOKEN="${IMPORT_ADMIN_TOKEN:-${ADMIN_TOKEN:-}}"
+if [[ -z "${TOKEN:-}" ]]; then
+  echo "ERROR: admin token not set. Use: export IMPORT_ADMIN_TOKEN=\"\$(cat .admin_token)\"" >&2
   exit 1
 fi
 
-common_headers=(
-  -H "Content-Type: application/json"
-  -H "x-admin-token: ${ADMIN_TOKEN}"
-)
+pretty() {
+  python - <<'PY'
+import sys, json
+try:
+  print(json.dumps(json.load(sys.stdin), indent=2))
+except Exception:
+  print(sys.stdin.read())
+PY
+}
 
-# If you use an API key gateway, uncomment:
-# if [[ -n "$API_KEY" ]]; then common_headers+=( -H "X-API-Key: ${API_KEY}" ); fi
-
-echo "== PropNexus Scrape Runner =="
-echo "BASE_URL:  $BASE_URL"
-echo "LOCATION:  $LOCATION"
-echo "MAX_PAGES: $MAX_PAGES"
+echo "== PropNexus Rightmove/Zoopla Debug Runner =="
+echo "BASE_URL:   $BASE_URL"
+echo "LOCATION:   $LOCATION"
+echo "MAX_PAGES:  $MAX_PAGES"
 echo
 
-post() {
-  local path="$1"
-  local body="$2"
-  echo "POST $path"
+auth_headers=(
+  -H "Authorization: Bearer $TOKEN"
+  -H "x-admin-token: $TOKEN"
+)
 
-  # Print status code while still outputting body.
-  local out http
-  out=$(curl -sS -w "\n__HTTP_STATUS__:%{http_code}" -X POST "$BASE_URL$path" "${common_headers[@]}" -d "$body")
-  http="${out##*__HTTP_STATUS__:}"
-  echo "  HTTP $http"
-  echo "  Body:"
-  echo "${out%__HTTP_STATUS__:*}" | sed 's/^/    /'
-  echo
+echo "---- 0) Backend health ----"
+curl -sS "$BASE_URL/health" | pretty || true
+echo
 
-  if [[ "$http" == "401" ]]; then
-    echo "ERROR: Unauthorized (check ADMIN_TOKEN)" >&2
-    exit 1
-  fi
-  if [[ "$http" == "404" ]]; then
-    echo "ERROR: Endpoint not found: $path" >&2
-    exit 1
-  fi
-}
+echo "---- 1) Probe Rightmove fetch ----"
+curl -sS "$BASE_URL/debug/scrape-probe?source=rightmove&location=${LOCATION}" \
+  "${auth_headers[@]}" | pretty
+echo
 
-get() {
-  local path="$1"
-  echo "GET $path"
-  curl -sS "$BASE_URL$path" | head -c 800 | sed 's/^/  /'
-  echo
-  echo
-}
+echo "---- 2) Probe Zoopla fetch ----"
+curl -sS "$BASE_URL/debug/scrape-probe?source=zoopla&location=${LOCATION}" \
+  "${auth_headers[@]}" | pretty
+echo
 
-# 1) Trigger imports (scrape + normalize + upsert)
-post "/import/rightmove" "{\"location\":\"${LOCATION}\"}"
-post "/import/zoopla?max_pages=${MAX_PAGES}" "{\"location\":\"${LOCATION}\"}"
+echo "---- 3) Import Rightmove ----"
+curl -sS -X POST "$BASE_URL/import/rightmove" \
+  -H "Content-Type: application/json" \
+  "${auth_headers[@]}" \
+  -d "{\"location\":\"${LOCATION}\"}" | pretty
+echo
 
-# 2) Quick sanity check that /properties responds
-get "/properties?sort=created_at&dir=desc&limit=5"
+echo "---- 4) Import Zoopla ----"
+curl -sS -X POST "$BASE_URL/import/zoopla?max_pages=${MAX_PAGES}" \
+  -H "Content-Type: application/json" \
+  "${auth_headers[@]}" \
+  -d "{\"location\":\"${LOCATION}\"}" | pretty
+echo
 
-echo "Done. Now check Supabase image columns (image_urls / imageurl / image_count)."
+echo "---- 5) DB counts (sanity) ----"
+curl -sS "$BASE_URL/debug/properties-count" \
+  "${auth_headers[@]}" | pretty
+echo
