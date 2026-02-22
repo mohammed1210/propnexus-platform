@@ -152,57 +152,6 @@ def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
     if item.get("comps") is None and isinstance(cache_payload.get("comps"), dict):
         item["comps"] = cache_payload.get("comps")
 
-    derived = (
-        cache_payload.get("derived") if isinstance(cache_payload.get("derived"), dict) else None
-    )
-    if isinstance(derived, dict):
-        metrics_overridden = False
-        roi_is_proxy = bool(item.get("roi_is_proxy"))
-        rent_source = (item.get("rent_source") or "").lower()
-        rent_is_proxy = rent_source == "proxy"
-
-        d_rent = derived.get("rent_estimate_monthly")
-        d_yield = derived.get("yield_percent")
-        d_roi = derived.get("roi_percent")
-
-        if d_roi is not None and _should_override_metric(
-            item.get("roi_percent"), is_proxy=roi_is_proxy, derived_value=d_roi
-        ):
-            try:
-                item["roi_percent"] = float(d_roi)
-                item["roi_is_proxy"] = False
-                metrics_overridden = True
-            except Exception:
-                pass
-
-        if d_yield is not None and _should_override_metric(
-            item.get("yield_percent"), is_proxy=False, derived_value=d_yield
-        ):
-            try:
-                item["yield_percent"] = float(d_yield)
-                metrics_overridden = True
-            except Exception:
-                pass
-
-        if d_rent is not None and _should_override_metric(
-            item.get("rent_monthly"), is_proxy=rent_is_proxy, derived_value=d_rent
-        ):
-            try:
-                item["rent_monthly"] = float(d_rent)
-                item["rent_source"] = derived.get("rent_source") or "enriched"
-                metrics_overridden = True
-            except Exception:
-                pass
-
-        # If we changed financial inputs, recompute score for this response object.
-        if metrics_overridden:
-            try:
-                score, breakdown = compute_deal_score(item)
-                item["score"] = score
-                item["score_breakdown"] = breakdown
-            except Exception:
-                pass
-
 
 def _attach_enrichment_from_cache(sb: Any, items: List[Dict[str, Any]]) -> List[str]:
     if not items:

@@ -296,14 +296,13 @@ export default function PropertyCard({
   const derived = useMemo(() => {
     const out: {
       rentMonthly?: number;
-      rentSource?: 'provided' | 'proxy';
+      rentSource?: 'provided';
       grossYieldPct?: number;
       priceToRent?: number;
       crimeLabel?: 'Low' | 'Med' | 'High';
       schoolsRating?: number;
       compsMedianSold?: number;
       compsCount?: number;
-      compsDateRange?: string;
       freshnessText?: string;
       cacheTag?: string;
     } = {};
@@ -317,29 +316,14 @@ export default function PropertyCard({
     const comps = insights?.payload?.comps && !insights?.payload?.comps?.error ? insights.payload.comps : null;
 
     // Rent estimate
-    const compRents: number[] = Array.isArray(comps?.rents)
-      ? comps.rents
-          .map((r: any) => Number(r?.monthly_rent ?? r?.rent ?? r?.pcm ?? 0))
-          .filter((n: number) => Number.isFinite(n) && n > 0)
-      : [];
-    const compRentMedian = compRents.length ? median(compRents) : undefined;
-    const areaRent = typeof area?.avg_rent === 'number' && area.avg_rent > 0 ? area.avg_rent : undefined;
-
     if (providedRent) {
       out.rentMonthly = Math.round(providedRent);
       out.rentSource = 'provided';
-    } else if (typeof compRentMedian === 'number') {
-      out.rentMonthly = Math.round(compRentMedian);
-      out.rentSource = 'proxy';
-    } else if (typeof areaRent === 'number') {
-      out.rentMonthly = Math.round(areaRent);
-      out.rentSource = 'proxy';
     }
 
-    // Yield (prefer property yield; otherwise proxy)
+    // Yield (only when explicitly provided on the property)
     const providedYield = typeof p.yield_percent === 'number' && isFinite(p.yield_percent) ? p.yield_percent : undefined;
     if (typeof providedYield === 'number') out.grossYieldPct = providedYield;
-    else if (price && out.rentMonthly) out.grossYieldPct = (out.rentMonthly * 12 * 100) / price;
 
     // Price-to-rent (annual)
     if (price && out.rentMonthly) out.priceToRent = price / (out.rentMonthly * 12);
@@ -351,21 +335,10 @@ export default function PropertyCard({
     }
     if (typeof area?.schools_rating === 'number') out.schoolsRating = area.schools_rating;
 
-    // Comps: median sold + count + date range
-    const salesArr: any[] = Array.isArray(comps?.sales) ? comps.sales : [];
-    const salePrices: number[] = salesArr
-      .map((s) => Number(s?.price ?? s?.sold_price ?? s?.soldPrice ?? 0))
-      .filter((n) => Number.isFinite(n) && n > 0);
-    const saleDates: number[] = salesArr
-      .map((s) => Date.parse(String(s?.date ?? s?.sold_date ?? s?.soldDate ?? s?.sold_at ?? '')))
-      .filter((t) => Number.isFinite(t) && t > 0);
-
-    out.compsCount = salePrices.length;
-    if (salePrices.length) out.compsMedianSold = median(salePrices);
-    if (saleDates.length) {
-      const min = new Date(Math.min(...saleDates));
-      const max = new Date(Math.max(...saleDates));
-      out.compsDateRange = `${min.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}–${max.toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}`;
+    // Comps: use DB medians/count (no provider arrays)
+    if (typeof comps?.count === 'number') out.compsCount = comps.count;
+    if (typeof comps?.median_price === 'number' && isFinite(comps.median_price) && comps.median_price > 0) {
+      out.compsMedianSold = comps.median_price;
     }
 
     // Freshness + cache tag
@@ -375,22 +348,14 @@ export default function PropertyCard({
 
       const areaSrc = insights.payload?.area?.source;
       const compsSrc = insights.payload?.comps?.source;
-      const anyProvider = areaSrc === 'provider' || compsSrc === 'provider';
-      const anyCache = areaSrc === 'cache' || compsSrc === 'cache';
-      out.cacheTag = anyProvider ? 'Live' : anyCache ? 'Cached' : undefined;
+      const anyDb = areaSrc === 'db' || compsSrc === 'db';
+      out.cacheTag = anyDb ? 'DB' : undefined;
     }
 
     // Touch timeTick to keep freshness recomputed.
     void timeTick;
     return out;
   }, [insights, p.monthly_rent, p.price, p.rent, p.rent_pcm, p.rent_per_month, p.yield_percent, timeTick]);
-
-  function median(nums: number[]): number {
-    const a = [...nums].sort((x, y) => x - y);
-    const mid = Math.floor(a.length / 2);
-    if (!a.length) return NaN;
-    return a.length % 2 === 1 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
-  }
 
   const priceText = useMemo(() => {
     const n = p.price ?? 0;
@@ -578,18 +543,15 @@ export default function PropertyCard({
               {p.yield_percent.toFixed(1)}% Yield
             </span>
           )}
-          {(typeof p.roi_percent === 'number' || typeof p.yield_percent === 'number') && (
+          {typeof p.roi_percent === 'number' && (
             <span
               className={cx(
                 'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
-                getBadgeColor('roi', (typeof p.roi_percent === 'number' ? p.roi_percent : (p.yield_percent as number)) as number),
+                getBadgeColor('roi', p.roi_percent),
               )}
-              aria-label={`ROI percentage: ${(
-                typeof p.roi_percent === 'number' ? p.roi_percent : (p.yield_percent as number)
-              ).toFixed(1)}%${typeof p.roi_percent === 'number' ? '' : ' (proxy)'}`}
+              aria-label={`ROI percentage: ${p.roi_percent.toFixed(1)}%`}
             >
-              {(typeof p.roi_percent === 'number' ? p.roi_percent : (p.yield_percent as number)).toFixed(1)}% ROI
-              {typeof p.roi_percent === 'number' ? '' : ' (proxy)'}
+              {p.roi_percent.toFixed(1)}% ROI
             </span>
           )}
         </div>
@@ -665,10 +627,6 @@ export default function PropertyCard({
                       {typeof derived.rentMonthly === 'number' && (
                         <span className="text-slate-700 dark:text-slate-200">
                           Rent <span className="font-semibold">£{derived.rentMonthly.toLocaleString()}/mo</span>
-                          <span className="text-slate-500 dark:text-slate-400">
-                            {' '}
-                            ({derived.rentSource === 'provided' ? 'provided' : 'proxy'})
-                          </span>
                         </span>
                       )}
                       {typeof derived.grossYieldPct === 'number' && isFinite(derived.grossYieldPct) && (
@@ -703,8 +661,7 @@ export default function PropertyCard({
                               : '—'}
                           </span>
                           <span className="text-slate-500 dark:text-slate-400">
-                            {' '}
-                            ({derived.compsCount}){derived.compsDateRange ? ` · ${derived.compsDateRange}` : ''}
+                            {' '}({derived.compsCount})
                           </span>
                         </span>
                       )}
@@ -754,15 +711,10 @@ export default function PropertyCard({
               <span className="inline-flex items-center gap-1.5">
                 <span
                   aria-hidden
-                  className={cx(
-                    'inline-block h-2 w-2 rounded-sm',
-                    derived.rentSource === 'proxy'
-                      ? 'bg-teal-500/70'
-                      : 'bg-slate-400/70 dark:bg-slate-500/60',
-                  )}
+                  className={cx('inline-block h-2 w-2 rounded-sm', 'bg-slate-400/70 dark:bg-slate-500/60')}
                 />
                 <span className="text-slate-600 dark:text-slate-400">
-                  {derived.rentSource === 'proxy' ? 'Yield proxy:' : 'Yield:'}
+                  Rent:
                 </span>
                 <span className="font-semibold">£{(derived.rentMonthly / 1000).toFixed(1)}k/mo</span>
               </span>

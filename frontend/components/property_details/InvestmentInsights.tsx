@@ -13,13 +13,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fetchWithRetry } from '@/lib/api';
 import Button from '@/components/ui/Button';
 
-type RentComp = { monthly_rent?: number | string };
-type SalesComp = Record<string, unknown>;
-
 type CompsPayload = {
   postcode?: string;
-  sales?: SalesComp[];
-  rents?: RentComp[];
+  source?: 'db';
+  match_level?: 'postcode' | 'outward' | 'none';
+  count?: number;
+  median_price?: number | null;
+  median_rent?: number | null;
   note?: string;
   error?: string;
 };
@@ -111,17 +111,8 @@ export default function InvestmentInsights({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postcode]);
 
-  const avgRent = useMemo(() => {
-    const rs =
-      comps?.rents
-        ?.map((r) => Number(r?.monthly_rent ?? 0))
-        .filter((n) => Number.isFinite(n) && n > 0) ?? [];
-    if (!rs.length) return undefined;
-    return Math.round(rs.reduce((a, b) => a + b, 0) / rs.length);
-  }, [comps?.rents]);
-
-  const salesCount = comps?.sales?.length ?? 0;
-  const rentsCount = comps?.rents?.length ?? 0;
+  const compsCount = typeof comps?.count === 'number' ? comps.count : 0;
+  const medianRent = typeof comps?.median_rent === 'number' && comps.median_rent > 0 ? comps.median_rent : undefined;
 
   // Heuristics
   const upsides: string[] = [];
@@ -136,13 +127,13 @@ export default function InvestmentInsights({
     upsides.push('Strong gross yield vs typical 4–6% band.');
   if (typeof roi_percent === 'number' && roi_percent >= 12)
     upsides.push('Healthy ROI potential on current assumptions.');
-  if (avgRent) upsides.push(`Local median rent around £${avgRent.toLocaleString()}.`);
+  if (medianRent) upsides.push(`Local median rent around £${Math.round(medianRent).toLocaleString()}.`);
 
   if (typeof yield_percent === 'number' && yield_percent < 4)
     risks.push('Below-average gross yield — pressure-test rent or price.');
   if (typeof roi_percent === 'number' && roi_percent < 8)
     risks.push('ROI looks light — review refurb scope and exit options.');
-  if (salesCount + rentsCount < 4 && postcode)
+  if (compsCount < 4 && postcode)
     risks.push('Limited nearby comps — validate pricing with local agents.');
 
   if (!upsides.length) upsides.push('No obvious positives from current inputs.');
@@ -238,9 +229,7 @@ export default function InvestmentInsights({
           </Button>
         </div>
 
-        {!postcode && (
-          <div className="text-sm text-neutral-500 mt-2">Add postcode to load sales & rents.</div>
-        )}
+        {!postcode && <div className="text-sm text-neutral-500 mt-2">Add postcode to load comps.</div>}
 
         {postcode && loading && (
           <div className="text-sm text-neutral-500 mt-2" aria-live="polite">
@@ -257,19 +246,24 @@ export default function InvestmentInsights({
           <div className="text-sm mt-2">
             <div className="flex flex-wrap gap-4">
               <span>
-                Recent Sales: <strong>{salesCount}</strong>
+                Samples: <strong>{compsCount}</strong>
               </span>
               <span>
-                Recent Rents: <strong>{rentsCount}</strong>
+                Median sale price:{' '}
+                <strong>
+                  {typeof comps?.median_price === 'number' && comps.median_price > 0
+                    ? `£${Math.round(comps.median_price).toLocaleString()}`
+                    : '—'}
+                </strong>
               </span>
-              {avgRent ? (
+              {medianRent ? (
                 <span>
-                  Avg Rent: <strong>£{avgRent.toLocaleString()}</strong>
+                  Median rent: <strong>£{Math.round(medianRent).toLocaleString()}/mo</strong>
                 </span>
               ) : null}
             </div>
 
-            {!salesCount && !rentsCount && (
+            {!compsCount && (
               <div className="text-neutral-500 mt-1">No comps found for this postcode.</div>
             )}
 
@@ -280,10 +274,6 @@ export default function InvestmentInsights({
             )}
           </div>
         )}
-
-        <div className="text-xs text-neutral-500 mt-3">
-          Live Land Registry & rent sources coming next.
-        </div>
       </div>
     </section>
   );
