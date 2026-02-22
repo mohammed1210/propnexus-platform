@@ -20,7 +20,11 @@ def get_client() -> OpenAI:
             # Don't crash CI/import; only raise when endpoint hit
             raise HTTPException(
                 status_code=503,
-                detail="OpenAI API key not configured in environment.",
+                detail={
+                    "ok": False,
+                    "ai_disabled": True,
+                    "error": "OpenAI API key not configured in environment.",
+                },
             )
         _client = OpenAI(api_key=api_key)
     return _client
@@ -64,8 +68,12 @@ async def generate_strategies(data: dict):
 
 @router.get("/health")
 async def gpt_health():
-    """Lightweight route to confirm GPT routes import properly."""
-    return {"status": "ok", "message": "GPT routes loaded successfully"}
+    """Lightweight health check for GPT routes.
+
+    This must succeed even when OPENAI_API_KEY is missing.
+    """
+    enabled = bool(os.getenv("OPENAI_API_KEY"))
+    return {"ok": True, "ai_enabled": enabled, "ai_disabled": not enabled}
 
 
 # Sprint 11: AI Chat & Scoring Endpoints

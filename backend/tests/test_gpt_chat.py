@@ -91,3 +91,41 @@ def test_ai_chat_without_context(mock_openai_client):
     data = response.json()
     assert data["ok"] is True
     assert "reply" in data
+
+
+def test_ai_chat_disabled_when_no_api_key(monkeypatch):
+    """When OPENAI_API_KEY is missing, endpoints should return 503 with ai_disabled."""
+    from backend.main import app
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    # Ensure module-level cache isn't carrying a client from other tests.
+    import backend.routes.gpt_routes as gpt_routes
+
+    gpt_routes._client = None
+
+    client = TestClient(app)
+    response = client.post(
+        "/gpt/chat",
+        json={"messages": [{"role": "user", "content": "Hello"}]},
+    )
+
+    assert response.status_code == 503
+    payload = response.json()
+    assert payload["detail"]["ai_disabled"] is True
+
+
+def test_gpt_health_reports_ai_enabled(monkeypatch):
+    from backend.main import app
+
+    client = TestClient(app)
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    resp = client.get("/gpt/health")
+    assert resp.status_code == 200
+    assert resp.json()["ai_enabled"] is False
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test")
+    resp2 = client.get("/gpt/health")
+    assert resp2.status_code == 200
+    assert resp2.json()["ai_enabled"] is True

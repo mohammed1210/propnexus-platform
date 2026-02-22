@@ -30,7 +30,11 @@ def ensure_api_key() -> str:
     if not key:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI service not configured: set OPENAI_API_KEY",
+            detail={
+                "ok": False,
+                "ai_disabled": True,
+                "error": "OpenAI API key not configured in environment.",
+            },
         )
     return key
 
