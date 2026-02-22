@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Header, HTTPException, Query, Request, status
 
 from backend.routes.properties_routes import _attach_cached_enrichment
 from backend.utils.canonical_metrics import apply_canonical_metrics
@@ -403,6 +403,45 @@ async def save_deal(
         raise
     except Exception as e:
         print(f"[save-deal-error] {e}")
+        raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
+
+
+@router.delete("/save-deal")
+async def delete_save_deal(
+    property_id: str = Query(..., description="Property UUID to remove from saved deals"),
+    authorization: Optional[str] = Header(None),
+    x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
+) -> Dict[str, Any]:
+    """Preferred delete endpoint (matches frontend contract).
+
+    Deletes a saved deal for the current user by property_id.
+    """
+    sb = _require_supabase()
+    try:
+        subject = _extract_user_id_from_token(authorization)
+        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+
+        if not property_id:
+            raise HTTPException(status_code=400, detail="Missing property_id")
+
+        if not _saved_deals_has_property_id(sb):
+            raise HTTPException(
+                status_code=500,
+                detail="saved_deals schema unsupported: missing property_id column",
+            )
+
+        res = (
+            sb.table("saved_deals")
+            .delete()
+            .eq("property_id", property_id)
+            .eq(identity_col, identity_val)
+            .execute()
+        )
+        return {"ok": True, "deleted": True, "data": res.data}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[delete-save-deal-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
 
 
