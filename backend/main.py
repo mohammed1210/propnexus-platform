@@ -33,6 +33,7 @@ from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
 from backend.routes.debug_properties import router as debug_properties_router
 from backend.routes.debug_scrape_probe import router as debug_scrape_probe_router
+from backend.routes.demo_seed import router as demo_seed_router
 from backend.routes.enrichment_queue_routes import router as enrichment_queue_router
 from backend.routes.enrichment_routes import router as enrichment_router
 from backend.routes.gpt_routes import router as gpt_router
@@ -265,6 +266,7 @@ app.include_router(area_intel_router)
 app.include_router(comps_router)
 app.include_router(debug_properties_router)
 app.include_router(debug_scrape_probe_router)
+app.include_router(demo_seed_router)
 app.include_router(gpt_router)
 app.include_router(import_router)
 app.include_router(admin_alias_router)
