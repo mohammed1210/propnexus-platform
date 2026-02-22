@@ -3,13 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { fetchWithRetry } from '@/lib/api';
 
-type CompsPayload = {
-  source?: 'db';
-  postcode?: string;
-  match_level?: 'postcode' | 'outward' | 'none';
-  count?: number;
-  median_price?: number | null;
-  median_rent?: number | null;
+type Comp = {
+  address: string;
+  price: number;
+  date?: string;
+  type?: string;
+  distance_km?: number;
 };
 
 export default function CompsMini({
@@ -19,7 +18,8 @@ export default function CompsMini({
   postcode?: string;
   className?: string;
 }) {
-  const [comps, setComps] = useState<CompsPayload | null>(null);
+  const [sales, setSales] = useState<Comp[] | null>(null);
+  const [rents, setRents] = useState<Comp[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -28,7 +28,8 @@ export default function CompsMini({
   useEffect(() => {
     const pc = (postcode ?? '').trim();
     if (!pc) {
-      setComps(null);
+      setSales(null);
+      setRents(null);
       setErr(null);
       setLoading(false);
       abortRef.current?.abort();
@@ -52,23 +53,32 @@ export default function CompsMini({
         return r.json();
       })
       .then((j) => {
-        setComps(j as CompsPayload);
+        setSales(Array.isArray(j?.sales) ? j.sales : []);
+        setRents(Array.isArray(j?.rents) ? j.rents : []);
       })
       .catch((e: any) => {
         if (e?.name === 'AbortError') return;
         console.error('CompsMini fetch error', e);
         setErr('Could not load comps');
-        setComps(null);
+        setSales([]);
+        setRents([]);
       })
       .finally(() => setLoading(false));
 
     return () => ctrl.abort();
   }, [postcode]);
 
-  const fmtMoney = (v?: number | null) =>
-    typeof v === 'number' && isFinite(v) && v > 0
-      ? '£' + v.toLocaleString(undefined, { maximumFractionDigits: 0 })
-      : '—';
+  const fmtMoney = (v?: number) =>
+    typeof v === 'number' ? '£' + v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—';
+
+  const fmtDate = (iso?: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+  };
+
+  const fmtDist = (km?: number) =>
+    typeof km === 'number' && isFinite(km) ? `${km.toFixed(2)} km` : '';
 
   return (
     <section
@@ -105,22 +115,59 @@ export default function CompsMini({
 
       {!loading && !err && (
         <div className="grid sm:grid-cols-2 gap-4">
-          <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-3">
-            <div className="text-sm text-neutral-600 dark:text-neutral-300 mb-1">Median sale price</div>
-            <div className="text-base font-semibold">{fmtMoney(comps?.median_price ?? null)}</div>
-            <div className="text-xs text-neutral-500 mt-1">
-              {typeof comps?.count === 'number' ? `${comps.count} sample${comps.count === 1 ? '' : 's'}` : ''}
-            </div>
+          {/* Sales */}
+          <div>
+            <p className="font-medium mb-1">Recent Sales</p>
+            {sales && sales.length > 0 ? (
+              <ul className="text-sm divide-y divide-neutral-200 dark:divide-neutral-800">
+                {sales.slice(0, 6).map((c, i) => (
+                  <li key={`s-${i}`} className="py-1 flex items-baseline justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate" title={c.address}>
+                        {c.address}
+                      </div>
+                      <div className="text-[11px] text-neutral-500">
+                        {c.type ? `${c.type} • ` : ''}
+                        {fmtDate(c.date)} {fmtDist(c.distance_km)}
+                      </div>
+                    </div>
+                    <span className="whitespace-nowrap font-medium">{fmtMoney(c.price)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-neutral-500 text-sm">No sales found.</div>
+            )}
           </div>
-          <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 p-3">
-            <div className="text-sm text-neutral-600 dark:text-neutral-300 mb-1">Median rent/mo</div>
-            <div className="text-base font-semibold">{fmtMoney(comps?.median_rent ?? null)}</div>
-            <div className="text-xs text-neutral-500 mt-1">
-              {comps?.match_level ? `match: ${comps.match_level}` : ''}
-            </div>
+
+          {/* Rents */}
+          <div>
+            <p className="font-medium mb-1">Recent Rents</p>
+            {rents && rents.length > 0 ? (
+              <ul className="text-sm divide-y divide-neutral-200 dark:divide-neutral-800">
+                {rents.slice(0, 6).map((c, i) => (
+                  <li key={`r-${i}`} className="py-1 flex items-baseline justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate" title={c.address}>
+                        {c.address}
+                      </div>
+                      <div className="text-[11px] text-neutral-500">
+                        {c.type ? `${c.type} • ` : ''}
+                        {fmtDate(c.date)} {fmtDist(c.distance_km)}
+                      </div>
+                    </div>
+                    <span className="whitespace-nowrap font-medium">{fmtMoney(c.price)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="text-neutral-500 text-sm">No rents found.</div>
+            )}
           </div>
         </div>
       )}
+
+      <p className="mt-3 text-xs text-neutral-500">Live Land Registry & rent feeds coming next.</p>
     </section>
   );
 }

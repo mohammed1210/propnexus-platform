@@ -89,21 +89,12 @@ export default function AreaIntel({
 
   // Merge: live → provided → sensible demo defaults
   const d = {
-    avgYieldPct: liveData?.avgYieldPct ?? data?.avgYieldPct,
-    avgRent: liveData?.avgRent ?? data?.avgRent,
-    crimeRateIndex: liveData?.crimeRateIndex ?? data?.crimeRateIndex,
-    ofstedSummary: liveData?.ofstedSummary ?? data?.ofstedSummary,
-    transportSummary: liveData?.transportSummary ?? data?.transportSummary,
-  };
-
-  const fmtPct = (v: unknown) => {
-    const n = typeof v === 'number' ? v : Number(v);
-    return Number.isFinite(n) && n > 0 ? `${n.toFixed(1)}%` : '—';
-  };
-
-  const fmtGBP = (v: unknown) => {
-    const n = typeof v === 'number' ? v : Number(v);
-    return Number.isFinite(n) && n > 0 ? `£${Math.round(n).toLocaleString()}` : '—';
+    avgYieldPct: liveData?.avgYieldPct ?? data?.avgYieldPct ?? 5.8,
+    avgRent: liveData?.avgRent ?? data?.avgRent ?? 1350,
+    crimeRateIndex: liveData?.crimeRateIndex ?? data?.crimeRateIndex ?? 42,
+    ofstedSummary: liveData?.ofstedSummary ?? data?.ofstedSummary ?? 'Ofsted Good nearby',
+    transportSummary:
+      liveData?.transportSummary ?? data?.transportSummary ?? 'Excellent · ~18 mins to centre',
   };
 
   return (
@@ -128,32 +119,36 @@ export default function AreaIntel({
         <>
           {err && (
             <div className="mb-3 text-xs text-amber-600">
-              {err}
+              {err} Showing illustrative figures instead.
             </div>
           )}
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <InfoCard
               label="Average Yield"
-              value={fmtPct(d.avgYieldPct)}
+              value={`${Number(d.avgYieldPct).toFixed(1)}%`}
               hint="Local average gross yield"
             />
             <InfoCard
               label="Average Rent"
-              value={fmtGBP(d.avgRent)}
+              value={`£${Math.round(Number(d.avgRent)).toLocaleString()}`}
               hint="Median monthly rent"
             />
             <InfoCard
               label="Crime (Index)"
-              value={typeof d.crimeRateIndex === 'number' && Number.isFinite(d.crimeRateIndex) ? String(d.crimeRateIndex) : '—'}
+              value={String(d.crimeRateIndex)}
               hint="Composite index (0–100). Lower is better."
             />
-            <InfoCard label="Schools" value={d.ofstedSummary || '—'} hint="Ofsted ratings summary" />
+            <InfoCard label="Schools" value={d.ofstedSummary} hint="Ofsted ratings summary" />
           </div>
 
           <div className="mt-3 rounded-md border border-neutral-200 dark:border-neutral-800 p-3 text-sm">
             <div className="mb-1 font-medium">Transport</div>
-            <div>{d.transportSummary || '—'}</div>
+            <div>{d.transportSummary}</div>
+            <div className="mt-2 text-xs text-neutral-500">
+              Figures are illustrative for product design. Live feeds coming soon (ONS, Police,
+              Ofsted, TfL/National Rail).
+            </div>
           </div>
         </>
       )}

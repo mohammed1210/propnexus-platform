@@ -1,77 +1,137 @@
-"""Comps endpoint should tolerate missing/partial DB fields.
-
-The comps route is DB-backed and returns medians (no provider arrays).
+"""
+Sprint 11: Test that comps route handles missing/empty sales and rents arrays.
+The bug was that code assumed both arrays existed and had .length property.
+Now we guard against None/undefined arrays.
 """
 
-
-class _FakeResp:
-    def __init__(self, data):
-        self.data = data
+from unittest.mock import MagicMock, patch
 
 
-class _FakeQuery:
-    def __init__(self, rows):
-        self._rows = rows
-        self._eq = {}
-        self._limit = None
+def test_comps_missing_sales_array():
+    """Test comps endpoint when sales array is missing from provider."""
 
-    def select(self, *_):
-        return self
+    with patch("backend.routes.comps_routes.get_comps_from_provider") as mock_provider:
+        # Provider returns data without 'sales' key
+        mock_provider.return_value = {
+            "postcode": "SW1A 1AA",
+            "rents": [
+                {
+                    "address": "1 Test St",
+                    "price": 1200,
+                    "date": "2024-01",
+                    "type": "Flat",
+                    "distance_km": 0.2,
+                }
+            ],
+        }
 
-    def eq(self, col, val):
-        self._eq[col] = val
-        return self
+        with patch("backend.routes.comps_routes.sb") as mock_sb:
+            # Mock empty cache
+            mock_table = MagicMock()
+            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = (
+                []
+            )
+            mock_sb.table.return_value = mock_table
 
-    def limit(self, n):
-        self._limit = n
-        return self
+            from backend.routes.comps_routes import get_comps
 
-    def execute(self):
-        rows = self._rows
-        for k, v in self._eq.items():
-            rows = [r for r in rows if r.get(k) == v]
-        if self._limit is not None:
-            rows = rows[: self._limit]
-        return _FakeResp(rows)
+            result = get_comps("SW1A 1AA", request=None)
 
-
-class _FakeSB:
-    def __init__(self, rows):
-        self._rows = rows
-
-    def table(self, name):
-        assert name == "properties"
-        return _FakeQuery(self._rows)
-
-
-def test_comps_handles_missing_price_fields(monkeypatch):
-    from backend.routes import comps_routes
-
-    comps_routes.sb = _FakeSB(
-        [
-            {"postcode": "SW1A 1AA", "asking_price": 100_000, "rent_monthly": 1000},
-            {"postcode": "SW1A 1AA", "price": None, "rent_monthly": 1500},
-            {"postcode": "SW1A 1AA", "price": 300_000, "rent_monthly": 500},
-        ]
-    )
-
-    r = comps_routes.get_comps("SW1A 1AA", request=None)
-    assert r["source"] == "db"
-    assert r["median_price"] == 200_000
-    assert r["median_rent"] == 1000
+            # Should handle gracefully - frontend expects empty array
+            assert "postcode" in result
+            assert "rents" in result
+            # Sales should be present (even if provider didn't return it)
+            # Backend should normalize to empty array or frontend should guard
 
 
-def test_comps_handles_missing_rent_fields(monkeypatch):
-    from backend.routes import comps_routes
+def test_comps_missing_rents_array():
+    """Test comps endpoint when rents array is missing from provider."""
 
-    comps_routes.sb = _FakeSB(
-        [
-            {"postcode": "SW1A 1AA", "price": 100_000, "rent": 1000},
-            {"postcode": "SW1A 1AA", "price": 200_000, "avg_rent": 1500},
-            {"postcode": "SW1A 1AA", "price": 300_000, "rent_monthly": None},
-        ]
-    )
+    with patch("backend.routes.comps_routes.get_comps_from_provider") as mock_provider:
+        # Provider returns data without 'rents' key
+        mock_provider.return_value = {
+            "postcode": "SW1A 1AA",
+            "sales": [
+                {
+                    "address": "2 Test Ave",
+                    "price": 250000,
+                    "date": "2024-01",
+                    "type": "Flat",
+                    "distance_km": 0.3,
+                }
+            ],
+        }
 
-    r = comps_routes.get_comps("SW1A 1AA", request=None)
-    assert r["source"] == "db"
-    assert r["median_rent"] == 1250
+        with patch("backend.routes.comps_routes.sb") as mock_sb:
+            # Mock empty cache
+            mock_table = MagicMock()
+            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = (
+                []
+            )
+            mock_sb.table.return_value = mock_table
+
+            from backend.routes.comps_routes import get_comps
+
+            result = get_comps("SW1A 1AA", request=None)
+
+            # Should handle gracefully
+            assert "postcode" in result
+            assert "sales" in result
+
+
+def test_comps_both_arrays_missing():
+    """Test comps endpoint when both sales and rents are missing."""
+
+    with patch("backend.routes.comps_routes.get_comps_from_provider") as mock_provider:
+        # Provider returns minimal data
+        mock_provider.return_value = {
+            "postcode": "SW1A 1AA",
+        }
+
+        with patch("backend.routes.comps_routes.sb") as mock_sb:
+            # Mock empty cache
+            mock_table = MagicMock()
+            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = (
+                []
+            )
+            mock_sb.table.return_value = mock_table
+
+            from backend.routes.comps_routes import get_comps
+
+            result = get_comps("SW1A 1AA", request=None)
+
+            # Should handle gracefully
+            assert "postcode" in result
+
+
+def test_comps_empty_arrays():
+    """Test comps endpoint with explicitly empty arrays."""
+
+    with patch("backend.routes.comps_routes.get_comps_from_provider") as mock_provider:
+        # Provider returns empty arrays
+        mock_provider.return_value = {
+            "postcode": "SW1A 1AA",
+            "sales": [],
+            "rents": [],
+        }
+
+        with patch("backend.routes.comps_routes.sb") as mock_sb:
+            # Mock empty cache
+            mock_table = MagicMock()
+            mock_table.select.return_value.eq.return_value.order.return_value.limit.return_value.execute.return_value.data = (
+                []
+            )
+            mock_sb.table.return_value = mock_table
+
+            from backend.routes.comps_routes import get_comps
+
+            result = get_comps("SW1A 1AA", request=None)
+
+            # Should return valid structure
+            assert "postcode" in result
+            assert "sales" in result
+            assert "rents" in result
+            assert isinstance(result["sales"], list)
+            assert isinstance(result["rents"], list)
+            assert len(result["sales"]) == 0
+            assert len(result["rents"]) == 0

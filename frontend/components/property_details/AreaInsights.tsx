@@ -9,31 +9,33 @@ import { getAreaIntel, getComps } from '@/lib/api';
 import { FF } from '@/lib/flags';
 
 type AreaIntelData = {
-  key?: string;
-  avg_price?: number | null;
-  avg_rent?: number | null;
-  rental_yield_percent?: number | null;
-  crime_index?: number | null;
-  schools_rating?: number | null;
-  count?: number;
-  match_level?: 'postcode' | 'outward' | 'none';
-  median_price?: number | null;
-  median_rent?: number | null;
-  median_yield_percent?: number | null;
+  key: string;
+  population: number;
+  avg_price: number;
+  avg_rent: number;
+  rental_yield_percent: number;
+  crime_index: number;
+  schools_rating: number;
   notes?: string;
-  source?: 'db';
+  source?: 'provider' | 'cache';
+};
+
+type CompLine = {
+  address: string;
+  price: number;
+  date: string;
+  type: string;
+  distance_km: number;
 };
 
 type CompsData = {
   postcode: string;
-  source?: 'db';
-  match_level?: 'postcode' | 'outward' | 'none';
-  count?: number;
-  median_price?: number | null;
-  median_rent?: number | null;
+  sales?: CompLine[];
+  rents?: CompLine[];
+  source?: 'provider' | 'cache';
 };
 
-type Status = 'db' | 'missing';
+type Status = 'live' | 'proxy' | 'missing';
 
 const UI_TEXT = {
   title: 'Area Insights',
@@ -79,19 +81,26 @@ function SkeletonLines() {
 
 function StatusPill({ status }: { status: Status }) {
   const cfg =
-    status === 'db'
+    status === 'live'
       ? {
-          label: 'DB',
+          label: 'Live',
           dot: 'bg-emerald-500',
           cls:
             'border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-200',
         }
-      : {
-          label: 'Missing',
-          dot: 'bg-slate-400',
-          cls:
-            'border-slate-200/80 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900/20 dark:text-slate-200',
-        };
+      : status === 'proxy'
+        ? {
+            label: 'Proxy',
+            dot: 'bg-amber-500',
+            cls:
+              'border-amber-200/80 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200',
+          }
+        : {
+            label: 'Missing',
+            dot: 'bg-slate-400',
+            cls:
+              'border-slate-200/80 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900/20 dark:text-slate-200',
+          };
 
   return (
     <span
@@ -118,6 +127,13 @@ function Chip({ label, value }: { label: string; value: string }) {
       <span className="font-semibold text-slate-900 dark:text-slate-100">{value}</span>
     </span>
   );
+}
+
+function countCaption(salesCount: number, rentsCount: number): string {
+  const parts: string[] = [];
+  if (salesCount > 0) parts.push(`${salesCount} sale${salesCount === 1 ? '' : 's'}`);
+  if (rentsCount > 0) parts.push(`${rentsCount} rental${rentsCount === 1 ? '' : 's'}`);
+  return parts.join(' • ');
 }
 
 export default function AreaInsights({
@@ -148,6 +164,7 @@ export default function AreaInsights({
   );
 
   const pc = normStr(postcode);
+  const rentSrc = normStr(rentSource).toLowerCase();
   const vLabel = fmtVersion(version);
 
   const [intelLoading, setIntelLoading] = useState<boolean>(showIntel);
@@ -217,18 +234,18 @@ export default function AreaInsights({
 
   if (!hasAny) return null;
 
-  const compsCount = typeof comps?.count === 'number' ? comps.count : 0;
+  const sales = Array.isArray(comps?.sales) ? comps!.sales! : [];
+  const rents = Array.isArray(comps?.rents) ? comps!.rents! : [];
+
   const usableIntel = !!intel;
-  const usableComps =
-    !!comps &&
-    (compsCount > 0 ||
-      (typeof comps.median_price === 'number' && comps.median_price > 0) ||
-      (typeof comps.median_rent === 'number' && comps.median_rent > 0));
+  const usableComps = sales.length > 0 || rents.length > 0;
 
   const status: Status = (() => {
     if (!pc) return 'missing';
+    if (rentSrc === 'missing') return 'missing';
     if (!usableIntel && !usableComps && !intelLoading && !compsLoading) return 'missing';
-    return 'db';
+    if (rentSrc === 'proxy') return 'proxy';
+    return 'live';
   })();
 
   const headerRight = (
@@ -301,7 +318,11 @@ export default function AreaInsights({
                     }
 
                     const sourceHint =
-                      vLabel ? `Source: db • ${vLabel}` : 'Source: db';
+                      vLabel && rentSrc
+                        ? rentSrc === 'proxy'
+                          ? `Source: proxy rent estimate • ${vLabel}`
+                          : `Source: live • ${vLabel}`
+                        : undefined;
 
                     return (
                       <>
@@ -333,23 +354,58 @@ export default function AreaInsights({
                     Comparable Sales
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {compsCount > 0 ? `${compsCount} sample${compsCount === 1 ? '' : 's'}` : ''}
-                    {comps?.match_level ? ` • ${comps.match_level}` : ''}
+                    {countCaption(sales.length, rents.length)}
                   </div>
                 </div>
 
                 {compsLoading ? (
                   <SkeletonLines />
-                ) : comps && (typeof comps.median_price === 'number' || typeof comps.median_rent === 'number') ? (
-                  <div className="flex flex-wrap gap-2">
-                    <Chip label="Median price" value={fmtGBP(comps.median_price)} />
-                    <Chip label="Median rent/mo" value={fmtGBP(comps.median_rent)} />
-                    <Chip label="Samples" value={String(compsCount)} />
-                    {comps.match_level ? <Chip label="Match" value={comps.match_level} /> : null}
-                  </div>
-                ) : (
+                ) : sales.length === 0 ? (
                   <div className="text-xs text-slate-600 dark:text-slate-400">{UI_TEXT.emptyComps}</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          <th className="text-left font-semibold py-2 pr-3">Address</th>
+                          <th className="text-left font-semibold py-2 pr-3 whitespace-nowrap">Date</th>
+                          <th className="text-right font-semibold py-2 pr-3 whitespace-nowrap">Price</th>
+                          <th className="text-right font-semibold py-2 whitespace-nowrap">Distance</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sales.slice(0, 6).map((line, idx) => (
+                          <tr
+                            key={`sale-${idx}`}
+                            className="border-t border-slate-200 dark:border-slate-800"
+                          >
+                            <td className="py-2 pr-3 max-w-[420px]">
+                              <div className="text-slate-800 dark:text-slate-200 font-medium overflow-hidden text-ellipsis whitespace-nowrap">
+                                {line.address}
+                              </div>
+                              <div className="text-[11px] text-slate-500 dark:text-slate-400">{line.type}</div>
+                            </td>
+                            <td className="py-2 pr-3 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {line.date}
+                            </td>
+                            <td className="py-2 pr-3 text-right font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                              {Number.isFinite(line.price) && line.price > 0 ? fmtGBP(line.price) : '—'}
+                            </td>
+                            <td className="py-2 text-right text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                              {Number.isFinite(line.distance_km) ? `${line.distance_km.toFixed(2)} km` : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
+
+                {rents.length > 0 ? (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Also available: {rents.length} rental comparable{rents.length === 1 ? '' : 's'}
+                  </div>
+                ) : null}
               </div>
             </GatedPanel>
           </div>
