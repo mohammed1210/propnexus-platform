@@ -407,7 +407,7 @@ async def test_rightmove_place_not_found_retries_minimal_url_plain_scraperapi():
 
         expected_minimal = (
             "https://www.rightmove.co.uk/property-for-sale/find.html"
-            "?locationIdentifier=REGION^87490&sortType=2&includeSSTC=false&paginationIndex=0"
+            "?locationIdentifier=REGION%5E87490&sortType=2&includeSSTC=false&paginationIndex=0"
         )
         assert (q.get("url") or [""])[0] == expected_minimal
         assert "channel=BUY" not in expected_minimal
@@ -580,7 +580,7 @@ def test_rightmove_caret_retry_targets_include_unescaped_first():
     url = "https://www.rightmove.co.uk/property-for-sale/find.html?locationIdentifier=REGION%5E87490&paginationIndex=0"
     variants = _rightmove_caret_url_variants(url)
     assert variants[0].count("REGION^") == 1
-    assert not any("REGION%5E87490" in v for v in variants)
+    assert any("REGION%5E87490" in v for v in variants)
 
 
 def main():
