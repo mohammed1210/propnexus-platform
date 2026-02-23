@@ -25,7 +25,7 @@ class RunIngestionBody(BaseModel):
 
 
 @router.post("/admin/run-ingestion", status_code=202)
-async def run_ingestion(body: RunIngestionBody, request: Request):
+async def admin_run_ingestion(request: Request, body: RunIngestionBody):
     """Trigger one ingestion cycle asynchronously.
 
     Returns immediately with 202 to avoid blocking the request.
@@ -35,7 +35,7 @@ async def run_ingestion(body: RunIngestionBody, request: Request):
 
     started_at = time.time()
 
-    location = body.location.strip()
+    location = (body.location or "").strip()
     if not location:
         # Keep behavior consistent with FastAPI validation semantics.
         # (Empty string is technically valid for pydantic unless constrained.)
@@ -45,7 +45,6 @@ async def run_ingestion(body: RunIngestionBody, request: Request):
     limit = body.limit
 
     async def _runner() -> None:
-        total = 0
         try:
             prev_mode = os.environ.get("SCRAPER_MODE")
             try:
@@ -55,7 +54,7 @@ async def run_ingestion(body: RunIngestionBody, request: Request):
                 kwargs: dict[str, object] = {}
                 if "mode" in sig.parameters:
                     kwargs["mode"] = mode
-                if "limit" in sig.parameters and limit is not None:
+                if "limit" in sig.parameters:
                     kwargs["limit"] = limit
 
                 total = await _ingest_location(location, **kwargs)
@@ -64,11 +63,10 @@ async def run_ingestion(body: RunIngestionBody, request: Request):
                     os.environ.pop("SCRAPER_MODE", None)
                 else:
                     os.environ["SCRAPER_MODE"] = prev_mode
-        except Exception as e:
-            logger.exception("[admin][ingest] failed for location=%s: %s", location, e)
-            total = 0
-        dur_ms = (time.time() - started_at) * 1000
-        logger.info("[admin][ingest] complete total=%s dur_ms=%.0f", total, dur_ms)
+            dur_ms = (time.time() - started_at) * 1000
+            logger.info("[admin][ingest] complete total=%s dur_ms=%.0f", total, dur_ms)
+        except Exception:
+            logger.exception("[admin][ingest] failed")
 
     task = asyncio.create_task(_runner())
 
