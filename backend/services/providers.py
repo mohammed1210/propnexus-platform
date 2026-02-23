@@ -23,10 +23,8 @@ def _outward_from_postcode(pc: str) -> Optional[str]:
     if not norm:
         return None
     s = norm.strip().upper()
-    # If we already only have outward (no inward part), keep it.
     if len(s) <= 4:
         return s
-    # Full postcode without spaces: outward + inward (3 chars).
     if len(s) > 3:
         return s[:-3]
     return None
@@ -79,7 +77,6 @@ def _fetch_properties_for_postcode(postcode: str, *, limit: int = 200) -> List[D
     def _run_outward() -> List[Dict[str, Any]]:
         if not outward:
             return []
-        # Postcodes are stored without spaces; outward prefix match is safe.
         q = sb.table("properties").select("*").like("postcode", f"{outward}%").limit(int(limit))
         res = q.execute()
         rows = getattr(res, "data", None) or []
@@ -108,7 +105,6 @@ def get_comps_from_provider(postcode: str) -> dict:
     today = _utcnow_iso_date()
 
     for r in rows:
-        # Asking price comps (best-effort): treat as "sales" list for UI median.
         price = _safe_int(r.get("price") or r.get("asking_price"))
         if price is not None:
             sales.append(
