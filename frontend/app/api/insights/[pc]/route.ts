@@ -18,7 +18,16 @@ export async function GET(request: Request, ctx: any) {
   const base =
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
-    'https://propnexus-backend-production.up.railway.app';
+    process.env.BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_BASE ||
+    (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
+
+  if (!base.trim()) {
+    return NextResponse.json(
+      { error: 'Missing backend base URL env (NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL / BACKEND_URL).' },
+      { status: 500 },
+    );
+  }
 
   try {
     const [areaRes, compsRes] = await Promise.all([

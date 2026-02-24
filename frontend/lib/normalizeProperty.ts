@@ -28,6 +28,107 @@ export type PropertyNormalized = {
 };
 
 
+function round1(n: number): number {
+  return Math.round(n * 10) / 10;
+}
+
+function clampYieldLikePercent(n: number): number | null {
+  if (!Number.isFinite(n)) return null;
+  // Optional but recommended: avoid showing insane values.
+  if (n < 0 || n > 25) return null;
+  return round1(n);
+}
+
+function getScoreInputs(p: AnyObj): AnyObj | null {
+  const a = p?.score_breakdown;
+  if (a && typeof a === 'object') {
+    const inputs = (a as any)?.inputs;
+    if (inputs && typeof inputs === 'object') return inputs as AnyObj;
+  }
+
+  const b = p?.scoreBreakdown;
+  if (b && typeof b === 'object') {
+    const inputs = (b as any)?.inputs;
+    if (inputs && typeof inputs === 'object') return inputs as AnyObj;
+  }
+  return null;
+}
+
+/**
+ * Canonical Yield fallback order (must be consistent across UI):
+ * 1) p.yield_percent
+ * 2) p.score_breakdown.inputs.yield_percent
+ * 3) compute from rent_monthly + price
+ */
+export function getYieldPercent(p: AnyObj): number | null {
+  if (!p || typeof p !== 'object') return null;
+
+  const direct = parsePercent((p as any).yield_percent);
+  const directClamped = direct == null ? null : clampYieldLikePercent(direct);
+  if (directClamped != null) return directClamped;
+
+  const scoreInputs = getScoreInputs(p);
+  const fromScore = scoreInputs ? parsePercent((scoreInputs as any).yield_percent) : null;
+  const fromScoreClamped = fromScore == null ? null : clampYieldLikePercent(fromScore);
+  if (fromScoreClamped != null) return fromScoreClamped;
+
+  const rent =
+    parseRent((p as any).rent_monthly) ??
+    (scoreInputs ? parseRent((scoreInputs as any).rent_monthly) : null);
+
+  const price =
+    parseMoney((p as any).price) ??
+    (scoreInputs ? parseMoney((scoreInputs as any).price) : null);
+
+  if (typeof rent === 'number' && rent > 0 && typeof price === 'number' && price > 0) {
+    const computed = (rent * 12 * 100) / price;
+    return clampYieldLikePercent(computed);
+  }
+
+  return null;
+}
+
+/**
+ * Canonical ROI fallback order (must be consistent across UI):
+ * 1) p.roi_percent
+ * 2) p.score_breakdown.inputs.roi_percent
+ * 3) compute proxy from rent_monthly + price
+ */
+export function getRoiPercent(p: AnyObj): number | null {
+  if (!p || typeof p !== 'object') return null;
+
+  const direct = parsePercent((p as any).roi_percent);
+  const directClamped = direct == null ? null : clampYieldLikePercent(direct);
+  if (directClamped != null) return directClamped;
+
+  const scoreInputs = getScoreInputs(p);
+  const fromScore = scoreInputs ? parsePercent((scoreInputs as any).roi_percent) : null;
+  const fromScoreClamped = fromScore == null ? null : clampYieldLikePercent(fromScore);
+  if (fromScoreClamped != null) return fromScoreClamped;
+
+  // Proxy: same rent/price yield formula when ROI is missing.
+  const rent =
+    parseRent((p as any).rent_monthly) ??
+    (scoreInputs ? parseRent((scoreInputs as any).rent_monthly) : null);
+
+  const price =
+    parseMoney((p as any).price) ??
+    (scoreInputs ? parseMoney((scoreInputs as any).price) : null);
+
+  if (typeof rent === 'number' && rent > 0 && typeof price === 'number' && price > 0) {
+    const computed = (rent * 12 * 100) / price;
+    return clampYieldLikePercent(computed);
+  }
+
+  return null;
+}
+
+export function formatPercent(n: number | null | undefined): string {
+  if (typeof n !== 'number' || !Number.isFinite(n)) return 'N/A';
+  return `${round1(n).toFixed(1)}%`;
+}
+
+
 function isFiniteNumber(v: any): v is number {
   return typeof v === 'number' && Number.isFinite(v);
 }
@@ -119,6 +220,14 @@ function getAreaFromLocation(location: string) {
 export function normalizeProperty(p: AnyObj): PropertyNormalized {
   const id = String(p?.id || p?.uuid || p?.property_id || '');
 
+  const scoreInputs: AnyObj | null =
+    (p?.score_breakdown && typeof p.score_breakdown === 'object' && (p.score_breakdown as any)?.inputs && typeof (p.score_breakdown as any).inputs === 'object'
+      ? (p.score_breakdown as any).inputs
+      : null) ||
+    (p?.scoreBreakdown && typeof p.scoreBreakdown === 'object' && (p.scoreBreakdown as any)?.inputs && typeof (p.scoreBreakdown as any).inputs === 'object'
+      ? (p.scoreBreakdown as any).inputs
+      : null);
+
   const title =
     p?.title ||
     p?.display_title ||
@@ -186,6 +295,15 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
     parsePercent(p?.rental_yield_pct) ??
     null;
 
+  // Fallback order: score_breakdown.inputs.yield_percent
+  if (yieldPercent == null) {
+    yieldPercent =
+      parsePercent(scoreInputs?.yield_percent) ??
+      parsePercent(scoreInputs?.yieldPercent) ??
+      parsePercent(scoreInputs?.yield_pct) ??
+      null;
+  }
+
   const roiFlag = Boolean(p?.roi_is_proxy ?? p?.roiIsProxy);
 
   let roiPercent =
@@ -197,6 +315,15 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
     parsePercent(p?.roi_percentage) ??
     parsePercent(p?.roiPercentage) ??
     null;
+
+  // Fallback order: score_breakdown.inputs.roi_percent
+  if (roiPercent == null) {
+    roiPercent =
+      parsePercent(scoreInputs?.roi_percent) ??
+      parsePercent(scoreInputs?.roiPercent) ??
+      parsePercent(scoreInputs?.roi_pct) ??
+      null;
+  }
 
   const rentMonthly =
     parseRent(p?.rent) ??
@@ -213,11 +340,18 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
     parseRent(p?.estimated_rent) ??
     parseRent(p?.rent_estimate) ??
     parseRent(p?.rentEstimate) ??
+    // Fallback order: score_breakdown.inputs.rent_monthly
+    parseRent(scoreInputs?.rent_monthly) ??
+    parseRent(scoreInputs?.rentMonthly) ??
+    parseRent(scoreInputs?.rent_pcm) ??
+    parseRent(scoreInputs?.rentPcm) ??
     null;
 
   const rentSource =
     p?.rent_source ||
     p?.rentSource ||
+    scoreInputs?.rent_source ||
+    scoreInputs?.rentSource ||
     (rentMonthly ? 'Proxy' : null);
 
   const imageUrl =
