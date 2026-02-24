@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from supabase import Client, create_client
+from backend.utils.supabase_client import get_supabase
+from supabase import Client
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -23,12 +23,17 @@ def _get_supabase() -> Client:
     """
     global _sb
     if _sb is None:
-        url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_SERVICE_ROLE")
-        if not url or not key:
+        try:
+            sb = get_supabase(required=True)
+        except Exception:
             # Don’t crash import-time in CI; raise a clear runtime error instead.
-            raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE")
-        _sb = create_client(url, key)
+            raise RuntimeError(
+                "Supabase is not configured. Set SUPABASE_URL and one of "
+                "SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY / SUPABASE_KEY."
+            )
+
+        # `get_supabase(required=True)` should never return None.
+        _sb = sb  # type: ignore[assignment]
     return _sb
 
 
