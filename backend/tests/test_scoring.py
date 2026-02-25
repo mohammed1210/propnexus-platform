@@ -2,7 +2,7 @@
 Tests for Sprint 11 AI scoring endpoints.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -121,14 +121,7 @@ def test_ai_score_categories_sum():
 @pytest.fixture
 def mock_openai_client_explain():
     """Mock OpenAI client for explanation endpoint."""
-    with patch("backend.routes.gpt_routes.get_client") as mock_get_client:
-        mock_client = MagicMock()
-
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[
-            0
-        ].message.content = """SUMMARY: This is a solid investment with good fundamentals.
+    text = """SUMMARY: This is a solid investment with good fundamentals.
 
 BULLETS:
 - Strong rental yield indicates good cash flow
@@ -137,10 +130,12 @@ BULLETS:
 - Property priced competitively
 - ROI projections are positive"""
 
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_get_client.return_value = mock_client
-
-        yield mock_client
+    with patch(
+        "backend.services.ai_service.chat_messages",
+        new_callable=AsyncMock,
+        return_value=text,
+    ) as mock_chat:
+        yield mock_chat
 
 
 def test_ai_score_explain_success(mock_openai_client_explain):

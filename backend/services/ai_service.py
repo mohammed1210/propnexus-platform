@@ -220,3 +220,9 @@ async def recommend_tradesmen(req: TradesmenRecommendRequest) -> TradesmenRecomm
         recommendation=raw.strip(),
         property_summary=property_desc,
     )
+
+
+async def chat_messages(messages: List[Dict[str, str]], temperature: float = 0.3) -> str:
+    """Generic chat completion for /gpt/chat. Expects already-built messages."""
+    require_api_key()
+    return await openai_client.chat_completion(messages, temperature=temperature)

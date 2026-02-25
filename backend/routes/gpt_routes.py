@@ -1,33 +1,11 @@
 import os
 
 from fastapi import APIRouter, HTTPException
-from openai import OpenAI
 
+from backend.services import ai_service
 from backend.utils.deal_scoring import compute_deal_score
 
 router = APIRouter(prefix="/gpt", tags=["GPT AI"])
-
-# Lazy client initialization to avoid import-time errors
-_client = None
-
-
-def get_client() -> OpenAI:
-    """Return a cached OpenAI client or initialize a new one."""
-    global _client
-    if _client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            # Don't crash CI/import; only raise when endpoint hit
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "ok": False,
-                    "ai_disabled": True,
-                    "error": "OpenAI API key not configured in environment.",
-                },
-            )
-        _client = OpenAI(api_key=api_key)
-    return _client
 
 
 @router.post("/generate-summary")
@@ -35,12 +13,9 @@ async def generate_summary(data: dict):
     """Generate a concise investment summary for a property."""
     prompt = f"Summarize this property for investors: {data.get('description', '')}"
     try:
-        client = get_client()
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+        text = await ai_service.chat_messages(
+            [{"role": "user", "content": prompt}],
         )
-        text = res.choices[0].message.content
         return {"summary": text}
     except HTTPException:
         raise
@@ -53,12 +28,9 @@ async def generate_strategies(data: dict):
     """Generate 3 suggested exit strategies for an investment."""
     prompt = f"Suggest 3 exit strategies for this investment: {data.get('description', '')}"
     try:
-        client = get_client()
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+        text = await ai_service.chat_messages(
+            [{"role": "user", "content": prompt}],
         )
-        text = res.choices[0].message.content
         return {"strategies": text}
     except HTTPException:
         raise
@@ -113,16 +85,8 @@ async def ai_chat(data: dict):
     full_messages = [{"role": "system", "content": system_msg}] + messages
 
     try:
-        client = get_client()
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=full_messages,
-        )
-        reply = res.choices[0].message.content
-        usage = {
-            "prompt_tokens": res.usage.prompt_tokens if res.usage else 0,
-            "completion_tokens": res.usage.completion_tokens if res.usage else 0,
-        }
+        reply = await ai_service.chat_messages(full_messages)
+        usage = {"prompt_tokens": 0, "completion_tokens": 0}
         return {"ok": True, "reply": reply, "usage": usage}
     except HTTPException:
         raise
@@ -181,12 +145,9 @@ BULLETS:
 """
 
     try:
-        client = get_client()
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+        text = await ai_service.chat_messages(
+            [{"role": "user", "content": prompt}],
         )
-        text = res.choices[0].message.content or ""
 
         # Parse response
         parts = text.split("BULLETS:")
