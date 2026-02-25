@@ -1,10 +1,33 @@
 // frontend/lib/api.ts
 'use client';
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
+function resolveApiBase(): string {
+  const envBase =
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    process.env.NEXT_PUBLIC_API_BASE;
+
+  // Dev convenience
+  if (!envBase && process.env.NODE_ENV !== 'production') {
+    return 'http://localhost:8000';
+  }
+
+  // Production must be explicit (avoid silently calling same-origin)
+  if (!envBase) {
+    // Optional escape hatch (only if you *really* want it)
+    const allowSameOrigin = process.env.NEXT_PUBLIC_ALLOW_SAME_ORIGIN_API === '1';
+    if (allowSameOrigin) return '';
+
+    throw new Error(
+      'Missing NEXT_PUBLIC_BACKEND_URL (or NEXT_PUBLIC_API_URL / NEXT_PUBLIC_API_BASE). ' +
+        'Set it in Vercel env vars to your backend URL (e.g. https://<railway-app>.up.railway.app).',
+    );
+  }
+
+  return envBase;
+}
+
+export const API_BASE = resolveApiBase();
 
 /* ---------------------------------------------------
    Generic Helpers (new + legacy compatibility)
