@@ -288,8 +288,20 @@ def derive_canonical_metrics(row: Dict[str, Any]) -> Dict[str, Any]:
 
     rent_source: str = "provided" if rent_monthly is not None else "missing"
 
-    # IMPORTANT: Do not invent rent via heuristics. If rent is missing and yield is missing,
-    # keep rent as null and let the UI display "—".
+    # If rent is entirely missing AND yield is missing, attempt a very lightweight proxy rent.
+    # This prevents the UI from showing blank Yield/ROI for scraped feeds that omit rent.
+    if rent_monthly is None and yield_pct is None and price:
+        band = _postcode_band(row)
+        beds_raw = _first_number(
+            _get_first(row, ["bedrooms", "beds", "numBedrooms", "numberOfBedrooms"])
+        )
+        bedrooms = int(round(beds_raw)) if beds_raw is not None else 0
+        if band:
+            cap_rate_pct = _cap_rate_percent(band, bedrooms)
+            proxy_rent = (price * (cap_rate_pct / 100.0)) / 12.0
+            if proxy_rent > 0 and (proxy_rent == proxy_rent):
+                rent_monthly = float(proxy_rent)
+                rent_source = "proxy"
 
     # Compute missing yield from rent + price.
     computed_yield: float | None = None

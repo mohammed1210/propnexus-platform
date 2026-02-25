@@ -4,7 +4,7 @@
 export const API_BASE =
   process.env.NEXT_PUBLIC_BACKEND_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  'https://propnexus-backend-production.up.railway.app';
+  (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
 
 /* ---------------------------------------------------
    Generic Helpers (new + legacy compatibility)

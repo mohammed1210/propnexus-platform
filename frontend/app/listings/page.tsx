@@ -10,6 +10,7 @@ import { FiSearch, FiSliders, FiMap, FiX } from 'react-icons/fi';
 
 import PropertyCard from '@/components/PropertyCard';
 import { isAuthEnabled } from '@/lib/auth';
+import { API_BASE } from '@/lib/api';
 
 /* ---------------- Helper Functions ---------------- */
 /**
@@ -772,9 +773,16 @@ function ListingsInner() {
 
       try {
         const backendUrl =
-          process.env.NEXT_PUBLIC_BACKEND_URL ||
-          process.env.NEXT_PUBLIC_API_BASE ||
-          'http://localhost:8080';
+          (process.env.NEXT_PUBLIC_BACKEND_URL ||
+            process.env.NEXT_PUBLIC_API_URL ||
+            process.env.NEXT_PUBLIC_API_BASE ||
+            API_BASE ||
+            '').replace(/\/+$/, '') ||
+          (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
+
+        if (!backendUrl.trim()) {
+          throw new Error('Missing backend base URL env (NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL).');
+        }
 
         const params = new URLSearchParams();
         if (q) params.set('q', q);

@@ -92,11 +92,20 @@ def health(response: Response):
     # Marker header to correlate deploy + response normalization behavior.
     # Kept intentionally stable for curl-based runbooks.
     response.headers["X-PropNexus-Properties-Normalization"] = "v1"
+
+    # Do not import Supabase client package here; just report configuration presence.
+    try:
+        from backend.utils.supabase_env import is_supabase_configured
+
+        supabase_configured = is_supabase_configured()
+    except Exception:
+        supabase_configured = False
     return {
         "status": "ok",
         "service": "propnexus-backend",
         "version": version,
         "environment": environment,
+        "supabase_configured": supabase_configured,
     }
 
 

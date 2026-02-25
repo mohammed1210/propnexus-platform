@@ -40,9 +40,13 @@ export default function ContactTradesmanModal({
       const apiBase =
         process.env.NEXT_PUBLIC_BACKEND_URL ||
         process.env.NEXT_PUBLIC_API_URL ||
-        'https://propnexus-backend-production.up.railway.app';
+        (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
 
-      const response = await fetch(`${apiBase}/tradesmen/contact`, {
+      if (!apiBase.trim()) {
+        throw new Error('Missing backend base URL env (NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL).');
+      }
+
+      const response = await fetch(`${apiBase.replace(/\/+$/, '')}/tradesmen/contact`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

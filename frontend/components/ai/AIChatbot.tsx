@@ -10,6 +10,7 @@ import { FF } from '@/lib/flags';
 import { useUserPlan } from '@/lib/useUserPlan';
 import { hasAccess } from '@/lib/planPermissions';
 import { isAuthEnabled } from '@/lib/auth';
+import { formatPercent, getRoiPercent, getYieldPercent } from '@/lib/normalizeProperty';
 
 type LooseProperty = Property & {
   latitude?: number | null;
@@ -88,9 +89,12 @@ function AIChatbotInner({
 
   const sendLocalReply = (prompt: string) => {
     const hints: string[] = [];
-    if (typeof property?.yield_percent === 'number')
-      hints.push(`yield ≈ ${property.yield_percent}%`);
-    if (typeof property?.roi_percent === 'number') hints.push(`ROI ≈ ${property.roi_percent}%`);
+
+    const yieldPct = property ? getYieldPercent(property as any) : null;
+    const roiPct = property ? getRoiPercent(property as any) : null;
+
+    if (typeof yieldPct === 'number') hints.push(`yield ≈ ${formatPercent(yieldPct)}`);
+    if (typeof roiPct === 'number') hints.push(`ROI ≈ ${formatPercent(roiPct)}`);
     if (typeof property?.price === 'number')
       hints.push(`price ≈ £${property.price.toLocaleString()}`);
 

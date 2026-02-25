@@ -2,7 +2,10 @@
 
 import React from 'react';
 
+import { formatPercent, getRoiPercent, getYieldPercent } from '@/lib/normalizeProperty';
+
 interface QuickStatsCardProps {
+  property?: Record<string, any> | null;
   price?: number;
   yieldPercent?: number;
   roiPercent?: number;
@@ -22,7 +25,7 @@ const formatValue = (value: number | undefined, format: 'currency' | 'percent' |
         maximumFractionDigits: 0,
       }).format(value);
     case 'percent':
-      return `${value.toFixed(1)}%`;
+      return formatPercent(value);
     case 'score':
       return `${value.toFixed(1)}/10`;
     default:
@@ -30,7 +33,17 @@ const formatValue = (value: number | undefined, format: 'currency' | 'percent' |
   }
 };
 
-export default function QuickStatsCard({ price, yieldPercent, roiPercent, aiScore }: QuickStatsCardProps) {
+export default function QuickStatsCard({ property, price, yieldPercent, roiPercent, aiScore }: QuickStatsCardProps) {
+  const merged = {
+    ...(property ?? {}),
+    price,
+    yield_percent: yieldPercent,
+    roi_percent: roiPercent,
+  };
+
+  const displayYield = getYieldPercent(merged) ?? undefined;
+  const displayRoi = getRoiPercent(merged) ?? undefined;
+
   return (
     <div className="panel space-y-4">
       <h3 className="font-semibold text-sm text-slate-600 dark:text-slate-400 uppercase tracking-wide">
@@ -46,20 +59,20 @@ export default function QuickStatsCard({ price, yieldPercent, roiPercent, aiScor
         </div>
       )}
 
-      {yieldPercent !== undefined && (
+      {displayYield !== undefined && (
         <div>
           <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">Yield</div>
           <div className="text-xl font-bold text-green-600 dark:text-green-400">
-            {formatValue(yieldPercent, 'percent')}
+            {formatValue(displayYield, 'percent')}
           </div>
         </div>
       )}
 
-      {roiPercent !== undefined && (
+      {displayRoi !== undefined && (
         <div>
           <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">ROI</div>
           <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
-            {formatValue(roiPercent, 'percent')}
+            {formatValue(displayRoi, 'percent')}
           </div>
         </div>
       )}

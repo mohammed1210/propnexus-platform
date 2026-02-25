@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FiHeart, FiShare2, FiDownload, FiCopy, FiCheck } from 'react-icons/fi';
 import { toast } from 'sonner';
 import { fetchWithRetry } from '@/lib/api';
-import { normalizeProperty } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiPercent, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 type QuickStatsActionsProps = {
   propertyId: string;
@@ -29,7 +29,7 @@ const formatValue = (value: number | undefined, format: 'currency' | 'percent' |
         maximumFractionDigits: 0,
       }).format(value);
     case 'percent':
-      return `${value.toFixed(1)}%`;
+      return formatPercent(value);
     case 'score':
       return `${value.toFixed(1)}/10`;
     default:
@@ -50,27 +50,22 @@ export default function QuickStatsActions({
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const normalized = useMemo(() => {
-    // Merge in existing props as fallbacks so this stays compatible
-    // with callers that only pass primitives.
-    return normalizeProperty({
+  const merged = useMemo(
+    () => ({
       ...(property ?? {}),
       id: propertyId,
       price,
       yield_percent: yieldPercent,
       roi_percent: roiPercent,
-    });
-  }, [property, propertyId, price, yieldPercent, roiPercent]);
+    }),
+    [property, propertyId, price, yieldPercent, roiPercent],
+  );
+
+  const normalized = useMemo(() => normalizeProperty(merged), [merged]);
 
   const displayPrice = typeof price === 'number' ? price : normalized.price ?? undefined;
-  const displayYield = typeof yieldPercent === 'number' ? yieldPercent : normalized.yieldPercent ?? undefined;
-  const realRoi = normalized.roiPercent ?? undefined;
-  const proxyRoi = normalized.roiProxyPercent ?? undefined;
-  const displayRoi = typeof roiPercent === 'number' ? roiPercent : realRoi ?? proxyRoi;
-  const displayRoiIsProxy =
-    typeof roiPercent === 'number'
-      ? false
-      : normalized.roiIsProxy || (realRoi == null && typeof proxyRoi === 'number');
+  const displayYield = getYieldPercent(merged) ?? undefined;
+  const displayRoi = getRoiPercent(merged) ?? undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -201,7 +196,7 @@ export default function QuickStatsActions({
 
               <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
                 <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                  ROI{displayRoiIsProxy && typeof displayRoi === 'number' ? ' (proxy)' : ''}
+                  ROI
                 </div>
                 <div
                   className={`text-2xl font-bold ${

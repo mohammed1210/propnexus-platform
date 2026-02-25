@@ -27,7 +27,7 @@ import TradesmenList from '@/components/tradesmen/TradesmenList';
 
 import type { Property } from '@/types';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
-import { normalizeProperty } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiPercent, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 /** ---- Client-only widgets (no SSR) ---- */
 const StampDutyCalculator = dynamic(
@@ -183,11 +183,15 @@ export default function PropertyDetailsPage() {
 
   const price = normalized?.price ?? 0;
   const rentMonthly = normalized?.rentMonthly ?? undefined;
-  const yieldPercent = normalized?.yieldPercent ?? undefined;
-  const roiPercent = normalized?.roiPercent ?? undefined;
-  const roiProxyPercent = normalized?.roiProxyPercent ?? undefined;
-  const roiDisplay = roiPercent ?? roiProxyPercent;
-  const roiDisplayIsProxy = typeof roiPercent !== 'number' && typeof roiProxyPercent === 'number';
+  const yieldPercent = useMemo(
+    () => (property ? getYieldPercent(property as any) ?? undefined : undefined),
+    [property],
+  );
+  const roiPercent = useMemo(
+    () => (property ? getRoiPercent(property as any) ?? undefined : undefined),
+    [property],
+  );
+  const roiDisplay = roiPercent;
 
   const estValue = useMemo((): number | undefined => {
     if (!property) return undefined;
@@ -385,13 +389,13 @@ export default function PropertyDetailsPage() {
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
                       <div className="text-xs text-slate-500 dark:text-slate-400">Yield</div>
                       <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {fmtPct(yieldPercent)}
+                        {formatPercent(yieldPercent)}
                       </div>
                     </div>
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
                       <div className="text-xs text-slate-500 dark:text-slate-400">ROI</div>
                       <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {fmtPct(roiDisplay)}{roiDisplayIsProxy && typeof roiDisplay === 'number' ? ' (proxy)' : ''}
+                        {formatPercent(roiDisplay)}
                       </div>
                     </div>
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">

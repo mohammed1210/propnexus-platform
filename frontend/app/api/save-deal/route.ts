@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
 function getBackendBase(): string {
-  return (
+  const base = (
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
-    'https://propnexus-backend-production.up.railway.app'
-  ).replace(/\/+$/, '');
+    process.env.BACKEND_URL ||
+    process.env.NEXT_PUBLIC_API_BASE ||
+    ''
+  ).trim();
+
+  if (base) return base.replace(/\/+$/, '');
+  if (process.env.NODE_ENV !== 'production') return 'http://localhost:8000';
+  throw new Error('Missing backend base URL env (NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL / BACKEND_URL).');
 }
 
 function isClerkServerEnabled(): boolean {
