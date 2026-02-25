@@ -18,24 +18,19 @@ SUPABASE_URL and the appropriate key are not set, the `/metrics`
 endpoint will raise a 500 error to signal misconfiguration.
 """
 
-import os
 
 from fastapi import APIRouter, HTTPException
 
-from supabase import create_client
+from backend.utils.supabase_client import get_supabase
 
 router = APIRouter()
 
-# Load Supabase credentials from environment. We support either the
-# service role or anon key to allow flexibility across environments
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
 
-# Initialise the client if possible. If credentials are absent the
-# client remains None and metrics will error.
-supabase = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+def _require_supabase():
+    try:
+        return get_supabase(required=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.get("/health")
@@ -60,8 +55,7 @@ async def metrics() -> dict[str, int]:
         HTTPException: If Supabase credentials are not configured or
             if there is an error querying the database.
     """
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+    supabase = _require_supabase()
     try:
         props_count = len(supabase.table("properties").select("id").execute().data or [])
         saved_count = len(supabase.table("saved_deals").select("id").execute().data or [])

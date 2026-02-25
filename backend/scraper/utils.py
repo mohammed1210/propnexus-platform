@@ -8,9 +8,10 @@ from urllib.parse import urlparse
 
 import aiohttp
 
+from backend.utils.supabase_client import get_supabase
+
 TARGET_CITIES = [
     "London",
-    "Birmingham",
     "Manchester",
     "Leeds",
     "Liverpool",
@@ -208,32 +209,11 @@ def normalize_image_urls(urls: list[str]) -> list[str]:
     return [best_by_key[k][2] for k, _ in ordered_keys if k in best_by_key]
 
 
-try:
-    from supabase import Client, create_client
-except ImportError:
-    Client = object  # type: ignore
-
-    def create_client(*args, **kwargs):
-        return None
-
-
 # ============================================================
 # Supabase client (scraper writes)
 # ============================================================
 
-supabase_url = os.getenv("SUPABASE_URL")
-# Use the service role key for server-side writes from scrapers
-supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
-# Only create client if both URL and key are available.
-# Type is intentionally loose here because `Client` may be a runtime fallback
-# when the optional `supabase` dependency isn't installed in certain envs/CI.
-supabase: Any = None
-if supabase_url and supabase_key:
-    try:
-        supabase = create_client(supabase_url, supabase_key)
-    except Exception:
-        supabase = None
+supabase: Any = get_supabase(required=False)
 
 
 async def insert_property_to_supabase(property_data: Dict[str, Any]) -> None:

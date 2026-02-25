@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.enrichment_queue import enqueue_property_ids
+from backend.utils.supabase_client import get_supabase
 
 try:
     from fastapi import APIRouter, HTTPException  # type: ignore
@@ -40,23 +40,12 @@ except Exception:  # pragma: no cover
 
 
 try:  # Supabase optional on local dev
-    from supabase import Client, create_client  # type: ignore
+    from supabase import Client  # type: ignore
 except Exception:  # pragma: no cover
     Client = object  # type: ignore
 
-    def create_client(*_a: object, **_kw: object) -> object:  # type: ignore
-        raise RuntimeError("Supabase SDK not available")
 
-
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-
-supabase: Optional[Client] = None
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)  # type: ignore
-    except Exception as e:  # pragma: no cover
-        logging.warning("Supabase init failed: %s", e)
+supabase: Optional[Client] = get_supabase(required=False)  # type: ignore[assignment]
 
 router = APIRouter()
 

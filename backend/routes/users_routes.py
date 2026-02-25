@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 
+from backend.utils.supabase_client import get_supabase
 from backend.utils.supabase_jwt import extract_bearer_token, verify_supabase_token
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -27,21 +28,11 @@ def _get_sb():
     if sb is not None:
         return sb
 
-    # Import here so it only happens when needed
-    # Adjust these imports to match your project structure:
-    from supabase import create_client
-
-    url = os.getenv("SUPABASE_URL", "")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY", "")
-
-    # If env vars are missing, leave sb as None and raise a clear error
-    if not url or not key:
-        raise RuntimeError(
-            "Supabase env vars missing: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_KEY)"
-        )
-
-    sb = create_client(url, key)
-    return sb
+    try:
+        sb = get_supabase(required=True)
+        return sb
+    except Exception as e:
+        raise RuntimeError(str(e)) from e
 
 
 # --- ENV ---

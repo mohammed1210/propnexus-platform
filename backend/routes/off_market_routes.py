@@ -11,17 +11,18 @@ from pydantic import BaseModel, Field, field_validator
 from pydantic.aliases import AliasChoices
 
 from backend.utils.off_market_scoring import compute_off_market_score
-from supabase import Client, create_client
+from backend.utils.supabase_client import get_supabase
+
+try:
+    from supabase import Client  # type: ignore
+except Exception:  # pragma: no cover
+    Client = object  # type: ignore
 
 router = APIRouter(prefix="/off-market", tags=["off-market"])
 logger = logging.getLogger(__name__)
 
 # --- Supabase client ---
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-supabase: Optional[Client] = (
-    create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
-)
+supabase: Optional[Client] = get_supabase(required=False)  # type: ignore[assignment]
 
 ADMIN_TOKEN = (
     os.getenv("OFF_MARKET_ADMIN_TOKEN")

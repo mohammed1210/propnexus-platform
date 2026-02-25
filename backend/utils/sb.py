@@ -1,21 +1,11 @@
 from __future__ import annotations
 
-import os
-
 from fastapi import HTTPException, status
 
-from supabase import Client, create_client
+from backend.utils.supabase_client import get_supabase
+from supabase import Client
 
-_SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-_SUPABASE_KEY = (
-    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    or os.getenv("SUPABASE_KEY")
-    or os.getenv("SUPABASE_SERVICE_ROLE")
-)
-
-_sb: Client | None = None
-if _SUPABASE_URL and _SUPABASE_KEY:
-    _sb = create_client(_SUPABASE_URL, _SUPABASE_KEY)
+_sb: Client | None = get_supabase(required=False)
 
 
 def require_sb() -> Client:

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 
 from backend.utils.supabase_env import resolve_supabase_config
 
 
-def get_supabase(*, required: bool = False):
+def get_supabase(
+    *, required: bool = False, create_client_fn: Callable[[str, str], object] | None = None
+):
     """
     Return a Supabase client if env is present.
 
@@ -26,9 +29,11 @@ def get_supabase(*, required: bool = False):
             )
         return None
     try:
-        from supabase import create_client
+        if create_client_fn is None:
+            from supabase import create_client
 
-        return create_client(cfg.url, cfg.key)
+            return create_client(cfg.url, cfg.key)
+        return create_client_fn(cfg.url, cfg.key)
     except Exception:
         if required:
             raise
