@@ -3,6 +3,13 @@ import os
 import pytest
 
 
+@pytest.fixture
+def app():
+    from backend.main import app as fastapi_app
+
+    return fastapi_app
+
+
 def _has_real_supabase():
     url = os.getenv("SUPABASE_URL", "")
     key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")

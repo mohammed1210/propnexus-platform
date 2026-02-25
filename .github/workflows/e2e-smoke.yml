@@ -12,11 +12,11 @@ jobs:
       - uses: actions/setup-python@v5
       - name: Backend deps
         run: |
-          pip install -r backend/requirements.txt || echo "⚠️ Backend deps partial install – continuing"
+          pip install -r backend/requirements.txt
       - name: Start backend
         run: |
-          nohup uvicorn backend.main:app --port 8000 &
-          sleep 3 || true
+          nohup uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+          sleep 3
       - uses: actions/setup-node@v4
       - name: Install + Build
         working-directory: frontend
@@ -30,15 +30,31 @@ jobs:
         run: |
           npm ci || npm install
           npm i leaflet @types/leaflet --force
-          npm run build || { echo "⚠️ Frontend build failed – soft pass"; }
+          npm run build
+
+      - name: Start frontend
+        working-directory: frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key_for_build' }}
+          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL != '' && secrets.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000' }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY != '' && secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY != '' && secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+        run: |
+          nohup npm run start -- -p 3000 &
+
       - name: Wait for servers
         run: |
           for i in {1..40}; do curl -fs http://localhost:8000/properties && break || sleep 2; done
           for i in {1..40}; do curl -fs http://localhost:3000 && break || sleep 2; done
-      - name: Run Playwright (non-fatal)
+          curl -fs http://localhost:8000/properties >/dev/null
+          curl -fs http://localhost:3000 >/dev/null
+
+      - name: Run Playwright
         working-directory: frontend
         env:
           E2E_BASE_URL: "http://localhost:3000"
         run: |
-          npx --yes @playwright/test@1.48.0 install --with-deps || true
-          npx --yes @playwright/test@1.48.0 test --reporter=list || echo "⚠️ Playwright tests failed – soft pass"
+          npx --yes @playwright/test@1.48.0 install --with-deps
+          npx --yes @playwright/test@1.48.0 test --reporter=list

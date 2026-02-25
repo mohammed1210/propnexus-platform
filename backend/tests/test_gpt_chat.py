@@ -3,7 +3,7 @@ Tests for Sprint 11 GPT chat endpoint.
 Mocks OpenAI responses to avoid requiring real API keys in tests.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -12,21 +12,12 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def mock_openai_client():
     """Mock OpenAI client to avoid real API calls."""
-    with patch("backend.routes.gpt_routes.get_client") as mock_get_client:
-        # Create mock client
-        mock_client = MagicMock()
-
-        # Mock chat completion response
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "This is a mock AI response."
-        mock_response.usage.prompt_tokens = 10
-        mock_response.usage.completion_tokens = 20
-
-        mock_client.chat.completions.create.return_value = mock_response
-        mock_get_client.return_value = mock_client
-
-        yield mock_client
+    with patch(
+        "backend.services.ai_service.chat_messages",
+        new_callable=AsyncMock,
+        return_value="This is a mock AI response.",
+    ) as mock_chat:
+        yield mock_chat
 
 
 def test_ai_chat_success(mock_openai_client):
@@ -49,8 +40,8 @@ def test_ai_chat_success(mock_openai_client):
     assert "reply" in data
     assert data["reply"] == "This is a mock AI response."
     assert "usage" in data
-    assert data["usage"]["prompt_tokens"] == 10
-    assert data["usage"]["completion_tokens"] == 20
+    assert "prompt_tokens" in data["usage"]
+    assert "completion_tokens" in data["usage"]
 
 
 def test_ai_chat_missing_messages():
@@ -98,11 +89,6 @@ def test_ai_chat_disabled_when_no_api_key(monkeypatch):
     from backend.main import app
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-
-    # Ensure module-level cache isn't carrying a client from other tests.
-    import backend.routes.gpt_routes as gpt_routes
-
-    gpt_routes._client = None
 
     client = TestClient(app)
     response = client.post(

@@ -14,5 +14,5 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci || npm i
-      - run: npx tsc --noEmit || true
-      - run: npx next lint || true
+      - run: npx tsc --noEmit
+      - run: npx next lint

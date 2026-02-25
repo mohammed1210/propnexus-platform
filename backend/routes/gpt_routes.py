@@ -1,73 +1,69 @@
 import os
 
-from fastapi import APIRouter, HTTPException
-from openai import OpenAI
+from fastapi import APIRouter, HTTPException, Response
 
+from backend.services import ai_service
 from backend.utils.deal_scoring import compute_deal_score
 
 router = APIRouter(prefix="/gpt", tags=["GPT AI"])
 
-# Lazy client initialization to avoid import-time errors
-_client = None
+
+_CANONICAL_HEADERS = {"X-PropNexus-AI-API": "canonical"}
 
 
-def get_client() -> OpenAI:
-    """Return a cached OpenAI client or initialize a new one."""
-    global _client
-    if _client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            # Don't crash CI/import; only raise when endpoint hit
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "ok": False,
-                    "ai_disabled": True,
-                    "error": "OpenAI API key not configured in environment.",
-                },
-            )
-        _client = OpenAI(api_key=api_key)
-    return _client
+def _apply_canonical_headers(response: Response) -> None:
+    response.headers.update(_CANONICAL_HEADERS)
+
+
+def _raise_with_canonical_headers(exc: HTTPException) -> None:
+    headers = dict(exc.headers or {})
+    headers.update(_CANONICAL_HEADERS)
+    raise HTTPException(status_code=exc.status_code, detail=exc.detail, headers=headers)
 
 
 @router.post("/generate-summary")
-async def generate_summary(data: dict):
+async def generate_summary(data: dict, response: Response):
+    _apply_canonical_headers(response)
     """Generate a concise investment summary for a property."""
     prompt = f"Summarize this property for investors: {data.get('description', '')}"
     try:
-        client = get_client()
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+        text = await ai_service.chat_messages(
+            [{"role": "user", "content": prompt}],
         )
-        text = res.choices[0].message.content
         return {"summary": text}
-    except HTTPException:
-        raise
+    except HTTPException as exc:
+        _raise_with_canonical_headers(exc)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating summary: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating summary: {str(e)}",
+            headers=_CANONICAL_HEADERS,
+        )
 
 
 @router.post("/generate-strategies")
-async def generate_strategies(data: dict):
+async def generate_strategies(data: dict, response: Response):
+    _apply_canonical_headers(response)
     """Generate 3 suggested exit strategies for an investment."""
     prompt = f"Suggest 3 exit strategies for this investment: {data.get('description', '')}"
     try:
-        client = get_client()
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+        text = await ai_service.chat_messages(
+            [{"role": "user", "content": prompt}],
         )
-        text = res.choices[0].message.content
         return {"strategies": text}
-    except HTTPException:
-        raise
+    except HTTPException as exc:
+        _raise_with_canonical_headers(exc)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating strategies: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating strategies: {str(e)}",
+            headers=_CANONICAL_HEADERS,
+        )
 
 
 @router.get("/health")
-async def gpt_health():
+async def gpt_health(response: Response):
+    _apply_canonical_headers(response)
     """Lightweight health check for GPT routes.
 
     This must succeed even when OPENAI_API_KEY is missing.
@@ -80,7 +76,8 @@ async def gpt_health():
 
 
 @router.post("/chat")
-async def ai_chat(data: dict):
+async def ai_chat(data: dict, response: Response):
+    _apply_canonical_headers(response)
     """
     POST /gpt/chat
     Input: {
@@ -93,7 +90,9 @@ async def ai_chat(data: dict):
     context = data.get("context", {})
 
     if not messages:
-        raise HTTPException(status_code=400, detail="messages array required")
+        raise HTTPException(
+            status_code=400, detail="messages array required", headers=_CANONICAL_HEADERS
+        )
 
     # Build system prompt with context if provided
     system_msg = "You are a helpful AI assistant for PropNexus, a UK property investment platform."
@@ -113,25 +112,20 @@ async def ai_chat(data: dict):
     full_messages = [{"role": "system", "content": system_msg}] + messages
 
     try:
-        client = get_client()
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=full_messages,
-        )
-        reply = res.choices[0].message.content
-        usage = {
-            "prompt_tokens": res.usage.prompt_tokens if res.usage else 0,
-            "completion_tokens": res.usage.completion_tokens if res.usage else 0,
-        }
+        reply = await ai_service.chat_messages(full_messages)
+        usage = {"prompt_tokens": 0, "completion_tokens": 0}
         return {"ok": True, "reply": reply, "usage": usage}
-    except HTTPException:
-        raise
+    except HTTPException as exc:
+        _raise_with_canonical_headers(exc)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error in AI chat: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Error in AI chat: {str(e)}", headers=_CANONICAL_HEADERS
+        )
 
 
 @router.post("/score")
-async def ai_score(data: dict):
+async def ai_score(data: dict, response: Response):
+    _apply_canonical_headers(response)
     """
     POST /gpt/score
     Deterministic rubric-based scoring (no GPT).
@@ -146,7 +140,8 @@ async def ai_score(data: dict):
 
 
 @router.post("/score/explain")
-async def ai_score_explain(data: dict):
+async def ai_score_explain(data: dict, response: Response):
+    _apply_canonical_headers(response)
     """
     POST /gpt/score/explain
     Uses GPT to generate 5-7 bullet points + paragraph summary explaining the deal score.
@@ -181,12 +176,9 @@ BULLETS:
 """
 
     try:
-        client = get_client()
-        res = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
+        text = await ai_service.chat_messages(
+            [{"role": "user", "content": prompt}],
         )
-        text = res.choices[0].message.content or ""
 
         # Parse response
         parts = text.split("BULLETS:")
@@ -220,7 +212,11 @@ BULLETS:
             "explanation": summary,
             "bullets": bullets[:7],  # max 7
         }
-    except HTTPException:
-        raise
+    except HTTPException as exc:
+        _raise_with_canonical_headers(exc)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating explanation: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating explanation: {str(e)}",
+            headers=_CANONICAL_HEADERS,
+        )
