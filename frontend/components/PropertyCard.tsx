@@ -172,8 +172,14 @@ export default function PropertyCard({
 }) {
   const normalized = useMemo(() => normalizeProperty(p as any), [p]);
 
-  const displayYieldPct = useMemo(() => getYieldPercent(p as any), [p]);
-  const displayRoiPct = useMemo(() => getRoiPercent(p as any), [p]);
+  const displayYieldPct = useMemo(
+    () => getYieldPercent(normalized as any) ?? getYieldPercent(p as any),
+    [normalized, p],
+  );
+  const displayRoiPct = useMemo(
+    () => getRoiPercent(normalized as any) ?? getRoiPercent(p as any),
+    [normalized, p],
+  );
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);

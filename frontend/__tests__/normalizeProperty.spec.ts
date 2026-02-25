@@ -94,6 +94,17 @@ describe('canonical Yield/ROI helpers', () => {
     expect(getYieldPercent(p)).toBeCloseTo(12.0, 5);
   });
 
+  it('falls back to proxy yield/roi from rent_monthly + price when missing', () => {
+    const p = normalizeProperty({
+      price: 100000,
+      rent_monthly: 1000,
+      yield_percent: null,
+      roi_percent: null,
+    } as any);
+    expect(getYieldPercent(p as any)).toBeCloseTo(12.0, 1);
+    expect(getRoiPercent(p as any)).toBeCloseTo(12.0, 1);
+  });
+
   it('returns null if inputs are unusable', () => {
     expect(getYieldPercent({} as any)).toBeNull();
     expect(getRoiPercent({} as any)).toBeNull();

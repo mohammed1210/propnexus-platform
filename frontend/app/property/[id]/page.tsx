@@ -184,12 +184,18 @@ export default function PropertyDetailsPage() {
   const price = normalized?.price ?? 0;
   const rentMonthly = normalized?.rentMonthly ?? undefined;
   const yieldPercent = useMemo(
-    () => (property ? getYieldPercent(property as any) ?? undefined : undefined),
-    [property],
+    () =>
+      normalized
+        ? (getYieldPercent(normalized as any) ?? getYieldPercent(property as any) ?? undefined)
+        : undefined,
+    [normalized, property],
   );
   const roiPercent = useMemo(
-    () => (property ? getRoiPercent(property as any) ?? undefined : undefined),
-    [property],
+    () =>
+      normalized
+        ? (getRoiPercent(normalized as any) ?? getRoiPercent(property as any) ?? undefined)
+        : undefined,
+    [normalized, property],
   );
   const roiDisplay = roiPercent;
 
