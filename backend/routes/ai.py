@@ -6,6 +6,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
+from backend.middleware.rate_limit import AI_RATE_LIMIT, is_test_or_ci, limiter
 from backend.schemas.ai import (
     StrategiesRequest,
     StrategiesResponse,
@@ -15,7 +16,6 @@ from backend.schemas.ai import (
     TradesmenRecommendResponse,
 )
 from backend.services import ai_service
-from backend.utils.rate_limit import rate_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -52,6 +52,7 @@ async def ai_health(response: Response) -> dict:
 
 
 @router.post("/summary", response_model=SummaryResponse)
+@limiter.limit(AI_RATE_LIMIT, exempt_when=is_test_or_ci)
 async def ai_summary(
     req: SummaryRequest,
     request: Request,
@@ -59,14 +60,6 @@ async def ai_summary(
     _api_key: str = Depends(_require_api_key_compat),
 ) -> SummaryResponse:
     _apply_compat_headers(response)
-    # Rate limit by client IP
-    ip = request.client.host or "unknown"
-    if not rate_limiter.allow(ip):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Rate limit exceeded",
-            headers=_COMPAT_HEADERS,
-        )
 
     try:
         return await ai_service.generate_summary(req)
@@ -86,6 +79,7 @@ async def ai_summary(
 
 
 @router.post("/strategies", response_model=StrategiesResponse)
+@limiter.limit(AI_RATE_LIMIT, exempt_when=is_test_or_ci)
 async def ai_strategies(
     req: StrategiesRequest,
     request: Request,
@@ -93,13 +87,6 @@ async def ai_strategies(
     _api_key: str = Depends(_require_api_key_compat),
 ) -> StrategiesResponse:
     _apply_compat_headers(response)
-    ip = request.client.host or "unknown"
-    if not rate_limiter.allow(ip):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Rate limit exceeded",
-            headers=_COMPAT_HEADERS,
-        )
 
     try:
         return await ai_service.generate_strategies(req)
@@ -119,6 +106,7 @@ async def ai_strategies(
 
 
 @router.post("/tradesmen/recommend", response_model=TradesmenRecommendResponse)
+@limiter.limit(AI_RATE_LIMIT, exempt_when=is_test_or_ci)
 async def ai_tradesmen_recommend(
     req: TradesmenRecommendRequest,
     request: Request,
@@ -131,13 +119,6 @@ async def ai_tradesmen_recommend(
     Returns a summary of typical work needed and cost estimates for the property type.
     """
     _apply_compat_headers(response)
-    ip = request.client.host or "unknown"
-    if not rate_limiter.allow(ip):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Rate limit exceeded",
-            headers=_COMPAT_HEADERS,
-        )
 
     try:
         return await ai_service.recommend_tradesmen(req)

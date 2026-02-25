@@ -54,11 +54,15 @@ AUTH_RATE_LIMIT = os.getenv("RATE_LIMIT_AUTH", "10/minute")
 # Webhook endpoints (public but should be limited)
 WEBHOOK_RATE_LIMIT = os.getenv("RATE_LIMIT_WEBHOOK", "30/minute")
 
+# AI endpoints (costly / external dependency)
+AI_RATE_LIMIT = os.getenv("RATE_LIMIT_AI", "10/minute")
+
 # If running tests/CI, relax limits to avoid 429s during fast test bursts
 if IS_TEST_ENV:
     GLOBAL_RATE_LIMIT = os.getenv("RATE_LIMIT_GLOBAL_TEST", "100000/minute")
     AUTH_RATE_LIMIT = os.getenv("RATE_LIMIT_AUTH_TEST", "100000/minute")
     WEBHOOK_RATE_LIMIT = os.getenv("RATE_LIMIT_WEBHOOK_TEST", "100000/minute")
+    AI_RATE_LIMIT = os.getenv("RATE_LIMIT_AI_TEST", "100000/minute")
 
 # Create the limiter instance
 limiter = Limiter(
