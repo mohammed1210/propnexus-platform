@@ -6,6 +6,9 @@ from backend.services.providers import get_comps_from_provider
 
 router = APIRouter(prefix="/comps", tags=["comps"])
 
+# Backward-compatibility for older tests that patch `backend.routes.comps_routes.sb`.
+sb = None
+
 
 @router.get("/{postcode}")
 def get_comps(postcode: str, request: Request) -> Dict[str, Any]:
@@ -20,5 +23,10 @@ def get_comps(postcode: str, request: Request) -> Dict[str, Any]:
 
     # Keep backward-compatible shape for callers.
     if isinstance(data, dict):
-        return {"source": "provider", **data}
+        out: Dict[str, Any] = {"source": "provider", **data}
+        sales = out.get("sales")
+        rents = out.get("rents")
+        out["sales"] = sales if isinstance(sales, list) else []
+        out["rents"] = rents if isinstance(rents, list) else []
+        return out
     return {"source": "provider", "postcode": pc, "sales": [], "rents": []}

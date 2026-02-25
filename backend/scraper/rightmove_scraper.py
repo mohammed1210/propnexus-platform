@@ -32,6 +32,58 @@ from backend.utils.scraper_logger import (
 from backend.utils.scraperapi_client import fetch_json_via_scraperapi, fetch_via_scraperapi
 from backend.utils.validation import clean_property_data, should_insert_property
 
+
+def _looks_like_html_document(text: object) -> bool:
+    if not isinstance(text, str):
+        return False
+    s = text.lstrip().lower()
+    if not s:
+        return False
+    return s.startswith("<!doctype html") or s.startswith("<html")
+
+
+def _extract_properties_from_rightmove_api_payload(
+    payload: Any, *, _depth: int = 0
+) -> List[Dict[str, Any]]:
+    """Extract Rightmove property objects from a JSON payload.
+
+    Supports common shapes like:
+    - {"properties": [...]}
+    - {"searchResults": {"properties": [...]}}
+    - nested dicts containing a "properties" list (bounded scan)
+    """
+
+    # Bounded scan to avoid pathological recursion.
+    if _depth > 8:
+        return []
+
+    if isinstance(payload, dict):
+        props = payload.get("properties")
+        if isinstance(props, list):
+            return [p for p in props if isinstance(p, dict)]
+
+        sr = payload.get("searchResults")
+        if isinstance(sr, dict):
+            sr_props = sr.get("properties")
+            if isinstance(sr_props, list):
+                return [p for p in sr_props if isinstance(p, dict)]
+
+        for v in payload.values():
+            out = _extract_properties_from_rightmove_api_payload(v, _depth=_depth + 1)
+            if out:
+                return out
+        return []
+
+    if isinstance(payload, list):
+        for it in payload:
+            out = _extract_properties_from_rightmove_api_payload(it, _depth=_depth + 1)
+            if out:
+                return out
+        return []
+
+    return []
+
+
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"

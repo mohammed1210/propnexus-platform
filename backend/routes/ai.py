@@ -3,175 +3,35 @@
 from __future__ import annotations
 
 import logging
-import os
-from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from backend.schemas.ai import (
     StrategiesRequest,
     StrategiesResponse,
-    Strategy,
     SummaryRequest,
     SummaryResponse,
     TradesmenRecommendRequest,
     TradesmenRecommendResponse,
 )
-from backend.utils.openai_client import openai_client
+from backend.services import ai_service
 from backend.utils.rate_limit import rate_limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
-def ensure_api_key() -> str:
-    """Ensure OPENAI_API_KEY is present; otherwise raise 503."""
-    key = os.getenv("OPENAI_API_KEY")
-    if not key:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "ok": False,
-                "ai_disabled": True,
-                "error": "OpenAI API key not configured in environment.",
-            },
-        )
-    return key
-
-
-def format_summary_prompt(req: SummaryRequest) -> List[Dict[str, str]]:
-    """Build messages for summary generation."""
-    sys_prompt = (
-        "You are an investment analyst for UK buy-to-let properties. "
-        "Be concise and factual. Currency GBP. Use UK property terms. "
-        "Return plain text only."
-    )
-    user_prompt = (
-        f"Title: {req.title}\n"
-        f"Location: {req.location}\n"
-        f"Price: {req.price or 'N/A'}\n"
-        f"Yield: {req.yield_ or 'N/A'}\n"
-        f"ROI: {req.roi or 'N/A'}\n"
-        f"Description: {req.description or 'N/A'}\n\n"
-        "Write the response in this exact format:\n"
-        "1) First line: a single sentence investment summary (no label).\n"
-        "2) Next lines: 3-6 bullets, each on its own line, each starting with '- '.\n\n"
-        "Rules:\n"
-        "- Use only the provided facts; if something is missing, say it's unknown.\n"
-        "- Mention yield/ROI only if given.\n"
-        "- Avoid disclaimers and avoid speculation."
-    )
-    return [
-        {"role": "system", "content": sys_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
-
-
-def parse_summary_response(text: str) -> SummaryResponse:
-    """Split the OpenAI response into summary and bullet list."""
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if not lines:
-        return SummaryResponse(summary="No summary available.", bullets=[])
-
-    summary = lines[0]
-    bullets = []
-    for line in lines[1:]:
-        # Accept leading symbols like "-", "•", "1.", etc.
-        clean = line.lstrip("-•0123456789. ").strip()
-        if clean:
-            bullets.append(clean)
-    return SummaryResponse(summary=summary, bullets=bullets)
-
-
-def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
-    """Build messages for strategy generation."""
-    sys_prompt = (
-        "You are an investment analyst for UK buy-to-let properties. "
-        "Provide exit strategies with rationale, steps and risk. Currency GBP. Use UK property terms. "
-        "Return plain text only."
-    )
-    prop_lines = "\n".join(f"{k}: {v}" for k, v in req.property.items())
-    constraints = req.constraints or {}
-    constraint_lines = (
-        "\n" + "\n".join(f"{k}: {v}" for k, v in constraints.items()) if constraints else ""
-    )
-    user_prompt = (
-        f"Property details:\n{prop_lines}{constraint_lines}\n\n"
-        "Suggest up to 3 realistic exit strategies. Use this exact template for each strategy:\n\n"
-        "1. <Title>\n"
-        "Rationale: <1-2 sentences, factual>\n"
-        "- <Step 1>\n"
-        "- <Step 2>\n"
-        "- <Step 3>\n"
-        "Risk: <single sentence>\n\n"
-        "Rules:\n"
-        "- Keep steps action-oriented and specific to UK property investing.\n"
-        "- If constraints are provided, respect them.\n"
-        "- Avoid marketing tone and avoid speculation."
-    )
-    return [
-        {"role": "system", "content": sys_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
-
-
-def parse_strategies_response(text: str) -> StrategiesResponse:
-    """Parse OpenAI output into structured strategies."""
-    lines = [line.strip() for line in text.splitlines()]
-    strategies: List[Strategy] = []
-    current: Dict[str, List[str] | str] = {
-        "title": "",
-        "rationale": "",
-        "steps": [],
-        "risk": "",
-    }
-    for line in lines:
-        if not line:
-            continue
-        # New strategy starts when line looks like "1. <Title>"
-        if line[0].isdigit() and "." in line:
-            if current["title"]:
-                strategies.append(
-                    Strategy(
-                        title=current["title"],
-                        rationale=current["rationale"],
-                        steps=list(current["steps"]),
-                        risk=current["risk"] or None,
-                    )
-                )
-                current = {"title": "", "rationale": "", "steps": [], "risk": ""}
-            current["title"] = line.split(".", 1)[1].strip()
-        elif line.lower().startswith(("rationale:", "reason:")):
-            current["rationale"] = line.split(":", 1)[1].strip()
-        elif line.lower().startswith("risk:"):
-            current["risk"] = line.split(":", 1)[1].strip()
-        elif line[0] in ("-", "•") or line[:2].isdigit() and line[2] in (".", ")"):
-            # Step lines starting with bullet or number
-            step = line.lstrip("-•0123456789. )").strip()
-            current["steps"].append(step)
-    # Append the last strategy
-    if current["title"]:
-        strategies.append(
-            Strategy(
-                title=current["title"],
-                rationale=current["rationale"],
-                steps=list(current["steps"]),
-                risk=current["risk"] or None,
-            )
-        )
-    if not strategies:
-        # Fallback: put entire response as one strategy
-        strategies.append(
-            Strategy(title="General Exit Strategy", rationale=text, steps=[], risk=None)
-        )
-    return StrategiesResponse(strategies=strategies)
+@router.get("/health")
+async def ai_health() -> dict:
+    enabled = ai_service.ai_enabled()
+    return {"ok": True, "ai_enabled": enabled, "ai_disabled": not enabled}
 
 
 @router.post("/summary", response_model=SummaryResponse)
 async def ai_summary(
     req: SummaryRequest,
     request: Request,
-    _api_key: str = Depends(ensure_api_key),
+    _api_key: str = Depends(ai_service.require_api_key),
 ) -> SummaryResponse:
     # Rate limit by client IP
     ip = request.client.host or "unknown"
@@ -181,9 +41,7 @@ async def ai_summary(
         )
 
     try:
-        messages = format_summary_prompt(req)
-        raw = await openai_client.chat_completion(messages, temperature=0.3)
-        return parse_summary_response(raw)
+        return await ai_service.generate_summary(req)
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     except Exception as exc:
@@ -195,7 +53,7 @@ async def ai_summary(
 async def ai_strategies(
     req: StrategiesRequest,
     request: Request,
-    _api_key: str = Depends(ensure_api_key),
+    _api_key: str = Depends(ai_service.require_api_key),
 ) -> StrategiesResponse:
     ip = request.client.host or "unknown"
     if not rate_limiter.allow(ip):
@@ -204,9 +62,7 @@ async def ai_strategies(
         )
 
     try:
-        messages = format_strategies_prompt(req)
-        raw = await openai_client.chat_completion(messages, temperature=0.5)
-        return parse_strategies_response(raw)
+        return await ai_service.generate_strategies(req)
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     except Exception as exc:
@@ -218,7 +74,7 @@ async def ai_strategies(
 async def ai_tradesmen_recommend(
     req: TradesmenRecommendRequest,
     request: Request,
-    _api_key: str = Depends(ensure_api_key),
+    _api_key: str = Depends(ai_service.require_api_key),
 ) -> TradesmenRecommendResponse:
     """
     Generate AI recommendation for tradesmen based on property details.
@@ -232,40 +88,7 @@ async def ai_tradesmen_recommend(
         )
 
     try:
-        # Build prompt for tradesmen recommendations
-        sys_prompt = (
-            "You are a UK property renovation expert. "
-            "Provide concise, practical advice about typical renovation work and costs. "
-            "Use UK terminology and GBP pricing. Keep responses under 150 words."
-        )
-
-        property_desc = (
-            f"{req.bedrooms}-bed {req.property_type or 'property'} in {req.location}"
-            if req.bedrooms
-            else f"{req.property_type or 'Property'} in {req.location}"
-        )
-
-        user_prompt = (
-            f"For a {property_desc}, typical investors need {req.trade_type or 'various trades'}. "
-            f"What are the most common renovation projects and estimated costs (ranges)? "
-            f"Keep it brief and practical."
-        )
-
-        if req.property_details:
-            user_prompt = f"{req.property_details}\n\n{user_prompt}"
-
-        messages = [
-            {"role": "system", "content": sys_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
-
-        raw = await openai_client.chat_completion(messages, temperature=0.4)
-
-        return TradesmenRecommendResponse(
-            recommendation=raw.strip(),
-            property_summary=property_desc,
-        )
-
+        return await ai_service.recommend_tradesmen(req)
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
     except Exception as exc:
