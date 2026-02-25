@@ -32,9 +32,4 @@ jobs:
       - name: Test
         env:
           NEXT_TELEMETRY_DISABLED: 1
-        run: |
-          if npm test -- --ci; then
-            echo "✅ Tests passed"
-          else
-            echo "⚠️ Tests failed – soft pass for now"; exit 0
-          fi
+        run: npm test -- --ci

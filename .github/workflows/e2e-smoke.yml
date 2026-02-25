@@ -12,11 +12,11 @@ jobs:
       - uses: actions/setup-python@v5
       - name: Backend deps
         run: |
-          pip install -r backend/requirements.txt || echo "⚠️ Backend deps partial install – continuing"
+          pip install -r backend/requirements.txt
       - name: Start backend
         run: |
           nohup uvicorn backend.main:app --port 8000 &
-          sleep 3 || true
+          sleep 3
       - uses: actions/setup-node@v4
       - name: Install + Build
         working-directory: frontend
@@ -30,15 +30,26 @@ jobs:
         run: |
           npm ci || npm install
           npm i leaflet @types/leaflet --force
-          npm run build || { echo "⚠️ Frontend build failed – soft pass"; }
+          npm run build
       - name: Wait for servers
         run: |
           for i in {1..40}; do curl -fs http://localhost:8000/properties && break || sleep 2; done
           for i in {1..40}; do curl -fs http://localhost:3000 && break || sleep 2; done
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx --yes @playwright/test@1.48.0 install --with-deps
+
       - name: Run Playwright (non-fatal)
+        id: playwright
+        continue-on-error: true
         working-directory: frontend
         env:
           E2E_BASE_URL: "http://localhost:3000"
+        run: npx --yes @playwright/test@1.48.0 test --reporter=list
+
+      - name: Report E2E result
+        if: always()
         run: |
-          npx --yes @playwright/test@1.48.0 install --with-deps || true
-          npx --yes @playwright/test@1.48.0 test --reporter=list || echo "⚠️ Playwright tests failed – soft pass"
+          if [ "${{ steps.playwright.outcome }}" != "success" ]; then
+            echo "::warning::E2E Smoke: Playwright tests failed (non-blocking)."
+          fi
