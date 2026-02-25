@@ -6,7 +6,7 @@ import os
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Response
+from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from slowapi import _rate_limit_exceeded_handler
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # Loading dotenv after importing them would prevent local .env values from taking effect.
 load_dotenv()
 
+from backend.deps.debug_guard import require_debug_enabled
 from backend.middleware.error_handler import ErrorHandlerMiddleware
 from backend.middleware.rate_limit import limiter
 from backend.middleware.security import SecurityHeadersMiddleware
@@ -138,7 +139,7 @@ app.add_middleware(
 # ======================
 # 🧪 Debug Routes (Safe)
 # ======================
-@app.get("/debug/supabase-env")
+@app.get("/debug/supabase-env", dependencies=[Depends(require_debug_enabled)])
 def debug_supabase_env():
     """
     Shows what the container is *actually* reading.
@@ -174,7 +175,7 @@ def debug_supabase_env():
     }
 
 
-@app.get("/debug/scraper-env")
+@app.get("/debug/scraper-env", dependencies=[Depends(require_debug_enabled)])
 def debug_scraper_env():
     """Expose scraper configuration in a safe way (no secrets)."""
 
@@ -197,7 +198,7 @@ def debug_scraper_env():
     }
 
 
-@app.get("/debug/routes")
+@app.get("/debug/routes", dependencies=[Depends(require_debug_enabled)])
 def debug_routes():
     """Return a sorted list of registered paths.
 
@@ -272,8 +273,8 @@ def _shutdown_worker():
 app.include_router(ai_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
-app.include_router(debug_properties_router)
-app.include_router(debug_scrape_probe_router)
+app.include_router(debug_properties_router, dependencies=[Depends(require_debug_enabled)])
+app.include_router(debug_scrape_probe_router, dependencies=[Depends(require_debug_enabled)])
 app.include_router(gpt_router)
 app.include_router(import_router)
 app.include_router(admin_alias_router)
