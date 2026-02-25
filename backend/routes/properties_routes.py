@@ -37,62 +37,6 @@ from supabase import create_client
 router = APIRouter(tags=["properties"])
 
 
-def _is_zero_coord(lat: Optional[float], lng: Optional[float]) -> bool:
-    try:
-        if lat is None or lng is None:
-            return False
-        return float(lat) == 0.0 and float(lng) == 0.0
-    except Exception:
-        return False
-
-
-def _coord_missing(lat: Optional[float], lng: Optional[float]) -> bool:
-    return lat is None or lng is None or _is_zero_coord(lat, lng)
-
-
-def _should_override_metric(
-    existing: Optional[float], *, is_proxy: bool, derived_value: Any | None = None
-) -> bool:
-    # Override if missing/unparseable.
-    if existing is None:
-        return True
-
-    # Override if existing was marked as proxy.
-    if bool(is_proxy):
-        return True
-
-    try:
-        existing_f = float(existing)
-    except Exception:
-        return True
-
-    # Override zero placeholders.
-    try:
-        if existing_f == 0.0:
-            return True
-    except Exception:
-        return True
-
-    # If we have a derived value, override when it differs materially.
-    if derived_value is not None:
-        try:
-            derived_f = float(derived_value)
-
-            # Heuristic: percentage metrics are typically small (single/double digits),
-            # whereas rent_monthly is usually in the hundreds/thousands.
-            threshold = 1.0
-            if abs(existing_f) > 50 or abs(derived_f) > 50:
-                threshold = 100.0
-
-            if abs(existing_f - derived_f) > threshold:
-                return True
-        except Exception:
-            # If derived can't be parsed, do not force override on diff.
-            pass
-
-    return False
-
-
 def _start_enrichment_thread(property_id: str) -> None:
     pid = (property_id or "").strip()
     if not pid:
@@ -133,18 +77,10 @@ def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
 
     geo = cache_payload.get("geo") if isinstance(cache_payload.get("geo"), dict) else None
     if isinstance(geo, dict):
-        cur_lat = item.get("latitude")
-        cur_lng = item.get("longitude")
-        en_lat = geo.get("latitude")
-        en_lng = geo.get("longitude")
-
-        # Treat 0,0 as missing and only override when current coords are missing.
-        if _coord_missing(cur_lat, cur_lng) and not _coord_missing(en_lat, en_lng):
-            try:
-                item["latitude"] = float(en_lat)
-                item["longitude"] = float(en_lng)
-            except Exception:
-                pass
+        if item.get("latitude") in (None, 0, 0.0, "") and geo.get("latitude") is not None:
+            item["latitude"] = geo.get("latitude")
+        if item.get("longitude") in (None, 0, 0.0, "") and geo.get("longitude") is not None:
+            item["longitude"] = geo.get("longitude")
 
     # Attach nested intel objects if not already present.
     if item.get("area_intel") is None and isinstance(cache_payload.get("area_intel"), dict):
@@ -156,52 +92,12 @@ def _attach_cached_enrichment(item: Dict[str, Any], cache_payload: Any) -> None:
         cache_payload.get("derived") if isinstance(cache_payload.get("derived"), dict) else None
     )
     if isinstance(derived, dict):
-        metrics_overridden = False
-        roi_is_proxy = bool(item.get("roi_is_proxy"))
-        rent_source = (item.get("rent_source") or "").lower()
-        rent_is_proxy = rent_source == "proxy"
-
-        d_rent = derived.get("rent_estimate_monthly")
-        d_yield = derived.get("yield_percent")
-        d_roi = derived.get("roi_percent")
-
-        if d_roi is not None and _should_override_metric(
-            item.get("roi_percent"), is_proxy=roi_is_proxy, derived_value=d_roi
-        ):
-            try:
-                item["roi_percent"] = float(d_roi)
-                item["roi_is_proxy"] = False
-                metrics_overridden = True
-            except Exception:
-                pass
-
-        if d_yield is not None and _should_override_metric(
-            item.get("yield_percent"), is_proxy=False, derived_value=d_yield
-        ):
-            try:
-                item["yield_percent"] = float(d_yield)
-                metrics_overridden = True
-            except Exception:
-                pass
-
-        if d_rent is not None and _should_override_metric(
-            item.get("rent_monthly"), is_proxy=rent_is_proxy, derived_value=d_rent
-        ):
-            try:
-                item["rent_monthly"] = float(d_rent)
-                item["rent_source"] = derived.get("rent_source") or "enriched"
-                metrics_overridden = True
-            except Exception:
-                pass
-
-        # If we changed financial inputs, recompute score for this response object.
-        if metrics_overridden:
-            try:
-                score, breakdown = compute_deal_score(item)
-                item["score"] = score
-                item["score_breakdown"] = breakdown
-            except Exception:
-                pass
+        if item.get("rent_monthly") is None and derived.get("rent_estimate_monthly") is not None:
+            item["rent_monthly"] = derived.get("rent_estimate_monthly")
+        if item.get("yield_percent") is None and derived.get("yield_percent") is not None:
+            item["yield_percent"] = derived.get("yield_percent")
+        if item.get("roi_percent") is None and derived.get("roi_percent") is not None:
+            item["roi_percent"] = derived.get("roi_percent")
 
 
 def _attach_enrichment_from_cache(sb: Any, items: List[Dict[str, Any]]) -> List[str]:
@@ -300,10 +196,6 @@ def _is_mappable_coordinate_pair(lat: Any, lng: Any) -> bool:
     lat_f = _to_float(lat)
     lng_f = _to_float(lng)
     if lat_f is None or lng_f is None:
-        return False
-
-    # Treat (0,0) as missing (bad default values).
-    if _is_zero_coord(lat_f, lng_f):
         return False
 
     if lat_f < -90 or lat_f > 90:
@@ -640,8 +532,42 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         pass
 
-    # IMPORTANT: Do not invent proxy rent/yield/roi in API responses.
-    # If missing after canonical metrics, keep null and let the UI display "—".
+    # If rent/yield/roi are still missing, try a best-effort proxy via deal scoring.
+    # IMPORTANT: never write 0 placeholders; only backfill when proxy is > 0.
+    try:
+        needs_proxy = any(
+            out.get(k) is None for k in ("rent_monthly", "yield_percent", "roi_percent")
+        )
+        if (
+            needs_proxy
+            and isinstance(out.get("price"), (int, float))
+            and float(out.get("price") or 0) > 0
+        ):
+            _score, breakdown = compute_deal_score(out)
+            inputs = breakdown.get("inputs") if isinstance(breakdown, dict) else None
+            if isinstance(inputs, dict):
+                rent_v = inputs.get("rent_monthly")
+                rent_src = inputs.get("rent_source")
+                y_v = inputs.get("yield_percent")
+                roi_v = inputs.get("roi_percent")
+                roi_src = inputs.get("roi_source")
+
+                if (
+                    out.get("rent_monthly") is None
+                    and isinstance(rent_v, (int, float))
+                    and rent_v > 0
+                ):
+                    if rent_src in {"provided", "proxy"}:
+                        out["rent_monthly"] = round(float(rent_v), 2)
+
+                if out.get("yield_percent") is None and isinstance(y_v, (int, float)) and y_v > 0:
+                    out["yield_percent"] = round(float(y_v), 2)
+
+                if out.get("roi_percent") is None and isinstance(roi_v, (int, float)) and roi_v > 0:
+                    if roi_src != "missing":
+                        out["roi_percent"] = round(float(roi_v), 2)
+    except Exception:
+        pass
 
     return out
 

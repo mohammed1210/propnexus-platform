@@ -1,15 +1,19 @@
-# Cache Design: comps + area-intel (24h TTL)
+# API Cache (Comps & Area Intel)
 
-**Tables**
-- `comps_cache(postcode TEXT PRIMARY KEY, payload JSONB, fetched_at TIMESTAMP WITH TIME ZONE)`
-- `area_intel_cache(area_key TEXT PRIMARY KEY, payload JSONB, fetched_at TIMESTAMP WITH TIME ZONE)`
+**Endpoints**
+- `GET /comps/{postcode}`
+- `GET /area-intel/{key}`
 
-**Policy**
-- A GET request first attempts to read the most recent cached row.
-- If `now - fetched_at < 24h`, it is a cache **hit** → return cached payload.
-- Otherwise, call the provider (currently a deterministic stub), **upsert** the payload with `fetched_at=now`, and return that payload.
+**Storage**
+- Supabase tables:
+  - `comps_cache(postcode text, payload jsonb, fetched_at timestamptz)`
+  - `area_intel_cache(area_key text, payload jsonb, fetched_at timestamptz)`
+
+**Strategy**
+- On read: if `now() - fetched_at < 24 hours` → return cached payload.
+- Otherwise: fetch from provider (currently a deterministic mock), upsert the row, and return.
+- If Supabase env isn’t present, endpoints **skip caching** but still return provider data (keeps local/dev simple).
 
 **Notes**
-- Provider stubs live in `backend/services/providers.py` — replace with real APIs later.
-- Cache write failures are non-fatal; the API still returns provider data.
-- Tests monkeypatch the DB layer and providers for deterministic behavior.
+- Provider logic lives in `backend/services/providers.py`.
+- Cache writes (when enabled) are best-effort and never fail the request path.

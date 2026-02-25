@@ -42,7 +42,11 @@ export default function TradesmenList({
         const apiBase =
           process.env.NEXT_PUBLIC_BACKEND_URL ||
           process.env.NEXT_PUBLIC_API_URL ||
-          'https://propnexus-backend-production.up.railway.app';
+          (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
+
+        if (!apiBase.trim()) {
+          throw new Error('Missing backend base URL env (NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL).');
+        }
 
         const params = new URLSearchParams({
           lat: propertyLat.toString(),
@@ -54,7 +58,7 @@ export default function TradesmenList({
           params.append('trade_type', tradeType.toLowerCase());
         }
 
-        const response = await fetch(`${apiBase}/tradesmen/nearby?${params}`);
+        const response = await fetch(`${apiBase.replace(/\/+$/, '')}/tradesmen/nearby?${params}`);
 
         if (!response.ok) {
           throw new Error('Failed to fetch tradesmen');

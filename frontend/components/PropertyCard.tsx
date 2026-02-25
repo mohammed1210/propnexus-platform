@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiHeart } from 'react-icons/fi';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
+import { formatPercent, getRoiPercent, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -169,6 +170,11 @@ export default function PropertyCard({
   isHovered?: boolean;
   onHoverChange?: (hovered: boolean) => void;
 }) {
+  const normalized = useMemo(() => normalizeProperty(p as any), [p]);
+
+  const displayYieldPct = useMemo(() => getYieldPercent(p as any), [p]);
+  const displayRoiPct = useMemo(() => getRoiPercent(p as any), [p]);
+
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -336,8 +342,10 @@ export default function PropertyCard({
       out.rentSource = 'proxy';
     }
 
-    // Yield (prefer property yield; otherwise proxy)
-    const providedYield = typeof p.yield_percent === 'number' && isFinite(p.yield_percent) ? p.yield_percent : undefined;
+    // Yield (prefer normalized yield; otherwise proxy)
+    const providedYield = typeof normalized.yieldPercent === 'number' && isFinite(normalized.yieldPercent)
+      ? normalized.yieldPercent
+      : undefined;
     if (typeof providedYield === 'number') out.grossYieldPct = providedYield;
     else if (price && out.rentMonthly) out.grossYieldPct = (out.rentMonthly * 12 * 100) / price;
 
@@ -383,7 +391,7 @@ export default function PropertyCard({
     // Touch timeTick to keep freshness recomputed.
     void timeTick;
     return out;
-  }, [insights, p.monthly_rent, p.price, p.rent, p.rent_pcm, p.rent_per_month, p.yield_percent, timeTick]);
+  }, [insights, normalized.yieldPercent, p.monthly_rent, p.price, p.rent, p.rent_pcm, p.rent_per_month, timeTick]);
 
   function median(nums: number[]): number {
     const a = [...nums].sort((x, y) => x - y);
@@ -567,29 +575,26 @@ export default function PropertyCard({
               Score {Math.round(p.score)}
             </span>
           )}
-          {typeof p.yield_percent === 'number' && (
+          {typeof displayYieldPct === 'number' && (
             <span
               className={cx(
                 'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
-                getBadgeColor('yield', p.yield_percent),
+                getBadgeColor('yield', displayYieldPct),
               )}
-              aria-label={`Yield percentage: ${p.yield_percent.toFixed(1)}%`}
+              aria-label={`Yield percentage: ${formatPercent(displayYieldPct)}`}
             >
-              {p.yield_percent.toFixed(1)}% Yield
+              {formatPercent(displayYieldPct)} Yield
             </span>
           )}
-          {(typeof p.roi_percent === 'number' || typeof p.yield_percent === 'number') && (
+          {typeof displayRoiPct === 'number' && (
             <span
               className={cx(
                 'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
-                getBadgeColor('roi', (typeof p.roi_percent === 'number' ? p.roi_percent : (p.yield_percent as number)) as number),
+                getBadgeColor('roi', displayRoiPct),
               )}
-              aria-label={`ROI percentage: ${(
-                typeof p.roi_percent === 'number' ? p.roi_percent : (p.yield_percent as number)
-              ).toFixed(1)}%${typeof p.roi_percent === 'number' ? '' : ' (proxy)'}`}
+              aria-label={`ROI percentage: ${formatPercent(displayRoiPct)}`}
             >
-              {(typeof p.roi_percent === 'number' ? p.roi_percent : (p.yield_percent as number)).toFixed(1)}% ROI
-              {typeof p.roi_percent === 'number' ? '' : ' (proxy)'}
+              {formatPercent(displayRoiPct)} ROI
             </span>
           )}
         </div>

@@ -2,6 +2,7 @@
 
 import clsx from 'clsx';
 import type { ComparableDeal } from './types';
+import { formatPercent, getRoiPercent, getYieldPercent } from '@/lib/normalizeProperty';
 
 function fmtGBP(n: unknown): string {
   const v = typeof n === 'number' ? n : Number(n);
@@ -15,13 +16,6 @@ function fmtGBP(n: unknown): string {
   } catch {
     return `£${Math.round(v).toLocaleString('en-GB')}`;
   }
-}
-
-function fmtPct(n: unknown): string {
-  if (n == null) return '—';
-  const v = typeof n === 'number' ? n : Number(n);
-  if (!Number.isFinite(v) || v <= 0) return '—';
-  return `${v.toFixed(1)}%`;
 }
 
 function fmtInt(n: unknown): string {
@@ -160,10 +154,10 @@ export default function DealComparePanel({
                 </div>
 
                 <div className="text-slate-600 dark:text-slate-300">Yield</div>
-                <div className="text-right text-slate-900 dark:text-white">{fmtPct(d.yield_percent)}</div>
+                <div className="text-right text-slate-900 dark:text-white">{formatPercent(getYieldPercent(d as any))}</div>
 
                 <div className="text-slate-600 dark:text-slate-300">ROI</div>
-                <div className="text-right text-slate-900 dark:text-white">{fmtPct(d.roi_percent)}</div>
+                <div className="text-right text-slate-900 dark:text-white">{formatPercent(getRoiPercent(d as any))}</div>
 
                 <div className="text-slate-600 dark:text-slate-300">Rent/mo</div>
                 <div className="text-right text-slate-900 dark:text-white">
@@ -248,13 +242,13 @@ export default function DealComparePanel({
 
         <Row label="Yield">
           {deals.map((d) => (
-            <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">{fmtPct(d.yield_percent)}</div>
+            <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">{formatPercent(getYieldPercent(d as any))}</div>
           ))}
         </Row>
 
         <Row label="ROI">
           {deals.map((d) => (
-            <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">{fmtPct(d.roi_percent)}</div>
+            <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">{formatPercent(getRoiPercent(d as any))}</div>
           ))}
         </Row>
 

@@ -7,7 +7,7 @@ import stripe
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from supabase import create_client
+from backend.utils.supabase_client import get_supabase
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
 
@@ -26,9 +26,8 @@ class PortalRequest(BaseModel):
 
 
 def _get_supabase():
-    url = os.getenv("SUPABASE_URL") or "http://localhost"
-    key = os.getenv("SUPABASE_KEY") or "anon"
-    return create_client(url, key)
+    # For tests and CI: avoid hard failures if Supabase isn't configured.
+    return get_supabase()
 
 
 def _frontend_url() -> str:
@@ -63,13 +62,14 @@ def create_checkout_session(payload: CheckoutRequest):
             customer_id = customer.id
 
         # 2) Persist/Upsert customer mapping in Supabase (mocked in tests)
-        try:
-            sb.table("stripe_customers").upsert(
-                {"email": email, "stripe_customer_id": customer_id},
-                on_conflict="email",
-            ).execute()
-        except Exception:
-            pass  # don't block checkout if db table isn't present
+        if sb:
+            try:
+                sb.table("stripe_customers").upsert(
+                    {"email": email, "stripe_customer_id": customer_id},
+                    on_conflict="email",
+                ).execute()
+            except Exception:
+                pass  # don't block checkout if db table isn't present
 
         base = _frontend_url().rstrip("/")
         success_url = os.getenv("STRIPE_SUCCESS_URL") or f"{base}/success"
@@ -112,18 +112,19 @@ def create_portal_session(payload: PortalRequest):
 
         # Try to find customer id in Supabase first
         customer_id: Optional[str] = None
-        try:
-            rec = (
-                sb.table("stripe_customers")
-                .select("stripe_customer_id")
-                .eq("email", email)
-                .maybe_single()
-                .execute()
-            )
-            if rec.data and rec.data.get("stripe_customer_id"):
-                customer_id = rec.data["stripe_customer_id"]
-        except Exception:
-            customer_id = None
+        if sb:
+            try:
+                rec = (
+                    sb.table("stripe_customers")
+                    .select("stripe_customer_id")
+                    .eq("email", email)
+                    .maybe_single()
+                    .execute()
+                )
+                if rec.data and rec.data.get("stripe_customer_id"):
+                    customer_id = rec.data["stripe_customer_id"]
+            except Exception:
+                customer_id = None
 
         # Fallback to Stripe search
         if not customer_id:
