@@ -15,7 +15,7 @@ jobs:
           pip install -r backend/requirements.txt
       - name: Start backend
         run: |
-          nohup uvicorn backend.main:app --port 8000 &
+          nohup uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
           sleep 3
       - uses: actions/setup-node@v4
       - name: Install + Build
@@ -31,25 +31,30 @@ jobs:
           npm ci || npm install
           npm i leaflet @types/leaflet --force
           npm run build
+
+      - name: Start frontend
+        working-directory: frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL != '' && secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY != '' && secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key_for_build' }}
+          NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL != '' && secrets.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000' }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY != '' && secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY != '' && secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
+        run: |
+          nohup npm run start -- -p 3000 &
+
       - name: Wait for servers
         run: |
           for i in {1..40}; do curl -fs http://localhost:8000/properties && break || sleep 2; done
           for i in {1..40}; do curl -fs http://localhost:3000 && break || sleep 2; done
-      - name: Install Playwright browsers
-        working-directory: frontend
-        run: npx --yes @playwright/test@1.48.0 install --with-deps
+          curl -fs http://localhost:8000/properties >/dev/null
+          curl -fs http://localhost:3000 >/dev/null
 
-      - name: Run Playwright (non-fatal)
-        id: playwright
-        continue-on-error: true
+      - name: Run Playwright
         working-directory: frontend
         env:
           E2E_BASE_URL: "http://localhost:3000"
-        run: npx --yes @playwright/test@1.48.0 test --reporter=list
-
-      - name: Report E2E result
-        if: always()
         run: |
-          if [ "${{ steps.playwright.outcome }}" != "success" ]; then
-            echo "::warning::E2E Smoke: Playwright tests failed (non-blocking)."
-          fi
+          npx --yes @playwright/test@1.48.0 install --with-deps
+          npx --yes @playwright/test@1.48.0 test --reporter=list
