@@ -70,3 +70,7 @@ The off-market module exists, but is intended to be **disabled by default for in
 ## Docs
 
 Product + engineering docs live in `docs/` (deployment, runbooks, feature flags, Clerk setup, billing, and troubleshooting).
+
+## AI
+
+Use `/gpt/*` for AI features. `/ai/*` remains supported for compatibility.
