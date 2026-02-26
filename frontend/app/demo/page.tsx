@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Metadata } from 'next';
 import { GalleryImage } from '@/components/GalleryImage';
-import { formatPercent, getRoiPercent, getRoiProxyPercent, getYieldPercent } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
 
 export const dynamic = "force-dynamic";
 
@@ -120,10 +120,9 @@ export default function DemoPage() {
                     </span>
                     <span className="text-xs font-semibold px-2 py-1 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                       {(() => {
-                        const real = getRoiPercent(property as any);
-                        const proxy = getRoiProxyPercent(property as any);
-                        const base = formatPercent(proxy);
-                        return `${base} ROI${real == null && proxy != null ? ' (proxy)' : ''}`;
+                        const roi = getRoiDisplay(property as any);
+                        const base = formatPercent(roi.value);
+                        return `${base} ROI${roi.isProxy ? ' (proxy)' : ''}`;
                       })()}
                     </span>
                   </div>

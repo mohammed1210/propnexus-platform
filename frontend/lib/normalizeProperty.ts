@@ -41,8 +41,8 @@ function clampYieldLikePercent(n: number): number | null {
 
 function clampRoiLikePercent(n: number): number | null {
   if (!Number.isFinite(n)) return null;
-  // ROI can be negative or substantially higher than yield.
-  if (n < -100 || n > 200) return null;
+  // ROI can be substantially higher than yield.
+  if (n < 0 || n > 200) return null;
   return round1(n);
 }
 
@@ -105,29 +105,41 @@ export function getYieldPercent(p: AnyObj): number | null {
   return typeof proxy === 'number' ? clampYieldLikePercent(proxy) : null;
 }
 
-/**
- * Canonical REAL ROI fallback order (must be consistent across UI):
- * 1) p.roi_percent
- * 2) p.score_breakdown.inputs.roi_percent
- * 3) else null
- */
-export function getRoiPercent(p: AnyObj): number | null {
-  if (!p || typeof p !== 'object') return null;
+export function getRoiDisplay(p: AnyObj): { value: number | null; isProxy: boolean } {
+  if (!p || typeof p !== 'object') return { value: null, isProxy: false };
 
   const scoreInputs = getScoreInputs(p);
+  const roiFlag = Boolean((p as any)?.roi_is_proxy ?? (p as any)?.roiIsProxy);
 
-  // 1) p.roi_percent
-  // Note: intentionally does NOT read `roiPct` because in normalized objects that can be a proxy.
-  const direct = parsePercent((p as any).roi_percent ?? (p as any).roiPercent);
-  const directClamped = direct == null ? null : clampRoiLikePercent(direct);
-  if (directClamped != null) return directClamped;
+  // real ROI candidates
+  const direct =
+    parsePercent((p as any).roi_percent ?? (p as any).roiPercent) ??
+    parsePercent((p as any).roi) ??
+    parsePercent((p as any).roi_pct) ??
+    parsePercent((p as any).roi_percentage) ??
+    parsePercent((p as any).roiPercentage);
+  const directOk = direct == null ? null : clampRoiLikePercent(direct);
+  if (directOk != null) return { value: directOk, isProxy: roiFlag };
 
-  // 2) p.score_breakdown.inputs.roi_percent
-  const fromScore = scoreInputs ? parsePercent((scoreInputs as any).roi_percent) : null;
-  const fromScoreClamped = fromScore == null ? null : clampRoiLikePercent(fromScore);
-  if (fromScoreClamped != null) return fromScoreClamped;
+  const fromScore = scoreInputs
+    ? parsePercent((scoreInputs as any).roi_percent ?? (scoreInputs as any).roiPercent ?? (scoreInputs as any).roi_pct)
+    : null;
+  const fromScoreOk = fromScore == null ? null : clampRoiLikePercent(fromScore);
+  if (fromScoreOk != null) return { value: fromScoreOk, isProxy: roiFlag };
 
-  return null;
+  // proxy fallback
+  const proxy = getYieldPercent(p);
+  const proxyOk = typeof proxy === 'number' ? clampRoiLikePercent(proxy) : null;
+  return { value: proxyOk, isProxy: proxyOk != null };
+}
+
+/**
+ * ROI display helper.
+ * - Prefers real ROI when present
+ * - Falls back to a proxy (yield-like) value when missing
+ */
+export function getRoiPercent(p: AnyObj): number | null {
+  return getRoiDisplay(p).value;
 }
 
 /**
@@ -135,11 +147,7 @@ export function getRoiPercent(p: AnyObj): number | null {
  * Default proxy source = yield-like proxy (canonical yield fallback order).
  */
 export function getRoiProxyPercent(p: AnyObj): number | null {
-  const real = getRoiPercent(p);
-  if (real != null) return real;
-
-  const proxyYield = getYieldPercent(p);
-  return typeof proxyYield === 'number' ? clampRoiLikePercent(proxyYield) : null;
+  return getRoiDisplay(p).value;
 }
 
 export function formatPercent(n: number | null | undefined): string {
@@ -328,7 +336,6 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
   let roiPercent =
     parsePercent(p?.roi_percent) ??
     parsePercent(p?.roiPercent) ??
-    parsePercent(p?.roiPct) ??
     parsePercent(p?.roi) ??
     parsePercent(p?.roi_pct) ??
     parsePercent(p?.roi_percentage) ??
@@ -391,7 +398,8 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
   // ROI is NOT yield. Keep real ROI separate from a proxy value.
   // - roiPercent: real ROI only (if present)
   // - roiProxyPercent: used for scoring/optional labeled display
-  const roiProxyPercent = roiPercent ?? yieldPercent;
+  const legacyRoiProxy = parsePercent(p?.roiPct) ?? null;
+  const roiProxyPercent = roiPercent ?? yieldPercent ?? legacyRoiProxy;
   const roiIsProxy = roiFlag || (roiPercent == null && roiProxyPercent != null);
 
   const yieldPct = yieldPercent;

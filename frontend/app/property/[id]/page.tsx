@@ -27,7 +27,7 @@ import TradesmenList from '@/components/tradesmen/TradesmenList';
 
 import type { Property } from '@/types';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
-import { formatPercent, getRoiPercent, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 /** ---- Client-only widgets (no SSR) ---- */
 const StampDutyCalculator = dynamic(
@@ -155,8 +155,6 @@ export default function PropertyDetailsPage() {
               price: toNum((data as any).price),
               bedrooms: toNum((data as any).bedrooms),
               bathrooms: toNum((data as any).bathrooms),
-              yield_percent: toNum((data as any).yield_percent),
-              roi_percent: toNum((data as any).roi_percent),
               latitude: toNum((data as any).latitude) ?? null,
               longitude: toNum((data as any).longitude) ?? null,
               // Map snake_case DB field to camelCase for frontend components
@@ -190,14 +188,13 @@ export default function PropertyDetailsPage() {
         : undefined,
     [normalized, property],
   );
-  const roiPercent = useMemo(
-    () =>
-      normalized
-        ? (getRoiPercent(normalized as any) ?? getRoiPercent(property as any) ?? undefined)
-        : undefined,
-    [normalized, property],
-  );
-  const roiDisplay = roiPercent;
+  const roiRealPercent = typeof normalized?.roiPercent === 'number' ? normalized.roiPercent : undefined;
+  const roiDisplay = useMemo(() => {
+    if (!property) return { value: null, isProxy: false };
+    const a = normalized ? getRoiDisplay(normalized as any) : { value: null, isProxy: false };
+    if (a.value != null) return a;
+    return getRoiDisplay(property as any);
+  }, [normalized, property]);
 
   const estValue = useMemo((): number | undefined => {
     if (!property) return undefined;
@@ -261,7 +258,7 @@ export default function PropertyDetailsPage() {
 
   const tldr = buildVerdict({
     yield_percent: yieldPercent,
-    roi_percent: roiPercent,
+    roi_percent: roiRealPercent,
     ai_score: (property as any).ai_score,
     score: (property as any).score,
     discount_percent: discountPercent,
@@ -281,7 +278,7 @@ export default function PropertyDetailsPage() {
         property={property}
         price={normalized?.price ?? undefined}
         yieldPercent={yieldPercent}
-        roiPercent={roiPercent}
+        roiPercent={roiRealPercent}
         discountPercent={discountPercent}
       />
 
@@ -436,8 +433,8 @@ export default function PropertyDetailsPage() {
                       title={String(property.title ?? '')}
                       location={String(property.location ?? '')}
                       price={typeof property.price === 'number' ? property.price : undefined}
-                      yield_percent={yieldPercent}
-                        roi_percent={roiPercent}
+                      yieldPercent={yieldPercent}
+                      roiPercent={roiDisplay.value ?? undefined}
                       propertyType={(property as any).propertyType ?? undefined}
                       investmentType={(property as any).investmentType ?? undefined}
                       description={(property as any).description ?? undefined}

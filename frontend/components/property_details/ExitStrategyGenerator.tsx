@@ -8,8 +8,8 @@ type Props = {
   title: string;
   location: string;
   price?: number;
-  yield_percent?: number;
-  roi_percent?: number;
+  yieldPercent?: number;
+  roiPercent?: number;
   propertyType?: string;
   investmentType?: string;
   description?: string;
@@ -39,8 +39,8 @@ export default function ExitStrategyGenerator(props: Props) {
           title: props.title,
           location: props.location,
           price: props.price,
-          yield_percent: props.yield_percent,
-          roi_percent: props.roi_percent,
+          yield_percent: props.yieldPercent,
+          roi_percent: props.roiPercent,
           propertyType: props.propertyType,
           investmentType: props.investmentType,
           description: props.description,

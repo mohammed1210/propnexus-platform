@@ -10,7 +10,7 @@ import { FF } from '@/lib/flags';
 import { useUserPlan } from '@/lib/useUserPlan';
 import { hasAccess } from '@/lib/planPermissions';
 import { isAuthEnabled } from '@/lib/auth';
-import { formatPercent, getRoiPercent, getRoiProxyPercent, getYieldPercent } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
 
 type LooseProperty = Property & {
   latitude?: number | null;
@@ -91,12 +91,12 @@ function AIChatbotInner({
     const hints: string[] = [];
 
     const yieldPct = property ? getYieldPercent(property as any) : null;
-    const roiReal = property ? getRoiPercent(property as any) : null;
-    const roiProxy = property ? getRoiProxyPercent(property as any) : null;
+    const roiDisplay = property ? getRoiDisplay(property as any) : { value: null, isProxy: false };
 
     if (typeof yieldPct === 'number') hints.push(`yield ≈ ${formatPercent(yieldPct)}`);
-    if (typeof roiReal === 'number') hints.push(`ROI ≈ ${formatPercent(roiReal)}`);
-    else if (typeof roiProxy === 'number') hints.push(`ROI (proxy) ≈ ${formatPercent(roiProxy)}`);
+    if (typeof roiDisplay.value === 'number') {
+      hints.push(`ROI${roiDisplay.isProxy ? ' (proxy)' : ''} ≈ ${formatPercent(roiDisplay.value)}`);
+    }
     if (typeof property?.price === 'number')
       hints.push(`price ≈ £${property.price.toLocaleString()}`);
 

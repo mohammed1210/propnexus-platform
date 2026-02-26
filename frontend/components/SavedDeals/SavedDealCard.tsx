@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import clsx from 'clsx';
 import type { SavedDeal } from './types';
-import { formatPercent, getRoiPercent, getRoiProxyPercent, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 function fmtGBP(n: unknown): string {
   const v = typeof n === 'number' ? n : Number(n);
@@ -49,9 +49,7 @@ export default function SavedDealCard({
   const imageSrc = deal.imageurl || 'https://placehold.co/640x360?text=PropNexus';
 
   const yieldDisplay = getYieldPercent(deal as any);
-  const roiReal = getRoiPercent(deal as any);
-  const roiDisplay = getRoiProxyPercent(deal as any);
-  const roiIsProxyDisplay = roiReal == null && roiDisplay != null;
+  const roiDisplay = getRoiDisplay(deal as any);
 
   return (
     <article
@@ -108,7 +106,7 @@ export default function SavedDealCard({
               Yield {formatPercent(yieldDisplay)}
             </span>
             <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
-              ROI{roiIsProxyDisplay ? ' (proxy)' : ''} {formatPercent(roiDisplay)}
+              ROI{roiDisplay.isProxy ? ' (proxy)' : ''} {formatPercent(roiDisplay.value)}
             </span>
           </div>
         </div>

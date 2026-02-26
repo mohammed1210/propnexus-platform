@@ -16,7 +16,7 @@ import {
   Legend,
 } from 'chart.js';
 import { getSupabase } from '@/lib/supabaseClient';
-import { formatPercent, getRoiPercent, getRoiProxyPercent, getYieldPercent } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -82,11 +82,10 @@ export default function AnalyticsPage() {
   const kpis = useMemo(() => {
     const count = deals.length;
     const avgYield = avgPercent(deals.map((d) => getYieldPercent(d as any)));
-    const avgROI = avgPercent(deals.map((d) => getRoiProxyPercent(d as any)));
+    const avgROI = avgPercent(deals.map((d) => getRoiDisplay(d as any).value));
     const avgRoiIsProxy = deals.some((d) => {
-      const real = getRoiPercent(d as any);
-      const proxy = getRoiProxyPercent(d as any);
-      return real == null && proxy != null;
+      const roi = getRoiDisplay(d as any);
+      return roi.isProxy && roi.value != null;
     });
     const totalValue = deals.reduce((s, d) => s + num(d.price), 0);
     return { count, avgYield, avgROI, avgRoiIsProxy, totalValue };
@@ -240,10 +239,9 @@ export default function AnalyticsPage() {
                         <Td>{formatPercent(getYieldPercent(d as any))}</Td>
                         <Td>
                           {(() => {
-                            const real = getRoiPercent(d as any);
-                            const proxy = getRoiProxyPercent(d as any);
-                            const base = formatPercent(proxy);
-                            return `${base}${real == null && proxy != null ? ' (proxy)' : ''}`;
+                            const roi = getRoiDisplay(d as any);
+                            const base = formatPercent(roi.value);
+                            return `${base}${roi.isProxy ? ' (proxy)' : ''}`;
                           })()}
                         </Td>
                         <Td>{formatDate(d.saved_at)}</Td>

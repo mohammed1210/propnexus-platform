@@ -1,5 +1,6 @@
 import {
   formatPercent,
+  getRoiDisplay,
   getRoiPercent,
   getRoiProxyPercent,
   getYieldPercent,
@@ -103,7 +104,8 @@ describe('canonical Yield/ROI helpers', () => {
       roi_percent: null,
     } as any);
     expect(getYieldPercent(p as any)).toBeCloseTo(12.0, 1);
-    expect(getRoiPercent(p as any)).toBeNull();
+    expect(getRoiDisplay(p as any)).toEqual({ value: 12.0, isProxy: true });
+    expect(getRoiPercent(p as any)).toBeCloseTo(12.0, 1);
     expect(getRoiProxyPercent(p as any)).toBeCloseTo(12.0, 1);
   });
 
@@ -111,16 +113,19 @@ describe('canonical Yield/ROI helpers', () => {
     expect(getYieldPercent({} as any)).toBeNull();
     expect(getRoiPercent({} as any)).toBeNull();
     expect(getRoiProxyPercent({} as any)).toBeNull();
+    expect(getRoiDisplay({} as any)).toEqual({ value: null, isProxy: false });
     expect(formatPercent(null)).toBe('N/A');
   });
 
   it('ROI uses score_breakdown.inputs if present; proxy helper falls back to yield proxy', () => {
     const fromScore: any = { score_breakdown: { inputs: { roi_percent: 9.4 } } };
+    expect(getRoiDisplay(fromScore)).toEqual({ value: 9.4, isProxy: false });
     expect(getRoiPercent(fromScore)).toBeCloseTo(9.4, 5);
     expect(getRoiProxyPercent(fromScore)).toBeCloseTo(9.4, 5);
 
     const proxy: any = { price: 150000, rent_monthly: 900 };
-    expect(getRoiPercent(proxy)).toBeNull();
+    expect(getRoiDisplay(proxy)).toEqual({ value: 7.2, isProxy: true });
+    expect(getRoiPercent(proxy)).toBeCloseTo(7.2, 5);
     expect(getRoiProxyPercent(proxy)).toBeCloseTo(7.2, 5);
   });
 });
