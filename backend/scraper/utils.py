@@ -12,6 +12,7 @@ from backend.utils.supabase_client import get_supabase
 
 TARGET_CITIES = [
     "London",
+    "Birmingham",
     "Manchester",
     "Leeds",
     "Liverpool",
