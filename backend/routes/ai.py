@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
@@ -26,13 +27,32 @@ _COMPAT_HEADERS = {
     "X-PropNexus-AI-Canonical": "/gpt/*",
 }
 
+_DEPRECATION_HEADERS = {
+    # This endpoint group is intentionally kept for backward-compatibility only.
+    # New development should use /gpt/*.
+    "Deprecation": "true",
+    "Sunset": "2026-06-01",
+    "Link": '</gpt/health>; rel="successor-version"',
+}
 
-def _apply_compat_headers(response: Response) -> None:
-    response.headers.update(_COMPAT_HEADERS)
+_LEGACY_HEADERS = {
+    **_COMPAT_HEADERS,
+    **_DEPRECATION_HEADERS,
+}
+
+
+def _apply_legacy_headers(response: Response) -> None:
+    response.headers.update(_LEGACY_HEADERS)
+
+
+def _maybe_log_deprecation(request: Request) -> None:
+    if (os.getenv("LOG_AI_DEPRECATION") or "0") != "1":
+        return
+    logger.warning("/ai/* endpoint used (deprecated): %s %s", request.method, request.url.path)
 
 
 def _require_api_key_compat(response: Response) -> str:
-    _apply_compat_headers(response)
+    _apply_legacy_headers(response)
     try:
         return ai_service.require_api_key()
     except HTTPException as exc:
@@ -40,13 +60,14 @@ def _require_api_key_compat(response: Response) -> str:
         raise HTTPException(
             status_code=exc.status_code,
             detail=exc.detail,
-            headers=_COMPAT_HEADERS,
+            headers=_LEGACY_HEADERS,
         )
 
 
 @router.get("/health")
-async def ai_health(response: Response) -> dict:
-    _apply_compat_headers(response)
+async def ai_health(request: Request, response: Response) -> dict:
+    _apply_legacy_headers(response)
+    _maybe_log_deprecation(request)
     enabled = ai_service.ai_enabled()
     return {"ok": True, "ai_enabled": enabled, "ai_disabled": not enabled}
 
@@ -59,7 +80,8 @@ async def ai_summary(
     response: Response,
     _api_key: str = Depends(_require_api_key_compat),
 ) -> SummaryResponse:
-    _apply_compat_headers(response)
+    _apply_legacy_headers(response)
+    _maybe_log_deprecation(request)
 
     try:
         return await ai_service.generate_summary(req)
@@ -67,14 +89,14 @@ async def ai_summary(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
-            headers=_COMPAT_HEADERS,
+            headers=_LEGACY_HEADERS,
         )
     except Exception as exc:
         logger.exception("Summary generation failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="AI summary error",
-            headers=_COMPAT_HEADERS,
+            headers=_LEGACY_HEADERS,
         )
 
 
@@ -86,7 +108,8 @@ async def ai_strategies(
     response: Response,
     _api_key: str = Depends(_require_api_key_compat),
 ) -> StrategiesResponse:
-    _apply_compat_headers(response)
+    _apply_legacy_headers(response)
+    _maybe_log_deprecation(request)
 
     try:
         return await ai_service.generate_strategies(req)
@@ -94,14 +117,14 @@ async def ai_strategies(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
-            headers=_COMPAT_HEADERS,
+            headers=_LEGACY_HEADERS,
         )
     except Exception as exc:
         logger.exception("Strategy generation failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="AI strategies error",
-            headers=_COMPAT_HEADERS,
+            headers=_LEGACY_HEADERS,
         )
 
 
@@ -118,7 +141,8 @@ async def ai_tradesmen_recommend(
 
     Returns a summary of typical work needed and cost estimates for the property type.
     """
-    _apply_compat_headers(response)
+    _apply_legacy_headers(response)
+    _maybe_log_deprecation(request)
 
     try:
         return await ai_service.recommend_tradesmen(req)
@@ -126,12 +150,12 @@ async def ai_tradesmen_recommend(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
-            headers=_COMPAT_HEADERS,
+            headers=_LEGACY_HEADERS,
         )
     except Exception as exc:
         logger.exception("Tradesmen recommendation failed: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="AI tradesmen recommendation error",
-            headers=_COMPAT_HEADERS,
+            headers=_LEGACY_HEADERS,
         )
