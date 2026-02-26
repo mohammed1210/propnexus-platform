@@ -39,6 +39,13 @@ function clampYieldLikePercent(n: number): number | null {
   return round1(n);
 }
 
+function clampRoiLikePercent(n: number): number | null {
+  if (!Number.isFinite(n)) return null;
+  // ROI can be negative or substantially higher than yield.
+  if (n < -100 || n > 200) return null;
+  return round1(n);
+}
+
 function getScoreInputs(p: AnyObj): AnyObj | null {
   const a = p?.score_breakdown;
   if (a && typeof a === 'object') {
@@ -99,10 +106,10 @@ export function getYieldPercent(p: AnyObj): number | null {
 }
 
 /**
- * Canonical ROI fallback order (must be consistent across UI):
+ * Canonical REAL ROI fallback order (must be consistent across UI):
  * 1) p.roi_percent
  * 2) p.score_breakdown.inputs.roi_percent
- * 3) compute proxy from rent_monthly + price
+ * 3) else null
  */
 export function getRoiPercent(p: AnyObj): number | null {
   if (!p || typeof p !== 'object') return null;
@@ -110,18 +117,29 @@ export function getRoiPercent(p: AnyObj): number | null {
   const scoreInputs = getScoreInputs(p);
 
   // 1) p.roi_percent
-  const direct = parsePercent((p as any).roi_percent ?? (p as any).roiPercent ?? (p as any).roiPct);
-  const directClamped = direct == null ? null : clampYieldLikePercent(direct);
+  // Note: intentionally does NOT read `roiPct` because in normalized objects that can be a proxy.
+  const direct = parsePercent((p as any).roi_percent ?? (p as any).roiPercent);
+  const directClamped = direct == null ? null : clampRoiLikePercent(direct);
   if (directClamped != null) return directClamped;
 
   // 2) p.score_breakdown.inputs.roi_percent
   const fromScore = scoreInputs ? parsePercent((scoreInputs as any).roi_percent) : null;
-  const fromScoreClamped = fromScore == null ? null : clampYieldLikePercent(fromScore);
+  const fromScoreClamped = fromScore == null ? null : clampRoiLikePercent(fromScore);
   if (fromScoreClamped != null) return fromScoreClamped;
 
-  // 3) proxy fallback (same calculation as yield proxy)
-  const proxy = proxyYieldFromRentAndPrice(p);
-  return typeof proxy === 'number' ? clampYieldLikePercent(proxy) : null;
+  return null;
+}
+
+/**
+ * Proxy ROI for explicitly-labeled display.
+ * Default proxy source = yield-like proxy (canonical yield fallback order).
+ */
+export function getRoiProxyPercent(p: AnyObj): number | null {
+  const real = getRoiPercent(p);
+  if (real != null) return real;
+
+  const proxyYield = getYieldPercent(p);
+  return typeof proxyYield === 'number' ? clampRoiLikePercent(proxyYield) : null;
 }
 
 export function formatPercent(n: number | null | undefined): string {

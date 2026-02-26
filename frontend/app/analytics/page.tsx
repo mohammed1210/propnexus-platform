@@ -16,7 +16,7 @@ import {
   Legend,
 } from 'chart.js';
 import { getSupabase } from '@/lib/supabaseClient';
-import { formatPercent, getRoiPercent, getYieldPercent } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiPercent, getRoiProxyPercent, getYieldPercent } from '@/lib/normalizeProperty';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -82,9 +82,14 @@ export default function AnalyticsPage() {
   const kpis = useMemo(() => {
     const count = deals.length;
     const avgYield = avgPercent(deals.map((d) => getYieldPercent(d as any)));
-    const avgROI = avgPercent(deals.map((d) => getRoiPercent(d as any)));
+    const avgROI = avgPercent(deals.map((d) => getRoiProxyPercent(d as any)));
+    const avgRoiIsProxy = deals.some((d) => {
+      const real = getRoiPercent(d as any);
+      const proxy = getRoiProxyPercent(d as any);
+      return real == null && proxy != null;
+    });
     const totalValue = deals.reduce((s, d) => s + num(d.price), 0);
-    return { count, avgYield, avgROI, totalValue };
+    return { count, avgYield, avgROI, avgRoiIsProxy, totalValue };
   }, [deals]);
 
   const monthly = useMemo(() => {
@@ -138,7 +143,10 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label="Saved Deals" value={kpis.count} />
           <KpiCard label="Avg Yield" value={formatPercent(kpis.avgYield)} />
-          <KpiCard label="Avg ROI" value={formatPercent(kpis.avgROI)} />
+          <KpiCard
+            label="Avg ROI"
+            value={`${formatPercent(kpis.avgROI)}${kpis.avgRoiIsProxy ? ' (proxy)' : ''}`}
+          />
           <KpiCard label="Total Value" value={`£${formatGBP(kpis.totalValue)}`} />
         </div>
 
@@ -230,7 +238,14 @@ export default function AnalyticsPage() {
                         <Td>{d.location ?? '—'}</Td>
                         <Td>£{formatGBP(num(d.price))}</Td>
                         <Td>{formatPercent(getYieldPercent(d as any))}</Td>
-                        <Td>{formatPercent(getRoiPercent(d as any))}</Td>
+                        <Td>
+                          {(() => {
+                            const real = getRoiPercent(d as any);
+                            const proxy = getRoiProxyPercent(d as any);
+                            const base = formatPercent(proxy);
+                            return `${base}${real == null && proxy != null ? ' (proxy)' : ''}`;
+                          })()}
+                        </Td>
                         <Td>{formatDate(d.saved_at)}</Td>
                       </tr>
                     ))

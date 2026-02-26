@@ -2,7 +2,7 @@
 
 import clsx from 'clsx';
 import type { ComparableDeal } from './types';
-import { formatPercent, getRoiPercent, getYieldPercent } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiPercent, getRoiProxyPercent, getYieldPercent } from '@/lib/normalizeProperty';
 
 function fmtGBP(n: unknown): string {
   const v = typeof n === 'number' ? n : Number(n);
@@ -126,6 +126,9 @@ export default function DealComparePanel({
       <div className="mt-3 space-y-3 md:hidden">
         {deals.map((d) => {
           const { rentMonthly, rentSource } = getRentInputs(d);
+          const roiReal = getRoiPercent(d as any);
+          const roiDisplay = getRoiProxyPercent(d as any);
+          const roiIsProxyDisplay = roiReal == null && roiDisplay != null;
           const scoreRaw = d.ai_score ?? d.score;
           const score =
             scoreRaw == null
@@ -156,8 +159,8 @@ export default function DealComparePanel({
                 <div className="text-slate-600 dark:text-slate-300">Yield</div>
                 <div className="text-right text-slate-900 dark:text-white">{formatPercent(getYieldPercent(d as any))}</div>
 
-                <div className="text-slate-600 dark:text-slate-300">ROI</div>
-                <div className="text-right text-slate-900 dark:text-white">{formatPercent(getRoiPercent(d as any))}</div>
+                <div className="text-slate-600 dark:text-slate-300">ROI{roiIsProxyDisplay ? ' (proxy)' : ''}</div>
+                <div className="text-right text-slate-900 dark:text-white">{formatPercent(roiDisplay)}</div>
 
                 <div className="text-slate-600 dark:text-slate-300">Rent/mo</div>
                 <div className="text-right text-slate-900 dark:text-white">
@@ -248,7 +251,17 @@ export default function DealComparePanel({
 
         <Row label="ROI">
           {deals.map((d) => (
-            <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">{formatPercent(getRoiPercent(d as any))}</div>
+            (() => {
+              const roiReal = getRoiPercent(d as any);
+              const roiDisplay = getRoiProxyPercent(d as any);
+              const roiIsProxyDisplay = roiReal == null && roiDisplay != null;
+              const base = formatPercent(roiDisplay);
+              return (
+                <div key={d.id} className="px-2 text-sm text-slate-700 dark:text-slate-200">
+                  {base}{roiIsProxyDisplay ? ' (proxy)' : ''}
+                </div>
+              );
+            })()
           ))}
         </Row>
 

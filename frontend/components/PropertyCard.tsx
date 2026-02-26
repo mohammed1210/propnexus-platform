@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiHeart } from 'react-icons/fi';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
-import { formatPercent, getRoiPercent, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiPercent, getRoiProxyPercent, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -176,10 +176,16 @@ export default function PropertyCard({
     () => getYieldPercent(normalized as any) ?? getYieldPercent(p as any),
     [normalized, p],
   );
-  const displayRoiPct = useMemo(
-    () => getRoiPercent(normalized as any) ?? getRoiPercent(p as any),
+  const roiRealPct = useMemo(
+    () => getRoiPercent(p as any) ?? getRoiPercent((normalized as any)?.raw ?? (normalized as any)),
     [normalized, p],
   );
+  const roiProxyPct = useMemo(
+    () => getRoiProxyPercent(p as any) ?? getRoiProxyPercent((normalized as any)?.raw ?? (normalized as any)),
+    [normalized, p],
+  );
+  const displayRoiPct = roiRealPct ?? roiProxyPct;
+  const roiIsProxyDisplay = roiRealPct == null && roiProxyPct != null;
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -600,7 +606,7 @@ export default function PropertyCard({
               )}
               aria-label={`ROI percentage: ${formatPercent(displayRoiPct)}`}
             >
-              {formatPercent(displayRoiPct)} ROI
+              {formatPercent(displayRoiPct)} ROI{roiIsProxyDisplay ? ' (proxy)' : ''}
             </span>
           )}
         </div>
