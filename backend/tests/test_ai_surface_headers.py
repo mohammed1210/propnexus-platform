@@ -19,3 +19,6 @@ def test_ai_has_compat_headers(app):
     if r.status_code != 422:
         assert r.headers.get("X-PropNexus-AI-API") == "compat"
         assert r.headers.get("X-PropNexus-AI-Canonical") == "/gpt/*"
+        assert r.headers.get("Deprecation") == "true"
+        assert r.headers.get("Sunset") == "2026-06-01"
+        assert r.headers.get("Link") == '</gpt/health>; rel="successor-version"'
