@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
+from backend.db import require_sb
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.enrichment_queue import enqueue_property_ids
-from backend.utils.supabase_client import get_supabase
 
 try:
     from fastapi import APIRouter, HTTPException  # type: ignore
@@ -39,13 +39,10 @@ except Exception:  # pragma: no cover
                 setattr(self, k, v)
 
 
-try:  # Supabase optional on local dev
+try:  # pragma: no cover
     from supabase import Client  # type: ignore
 except Exception:  # pragma: no cover
     Client = object  # type: ignore
-
-
-supabase: Optional[Client] = get_supabase(required=False)  # type: ignore[assignment]
 
 router = APIRouter()
 
@@ -145,8 +142,9 @@ async def scrape_endpoint(req: ScrapeRequest):
                 row = sanitize_property_payload(row, allowed_columns)
                 db_rows.append(row)
 
-        # Upsert in chunks (if Supabase configured)
-        if supabase and db_rows:
+        # Upsert in chunks (requires Supabase)
+        if db_rows:
+            sb = require_sb()
             total_written = 0
             total_failed = 0
 
@@ -156,9 +154,7 @@ async def scrape_endpoint(req: ScrapeRequest):
 
                 # Attempt 1: upsert with preferred conflict key
                 try:
-                    supabase.table("properties").upsert(  # type: ignore
-                        batch, on_conflict="source,external_id"
-                    ).execute()
+                    sb.table("properties").upsert(batch, on_conflict="source,external_id").execute()
                     total_written += len(batch)
                     continue
                 except Exception as db_err:  # pragma: no cover
@@ -166,7 +162,7 @@ async def scrape_endpoint(req: ScrapeRequest):
 
                 # Attempt 2: plain upsert (lets PostgREST choose PK/constraints)
                 try:
-                    supabase.table("properties").upsert(batch).execute()  # type: ignore
+                    sb.table("properties").upsert(batch).execute()
                     total_written += len(batch)
                     continue
                 except Exception as db_err2:  # pragma: no cover
@@ -174,7 +170,7 @@ async def scrape_endpoint(req: ScrapeRequest):
 
                 # Attempt 3: insert best-effort (may create duplicates if no constraints)
                 try:
-                    supabase.table("properties").insert(batch).execute()  # type: ignore
+                    sb.table("properties").insert(batch).execute()
                     total_written += len(batch)
                     continue
                 except Exception as db_err3:  # pragma: no cover
@@ -221,7 +217,7 @@ async def scrape_endpoint(req: ScrapeRequest):
                             batch = uniq[i : i + 50]
                             try:
                                 res = (
-                                    supabase.table("properties")
+                                    sb.table("properties")
                                     .select("id")
                                     .eq("source", src)
                                     .in_("external_id", batch)
