@@ -9,13 +9,13 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 
+from backend.db import require_sb
 from backend.routes.properties_routes import _attach_cached_enrichment
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.enrichment_store import get_property_enrichment_cache
-from backend.utils.supabase_client import get_supabase
 
 try:
     from supabase import Client  # type: ignore
@@ -34,14 +34,7 @@ _SAVED_DEALS_HAS_SAVED_AT: Optional[bool] = None
 
 
 def _require_supabase() -> Client:
-    try:
-        sb = get_supabase(required=True)
-        return sb  # type: ignore[return-value]
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
-        ) from e
+    return require_sb()  # type: ignore[return-value]
 
 
 def _now_iso() -> str:
