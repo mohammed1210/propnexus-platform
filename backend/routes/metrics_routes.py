@@ -21,16 +21,13 @@ endpoint will raise a 500 error to signal misconfiguration.
 
 from fastapi import APIRouter, HTTPException
 
-from backend.utils.supabase_client import get_supabase
+from backend.db import require_sb
 
 router = APIRouter()
 
 
 def _require_supabase():
-    try:
-        return get_supabase(required=True)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    return require_sb()
 
 
 @router.get("/health")

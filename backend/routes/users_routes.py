@@ -7,7 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 
-from backend.utils.supabase_client import get_supabase
+from backend.db import require_sb
 from backend.utils.supabase_jwt import extract_bearer_token, verify_supabase_token
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -28,11 +28,8 @@ def _get_sb():
     if sb is not None:
         return sb
 
-    try:
-        sb = get_supabase(required=True)
-        return sb
-    except Exception as e:
-        raise RuntimeError(str(e)) from e
+    sb = require_sb()
+    return sb
 
 
 # --- ENV ---
@@ -118,6 +115,8 @@ async def get_user_plan(
             {"plan": row.get(PLAN_COL, "free"), "stripe_customer_id": row.get(CUST_COL)}
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[users_routes] Error fetching user plan: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch user plan: {e}")
