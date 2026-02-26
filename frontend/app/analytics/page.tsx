@@ -16,6 +16,7 @@ import {
   Legend,
 } from 'chart.js';
 import { getSupabase } from '@/lib/supabaseClient';
+import { formatPercent, getRoiPercent, getYieldPercent } from '@/lib/normalizeProperty';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
 
@@ -80,26 +81,33 @@ export default function AnalyticsPage() {
 
   const kpis = useMemo(() => {
     const count = deals.length;
-    const avgYield = avg(deals.map((d) => num(d.yield_percent)));
-    const avgROI = avg(deals.map((d) => num(d.roi_percent)));
+    const avgYield = avgPercent(deals.map((d) => getYieldPercent(d as any)));
+    const avgROI = avgPercent(deals.map((d) => getRoiPercent(d as any)));
     const totalValue = deals.reduce((s, d) => s + num(d.price), 0);
     return { count, avgYield, avgROI, totalValue };
   }, [deals]);
 
   const monthly = useMemo(() => {
-    const map = new Map<string, { count: number; sumYield: number }>();
+    const map = new Map<string, { count: number; sumYield: number; yieldCount: number }>();
     for (const d of deals) {
       const key = (d.saved_at ?? '').slice(0, 7) || 'Unknown';
-      const m = map.get(key) ?? { count: 0, sumYield: 0 };
+      const m = map.get(key) ?? { count: 0, sumYield: 0, yieldCount: 0 };
       m.count += 1;
-      m.sumYield += num(d.yield_percent);
+
+      const y = getYieldPercent(d as any);
+      if (typeof y === 'number' && Number.isFinite(y)) {
+        m.sumYield += y;
+        m.yieldCount += 1;
+      }
       map.set(key, m);
     }
     const labels = Array.from(map.keys()).sort();
     const countSeries = labels.map((l) => map.get(l)!.count);
-    const yieldSeries = labels.map((l) =>
-      round(map.get(l)!.sumYield / Math.max(map.get(l)!.count, 1) || 0),
-    );
+    const yieldSeries = labels.map((l) => {
+      const m = map.get(l)!;
+      if (!m.yieldCount) return 0;
+      return round(m.sumYield / m.yieldCount);
+    });
     return { labels, countSeries, yieldSeries };
   }, [deals]);
 
@@ -129,8 +137,8 @@ export default function AnalyticsPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard label="Saved Deals" value={kpis.count} />
-          <KpiCard label="Avg Yield" value={`${kpis.avgYield}%`} />
-          <KpiCard label="Avg ROI" value={`${kpis.avgROI}%`} />
+          <KpiCard label="Avg Yield" value={formatPercent(kpis.avgYield)} />
+          <KpiCard label="Avg ROI" value={formatPercent(kpis.avgROI)} />
           <KpiCard label="Total Value" value={`£${formatGBP(kpis.totalValue)}`} />
         </div>
 
@@ -221,8 +229,8 @@ export default function AnalyticsPage() {
                         <Td>{d.title ?? '—'}</Td>
                         <Td>{d.location ?? '—'}</Td>
                         <Td>£{formatGBP(num(d.price))}</Td>
-                        <Td>{valOrDash(d.yield_percent)}%</Td>
-                        <Td>{valOrDash(d.roi_percent)}%</Td>
+                        <Td>{formatPercent(getYieldPercent(d as any))}</Td>
+                        <Td>{formatPercent(getRoiPercent(d as any))}</Td>
                         <Td>{formatDate(d.saved_at)}</Td>
                       </tr>
                     ))
@@ -291,8 +299,9 @@ function avg(list: number[]) {
   const arr = list.filter((x) => Number.isFinite(x));
   return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
 }
-function valOrDash(n?: number | null) {
-  return n == null ? '–' : n;
+function avgPercent(list: Array<number | null>) {
+  const arr = list.filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
+  return arr.length ? round(arr.reduce((a, b) => a + b, 0) / arr.length) : null;
 }
 function formatGBP(n: number) {
   return n.toLocaleString('en-GB', { maximumFractionDigits: 0 });
