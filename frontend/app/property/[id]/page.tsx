@@ -398,7 +398,7 @@ export default function PropertyDetailsPage() {
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
                       <div className="text-xs text-slate-500 dark:text-slate-400">ROI</div>
                       <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {formatPercent(roiDisplay)}
+                        {formatPercent(roiDisplay.value)}
                       </div>
                     </div>
                     <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">

@@ -61,18 +61,35 @@ function getScoreInputs(p: AnyObj): AnyObj | null {
   return null;
 }
 
-function proxyYieldFromRentAndPrice(p: any): number | null {
-  const price = typeof p?.price === 'number' ? p.price : null;
+function proxyYieldFromRentAndPrice(p: any, scoreInputs?: AnyObj | null): number | null {
+  // Robust parsers (handles numbers OR strings) and allow scoreInputs fallback.
+  const price =
+    parseMoney(p?.price) ??
+    parseMoney(p?.asking_price) ??
+    parseMoney(p?.askingPrice) ??
+    parseMoney(p?.listing_price) ??
+    parseMoney(p?.listingPrice) ??
+    (scoreInputs
+      ? parseMoney(scoreInputs?.price ?? scoreInputs?.asking_price ?? scoreInputs?.askingPrice)
+      : null);
+
   const rent =
-    typeof p?.rent_monthly === 'number'
-      ? p.rent_monthly
-      : typeof p?.rentMonthly === 'number'
-        ? p.rentMonthly
-        : typeof p?.rent_pcm === 'number'
-          ? p.rent_pcm
-          : typeof p?.rentPcm === 'number'
-            ? p.rentPcm
-            : null;
+    parseRent(p?.rent_monthly) ??
+    parseRent(p?.rentMonthly) ??
+    parseRent(p?.rent_pcm) ??
+    parseRent(p?.rentPcm) ??
+    parseRent(p?.rent_per_month) ??
+    parseRent(p?.rentPerMonth) ??
+    (scoreInputs
+      ? parseRent(
+          scoreInputs?.rent_monthly ??
+            scoreInputs?.rentMonthly ??
+            scoreInputs?.rent_pcm ??
+            scoreInputs?.rentPcm ??
+            scoreInputs?.rent_per_month ??
+            scoreInputs?.rentPerMonth
+        )
+      : null);
 
   if (!price || !rent || price <= 0 || rent <= 0) return null;
   const pct = (rent * 12 * 100) / price;
@@ -101,7 +118,7 @@ export function getYieldPercent(p: AnyObj): number | null {
   if (fromScoreClamped != null) return fromScoreClamped;
 
   // 3) proxy from rent+price
-  const proxy = proxyYieldFromRentAndPrice(p);
+  const proxy = proxyYieldFromRentAndPrice(p, scoreInputs);
   return typeof proxy === 'number' ? clampYieldLikePercent(proxy) : null;
 }
 
@@ -147,7 +164,8 @@ export function getRoiPercent(p: AnyObj): number | null {
  * Default proxy source = yield-like proxy (canonical yield fallback order).
  */
 export function getRoiProxyPercent(p: AnyObj): number | null {
-  return getRoiDisplay(p).value;
+  const d = getRoiDisplay(p);
+  return d.isProxy ? d.value : null;
 }
 
 export function formatPercent(n: number | null | undefined): string {
