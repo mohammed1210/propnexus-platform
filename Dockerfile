@@ -1,18 +1,13 @@
-# Multi-runtime image for backend (Python) and frontend (Next.js)
+# Backend image (Python)
 
 FROM python:3.12-slim AS base
 
 WORKDIR /app
 
-# Install system deps for Python builds and Node.js for frontend
+# Install system deps for Python builds
 RUN apt-get update && apt-get install -y \
     curl \
     build-essential \
-  && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js (for frontend build and npm ci)
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-  && apt-get install -y nodejs \
   && rm -rf /var/lib/apt/lists/*
 
 # Copy repository content
@@ -25,9 +20,6 @@ RUN python3 -m pip install --upgrade pip && \
 # Install Playwright browser binaries (Chromium) needed at runtime.
 # Note: this increases build time/size but is required for PLAYWRIGHT_ENABLE=true.
 RUN python3 -m playwright install --with-deps chromium
-
-# Frontend dependencies (Next.js app)
-RUN cd frontend && npm ci
 
 # Default to running the FastAPI backend via uvicorn
 WORKDIR /app
