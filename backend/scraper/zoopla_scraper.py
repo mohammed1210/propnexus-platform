@@ -5,13 +5,14 @@ import json
 import os
 import random
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from urllib.parse import urlencode, urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup
 from fastapi import BackgroundTasks
 
+from backend.scraper.search_utils import build_zoopla_search_urls
 from backend.scraper.utils import normalize_image_urls
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from backend.utils.postcode import get_lat_lng_from_postcode
@@ -1318,15 +1319,23 @@ async def scrape_zoopla_properties(
     # Start audit logging
     with RunLog.start(source="zoopla", mode=SCRAPER_MODE, location=location) as run_log:
         try:
-            effective_max_pages = (
-                int(max_pages)
-                if max_pages is not None
-                else int(os.getenv("ZP_MAX_PAGES", str(ZP_MAX_PAGES)))
+            # NEW: hit three smart-sorted page-1 URLs (lowest/oldest/reduced)
+            # and cap to first ~40 unique properties.
+            max_unique = min(int(limit or 40), 40)
+            seen: Set[str] = set()
+
+            place_slug = _slugify_location(location)
+            search_urls = (
+                build_zoopla_search_urls(place_slug)
+                if place_slug
+                else [_build_search_url(location, 0)]
             )
-            effective_max_pages = max(1, min(5, int(effective_max_pages)))
+
+            if max_pages is not None:
+                # Allow tests/callers to constrain the number of smart URLs (max 3).
+                search_urls = search_urls[: max(1, min(3, int(max_pages)))]
             async with aiohttp.ClientSession() as session:
-                for page in range(effective_max_pages):
-                    url = _build_search_url(location, page)
+                for page, url in enumerate(search_urls):
                     html = await _fetch_html(session, url)
                     if not html:
                         # If direct fetch gets blocked/empty, try browser rendering if enabled.
@@ -1357,11 +1366,18 @@ async def scrape_zoopla_properties(
                         )
                         if embedded_listings:
                             for d in embedded_listings:
-                                if len(results) >= limit:
+                                if len(seen) >= max_unique:
                                     break
                                 mapped = _zoopla_property_from_listing_dict(d)
                                 if not mapped:
                                     continue
+
+                                external_id = str(mapped.get("external_id") or "").strip()
+                                if external_id:
+                                    if external_id in seen:
+                                        continue
+                                    seen.add(external_id)
+
                                 should_insert, reason = should_insert_property(mapped)
                                 if should_insert:
                                     results.append(clean_property_data(mapped))
@@ -1371,7 +1387,7 @@ async def scrape_zoopla_properties(
 
                             if results:
                                 # Best-effort enrich with gallery images from each detail page.
-                                max_details = min(len(results), max(3, min(8, limit)))
+                                max_details = min(len(results), max(3, min(8, max_unique)))
                                 for item in results[:max_details]:
                                     try:
                                         detail_url = item.get("listing_url") or item.get("raw_url")
@@ -1408,20 +1424,16 @@ async def scrape_zoopla_properties(
                                     except Exception:
                                         continue
 
-                                stats.log_summary()
-                                print(
-                                    f"✅ Zoopla embedded JSON returned {len(results)} properties for '{location}'"
-                                )
-                                run_log.set_count(len(results))
-                                return results
+                                if len(seen) >= max_unique:
+                                    break
 
                         # Fallback: if DOM selectors and embedded JSON both fail,
                         # try extracting detail page links and parsing each detail page.
                         detail_urls = _collect_detail_listing_urls(soup)
                         if detail_urls:
-                            max_details = min(len(detail_urls), max(3, min(12, limit)))
+                            max_details = min(len(detail_urls), max(3, min(12, max_unique)))
                             for detail_url in detail_urls[:max_details]:
-                                if len(results) >= limit:
+                                if len(seen) >= max_unique:
                                     break
                                 try:
                                     detail_html = await _fetch_html(session, detail_url)
@@ -1433,6 +1445,13 @@ async def scrape_zoopla_properties(
                                 parsed = _parse_zoopla_detail_page(detail_html, detail_url)
                                 if not parsed:
                                     continue
+
+                                external_id = str(parsed.get("external_id") or "").strip()
+                                if external_id:
+                                    if external_id in seen:
+                                        continue
+                                    seen.add(external_id)
+
                                 if not parsed.get("location"):
                                     parsed["location"] = location
                                 should_insert, reason = should_insert_property(parsed)
@@ -1442,13 +1461,8 @@ async def scrape_zoopla_properties(
                                 else:
                                     stats.log_validation_failure(reason or "Unknown")
 
-                            if results:
-                                stats.log_summary()
-                                print(
-                                    f"✅ Zoopla detail-page fallback returned {len(results)} properties for '{location}'"
-                                )
-                                run_log.set_count(len(results))
-                                return results
+                            if len(seen) >= max_unique:
+                                break
 
                         if PLAYWRIGHT_ENABLE:
                             rendered = await render_page(
@@ -1466,11 +1480,11 @@ async def scrape_zoopla_properties(
                                     capture_debug_html(f"zoopla_empty_{page}", rendered)
                         if not cards:
                             print("ℹ️ No Zoopla cards found; stopping.")
-                            break
+                            continue
 
                     for card in cards:
                         stats.log_card_found()
-                        if len(results) >= limit:
+                        if len(seen) >= max_unique:
                             break
                         try:
                             title_el = card.select_one("h2") or card.select_one(
@@ -1518,6 +1532,11 @@ async def scrape_zoopla_properties(
                             property_type = _extract_property_type(card)
 
                             external_id, listing_url = _extract_external_id_and_url(card)
+
+                            if external_id:
+                                if external_id in seen:
+                                    continue
+                                seen.add(external_id)
 
                             # Enrich images from the detail page (best-effort).
                             # Keep this additive: only override if we actually find a gallery.
@@ -1593,11 +1612,18 @@ async def scrape_zoopla_properties(
                         )
                         if embedded_listings:
                             for d in embedded_listings:
-                                if len(results) >= limit:
+                                if len(seen) >= max_unique:
                                     break
                                 mapped = _zoopla_property_from_listing_dict(d)
                                 if not mapped:
                                     continue
+
+                                external_id = str(mapped.get("external_id") or "").strip()
+                                if external_id:
+                                    if external_id in seen:
+                                        continue
+                                    seen.add(external_id)
+
                                 should_insert, reason = should_insert_property(mapped)
                                 if should_insert:
                                     results.append(clean_property_data(mapped))
@@ -1605,19 +1631,14 @@ async def scrape_zoopla_properties(
                                 else:
                                     stats.log_validation_failure(reason or "Unknown")
 
-                            if results:
-                                stats.log_summary()
-                                print(
-                                    f"✅ Zoopla embedded JSON returned {len(results)} properties for '{location}'"
-                                )
-                                run_log.set_count(len(results))
-                                return results
+                            if len(seen) >= max_unique:
+                                break
 
                         detail_urls = _collect_detail_listing_urls(soup)
                         if detail_urls:
-                            max_details = min(len(detail_urls), max(3, min(12, limit)))
+                            max_details = min(len(detail_urls), max(3, min(12, max_unique)))
                             for detail_url in detail_urls[:max_details]:
-                                if len(results) >= limit:
+                                if len(seen) >= max_unique:
                                     break
                                 try:
                                     detail_html = await _fetch_html(session, detail_url)
@@ -1629,6 +1650,13 @@ async def scrape_zoopla_properties(
                                 parsed = _parse_zoopla_detail_page(detail_html, detail_url)
                                 if not parsed:
                                     continue
+
+                                external_id = str(parsed.get("external_id") or "").strip()
+                                if external_id:
+                                    if external_id in seen:
+                                        continue
+                                    seen.add(external_id)
+
                                 if not parsed.get("location"):
                                     parsed["location"] = location
                                 should_insert, reason = should_insert_property(parsed)
@@ -1638,14 +1666,9 @@ async def scrape_zoopla_properties(
                                 else:
                                     stats.log_validation_failure(reason or "Unknown")
 
-                            if results:
-                                stats.log_summary()
-                                print(
-                                    f"✅ Zoopla detail-page fallback returned {len(results)} properties for '{location}'"
-                                )
-                                run_log.set_count(len(results))
-                                return results
-                    if len(results) >= limit:
+                            if len(seen) >= max_unique:
+                                break
+                    if len(seen) >= max_unique:
                         break
                     await asyncio.sleep(ZP_DELAY_MS / 1000.0)
 
