@@ -34,7 +34,7 @@ jobs:
           railway up \
             --service "propnexus-backend" \
             --ci \
-            --json || { echo "⚠️ Railway deploy failed – skipping health check but passing."; exit 0; }
+            --json
 
       - name: Wait for health
         env:
@@ -46,5 +46,26 @@ jobs:
             [ "$code" = "200" ] && echo "✅ Healthy" && exit 0
             sleep 5
           done
-          echo "⚠️ Health check never reached 200 – soft pass"
-          exit 0
+          echo "❌ Health check never reached 200"
+          exit 1
+
+      - name: Verify deployed version
+        env:
+          URL: https://propnexus-backend-production.up.railway.app/health
+          EXPECT_SHA: ${{ github.sha }}
+        run: |
+          actual=$(curl -fsSL "$URL" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version",""))')
+          echo "Deployed version: $actual"
+          if [ -z "$actual" ]; then
+            echo "❌ /health did not include a version"
+            exit 1
+          fi
+          expect_short="${EXPECT_SHA:0:7}"
+
+          if [ "$actual" = "$EXPECT_SHA" ] || [ "$actual" = "$expect_short" ] || [ "${actual#${EXPECT_SHA}}" != "$actual" ] || [ "${EXPECT_SHA#$actual}" != "$EXPECT_SHA" ]; then
+            echo "✅ Deployed version matches commit"
+            exit 0
+          fi
+
+          echo "❌ Deployed version does not match this commit ($EXPECT_SHA)"
+          exit 1
