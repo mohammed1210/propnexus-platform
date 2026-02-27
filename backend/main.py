@@ -76,33 +76,6 @@ app.add_middleware(SecurityHeadersMiddleware)
 # ======================
 # ❤️ Health Check (DO NOT MOVE)
 # ======================
-def _read_app_version_file() -> str | None:
-    candidates: list[Path] = []
-
-    explicit = os.getenv("APP_VERSION_FILE")
-    if explicit:
-        candidates.append(Path(explicit))
-
-    backend_dir = Path(__file__).resolve().parent
-    candidates.extend(
-        [
-            backend_dir / ".app_version",
-            backend_dir / "VERSION",
-            Path("/app/.app_version"),
-        ]
-    )
-
-    for candidate in candidates:
-        try:
-            value = candidate.read_text(encoding="utf-8").strip()
-        except OSError:
-            continue
-        if value:
-            return value
-
-    return None
-
-
 @app.get("/health")
 def health(response: Response):
     """
@@ -114,10 +87,15 @@ def health(response: Response):
         or os.getenv("RAILWAY_GIT_COMMIT_SHA")
         or os.getenv("GIT_COMMIT_SHA")
         or os.getenv("GIT_SHA")
-        or "unknown"
     )
-    if version == "unknown":
-        version = _read_app_version_file() or version
+
+    if not version:
+        try:
+            version = (Path(__file__).resolve().parent / ".app_version").read_text().strip() or None
+        except Exception:
+            version = None
+
+    version = version or "unknown"
     environment = os.getenv("ENVIRONMENT") or os.getenv("RAILWAY_ENVIRONMENT") or "development"
 
     # Marker header to correlate deploy + response normalization behavior.

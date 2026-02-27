@@ -13,6 +13,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Stamp app version
+        run: |
+          echo "${GITHUB_SHA}" > backend/.app_version
+
       - name: Secrets sanity check
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
