@@ -33,7 +33,8 @@ jobs:
         run: |
           railway up \
             --service "propnexus-backend" \
-            --ci || { echo "⚠️ Railway deploy failed – skipping health check but passing."; exit 0; }
+            --ci \
+            --verbose || { echo "⚠️ Railway deploy failed – skipping health check but passing."; exit 0; }
 
       - name: Wait for health
         env:
