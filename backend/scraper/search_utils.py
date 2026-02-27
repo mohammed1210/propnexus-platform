@@ -29,7 +29,7 @@ def build_rightmove_search_urls(
     We only hit page-1 of each – ~24 results apiece.
     """
     urls: list[str] = []
-    for sort_name, sort_type in _RIGHTMOVE_SORT_PARAMS.items():
+    for _, sort_type in _RIGHTMOVE_SORT_PARAMS.items():
         query = urlencode(
             {
                 "locationIdentifier": region_code,  # e.g. "REGION^87490" (Liverpool)

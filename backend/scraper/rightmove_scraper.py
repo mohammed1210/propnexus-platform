@@ -136,16 +136,6 @@ _LOCATION_IDENTIFIER = {
     # Common region codes; extend as needed.
     "london": "REGION^87490",
 }
-
-# ---- NEW: city / region codes here (Rightmove REGION^ codes) ----
-CITY_CODES = [
-    "REGION^87490",  # Liverpool
-    "REGION^93917",  # Manchester
-    "REGION^95624",  # Sheffield
-    "REGION^92924",  # Birmingham
-    "REGION^95409",  # Leeds
-]
-# ---------------------------------------------------------------
 RIGHTMOVE_API_BASE = "https://www.rightmove.co.uk/api/_search"
 SCRAPERAPI_BASE = "https://api.scraperapi.com/"
 
@@ -1671,21 +1661,20 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         f"[rightmove] resolved locationIdentifier={location_identifier} for query={location}"
                     )
 
-                # NOTE: Do not use Rightmove JSON endpoints in production.
-                # They are frequently blocked/404. Always prefer search HTML.
-                #
-                # NEW: hit three smart-sorted page-1 URLs (lowest/oldest/reduced)
-                # and cap to first ~40 unique properties.
-                max_unique = min(int(limit or 40), 40)
+                effective_limit = min(int(limit or 0) or 40, 40)
                 seen: Set[str] = set()
 
-                search_urls = (
-                    build_rightmove_search_urls(location_identifier)
-                    if location_identifier
-                    else [_build_search_url(location, 0, location_identifier=None)]
-                )
+                if location_identifier:
+                    search_urls = build_rightmove_search_urls(
+                        normalize_location_identifier(location_identifier)
+                    )
+                else:
+                    # Fallback to the existing single-page search URL builder.
+                    search_urls = [_build_search_url(location, 0, location_identifier=None)]
 
-                for page, url in enumerate(search_urls):
+                # NOTE: Do not use Rightmove JSON endpoints in production.
+                # They are frequently blocked/404. Always prefer search HTML.
+                for url_index, url in enumerate(search_urls):
                     # Spec: log the final Rightmove find.html URL being fetched (do not log ScraperAPI proxy URLs).
                     print(f"[rightmove] search_url={url}")
                     html = await _fetch_html(session, url)
@@ -1703,14 +1692,14 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             if rendered:
                                 html = rendered
                             else:
-                                log_page_fetch_error("rightmove", page, "blocked or empty")
+                                log_page_fetch_error("rightmove", url_index, "blocked or empty")
                                 continue
                         else:
-                            log_page_fetch_error("rightmove", page, "blocked or empty")
+                            log_page_fetch_error("rightmove", url_index, "blocked or empty")
                             continue
                     # Explicitly detect Rightmove 'place not found' soft-error pages.
                     if _is_place_not_found_variant(html):
-                        capture_debug_html(f"rightmove_place_not_found_{page}", html)
+                        capture_debug_html(f"rightmove_place_not_found_{url_index}", html)
                         print(
                             "⚠️ [rightmove] location returned 'place not found' page; treating as failure"
                         )
@@ -1765,7 +1754,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                     )
                     if next_props:
                         for p in next_props:
-                            if len(seen) >= max_unique:
+                            if len(results) >= effective_limit:
                                 break
                             # Some payloads nest listing under a subkey.
                             if isinstance(p, dict) and any(
@@ -1779,22 +1768,22 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             mapped = _rm_property_from_api_dict(p)
                             if not mapped:
                                 continue
-
-                            external_id = str(mapped.get("external_id") or "").strip()
-                            if external_id:
-                                if external_id in seen:
-                                    continue
-                                seen.add(external_id)
-
+                            external_id = mapped.get("external_id")
+                            if isinstance(external_id, str) and external_id in seen:
+                                continue
                             should_insert, reason = should_insert_property(mapped)
                             if should_insert:
+                                if isinstance(external_id, str):
+                                    seen.add(external_id)
                                 results.append(clean_property_data(mapped))
                                 stats.log_parse_success()
                             else:
                                 stats.log_validation_failure(reason or "Unknown")
-
-                        if len(seen) >= max_unique:
+                        if len(results) >= effective_limit:
                             break
+
+                    if len(results) >= effective_limit:
+                        break
 
                     # If the DOM doesn't contain cards, try the embedded state model.
                     embedded_state = _extract_preloaded_state(soup)
@@ -1805,27 +1794,27 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                     )
                     if embedded_props:
                         for p in embedded_props:
-                            if len(seen) >= max_unique:
+                            if len(results) >= effective_limit:
                                 break
                             mapped = _rm_property_from_api_dict(p)
                             if not mapped:
                                 continue
-
-                            external_id = str(mapped.get("external_id") or "").strip()
-                            if external_id:
-                                if external_id in seen:
-                                    continue
-                                seen.add(external_id)
-
+                            external_id = mapped.get("external_id")
+                            if isinstance(external_id, str) and external_id in seen:
+                                continue
                             should_insert, reason = should_insert_property(mapped)
                             if should_insert:
+                                if isinstance(external_id, str):
+                                    seen.add(external_id)
                                 results.append(clean_property_data(mapped))
                                 stats.log_parse_success()
                             else:
                                 stats.log_validation_failure(reason or "Unknown")
-
-                        if len(seen) >= max_unique:
+                        if len(results) >= effective_limit:
                             break
+
+                    if len(results) >= effective_limit:
+                        break
 
                     cards = _collect_selectors(soup)
 
@@ -1870,7 +1859,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 )
                                 if retry_next_props:
                                     for p in retry_next_props:
-                                        if len(seen) >= max_unique:
+                                        if len(results) >= limit:
                                             break
                                         if isinstance(p, dict) and any(
                                             k in p and isinstance(p[k], dict)
@@ -1883,13 +1872,6 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                         mapped = _rm_property_from_api_dict(p)
                                         if not mapped:
                                             continue
-
-                                        external_id = str(mapped.get("external_id") or "").strip()
-                                        if external_id:
-                                            if external_id in seen:
-                                                continue
-                                            seen.add(external_id)
-
                                         should_insert, reason = should_insert_property(mapped)
                                         if should_insert:
                                             results.append(clean_property_data(mapped))
@@ -1897,8 +1879,13 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                         else:
                                             stats.log_validation_failure(reason or "Unknown")
 
-                                    if len(seen) >= max_unique:
-                                        break
+                                    if results:
+                                        stats.log_summary()
+                                        print(
+                                            f"✅ Rightmove render retry (__NEXT_DATA__) returned {len(results)} properties for '{location}'"
+                                        )
+                                        run_log.set_count(len(results))
+                                        return results
 
                                 retry_state = _extract_preloaded_state(retry_soup)
                                 retry_props = (
@@ -1908,27 +1895,24 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 )
                                 if retry_props:
                                     for p in retry_props:
-                                        if len(seen) >= max_unique:
+                                        if len(results) >= limit:
                                             break
                                         mapped = _rm_property_from_api_dict(p)
                                         if not mapped:
                                             continue
-
-                                        external_id = str(mapped.get("external_id") or "").strip()
-                                        if external_id:
-                                            if external_id in seen:
-                                                continue
-                                            seen.add(external_id)
-
                                         should_insert, reason = should_insert_property(mapped)
                                         if should_insert:
                                             results.append(clean_property_data(mapped))
                                             stats.log_parse_success()
                                         else:
                                             stats.log_validation_failure(reason or "Unknown")
-
-                                    if len(seen) >= max_unique:
-                                        break
+                                    if results:
+                                        stats.log_summary()
+                                        print(
+                                            f"✅ Rightmove render retry (__PRELOADED_STATE__) returned {len(results)} properties for '{location}'"
+                                        )
+                                        run_log.set_count(len(results))
+                                        return results
 
                                 retry_cards = _collect_selectors(retry_soup)
                                 if retry_cards:
@@ -1951,14 +1935,14 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 soup = BeautifulSoup(rendered, "html.parser")
                                 cards = _collect_selectors(soup)
                                 if not cards:
-                                    capture_debug_html(f"rightmove_empty_{page}", rendered)
+                                    capture_debug_html(f"rightmove_empty_{url_index}", rendered)
                         if not cards:
-                            print("ℹ️ No cards found; skipping this search URL.")
+                            print("ℹ️ No cards found; stopping pagination.")
                             continue
 
                     for card in cards:
                         stats.log_card_found()
-                        if len(seen) >= max_unique:
+                        if len(results) >= effective_limit:
                             break
                         try:
                             title_el = (
@@ -2008,10 +1992,8 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                 card, title=title, location=location_text
                             )
 
-                            if external_id:
-                                if external_id in seen:
-                                    continue
-                                seen.add(external_id)
+                            if external_id in seen:
+                                continue
 
                             # Enrich images from the detail page (best-effort).
                             # Keep this additive: only override if we actually find a gallery.
@@ -2071,6 +2053,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             # Validate before adding
                             should_insert, reason = should_insert_property(property_data)
                             if should_insert:
+                                seen.add(external_id)
                                 results.append(clean_property_data(property_data))
                                 stats.log_parse_success()
                             else:
@@ -2078,10 +2061,13 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
 
                         except Exception as e:
                             stats.log_parse_failure(str(e))
-                    if len(seen) >= max_unique:
+                    if len(results) >= effective_limit:
                         break
                     # polite delay
                     await asyncio.sleep(RM_DELAY_MS / 1000.0)
+
+                if results:
+                    await _enrich_rightmove_results_with_detail_images(session, results)
 
             stats.log_summary()
             print(f"✅ Scraped {len(results)} Rightmove properties for '{location}'")
