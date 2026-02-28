@@ -60,3 +60,4 @@ websockets==15.0.1
 sentry-sdk==1.43.0
 slowapi==0.1.9
 stripe
+prometheus-fastapi-instrumentator==7.1.0

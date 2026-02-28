@@ -18,3 +18,4 @@ pytest-asyncio>=0.23.0
 ruff==0.15.2
 aiohttp>=3.9.0
 slowapi>=0.1.9
+prometheus-fastapi-instrumentator>=7.1.0
