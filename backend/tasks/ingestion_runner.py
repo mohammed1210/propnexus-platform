@@ -31,26 +31,11 @@ try:
 except Exception:
     pass
 
-try:
-    from supabase import create_client  # type: ignore
-except Exception:  # pragma: no cover
-    create_client = None  # type: ignore
-
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.ingest import scrape_all_sources
+from backend.utils.supabase_client import get_supabase
 
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-SCRAPER_MODE = os.getenv("SCRAPER_MODE", "direct").lower()
-
-if create_client and SUPABASE_URL and SUPABASE_KEY:
-    try:
-        sb = create_client(SUPABASE_URL, SUPABASE_KEY)  # type: ignore
-    except Exception as e:  # pragma: no cover
-        logging.warning("Supabase client init failed: %s", e)
-        sb = None
-else:  # pragma: no cover
-    sb = None
+sb = get_supabase(required=False)
 
 
 def _load_locations() -> List[str]:

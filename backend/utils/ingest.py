@@ -34,7 +34,8 @@ from dotenv import load_dotenv
 
 from backend.utils.deal_signals import extract_deal_signals
 from backend.utils.property_type_classifier import classify_property_type
-from supabase import Client, create_client
+from backend.utils.supabase_client import get_supabase
+from supabase import Client
 
 load_dotenv()
 
@@ -60,20 +61,13 @@ def err(msg: str) -> None:
 # Supabase client
 # ----------------------------
 def get_supabase_client() -> Client:
-    url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
-    key = (
-        os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-        or os.environ.get("SUPABASE_KEY")
-        or os.environ.get("SUPABASE_ANON_KEY")
-        or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
-    )
-
-    if not url or not key:
+    sb = get_supabase(required=True)
+    if sb is None:
         raise RuntimeError(
-            "Missing Supabase credentials. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+            "Supabase is not configured. Set SUPABASE_URL and one of "
+            "SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY / SUPABASE_KEY."
         )
-
-    return create_client(url, key)
+    return sb  # type: ignore[return-value]
 
 
 # ----------------------------

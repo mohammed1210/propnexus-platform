@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -86,8 +87,15 @@ def health(response: Response):
         or os.getenv("RAILWAY_GIT_COMMIT_SHA")
         or os.getenv("GIT_COMMIT_SHA")
         or os.getenv("GIT_SHA")
-        or "unknown"
     )
+
+    if not version:
+        try:
+            version = (Path(__file__).resolve().parent / ".app_version").read_text().strip() or None
+        except Exception:
+            version = None
+
+    version = version or "unknown"
     environment = os.getenv("ENVIRONMENT") or os.getenv("RAILWAY_ENVIRONMENT") or "development"
 
     # Marker header to correlate deploy + response normalization behavior.

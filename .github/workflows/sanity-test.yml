@@ -127,8 +127,10 @@ jobs:
           # Backend placeholder for build-time env usage
           NEXT_PUBLIC_BACKEND_URL: ${{ secrets.NEXT_PUBLIC_BACKEND_URL || 'https://example.com' }}
 
-          # Clerk: prevent prerender crash on /magic-login by providing a key-shaped value
+          # Clerk: prevent prerender crash by providing a structurally valid publishable key.
+          # Clerk publishable keys are expected to be `pk_(test|live)_<base64(frontendApi + '$')>`.
+          # This placeholder decodes to `clerk.example.com$`.
           # If you have real secrets, they will override these.
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_Y2xlcmsuZXhhbXBsZS5jb20k' }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_0123456789abcdefghijklmnopqrstuvwxyz0123456789' }}
         run: npm run build

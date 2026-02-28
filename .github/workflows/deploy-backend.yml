@@ -13,19 +13,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Stamp app version
+        run: |
+          echo "${GITHUB_SHA}" > backend/.app_version
+
       - name: Secrets sanity check
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
-            echo "ℹ️ RAILWAY_TOKEN not configured – skipping deploy (soft pass)."
-            exit 0
+            echo "❌ RAILWAY_TOKEN not configured"
+            exit 1
           fi
 
       - name: Install Railway CLI
         run: |
-          curl -fsSL https://railway.app/install.sh | sh
-          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+          set -euo pipefail
+
+          # Primary install method.
+          if curl -fsSL https://railway.app/install.sh | sh; then
+            echo "$HOME/.railway/bin" >> $GITHUB_PATH
+          else
+            # Fallback: GitHub may be unreachable from the runner, which breaks the install script.
+            # Using npm avoids fetching the release asset from GitHub.
+            echo "⚠️ Railway install script failed; falling back to npm install"
+            npm install -g @railway/cli
+            echo "$(npm bin -g)" >> $GITHUB_PATH
+          fi
+
+          railway --version
 
       - name: Deploy with Railway
         env:
@@ -34,7 +50,7 @@ jobs:
           railway up \
             --service "propnexus-backend" \
             --ci \
-            --no-stream || { echo "⚠️ Railway deploy failed – skipping health check but passing."; exit 0; }
+            --json
 
       - name: Wait for health
         env:
@@ -46,5 +62,26 @@ jobs:
             [ "$code" = "200" ] && echo "✅ Healthy" && exit 0
             sleep 5
           done
-          echo "⚠️ Health check never reached 200 – soft pass"
-          exit 0
+          echo "❌ Health check never reached 200"
+          exit 1
+
+      - name: Verify deployed version
+        env:
+          URL: https://propnexus-backend-production.up.railway.app/health
+          EXPECT_SHA: ${{ github.sha }}
+        run: |
+          actual=$(curl -fsSL "$URL" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version",""))')
+          echo "Deployed version: $actual"
+          if [ -z "$actual" ]; then
+            echo "❌ /health did not include a version"
+            exit 1
+          fi
+          expect_short="${EXPECT_SHA:0:7}"
+
+          if [ "$actual" = "$EXPECT_SHA" ] || [ "$actual" = "$expect_short" ] || [ "${actual#${EXPECT_SHA}}" != "$actual" ] || [ "${EXPECT_SHA#$actual}" != "$EXPECT_SHA" ]; then
+            echo "✅ Deployed version matches commit"
+            exit 0
+          fi
+
+          echo "❌ Deployed version does not match this commit ($EXPECT_SHA)"
+          exit 1

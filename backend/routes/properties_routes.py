@@ -32,6 +32,7 @@ from backend.utils.property_type_classifier import (
     normalize_property_type_value,
 )
 from backend.utils.recommended_ranker import normalize_deal_type, rerank_recommended
+from backend.utils.supabase_client import get_supabase
 from supabase import create_client
 
 router = APIRouter(tags=["properties"])
@@ -209,17 +210,17 @@ def _is_mappable_coordinate_pair(lat: Any, lng: Any) -> bool:
 def _get_supabase():
     """
     Lazily create Supabase client so unit tests can patch create_client.
-    Also avoids crashing if env vars aren't set in CI.
+
+    Uses the canonical env resolution in get_supabase(), but passes through the
+    local create_client symbol so tests can patch it.
     """
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "http://localhost"
-    key = (
-        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        or os.getenv("SUPABASE_SERVICE_ROLE")
-        or os.getenv("SUPABASE_KEY")
-        or os.getenv("SUPABASE_ANON_KEY")
-        or "anon"
-    )
-    return create_client(url, key)
+    try:
+        sb = get_supabase(required=True, create_client_fn=create_client)
+        if sb is None:
+            raise RuntimeError("Supabase client is not configured")
+        return sb
+    except Exception:
+        raise HTTPException(status_code=503, detail="Supabase not configured on server")
 
 
 def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:

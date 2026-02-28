@@ -10,18 +10,16 @@ from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field, field_validator
 from pydantic.aliases import AliasChoices
 
+from backend.db import require_sb
 from backend.utils.off_market_scoring import compute_off_market_score
-from supabase import Client, create_client
+
+try:
+    from supabase import Client  # type: ignore
+except Exception:  # pragma: no cover
+    Client = object  # type: ignore
 
 router = APIRouter(prefix="/off-market", tags=["off-market"])
 logger = logging.getLogger(__name__)
-
-# --- Supabase client ---
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-supabase: Optional[Client] = (
-    create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
-)
 
 ADMIN_TOKEN = (
     os.getenv("OFF_MARKET_ADMIN_TOKEN")
@@ -53,14 +51,14 @@ def _strip_key(rows: List[dict], key: str) -> List[dict]:
     return [{k: v for k, v in r.items() if k != key} for r in rows]
 
 
-def _insert_with_schema_fallback(table: str, rows: List[dict]) -> List[dict]:
+def _insert_with_schema_fallback(sb: Client, table: str, rows: List[dict]) -> List[dict]:
     """Insert rows, retrying if PostgREST reports missing columns in schema cache."""
     attempts = 0
     current = rows
     while True:
         attempts += 1
         try:
-            res = supabase.table(table).insert(current).execute()  # type: ignore[union-attr]
+            res = sb.table(table).insert(current).execute()
             inserted = res.data or []
             return inserted if isinstance(inserted, list) else []
         except Exception as exc:
@@ -174,8 +172,7 @@ def create_off_market_deal(payload: CreateDealRequest):
 
     If user_id is omitted, it is stored as NULL (admin flow).
     """
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+    sb = require_sb()
 
     image_urls: List[str] = []
     if payload.image_urls and isinstance(payload.image_urls, list):
@@ -228,7 +225,7 @@ def create_off_market_deal(payload: CreateDealRequest):
         "image_urls": image_urls or None,
     }
     try:
-        inserted = _insert_with_schema_fallback(OFF_MARKET_TABLE, [data])
+        inserted = _insert_with_schema_fallback(sb, OFF_MARKET_TABLE, [data])
         if not inserted:
             raise HTTPException(status_code=502, detail="Insert failed")
         return CreateDealResponse(**inserted[0])
@@ -257,8 +254,7 @@ class GenerateRequest(BaseModel):
 
 @router.post("/generate-off-market")
 async def generate_off_market(payload: GenerateRequest):
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+    sb = require_sb()
 
     inv = (payload.investment_type or "").strip() or None
 
@@ -309,7 +305,7 @@ async def generate_off_market(payload: GenerateRequest):
         )
 
     try:
-        inserted = _insert_with_schema_fallback(OFF_MARKET_TABLE, rows)
+        inserted = _insert_with_schema_fallback(sb, OFF_MARKET_TABLE, rows)
         # New shape: leads. Keep deals for backward compatibility.
         return {"leads": inserted, "deals": inserted}
     except Exception as e:
@@ -330,11 +326,10 @@ def list_off_market_leads(
     sort: SortParam = Query(default="created_at_desc"),
 ) -> List[dict]:
     """Return newest off-market leads with optional filters."""
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+    sb = require_sb()
 
     try:
-        base_query = supabase.table(OFF_MARKET_TABLE).select("*")
+        base_query = sb.table(OFF_MARKET_TABLE).select("*")
 
         def apply_sort(q):
             if sort == "score_desc":
@@ -381,17 +376,10 @@ def list_off_market_leads(
 @router.get("/{lead_id}")
 def get_off_market_lead(lead_id: uuid.UUID) -> dict:
     """Fetch a single off-market lead by id."""
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+    sb = require_sb()
 
     try:
-        res = (
-            supabase.table(OFF_MARKET_TABLE)
-            .select("*")
-            .eq("id", str(lead_id))
-            .maybe_single()
-            .execute()
-        )
+        res = sb.table(OFF_MARKET_TABLE).select("*").eq("id", str(lead_id)).maybe_single().execute()
         if not res.data:
             raise HTTPException(status_code=404, detail="Lead not found")
         if isinstance(res.data, dict):
@@ -407,8 +395,7 @@ def get_off_market_lead(lead_id: uuid.UUID) -> dict:
 @router.post("/admin/backfill-scores", dependencies=[Depends(require_admin)])
 def backfill_off_market_scores(limit: int = Query(default=200, ge=1, le=500)) -> dict:
     """Backfill score for legacy rows (score is NULL/0)."""
-    if not supabase:
-        raise HTTPException(status_code=500, detail="Supabase not configured")
+    sb = require_sb()
 
     try:
         select_cols = "id,asking_price,estimated_value,discount_percent,bedrooms,location,score"
@@ -416,7 +403,7 @@ def backfill_off_market_scores(limit: int = Query(default=200, ge=1, le=500)) ->
         # PostgREST OR filters can be brittle across schema cache updates.
         # Use two queries and merge unique ids.
         res_null = (
-            supabase.table(OFF_MARKET_TABLE)
+            sb.table(OFF_MARKET_TABLE)
             .select(select_cols)
             .is_("score", "null")
             .limit(int(limit))
@@ -427,7 +414,7 @@ def backfill_off_market_scores(limit: int = Query(default=200, ge=1, le=500)) ->
             null_rows = []
 
         res_zero = (
-            supabase.table(OFF_MARKET_TABLE)
+            sb.table(OFF_MARKET_TABLE)
             .select(select_cols)
             .lte("score", 0)
             .limit(int(limit))
@@ -496,9 +483,7 @@ def backfill_off_market_scores(limit: int = Query(default=200, ge=1, le=500)) ->
                 update_payload["discount_percent"] = discount_percent
 
             try:
-                supabase.table(OFF_MARKET_TABLE).update(update_payload).eq(
-                    "id", str(lead_id)
-                ).execute()
+                sb.table(OFF_MARKET_TABLE).update(update_payload).eq("id", str(lead_id)).execute()
                 updated += 1
             except Exception:
                 logger.exception("Failed to backfill score for %s", lead_id)

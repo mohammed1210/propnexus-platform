@@ -189,7 +189,7 @@ def test_admin_backfill_scores_requires_token_when_configured(monkeypatch):
     assert res.status_code == 401
 
 
-def test_admin_backfill_scores_allows_token_but_may_500_without_supabase(monkeypatch):
+def test_admin_backfill_scores_allows_token_but_returns_503_without_supabase(monkeypatch):
     from backend.routes import off_market_routes
 
     monkeypatch.setattr(off_market_routes, "ADMIN_TOKEN", "test-token")
@@ -199,9 +199,9 @@ def test_admin_backfill_scores_allows_token_but_may_500_without_supabase(monkeyp
         headers={"Authorization": "Bearer test-token"},
     )
 
-    # If Supabase isn't configured in this environment, the route returns 500.
+    # If Supabase isn't configured in this environment, require_sb() surfaces 503.
     if not _supabase_configured():
-        assert res.status_code == 500
+        assert res.status_code == 503
     else:
         assert res.status_code == 200
 

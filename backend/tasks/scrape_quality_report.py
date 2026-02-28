@@ -13,12 +13,11 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from typing import Any, Dict, List
 
-from db import sb
+from db import require_sb
 
 
 def fetch_recent_properties(limit: int = 500) -> List[Dict[str, Any]]:
-    if sb is None:
-        raise RuntimeError("Supabase client not configured (check SUPABASE_URL/KEY)")
+    sb = require_sb()
 
     resp = (
         sb.table("properties")  # type: ignore[union-attr]

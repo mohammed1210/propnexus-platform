@@ -4,31 +4,27 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from dotenv import load_dotenv
-from fastapi import APIRouter, Header, HTTPException, Query, Request, status
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 
+from backend.db import require_sb
 from backend.routes.properties_routes import _attach_cached_enrichment
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.enrichment_store import get_property_enrichment_cache
-from supabase import Client, create_client
+
+try:
+    from supabase import Client  # type: ignore
+except Exception:  # pragma: no cover
+    Client = object  # type: ignore
 
 load_dotenv()
 
 router = APIRouter()
-
-# Prefer service role key so the API can write server-side
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-
-supabase: Optional[Client] = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 _SAVED_DEALS_HAS_CLERK_USER_ID: Optional[bool] = None
@@ -38,12 +34,7 @@ _SAVED_DEALS_HAS_SAVED_AT: Optional[bool] = None
 
 
 def _require_supabase() -> Client:
-    if supabase is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Supabase not configured on the server",
-        )
-    return supabase
+    return require_sb()  # type: ignore[return-value]
 
 
 def _now_iso() -> str:

@@ -10,17 +10,12 @@ Keeping this file for reference in case the schema needs to be migrated to this 
 in the future, but it is NOT imported or used by the current application.
 """
 
-import os
 from datetime import datetime, timezone
 
-from supabase import Client, create_client
+from backend.utils.supabase_client import get_supabase
+from supabase import Client
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
-supabase: Client | None = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Client | None = get_supabase(required=False)
 
 
 def _dt_from_ts(ts: int | None):
