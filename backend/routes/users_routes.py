@@ -7,6 +7,7 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 
+from backend.db import require_sb
 from backend.utils.supabase_jwt import extract_bearer_token, verify_supabase_token
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -27,20 +28,7 @@ def _get_sb():
     if sb is not None:
         return sb
 
-    # Import here so it only happens when needed
-    # Adjust these imports to match your project structure:
-    from supabase import create_client
-
-    url = os.getenv("SUPABASE_URL", "")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY", "")
-
-    # If env vars are missing, leave sb as None and raise a clear error
-    if not url or not key:
-        raise RuntimeError(
-            "Supabase env vars missing: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_KEY)"
-        )
-
-    sb = create_client(url, key)
+    sb = require_sb()
     return sb
 
 
@@ -127,6 +115,8 @@ async def get_user_plan(
             {"plan": row.get(PLAN_COL, "free"), "stripe_customer_id": row.get(CUST_COL)}
         )
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[users_routes] Error fetching user plan: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch user plan: {e}")

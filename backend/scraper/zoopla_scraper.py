@@ -5,13 +5,14 @@ import json
 import os
 import random
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 from urllib.parse import urlencode, urljoin
 
 import aiohttp
 from bs4 import BeautifulSoup
 from fastapi import BackgroundTasks
 
+from backend.scraper.search_utils import build_zoopla_search_urls
 from backend.scraper.utils import normalize_image_urls
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from backend.utils.postcode import get_lat_lng_from_postcode
@@ -1318,15 +1319,11 @@ async def scrape_zoopla_properties(
     # Start audit logging
     with RunLog.start(source="zoopla", mode=SCRAPER_MODE, location=location) as run_log:
         try:
-            effective_max_pages = (
-                int(max_pages)
-                if max_pages is not None
-                else int(os.getenv("ZP_MAX_PAGES", str(ZP_MAX_PAGES)))
-            )
-            effective_max_pages = max(1, min(5, int(effective_max_pages)))
+            place_slug = _slugify_location(location)
+            search_urls = build_zoopla_search_urls(place_slug)
+            seen: Set[str] = set()
             async with aiohttp.ClientSession() as session:
-                for page in range(effective_max_pages):
-                    url = _build_search_url(location, page)
+                for url_index, url in enumerate(search_urls):
                     html = await _fetch_html(session, url)
                     if not html:
                         # If direct fetch gets blocked/empty, try browser rendering if enabled.
@@ -1342,10 +1339,10 @@ async def scrape_zoopla_properties(
                             if rendered:
                                 html = rendered
                             else:
-                                log_page_fetch_error("zoopla", page, "blocked or empty")
+                                log_page_fetch_error("zoopla", url_index, "blocked or empty")
                                 continue
                         else:
-                            log_page_fetch_error("zoopla", page, "blocked or empty")
+                            log_page_fetch_error("zoopla", url_index, "blocked or empty")
                             continue
                     soup = BeautifulSoup(html, "html.parser")
                     cards = _collect_cards(soup)
@@ -1362,8 +1359,13 @@ async def scrape_zoopla_properties(
                                 mapped = _zoopla_property_from_listing_dict(d)
                                 if not mapped:
                                     continue
+                                external_id = mapped.get("external_id")
+                                if isinstance(external_id, str) and external_id in seen:
+                                    continue
                                 should_insert, reason = should_insert_property(mapped)
                                 if should_insert:
+                                    if isinstance(external_id, str):
+                                        seen.add(external_id)
                                     results.append(clean_property_data(mapped))
                                     stats.log_parse_success()
                                 else:
@@ -1412,8 +1414,8 @@ async def scrape_zoopla_properties(
                                 print(
                                     f"✅ Zoopla embedded JSON returned {len(results)} properties for '{location}'"
                                 )
-                                run_log.set_count(len(results))
-                                return results
+                                if len(results) >= limit:
+                                    break
 
                         # Fallback: if DOM selectors and embedded JSON both fail,
                         # try extracting detail page links and parsing each detail page.
@@ -1435,8 +1437,13 @@ async def scrape_zoopla_properties(
                                     continue
                                 if not parsed.get("location"):
                                     parsed["location"] = location
+                                external_id = parsed.get("external_id")
+                                if isinstance(external_id, str) and external_id in seen:
+                                    continue
                                 should_insert, reason = should_insert_property(parsed)
                                 if should_insert:
+                                    if isinstance(external_id, str):
+                                        seen.add(external_id)
                                     results.append(clean_property_data(parsed))
                                     stats.log_parse_success()
                                 else:
@@ -1447,8 +1454,8 @@ async def scrape_zoopla_properties(
                                 print(
                                     f"✅ Zoopla detail-page fallback returned {len(results)} properties for '{location}'"
                                 )
-                                run_log.set_count(len(results))
-                                return results
+                                if len(results) >= limit:
+                                    break
 
                         if PLAYWRIGHT_ENABLE:
                             rendered = await render_page(
@@ -1463,10 +1470,10 @@ async def scrape_zoopla_properties(
                                 soup = BeautifulSoup(rendered, "html.parser")
                                 cards = _collect_cards(soup)
                                 if not cards:
-                                    capture_debug_html(f"zoopla_empty_{page}", rendered)
+                                    capture_debug_html(f"zoopla_empty_{url_index}", rendered)
                         if not cards:
                             print("ℹ️ No Zoopla cards found; stopping.")
-                            break
+                            continue
 
                     for card in cards:
                         stats.log_card_found()
@@ -1518,6 +1525,9 @@ async def scrape_zoopla_properties(
                             property_type = _extract_property_type(card)
 
                             external_id, listing_url = _extract_external_id_and_url(card)
+
+                            if external_id in seen:
+                                continue
 
                             # Enrich images from the detail page (best-effort).
                             # Keep this additive: only override if we actually find a gallery.
@@ -1575,6 +1585,7 @@ async def scrape_zoopla_properties(
                             # Validate before adding
                             should_insert, reason = should_insert_property(property_data)
                             if should_insert:
+                                seen.add(external_id)
                                 results.append(clean_property_data(property_data))
                                 stats.log_parse_success()
                             else:
@@ -1598,8 +1609,13 @@ async def scrape_zoopla_properties(
                                 mapped = _zoopla_property_from_listing_dict(d)
                                 if not mapped:
                                     continue
+                                external_id = mapped.get("external_id")
+                                if isinstance(external_id, str) and external_id in seen:
+                                    continue
                                 should_insert, reason = should_insert_property(mapped)
                                 if should_insert:
+                                    if isinstance(external_id, str):
+                                        seen.add(external_id)
                                     results.append(clean_property_data(mapped))
                                     stats.log_parse_success()
                                 else:
@@ -1610,8 +1626,8 @@ async def scrape_zoopla_properties(
                                 print(
                                     f"✅ Zoopla embedded JSON returned {len(results)} properties for '{location}'"
                                 )
-                                run_log.set_count(len(results))
-                                return results
+                                if len(results) >= limit:
+                                    break
 
                         detail_urls = _collect_detail_listing_urls(soup)
                         if detail_urls:
@@ -1631,8 +1647,13 @@ async def scrape_zoopla_properties(
                                     continue
                                 if not parsed.get("location"):
                                     parsed["location"] = location
+                                external_id = parsed.get("external_id")
+                                if isinstance(external_id, str) and external_id in seen:
+                                    continue
                                 should_insert, reason = should_insert_property(parsed)
                                 if should_insert:
+                                    if isinstance(external_id, str):
+                                        seen.add(external_id)
                                     results.append(clean_property_data(parsed))
                                     stats.log_parse_success()
                                 else:
@@ -1643,8 +1664,8 @@ async def scrape_zoopla_properties(
                                 print(
                                     f"✅ Zoopla detail-page fallback returned {len(results)} properties for '{location}'"
                                 )
-                                run_log.set_count(len(results))
-                                return results
+                                if len(results) >= limit:
+                                    break
                     if len(results) >= limit:
                         break
                     await asyncio.sleep(ZP_DELAY_MS / 1000.0)

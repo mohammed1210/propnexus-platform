@@ -24,6 +24,10 @@ router = APIRouter(prefix="/ai", tags=["ai"])
 _COMPAT_HEADERS = {
     "X-PropNexus-AI-API": "compat",
     "X-PropNexus-AI-Canonical": "/gpt/*",
+    # Deprecation signaling (RFC-style headers)
+    "Deprecation": "true",
+    "Sunset": "2026-06-01",
+    "Link": '</gpt/health>; rel="successor-version"',
 }
 
 
@@ -45,7 +49,7 @@ def _require_api_key_compat(response: Response) -> str:
 
 
 @router.get("/health")
-async def ai_health(response: Response) -> dict:
+async def ai_health(request: Request, response: Response) -> dict:
     _apply_compat_headers(response)
     enabled = ai_service.ai_enabled()
     return {"ok": True, "ai_enabled": enabled, "ai_disabled": not enabled}

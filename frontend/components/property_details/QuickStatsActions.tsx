@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FiHeart, FiShare2, FiDownload, FiCopy, FiCheck } from 'react-icons/fi';
 import { toast } from 'sonner';
 import { fetchWithRetry } from '@/lib/api';
-import { formatPercent, getRoiPercent, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 type QuickStatsActionsProps = {
   propertyId: string;
@@ -65,7 +65,8 @@ export default function QuickStatsActions({
 
   const displayPrice = typeof price === 'number' ? price : normalized.price ?? undefined;
   const displayYield = getYieldPercent(merged) ?? undefined;
-  const displayRoi = getRoiPercent(merged) ?? undefined;
+  const roiDisplay = getRoiDisplay(merged);
+  const displayRoi = roiDisplay.value ?? undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -196,7 +197,7 @@ export default function QuickStatsActions({
 
               <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
                 <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
-                  ROI
+                  ROI{roiDisplay.isProxy ? ' (proxy)' : ''}
                 </div>
                 <div
                   className={`text-2xl font-bold ${

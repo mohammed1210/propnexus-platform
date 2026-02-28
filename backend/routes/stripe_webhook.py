@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from backend.middleware.rate_limit import WEBHOOK_RATE_LIMIT, is_test_or_ci, limiter
+from backend.utils.supabase_client import get_supabase
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -78,20 +79,10 @@ def get_supabase_client():
     if supabase is not None:
         return supabase
 
-    # Attempt to create a client if credentials are present
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-
-    if not url or not key:
-        return None
-
     try:
-        from supabase import create_client
-
-        client = create_client(url, key)
-        return client
+        return get_supabase(required=False)
     except Exception as e:
-        # If client creation fails (e.g., DNS issues in test), gracefully return None
+        # Keep webhook resilient: never hard-fail on Supabase init.
         logger.debug(f"Failed to create Supabase client: {e}")
         return None
 

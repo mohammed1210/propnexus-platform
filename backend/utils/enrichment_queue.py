@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
+
+from backend.utils.supabase_client import get_supabase
 
 _CACHED_SB: Any | None = None
 
@@ -17,22 +18,8 @@ def _get_supabase_from_env() -> Any | None:
     if _CACHED_SB is not None:
         return _CACHED_SB
 
-    url = (os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "").strip()
-    key = (
-        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        or os.getenv("SUPABASE_SERVICE_ROLE")
-        or os.getenv("SUPABASE_KEY")
-        or os.getenv("SUPABASE_ANON_KEY")
-        or ""
-    ).strip()
-
-    if not url or not key:
-        return None
-
     try:
-        from supabase import create_client  # type: ignore
-
-        _CACHED_SB = create_client(url, key)
+        _CACHED_SB = get_supabase(required=False)
         return _CACHED_SB
     except Exception:
         return None

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 
 from backend.utils.supabase_env import resolve_supabase_config
 
+_CACHED_CLIENT: object | None = None
+_CACHED_SIGNATURE: tuple[str, str] | None = None
 
-def get_supabase(*, required: bool = False):
+
+def get_supabase(
+    *, required: bool = False, create_client_fn: Callable[[str, str], object] | None = None
+):
     """
     Return a Supabase client if env is present.
 
@@ -26,9 +32,23 @@ def get_supabase(*, required: bool = False):
             )
         return None
     try:
+        # If caller provides a custom factory (tests), don't cache to avoid cross-test leakage.
+        if create_client_fn is not None:
+            return create_client_fn(cfg.url, cfg.key)
+
+        global _CACHED_CLIENT, _CACHED_SIGNATURE
+        sig = (cfg.url, cfg.key)
+
+        # Reuse client if env is unchanged.
+        if _CACHED_CLIENT is not None and _CACHED_SIGNATURE == sig:
+            return _CACHED_CLIENT
+
         from supabase import create_client
 
-        return create_client(cfg.url, cfg.key)
+        client = create_client(cfg.url, cfg.key)
+        _CACHED_CLIENT = client
+        _CACHED_SIGNATURE = sig
+        return client
     except Exception:
         if required:
             raise

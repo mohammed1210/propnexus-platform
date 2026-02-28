@@ -16,16 +16,12 @@ may wish to adapt them accordingly.
 
 import os
 
-from supabase import create_client
+from backend.utils.supabase_client import get_supabase
 
 # Import scrapers lazily inside functions to avoid heavy imports when
 # this module is imported but tasks are not run.
 
-SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-supabase = None
-if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = get_supabase(required=False)
 
 
 async def daily_scrape() -> None:

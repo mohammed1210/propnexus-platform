@@ -39,6 +39,13 @@ function clampYieldLikePercent(n: number): number | null {
   return round1(n);
 }
 
+function clampRoiLikePercent(n: number): number | null {
+  if (!Number.isFinite(n)) return null;
+  // ROI can be substantially higher than yield.
+  if (n < 0 || n > 200) return null;
+  return round1(n);
+}
+
 function getScoreInputs(p: AnyObj): AnyObj | null {
   const a = p?.score_breakdown;
   if (a && typeof a === 'object') {
@@ -54,6 +61,41 @@ function getScoreInputs(p: AnyObj): AnyObj | null {
   return null;
 }
 
+function proxyYieldFromRentAndPrice(p: any, scoreInputs?: AnyObj | null): number | null {
+  // Robust parsers (handles numbers OR strings) and allow scoreInputs fallback.
+  const price =
+    parseMoney(p?.price) ??
+    parseMoney(p?.asking_price) ??
+    parseMoney(p?.askingPrice) ??
+    parseMoney(p?.listing_price) ??
+    parseMoney(p?.listingPrice) ??
+    (scoreInputs
+      ? parseMoney(scoreInputs?.price ?? scoreInputs?.asking_price ?? scoreInputs?.askingPrice)
+      : null);
+
+  const rent =
+    parseRent(p?.rent_monthly) ??
+    parseRent(p?.rentMonthly) ??
+    parseRent(p?.rent_pcm) ??
+    parseRent(p?.rentPcm) ??
+    parseRent(p?.rent_per_month) ??
+    parseRent(p?.rentPerMonth) ??
+    (scoreInputs
+      ? parseRent(
+          scoreInputs?.rent_monthly ??
+            scoreInputs?.rentMonthly ??
+            scoreInputs?.rent_pcm ??
+            scoreInputs?.rentPcm ??
+            scoreInputs?.rent_per_month ??
+            scoreInputs?.rentPerMonth
+        )
+      : null);
+
+  if (!price || !rent || price <= 0 || rent <= 0) return null;
+  const pct = (rent * 12 * 100) / price;
+  return Number.isFinite(pct) ? pct : null;
+}
+
 /**
  * Canonical Yield fallback order (must be consistent across UI):
  * 1) p.yield_percent
@@ -63,64 +105,67 @@ function getScoreInputs(p: AnyObj): AnyObj | null {
 export function getYieldPercent(p: AnyObj): number | null {
   if (!p || typeof p !== 'object') return null;
 
-  const direct = parsePercent((p as any).yield_percent);
+  const scoreInputs = getScoreInputs(p);
+
+  // 1) p.yield_percent
+  const direct = parsePercent((p as any).yield_percent ?? (p as any).yieldPercent ?? (p as any).yieldPct);
   const directClamped = direct == null ? null : clampYieldLikePercent(direct);
   if (directClamped != null) return directClamped;
 
-  const scoreInputs = getScoreInputs(p);
+  // 2) p.score_breakdown.inputs.yield_percent
   const fromScore = scoreInputs ? parsePercent((scoreInputs as any).yield_percent) : null;
   const fromScoreClamped = fromScore == null ? null : clampYieldLikePercent(fromScore);
   if (fromScoreClamped != null) return fromScoreClamped;
 
-  const rent =
-    parseRent((p as any).rent_monthly) ??
-    (scoreInputs ? parseRent((scoreInputs as any).rent_monthly) : null);
+  // 3) proxy from rent+price
+  const proxy = proxyYieldFromRentAndPrice(p, scoreInputs);
+  return typeof proxy === 'number' ? clampYieldLikePercent(proxy) : null;
+}
 
-  const price =
-    parseMoney((p as any).price) ??
-    (scoreInputs ? parseMoney((scoreInputs as any).price) : null);
+export function getRoiDisplay(p: AnyObj): { value: number | null; isProxy: boolean } {
+  if (!p || typeof p !== 'object') return { value: null, isProxy: false };
 
-  if (typeof rent === 'number' && rent > 0 && typeof price === 'number' && price > 0) {
-    const computed = (rent * 12 * 100) / price;
-    return clampYieldLikePercent(computed);
-  }
+  const scoreInputs = getScoreInputs(p);
+  const roiFlag = Boolean((p as any)?.roi_is_proxy ?? (p as any)?.roiIsProxy);
 
-  return null;
+  // real ROI candidates
+  const direct =
+    parsePercent((p as any).roi_percent ?? (p as any).roiPercent) ??
+    parsePercent((p as any).roi) ??
+    parsePercent((p as any).roi_pct) ??
+    parsePercent((p as any).roi_percentage) ??
+    parsePercent((p as any).roiPercentage);
+  const directOk = direct == null ? null : clampRoiLikePercent(direct);
+  if (directOk != null) return { value: directOk, isProxy: roiFlag };
+
+  const fromScore = scoreInputs
+    ? parsePercent((scoreInputs as any).roi_percent ?? (scoreInputs as any).roiPercent ?? (scoreInputs as any).roi_pct)
+    : null;
+  const fromScoreOk = fromScore == null ? null : clampRoiLikePercent(fromScore);
+  if (fromScoreOk != null) return { value: fromScoreOk, isProxy: roiFlag };
+
+  // proxy fallback
+  const proxy = getYieldPercent(p);
+  const proxyOk = typeof proxy === 'number' ? clampRoiLikePercent(proxy) : null;
+  return { value: proxyOk, isProxy: proxyOk != null };
 }
 
 /**
- * Canonical ROI fallback order (must be consistent across UI):
- * 1) p.roi_percent
- * 2) p.score_breakdown.inputs.roi_percent
- * 3) compute proxy from rent_monthly + price
+ * ROI display helper.
+ * - Prefers real ROI when present
+ * - Falls back to a proxy (yield-like) value when missing
  */
 export function getRoiPercent(p: AnyObj): number | null {
-  if (!p || typeof p !== 'object') return null;
+  return getRoiDisplay(p).value;
+}
 
-  const direct = parsePercent((p as any).roi_percent);
-  const directClamped = direct == null ? null : clampYieldLikePercent(direct);
-  if (directClamped != null) return directClamped;
-
-  const scoreInputs = getScoreInputs(p);
-  const fromScore = scoreInputs ? parsePercent((scoreInputs as any).roi_percent) : null;
-  const fromScoreClamped = fromScore == null ? null : clampYieldLikePercent(fromScore);
-  if (fromScoreClamped != null) return fromScoreClamped;
-
-  // Proxy: same rent/price yield formula when ROI is missing.
-  const rent =
-    parseRent((p as any).rent_monthly) ??
-    (scoreInputs ? parseRent((scoreInputs as any).rent_monthly) : null);
-
-  const price =
-    parseMoney((p as any).price) ??
-    (scoreInputs ? parseMoney((scoreInputs as any).price) : null);
-
-  if (typeof rent === 'number' && rent > 0 && typeof price === 'number' && price > 0) {
-    const computed = (rent * 12 * 100) / price;
-    return clampYieldLikePercent(computed);
-  }
-
-  return null;
+/**
+ * Proxy ROI for explicitly-labeled display.
+ * Default proxy source = yield-like proxy (canonical yield fallback order).
+ */
+export function getRoiProxyPercent(p: AnyObj): number | null {
+  const d = getRoiDisplay(p);
+  return d.isProxy ? d.value : null;
 }
 
 export function formatPercent(n: number | null | undefined): string {
@@ -309,7 +354,6 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
   let roiPercent =
     parsePercent(p?.roi_percent) ??
     parsePercent(p?.roiPercent) ??
-    parsePercent(p?.roiPct) ??
     parsePercent(p?.roi) ??
     parsePercent(p?.roi_pct) ??
     parsePercent(p?.roi_percentage) ??
@@ -372,7 +416,8 @@ export function normalizeProperty(p: AnyObj): PropertyNormalized {
   // ROI is NOT yield. Keep real ROI separate from a proxy value.
   // - roiPercent: real ROI only (if present)
   // - roiProxyPercent: used for scoring/optional labeled display
-  const roiProxyPercent = roiPercent ?? yieldPercent;
+  const legacyRoiProxy = parsePercent(p?.roiPct) ?? null;
+  const roiProxyPercent = roiPercent ?? yieldPercent ?? legacyRoiProxy;
   const roiIsProxy = roiFlag || (roiPercent == null && roiProxyPercent != null);
 
   const yieldPct = yieldPercent;

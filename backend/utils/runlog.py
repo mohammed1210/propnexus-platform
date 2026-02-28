@@ -1,27 +1,15 @@
 # backend/utils/runlog.py
-import os
 import sys
 import time
 from typing import Any, Dict, List, Optional
 
-try:
-    from supabase import create_client
-except Exception:  # pragma: no cover
-    create_client = None
+from backend.utils.supabase_client import get_supabase
 
 
 def _make_supabase_client():
     """Create Supabase client if env vars exist; otherwise return None."""
-    if not create_client:
-        return None
-
-    url = os.getenv("SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
-    if not url or not key:
-        return None
-
     try:
-        return create_client(url, key)
+        return get_supabase(required=False)
     except Exception:
         return None
 

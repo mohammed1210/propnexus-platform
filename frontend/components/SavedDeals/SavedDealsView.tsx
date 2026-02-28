@@ -571,8 +571,13 @@ export default function SavedDealsView() {
                         },
                         {
                           label: 'ROI',
-                          get: (p: ReturnType<typeof normalizeProperty>) =>
-                            formatPercent(p.roiPercent ?? p.roiProxyPercent ?? p.roiPct),
+                          get: (p: ReturnType<typeof normalizeProperty>) => {
+                            const roiReal = p.roiPercent;
+                            const roiProxy = p.roiProxyPercent;
+                            const roi = formatPercent(roiReal ?? roiProxy);
+                            const roiIsProxyDisplay = p.roiIsProxy || (roiReal == null && roiProxy != null);
+                            return `${roi}${roiIsProxyDisplay ? ' (proxy)' : ''}`;
+                          },
                         },
                         {
                           label: 'Rent / mo',

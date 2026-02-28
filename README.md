@@ -73,4 +73,4 @@ Product + engineering docs live in `docs/` (deployment, runbooks, feature flags,
 
 ## AI
 
-Use `/gpt/*` for AI features. `/ai/*` remains supported for compatibility.
+Use `/gpt/*` for AI features (canonical). `/ai/*` remains supported for compatibility but is deprecated for new development.

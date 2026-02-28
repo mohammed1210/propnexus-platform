@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import { formatPercent, getRoiPercent, getYieldPercent } from '@/lib/normalizeProperty';
+import { formatPercent, getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
 
 interface QuickStatsCardProps {
   property?: Record<string, any> | null;
@@ -42,7 +42,8 @@ export default function QuickStatsCard({ property, price, yieldPercent, roiPerce
   };
 
   const displayYield = getYieldPercent(merged) ?? undefined;
-  const displayRoi = getRoiPercent(merged) ?? undefined;
+  const roiDisplay = getRoiDisplay(merged);
+  const displayRoi = roiDisplay.value ?? undefined;
 
   return (
     <div className="panel space-y-4">
@@ -70,7 +71,7 @@ export default function QuickStatsCard({ property, price, yieldPercent, roiPerce
 
       {displayRoi !== undefined && (
         <div>
-          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">ROI</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 mb-1">ROI{roiDisplay.isProxy ? ' (proxy)' : ''}</div>
           <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
             {formatValue(displayRoi, 'percent')}
           </div>

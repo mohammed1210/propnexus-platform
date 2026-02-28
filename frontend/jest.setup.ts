@@ -12,9 +12,11 @@ try {
 // Testing Library matchers
 import "@testing-library/jest-dom";
 
+import { jest } from "@jest/globals";
+
 // --- Mock Next.js App Router (prevents: "expected app router to be mounted") ---
 jest.mock("next/navigation", () => {
-  const actual = jest.requireActual("next/navigation");
+  const actual = jest.requireActual<Record<string, any>>("next/navigation");
   return {
     ...actual,
     useRouter: () => ({
