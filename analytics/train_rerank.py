@@ -64,6 +64,12 @@ def _map_at_k(y_true: list[float], y_pred: list[float], qids: list[str], k: int 
 
     aps: list[float] = []
     for pairs in by_q.values():
+        relevant_count = sum(1 for label, _ in pairs if label > 0)
+        denom = min(k, relevant_count)
+        if denom <= 0:
+            aps.append(0.0)
+            continue
+
         ranked = sorted(pairs, key=lambda t: t[1], reverse=True)[:k]
         hits = 0
         precisions = []
@@ -71,10 +77,7 @@ def _map_at_k(y_true: list[float], y_pred: list[float], qids: list[str], k: int 
             if label > 0:
                 hits += 1
                 precisions.append(hits / i)
-        if precisions:
-            aps.append(sum(precisions) / len(precisions))
-        else:
-            aps.append(0.0)
+        aps.append(sum(precisions) / denom if precisions else 0.0)
     return sum(aps) / len(aps)
 
 
@@ -199,12 +202,18 @@ def _prepare_matrix(df):
 
 def _split_by_query(df, frac: float = 0.8):
     qids = sorted(df["query_id"].unique().tolist())
-    split = max(1, int(len(qids) * frac))
+    if not qids:
+        return df.copy(), df.iloc[0:0].copy()
+
+    if len(qids) == 1:
+        train_df = df.copy()
+        test_df = df.iloc[0:0].copy()
+        return train_df, test_df
+
+    split = max(1, min(len(qids) - 1, int(len(qids) * frac)))
     train_qids = set(qids[:split])
     train_df = df[df["query_id"].isin(train_qids)].copy()
     test_df = df[~df["query_id"].isin(train_qids)].copy()
-    if test_df.empty:
-        test_df = train_df.copy()
     return train_df, test_df
 
 
@@ -226,9 +235,7 @@ def train(days: int, output: str, features_prefix: str) -> EvalMetrics:
     y_train = train_df["user_clicked"]
     group_train = train_df.groupby("query_id").size().tolist()
 
-    X_test = test_df[FEATURE_COLUMNS]
-    y_test = test_df["user_clicked"].tolist()
-    q_test = test_df["query_id"].tolist()
+    has_holdout = not test_df.empty
 
     ranker = xgb.sklearn.XGBRanker(
         objective="rank:ndcg",
@@ -244,16 +251,24 @@ def train(days: int, output: str, features_prefix: str) -> EvalMetrics:
     Path(output).parent.mkdir(parents=True, exist_ok=True)
     ranker.save_model(output)
 
-    y_pred = ranker.predict(X_test).tolist()
-    metrics = EvalMetrics(
-        ndcg_at_10=_ndcg_at_k(y_true=y_test, y_pred=y_pred, qids=q_test, k=10),
-        map_at_10=_map_at_k(y_true=y_test, y_pred=y_pred, qids=q_test, k=10),
-    )
+    if has_holdout:
+        X_test = test_df[FEATURE_COLUMNS]
+        y_test = test_df["user_clicked"].tolist()
+        q_test = test_df["query_id"].tolist()
+        y_pred = ranker.predict(X_test).tolist()
+        metrics = EvalMetrics(
+            ndcg_at_10=_ndcg_at_k(y_true=y_test, y_pred=y_pred, qids=q_test, k=10),
+            map_at_10=_map_at_k(y_true=y_test, y_pred=y_pred, qids=q_test, k=10),
+        )
+    else:
+        metrics = EvalMetrics(ndcg_at_10=0.0, map_at_10=0.0)
 
     print("| metric | value |")
     print("|---|---:|")
     print(f"| NDCG@10 | {metrics.ndcg_at_10:.4f} |")
     print(f"| MAP@10 | {metrics.map_at_10:.4f} |")
+    if not has_holdout:
+        print("| NOTE | holdout split unavailable (single query_id); metrics set to 0.0000 |")
 
     return metrics
 
