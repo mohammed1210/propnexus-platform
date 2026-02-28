@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
+from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -37,6 +38,7 @@ from backend.routes.debug_properties import router as debug_properties_router
 from backend.routes.debug_scrape_probe import router as debug_scrape_probe_router
 from backend.routes.enrichment_queue_routes import router as enrichment_queue_router
 from backend.routes.enrichment_routes import router as enrichment_router
+from backend.routes.events import router as events_router
 from backend.routes.gpt_routes import router as gpt_router
 from backend.routes.import_routes import admin_alias_router
 from backend.routes.import_routes import router as import_router
@@ -60,6 +62,8 @@ except Exception as e:
     logger.warning(f"Sentry initialization failed: {e}")
 
 app = FastAPI()
+
+Instrumentator().instrument(app).expose(app)
 
 
 _enrichment_worker = None
@@ -288,6 +292,7 @@ app.include_router(import_router)
 app.include_router(admin_alias_router)
 app.include_router(enrichment_router)
 app.include_router(enrichment_queue_router)
+app.include_router(events_router)
 app.include_router(admin_ingestion_router)
 app.include_router(admin_scrape_runs_router)
 app.include_router(notes_router)
