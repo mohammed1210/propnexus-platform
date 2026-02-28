@@ -104,7 +104,7 @@ Both serve the same features; new code should use `/gpt/*`.
 
 1. Create a feature branch from `main`.
 2. Make sure `pre-commit run --all-files` passes locally.
-3. Push and open a PR – the **Sanity test** workflow will run automatically.
-4. Keep PRs small and focused; squash-merge when CI is green.
+3. Push and open a PR. If you want to run the **Sanity test** workflow in GitHub Actions, trigger it manually (it is `workflow_dispatch` only).
+4. Keep PRs small and focused; squash-merge when checks are green.
 
 Thanks for helping make PropNexus better!
