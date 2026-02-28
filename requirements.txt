@@ -60,3 +60,5 @@ websockets==15.0.1
 sentry-sdk==1.43.0
 slowapi==0.1.9
 stripe
+xgboost==2.1.4
+scikit-learn==1.5.2

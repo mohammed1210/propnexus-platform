@@ -1,0 +1,114 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any
+
+from backend.ml.rerank import rerank
+
+
+def _normalize_text(v: Any) -> str:
+    return str(v or "").strip().lower()
+
+
+def _trigrams(text: str) -> set[str]:
+    s = f"  {text}  "
+    return {s[i : i + 3] for i in range(max(len(s) - 2, 0))}
+
+
+def trigram_similarity(a: str, b: str) -> float:
+    ta = _trigrams(_normalize_text(a))
+    tb = _trigrams(_normalize_text(b))
+    if not ta or not tb:
+        return 0.0
+    return float(len(ta & tb) / max(len(ta | tb), 1))
+
+
+def _coerce_float(v: Any, default: float = 0.0) -> float:
+    try:
+        return float(v)
+    except Exception:
+        return default
+
+
+def _age_days(created_at: Any) -> int:
+    if not created_at:
+        return 0
+    if isinstance(created_at, str):
+        try:
+            created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+        except Exception:
+            return 0
+    elif isinstance(created_at, datetime):
+        created = created_at
+    else:
+        return 0
+    now = datetime.now(timezone.utc)
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    delta = now - created
+    return max(int(delta.days), 0)
+
+
+def build_feature_rows(query_text: str, candidates: list[dict[str, Any]]) -> list[list[float]]:
+    prices = [_coerce_float(c.get("price"), default=0.0) for c in candidates]
+    valid_prices = [p for p in prices if p > 0]
+    sorted_prices = sorted(valid_prices)
+
+    out: list[list[float]] = []
+    q_norm = _normalize_text(query_text)
+
+    for idx, c in enumerate(candidates):
+        title = _normalize_text(c.get("title"))
+        location = _normalize_text(c.get("location"))
+        blob = f"{title} {location}".strip()
+
+        exact_match = 1.0 if q_norm and q_norm in blob else 0.0
+        trigram_sim = trigram_similarity(q_norm, blob)
+
+        price = prices[idx]
+        if price > 0 and sorted_prices:
+            rank = sum(1 for p in sorted_prices if p <= price)
+            price_rank_pct = rank / max(len(sorted_prices), 1)
+        else:
+            price_rank_pct = 0.0
+
+        age_days = float(_age_days(c.get("created_at")))
+        beds = _coerce_float(c.get("bedrooms"), default=0.0)
+        yield_pct = _coerce_float(c.get("yield_percent"), default=0.0)
+
+        out.append([exact_match, trigram_sim, price_rank_pct, age_days, beds, yield_pct])
+
+    return out
+
+
+def fetch_candidates(sb: Any, query_text: str, recall_limit: int = 100) -> list[dict[str, Any]]:
+    q = _normalize_text(query_text)
+
+    query = sb.table("properties").select("*").order("created_at", desc=True).limit(recall_limit)
+    if q:
+        safe_q = q.replace("%", "").replace(",", " ")
+        query = query.or_(f"title.ilike.%{safe_q}%,location.ilike.%{safe_q}%")
+
+    res = query.execute()
+    rows = res.data or []
+    if isinstance(rows, list):
+        return [r for r in rows if isinstance(r, dict)]
+    return []
+
+
+def search_with_optional_rerank(
+    sb: Any,
+    query_text: str,
+    *,
+    top_k: int = 20,
+    enable_ml: bool = False,
+) -> list[dict[str, Any]]:
+    recall = fetch_candidates(sb, query_text=query_text, recall_limit=100)
+    if not recall:
+        return []
+
+    if enable_ml:
+        features = build_feature_rows(query_text, recall)
+        recall = rerank(recall, features)
+
+    return recall[: max(int(top_k), 1)]

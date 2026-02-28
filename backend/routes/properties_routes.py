@@ -15,6 +15,8 @@ from fastapi.params import Param
 from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
+from backend.config import settings
+from backend.search.query import search_with_optional_rerank
 from backend.utils.admin_auth import require_admin
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
@@ -151,6 +153,34 @@ class PropertiesPageResponse(BaseModel):
     limit: int = 50
     offset: int = 0
     has_more: bool = False
+
+
+@router.get("/api/v1/search")
+def api_v1_search(
+    query: str = Query(default="", alias="query"),
+    k: int = Query(default=20, ge=1, le=100),
+    ml: str | None = Query(default=None, description="Set to 1 to force ML rerank canary"),
+):
+    sb = _get_supabase()
+
+    force_ml = str(ml or "").strip().lower() in {"1", "true", "yes", "on"}
+    ml_enabled = bool(settings.SMART_SEARCH_ML_RERANK or force_ml)
+
+    top = search_with_optional_rerank(
+        sb,
+        query_text=query,
+        top_k=k,
+        enable_ml=ml_enabled,
+    )
+    ids = [str(item.get("id")) for item in top if item.get("id") is not None]
+
+    return {
+        "query": query,
+        "ml_enabled": ml_enabled,
+        "count": len(top),
+        "ids": ids,
+        "items": top,
+    }
 
 
 def _safe_order(query: Any, column: str, *, desc: bool, nulls_last: bool = True) -> Any:
