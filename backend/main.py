@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
+from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -61,6 +62,8 @@ except Exception as e:
     logger.warning(f"Sentry initialization failed: {e}")
 
 app = FastAPI()
+
+Instrumentator().instrument(app).expose(app)
 
 
 _enrichment_worker = None
