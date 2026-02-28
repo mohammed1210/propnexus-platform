@@ -1661,7 +1661,13 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                         f"[rightmove] resolved locationIdentifier={location_identifier} for query={location}"
                     )
 
-                effective_limit = min(int(limit or 0) or 40, 40)
+                # Honor caller-provided limit; treat non-positive values as default.
+                try:
+                    effective_limit = int(limit)
+                except Exception:
+                    effective_limit = 50
+                if effective_limit <= 0:
+                    effective_limit = 50
                 seen: Set[str] = set()
 
                 if location_identifier:
