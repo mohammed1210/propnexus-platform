@@ -15,6 +15,8 @@ from fastapi.params import Param
 from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
+from backend.config import settings
+from backend.search.query import expand_query_terms, fetch_postgres_fuzzy_ids, is_postgres_detected
 from backend.utils.admin_auth import require_admin
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
@@ -817,6 +819,14 @@ def list_properties(
                 seen_pt.add(canon)
                 property_type_filter.append(canon)
 
+        raw_query_text = str(q or "").strip()
+        search_terms_for_q: List[str] = []
+        if raw_query_text:
+            if settings.SMART_SEARCH_SYNONYMS:
+                search_terms_for_q = expand_query_terms(raw_query_text)
+            if not search_terms_for_q:
+                search_terms_for_q = [raw_query_text]
+
         # We try DB filtering first; if the column doesn't exist, fall back to python filtering.
         property_type_db_value: str | None = (
             str(property_type) if property_type is not None else None
@@ -877,11 +887,18 @@ def list_properties(
                     q0 = q0.gte("created_at", ts)
 
             # Search across common fields
-            if q:
-                q_esc = q.replace("%", "").strip()
-                if q_esc:
-                    # Supabase .or_ expects a comma-separated filter string
-                    q0 = q0.or_(f"title.ilike.%{q_esc}%,location.ilike.%{q_esc}%")
+            if raw_query_text:
+                parts: List[str] = []
+                for term in search_terms_for_q[:30]:
+                    q_esc = str(term).replace("%", "").replace(",", " ").strip()
+                    if not q_esc:
+                        continue
+                    parts.append(f"title.ilike.%{q_esc}%")
+                    parts.append(f"location.ilike.%{q_esc}%")
+
+                if parts:
+                    # Supabase .or_ expects a comma-separated filter string.
+                    q0 = q0.or_(",".join(parts))
 
             # Numeric filters
             if min is not None:
@@ -1039,6 +1056,41 @@ def list_properties(
         total_int = int(total) if isinstance(total, (int, float)) else 0
 
         items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
+
+        # Postgres-only fuzzy fallback (pg_trgm + levenshtein<=1) for typo tolerance.
+        if (
+            settings.SMART_SEARCH_SYNONYMS
+            and raw_query_text
+            and not items
+            and is_postgres_detected()
+            and search_terms_for_q
+        ):
+            try:
+                fuzzy_ids = fetch_postgres_fuzzy_ids(
+                    raw_query_text,
+                    search_terms_for_q,
+                    limit=builtins.max(limit * 3, 50),
+                )
+                if fuzzy_ids:
+                    fuzzy_res = (
+                        sb.table("properties")
+                        .select("*", count="exact")
+                        .in_("id", fuzzy_ids[:500])
+                        .limit(limit)
+                        .execute()
+                    )
+                    fuzzy_rows = fuzzy_res.data or []
+                    if isinstance(fuzzy_rows, list):
+                        items = [
+                            _normalize_property_row(r) for r in fuzzy_rows if isinstance(r, dict)
+                        ]
+                        fuzzy_total = getattr(fuzzy_res, "count", None)
+                        if isinstance(fuzzy_total, (int, float)):
+                            total_int = int(fuzzy_total)
+                        elif items:
+                            total_int = len(items)
+            except Exception:
+                pass
 
         # Attach cached enrichment (geo/crime/comps/derived) where available.
         try:
