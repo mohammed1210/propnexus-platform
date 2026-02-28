@@ -51,6 +51,25 @@ function sanitizeSearch(q: string): string {
   return sanitized.slice(0, 64);
 }
 
+function generateQueryId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+  } catch {
+    // fallback below
+  }
+  return '00000000-0000-4000-8000-000000000000';
+}
+
 // ✅ Safe auth hook (prevents Clerk from loading in CI/build when disabled)
 type UseUserReturn = { user: any; isLoaded: boolean };
 
@@ -585,6 +604,7 @@ function ListingsInner() {
 
   const qRaw = searchParams?.get('q') ?? '';
   const q = sanitizeSearch(qRaw);
+  const queryId = (searchParams?.get('query_id') ?? '').trim();
   const minP = parsePositiveInt(searchParams?.get('min') ?? '');
   const maxP = parsePositiveInt(searchParams?.get('max') ?? '');
   const beds = parsePositiveInt(searchParams?.get('beds') ?? '');
@@ -1010,6 +1030,9 @@ function ListingsInner() {
     // Set/clear in one place so paging/map/sort stay stable.
     if (searchInput) p.set('q', searchInput);
     else p.delete('q');
+
+    if (searchInput.trim()) p.set('query_id', generateQueryId());
+    else p.delete('query_id');
     if (minInput) p.set('min', minInput);
     else p.delete('min');
     if (maxInput) p.set('max', maxInput);
@@ -1739,13 +1762,15 @@ function ListingsInner() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {typeFilteredRows.map((property) => (
+                {typeFilteredRows.map((property, idx) => (
                   <PropertyCard
                     key={property.id || Math.random()}
                     p={property}
                     showDealReasonChip={sort === 'recommended'}
                     isHovered={hoveredId === property.id}
                     onHoverChange={(h) => setHoveredId(h ? property.id : null)}
+                    queryId={queryId || null}
+                    rank={offset + idx + 1}
                   />
                 ))}
               </div>
@@ -1770,13 +1795,15 @@ function ListingsInner() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {typeFilteredRows.map((property) => (
+                  {typeFilteredRows.map((property, idx) => (
                     <PropertyCard
                       key={property.id || Math.random()}
                       p={property}
                       showDealReasonChip={sort === 'recommended'}
                       isHovered={hoveredId === property.id}
                       onHoverChange={(h) => setHoveredId(h ? property.id : null)}
+                      queryId={queryId || null}
+                      rank={offset + idx + 1}
                     />
                   ))}
                 </div>

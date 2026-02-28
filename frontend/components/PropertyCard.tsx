@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiHeart } from 'react-icons/fi';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
+import { track } from '@/lib/events';
 import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 // tiny classnames helper – keeps conditional class logic tidy
@@ -164,11 +165,15 @@ export default function PropertyCard({
   showDealReasonChip,
   isHovered,
   onHoverChange,
+  queryId,
+  rank,
 }: {
   p: Property;
   showDealReasonChip?: boolean;
   isHovered?: boolean;
   onHoverChange?: (hovered: boolean) => void;
+  queryId?: string | null;
+  rank?: number;
 }) {
   const normalized = useMemo(() => normalizeProperty(p as any), [p]);
 
@@ -474,6 +479,15 @@ export default function PropertyCard({
 
   const verdict = useMemo(() => buildVerdict(p), [p]);
 
+  const handleSearchClickTrack = useCallback(() => {
+    if (!queryId || !p.id) return;
+    void track('search_click', {
+      queryId,
+      listingId: p.id,
+      rank,
+    });
+  }, [p.id, queryId, rank]);
+
   return (
     <article
       ref={(n) => {
@@ -488,6 +502,7 @@ export default function PropertyCard({
     >
       <Link
         href={href}
+        onClick={handleSearchClickTrack}
         className="block relative w-full h-48 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
         aria-label={`Open ${p.title ?? 'property'}`}
       >
@@ -616,7 +631,7 @@ export default function PropertyCard({
       )}
 
       <div className="p-4 space-y-2">
-        <Link href={href} className="block group">
+        <Link href={href} onClick={handleSearchClickTrack} className="block group">
           <div className="mb-1">
             <span
               className={cx(
