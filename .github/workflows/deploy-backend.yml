@@ -13,19 +13,35 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Stamp app version
+        run: |
+          echo "${GITHUB_SHA}" > backend/.app_version
+
       - name: Secrets sanity check
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           if [ -z "$RAILWAY_TOKEN" ]; then
-            echo "ℹ️ RAILWAY_TOKEN not configured – skipping deploy (soft pass)."
-            exit 0
+            echo "❌ RAILWAY_TOKEN not configured"
+            exit 1
           fi
 
       - name: Install Railway CLI
         run: |
-          curl -fsSL https://railway.app/install.sh | sh
-          echo "$HOME/.railway/bin" >> $GITHUB_PATH
+          set -euo pipefail
+
+          # Primary install method.
+          if curl -fsSL https://railway.app/install.sh | sh; then
+            echo "$HOME/.railway/bin" >> $GITHUB_PATH
+          else
+            # Fallback: GitHub may be unreachable from the runner, which breaks the install script.
+            # Using npm avoids fetching the release asset from GitHub.
+            echo "⚠️ Railway install script failed; falling back to npm install"
+            npm install -g @railway/cli
+            echo "$(npm bin -g)" >> $GITHUB_PATH
+          fi
+
+          railway --version
 
       - name: Deploy with Railway
         env:

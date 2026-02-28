@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import socket
 from collections.abc import Callable
+from urllib.parse import urlparse
 
 from backend.utils.supabase_env import resolve_supabase_config
 
@@ -31,11 +33,23 @@ def get_supabase(
                 "SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY / SUPABASE_KEY."
             )
         return None
-    try:
-        # If caller provides a custom factory (tests), don't cache to avoid cross-test leakage.
-        if create_client_fn is not None:
-            return create_client_fn(cfg.url, cfg.key)
 
+    # If caller provides a custom factory (tests), bypass DNS checks and caching.
+    if create_client_fn is not None:
+        return create_client_fn(cfg.url, cfg.key)
+
+    # If the hostname is not resolvable, treat Supabase as effectively unconfigured.
+    # This keeps CI/local dev stable when placeholder env vars are present.
+    try:
+        host = urlparse(cfg.url).hostname
+        if not host:
+            raise RuntimeError("Invalid SUPABASE_URL (missing hostname)")
+        socket.gethostbyname(host)
+    except Exception as e:
+        if required:
+            raise RuntimeError(f"Supabase URL is not resolvable: {cfg.url}") from e
+        return None
+    try:
         global _CACHED_CLIENT, _CACHED_SIGNATURE
         sig = (cfg.url, cfg.key)
 

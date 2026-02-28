@@ -1319,8 +1319,16 @@ async def scrape_zoopla_properties(
     # Start audit logging
     with RunLog.start(source="zoopla", mode=SCRAPER_MODE, location=location) as run_log:
         try:
+            effective_max_pages = (
+                int(max_pages)
+                if max_pages is not None
+                else int(os.getenv("ZP_MAX_PAGES", str(ZP_MAX_PAGES)))
+            )
+            # Keep bounded to avoid accidental deep paging.
+            effective_max_pages = max(1, min(5, int(effective_max_pages)))
+
             place_slug = _slugify_location(location)
-            search_urls = build_zoopla_search_urls(place_slug)
+            search_urls = build_zoopla_search_urls(place_slug, max_pages=effective_max_pages)
             seen: Set[str] = set()
             async with aiohttp.ClientSession() as session:
                 for url_index, url in enumerate(search_urls):

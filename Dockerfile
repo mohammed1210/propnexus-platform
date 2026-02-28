@@ -27,7 +27,9 @@ RUN python3 -m pip install --upgrade pip && \
 RUN python3 -m playwright install --with-deps chromium
 
 # Frontend dependencies (Next.js app)
-RUN cd frontend && npm ci
+# Note: some Railway deploys exclude `frontend/` from the build context via `.railwayignore`.
+# Guard this step so backend-only deploys still succeed.
+RUN if [ -d frontend ]; then cd frontend && npm ci; else echo "frontend/ not present; skipping npm ci"; fi
 
 # Default to running the FastAPI backend via uvicorn
 WORKDIR /app

@@ -63,20 +63,24 @@ def build_zoopla_search_urls(
     place_name: str,
     base_url: str = "https://www.zoopla.co.uk/for-sale/property",
     results_per_page: int = 25,
+    max_pages: int = 1,
 ) -> list[str]:
     """
     Zoopla build is path-based (`/for-sale/property/<city>/?q=<city>&results_sort=age`)
     """
     urls: list[str] = []
+    effective_max_pages = max(1, int(max_pages or 1))
+
     for _, sort_flag in _ZOOPLA_SORT_PARAMS.items():
-        query = urlencode(
-            {
-                "q": place_name,
-                "results_sort": sort_flag,
-                "pn": 1,  # first page only
-                "view_type": "list",
-                "include_rented": "false",
-            }
-        )
-        urls.append(f"{base_url}/{place_name}/?{query}")
+        for page in range(1, effective_max_pages + 1):
+            query = urlencode(
+                {
+                    "q": place_name,
+                    "results_sort": sort_flag,
+                    "pn": page,
+                    "view_type": "list",
+                    "include_rented": "false",
+                }
+            )
+            urls.append(f"{base_url}/{place_name}/?{query}")
     return urls
