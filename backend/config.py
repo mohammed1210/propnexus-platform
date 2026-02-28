@@ -4,14 +4,14 @@ import os
 
 
 def _env_bool(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
+    raw = os.getenv(name)
+    if raw is None:
         return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 class Settings:
-    SMART_SEARCH_SYNONYMS: bool = _env_bool("SMART_SEARCH_SYNONYMS", True)
+    SMART_SEARCH_ML_RERANK: bool = _env_bool("SMART_SEARCH_ML_RERANK", False)
 
 
 settings = Settings()
