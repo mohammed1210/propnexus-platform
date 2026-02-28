@@ -8,3 +8,6 @@ create table if not exists analytics.search_clicks (
   rank        int,
   inserted_at timestamptz default now()
 );
+
+grant usage on schema analytics to service_role;
+grant insert, select on table analytics.search_clicks to service_role;
