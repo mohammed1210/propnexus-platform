@@ -15,6 +15,8 @@ from fastapi.params import Param
 from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
+from backend.config import settings
+from backend.search.query import expand_query_terms, fetch_postgres_fuzzy_ids, is_postgres_detected
 from backend.utils.admin_auth import require_admin
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
@@ -817,13 +819,21 @@ def list_properties(
                 seen_pt.add(canon)
                 property_type_filter.append(canon)
 
+        raw_query_text = str(q or "").strip()
+        search_terms_for_q: List[str] = []
+        if raw_query_text:
+            if settings.SMART_SEARCH_SYNONYMS:
+                search_terms_for_q = expand_query_terms(raw_query_text)
+            if not search_terms_for_q:
+                search_terms_for_q = [raw_query_text]
+
         # We try DB filtering first; if the column doesn't exist, fall back to python filtering.
         property_type_db_value: str | None = (
             str(property_type) if property_type is not None else None
         )
         python_filter_property_type = False
 
-        def _build_base_query():
+        def _build_base_query(*, include_text_search: bool = True):
             q0 = sb.table("properties").select("*", count="exact")
 
             def _parse_csv(value: Any) -> List[str]:
@@ -877,11 +887,18 @@ def list_properties(
                     q0 = q0.gte("created_at", ts)
 
             # Search across common fields
-            if q:
-                q_esc = q.replace("%", "").strip()
-                if q_esc:
-                    # Supabase .or_ expects a comma-separated filter string
-                    q0 = q0.or_(f"title.ilike.%{q_esc}%,location.ilike.%{q_esc}%")
+            if include_text_search and raw_query_text:
+                parts: List[str] = []
+                for term in search_terms_for_q[:30]:
+                    q_esc = str(term).replace("%", "").replace(",", " ").strip()
+                    if not q_esc:
+                        continue
+                    parts.append(f"title.ilike.%{q_esc}%")
+                    parts.append(f"location.ilike.%{q_esc}%")
+
+                if parts:
+                    # Supabase .or_ expects a comma-separated filter string.
+                    q0 = q0.or_(",".join(parts))
 
             # Numeric filters
             if min is not None:
@@ -1039,6 +1056,46 @@ def list_properties(
         total_int = int(total) if isinstance(total, (int, float)) else 0
 
         items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
+
+        # Postgres-only fuzzy fallback (pg_trgm + levenshtein<=1) for typo tolerance.
+        if (
+            settings.SMART_SEARCH_SYNONYMS
+            and raw_query_text
+            and not items
+            and total_int == 0
+            and is_postgres_detected()
+            and search_terms_for_q
+        ):
+            try:
+                fuzzy_ids = fetch_postgres_fuzzy_ids(
+                    raw_query_text,
+                    search_terms_for_q,
+                    limit=builtins.max(limit * 3, 50),
+                )
+                if fuzzy_ids:
+                    ranked_ids = [str(i) for i in fuzzy_ids[:500] if str(i).strip()]
+                    id_position = {pid: idx for idx, pid in enumerate(ranked_ids)}
+
+                    fuzzy_query = _build_base_query(include_text_search=False)
+                    fuzzy_query = fuzzy_query.in_("id", ranked_ids)
+                    fuzzy_query = fuzzy_query.range(0, builtins.max(len(ranked_ids) - 1, 0))
+
+                    fuzzy_res = fuzzy_query.execute()
+                    fuzzy_rows = fuzzy_res.data or []
+                    if isinstance(fuzzy_rows, list):
+                        filtered_ranked = sorted(
+                            [
+                                _normalize_property_row(r)
+                                for r in fuzzy_rows
+                                if isinstance(r, dict) and str(r.get("id") or "") in id_position
+                            ],
+                            key=lambda row: id_position.get(str(row.get("id") or ""), 10**9),
+                        )
+
+                        total_int = len(filtered_ranked)
+                        items = filtered_ranked[offset : offset + limit]
+            except Exception:
+                pass
 
         # Attach cached enrichment (geo/crime/comps/derived) where available.
         try:
