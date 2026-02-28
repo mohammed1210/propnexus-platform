@@ -1,26 +1,45 @@
 from __future__ import annotations
 
 import os
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 MODEL_PATH = Path(os.getenv("SMART_SEARCH_MODEL_PATH", "models/search_rerank.json"))
+_MODEL_CACHE: tuple[int, Any] | None = None
+_MODEL_FAILED_MTIME: int | None = None
 
 
-@lru_cache(maxsize=1)
 def get_model():
+    global _MODEL_CACHE, _MODEL_FAILED_MTIME
+
     try:
         import xgboost as xgb  # type: ignore[import-not-found]
     except Exception:
         return None
 
     path = MODEL_PATH
-    if not path.exists():
+    try:
+        mtime = path.stat().st_mtime_ns
+    except FileNotFoundError:
+        _MODEL_CACHE = None
+        _MODEL_FAILED_MTIME = None
+        return None
+
+    if _MODEL_CACHE is not None and _MODEL_CACHE[0] == mtime:
+        return _MODEL_CACHE[1]
+    if _MODEL_FAILED_MTIME == mtime:
         return None
 
     model = xgb.Booster()
-    model.load_model(str(path))
+    try:
+        model.load_model(str(path))
+    except Exception:
+        _MODEL_CACHE = None
+        _MODEL_FAILED_MTIME = mtime
+        return None
+
+    _MODEL_CACHE = (mtime, model)
+    _MODEL_FAILED_MTIME = None
     return model
 
 
