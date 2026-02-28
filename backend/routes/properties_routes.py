@@ -833,7 +833,7 @@ def list_properties(
         )
         python_filter_property_type = False
 
-        def _build_base_query():
+        def _build_base_query(*, include_text_search: bool = True):
             q0 = sb.table("properties").select("*", count="exact")
 
             def _parse_csv(value: Any) -> List[str]:
@@ -887,7 +887,7 @@ def list_properties(
                     q0 = q0.gte("created_at", ts)
 
             # Search across common fields
-            if raw_query_text:
+            if include_text_search and raw_query_text:
                 parts: List[str] = []
                 for term in search_terms_for_q[:30]:
                     q_esc = str(term).replace("%", "").replace(",", " ").strip()
@@ -1062,6 +1062,7 @@ def list_properties(
             settings.SMART_SEARCH_SYNONYMS
             and raw_query_text
             and not items
+            and total_int == 0
             and is_postgres_detected()
             and search_terms_for_q
         ):
@@ -1072,23 +1073,27 @@ def list_properties(
                     limit=builtins.max(limit * 3, 50),
                 )
                 if fuzzy_ids:
-                    fuzzy_res = (
-                        sb.table("properties")
-                        .select("*", count="exact")
-                        .in_("id", fuzzy_ids[:500])
-                        .limit(limit)
-                        .execute()
-                    )
+                    ranked_ids = [str(i) for i in fuzzy_ids[:500] if str(i).strip()]
+                    id_position = {pid: idx for idx, pid in enumerate(ranked_ids)}
+
+                    fuzzy_query = _build_base_query(include_text_search=False)
+                    fuzzy_query = fuzzy_query.in_("id", ranked_ids)
+                    fuzzy_query = fuzzy_query.range(0, builtins.max(len(ranked_ids) - 1, 0))
+
+                    fuzzy_res = fuzzy_query.execute()
                     fuzzy_rows = fuzzy_res.data or []
                     if isinstance(fuzzy_rows, list):
-                        items = [
-                            _normalize_property_row(r) for r in fuzzy_rows if isinstance(r, dict)
-                        ]
-                        fuzzy_total = getattr(fuzzy_res, "count", None)
-                        if isinstance(fuzzy_total, (int, float)):
-                            total_int = int(fuzzy_total)
-                        elif items:
-                            total_int = len(items)
+                        filtered_ranked = sorted(
+                            [
+                                _normalize_property_row(r)
+                                for r in fuzzy_rows
+                                if isinstance(r, dict) and str(r.get("id") or "") in id_position
+                            ],
+                            key=lambda row: id_position.get(str(row.get("id") or ""), 10**9),
+                        )
+
+                        total_int = len(filtered_ranked)
+                        items = filtered_ranked[offset : offset + limit]
             except Exception:
                 pass
 
