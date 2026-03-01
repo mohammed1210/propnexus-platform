@@ -10,9 +10,13 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
-from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+except Exception:  # pragma: no cover - optional runtime dependency
+    Instrumentator = None  # type: ignore[assignment]
 
 # ruff: noqa: E402
 
@@ -63,7 +67,10 @@ except Exception as e:
 
 app = FastAPI()
 
-Instrumentator().instrument(app).expose(app)
+if Instrumentator is not None:
+    Instrumentator().instrument(app).expose(app)
+else:
+    logger.warning("prometheus_fastapi_instrumentator not installed; /metrics disabled")
 
 
 _enrichment_worker = None
