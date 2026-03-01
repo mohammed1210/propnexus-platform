@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from backend.ml.rerank import rerank
@@ -8,6 +11,155 @@ from backend.ml.rerank import rerank
 
 def _normalize_text(v: Any) -> str:
     return str(v or "").strip().lower()
+
+
+@lru_cache(maxsize=1)
+def _synonym_map() -> dict[str, set[str]]:
+    path = Path(__file__).resolve().parents[2] / "search" / "synonyms.yml"
+    mapping: dict[str, set[str]] = {}
+
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except Exception:
+        return mapping
+
+    for raw_line in lines:
+        line = str(raw_line or "").strip()
+        if not line or line.startswith("#"):
+            continue
+        terms = [_normalize_text(p) for p in line.split(",") if _normalize_text(p)]
+        if len(terms) < 2:
+            continue
+        group = set(terms)
+        for term in group:
+            mapping.setdefault(term, set()).update(group)
+
+    return mapping
+
+
+def expand_query_terms(raw_query: str, max_terms: int = 30) -> list[str]:
+    q = _normalize_text(raw_query)
+    if not q:
+        return []
+
+    syn = _synonym_map()
+    out: list[str] = []
+    seen: set[str] = set()
+
+    def _add(term: str) -> None:
+        t = _normalize_text(term)
+        if not t or t in seen:
+            return
+        seen.add(t)
+        out.append(t)
+
+    _add(q)
+    for token in [t for t in q.replace("-", " ").split() if t.strip()]:
+        _add(token)
+
+    for key in list(out):
+        for s in sorted(syn.get(key, set())):
+            _add(s)
+            if len(out) >= max_terms:
+                return out[:max_terms]
+
+    return out[:max_terms]
+
+
+def _postgres_url() -> str:
+    return str(
+        os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or os.getenv("POSTGRESQL_URL") or ""
+    ).strip()
+
+
+def is_postgres_detected() -> bool:
+    url = _postgres_url().lower()
+    return url.startswith("postgres://") or url.startswith("postgresql://")
+
+
+def fetch_postgres_fuzzy_ids(
+    raw_query: str, expanded_terms: list[str], limit: int = 50
+) -> list[str]:
+    if not is_postgres_detected():
+        return []
+
+    q = _normalize_text(raw_query)
+    if not q:
+        return []
+
+    try:
+        from sqlalchemy import create_engine, text
+    except Exception:
+        return []
+
+    terms = [t for t in expanded_terms if _normalize_text(t)]
+    if not terms:
+        terms = [q]
+    terms = terms[:20]
+
+    params: dict[str, Any] = {
+        "q": q,
+        "limit": max(1, int(limit)),
+    }
+
+    like_clauses: list[str] = []
+    for idx, term in enumerate(terms):
+        key = f"t{idx}"
+        params[key] = f"%{_normalize_text(term)}%"
+        like_clauses.append(f"lower(title) LIKE :{key}")
+        like_clauses.append(f"lower(location) LIKE :{key}")
+
+    where_like = " OR ".join(like_clauses) if like_clauses else "FALSE"
+
+    query_with_similarity = text(
+        f"""
+        SELECT id::text
+        FROM properties
+        WHERE ({where_like})
+           OR similarity(lower(coalesce(title, '')), :q) >= 0.2
+           OR similarity(lower(coalesce(location, '')), :q) >= 0.2
+        ORDER BY GREATEST(
+            similarity(lower(coalesce(title, '')), :q),
+            similarity(lower(coalesce(location, '')), :q)
+        ) DESC NULLS LAST,
+        created_at DESC NULLS LAST
+        LIMIT :limit
+        """
+    )
+
+    query_without_similarity = text(
+        f"""
+        SELECT id::text
+        FROM properties
+        WHERE ({where_like})
+        ORDER BY created_at DESC NULLS LAST
+        LIMIT :limit
+        """
+    )
+
+    engine = create_engine(_postgres_url(), future=True)
+    try:
+        with engine.connect() as conn:
+            try:
+                rows = conn.execute(query_with_similarity, params).fetchall()
+            except Exception:
+                rows = conn.execute(query_without_similarity, params).fetchall()
+    except Exception:
+        return []
+    finally:
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for row in rows:
+        rid = str(row[0] if isinstance(row, (list, tuple)) else row)
+        if rid and rid not in seen:
+            seen.add(rid)
+            out.append(rid)
+    return out
 
 
 def _trigrams(text: str) -> set[str]:

@@ -16,7 +16,12 @@ from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
 from backend.config import settings
-from backend.search.query import search_with_optional_rerank
+from backend.search.query import (
+    expand_query_terms,
+    fetch_postgres_fuzzy_ids,
+    is_postgres_detected,
+    search_with_optional_rerank,
+)
 from backend.utils.admin_auth import require_admin
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
