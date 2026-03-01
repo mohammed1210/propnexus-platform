@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 
 import FilterBar, { type FilterBarValue } from '@/components/FilterBar';
 import { useSearchFilterParams } from '@/hooks/useSearchParams';
@@ -21,6 +21,14 @@ type SearchResponse = {
 };
 
 export default function SearchPage() {
+  return (
+    <Suspense fallback={<main className="mx-auto max-w-6xl p-4">Loading…</main>}>
+      <SearchInner />
+    </Suspense>
+  );
+}
+
+function SearchInner() {
   const { state, setQueryParams, resetQueryParams } = useSearchFilterParams();
   const [items, setItems] = useState<SearchItem[]>([]);
   const [total, setTotal] = useState(0);
