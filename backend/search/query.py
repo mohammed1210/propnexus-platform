@@ -162,6 +162,83 @@ def fetch_postgres_fuzzy_ids(
     return out
 
 
+def _within_edit_distance_one(a: str, b: str) -> bool:
+    a = _normalize_text(a)
+    b = _normalize_text(b)
+    if not a or not b:
+        return False
+    if abs(len(a) - len(b)) > 1:
+        return False
+    if a == b:
+        return True
+
+    i = j = 0
+    edits = 0
+    while i < len(a) and j < len(b):
+        if a[i] == b[j]:
+            i += 1
+            j += 1
+            continue
+
+        edits += 1
+        if edits > 1:
+            return False
+
+        if len(a) > len(b):
+            i += 1
+        elif len(a) < len(b):
+            j += 1
+        else:
+            i += 1
+            j += 1
+
+    if i < len(a) or j < len(b):
+        edits += 1
+    return edits <= 1
+
+
+def query(raw_query: str, listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    q = _normalize_text(raw_query)
+    if not q:
+        return list(listings or [])
+
+    expanded = expand_query_terms(q)
+    if q not in expanded:
+        expanded.insert(0, q)
+
+    query_tokens = [t for t in q.replace("-", " ").split() if t.strip()]
+    if not query_tokens:
+        query_tokens = [q]
+
+    results: list[dict[str, Any]] = []
+    for row in listings or []:
+        if not isinstance(row, dict):
+            continue
+
+        tags = row.get("tags")
+        tags_text = " ".join(str(t) for t in tags) if isinstance(tags, list) else str(tags or "")
+        haystack = " ".join(
+            [
+                _normalize_text(row.get("title")),
+                _normalize_text(row.get("location")),
+                _normalize_text(tags_text),
+            ]
+        ).strip()
+        hay_tokens = [t for t in haystack.replace("-", " ").split() if t.strip()]
+
+        matched = any(term in haystack for term in expanded)
+        if not matched:
+            for qt in query_tokens:
+                if any(_within_edit_distance_one(qt, ht) for ht in hay_tokens):
+                    matched = True
+                    break
+
+        if matched:
+            results.append(row)
+
+    return results
+
+
 def _trigrams(text: str) -> set[str]:
     s = f"  {text}  "
     return {s[i : i + 3] for i in range(max(len(s) - 2, 0))}

@@ -11,6 +11,7 @@ def _env_bool(name: str, default: bool) -> bool:
 
 
 class Settings:
+    SMART_SEARCH_SYNONYMS: bool = _env_bool("SMART_SEARCH_SYNONYMS", True)
     SMART_SEARCH_ML_RERANK: bool = _env_bool("SMART_SEARCH_ML_RERANK", False)
 
 
