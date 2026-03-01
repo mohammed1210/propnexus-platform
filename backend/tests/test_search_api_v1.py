@@ -56,3 +56,43 @@ def test_api_v1_search_respects_flag_when_ml_not_forced(monkeypatch) -> None:
     body = res.json()
     assert body["ml_enabled"] is False
     assert body["ids"] == ["a", "b"]
+
+
+def test_api_v1_search_post_returns_filtered_payload_shape(monkeypatch) -> None:
+    from backend.routes import properties_routes
+
+    monkeypatch.setattr(
+        properties_routes,
+        "query_db",
+        lambda _payload: {
+            "items": [{"id": "x1", "title": "Filtered item", "bedrooms": 3}],
+            "total_results": 1,
+        },
+    )
+    monkeypatch.setattr(
+        properties_routes,
+        "get_facets",
+        lambda _payload: {
+            "beds": {"1": 0, "2": 0, "3": 1, "4+": 0},
+            "price": {"0-100k": 0, "100-200k": 0, "200-300k": 1, "300-500k": 0, "500k+": 0},
+            "yield": {">=5%": 1, ">=7%": 0},
+        },
+    )
+
+    payload = {
+        "q": "london",
+        "filters": {
+            "beds": {"gte": 2, "lte": 4},
+            "price": {"lte": 300000},
+            "yield": {"gte": 0.05},
+        },
+    }
+    res = client.post("/api/v1/search", json=payload)
+    assert res.status_code == 200
+    body = res.json()
+
+    assert body["q"] == "london"
+    assert body["count"] == 1
+    assert body["total_results"] == 1
+    assert body["items"][0]["id"] == "x1"
+    assert body["facets"]["beds"]["3"] == 1

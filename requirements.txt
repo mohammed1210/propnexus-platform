@@ -36,6 +36,7 @@ pydantic_core==2.33.2
 pyee==13.0.0
 PyJWT==2.10.1
 python-dotenv==1.1.1
+python-jose==3.5.0
 python-multipart==0.0.20
 PyYAML==6.0.2
 realtime==2.20.0
@@ -57,6 +58,7 @@ urllib3==2.5.0
 uvicorn==0.37.0
 virtualenv==20.34.0
 websockets==15.0.1
+aiohttp==3.12.15
 sentry-sdk==1.43.0
 prometheus-fastapi-instrumentator==7.1.0
 slowapi==0.1.9
