@@ -22,6 +22,9 @@ class _FakeSB:
     def schema(self, _name):
         return _FakeSchema()
 
+    def table(self, _name):
+        return _FakeTable()
+
 
 def test_search_click_event_accepts_valid_payload(monkeypatch):
     from backend.routes import events
@@ -45,4 +48,31 @@ def test_search_click_event_rejects_invalid_uuid():
         "rank": 1,
     }
     res = client.post("/events/search_click", json=body)
+    assert res.status_code == 422
+
+
+def test_filter_select_event_accepts_valid_payload(monkeypatch):
+    from backend.routes import events
+
+    monkeypatch.setattr(events, "require_sb", lambda: _FakeSB())
+
+    body = {
+        "facet": "price",
+        "value": "0-300k",
+    }
+    res = client.post("/events/filter_select", json=body)
+    assert res.status_code == 200
+    assert res.json().get("ok") is True
+
+
+def test_filter_select_event_rejects_missing_facet(monkeypatch):
+    from backend.routes import events
+
+    monkeypatch.setattr(events, "require_sb", lambda: _FakeSB())
+
+    body = {
+        "facet": "",
+        "value": "0-300k",
+    }
+    res = client.post("/events/filter_select", json=body)
     assert res.status_code == 422

@@ -16,10 +16,12 @@ from postgrest.exceptions import APIError
 from pydantic import BaseModel, Field
 
 from backend.config import settings
+from backend.search.facets import get_facets
 from backend.search.query import (
     expand_query_terms,
     fetch_postgres_fuzzy_ids,
     is_postgres_detected,
+    query_db,
     search_with_optional_rerank,
 )
 from backend.utils.admin_auth import require_admin
@@ -160,6 +162,26 @@ class PropertiesPageResponse(BaseModel):
     has_more: bool = False
 
 
+class SearchRangeFilter(BaseModel):
+    gte: float | None = None
+    lte: float | None = None
+
+
+class SearchFiltersPayload(BaseModel):
+    beds: SearchRangeFilter | None = None
+    price: SearchRangeFilter | None = None
+    yield_filter: SearchRangeFilter | None = Field(default=None, alias="yield")
+
+    model_config = {"populate_by_name": True}
+
+
+class SearchPayload(BaseModel):
+    q: str = ""
+    filters: SearchFiltersPayload = Field(default_factory=SearchFiltersPayload)
+    limit: int = Field(default=20, ge=1, le=100)
+    offset: int = Field(default=0, ge=0)
+
+
 @router.get("/api/v1/search")
 def api_v1_search(
     query: str = Query(default="", alias="query"),
@@ -185,6 +207,28 @@ def api_v1_search(
         "count": len(top),
         "ids": ids,
         "items": top,
+    }
+
+
+@router.post("/api/v1/search")
+def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
+    filter_payload = payload.model_dump(by_alias=True)
+    queried = query_db(filter_payload)
+    items = queried.get("items") if isinstance(queried, dict) else []
+    total_results = queried.get("total_results") if isinstance(queried, dict) else 0
+
+    out_items = [dict(item) for item in items] if isinstance(items, list) else []
+    facets = get_facets(filter_payload)
+
+    return {
+        "q": payload.q,
+        "filters": filter_payload.get("filters", {}),
+        "items": out_items,
+        "count": len(out_items),
+        "total_results": int(total_results or 0),
+        "facets": facets,
+        "limit": payload.limit,
+        "offset": payload.offset,
     }
 
 

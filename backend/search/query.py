@@ -197,10 +197,173 @@ def _within_edit_distance_one(a: str, b: str) -> bool:
     return edits <= 1
 
 
-def query(raw_query: str, listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    q = _normalize_text(raw_query)
+def _coerce_optional_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def _extract_range(filters: dict[str, Any], key: str) -> tuple[float | None, float | None]:
+    raw = filters.get(key)
+    if not isinstance(raw, dict):
+        return (None, None)
+    return (_coerce_optional_float(raw.get("gte")), _coerce_optional_float(raw.get("lte")))
+
+
+def _matches_numeric_filters(row: dict[str, Any], filters: dict[str, Any]) -> bool:
+    beds_gte, beds_lte = _extract_range(filters, "beds")
+    price_gte, price_lte = _extract_range(filters, "price")
+    yield_gte, yield_lte = _extract_range(filters, "yield")
+
+    beds_val = _coerce_optional_float(row.get("bedrooms"))
+    price_val = _coerce_optional_float(row.get("price"))
+    row_yield = row.get("yield") if row.get("yield") is not None else row.get("yield_percent")
+    yield_val = _coerce_optional_float(row_yield)
+
+    if beds_gte is not None and (beds_val is None or beds_val < beds_gte):
+        return False
+    if beds_lte is not None and (beds_val is None or beds_val > beds_lte):
+        return False
+
+    if price_gte is not None and (price_val is None or price_val < price_gte):
+        return False
+    if price_lte is not None and (price_val is None or price_val > price_lte):
+        return False
+
+    if yield_gte is not None and (yield_val is None or yield_val < yield_gte):
+        return False
+    if yield_lte is not None and (yield_val is None or yield_val > yield_lte):
+        return False
+
+    return True
+
+
+def build_search_where(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    q = _normalize_text(payload.get("q"))
+    filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+
+    clauses: list[str] = ["1=1"]
+    params: dict[str, Any] = {}
+
+    if q:
+        params["q"] = f"%{q}%"
+        clauses.append(
+            "(lower(coalesce(title, '')) LIKE :q OR lower(coalesce(location, '')) LIKE :q OR lower(coalesce(postcode, '')) LIKE :q)"
+        )
+
+    beds_gte, beds_lte = _extract_range(filters, "beds")
+    if beds_gte is not None:
+        clauses.append("bedrooms >= :beds_gte")
+        params["beds_gte"] = beds_gte
+    if beds_lte is not None:
+        clauses.append("bedrooms <= :beds_lte")
+        params["beds_lte"] = beds_lte
+
+    price_gte, price_lte = _extract_range(filters, "price")
+    if price_gte is not None:
+        clauses.append("price >= :price_gte")
+        params["price_gte"] = price_gte
+    if price_lte is not None:
+        clauses.append("price <= :price_lte")
+        params["price_lte"] = price_lte
+
+    yield_gte, yield_lte = _extract_range(filters, "yield")
+    if yield_gte is not None:
+        clauses.append("COALESCE(yield, yield_percent) >= :yield_gte")
+        params["yield_gte"] = yield_gte
+    if yield_lte is not None:
+        clauses.append("COALESCE(yield, yield_percent) <= :yield_lte")
+        params["yield_lte"] = yield_lte
+
+    return " AND ".join(clauses), params
+
+
+def query_db(payload: dict[str, Any]) -> dict[str, Any]:
+    if not is_postgres_detected():
+        return {"items": [], "total_results": 0}
+
+    try:
+        from sqlalchemy import create_engine, text
+    except Exception:
+        return {"items": [], "total_results": 0}
+
+    safe_payload = payload if isinstance(payload, dict) else {}
+    where_sql, params = build_search_where(safe_payload)
+    limit = int(safe_payload.get("limit", 20) or 20)
+    offset = int(safe_payload.get("offset", 0) or 0)
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+
+    params.update({"limit": limit, "offset": offset})
+
+    stmt = text(
+        f"""
+        SELECT
+            id::text,
+            title,
+            location,
+            postcode,
+            price,
+            bedrooms,
+            bathrooms,
+            COALESCE(yield, yield_percent) AS yield,
+            yield_percent,
+            roi_percent,
+            source,
+            created_at,
+            count(*) OVER() AS total_results
+        FROM properties
+        WHERE {where_sql}
+        ORDER BY created_at DESC NULLS LAST
+        LIMIT :limit OFFSET :offset
+        """
+    )
+
+    engine = create_engine(_postgres_url(), future=True)
+    rows: list[dict[str, Any]] = []
+    total_results = 0
+    try:
+        with engine.connect() as conn:
+            rs = conn.execute(stmt, params)
+            for rec in rs.mappings().all():
+                row = dict(rec)
+                total_results = int(row.get("total_results") or 0)
+                rows.append(row)
+    except Exception:
+        return {"items": [], "total_results": 0}
+    finally:
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+
+    for row in rows:
+        row.pop("total_results", None)
+
+    return {"items": rows, "total_results": total_results}
+
+
+def query(raw_query: str | dict[str, Any], listings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    payload_mode = isinstance(raw_query, dict)
+    payload = raw_query if payload_mode else None
+
+    q = _normalize_text(payload.get("q") if payload_mode else raw_query)
     if not q:
+        if payload_mode and isinstance(payload.get("filters"), dict):
+            return [
+                row
+                for row in list(listings or [])
+                if isinstance(row, dict)
+                and _matches_numeric_filters(row, payload.get("filters", {}))
+            ]
         return list(listings or [])
+
+    filters = (
+        payload.get("filters") if payload_mode and isinstance(payload.get("filters"), dict) else {}
+    )
 
     expanded = expand_query_terms(q)
     if q not in expanded:
@@ -234,6 +397,8 @@ def query(raw_query: str, listings: list[dict[str, Any]]) -> list[dict[str, Any]
                     break
 
         if matched:
+            if filters and not _matches_numeric_filters(row, filters):
+                continue
             results.append(row)
 
     return results
