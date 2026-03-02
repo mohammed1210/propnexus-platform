@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import difflib
 import os
+import re
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from backend.ml.rerank import rerank
+from backend.search.synonyms import load_synonyms
 
 
 def _normalize_text(v: Any) -> str:
@@ -304,6 +307,7 @@ def query_db(payload: dict[str, Any]) -> dict[str, Any]:
         SELECT
             id::text,
             title,
+            description,
             location,
             postcode,
             price,
@@ -342,6 +346,34 @@ def query_db(payload: dict[str, Any]) -> dict[str, Any]:
 
     for row in rows:
         row.pop("total_results", None)
+
+    # ──────────────── NEW: build match metadata ────────────────
+    def find_matches(
+        row: dict[str, Any], q_terms: list[str], syn: dict[str, set[str]]
+    ) -> list[str]:
+        title = str(row.get("title") or "").lower()
+        description = str(row.get("description") or "").lower()
+        tokens = re.split(r"[^\w]+", f"{title} {description}")
+        out: list[str] = []
+
+        for term in q_terms:
+            if term in tokens:
+                out.append(
+                    f"keyword:title:{term}" if term in title else f"keyword:description:{term}"
+                )
+            for s in syn.get(term, set()):
+                if s in tokens:
+                    out.append(f"synonym:description:{s}")
+            for tok in tokens:
+                if tok and difflib.SequenceMatcher(None, term, tok).ratio() > 0.84:
+                    out.append(f"fuzzy:{tok}")
+                    break
+        return out
+
+    syn_map = load_synonyms()
+    q_terms = str(safe_payload.get("q") or "").lower().split()
+    for row in rows:
+        row["matches"] = find_matches(row, q_terms, syn_map)
 
     return {"items": rows, "total_results": total_results}
 

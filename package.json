@@ -47,6 +47,7 @@
     "validate-config": "node scripts/check-env.cjs",
     "ingest:csv": "tsx scripts/ingest-csv.ts data/listings.sample.csv --source=rightmove",
     "ingest:live": "tsx scripts/ingest-live.ts",
+    "type-check": "npm run typecheck",
     "typecheck": "tsc --noEmit",
     "health:report": "node scripts/system-health-report.mjs",
     "test": "jest --passWithNoTests --testPathIgnorePatterns='e2e/'",

@@ -52,6 +52,7 @@ export function useSearchFilterParams() {
 
   const setQueryParams = useCallback(
     (next: SearchFilterState) => {
+      const basePath = pathname || '/search';
       const params = new URLSearchParams(searchParams?.toString() ?? '');
 
       if (next.q) params.set('q', next.q);
@@ -70,14 +71,14 @@ export function useSearchFilterParams() {
       if (typeof next.yieldMin === 'number') params.set('yield_min', String(next.yieldMin));
       else params.delete('yield_min');
 
-      const target = `${pathname}?${params.toString()}`;
+      const target = `${basePath}?${params.toString()}`;
       router.replace(target, { scroll: false });
     },
     [pathname, router, searchParams],
   );
 
   const resetQueryParams = useCallback(() => {
-    router.replace(pathname, { scroll: false });
+    router.replace(pathname || '/search', { scroll: false });
   }, [pathname, router]);
 
   return { state, setQueryParams, resetQueryParams };
