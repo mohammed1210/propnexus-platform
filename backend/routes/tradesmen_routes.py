@@ -231,7 +231,7 @@ def contact_tradesman(request: ContactTradesmanRequest):
 
         lead_id = lead_response.data[0]["id"]
 
-        # TODO: Send email notification to tradesman
+        # TODO(#318): Send notification email to the tradesman after lead creation.
         # For now, we're just storing the lead. Email integration can be added later
         # using existing email utilities (Resend API, Mailgun, etc.)
         tradesman_email = tradesman.get("email")

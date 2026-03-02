@@ -55,7 +55,7 @@ export default function Header() {
           Account) unreachable on phones. If you need to hide the links on
           mobile, add a replacement mobile menu before switching to `hidden md:flex`.
 
-          TODO: Replace this inline nav with a responsive menu (Disclosure or
+          TODO(#319): Replace inline nav with a responsive menu (Disclosure or
           a separate mobile nav component) so links remain accessible on all
           breakpoints.
         */}
