@@ -23,6 +23,28 @@ export function useStreamedSearch(body: Record<string, unknown> | null) {
       setMeta({});
       setLoading(true);
 
+      const applyEnvelope = (obj: Record<string, unknown>) => {
+        const results = obj.results;
+        const items = obj.items;
+        const envelopeHits = Array.isArray(results)
+          ? (results as SearchHit[])
+          : Array.isArray(items)
+            ? (items as SearchHit[])
+            : null;
+
+        if (!envelopeHits) return false;
+
+        setHits(envelopeHits);
+        setMeta({
+          broadened: Boolean(obj.broadened),
+          changes:
+            obj.changes && typeof obj.changes === 'object'
+              ? (obj.changes as Record<string, string>)
+              : {},
+        });
+        return true;
+      };
+
       try {
         const res = await fetch('/api/search?stream=1', {
           method: 'POST',
@@ -49,21 +71,22 @@ export function useStreamedSearch(body: Record<string, unknown> | null) {
             if (!l.trim()) continue;
             try {
               const obj = JSON.parse(l) as Record<string, unknown>;
-              if (Array.isArray(obj.results)) {
-                setHits(obj.results as SearchHit[]);
-                setMeta({
-                  broadened: Boolean(obj.broadened),
-                  changes:
-                    obj.changes && typeof obj.changes === 'object'
-                      ? (obj.changes as Record<string, string>)
-                      : {},
-                });
-                return;
-              }
+              if (applyEnvelope(obj)) return;
               setHits((h) => [...h, obj]);
             } catch {
               // ignore malformed stream lines
             }
+          }
+        }
+
+        // Handle non-NDJSON responses (e.g. proxy returns a single JSON payload).
+        if (buf.trim()) {
+          try {
+            const obj = JSON.parse(buf) as Record<string, unknown>;
+            if (applyEnvelope(obj)) return;
+            setHits([obj]);
+          } catch {
+            // ignore trailing junk
           }
         }
       } finally {
@@ -72,7 +95,7 @@ export function useStreamedSearch(body: Record<string, unknown> | null) {
     })().catch(console.error);
 
     return () => abort.current?.abort();
-  }, [JSON.stringify(body)]);
+  }, [body]);
 
   return { hits, loading, meta };
 }

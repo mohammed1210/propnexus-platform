@@ -16,11 +16,17 @@ type SearchItem = {
   price?: number;
   bedrooms?: number;
   yield?: number;
+  matches?: string[];
 };
 
 function toSearchItem(hit: SearchHit): SearchItem | null {
   const id = typeof hit.id === 'string' ? hit.id : null;
   if (!id) return null;
+
+  const matchesRaw = Array.isArray(hit.matches) ? hit.matches : null;
+  const matches = matchesRaw
+    ? matchesRaw.filter((m): m is string => typeof m === 'string')
+    : undefined;
 
   return {
     id,
@@ -28,6 +34,7 @@ function toSearchItem(hit: SearchHit): SearchItem | null {
     location: typeof hit.location === 'string' ? hit.location : undefined,
     price: typeof hit.price === 'number' ? hit.price : undefined,
     bedrooms: typeof hit.bedrooms === 'number' ? hit.bedrooms : undefined,
+    matches: matches && matches.length > 0 ? matches : undefined,
   };
 }
 
@@ -147,6 +154,7 @@ function SearchInner() {
               location: item.location,
               price: item.price,
               bedrooms: item.bedrooms,
+              matches: item.matches,
             }}
             rank={index + 1}
           />
