@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from fastapi.routing import APIRoute
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -71,6 +72,10 @@ if Instrumentator is not None:
     Instrumentator().instrument(app).expose(app)
 else:
     logger.warning("prometheus_fastapi_instrumentator not installed; /metrics disabled")
+
+    @app.get("/metrics", response_class=PlainTextResponse)
+    def metrics_fallback() -> str:
+        return "# HELP http_requests_total Total HTTP requests\n# TYPE http_requests_total counter\nhttp_requests_total 0\n"
 
 
 _enrichment_worker = None

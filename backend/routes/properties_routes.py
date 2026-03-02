@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 from backend.config import settings
 from backend.search.facets import get_facets
+from backend.search.fallback import broaden
 from backend.search.query import (
     expand_query_terms,
     fetch_postgres_fuzzy_ids,
@@ -178,6 +179,7 @@ class SearchFiltersPayload(BaseModel):
 class SearchPayload(BaseModel):
     q: str = ""
     filters: SearchFiltersPayload = Field(default_factory=SearchFiltersPayload)
+    allow_broaden: bool = True
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
 
@@ -218,6 +220,28 @@ def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
     total_results = queried.get("total_results") if isinstance(queried, dict) else 0
 
     out_items = [dict(item) for item in items] if isinstance(items, list) else []
+
+    if not out_items and payload.allow_broaden:
+        original_filters = filter_payload.get("filters", {})
+        new_filters, changed = broaden(
+            original_filters if isinstance(original_filters, dict) else {}
+        )
+        widened_payload = dict(filter_payload)
+        widened_payload["filters"] = new_filters
+        widened_payload["allow_broaden"] = False
+
+        alt_queried = query_db(widened_payload)
+        alt_items = alt_queried.get("items") if isinstance(alt_queried, dict) else []
+        alt_total = alt_queried.get("total_results") if isinstance(alt_queried, dict) else 0
+        alt_out_items = [dict(item) for item in alt_items] if isinstance(alt_items, list) else []
+
+        return {
+            "results": alt_out_items,
+            "total": int(alt_total or len(alt_out_items)),
+            "broadened": True,
+            "changes": changed,
+        }
+
     facets = get_facets(filter_payload)
 
     return {
