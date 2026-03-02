@@ -142,7 +142,7 @@ export default function QuickStatsActions({
   };
 
   const handleExportPDF = () => {
-    // TODO: Integrate with PDF export
+    // TODO(#320): Integrate the quick actions PDF export flow.
     toast.info('PDF export coming soon!');
   };
 
