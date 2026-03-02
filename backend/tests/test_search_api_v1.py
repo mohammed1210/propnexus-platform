@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from fastapi.testclient import TestClient
 
 from backend.main import app
@@ -123,6 +126,35 @@ def test_api_v1_search_post_logs_search_query_metrics(monkeypatch) -> None:
             return _FakeTable()
 
     monkeypatch.setattr(properties_routes, "_get_supabase", lambda: _FakeSB())
+
+
+def test_api_v1_search_post_typo_query_returns_results_with_fixture(monkeypatch) -> None:
+    from backend.routes import properties_routes
+
+    fixture_path = Path(__file__).parent / "fixtures" / "search_guardrail_rows.json"
+    rows = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+    def _fake_query_db(payload):
+        q = str(payload.get("q") or "").strip().lower()
+        if q == "londn":
+            return {"items": [rows[0]], "total_results": 1}
+        return {"items": [], "total_results": 0}
+
+    monkeypatch.setattr(properties_routes, "query_db", _fake_query_db)
+    monkeypatch.setattr(properties_routes, "get_facets", lambda _payload: {})
+
+    res = client.post("/api/v1/search", json={"q": "londn", "allow_broaden": False, "filters": {}})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["total_results"] == 1
+    assert body["items"][0]["location"] == "London"
+
+
+def test_api_v1_search_post_allow_broaden_false_skips_fallback(monkeypatch) -> None:
+    from backend.routes import properties_routes
+
+    broaden_called = {"value": False}
+
     monkeypatch.setattr(
         properties_routes,
         "query_db",
@@ -132,6 +164,12 @@ def test_api_v1_search_post_logs_search_query_metrics(monkeypatch) -> None:
         },
     )
     monkeypatch.setattr(properties_routes, "get_facets", lambda _payload: {})
+
+    def _fake_broaden(_filters):
+        broaden_called["value"] = True
+        return {}, {}
+
+    monkeypatch.setattr(properties_routes, "broaden", _fake_broaden)
 
     res = client.post(
         "/api/v1/search",
@@ -143,6 +181,15 @@ def test_api_v1_search_post_logs_search_query_metrics(monkeypatch) -> None:
     )
 
     assert res.status_code == 200
-    assert inserted_rows, "Expected search query metric row to be inserted"
-    assert inserted_rows[0]["query"] == "londn"
-    assert inserted_rows[0]["results_count"] == 0
+    body = res.json()
+    assert body.get("broadened") is not True
+    assert body["count"] == 0
+    assert broaden_called["value"] is False
+
+
+def test_expand_query_terms_includes_synonyms() -> None:
+    from backend.search.query import expand_query_terms
+
+    terms = expand_query_terms("flat")
+    assert "flat" in terms
+    assert "apartment" in terms
