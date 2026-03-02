@@ -96,3 +96,53 @@ def test_api_v1_search_post_returns_filtered_payload_shape(monkeypatch) -> None:
     assert body["total_results"] == 1
     assert body["items"][0]["id"] == "x1"
     assert body["facets"]["beds"]["3"] == 1
+
+
+def test_api_v1_search_post_logs_search_query_metrics(monkeypatch) -> None:
+    from backend.routes import properties_routes
+
+    inserted_rows: list[dict] = []
+
+    class _FakeTable:
+        def insert(self, row):
+            inserted_rows.append(row)
+            return self
+
+        def execute(self):
+            return type("Res", (), {"data": [{"ok": True}]})()
+
+    class _FakeSchema:
+        def table(self, _name):
+            return _FakeTable()
+
+    class _FakeSB:
+        def schema(self, _name):
+            return _FakeSchema()
+
+        def table(self, _name):
+            return _FakeTable()
+
+    monkeypatch.setattr(properties_routes, "_get_supabase", lambda: _FakeSB())
+    monkeypatch.setattr(
+        properties_routes,
+        "query_db",
+        lambda _payload: {
+            "items": [],
+            "total_results": 0,
+        },
+    )
+    monkeypatch.setattr(properties_routes, "get_facets", lambda _payload: {})
+
+    res = client.post(
+        "/api/v1/search",
+        json={
+            "q": "londn",
+            "allow_broaden": False,
+            "filters": {"price": {"lte": 250000}},
+        },
+    )
+
+    assert res.status_code == 200
+    assert inserted_rows, "Expected search query metric row to be inserted"
+    assert inserted_rows[0]["query"] == "londn"
+    assert inserted_rows[0]["results_count"] == 0
