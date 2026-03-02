@@ -156,6 +156,8 @@ function SearchInner() {
               bedrooms: item.bedrooms,
               matches: item.matches,
             }}
+            queryText={state.q || 'london'}
+            filters={payload.filters}
             rank={index + 1}
           />
         ))}

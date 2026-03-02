@@ -1770,6 +1770,15 @@ function ListingsInner() {
                     isHovered={hoveredId === property.id}
                     onHoverChange={(h) => setHoveredId(h ? property.id : null)}
                     queryId={queryId || null}
+                    queryText={q || qRaw}
+                    filters={{
+                      min: minP,
+                      max: maxP,
+                      beds,
+                      baths,
+                      investment_type: investmentTypeUrl || undefined,
+                      property_type: propertyTypeUrl || undefined,
+                    }}
                     rank={offset + idx + 1}
                   />
                 ))}
@@ -1803,6 +1812,15 @@ function ListingsInner() {
                       isHovered={hoveredId === property.id}
                       onHoverChange={(h) => setHoveredId(h ? property.id : null)}
                       queryId={queryId || null}
+                      queryText={q || qRaw}
+                      filters={{
+                        min: minP,
+                        max: maxP,
+                        beds,
+                        baths,
+                        investment_type: investmentTypeUrl || undefined,
+                        property_type: propertyTypeUrl || undefined,
+                      }}
                       rank={offset + idx + 1}
                     />
                   ))}
