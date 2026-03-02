@@ -34,7 +34,7 @@
     "@sentry/nextjs": "^10.40.0",
     "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.39.4",
+    "@supabase/supabase-js": "^2.98.0",
     "@vis.gl/react-google-maps": "^1.7.1",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
