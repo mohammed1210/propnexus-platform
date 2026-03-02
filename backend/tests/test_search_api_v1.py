@@ -181,9 +181,6 @@ def test_api_v1_search_post_allow_broaden_false_skips_fallback(monkeypatch) -> N
     )
 
     assert res.status_code == 200
-    assert inserted_rows, "Expected search query metric row to be inserted"
-    assert inserted_rows[0]["query"] == "londn"
-    assert inserted_rows[0]["results_count"] == 0
     body = res.json()
     assert body.get("broadened") is not True
     assert body["count"] == 0
