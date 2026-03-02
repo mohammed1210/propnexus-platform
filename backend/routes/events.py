@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
@@ -19,6 +20,11 @@ filter_click_total = Counter(
 
 
 class SearchClickEvent(BaseModel):
+    query: str = ""
+    property_id: UUID | None = None
+    position: int | None = Field(default=None, ge=1)
+    filters_json: dict[str, Any] | None = None
+    session_id: str | None = None
     query_id: UUID
     listing_id: UUID
     rank: int | None = Field(default=None, ge=1)
@@ -35,7 +41,36 @@ class FilterSelectEvent(BaseModel):
 def post_search_click(payload: SearchClickEvent) -> dict[str, Any]:
     sb = require_sb()
 
+    property_id = payload.property_id or payload.listing_id
+    position = payload.position if payload.position is not None else payload.rank
+    query_text = str(payload.query or "").strip()
+    session_id = str(payload.session_id or "").strip()
+
+    if session_id and query_text and property_id:
+        dedupe_from = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+        try:
+            existing = (
+                sb.schema("analytics")
+                .table("search_clicks")
+                .select("id")
+                .eq("session_id", session_id)
+                .eq("query", query_text)
+                .eq("property_id", str(property_id))
+                .gte("created_at", dedupe_from)
+                .limit(1)
+                .execute()
+            )
+            if existing.data:
+                return {"ok": True, "deduped": True}
+        except Exception:
+            pass
+
     row = {
+        "query": query_text,
+        "property_id": str(property_id),
+        "position": position,
+        "filters_json": payload.filters_json or {},
+        "session_id": session_id,
         "query_id": str(payload.query_id),
         "listing_id": str(payload.listing_id),
         "rank": payload.rank,
