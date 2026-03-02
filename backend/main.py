@@ -37,6 +37,7 @@ from backend.routes import admin_schedule
 from backend.routes.admin_ingestion import router as admin_ingestion_router
 from backend.routes.admin_scrape_runs import router as admin_scrape_runs_router
 from backend.routes.ai import router as ai_router
+from backend.routes.analytics_metrics import router as analytics_metrics_router
 from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
 from backend.routes.debug_properties import router as debug_properties_router
@@ -296,6 +297,7 @@ def _shutdown_worker():
 # 🔌 Routers
 # ======================
 app.include_router(ai_router)
+app.include_router(analytics_metrics_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
 app.include_router(debug_properties_router, dependencies=[Depends(require_debug_enabled)])
