@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { fetchWithRetry } from '@/lib/api';
 import ImageWithFallback from '@/components/ImageWithFallback';
+import { Highlight } from '@/components/Highlight';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiHeart } from 'react-icons/fi';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
@@ -41,6 +42,7 @@ type Property = {
   monthly_rent?: number | null;
   rent_pcm?: number | null;
   rent_per_month?: number | null;
+  matches?: string[] | null;
 };
 
 type InsightsPayload = {
@@ -474,6 +476,47 @@ export default function PropertyCard({
     return trimmed.slice(0, 177) + '...';
   }, [p.description]);
 
+  const matchInfo = useMemo(() => {
+    const raw = Array.isArray(p.matches) ? p.matches : [];
+    const terms = new Set<string>();
+    let exact = false;
+    let synonym = false;
+    let fuzzy = false;
+
+    for (const item of raw) {
+      const value = String(item || '').trim();
+      if (!value) continue;
+
+      if (value.startsWith('keyword:')) {
+        exact = true;
+        const term = value.split(':').pop();
+        if (term) terms.add(term.toLowerCase());
+        continue;
+      }
+
+      if (value.startsWith('synonym:')) {
+        synonym = true;
+        const term = value.split(':').pop();
+        if (term) terms.add(term.toLowerCase());
+        continue;
+      }
+
+      if (value.startsWith('fuzzy:')) {
+        fuzzy = true;
+        const term = value.split(':').pop();
+        if (term) terms.add(term.toLowerCase());
+      }
+    }
+
+    return {
+      hasAny: exact || synonym || fuzzy,
+      exact,
+      synonym,
+      fuzzy,
+      tokens: Array.from(terms),
+    };
+  }, [p.matches]);
+
   const sourceBadgeText = useMemo(() => formatSourceBadge(p.source), [p.source]);
   const sourceBadgeClasses = useMemo(() => getSourceBadgeClasses(p.source), [p.source]);
 
@@ -626,7 +669,7 @@ export default function PropertyCard({
 
       {descriptionSnippet && (
         <div className="px-4 pt-3 text-sm text-slate-700 dark:text-slate-300 line-clamp-3">
-          {descriptionSnippet}
+          <Highlight text={descriptionSnippet} tokens={matchInfo.tokens} />
         </div>
       )}
 
@@ -645,9 +688,29 @@ export default function PropertyCard({
             </span>
           </div>
           <h3 className="font-semibold leading-snug line-clamp-2 group-hover:underline">
-            {p.title || 'Untitled property'}
+            <Highlight text={p.title || 'Untitled property'} tokens={matchInfo.tokens} />
           </h3>
         </Link>
+
+        {matchInfo.hasAny && (
+          <div className="flex flex-wrap gap-1 pt-1">
+            {matchInfo.exact && (
+              <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-300">
+                exact
+              </span>
+            )}
+            {matchInfo.synonym && (
+              <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold text-violet-700 dark:border-violet-700/60 dark:bg-violet-900/20 dark:text-violet-300">
+                synonym
+              </span>
+            )}
+            {matchInfo.fuzzy && (
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-300">
+                fuzzy
+              </span>
+            )}
+          </div>
+        )}
 
         <p className="text-sm text-zinc-600 dark:text-zinc-400">{p.location || '—'}</p>
 

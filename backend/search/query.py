@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import difflib
 import os
+import re
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from backend.ml.rerank import rerank
+from backend.search.synonyms import load_synonyms
 
 
 def _normalize_text(v: Any) -> str:
@@ -241,7 +244,9 @@ def _matches_numeric_filters(row: dict[str, Any], filters: dict[str, Any]) -> bo
     return True
 
 
-def build_search_where(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+def build_search_where(
+    payload: dict[str, Any], *, include_similarity: bool = False
+) -> tuple[str, dict[str, Any]]:
     q = _normalize_text(payload.get("q"))
     filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
 
@@ -250,9 +255,23 @@ def build_search_where(payload: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
     if q:
         params["q"] = f"%{q}%"
-        clauses.append(
-            "(lower(coalesce(title, '')) LIKE :q OR lower(coalesce(location, '')) LIKE :q OR lower(coalesce(postcode, '')) LIKE :q)"
-        )
+        search_clauses = [
+            "lower(coalesce(title, '')) LIKE :q",
+            "lower(coalesce(description, '')) LIKE :q",
+            "lower(coalesce(location, '')) LIKE :q",
+            "lower(coalesce(postcode, '')) LIKE :q",
+        ]
+        if include_similarity:
+            params["q_raw"] = q
+            search_clauses.extend(
+                [
+                    "similarity(lower(coalesce(title, '')), :q_raw) >= 0.2",
+                    "similarity(lower(coalesce(description, '')), :q_raw) >= 0.2",
+                    "similarity(lower(coalesce(location, '')), :q_raw) >= 0.2",
+                    "similarity(lower(coalesce(postcode, '')), :q_raw) >= 0.2",
+                ]
+            )
+        clauses.append(f"({' OR '.join(search_clauses)})")
 
     beds_gte, beds_lte = _extract_range(filters, "beds")
     if beds_gte is not None:
@@ -291,47 +310,58 @@ def query_db(payload: dict[str, Any]) -> dict[str, Any]:
         return {"items": [], "total_results": 0}
 
     safe_payload = payload if isinstance(payload, dict) else {}
-    where_sql, params = build_search_where(safe_payload)
     limit = int(safe_payload.get("limit", 20) or 20)
     offset = int(safe_payload.get("offset", 0) or 0)
     limit = max(1, min(limit, 100))
     offset = max(0, offset)
-
-    params.update({"limit": limit, "offset": offset})
-
-    stmt = text(
-        f"""
-        SELECT
-            id::text,
-            title,
-            location,
-            postcode,
-            price,
-            bedrooms,
-            bathrooms,
-            COALESCE(yield, yield_percent) AS yield,
-            yield_percent,
-            roi_percent,
-            source,
-            created_at,
-            count(*) OVER() AS total_results
-        FROM properties
-        WHERE {where_sql}
-        ORDER BY created_at DESC NULLS LAST
-        LIMIT :limit OFFSET :offset
-        """
-    )
 
     engine = create_engine(_postgres_url(), future=True)
     rows: list[dict[str, Any]] = []
     total_results = 0
     try:
         with engine.connect() as conn:
-            rs = conn.execute(stmt, params)
-            for rec in rs.mappings().all():
-                row = dict(rec)
-                total_results = int(row.get("total_results") or 0)
-                rows.append(row)
+
+            def _run(include_similarity: bool) -> tuple[list[dict[str, Any]], int]:
+                where_sql, params = build_search_where(
+                    safe_payload, include_similarity=include_similarity
+                )
+                params.update({"limit": limit, "offset": offset})
+                stmt = text(
+                    f"""
+                    SELECT
+                        id::text,
+                        title,
+                        description,
+                        location,
+                        postcode,
+                        price,
+                        bedrooms,
+                        bathrooms,
+                        COALESCE(yield, yield_percent) AS yield,
+                        yield_percent,
+                        roi_percent,
+                        source,
+                        created_at,
+                        count(*) OVER() AS total_results
+                    FROM properties
+                    WHERE {where_sql}
+                    ORDER BY created_at DESC NULLS LAST
+                    LIMIT :limit OFFSET :offset
+                    """
+                )
+                local_rows: list[dict[str, Any]] = []
+                local_total = 0
+                rs = conn.execute(stmt, params)
+                for rec in rs.mappings().all():
+                    row = dict(rec)
+                    local_total = int(row.get("total_results") or 0)
+                    local_rows.append(row)
+                return local_rows, local_total
+
+            try:
+                rows, total_results = _run(include_similarity=True)
+            except Exception:
+                rows, total_results = _run(include_similarity=False)
     except Exception:
         return {"items": [], "total_results": 0}
     finally:
@@ -342,6 +372,46 @@ def query_db(payload: dict[str, Any]) -> dict[str, Any]:
 
     for row in rows:
         row.pop("total_results", None)
+
+    # ──────────────── NEW: build match metadata ────────────────
+    def find_matches(
+        row: dict[str, Any], q_terms: list[str], syn: dict[str, set[str]]
+    ) -> list[str]:
+        title = str(row.get("title") or "").lower()
+        description = str(row.get("description") or "").lower()
+        location = str(row.get("location") or "").lower()
+        postcode = str(row.get("postcode") or "").lower()
+        tokens = re.split(r"[^\w]+", f"{title} {description} {location} {postcode}")
+        out: list[str] = []
+
+        for term in q_terms:
+            if term in tokens:
+                if term in title:
+                    out.append(f"keyword:title:{term}")
+                elif term in description:
+                    out.append(f"keyword:description:{term}")
+                elif term in location:
+                    out.append(f"keyword:location:{term}")
+                elif term in postcode:
+                    out.append(f"keyword:postcode:{term}")
+            for s in syn.get(term, set()):
+                if s in tokens:
+                    if s in location:
+                        out.append(f"synonym:location:{s}")
+                    elif s in postcode:
+                        out.append(f"synonym:postcode:{s}")
+                    else:
+                        out.append(f"synonym:description:{s}")
+            for tok in tokens:
+                if tok and difflib.SequenceMatcher(None, term, tok).ratio() > 0.84:
+                    out.append(f"fuzzy:{tok}")
+                    break
+        return out
+
+    syn_map = load_synonyms()
+    q_terms = str(safe_payload.get("q") or "").lower().split()
+    for row in rows:
+        row["matches"] = find_matches(row, q_terms, syn_map)
 
     return {"items": rows, "total_results": total_results}
 
