@@ -1,8 +1,9 @@
 // frontend/components/property_details/calculators/BTLCalculator.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { calculateBTL } from '@/lib/investment/formulas';
+import { projectMortgage } from '@/lib/finance/mortgage';
 import type { BTLInput, BTLOutput } from '@/lib/investment/types';
 
 interface BTLCalculatorProps {
@@ -12,12 +13,43 @@ interface BTLCalculatorProps {
   savedInputs?: Partial<BTLInput>;
 }
 
+type ChartData = {
+  basePath: string;
+  overpayPath: string;
+  width: number;
+  height: number;
+};
+
+function buildLinePath(
+  points: Array<{ year: number; balance: number }>,
+  width: number,
+  height: number,
+  padding = 8,
+): string {
+  if (points.length < 2) return '';
+
+  const maxYear = Math.max(...points.map((point) => point.year), 1);
+  const maxBalance = Math.max(...points.map((point) => point.balance), 1);
+  const innerWidth = Math.max(width - padding * 2, 1);
+  const innerHeight = Math.max(height - padding * 2, 1);
+
+  return points
+    .map((point, index) => {
+      const x = padding + (point.year / maxYear) * innerWidth;
+      const y = height - padding - (point.balance / maxBalance) * innerHeight;
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`;
+    })
+    .join(' ');
+}
+
 export default function BTLCalculator({
   initialPrice,
   onChange,
   onInputChange,
   savedInputs,
 }: BTLCalculatorProps) {
+  const [monthlyOverpayment, setMonthlyOverpayment] = useState(0);
+
   const [inputs, setInputs] = useState<BTLInput>({
     price: initialPrice ?? savedInputs?.price ?? 200000,
     depositPercent: savedInputs?.depositPercent ?? 25,
@@ -38,6 +70,63 @@ export default function BTLCalculator({
   useEffect(() => {
     onInputChange?.(inputs);
   }, [inputs, onInputChange]);
+
+  const baseProjection = useMemo(
+    () =>
+      projectMortgage({
+        principal: output.loanAmount,
+        annualRatePct: inputs.interestRate,
+        termYears: inputs.termYears,
+        monthlyOverpayment: 0,
+      }),
+    [inputs.interestRate, inputs.termYears, output.loanAmount],
+  );
+
+  const overpayProjection = useMemo(
+    () =>
+      projectMortgage({
+        principal: output.loanAmount,
+        annualRatePct: inputs.interestRate,
+        termYears: inputs.termYears,
+        monthlyOverpayment,
+      }),
+    [inputs.interestRate, inputs.termYears, monthlyOverpayment, output.loanAmount],
+  );
+
+  const chart = useMemo<ChartData>(() => {
+    if (baseProjection.yearlyBalance.length < 2) {
+      return { basePath: '', overpayPath: '', width: 300, height: 108 };
+    }
+
+    const width = 300;
+    const height = 108;
+    const maxYear = Math.max(
+      baseProjection.yearlyBalance[baseProjection.yearlyBalance.length - 1]?.year ?? 0,
+      overpayProjection.yearlyBalance[overpayProjection.yearlyBalance.length - 1]?.year ?? 0,
+      1,
+    );
+    const maxBalance = Math.max(
+      baseProjection.yearlyBalance[0]?.balance ?? 0,
+      overpayProjection.yearlyBalance[0]?.balance ?? 0,
+      1,
+    );
+
+    const normalize = (points: Array<{ year: number; balance: number }>) =>
+      points.map((point) => ({
+        year: maxYear > 0 ? (point.year / maxYear) * 100 : 0,
+        balance: maxBalance > 0 ? (point.balance / maxBalance) * 100 : 0,
+      }));
+
+    return {
+      basePath: buildLinePath(normalize(baseProjection.yearlyBalance), width, height),
+      overpayPath: buildLinePath(normalize(overpayProjection.yearlyBalance), width, height),
+      width,
+      height,
+    };
+  }, [baseProjection.yearlyBalance, overpayProjection.yearlyBalance]);
+
+  const monthsSaved = Math.max(baseProjection.monthsToPayoff - overpayProjection.monthsToPayoff, 0);
+  const interestSaved = Math.max(baseProjection.totalInterest - overpayProjection.totalInterest, 0);
 
   const handleChange = (field: keyof BTLInput) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
@@ -136,6 +225,26 @@ export default function BTLCalculator({
             step="50"
           />
         </div>
+
+        <div>
+          <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">
+            Monthly Overpayment (£)
+          </label>
+          <input
+            type="number"
+            value={monthlyOverpayment}
+            onChange={(e) => {
+              const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+              setMonthlyOverpayment(isNaN(value) ? 0 : Math.max(0, value));
+            }}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-900 text-gray-900 dark:text-gray-100"
+            min="0"
+            step="25"
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Used for amortization comparison only.
+          </p>
+        </div>
       </div>
 
       {/* Outputs */}
@@ -193,6 +302,43 @@ export default function BTLCalculator({
               {output.roi.toFixed(2)}%
             </div>
           </div>
+        </div>
+
+        <div className="bg-gray-50 dark:bg-zinc-800/40 p-3 rounded-lg">
+          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Amortization Trend</div>
+          <svg
+            viewBox={`0 0 ${chart.width} ${chart.height}`}
+            className="w-full h-24 text-gray-500 dark:text-gray-300"
+            aria-label="BTL amortization trend chart"
+            role="img"
+          >
+            <path
+              d={chart.basePath}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeOpacity="0.45"
+              strokeDasharray="4 4"
+            />
+            {monthlyOverpayment > 0 && (
+              <path
+                d={chart.overpayPath}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              />
+            )}
+          </svg>
+          <div className="mt-1 text-xs text-gray-600 dark:text-gray-400 flex items-center gap-3">
+            <span>Dashed: base</span>
+            <span>Solid: overpay</span>
+          </div>
+          {monthlyOverpayment > 0 && (
+            <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+              Saved: £{interestSaved.toLocaleString(undefined, { maximumFractionDigits: 0 })} interest /{' '}
+              {(monthsSaved / 12).toFixed(1)} years
+            </div>
+          )}
         </div>
       </div>
     </div>
