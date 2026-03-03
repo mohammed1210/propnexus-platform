@@ -35,6 +35,7 @@ from backend.middleware.rate_limit import limiter
 from backend.middleware.security import SecurityHeadersMiddleware
 from backend.routes import admin_schedule
 from backend.routes.admin_ingestion import router as admin_ingestion_router
+from backend.routes.admin_ml import router as admin_ml_router
 from backend.routes.admin_scrape_runs import router as admin_scrape_runs_router
 from backend.routes.ai import router as ai_router
 from backend.routes.analytics_metrics import router as analytics_metrics_router
@@ -318,6 +319,7 @@ app.include_router(scrape_router)
 app.include_router(search_health_router)
 app.include_router(tradesmen_router)
 app.include_router(admin_schedule.router)
+app.include_router(admin_ml_router)
 
 # Waitlist
 app.include_router(waitlist_router)
