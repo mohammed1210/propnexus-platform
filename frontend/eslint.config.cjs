@@ -1,4 +1,5 @@
 const nextCoreWebVitals = require('eslint-config-next/core-web-vitals');
+const jsxA11y = require('eslint-plugin-jsx-a11y');
 
 module.exports = [
   {
@@ -8,6 +9,7 @@ module.exports = [
     },
   },
   ...nextCoreWebVitals,
+  jsxA11y.flatConfigs.recommended,
   {
     rules: {
       // Enabled by Next's flat config but not by the legacy eslintrc config.

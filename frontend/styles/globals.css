@@ -43,6 +43,19 @@
   --panel-bg: rgba(255, 255, 255, 0.03);
 }
 
+:root.high-contrast {
+  --pnx-ring: 3px;
+}
+
+.high-contrast {
+  color-scheme: light dark;
+}
+
+.high-contrast * {
+  text-decoration-thickness: max(2px, 0.12em);
+  text-underline-offset: 0.2em;
+}
+
 /* 2) Form control baseline */
 input[type='text'],
 input[type='number'],
