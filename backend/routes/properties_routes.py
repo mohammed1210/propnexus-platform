@@ -12,7 +12,9 @@ from collections import deque
 from datetime import datetime, timezone
 from time import monotonic
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
+import httpx
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.params import Param
 from postgrest.exceptions import APIError
@@ -350,7 +352,7 @@ def api_v1_search(
 
 
 @router.post("/api/v1/search")
-def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
+def _run_local_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
     filter_payload = payload.model_dump(by_alias=True)
     queried = query_db(filter_payload)
     items = queried.get("items") if isinstance(queried, dict) else []
@@ -379,6 +381,7 @@ def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
             "total": int(alt_total or len(alt_out_items)),
             "broadened": True,
             "changes": changed,
+            "served_by": "local",
         }
 
     facets = get_facets(filter_payload)
@@ -394,7 +397,48 @@ def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
         "facets": facets,
         "limit": payload.limit,
         "offset": payload.offset,
+        "served_by": "local",
     }
+
+
+@router.post("/internal/search", include_in_schema=False)
+def internal_search(payload: SearchPayload) -> dict[str, Any]:
+    return _run_local_search_with_filters(payload)
+
+
+@router.post("/api/v1/search")
+def api_v1_search_with_filters(payload: SearchPayload, request: Request) -> dict[str, Any]:
+    target = str(getattr(settings, "SEARCH_INSTANCE", "blue") or "blue").strip().lower()
+    if target not in {"blue", "green"}:
+        logger.warning("SEARCH_INSTANCE=%s invalid, defaulting to blue", target)
+        target = "blue"
+
+    svc_url = str(os.getenv(f"SERVICE_URL_search_{target}") or "").strip()
+    if svc_url:
+        try:
+            request_host = urlparse(str(request.base_url)).netloc.lower()
+            target_host = urlparse(svc_url).netloc.lower()
+            if request_host and target_host and request_host == target_host:
+                body = _run_local_search_with_filters(payload)
+                body["served_by"] = target
+                return body
+
+            with httpx.Client(timeout=8.0) as client:
+                resp = client.post(
+                    f"{svc_url.rstrip('/')}/internal/search",
+                    json=payload.model_dump(by_alias=True),
+                )
+                resp.raise_for_status()
+                body = resp.json()
+                if isinstance(body, dict):
+                    body["served_by"] = target
+                return body
+        except Exception as e:
+            logger.error("Blue-Green target %s failed: %s – falling back to local", target, e)
+
+    body = _run_local_search_with_filters(payload)
+    body["served_by"] = "local"
+    return body
 
 
 def _safe_order(query: Any, column: str, *, desc: bool, nulls_last: bool = True) -> Any:

@@ -30,6 +30,7 @@ class Settings:
     SMART_SEARCH_ML_FALLBACK_COOLDOWN_SECONDS: int = _env_int(
         "SMART_SEARCH_ML_FALLBACK_COOLDOWN_SECONDS", 600
     )
+    SEARCH_INSTANCE: str = str(os.getenv("SEARCH_INSTANCE", "blue") or "blue").strip().lower()
 
 
 settings = Settings()

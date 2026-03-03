@@ -1,0 +1,10 @@
+{
+  "name": "search-proxy",
+  "routes": [
+    {
+      "src": "/api/search",
+      "dest": "@search-${env:SEARCH_INSTANCE}",
+      "methods": ["GET", "POST", "OPTIONS"]
+    }
+  ]
+}
