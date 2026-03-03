@@ -10,6 +10,7 @@ import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
 import { track } from '@/lib/events';
 import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import { Badge } from '@/components/Badges';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -43,6 +44,7 @@ type Property = {
   rent_pcm?: number | null;
   rent_per_month?: number | null;
   matches?: string[] | null;
+  badges?: string[] | null;
 };
 
 type InsightsPayload = {
@@ -715,6 +717,14 @@ export default function PropertyCard({
                 fuzzy
               </span>
             )}
+          </div>
+        )}
+
+        {Array.isArray(p.badges) && p.badges.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {p.badges.map((badgeId) => (
+              <Badge key={badgeId} id={String(badgeId)} />
+            ))}
           </div>
         )}
 
