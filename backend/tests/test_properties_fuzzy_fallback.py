@@ -179,3 +179,44 @@ def test_fuzzy_fallback_without_postgres_uses_python_scoring(mock_create_client,
     assert len(body["items"]) == 1
     assert body["items"][0]["id"] == "id1"
     fuzzy_mock.assert_not_called()
+
+
+@patch("backend.routes.properties_routes.create_client")
+def test_fuzzy_fallback_exposes_correction_metadata_when_inferred(mock_create_client, client):
+    from backend.routes import properties_routes
+
+    mock_sb = Mock()
+    mock_query = _make_query_mock()
+    mock_query.execute.side_effect = [
+        Mock(data=[], count=0),
+        Mock(
+            data=[
+                {
+                    "id": "id1",
+                    "title": "Flat",
+                    "location": "London",
+                    "postcode": "E1 6AN",
+                }
+            ],
+            count=1,
+        ),
+        Mock(data=[{"id": "id1", "title": "Flat", "location": "London"}], count=1),
+    ]
+
+    mock_sb.table.return_value = mock_query
+    mock_create_client.return_value = mock_sb
+
+    with (
+        patch.object(properties_routes.settings, "SMART_SEARCH_SYNONYMS", True),
+        patch("backend.routes.properties_routes.is_postgres_detected", return_value=False),
+        patch("backend.routes.properties_routes.fetch_postgres_fuzzy_ids") as fuzzy_mock,
+    ):
+        res = client.get("/properties", params={"q": "londn", "limit": 10, "offset": 0})
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["correction_applied"] is True
+    assert body["original_query"] == "londn"
+    assert body["corrected_query"] == "london"
+    assert body["correction_source"] == "fuzzy_fallback"
+    fuzzy_mock.assert_not_called()

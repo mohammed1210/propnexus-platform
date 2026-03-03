@@ -162,6 +162,10 @@ class PropertiesPageResponse(BaseModel):
     limit: int = 50
     offset: int = 0
     has_more: bool = False
+    correction_applied: Optional[bool] = None
+    original_query: Optional[str] = None
+    corrected_query: Optional[str] = None
+    correction_source: Optional[str] = None
 
 
 class SearchRangeFilter(BaseModel):
@@ -954,12 +958,58 @@ def list_properties(
                 property_type_filter.append(canon)
 
         raw_query_text = str(q or "").strip()
+        correction_applied = False
+        original_query = raw_query_text or None
+        corrected_query: str | None = None
+        correction_source: str | None = None
         search_terms_for_q: List[str] = []
         if raw_query_text:
             if settings.SMART_SEARCH_SYNONYMS:
                 search_terms_for_q = expand_query_terms(raw_query_text)
             if not search_terms_for_q:
                 search_terms_for_q = [raw_query_text]
+
+        def _location_terms_from_rows(rows: List[Dict[str, Any]]) -> set[str]:
+            terms: set[str] = set()
+            for row in rows[:200]:
+                loc_blob = " ".join(
+                    [
+                        str(row.get("location") or ""),
+                        str(row.get("postcode") or ""),
+                    ]
+                ).lower()
+                for tok in re.split(r"[^a-z0-9]+", loc_blob):
+                    tok_norm = str(tok or "").strip()
+                    if len(tok_norm) >= 3:
+                        terms.add(tok_norm)
+            return terms
+
+        def _best_correction_term(raw_text: str, rows: List[Dict[str, Any]]) -> str | None:
+            q_tokens = [
+                tok for tok in re.split(r"[^a-z0-9]+", str(raw_text or "").lower()) if len(tok) >= 3
+            ]
+            if not q_tokens:
+                return None
+
+            location_terms = _location_terms_from_rows(rows)
+            if not location_terms:
+                return None
+
+            primary = q_tokens[0]
+            if primary in location_terms:
+                return None
+
+            best_term: str | None = None
+            best_ratio = 0.0
+            for candidate in location_terms:
+                ratio = difflib.SequenceMatcher(None, primary, candidate).ratio()
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_term = candidate
+
+            if best_term and best_ratio >= 0.84:
+                return best_term
+            return None
 
         # We try DB filtering first; if the column doesn't exist, fall back to python filtering.
         property_type_db_value: str | None = (
@@ -1210,6 +1260,15 @@ def list_properties(
                     )
 
                 if not fuzzy_ids:
+                    fuzzy_threshold = 0.88
+                    try:
+                        fuzzy_threshold = float(
+                            os.getenv("SMART_SEARCH_PY_FUZZY_THRESHOLD", "0.88")
+                        )
+                    except Exception:
+                        fuzzy_threshold = 0.88
+                    fuzzy_threshold = builtins.min(builtins.max(fuzzy_threshold, 0.65), 0.98)
+
                     candidate_limit = builtins.max(limit * 10, 200)
                     candidate_query = _build_base_query(include_text_search=False)
                     candidate_query = _safe_order(
@@ -1230,8 +1289,19 @@ def list_properties(
                                     str(row.get("postcode") or ""),
                                 ]
                             ).lower()
+                            location_blob = " ".join(
+                                [
+                                    str(row.get("location") or ""),
+                                    str(row.get("postcode") or ""),
+                                ]
+                            ).lower()
                             tokens = [
                                 tok for tok in re.split(r"[^a-z0-9]+", raw_blob) if len(tok) >= 3
+                            ]
+                            location_tokens = [
+                                tok
+                                for tok in re.split(r"[^a-z0-9]+", location_blob)
+                                if len(tok) >= 3
                             ]
                             if not tokens:
                                 return 0.0
@@ -1241,8 +1311,15 @@ def list_properties(
                                 term_norm = str(term or "").strip().lower()
                                 if len(term_norm) < 3:
                                     continue
+                                if term_norm in location_tokens:
+                                    return 1.2
                                 if term_norm in tokens:
-                                    return 1.0
+                                    best = builtins.max(best, 1.0)
+                                    continue
+                                for tok in location_tokens[:200]:
+                                    ratio = difflib.SequenceMatcher(None, term_norm, tok).ratio()
+                                    if ratio > best:
+                                        best = ratio + 0.03
                                 for tok in tokens[:500]:
                                     ratio = difflib.SequenceMatcher(None, term_norm, tok).ratio()
                                     if ratio > best:
@@ -1254,7 +1331,7 @@ def list_properties(
                             for r in candidate_rows
                             if isinstance(r, dict) and str(r.get("id") or "").strip()
                         ]
-                        scored = [pair for pair in scored if pair[1] >= 0.84]
+                        scored = [pair for pair in scored if pair[1] >= fuzzy_threshold]
                         scored.sort(key=lambda pair: pair[1], reverse=True)
                         fuzzy_ids = [pid for pid, _score in scored[:500]]
 
@@ -1280,6 +1357,15 @@ def list_properties(
 
                         total_int = len(filtered_ranked)
                         items = filtered_ranked[offset : offset + limit]
+                        if raw_query_text:
+                            maybe_corrected = _best_correction_term(raw_query_text, filtered_ranked)
+                            if (
+                                maybe_corrected
+                                and maybe_corrected.lower() != raw_query_text.lower()
+                            ):
+                                corrected_query = maybe_corrected
+                                correction_applied = True
+                                correction_source = "fuzzy_fallback"
             except Exception:
                 pass
 
@@ -1631,6 +1717,10 @@ def list_properties(
             "limit": limit,
             "offset": offset,
             "has_more": has_more,
+            "correction_applied": correction_applied if correction_applied else None,
+            "original_query": original_query if correction_applied else None,
+            "corrected_query": corrected_query if correction_applied else None,
+            "correction_source": correction_source if correction_applied else None,
         }
 
     except HTTPException:

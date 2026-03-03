@@ -737,6 +737,9 @@ function ListingsInner() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [correctionApplied, setCorrectionApplied] = useState(false);
+  const [correctedQuery, setCorrectedQuery] = useState<string | null>(null);
+  const [originalQuery, setOriginalQuery] = useState<string | null>(null);
 
   const { user, isLoaded } = useOptionalUser();
 
@@ -858,6 +861,15 @@ function ListingsInner() {
               ? items.length
               : 0;
         const more = typeof data?.has_more === 'boolean' ? data.has_more : false;
+        const correctionFlag = Boolean(data?.correction_applied);
+        const correctionTo =
+          typeof data?.corrected_query === 'string' && data.corrected_query.trim()
+            ? data.corrected_query.trim()
+            : null;
+        const correctionFrom =
+          typeof data?.original_query === 'string' && data.original_query.trim()
+            ? data.original_query.trim()
+            : qRaw.trim() || null;
 
         const mappedData: RawProperty[] = (items || [])
           .filter((prop: any) => String(prop?.source ?? '').toLowerCase() !== 'spareroom')
@@ -918,6 +930,9 @@ function ListingsInner() {
         setTotal(totalCount);
         setHasMore(more);
         setMappableCount(mappable);
+        setCorrectionApplied(correctionFlag && Boolean(correctionTo));
+        setCorrectedQuery(correctionFlag ? correctionTo : null);
+        setOriginalQuery(correctionFlag ? correctionFrom : null);
       } catch (error) {
         console.error('[listings] fetch error', error);
         setRows([]);
@@ -925,6 +940,9 @@ function ListingsInner() {
         setTotal(0);
         setHasMore(false);
         setMappableCount(0);
+        setCorrectionApplied(false);
+        setCorrectedQuery(null);
+        setOriginalQuery(null);
       } finally {
         setLoading(false);
       }
@@ -1737,6 +1755,15 @@ function ListingsInner() {
       )}
 
       <div className="max-w-7xl mx-auto px-4 py-4">
+        {correctionApplied && correctedQuery && (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
+            Showing results for <span className="font-semibold">{correctedQuery}</span>
+            {originalQuery && originalQuery.toLowerCase() !== correctedQuery.toLowerCase() && (
+              <span className="ml-1 text-amber-800/90 dark:text-amber-300/90">instead of “{originalQuery}”.</span>
+            )}
+          </div>
+        )}
+
         <div className="mb-4 flex items-center justify-center sm:justify-start">
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Total properties:{' '}
