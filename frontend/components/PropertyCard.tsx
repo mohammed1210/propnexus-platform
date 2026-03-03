@@ -554,7 +554,7 @@ export default function PropertyCard({
       <Link
         href={href}
         onClick={handleSearchClickTrack}
-        className="block relative w-full h-48 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
+        className="group block relative aspect-[3/2] w-full overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label={`Open ${p.title ?? 'property'}`}
       >
         <ImageWithFallback
