@@ -150,6 +150,29 @@ def test_api_v1_search_post_typo_query_returns_results_with_fixture(monkeypatch)
     assert body["items"][0]["location"] == "London"
 
 
+def test_api_v1_search_post_london_and_typo_both_return_results(monkeypatch) -> None:
+    from backend.routes import properties_routes
+
+    fixture_path = Path(__file__).parent / "fixtures" / "search_guardrail_rows.json"
+    rows = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+    def _fake_query_db(payload):
+        q = str(payload.get("q") or "").strip().lower()
+        if q in {"london", "londn"}:
+            return {"items": rows[:2], "total_results": 2}
+        return {"items": [], "total_results": 0}
+
+    monkeypatch.setattr(properties_routes, "query_db", _fake_query_db)
+    monkeypatch.setattr(properties_routes, "get_facets", lambda _payload: {})
+
+    for term in ("london", "londn"):
+        res = client.post("/api/v1/search", json={"q": term, "allow_broaden": False, "filters": {}})
+        assert res.status_code == 200
+        body = res.json()
+        assert body["total_results"] > 0
+        assert len(body["items"]) > 0
+
+
 def test_api_v1_search_post_allow_broaden_false_skips_fallback(monkeypatch) -> None:
     from backend.routes import properties_routes
 
