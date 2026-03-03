@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { BroadenBanner } from '@/components/BroadenBanner';
 import FilterDrawerMobile from '@/components/FilterDrawerMobile';
@@ -56,14 +57,17 @@ function SkeletonResults() {
 }
 
 export default function SearchPage() {
+  const t = useTranslations('search');
+
   return (
-    <Suspense fallback={<main className="mx-auto max-w-6xl p-4">Loading…</main>}>
+    <Suspense fallback={<main className="mx-auto max-w-6xl p-4">{t('loading')}</main>}>
       <SearchInner />
     </Suspense>
   );
 }
 
 function SearchInner() {
+  const t = useTranslations('search');
   const { state, setQueryParams, resetQueryParams } = useSearchFilterParams();
   const [allowBroaden, setAllowBroaden] = useState(true);
 
@@ -138,7 +142,7 @@ function SearchInner() {
 
   return (
     <main className="mx-auto max-w-6xl p-4 pb-20 sm:pb-4">
-      <h1 className="mb-4 text-2xl font-semibold">Search</h1>
+      <h1 className="mb-4 text-2xl font-semibold">{t('title')}</h1>
 
       <div className="sticky top-0 z-20 hidden border-b border-slate-200 bg-white/80 py-2 backdrop-blur dark:border-slate-700 dark:bg-slate-900/80 sm:block">
         <FilterBar
@@ -176,8 +180,11 @@ function SearchInner() {
         }}
       />
 
-      <p className="mt-4 text-sm text-gray-500">
-        {total} results{loading ? ' (streaming...)' : ''}
+      <p className="mt-4 text-sm text-gray-500" aria-live="polite" aria-atomic="true">
+        {t('results', { count: total })}{loading ? ` ${t('streaming')}` : ''}
+      </p>
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {t('announcement', { count: total })}
       </p>
 
       {meta.broadened && (

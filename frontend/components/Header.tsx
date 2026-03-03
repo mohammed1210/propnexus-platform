@@ -6,22 +6,25 @@ import clsx from "clsx";
 import { useState } from "react";
 import { Disclosure, Transition } from "@headlessui/react";
 import { Bars3Icon, XMarkIcon, ChevronDownIcon } from "@heroicons/react/24/outline";
+import { useTranslations } from "next-intl";
 import { SafeSignedIn, SafeSignedOut, SafeUserButton } from "./ClerkAuthSafe";
 import ThemeToggle from "./ThemeToggle";
+import ContrastToggle from "./ContrastToggle";
 import { isAuthEnabled } from "@/lib/auth";
 
 export default function Header() {
+  const t = useTranslations("header");
   const pathname = usePathname();
   const links = [
-    { href: '/', label: 'Home' },
-    { href: '/listings', label: 'Listings' },
-    { href: '/saved', label: 'Saved Deals' },
-    { href: '/off-market', label: 'Off-Market' },
-    { href: '/demo', label: 'Demo' },
-    { href: '/pricing', label: 'Pricing' },
+    { href: '/', label: t('nav.home') },
+    { href: '/listings', label: t('nav.listings') },
+    { href: '/saved', label: t('nav.savedDeals') },
+    { href: '/off-market', label: t('nav.offMarket') },
+    { href: '/demo', label: t('nav.demo') },
+    { href: '/pricing', label: t('nav.pricing') },
   ];
   const accountLinks = [
-    { href: '/account', label: 'Account' },
+    { href: '/account', label: t('account') },
   ];
 
   const [mobileMenuKey, setMobileMenuKey] = useState(0);
@@ -43,7 +46,7 @@ export default function Header() {
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-brand-sm">
             <span className="text-white font-bold text-sm">PN</span>
           </div>
-          <span className="text-xl font-bold text-slate-900 dark:text-white">PropNexus</span>
+          <span className="text-xl font-bold text-slate-900 dark:text-white">{t('brand')}</span>
         </Link>
 
   {/* Nav */}
@@ -83,6 +86,7 @@ export default function Header() {
         {/* Desktop right side actions */}
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
+          <ContrastToggle />
 
           <SafeSignedIn>
             <nav className="flex items-center gap-2" aria-label="Account">
@@ -114,10 +118,10 @@ export default function Header() {
                   href="/sign-in"
                   className="hidden md:inline-flex text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition-colors duration-300"
                 >
-                  Sign in
+                  {t('signIn')}
                 </Link>
                 <Link href="/sign-up" className="btn-primary text-sm px-5 py-2">
-                  Get Started
+                  {t('getStarted')}
                 </Link>
               </>
             ) : (
@@ -126,10 +130,10 @@ export default function Header() {
                   href="/sign-in"
                   className="hidden md:inline-flex text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400 dark:hover:text-brand-300 transition-colors duration-300"
                 >
-                  Sign in
+                  {t('signIn')}
                 </Link>
                 <Link href="/sign-up" className="btn-primary text-sm px-5 py-2">
-                  Get Started
+                  {t('getStarted')}
                 </Link>
               </>
             )}
@@ -139,12 +143,13 @@ export default function Header() {
         {/* Mobile right side: Theme + Hamburger */}
         <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
+          <ContrastToggle />
           <Disclosure key={mobileMenuKey}>
             {({ open }) => (
               <>
                 <Disclosure.Button
                   className="inline-flex items-center justify-center rounded-md p-2 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  aria-label={open ? 'Close menu' : 'Open menu'}
+                  aria-label={open ? t('closeMenu') : t('openMenu')}
                 >
                   {open ? <XMarkIcon className="h-6 w-6" /> : <Bars3Icon className="h-6 w-6" />}
                 </Disclosure.Button>
@@ -163,7 +168,7 @@ export default function Header() {
                         {({ open: pagesOpen }) => (
                           <div>
                             <Disclosure.Button className="flex w-full items-center justify-between text-left text-sm font-medium text-slate-800 dark:text-slate-200">
-                              <span>Pages</span>
+                              <span>{t('pages')}</span>
                               <ChevronDownIcon className={clsx('h-5 w-5 transition-transform', pagesOpen ? 'rotate-180' : 'rotate-0')} />
                             </Disclosure.Button>
                             <Transition
@@ -208,7 +213,7 @@ export default function Header() {
                               onClick={handleMobileNavigate}
                               className="rounded-md border border-slate-300 dark:border-slate-700 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             >
-                              Account Settings
+                              {t('accountSettings')}
                             </Link>
                             <SafeUserButton
                               afterSignOutUrl="/"
@@ -229,14 +234,14 @@ export default function Header() {
                                   onClick={handleMobileNavigate}
                                   className="block rounded-md bg-black px-3 py-2 text-white hover:bg-slate-800 text-sm font-semibold transition-colors text-center"
                                 >
-                                  Sign in
+                                  {t('signIn')}
                                 </Link>
                                 <Link
                                   href="/sign-up"
                                   onClick={handleMobileNavigate}
                                   className="block rounded-md border border-slate-300 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-center"
                                 >
-                                  Get Started
+                                  {t('getStarted')}
                                 </Link>
                               </>
                             ) : (
@@ -246,14 +251,14 @@ export default function Header() {
                                   onClick={handleMobileNavigate}
                                   className="block rounded-md bg-black px-3 py-2 text-white hover:bg-slate-800 text-sm font-semibold transition-colors"
                                 >
-                                  Sign in
+                                  {t('signIn')}
                                 </Link>
                                 <Link
                                   href="/sign-up"
                                   onClick={handleMobileNavigate}
                                   className="block rounded-md border border-slate-300 dark:border-slate-700 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                 >
-                                  Get Started
+                                  {t('getStarted')}
                                 </Link>
                               </>
                             )}

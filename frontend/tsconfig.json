@@ -58,6 +58,7 @@
     "**/playwright.config.*",
     "**/*.spec.ts",
     "**/*.spec.tsx",
-    "e2e/**"
+    "e2e/**",
+    "cypress/**"
   ]
 }

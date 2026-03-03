@@ -1,0 +1,39 @@
+{
+  "header": {
+    "brand": "PropNexus",
+    "pages": "Pages",
+    "account": "Account",
+    "accountSettings": "Account Settings",
+    "signIn": "Sign in",
+    "getStarted": "Get Started",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "nav": {
+      "home": "Home",
+      "listings": "Listings",
+      "savedDeals": "Saved Deals",
+      "offMarket": "Off-Market",
+      "demo": "Demo",
+      "pricing": "Pricing"
+    },
+    "contrast": {
+      "enable": "Enable high contrast",
+      "disable": "Disable high contrast",
+      "on": "High Contrast On",
+      "off": "High Contrast"
+    }
+  },
+  "search": {
+    "title": "Search",
+    "loading": "Loading…",
+    "results": "{count} results",
+    "streaming": "(streaming...)",
+    "announcement": "Showing {count} results"
+  },
+  "filters": {
+    "title": "Filters",
+    "open": "Filters",
+    "close": "Close filters",
+    "apply": "Apply"
+  }
+}
