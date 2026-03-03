@@ -8,7 +8,9 @@ import logging
 import os
 import re
 import threading
+from collections import deque
 from datetime import datetime, timezone
+from time import monotonic
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
@@ -46,7 +48,81 @@ from backend.utils.recommended_ranker import normalize_deal_type, rerank_recomme
 from backend.utils.supabase_client import get_supabase
 from supabase import create_client
 
+try:
+    from prometheus_client import Counter
+except Exception:  # pragma: no cover - optional runtime dependency
+    Counter = None  # type: ignore[assignment]
+
 router = APIRouter(tags=["properties"])
+logger = logging.getLogger(__name__)
+
+
+if Counter is not None:
+    search_requests_total = Counter(
+        "search_requests_total",
+        "Total search requests by endpoint",
+        ["endpoint"],
+    )
+    search_zero_results_total = Counter(
+        "search_zero_results_total",
+        "Total zero-result search responses by endpoint",
+        ["endpoint"],
+    )
+    search_ml_fallback_total = Counter(
+        "search_ml_fallback_total",
+        "Total ML fallback activations by reason",
+        ["reason"],
+    )
+else:  # pragma: no cover - optional runtime dependency
+    search_requests_total = None
+    search_zero_results_total = None
+    search_ml_fallback_total = None
+
+
+_ML_FAILURE_TIMESTAMPS: deque[float] = deque()
+_ML_FALLBACK_UNTIL_MONOTONIC: float = 0.0
+
+
+def _increment_search_metrics(endpoint: str, results_count: int) -> None:
+    if search_requests_total is not None:
+        search_requests_total.labels(endpoint=endpoint).inc()
+    if results_count <= 0 and search_zero_results_total is not None:
+        search_zero_results_total.labels(endpoint=endpoint).inc()
+
+
+def _record_ml_guardrail_fallback(reason: str) -> None:
+    if search_ml_fallback_total is not None:
+        search_ml_fallback_total.labels(reason=reason).inc()
+
+
+def _prune_ml_failures(now_monotonic: float, window_seconds: int) -> None:
+    while _ML_FAILURE_TIMESTAMPS and (now_monotonic - _ML_FAILURE_TIMESTAMPS[0]) > window_seconds:
+        _ML_FAILURE_TIMESTAMPS.popleft()
+
+
+def _ml_fallback_active(now_monotonic: float) -> bool:
+    return now_monotonic < _ML_FALLBACK_UNTIL_MONOTONIC
+
+
+def _record_ml_failure(now_monotonic: float) -> None:
+    global _ML_FALLBACK_UNTIL_MONOTONIC
+
+    threshold = max(int(settings.SMART_SEARCH_ML_5XX_SPIKE_THRESHOLD), 1)
+    window_seconds = max(int(settings.SMART_SEARCH_ML_5XX_SPIKE_WINDOW_SECONDS), 10)
+    cooldown_seconds = max(int(settings.SMART_SEARCH_ML_FALLBACK_COOLDOWN_SECONDS), 30)
+
+    _prune_ml_failures(now_monotonic, window_seconds)
+    _ML_FAILURE_TIMESTAMPS.append(now_monotonic)
+
+    if len(_ML_FAILURE_TIMESTAMPS) >= threshold:
+        _ML_FALLBACK_UNTIL_MONOTONIC = now_monotonic + cooldown_seconds
+        _ML_FAILURE_TIMESTAMPS.clear()
+
+
+def _reset_ml_guardrail_state_for_tests() -> None:
+    global _ML_FALLBACK_UNTIL_MONOTONIC
+    _ML_FAILURE_TIMESTAMPS.clear()
+    _ML_FALLBACK_UNTIL_MONOTONIC = 0.0
 
 
 def _start_enrichment_thread(property_id: str) -> None:
@@ -223,19 +299,50 @@ def api_v1_search(
     sb = _get_supabase()
 
     force_ml = str(ml or "").strip().lower() in {"1", "true", "yes", "on"}
-    ml_enabled = bool(settings.SMART_SEARCH_ML_RERANK or force_ml)
+    ml_requested = bool(settings.SMART_SEARCH_ML_RERANK or force_ml)
 
-    top = search_with_optional_rerank(
-        sb,
-        query_text=query,
-        top_k=k,
-        enable_ml=ml_enabled,
-    )
+    now_monotonic = monotonic()
+    ml_blocked_by_guardrail = ml_requested and _ml_fallback_active(now_monotonic)
+    ml_enabled = bool(ml_requested and not ml_blocked_by_guardrail)
+
+    if ml_blocked_by_guardrail:
+        _record_ml_guardrail_fallback("spike_cooldown")
+
+    used_fallback = False
+    fallback_reason: str | None = "spike_cooldown" if ml_blocked_by_guardrail else None
+    try:
+        top = search_with_optional_rerank(
+            sb,
+            query_text=query,
+            top_k=k,
+            enable_ml=ml_enabled,
+        )
+    except Exception as e:
+        if not ml_enabled:
+            raise
+
+        _record_ml_failure(now_monotonic)
+        _record_ml_guardrail_fallback("ml_5xx")
+        logger.warning("ML rerank failed; falling back to legacy ranking: %s", e)
+        top = search_with_optional_rerank(
+            sb,
+            query_text=query,
+            top_k=k,
+            enable_ml=False,
+        )
+        used_fallback = True
+        fallback_reason = "ml_5xx"
+
     ids = [str(item.get("id")) for item in top if item.get("id") is not None]
+    _increment_search_metrics("api_v1_search_get", len(top))
+    effective_ml_enabled = bool(ml_enabled and not used_fallback)
 
     return {
         "query": query,
-        "ml_enabled": ml_enabled,
+        "ml_enabled": effective_ml_enabled,
+        "ml_requested": ml_requested,
+        "ml_fallback_active": bool(ml_blocked_by_guardrail or used_fallback),
+        "fallback_reason": fallback_reason if (ml_blocked_by_guardrail or used_fallback) else None,
         "count": len(top),
         "ids": ids,
         "items": top,
@@ -265,6 +372,7 @@ def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
         alt_total = alt_queried.get("total_results") if isinstance(alt_queried, dict) else 0
         alt_out_items = [dict(item) for item in alt_items] if isinstance(alt_items, list) else []
         _log_search_query_metric(filter_payload, int(alt_total or len(alt_out_items)))
+        _increment_search_metrics("api_v1_search_post", int(alt_total or len(alt_out_items)))
 
         return {
             "results": alt_out_items,
@@ -275,6 +383,7 @@ def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
 
     facets = get_facets(filter_payload)
     _log_search_query_metric(filter_payload, int(total_results or len(out_items)))
+    _increment_search_metrics("api_v1_search_post", int(total_results or len(out_items)))
 
     return {
         "q": payload.q,
