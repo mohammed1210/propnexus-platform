@@ -953,6 +953,7 @@ function ListingsInner() {
     };
   }, [
     q,
+    qRaw,
     minP,
     maxP,
     beds,
