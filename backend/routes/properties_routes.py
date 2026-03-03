@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import builtins
+import difflib
 import json
 import logging
 import os
@@ -1196,15 +1197,67 @@ def list_properties(
             and raw_query_text
             and not items
             and total_int == 0
-            and is_postgres_detected()
             and search_terms_for_q
         ):
             try:
-                fuzzy_ids = fetch_postgres_fuzzy_ids(
-                    raw_query_text,
-                    search_terms_for_q,
-                    limit=builtins.max(limit * 3, 50),
-                )
+                fuzzy_ids: List[str] = []
+
+                if is_postgres_detected():
+                    fuzzy_ids = fetch_postgres_fuzzy_ids(
+                        raw_query_text,
+                        search_terms_for_q,
+                        limit=builtins.max(limit * 3, 50),
+                    )
+
+                if not fuzzy_ids:
+                    candidate_limit = builtins.max(limit * 10, 200)
+                    candidate_query = _build_base_query(include_text_search=False)
+                    candidate_query = _safe_order(
+                        candidate_query, "created_at", desc=True, nulls_last=True
+                    )
+                    candidate_query = candidate_query.range(0, int(candidate_limit) - 1)
+                    candidate_res = candidate_query.execute()
+                    candidate_rows = candidate_res.data or []
+
+                    if isinstance(candidate_rows, list):
+
+                        def _row_score(row: dict[str, Any]) -> float:
+                            raw_blob = " ".join(
+                                [
+                                    str(row.get("title") or ""),
+                                    str(row.get("description") or ""),
+                                    str(row.get("location") or ""),
+                                    str(row.get("postcode") or ""),
+                                ]
+                            ).lower()
+                            tokens = [
+                                tok for tok in re.split(r"[^a-z0-9]+", raw_blob) if len(tok) >= 3
+                            ]
+                            if not tokens:
+                                return 0.0
+
+                            best = 0.0
+                            for term in search_terms_for_q[:10]:
+                                term_norm = str(term or "").strip().lower()
+                                if len(term_norm) < 3:
+                                    continue
+                                if term_norm in tokens:
+                                    return 1.0
+                                for tok in tokens[:500]:
+                                    ratio = difflib.SequenceMatcher(None, term_norm, tok).ratio()
+                                    if ratio > best:
+                                        best = ratio
+                            return best
+
+                        scored = [
+                            (str(r.get("id") or ""), _row_score(r))
+                            for r in candidate_rows
+                            if isinstance(r, dict) and str(r.get("id") or "").strip()
+                        ]
+                        scored = [pair for pair in scored if pair[1] >= 0.84]
+                        scored.sort(key=lambda pair: pair[1], reverse=True)
+                        fuzzy_ids = [pid for pid, _score in scored[:500]]
+
                 if fuzzy_ids:
                     ranked_ids = [str(i) for i in fuzzy_ids[:500] if str(i).strip()]
                     id_position = {pid: idx for idx, pid in enumerate(ranked_ids)}
