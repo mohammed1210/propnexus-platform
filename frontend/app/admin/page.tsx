@@ -1,4 +1,5 @@
 import { supabaseServer } from "@/lib/supabaseServer";
+import Link from "next/link";
 import AuthStatusPanel from "@/components/admin/AuthStatusPanel";
 import RunImportPanel from "@/components/admin/RunImportPanel";
 
@@ -378,6 +379,19 @@ export default async function AdminPage() {
 
       <div className="mt-8">
         <RunImportPanel />
+      </div>
+
+      <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Search Analytics</h2>
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          View 7-day search health KPIs and top zero-result queries.
+        </p>
+        <Link
+          href="/admin/search-metrics"
+          className="mt-3 inline-flex text-sm text-brand-600 hover:underline dark:text-brand-400"
+        >
+          Open Search Metrics Dashboard
+        </Link>
       </div>
 
       <div className="mt-8 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">

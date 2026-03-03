@@ -136,6 +136,7 @@ export default function BTLCalculator({
             step="50"
           />
         </div>
+
       </div>
 
       {/* Outputs */}
@@ -194,6 +195,7 @@ export default function BTLCalculator({
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );

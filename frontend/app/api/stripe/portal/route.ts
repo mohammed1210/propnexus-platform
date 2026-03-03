@@ -8,7 +8,7 @@ const KEY = process.env.STRIPE_SECRET_KEY;
 const BASE = process.env.NEXT_PUBLIC_APP_BASE_URL ?? '';
 
 /**
- * TODO: Replace with a real lookup that maps the signed-in user
+ * TODO(#322): Replace with a real lookup that maps the signed-in user
  * to their Stripe customer ID (e.g., from your DB via webhook sync).
  */
 async function getCustomerIdForCurrentUser(): Promise<string | null> {
