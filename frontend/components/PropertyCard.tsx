@@ -168,6 +168,8 @@ export default function PropertyCard({
   isHovered,
   onHoverChange,
   queryId,
+  queryText,
+  filters,
   rank,
 }: {
   p: Property;
@@ -175,6 +177,8 @@ export default function PropertyCard({
   isHovered?: boolean;
   onHoverChange?: (hovered: boolean) => void;
   queryId?: string | null;
+  queryText?: string | null;
+  filters?: Record<string, unknown>;
   rank?: number;
 }) {
   const normalized = useMemo(() => normalizeProperty(p as any), [p]);
@@ -523,13 +527,15 @@ export default function PropertyCard({
   const verdict = useMemo(() => buildVerdict(p), [p]);
 
   const handleSearchClickTrack = useCallback(() => {
-    if (!queryId || !p.id) return;
+    if (!p.id) return;
     void track('search_click', {
       queryId,
+      queryText,
       listingId: p.id,
+      filters,
       rank,
     });
-  }, [p.id, queryId, rank]);
+  }, [filters, p.id, queryId, queryText, rank]);
 
   return (
     <article

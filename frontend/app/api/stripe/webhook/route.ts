@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
         console.log('[Stripe Webhook] Checkout completed:', logData);
         // Backend webhook handles the actual subscription activation
         // This frontend webhook is primarily for logging/monitoring
-        // TODO: Consider sending to monitoring service (e.g., Sentry, Datadog)
+        // TODO(#321): Send Stripe webhook events to monitoring (e.g., Sentry/Datadog).
         break;
       }
       case 'customer.subscription.created':
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
           timestamp: new Date().toISOString(),
         };
         console.log(`[Stripe Webhook] Subscription ${event.type}:`, logData);
-        // TODO: Consider sending to monitoring service (e.g., Sentry, Datadog)
+        // TODO(#321): Send Stripe webhook events to monitoring (e.g., Sentry/Datadog).
         break;
       }
       default:
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       stack: error.stack,
       timestamp: new Date().toISOString(),
     });
-    // TODO: Send error to monitoring service
+    // TODO(#321): Send Stripe webhook handler errors to monitoring.
     return NextResponse.json({ error: 'handler-error' }, { status: 500 });
   }
 }

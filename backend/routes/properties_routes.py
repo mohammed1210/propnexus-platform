@@ -179,9 +179,34 @@ class SearchFiltersPayload(BaseModel):
 class SearchPayload(BaseModel):
     q: str = ""
     filters: SearchFiltersPayload = Field(default_factory=SearchFiltersPayload)
+    session_id: str | None = None
     allow_broaden: bool = True
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
+
+
+def _log_search_query_metric(payload: dict[str, Any], total_results: int) -> None:
+    query_text = str(payload.get("q") or "").strip()
+    if not query_text:
+        return
+
+    filters = payload.get("filters") if isinstance(payload.get("filters"), dict) else {}
+    row = {
+        "query": query_text,
+        "results_count": int(total_results),
+        "filters_json": filters,
+        "session_id": str(payload.get("session_id") or "").strip() or None,
+    }
+
+    try:
+        sb = _get_supabase()
+        sb.schema("analytics").table("search_queries").insert(row).execute()
+    except Exception:
+        try:
+            sb = _get_supabase()
+            sb.table("search_queries").insert(row).execute()
+        except Exception:
+            return
 
 
 @router.get("/api/v1/search")
@@ -234,6 +259,7 @@ def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
         alt_items = alt_queried.get("items") if isinstance(alt_queried, dict) else []
         alt_total = alt_queried.get("total_results") if isinstance(alt_queried, dict) else 0
         alt_out_items = [dict(item) for item in alt_items] if isinstance(alt_items, list) else []
+        _log_search_query_metric(filter_payload, int(alt_total or len(alt_out_items)))
 
         return {
             "results": alt_out_items,
@@ -243,6 +269,7 @@ def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
         }
 
     facets = get_facets(filter_payload)
+    _log_search_query_metric(filter_payload, int(total_results or len(out_items)))
 
     return {
         "q": payload.q,

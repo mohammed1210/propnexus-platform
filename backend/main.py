@@ -37,6 +37,7 @@ from backend.routes import admin_schedule
 from backend.routes.admin_ingestion import router as admin_ingestion_router
 from backend.routes.admin_scrape_runs import router as admin_scrape_runs_router
 from backend.routes.ai import router as ai_router
+from backend.routes.analytics_metrics import router as analytics_metrics_router
 from backend.routes.area_intel_routes import router as area_intel_router
 from backend.routes.comps_routes import router as comps_router
 from backend.routes.debug_properties import router as debug_properties_router
@@ -52,6 +53,7 @@ from backend.routes.off_market_routes import router as off_market_router
 from backend.routes.properties_routes import router as properties_router
 from backend.routes.save_deal import router as save_deal_router
 from backend.routes.scrape_routes import router as scrape_router
+from backend.routes.search_health import router as search_health_router
 from backend.routes.stripe_routes import router as stripe_routes_router
 from backend.routes.stripe_webhook import router as stripe_webhook_router
 from backend.routes.tradesmen_routes import router as tradesmen_router
@@ -295,6 +297,7 @@ def _shutdown_worker():
 # 🔌 Routers
 # ======================
 app.include_router(ai_router)
+app.include_router(analytics_metrics_router)
 app.include_router(area_intel_router)
 app.include_router(comps_router)
 app.include_router(debug_properties_router, dependencies=[Depends(require_debug_enabled)])
@@ -312,6 +315,7 @@ app.include_router(off_market_router)
 app.include_router(save_deal_router)
 app.include_router(properties_router)
 app.include_router(scrape_router)
+app.include_router(search_health_router)
 app.include_router(tradesmen_router)
 app.include_router(admin_schedule.router)
 
