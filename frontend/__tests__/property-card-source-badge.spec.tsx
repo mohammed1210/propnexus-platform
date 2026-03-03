@@ -67,4 +67,22 @@ describe('PropertyCard source badge', () => {
     const badge = screen.getByText('OTM');
     expect(badge).toHaveClass('bg-rose-100');
   });
+
+  it('renders trust badge chips from badges metadata', () => {
+    render(
+      <PropertyCard
+        p={{
+          id: '4',
+          title: 'Test',
+          source: 'rightmove',
+          location: 'London',
+          price: 100000,
+          badges: ['rightmove', 'floorplan', 'agent-photo'],
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/floorplan/i)).toBeInTheDocument();
+    expect(screen.getByText(/agent photo/i)).toBeInTheDocument();
+  });
 });

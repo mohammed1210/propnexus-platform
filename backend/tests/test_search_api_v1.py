@@ -216,3 +216,30 @@ def test_expand_query_terms_includes_synonyms() -> None:
     terms = expand_query_terms("flat")
     assert "flat" in terms
     assert "apartment" in terms
+
+
+def test_api_v1_search_post_includes_badges_in_items(monkeypatch) -> None:
+    from backend.routes import properties_routes
+
+    monkeypatch.setattr(
+        properties_routes,
+        "query_db",
+        lambda _payload: {
+            "items": [
+                {
+                    "id": "x1",
+                    "title": "London Flat",
+                    "location": "London",
+                    "badges": ["rightmove", "floorplan"],
+                }
+            ],
+            "total_results": 1,
+        },
+    )
+    monkeypatch.setattr(properties_routes, "get_facets", lambda _payload: {})
+
+    res = client.post("/api/v1/search", json={"q": "london", "filters": {}})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["items"]
+    assert "badges" in body["items"][0]
