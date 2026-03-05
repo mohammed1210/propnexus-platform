@@ -10,6 +10,27 @@ class SupabaseConfig:
     key: str
 
 
+@dataclass(frozen=True)
+class SupabaseEnvBlock:
+    """Canonical backend Supabase environment block."""
+
+    url: str | None
+    service_role_key: str | None
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.url and self.service_role_key)
+
+    @property
+    def missing_vars(self) -> tuple[str, ...]:
+        missing: list[str] = []
+        if not self.url:
+            missing.append("SUPABASE_URL")
+        if not self.service_role_key:
+            missing.append("SUPABASE_SERVICE_ROLE_KEY")
+        return tuple(missing)
+
+
 def _getenv_stripped(name: str) -> str | None:
     value = os.getenv(name)
     if value is None:
@@ -18,38 +39,25 @@ def _getenv_stripped(name: str) -> str | None:
     return value or None
 
 
-def resolve_supabase_url() -> str | None:
-    """Resolve Supabase URL.
+def resolve_supabase_env_block() -> SupabaseEnvBlock:
+    """Read the canonical backend Supabase env block.
 
-    Primary source is `SUPABASE_URL`. We also accept `NEXT_PUBLIC_SUPABASE_URL`
-    as a backwards-compatible fallback used by some deployments.
+    Required vars:
+    - SUPABASE_URL
+    - SUPABASE_SERVICE_ROLE_KEY
     """
 
-    return _getenv_stripped("SUPABASE_URL") or _getenv_stripped("NEXT_PUBLIC_SUPABASE_URL")
-
-
-def resolve_supabase_key() -> str | None:
-    """Resolve Supabase API key with canonical precedence.
-
-    Precedence:
-    1) SUPABASE_SERVICE_ROLE_KEY
-    2) SUPABASE_SERVICE_KEY
-    3) SUPABASE_KEY
-    """
-
-    return (
-        _getenv_stripped("SUPABASE_SERVICE_ROLE_KEY")
-        or _getenv_stripped("SUPABASE_SERVICE_KEY")
-        or _getenv_stripped("SUPABASE_KEY")
+    return SupabaseEnvBlock(
+        url=_getenv_stripped("SUPABASE_URL"),
+        service_role_key=_getenv_stripped("SUPABASE_SERVICE_ROLE_KEY"),
     )
 
 
 def resolve_supabase_config() -> SupabaseConfig | None:
-    url = resolve_supabase_url()
-    key = resolve_supabase_key()
-    if not url or not key:
+    env_block = resolve_supabase_env_block()
+    if not env_block.configured:
         return None
-    return SupabaseConfig(url=url, key=key)
+    return SupabaseConfig(url=env_block.url or "", key=env_block.service_role_key or "")
 
 
 def is_supabase_configured() -> bool:

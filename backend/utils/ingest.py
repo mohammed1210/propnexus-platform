@@ -64,8 +64,7 @@ def get_supabase_client() -> Client:
     sb = get_supabase(required=True)
     if sb is None:
         raise RuntimeError(
-            "Supabase is not configured. Set SUPABASE_URL and one of "
-            "SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY / SUPABASE_KEY."
+            "Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
         )
     return sb  # type: ignore[return-value]
 

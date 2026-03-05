@@ -13,8 +13,8 @@ client = TestClient(app)
 
 
 def _supabase_configured() -> bool:
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     if not (url and key):
         return False
 
@@ -216,8 +216,8 @@ def test_admin_backfill_scores_updates_zero_score_rows():
 
     from supabase import create_client
 
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY")
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     assert url and key
     sb = create_client(url, key)
 

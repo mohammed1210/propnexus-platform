@@ -29,8 +29,7 @@ def get_supabase(
     if not cfg:
         if required:
             raise RuntimeError(
-                "Supabase is not configured. Set SUPABASE_URL and one of "
-                "SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY / SUPABASE_KEY."
+                "Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
             )
         return None
 
