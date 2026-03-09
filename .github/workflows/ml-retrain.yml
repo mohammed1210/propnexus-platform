@@ -1,0 +1,41 @@
+name: Nightly Rerank Retrain
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL_RW: ${{ secrets.SUPABASE_URL_RW }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      ML_MODEL_BUCKET: ${{ secrets.ML_MODEL_BUCKET }}
+      ADMIN_ML_SECRET: ${{ secrets.ADMIN_ML_SECRET }}
+      BACKEND_URL: ${{ secrets.BACKEND_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install lightgbm psycopg2-binary boto3
+
+      - name: Train model
+        run: python analytics/train_rerank.py
+
+      - name: Promote model if uploaded
+        run: |
+          KEY=$(aws s3 ls s3://$ML_MODEL_BUCKET/ --recursive | grep 'search_rerank_.*\.json$' | tail -1 | awk '{print $4}')
+          if [ -z "$KEY" ]; then
+            echo "No model artifact found"
+            exit 0
+          fi
+          curl -sS -X POST "$BACKEND_URL/admin/ml/promote?token=$ADMIN_ML_SECRET&key=$KEY"

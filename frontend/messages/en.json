@@ -15,6 +15,12 @@
       "offMarket": "Off-Market",
       "demo": "Demo",
       "pricing": "Pricing"
+    },
+    "contrast": {
+      "enable": "Enable high contrast",
+      "disable": "Disable high contrast",
+      "on": "High Contrast On",
+      "off": "High Contrast"
     }
   },
   "search": {
