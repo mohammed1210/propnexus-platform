@@ -495,6 +495,16 @@ def _is_mappable_coordinate_pair(lat: Any, lng: Any) -> bool:
     return True
 
 
+def _is_test_or_ci_env() -> bool:
+    env = str(os.getenv("ENVIRONMENT") or "").strip().lower()
+    ci = str(os.getenv("CI") or "").strip().lower()
+    return (
+        os.getenv("PYTEST_CURRENT_TEST") is not None
+        or env in {"test", "ci"}
+        or ci in {"1", "true", "yes", "on"}
+    )
+
+
 def _get_supabase():
     """
     Lazily create Supabase client so unit tests can patch create_client.
@@ -507,13 +517,16 @@ def _get_supabase():
         if sb is None:
             raise RuntimeError("Supabase client is not configured")
         return sb
-    except Exception:
+    except Exception as e:
         # Test/CI fallback: allow patched create_client to inject a fake client
         # even when SUPABASE_* env vars are not configured.
-        try:
-            return create_client("http://localhost", "test-key")
-        except Exception:
-            raise HTTPException(status_code=503, detail="Supabase not configured on server")
+        if _is_test_or_ci_env():
+            try:
+                return create_client("http://localhost", "test-key")
+            except Exception:
+                pass
+
+        raise HTTPException(status_code=503, detail=f"Supabase not configured on server: {e}")
 
 
 def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -1023,6 +1036,32 @@ def list_properties(
         if isinstance(points_limit, Param):
             points_limit = int(getattr(points_limit, "default", 2000))
 
+        # When called directly (unit tests/scripts), scalar Query params may also be Param objects.
+        if isinstance(q, Param):
+            q = getattr(q, "default", None)
+        if isinstance(source, Param):
+            source = getattr(source, "default", None)
+        if isinstance(created_after, Param):
+            created_after = getattr(created_after, "default", None)
+        if isinstance(min, Param):
+            min = getattr(min, "default", None)
+        if isinstance(max, Param):
+            max = getattr(max, "default", None)
+        if isinstance(beds, Param):
+            beds = getattr(beds, "default", None)
+        if isinstance(baths, Param):
+            baths = getattr(baths, "default", None)
+        if isinstance(deal_type, Param):
+            deal_type = getattr(deal_type, "default", "balanced")
+        if isinstance(sort, Param):
+            sort = getattr(sort, "default", "created_at_desc")
+        if isinstance(dir, Param):
+            dir = getattr(dir, "default", "desc")
+        if isinstance(limit, Param):
+            limit = int(getattr(limit, "default", 50))
+        if isinstance(offset, Param):
+            offset = int(getattr(offset, "default", 0))
+
         # When called directly (unit tests), bool Query params may be Param objects too.
         if isinstance(deals_only, Param):
             deals_only = _parse_bool(getattr(deals_only, "default", False))
@@ -1052,6 +1091,10 @@ def list_properties(
             investment_type = getattr(investment_type, "default", None)
         if isinstance(property_type, Param):
             property_type = getattr(property_type, "default", None)
+
+        deal_type = str(deal_type or "balanced")
+        sort = str(sort or "created_at_desc")
+        dir = str(dir or "desc")
 
         response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
 
@@ -1121,6 +1164,16 @@ def list_properties(
                 search_terms_for_q = expand_query_terms(raw_query_text)
             if not search_terms_for_q:
                 search_terms_for_q = [raw_query_text]
+
+        def _build_text_search_parts(terms: List[str]) -> List[str]:
+            parts: List[str] = []
+            for term in terms[:30]:
+                q_esc = str(term).replace("%", "").replace(",", " ").strip()
+                if not q_esc:
+                    continue
+                parts.append(f"title.ilike.%{q_esc}%")
+                parts.append(f"location.ilike.%{q_esc}%")
+            return parts
 
         def _location_terms_from_rows(rows: List[Dict[str, Any]]) -> set[str]:
             terms: set[str] = set()
@@ -1225,13 +1278,7 @@ def list_properties(
 
             # Search across common fields
             if include_text_search and raw_query_text:
-                parts: List[str] = []
-                for term in search_terms_for_q[:30]:
-                    q_esc = str(term).replace("%", "").replace(",", " ").strip()
-                    if not q_esc:
-                        continue
-                    parts.append(f"title.ilike.%{q_esc}%")
-                    parts.append(f"location.ilike.%{q_esc}%")
+                parts = _build_text_search_parts(search_terms_for_q)
 
                 if parts:
                     # Supabase .or_ expects a comma-separated filter string.
@@ -1262,8 +1309,6 @@ def list_properties(
 
             return q0
 
-        query = _build_base_query()
-
         deal_type_norm = normalize_deal_type(deal_type)
 
         # Sorting
@@ -1280,19 +1325,24 @@ def list_properties(
             "score_desc": ("score", True),
         }
 
-        if sort_key in sort_map:
-            sort_col, desc = sort_map[sort_key]
-            query = _safe_order(query, sort_col, desc=desc, nulls_last=True)
-            # Stable fallback ordering for deterministic paging.
-            if sort_col != "created_at":
-                query = _safe_order(query, "created_at", desc=True, nulls_last=True)
-        else:
+        def _apply_sorting(qobj: Any) -> Any:
+            if sort_key in sort_map:
+                sort_col, desc = sort_map[sort_key]
+                qobj = _safe_order(qobj, sort_col, desc=desc, nulls_last=True)
+                # Stable fallback ordering for deterministic paging.
+                if sort_col != "created_at":
+                    qobj = _safe_order(qobj, "created_at", desc=True, nulls_last=True)
+                return qobj
+
             # Legacy behaviour: allow sorting by a column + dir=asc|desc
             sort_col = sort_key if (sort_key in ALLOWED_SORT_COLS) else "created_at"
             ascending = (dir or "").lower() == "asc"
-            query = _safe_order(query, sort_col, desc=not ascending, nulls_last=True)
+            qobj = _safe_order(qobj, sort_col, desc=not ascending, nulls_last=True)
             if sort_col != "created_at":
-                query = _safe_order(query, "created_at", desc=True, nulls_last=True)
+                qobj = _safe_order(qobj, "created_at", desc=True, nulls_last=True)
+            return qobj
+
+        query = _apply_sorting(_build_base_query())
 
         # Pagination
         start = offset
@@ -1329,6 +1379,64 @@ def list_properties(
         inv_filter_active = bool(investment_type_filter)
         needs_pool_from_zero = False
         pool_size = 0
+
+        def _fetch_filtered_page_exact() -> tuple[List[Dict[str, Any]], int]:
+            # Exact pagination/count path for Python-side filters when the requested page
+            # sits outside the in-memory pool window.
+            batch_size = builtins.min(builtins.max(limit * 4, 200), 1000)
+            scan_offset = 0
+            filtered_total = 0
+            page_items: List[Dict[str, Any]] = []
+            requested_inv = set(investment_type_filter)
+            allowed_property_types = set(property_type_filter)
+
+            while True:
+                scan_query = _apply_sorting(_build_base_query())
+                scan_query = scan_query.range(scan_offset, scan_offset + batch_size - 1)
+                scan_res = scan_query.execute()
+                scan_rows = scan_res.data or []
+                if not isinstance(scan_rows, list) or not scan_rows:
+                    break
+
+                batch_items = [_normalize_property_row(r) for r in scan_rows if isinstance(r, dict)]
+
+                if inv_filter_active and batch_items:
+                    inv_filtered: List[Dict[str, Any]] = []
+                    for it in batch_items:
+                        try:
+                            it["investment_types"] = sorted(classify_investment_types(it))
+                        except Exception:
+                            it["investment_types"] = []
+                        if requested_inv.intersection(set(it.get("investment_types") or [])):
+                            inv_filtered.append(it)
+                    batch_items = inv_filtered
+
+                if property_type_filter and python_filter_property_type and batch_items:
+                    batch_items = [it for it in batch_items if it.get("property_type") in allowed_property_types]
+
+                if any_deal_filter and batch_items:
+                    batch_items = [_ensure_deal_fields(it) for it in batch_items if isinstance(it, dict)]
+                    batch_items = [
+                        it
+                        for it in batch_items
+                        if _matches_deal_filters(
+                            it.get("deal_signals"),
+                            deals_only=deals_only,
+                            required_signals=required_signals,
+                        )
+                    ]
+
+                for it in batch_items:
+                    if filtered_total >= offset and len(page_items) < limit:
+                        page_items.append(it)
+                    filtered_total += 1
+
+                if len(scan_rows) < batch_size:
+                    break
+                scan_offset += batch_size
+
+            return page_items, filtered_total
+
         if is_recommended or any_deal_filter:
             pool_size = builtins.min(builtins.max(offset + limit, limit * 8), 500)
             # Only fetch from zero if the requested page fits in the capped pool.
@@ -1353,19 +1461,7 @@ def list_properties(
             if missing == "property_type" and property_type_filter:
                 python_filter_property_type = True
                 property_type_db_value = None
-                query = _build_base_query()
-                # Preserve sorting behavior.
-                if sort_key in sort_map:
-                    sort_col, desc = sort_map[sort_key]
-                    query = _safe_order(query, sort_col, desc=desc, nulls_last=True)
-                    if sort_col != "created_at":
-                        query = _safe_order(query, "created_at", desc=True, nulls_last=True)
-                else:
-                    sort_col = sort_key if (sort_key in ALLOWED_SORT_COLS) else "created_at"
-                    ascending = (dir or "").lower() == "asc"
-                    query = _safe_order(query, sort_col, desc=not ascending, nulls_last=True)
-                    if sort_col != "created_at":
-                        query = _safe_order(query, "created_at", desc=True, nulls_last=True)
+                query = _apply_sorting(_build_base_query())
 
                 # If we're going to python-filter, fetch a candidate pool from zero.
                 pool_size = builtins.min(builtins.max(offset + limit, limit * 8), 500)
@@ -1601,6 +1697,14 @@ def list_properties(
             # Non-recommended + investment type filtering: slice after filtering.
             items = items[offset : offset + limit]
 
+        needs_exact_filtered_page = (
+            not is_recommended
+            and not fetched_pool_from_zero
+            and (inv_filter_active or any_deal_filter or (property_type_filter and python_filter_property_type))
+        )
+        if needs_exact_filtered_page:
+            items, total_int = _fetch_filtered_page_exact()
+
         points: Optional[List[Dict[str, Any]]] = None
         if include_points:
             # Minimal payload for map pinning. We intentionally do not include images/raw payload.
@@ -1640,10 +1744,10 @@ def list_properties(
                     if ts:
                         q0 = q0.gte("created_at", ts)
 
-                if q:
-                    q_esc = q.replace("%", "").strip()
-                    if q_esc:
-                        q0 = q0.or_(f"title.ilike.%{q_esc}%,location.ilike.%{q_esc}%")
+                if raw_query_text:
+                    parts = _build_text_search_parts(search_terms_for_q)
+                    if parts:
+                        q0 = q0.or_(",".join(parts))
 
                 if min is not None:
                     q0 = q0.gte("price", min)

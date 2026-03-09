@@ -6,6 +6,7 @@ import os
 from unittest.mock import Mock, patch
 
 import pytest
+from fastapi import HTTPException, Response
 from fastapi.testclient import TestClient
 
 
@@ -684,3 +685,289 @@ def test_get_property_not_found(mock_create_client, client):
     response = client.get("/properties/nonexistent")
 
     assert response.status_code == 404
+
+
+def test_get_supabase_fallback_only_in_test_env(monkeypatch):
+    from backend.routes import properties_routes as routes
+
+    calls = {"count": 0}
+
+    def _raise_get_supabase(*args, **kwargs):
+        raise RuntimeError("missing config")
+
+    def _fake_create_client(url: str, key: str):
+        calls["count"] += 1
+        return object()
+
+    monkeypatch.setattr(routes, "get_supabase", _raise_get_supabase)
+    monkeypatch.setattr(routes, "create_client", _fake_create_client)
+
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    assert routes._get_supabase() is not None
+    assert calls["count"] == 1
+
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("CI", "false")
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    with pytest.raises(HTTPException) as exc:
+        routes._get_supabase()
+    assert exc.value.status_code == 503
+    assert calls["count"] == 1
+
+
+def test_list_properties_direct_call_handles_fastapi_defaults(monkeypatch):
+    from backend.routes import properties_routes as routes
+
+    class _FakeRes:
+        def __init__(self, data, count):
+            self.data = data
+            self.count = count
+
+    class _FakeQuery:
+        def __init__(self, rows):
+            self.rows = rows
+            self._start = 0
+            self._end = max(len(rows) - 1, 0)
+
+        def select(self, *args, **kwargs):
+            return self
+
+        def eq(self, *args, **kwargs):
+            return self
+
+        def gte(self, *args, **kwargs):
+            return self
+
+        def lte(self, *args, **kwargs):
+            return self
+
+        def in_(self, *args, **kwargs):
+            return self
+
+        def ilike(self, *args, **kwargs):
+            return self
+
+        def or_(self, *args, **kwargs):
+            return self
+
+        def order(self, *args, **kwargs):
+            return self
+
+        def range(self, start, end):
+            self._start = int(start)
+            self._end = int(end)
+            return self
+
+        def execute(self):
+            return _FakeRes(self.rows[self._start : self._end + 1], len(self.rows))
+
+    class _FakeSupabase:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def table(self, _name):
+            return _FakeQuery(self.rows)
+
+    rows = [{"id": "p1", "title": "Test", "location": "London", "created_at": "2025-01-01T00:00:00Z"}]
+    monkeypatch.setattr(routes, "_get_supabase", lambda: _FakeSupabase(rows))
+
+    out = routes.list_properties(Response())
+    assert isinstance(out, dict)
+    assert out["total"] == 1
+    assert len(out["items"]) == 1
+
+
+def test_list_properties_investment_type_high_offset_reports_filtered_total(monkeypatch):
+    from backend.routes import properties_routes as routes
+
+    class _FakeRes:
+        def __init__(self, data, count):
+            self.data = data
+            self.count = count
+
+    class _FakeQuery:
+        def __init__(self, rows):
+            self.rows = rows
+            self._start = 0
+            self._end = max(len(rows) - 1, 0)
+
+        def select(self, *args, **kwargs):
+            return self
+
+        def eq(self, *args, **kwargs):
+            return self
+
+        def gte(self, *args, **kwargs):
+            return self
+
+        def lte(self, *args, **kwargs):
+            return self
+
+        def in_(self, *args, **kwargs):
+            return self
+
+        def ilike(self, *args, **kwargs):
+            return self
+
+        def or_(self, *args, **kwargs):
+            return self
+
+        def order(self, *args, **kwargs):
+            return self
+
+        def range(self, start, end):
+            self._start = int(start)
+            self._end = int(end)
+            return self
+
+        def execute(self):
+            return _FakeRes(self.rows[self._start : self._end + 1], len(self.rows))
+
+    class _FakeSupabase:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def table(self, _name):
+            return _FakeQuery(self.rows)
+
+    rows = []
+    for i in range(1000):
+        title = f"Licensed HMO {i}" if i < 10 else f"Standard Flat {i}"
+        rows.append(
+            {
+                "id": str(i),
+                "title": title,
+                "description": title,
+                "location": "London",
+                "created_at": f"2025-01-{(i % 28) + 1:02d}T00:00:00Z",
+                "price": 100000 + i,
+            }
+        )
+
+    monkeypatch.setattr(routes, "_get_supabase", lambda: _FakeSupabase(rows))
+
+    body = routes.list_properties(
+        Response(),
+        investment_type="HMO",
+        limit=50,
+        offset=600,
+        sort="created_at_desc",
+        dir="desc",
+    )
+    assert body["total"] == 10
+    assert body["has_more"] is False
+    assert body["items"] == []
+
+
+def test_list_properties_deal_filter_high_offset_reports_filtered_total(monkeypatch):
+    from backend.routes import properties_routes as routes
+
+    class _FakeRes:
+        def __init__(self, data, count):
+            self.data = data
+            self.count = count
+
+    class _FakeQuery:
+        def __init__(self, rows):
+            self.rows = rows
+            self._start = 0
+            self._end = max(len(rows) - 1, 0)
+
+        def select(self, *args, **kwargs):
+            return self
+
+        def eq(self, *args, **kwargs):
+            return self
+
+        def gte(self, *args, **kwargs):
+            return self
+
+        def lte(self, *args, **kwargs):
+            return self
+
+        def in_(self, *args, **kwargs):
+            return self
+
+        def ilike(self, *args, **kwargs):
+            return self
+
+        def or_(self, *args, **kwargs):
+            return self
+
+        def order(self, *args, **kwargs):
+            return self
+
+        def range(self, start, end):
+            self._start = int(start)
+            self._end = int(end)
+            return self
+
+        def execute(self):
+            return _FakeRes(self.rows[self._start : self._end + 1], len(self.rows))
+
+    class _FakeSupabase:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def table(self, _name):
+            return _FakeQuery(self.rows)
+
+    rows = []
+    for i in range(1000):
+        rows.append(
+            {
+                "id": str(i),
+                "title": f"Property {i}",
+                "location": "London",
+                "created_at": f"2025-01-{(i % 28) + 1:02d}T00:00:00Z",
+                "deal_signals": ["auction"] if i < 12 else [],
+            }
+        )
+
+    monkeypatch.setattr(routes, "_get_supabase", lambda: _FakeSupabase(rows))
+
+    body = routes.list_properties(
+        Response(),
+        auction_only=True,
+        limit=50,
+        offset=600,
+        sort="created_at_desc",
+        dir="desc",
+    )
+    assert body["total"] == 12
+    assert body["has_more"] is False
+    assert body["items"] == []
+
+
+def test_list_properties_include_points_uses_synonym_expansion(monkeypatch):
+    from backend.routes import properties_routes as routes
+
+    monkeypatch.setattr(routes.settings, "SMART_SEARCH_SYNONYMS", True)
+
+    mock_sb = Mock()
+    mock_query = Mock()
+    mock_query.select.return_value = mock_query
+    mock_query.range.return_value = mock_query
+    mock_query.or_.return_value = mock_query
+    mock_query.eq.return_value = mock_query
+    mock_query.gte.return_value = mock_query
+    mock_query.lte.return_value = mock_query
+    mock_query.in_.return_value = mock_query
+    mock_query.order.return_value = mock_query
+    mock_query.execute.return_value = Mock(data=[], count=0)
+    mock_sb.table.return_value = mock_query
+    monkeypatch.setattr(routes, "_get_supabase", lambda: mock_sb)
+
+    out = routes.list_properties(
+        Response(),
+        q="flat",
+        include_points=True,
+        sort="created_at_desc",
+        dir="desc",
+    )
+    assert isinstance(out, dict)
+
+    calls = [c.args[0] for c in mock_query.or_.call_args_list if getattr(c, "args", None)]
+    assert len(calls) >= 2
+    assert "apartment" in calls[0]
+    assert "apartment" in calls[1]
