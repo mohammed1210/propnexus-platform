@@ -7,7 +7,10 @@ Sensitive information such as API keys, database URLs, and authentication tokens
 ## Principles
 
 - **Do not commit secrets** – Files such as `.env` should never be checked into git. Only `.env.example` should exist in the repository to serve as a template.
-- **Use environment variables** – Read secrets from environment variables in your code. For example, use `os.getenv("DATABASE_URL")` in Python or `process.env.NEXT_PUBLIC_SUPABASE_URL` in JavaScript.
+- **Use environment variables** – Read secrets from environment variables in your code. Canonical project names include:
+  - Backend: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+  - Frontend (public): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_BASE`
+  - See also: `docs/ENVIRONMENT_VARIABLES_SUMMARY.md`
 - **Least privilege** – Provision separate credentials for development, staging, and production. Avoid reusing tokens across environments.
 - **Rotate regularly** – Rotate secrets periodically and immediately after suspected exposure.
 

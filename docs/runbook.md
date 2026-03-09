@@ -5,9 +5,13 @@
 - **Supabase**: console → Table Editor → `properties`.
 
 ## Environments
-- **Required env** (public):
+- **Required env** (frontend/public):
   - `NEXT_PUBLIC_SUPABASE_URL`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `NEXT_PUBLIC_API_BASE`
+- **Required env** (backend/private):
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
 - Vercel → Project → Settings → Environment Variables. Redeploy after changes.
 
 ## Data Access
