@@ -20,11 +20,11 @@ export async function GET(request: Request, ctx: any) {
     process.env.NEXT_PUBLIC_API_URL ||
     process.env.BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_BASE ||
-    (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
+    (process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : '');
 
   if (!base.trim()) {
     return NextResponse.json(
-      { error: 'Missing backend base URL env (NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL / BACKEND_URL).' },
+      { error: 'Missing backend base URL env (NEXT_PUBLIC_API_BASE / NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL / BACKEND_URL).' },
       { status: 500 },
     );
   }

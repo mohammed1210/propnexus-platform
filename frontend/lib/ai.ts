@@ -60,7 +60,7 @@ async function requestJSON<T>(
   const base = (BASE || '').replace(/\/+$/, '');
   if (!base) {
     throw new Error(
-      '[ai] BASE URL is empty. Set NEXT_PUBLIC_API_BASE (or legacy NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL).',
+      '[ai] BASE URL is empty. Set NEXT_PUBLIC_API_BASE.',
     );
   }
 

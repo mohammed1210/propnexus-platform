@@ -795,16 +795,10 @@ function ListingsInner() {
       setLoading(true);
 
       try {
-        const backendUrl =
-          (process.env.NEXT_PUBLIC_BACKEND_URL ||
-            process.env.NEXT_PUBLIC_API_URL ||
-            process.env.NEXT_PUBLIC_API_BASE ||
-            API_BASE ||
-            '').replace(/\/+$/, '') ||
-          (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
+        const backendUrl = (API_BASE || '').replace(/\/+$/, '');
 
         if (!backendUrl.trim()) {
-          throw new Error('Missing backend base URL env (NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL).');
+          throw new Error('Missing backend base URL env (NEXT_PUBLIC_API_BASE).');
         }
 
         const params = new URLSearchParams();
