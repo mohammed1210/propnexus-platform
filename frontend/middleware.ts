@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { clerkMiddleware, createRouteMatcher, clerkClient } from "@clerk/nextjs/server";
 import { hasValidClerkKey } from "@/lib/clerk-utils";
-import { isAuthEnabled } from "@/lib/auth";
+import { disableAuth, isAuthEnabled } from "@/lib/auth";
 
 const DEFAULT_ADMIN_EMAILS = ["abbas_m90@hotmail.com", "ysoserious360@gmail.com"];
 
@@ -37,7 +37,7 @@ const isProtectedRoute = createRouteMatcher([
   "/api/admin(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, req) => {
+const clerkAuthMiddleware = clerkMiddleware(async (auth, req) => {
   const redirectRes = handleRedirects(req);
   if (redirectRes.headers.get("location")) return redirectRes;
 
@@ -117,6 +117,16 @@ export default clerkMiddleware(async (auth, req) => {
   // inject the auth headers that `auth()` reads inside route handlers.
   return;
 });
+
+export default function middleware(req: NextRequest, evt: any) {
+  if (process.env.SCREENSHOT_TEST === "true" || disableAuth) {
+    const redirectRes = handleRedirects(req);
+    if (redirectRes.headers.get("location")) return redirectRes;
+    return NextResponse.next();
+  }
+
+  return clerkAuthMiddleware(req, evt);
+}
 
 export const config = {
   matcher: [

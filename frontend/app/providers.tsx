@@ -22,7 +22,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   // If auth is disabled (or key missing), render without Clerk.
   if (!isAuthEnabled) {
     return (
-      <NextIntlClientProvider locale="en" messages={messages}>
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC" now={new Date()}>
         {children}
       </NextIntlClientProvider>
     );
@@ -30,7 +30,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <ClerkProvider>
-      <NextIntlClientProvider locale="en" messages={messages}>
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC" now={new Date()}>
         {children}
       </NextIntlClientProvider>
     </ClerkProvider>

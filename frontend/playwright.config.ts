@@ -14,7 +14,7 @@ export default defineConfig({
   timeout: 30_000,
   reporter: 'list',
   use: {
-    baseURL: isScreenshotTest ? 'http://localhost:3000' : BASE,
+    baseURL: isScreenshotTest ? 'http://127.0.0.1:3000' : BASE,
     trace: 'on-first-retry',
     colorScheme: isScreenshotTest ? 'dark' : undefined,
   },
@@ -22,7 +22,7 @@ export default defineConfig({
     command: isScreenshotTest
       ? 'npm run build && npm run start'
       : `NEXT_PUBLIC_API_BASE="${API_BASE}" npx next build && npx next start -H ${HOST} -p ${PORT}`,
-    url: isScreenshotTest ? 'http://localhost:3000' : BASE,
+    url: isScreenshotTest ? 'http://127.0.0.1:3000' : BASE,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,
   },
