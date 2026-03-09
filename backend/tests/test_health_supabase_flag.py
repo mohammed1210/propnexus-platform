@@ -1,7 +1,4 @@
-"""Regression tests for /health supabase_configured flag.
-
-This must stay additive/backward-compatible and must not leak secrets.
-"""
+"""Regression tests for /health supabase_configured flag."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,10 +19,7 @@ def test_health_includes_supabase_configured_boolean(monkeypatch: pytest.MonkeyP
     client = TestClient(app)
 
     monkeypatch.delenv("SUPABASE_URL", raising=False)
-    monkeypatch.delenv("NEXT_PUBLIC_SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
-    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
-    monkeypatch.delenv("SUPABASE_KEY", raising=False)
 
     resp = client.get("/health")
     assert resp.status_code == 200
@@ -33,6 +27,13 @@ def test_health_includes_supabase_configured_boolean(monkeypatch: pytest.MonkeyP
     assert "supabase_configured" in body
     assert isinstance(body["supabase_configured"], bool)
     assert body["supabase_configured"] is False
+
+    # Legacy fallback vars are ignored by backend config parsing.
+    monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_URL", "https://legacy.supabase.co")
+    monkeypatch.setenv("SUPABASE_KEY", "legacy_key")
+    resp_legacy = client.get("/health")
+    assert resp_legacy.status_code == 200
+    assert resp_legacy.json().get("supabase_configured") is False
 
     # If configured, it should flip to True — but still never echo secrets.
     secret_key = "super-secret-service-role-key"
