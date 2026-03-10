@@ -4,19 +4,23 @@
 function resolveApiBase(): string {
   const envBase = process.env.NEXT_PUBLIC_API_BASE?.trim();
 
+  if (envBase) {
+    return envBase.replace(/\/+$/, '');
+  }
+
   // Dev convenience
-  if (!envBase && process.env.NODE_ENV !== 'production') {
+  if (process.env.NODE_ENV !== 'production') {
     return 'http://localhost:8000';
   }
 
-  // Production must be explicit (avoid silently calling production/same-origin APIs)
-  if (!envBase) {
-    throw new Error(
-      'Missing NEXT_PUBLIC_API_BASE. Set it to your backend URL (e.g. http://localhost:8000 for local).',
+  // Production fallback: use Next.js API routes when env is not injected.
+  // This avoids client calls to `/properties` (404) and keeps the app functional.
+  if (typeof console !== 'undefined') {
+    console.warn(
+      '[api] NEXT_PUBLIC_API_BASE is missing in production; falling back to /api routes.',
     );
   }
-
-  return envBase;
+  return '/api';
 }
 
 export const API_BASE = resolveApiBase();
