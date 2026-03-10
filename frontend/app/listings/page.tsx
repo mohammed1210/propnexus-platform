@@ -1573,7 +1573,7 @@ function ListingsInner() {
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
                   placeholder="Search location or postcode…"
-                  className="input-field w-full"
+                  className="search-location-input input-field w-full"
                   style={{ height: 40, paddingLeft: 40, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
                   aria-label="Search by location"
                 />
@@ -1601,7 +1601,7 @@ function ListingsInner() {
                       );
                     }}
                     disabled={!mapAvailable}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    className={`toggle-map-view relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                       showMap && mapAvailable ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'
                     } ${!mapAvailable ? 'opacity-60 cursor-not-allowed' : ''}`}
                     title={mapAvailable ? 'Toggle map' : 'Map unavailable (no coordinates)'}
@@ -1623,7 +1623,7 @@ function ListingsInner() {
                       p.set('offset', '0');
                     });
                   }}
-                  className="input-field"
+                  className="investment-type-select input-field"
                   style={{ height: 40, padding: '0.5rem 0.75rem' }}
                   aria-label="Sort"
                 >
@@ -1646,7 +1646,7 @@ function ListingsInner() {
 
                 <button
                   onClick={() => setShowFilters((v) => !v)}
-                  className="h-10 px-3 md:px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
+                  className="more-filters-button h-10 px-3 md:px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
                   aria-expanded={showFilters}
                   aria-controls="listings-filters-popover"
                 >

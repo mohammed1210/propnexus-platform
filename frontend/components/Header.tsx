@@ -10,6 +10,7 @@ import { useTranslations } from "next-intl";
 import { SafeSignedIn, SafeSignedOut, SafeUserButton } from "./ClerkAuthSafe";
 import ThemeToggle from "./ThemeToggle";
 import ContrastToggle from "./ContrastToggle";
+import OnboardingTour from "./OnboardingTour";
 import { isAuthEnabled } from "@/lib/auth";
 
 export default function Header() {
@@ -28,6 +29,8 @@ export default function Header() {
   ];
 
   const [mobileMenuKey, setMobileMenuKey] = useState(0);
+  const [tourRunNonce, setTourRunNonce] = useState(0);
+  const [tourSeen, setTourSeen] = useState(true);
 
   // Close the mobile menu by remounting Disclosure when a link is tapped
   const handleMobileNavigate = () => setMobileMenuKey((k) => k + 1);
@@ -85,6 +88,13 @@ export default function Header() {
 
         {/* Desktop right side actions */}
         <div className="hidden md:flex items-center gap-3">
+          <button
+            type="button"
+            className="hidden lg:inline-flex h-10 px-3 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            onClick={() => setTourRunNonce((n) => n + 1)}
+          >
+            {tourSeen ? 'Replay Tour' : 'Start Tour'}
+          </button>
           <ThemeToggle />
           <ContrastToggle />
 
@@ -273,6 +283,8 @@ export default function Header() {
           </Disclosure>
         </div>
       </div>
+
+      <OnboardingTour runNonce={tourRunNonce} onSeenChange={setTourSeen} />
     </header>
   );
 }

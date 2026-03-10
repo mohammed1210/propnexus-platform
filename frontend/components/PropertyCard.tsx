@@ -547,7 +547,7 @@ export default function PropertyCard({
       onMouseEnter={() => onHoverChange?.(true)}
       onMouseLeave={() => onHoverChange?.(false)}
       className={cx(
-        'card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30',
+        'property-card card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30',
         isHovered && 'ring-2 ring-brand-500/20 border-brand-500/30',
       )}
     >
