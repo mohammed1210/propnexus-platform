@@ -116,7 +116,17 @@ def test_property_search_contract(client: TestClient, monkeypatch: pytest.Monkey
     assert isinstance(body, dict)
     _assert_keys(
         body,
-        {"q", "filters", "items", "count", "total_results", "facets", "limit", "offset", "served_by"},
+        {
+            "q",
+            "filters",
+            "items",
+            "count",
+            "total_results",
+            "facets",
+            "limit",
+            "offset",
+            "served_by",
+        },
     )
     assert body["q"] == "london"
     assert isinstance(body["items"], list)
@@ -154,7 +164,9 @@ def test_ai_summary_contract_with_stub(client: TestClient, monkeypatch: pytest.M
     async def _fake_generate_summary(req):
         return SummaryResponse(summary="Stub summary", bullets=["Point 1", "Point 2"])
 
-    monkeypatch.setattr(ai_routes.ai_service, "generate_summary", _fake_generate_summary, raising=True)
+    monkeypatch.setattr(
+        ai_routes.ai_service, "generate_summary", _fake_generate_summary, raising=True
+    )
 
     resp = client.post(
         "/ai/summary",
@@ -251,4 +263,3 @@ def test_area_and_comps_contract(client: TestClient, monkeypatch: pytest.MonkeyP
     assert comps_body["postcode"] == "SW1A"
     assert isinstance(comps_body["sales"], list)
     assert isinstance(comps_body["rents"], list)
-

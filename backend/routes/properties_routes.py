@@ -1412,10 +1412,16 @@ def list_properties(
                     batch_items = inv_filtered
 
                 if property_type_filter and python_filter_property_type and batch_items:
-                    batch_items = [it for it in batch_items if it.get("property_type") in allowed_property_types]
+                    batch_items = [
+                        it
+                        for it in batch_items
+                        if it.get("property_type") in allowed_property_types
+                    ]
 
                 if any_deal_filter and batch_items:
-                    batch_items = [_ensure_deal_fields(it) for it in batch_items if isinstance(it, dict)]
+                    batch_items = [
+                        _ensure_deal_fields(it) for it in batch_items if isinstance(it, dict)
+                    ]
                     batch_items = [
                         it
                         for it in batch_items
@@ -1700,7 +1706,11 @@ def list_properties(
         needs_exact_filtered_page = (
             not is_recommended
             and not fetched_pool_from_zero
-            and (inv_filter_active or any_deal_filter or (property_type_filter and python_filter_property_type))
+            and (
+                inv_filter_active
+                or any_deal_filter
+                or (property_type_filter and python_filter_property_type)
+            )
         )
         if needs_exact_filtered_page:
             items, total_int = _fetch_filtered_page_exact()
