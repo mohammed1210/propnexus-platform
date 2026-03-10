@@ -1,0 +1,17 @@
+groups:
+  - name: search-guardrails
+    rules:
+      - alert: SearchZeroResultsRateHigh
+        expr: |
+          (
+            sum(increase(search_zero_results_total[10m]))
+            /
+            clamp_min(sum(increase(search_requests_total[10m])), 1)
+          ) > 0.15
+        for: 10m
+        labels:
+          severity: warning
+          service: search
+        annotations:
+          summary: "Search zero-result rate exceeded 15% for 10 minutes"
+          description: "The zero-result rate for search endpoints is above 15% over the last 10 minutes. Check search quality, ingestion freshness, and fallback activation."

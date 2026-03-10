@@ -1,289 +1,228 @@
+#!/usr/bin/env python
+"""
+Nightly job: train LambdaMART rerank model from last-14-day click logs.
+Outputs a model json + metrics json.
+"""
+
 from __future__ import annotations
 
-import argparse
-import io
+import datetime as dt
+import json
 import os
-from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
+from io import BytesIO
 from typing import Iterable
-from urllib.parse import urlparse
 
-FEATURE_COLUMNS = ["exact_match", "trigram_sim", "price_rank_pct", "age_days", "beds", "yield"]
+import boto3
+import lightgbm as lgb
+import pandas as pd
+import psycopg2
 
-
-@dataclass
-class EvalMetrics:
-    ndcg_at_10: float
-    map_at_10: float
-
-
-def _safe_float(v) -> float:
-    try:
-        return float(v)
-    except Exception:
-        return 0.0
+SUPABASE_URL = os.environ["SUPABASE_URL_RW"]
+S3_BUCKET = os.environ["ML_MODEL_BUCKET"]
 
 
-def _dcg(rels: list[float], k: int) -> float:
-    import math
-
-    out = 0.0
-    for i, rel in enumerate(rels[:k], start=1):
-        out += (2.0**rel - 1.0) / math.log2(i + 1.0)
-    return out
-
-
-def _ndcg_at_k(y_true: list[float], y_pred: list[float], qids: list[str], k: int = 10) -> float:
-    by_q: dict[str, list[tuple[float, float]]] = {}
-    for yt, yp, qid in zip(y_true, y_pred, qids):
-        by_q.setdefault(str(qid), []).append((float(yt), float(yp)))
-
-    if not by_q:
-        return 0.0
-
-    scores: list[float] = []
-    for pairs in by_q.values():
-        sorted_by_pred = [p[0] for p in sorted(pairs, key=lambda t: t[1], reverse=True)]
-        ideal = sorted((p[0] for p in pairs), reverse=True)
-        denom = _dcg(ideal, k)
-        if denom <= 0:
-            continue
-        scores.append(_dcg(sorted_by_pred, k) / denom)
-
-    return sum(scores) / len(scores) if scores else 0.0
-
-
-def _map_at_k(y_true: list[float], y_pred: list[float], qids: list[str], k: int = 10) -> float:
-    by_q: dict[str, list[tuple[float, float]]] = {}
-    for yt, yp, qid in zip(y_true, y_pred, qids):
-        by_q.setdefault(str(qid), []).append((float(yt), float(yp)))
-
-    if not by_q:
-        return 0.0
-
-    aps: list[float] = []
-    for pairs in by_q.values():
-        relevant_count = sum(1 for label, _ in pairs if label > 0)
-        denom = min(k, relevant_count)
-        if denom <= 0:
-            aps.append(0.0)
-            continue
-
-        ranked = sorted(pairs, key=lambda t: t[1], reverse=True)[:k]
-        hits = 0
-        precisions = []
-        for i, (label, _) in enumerate(ranked, start=1):
-            if label > 0:
-                hits += 1
-                precisions.append(hits / i)
-        aps.append(sum(precisions) / denom if precisions else 0.0)
-    return sum(aps) / len(aps)
-
-
-def _list_s3_objects(prefix: str, day_keys: Iterable[str]) -> list[tuple[str, str]]:
-    try:
-        import boto3  # type: ignore[import-not-found]
-    except Exception as e:
-        raise RuntimeError("boto3 is required to read S3 parquet") from e
-
-    parsed = urlparse(prefix)
-    bucket = parsed.netloc
-    base = parsed.path.lstrip("/").rstrip("/")
-
-    s3 = boto3.client("s3")
-    out: list[tuple[str, str]] = []
-    for day in day_keys:
-        pfx = f"{base}/date={day}/"
-        token = None
-        while True:
-            kwargs = {"Bucket": bucket, "Prefix": pfx}
-            if token:
-                kwargs["ContinuationToken"] = token
-            res = s3.list_objects_v2(**kwargs)
-            for obj in res.get("Contents", []):
-                key = obj.get("Key", "")
-                if key.endswith(".parquet"):
-                    out.append((bucket, key))
-            if not res.get("IsTruncated"):
-                break
-            token = res.get("NextContinuationToken")
-    return out
-
-
-def _read_parquet_from_s3(prefix: str, day_keys: Iterable[str]):
-    try:
-        import boto3  # type: ignore[import-not-found]
-        import pandas as pd  # type: ignore[import-not-found]
-        import pyarrow.parquet as pq  # type: ignore[import-not-found]
-    except Exception as e:
-        raise RuntimeError("boto3, pandas and pyarrow are required") from e
-
-    s3 = boto3.client("s3")
-    frames = []
-    for bucket, key in _list_s3_objects(prefix, day_keys):
-        obj = s3.get_object(Bucket=bucket, Key=key)
-        body = obj["Body"].read()
-        table = pq.read_table(io.BytesIO(body))
-        frames.append(table.to_pandas())
-
-    if not frames:
-        return pd.DataFrame()
-    return pd.concat(frames, ignore_index=True)
-
-
-def _read_parquet_from_local(prefix: str, day_keys: Iterable[str]):
-    try:
-        import pandas as pd  # type: ignore[import-not-found]
-    except Exception as e:
-        raise RuntimeError("pandas is required") from e
-
-    base = Path(prefix)
-    frames = []
-    for day in day_keys:
-        day_dir = base / f"date={day}"
-        if not day_dir.exists():
-            continue
-        for part in sorted(day_dir.glob("*.parquet")):
-            frames.append(pd.read_parquet(part))
-
-    if not frames:
-        return pd.DataFrame()
-    return pd.concat(frames, ignore_index=True)
-
-
-def load_feature_frame(days: int, prefix: str):
-    end_day = datetime.now(timezone.utc).date() - timedelta(days=1)
-    day_keys = [(end_day - timedelta(days=i)).isoformat() for i in range(max(days, 1))]
-
-    if prefix.startswith("s3://"):
-        return _read_parquet_from_s3(prefix, day_keys)
-    return _read_parquet_from_local(prefix, day_keys)
-
-
-def _augment_with_negatives(df):
-    import pandas as pd  # type: ignore[import-not-found]
-
-    if df.empty:
-        return df
-
-    rows = []
-    for qid, group in df.groupby("query_id"):
-        g = group.copy()
-        g["user_clicked"] = g["user_clicked"].fillna(1).astype(int)
-        rows.append(g)
-        # Synthetic negatives if only positives exist.
-        if int(g["user_clicked"].sum()) == len(g):
-            neg = g.head(min(3, len(g))).copy()
-            neg["user_clicked"] = 0
-            neg["trigram_sim"] = (neg["trigram_sim"].astype(float) * 0.5).clip(lower=0.0)
-            neg["exact_match"] = False
-            neg["price_rank_pct"] = (1.0 - neg["price_rank_pct"].astype(float)).clip(0.0, 1.0)
-            rows.append(neg)
-
-    return pd.concat(rows, ignore_index=True)
-
-
-def _prepare_matrix(df):
-    import pandas as pd  # type: ignore[import-not-found]
-
-    out = df.copy()
-    out["exact_match"] = out["exact_match"].astype(int)
-    for col in FEATURE_COLUMNS:
-        if col not in out.columns:
-            out[col] = 0.0
-        out[col] = pd.to_numeric(out[col], errors="coerce").fillna(0.0)
-    out["user_clicked"] = (
-        pd.to_numeric(out.get("user_clicked", 0), errors="coerce").fillna(0).astype(int)
-    )
-    out["query_id"] = out["query_id"].astype(str)
-    return out
-
-
-def _split_by_query(df, frac: float = 0.8):
-    qids = sorted(df["query_id"].unique().tolist())
-    if not qids:
-        return df.copy(), df.iloc[0:0].copy()
-
-    if len(qids) == 1:
-        train_df = df.copy()
-        test_df = df.iloc[0:0].copy()
-        return train_df, test_df
-
-    split = max(1, min(len(qids) - 1, int(len(qids) * frac)))
-    train_qids = set(qids[:split])
-    train_df = df[df["query_id"].isin(train_qids)].copy()
-    test_df = df[~df["query_id"].isin(train_qids)].copy()
-    return train_df, test_df
-
-
-def train(days: int, output: str, features_prefix: str) -> EvalMetrics:
-    try:
-        import xgboost as xgb  # type: ignore[import-not-found]
-    except Exception as e:
-        raise RuntimeError("xgboost is required for training") from e
-
-    frame = load_feature_frame(days=days, prefix=features_prefix)
-    if frame.empty:
-        raise RuntimeError("No feature parquet rows found for requested period")
-
-    frame = _augment_with_negatives(frame)
-    frame = _prepare_matrix(frame)
-    train_df, test_df = _split_by_query(frame, frac=0.8)
-
-    X_train = train_df[FEATURE_COLUMNS]
-    y_train = train_df["user_clicked"]
-    group_train = train_df.groupby("query_id").size().tolist()
-
-    has_holdout = not test_df.empty
-
-    ranker = xgb.sklearn.XGBRanker(
-        objective="rank:ndcg",
-        n_estimators=80,
-        learning_rate=0.1,
-        max_depth=6,
-        subsample=0.9,
-        colsample_bytree=0.9,
-        random_state=42,
-    )
-    ranker.fit(X_train, y_train, group=group_train, verbose=False)
-
-    Path(output).parent.mkdir(parents=True, exist_ok=True)
-    ranker.save_model(output)
-
-    if has_holdout:
-        X_test = test_df[FEATURE_COLUMNS]
-        y_test = test_df["user_clicked"].tolist()
-        q_test = test_df["query_id"].tolist()
-        y_pred = ranker.predict(X_test).tolist()
-        metrics = EvalMetrics(
-            ndcg_at_10=_ndcg_at_k(y_true=y_test, y_pred=y_pred, qids=q_test, k=10),
-            map_at_10=_map_at_k(y_true=y_test, y_pred=y_pred, qids=q_test, k=10),
+def _table_columns(conn, schema: str, table: str) -> set[str]:
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            select column_name
+            from information_schema.columns
+            where table_schema = %s and table_name = %s
+            """,
+            (schema, table),
         )
+        return {r[0] for r in cur.fetchall()}
+
+
+def _first_existing_table(
+    conn, candidates: Iterable[tuple[str, str]]
+) -> tuple[str, str, set[str]] | None:
+    for schema, table in candidates:
+        cols = _table_columns(conn, schema, table)
+        if cols:
+            return schema, table, cols
+    return None
+
+
+def _build_click_sql(schema: str, table: str, cols: set[str]) -> str:
+    query_expr = "query" if "query" in cols else ("query_id::text" if "query_id" in cols else "''")
+
+    if "property_id" in cols:
+        listing_expr = "property_id"
+    elif "listing_id" in cols:
+        listing_expr = "listing_id"
     else:
-        metrics = EvalMetrics(ndcg_at_10=0.0, map_at_10=0.0)
+        raise RuntimeError(f"{schema}.{table} is missing property_id/listing_id column")
 
-    print("| metric | value |")
-    print("|---|---:|")
-    print(f"| NDCG@10 | {metrics.ndcg_at_10:.4f} |")
-    print(f"| MAP@10 | {metrics.map_at_10:.4f} |")
-    if not has_holdout:
-        print("| NOTE | holdout split unavailable (single query_id); metrics set to 0.0000 |")
+    rank_expr = "position" if "position" in cols else ("rank" if "rank" in cols else "0")
 
-    return metrics
+    if "created_at" in cols:
+        time_expr = "created_at"
+    elif "clicked_at" in cols:
+        time_expr = "clicked_at"
+    elif "inserted_at" in cols:
+        time_expr = "inserted_at"
+    else:
+        raise RuntimeError(f"{schema}.{table} is missing created_at/clicked_at/inserted_at column")
+
+    return f"""
+select
+  {query_expr} as query,
+  {listing_expr} as listing_id,
+  {rank_expr} as rank,
+  {time_expr} as clicked_at
+from {schema}.{table}
+where {time_expr} >= now() - interval '14 days';
+"""
+
+
+def _build_feature_sql(schema: str, table: str, cols: set[str]) -> str:
+    if "listing_id" in cols:
+        listing_expr = "listing_id"
+    elif "property_id" in cols:
+        listing_expr = "property_id"
+    elif "id" in cols:
+        listing_expr = "id"
+    else:
+        raise RuntimeError(f"{schema}.{table} is missing listing_id/property_id/id column")
+
+    if "price" not in cols:
+        raise RuntimeError(f"{schema}.{table} is missing price column")
+
+    if "yield_value" in cols:
+        yield_expr = "yield_value"
+    elif "yield_percent" in cols:
+        yield_expr = "yield_percent"
+    elif "yield" in cols:
+        yield_expr = '"yield"'
+    else:
+        yield_expr = "0::numeric"
+
+    tfidf_expr = "tfidf" if "tfidf" in cols else "0::numeric"
+
+    return f"""
+select
+  {listing_expr} as listing_id,
+  price,
+  {yield_expr} as yield_value,
+  {tfidf_expr} as tfidf
+from {schema}.{table};
+"""
+
+
+def fetch_clicks() -> pd.DataFrame:
+    conn = psycopg2.connect(SUPABASE_URL)
+    try:
+        match = _first_existing_table(
+            conn,
+            [
+                ("analytics", "search_clicks"),
+                ("public", "search_clicks"),
+            ],
+        )
+        if not match:
+            print(
+                "No search_clicks table found (checked analytics.search_clicks, public.search_clicks). "
+                "Skipping retrain until analytics migrations are applied."
+            )
+            return pd.DataFrame(columns=["query", "listing_id", "rank", "clicked_at"])
+
+        schema, table, cols = match
+        click_sql = _build_click_sql(schema, table, cols)
+        print(f"Using click table: {schema}.{table}")
+        return pd.read_sql(click_sql, conn)
+    finally:
+        conn.close()
+
+
+def build_dataset(df: pd.DataFrame) -> pd.DataFrame:
+    conn = psycopg2.connect(SUPABASE_URL)
+    try:
+        match = _first_existing_table(
+            conn,
+            [
+                ("features", "listing_vectors"),
+                ("public", "listing_vectors"),
+                ("public", "properties"),
+            ],
+        )
+        if not match:
+            raise RuntimeError(
+                "No feature table found (checked features.listing_vectors, public.listing_vectors, public.properties)"
+            )
+
+        schema, table, cols = match
+        feature_sql = _build_feature_sql(schema, table, cols)
+        print(f"Using feature table: {schema}.{table}")
+        feats = pd.read_sql(feature_sql, conn)
+    finally:
+        conn.close()
+
+    df = df.copy()
+    df["listing_id"] = df["listing_id"].astype(str)
+    feats["listing_id"] = feats["listing_id"].astype(str)
+
+    merged = df.merge(feats, on="listing_id", how="inner")
+    merged = merged.dropna(subset=["query", "price", "yield_value", "tfidf", "rank"])
+
+    rank_numeric = pd.to_numeric(merged["rank"], errors="coerce").fillna(100.0)
+    max_rank = float(rank_numeric.max()) if len(rank_numeric) else 100.0
+    merged["label"] = (max_rank - rank_numeric + 1.0).clip(lower=1.0)
+    return merged
+
+
+def train(df: pd.DataFrame):
+    features = ["price", "yield_value", "tfidf"]
+    grouped = df.groupby("query", sort=False).size().tolist()
+
+    dtrain = lgb.Dataset(df[features], label=df["label"], group=grouped)
+    params = {
+        "objective": "lambdarank",
+        "metric": "ndcg",
+        "learning_rate": 0.05,
+        "num_leaves": 31,
+        "min_data_in_leaf": 20,
+        "verbosity": -1,
+    }
+    model = lgb.train(params, dtrain, num_boost_round=100)
+    metrics = {
+        "num_rows": int(len(df)),
+        "num_queries": int(df["query"].nunique()),
+    }
+    return model, metrics
+
+
+def upload(model: lgb.Booster, metrics: dict) -> str:
+    s3 = boto3.client("s3")
+    ts = dt.datetime.utcnow().strftime("%Y%m%d%H%M")
+    key = f"search_rerank_{ts}.json"
+
+    model_json = json.dumps(model.dump_model()).encode("utf-8")
+    buf = BytesIO(model_json)
+    s3.upload_fileobj(buf, S3_BUCKET, key, ExtraArgs={"ContentType": "application/json"})
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=f"{key}.metrics",
+        Body=json.dumps(metrics).encode("utf-8"),
+        ContentType="application/json",
+    )
+    return key
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train Smart-Search rerank model")
-    parser.add_argument("--days", type=int, default=30)
-    parser.add_argument("--output", default="models/search_rerank.json")
-    parser.add_argument(
-        "--features-prefix",
-        default=os.getenv("SMART_SEARCH_FEATURES_PREFIX", "s3://propnexus-ml/features"),
-    )
-    args = parser.parse_args()
+    df = fetch_clicks()
+    if len(df) < 500:
+        print("Not enough clicks, aborting")
+        return
 
-    train(days=args.days, output=args.output, features_prefix=args.features_prefix)
+    data = build_dataset(df)
+    if len(data) < 200:
+        print("Not enough joined feature rows, aborting")
+        return
+
+    model, metrics = train(data)
+    key = upload(model, metrics)
+    print("uploaded", key, metrics)
 
 
 if __name__ == "__main__":

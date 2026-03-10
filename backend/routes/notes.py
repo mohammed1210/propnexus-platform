@@ -28,8 +28,7 @@ def _get_supabase() -> Client:
         except Exception:
             # Don’t crash import-time in CI; raise a clear runtime error instead.
             raise RuntimeError(
-                "Supabase is not configured. Set SUPABASE_URL and one of "
-                "SUPABASE_SERVICE_ROLE_KEY / SUPABASE_SERVICE_KEY / SUPABASE_KEY."
+                "Supabase is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
             )
 
         # `get_supabase(required=True)` should never return None.

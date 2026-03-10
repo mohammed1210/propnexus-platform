@@ -263,7 +263,7 @@ psql -f supabase/seed/tradesmen_seed.sql
 ### 3. Environment Variables
 
 No new environment variables required. Uses existing:
-- `NEXT_PUBLIC_BACKEND_URL` or `NEXT_PUBLIC_API_URL` - Backend API URL
+- `NEXT_PUBLIC_API_BASE` - Backend API URL
 - `SUPABASE_URL` - Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
 

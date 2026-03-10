@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import TradesmanCard, { type Tradesman } from './TradesmanCard';
 import ContactTradesmanModal from './ContactTradesmanModal';
+import { API_BASE } from '@/lib/api';
 
 interface TradesmenListProps {
   propertyLat: number;
@@ -39,13 +40,10 @@ export default function TradesmenList({
       setError(null);
 
       try {
-        const apiBase =
-          process.env.NEXT_PUBLIC_BACKEND_URL ||
-          process.env.NEXT_PUBLIC_API_URL ||
-          (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
+        const apiBase = (API_BASE || '').trim();
 
         if (!apiBase.trim()) {
-          throw new Error('Missing backend base URL env (NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL).');
+          throw new Error('Missing backend base URL env (NEXT_PUBLIC_API_BASE).');
         }
 
         const params = new URLSearchParams({

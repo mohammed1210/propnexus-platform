@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { isAuthEnabled } from '@/lib/auth';
+import { API_BASE } from '@/lib/api';
 
 export type UserPlan = 'free' | 'pro' | 'investor';
 
@@ -88,7 +89,10 @@ export function useUserPlan(): UserPlanData {
       }
 
       // Fetch plan from backend using email query parameter
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+      const backendUrl = (API_BASE || '').trim();
+      if (!backendUrl) {
+        throw new Error('Missing backend base URL env (NEXT_PUBLIC_API_BASE).');
+      }
       const response = await fetch(
         `${backendUrl}/users/plan?email=${encodeURIComponent(email)}`,
         {

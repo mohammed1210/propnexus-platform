@@ -4,7 +4,7 @@
 Create/update **.env.example** files:
 - `NEXT_PUBLIC_API_BASE`
 - `OPENAI_API_KEY` (backend only)
-- `SUPABASE_URL`, `SUPABASE_KEY` (service role on backend only)
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (backend only)
 - `STRIPE_PUBLIC_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
 - `MAILGUN_DOMAIN`, `MAILGUN_API_KEY`
 - `OFF_MARKET_ADMIN_TOKEN`

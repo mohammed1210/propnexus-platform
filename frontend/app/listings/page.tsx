@@ -737,6 +737,9 @@ function ListingsInner() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [correctionApplied, setCorrectionApplied] = useState(false);
+  const [correctedQuery, setCorrectedQuery] = useState<string | null>(null);
+  const [originalQuery, setOriginalQuery] = useState<string | null>(null);
 
   const { user, isLoaded } = useOptionalUser();
 
@@ -792,16 +795,15 @@ function ListingsInner() {
       setLoading(true);
 
       try {
+        const rawBase = (API_BASE || '').replace(/\/+$/, '');
+        const origin = typeof window !== 'undefined' ? window.location.origin.replace(/\/+$/, '') : '';
         const backendUrl =
-          (process.env.NEXT_PUBLIC_BACKEND_URL ||
-            process.env.NEXT_PUBLIC_API_URL ||
-            process.env.NEXT_PUBLIC_API_BASE ||
-            API_BASE ||
-            '').replace(/\/+$/, '') ||
-          (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
+          rawBase && origin && (rawBase === origin || rawBase === `${origin}/`)
+            ? `${origin}/api`
+            : rawBase;
 
         if (!backendUrl.trim()) {
-          throw new Error('Missing backend base URL env (NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL).');
+          throw new Error('Missing backend base URL env (NEXT_PUBLIC_API_BASE).');
         }
 
         const params = new URLSearchParams();
@@ -858,6 +860,15 @@ function ListingsInner() {
               ? items.length
               : 0;
         const more = typeof data?.has_more === 'boolean' ? data.has_more : false;
+        const correctionFlag = Boolean(data?.correction_applied);
+        const correctionTo =
+          typeof data?.corrected_query === 'string' && data.corrected_query.trim()
+            ? data.corrected_query.trim()
+            : null;
+        const correctionFrom =
+          typeof data?.original_query === 'string' && data.original_query.trim()
+            ? data.original_query.trim()
+            : qRaw.trim() || null;
 
         const mappedData: RawProperty[] = (items || [])
           .filter((prop: any) => String(prop?.source ?? '').toLowerCase() !== 'spareroom')
@@ -918,6 +929,9 @@ function ListingsInner() {
         setTotal(totalCount);
         setHasMore(more);
         setMappableCount(mappable);
+        setCorrectionApplied(correctionFlag && Boolean(correctionTo));
+        setCorrectedQuery(correctionFlag ? correctionTo : null);
+        setOriginalQuery(correctionFlag ? correctionFrom : null);
       } catch (error) {
         console.error('[listings] fetch error', error);
         setRows([]);
@@ -925,6 +939,9 @@ function ListingsInner() {
         setTotal(0);
         setHasMore(false);
         setMappableCount(0);
+        setCorrectionApplied(false);
+        setCorrectedQuery(null);
+        setOriginalQuery(null);
       } finally {
         setLoading(false);
       }
@@ -935,6 +952,7 @@ function ListingsInner() {
     };
   }, [
     q,
+    qRaw,
     minP,
     maxP,
     beds,
@@ -1555,7 +1573,7 @@ function ListingsInner() {
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
                   placeholder="Search location or postcode…"
-                  className="input-field w-full"
+                  className="search-location-input input-field w-full"
                   style={{ height: 40, paddingLeft: 40, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
                   aria-label="Search by location"
                 />
@@ -1583,7 +1601,7 @@ function ListingsInner() {
                       );
                     }}
                     disabled={!mapAvailable}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    className={`toggle-map-view relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                       showMap && mapAvailable ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'
                     } ${!mapAvailable ? 'opacity-60 cursor-not-allowed' : ''}`}
                     title={mapAvailable ? 'Toggle map' : 'Map unavailable (no coordinates)'}
@@ -1605,7 +1623,7 @@ function ListingsInner() {
                       p.set('offset', '0');
                     });
                   }}
-                  className="input-field"
+                  className="investment-type-select input-field"
                   style={{ height: 40, padding: '0.5rem 0.75rem' }}
                   aria-label="Sort"
                 >
@@ -1628,7 +1646,7 @@ function ListingsInner() {
 
                 <button
                   onClick={() => setShowFilters((v) => !v)}
-                  className="h-10 px-3 md:px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
+                  className="more-filters-button h-10 px-3 md:px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
                   aria-expanded={showFilters}
                   aria-controls="listings-filters-popover"
                 >
@@ -1737,6 +1755,15 @@ function ListingsInner() {
       )}
 
       <div className="max-w-7xl mx-auto px-4 py-4">
+        {correctionApplied && correctedQuery && (
+          <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800/40 dark:bg-amber-900/20 dark:text-amber-200">
+            Showing results for <span className="font-semibold">{correctedQuery}</span>
+            {originalQuery && originalQuery.toLowerCase() !== correctedQuery.toLowerCase() && (
+              <span className="ml-1 text-amber-800/90 dark:text-amber-300/90">instead of “{originalQuery}”.</span>
+            )}
+          </div>
+        )}
+
         <div className="mb-4 flex items-center justify-center sm:justify-start">
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Total properties:{' '}

@@ -69,6 +69,21 @@ body,
 :root {
   color-scheme: light dark;
 }
+
+:root.high-contrast {
+  --focus-ring-size: 3px;
+}
+
+.high-contrast *:focus-visible {
+  outline: var(--focus-ring-size, 2px) solid currentColor;
+  outline-offset: 2px;
+}
+
+.high-contrast * {
+  text-decoration-thickness: max(2px, 0.12em);
+  text-underline-offset: 0.2em;
+}
+
 * {
   box-sizing: border-box;
 }

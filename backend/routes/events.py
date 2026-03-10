@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
@@ -17,6 +18,58 @@ filter_click_total = Counter(
     "Total number of filter select events",
     ["facet"],
 )
+
+
+def _insert_minimal(table: Any, row: dict[str, Any]) -> None:
+    """Insert with minimal returning when supported by the client."""
+    try:
+        table.insert(row, returning="minimal").execute()
+    except TypeError:
+        table.insert(row).execute()
+
+
+def _postgres_url() -> str:
+    return str(
+        os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or os.getenv("POSTGRESQL_URL") or ""
+    ).strip()
+
+
+def _insert_search_click_via_postgres(row: dict[str, Any], legacy_row: dict[str, Any]) -> None:
+    pg_url = _postgres_url()
+    if not pg_url:
+        raise RuntimeError("DATABASE_URL/POSTGRES_URL not configured")
+
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(pg_url, future=True, pool_pre_ping=True)
+    with engine.begin() as conn:
+        cols = conn.execute(
+            text(
+                """
+                select column_name
+                from information_schema.columns
+                where table_schema = 'analytics'
+                  and table_name = 'search_clicks'
+                """
+            )
+        ).scalars()
+        allowed = set(cols)
+        if not allowed:
+            raise RuntimeError("analytics.search_clicks not found")
+
+        payload = {k: v for k, v in row.items() if k in allowed}
+        if "query_id" not in payload or "listing_id" not in payload:
+            payload = {k: v for k, v in legacy_row.items() if k in allowed}
+
+        if not payload:
+            raise RuntimeError("No compatible columns found for analytics.search_clicks")
+
+        col_list = ", ".join(payload.keys())
+        val_list = ", ".join(f":{k}" for k in payload.keys())
+        conn.execute(
+            text(f"insert into analytics.search_clicks ({col_list}) values ({val_list})"),
+            payload,
+        )
 
 
 class SearchClickEvent(BaseModel):
@@ -77,17 +130,42 @@ def post_search_click(payload: SearchClickEvent) -> dict[str, Any]:
         "user_id": str(payload.user_id) if payload.user_id else None,
     }
 
+    legacy_row = {
+        "query_id": str(payload.query_id),
+        "listing_id": str(payload.listing_id),
+        "rank": payload.rank,
+        "user_id": str(payload.user_id) if payload.user_id else None,
+    }
+
     try:
         # Preferred: explicit analytics schema.
-        sb.schema("analytics").table("search_clicks").insert(row).execute()
+        _insert_minimal(sb.schema("analytics").table("search_clicks"), row)
     except Exception:
         try:
-            # Fallback for clients/environments without schema() support.
-            sb.table("search_clicks").insert(row).execute()
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Failed to write search click: {exc}")
+            # Handle partially-migrated table shapes where newer columns are not present.
+            _insert_minimal(sb.schema("analytics").table("search_clicks"), legacy_row)
+        except Exception:
+            try:
+                # Fallback for clients/environments without schema() support.
+                _insert_minimal(sb.table("search_clicks"), row)
+            except Exception:
+                try:
+                    # Final fallback for legacy public-schema table shape.
+                    _insert_minimal(sb.table("search_clicks"), legacy_row)
+                except HTTPException:
+                    raise
+                except Exception as exc:
+                    try:
+                        # Last-resort write path that bypasses PostgREST response generation.
+                        _insert_search_click_via_postgres(row, legacy_row)
+                    except Exception as pg_exc:
+                        raise HTTPException(
+                            status_code=500,
+                            detail=(
+                                "Failed to write search click: "
+                                f"supabase_error={exc}; postgres_fallback_error={pg_exc}"
+                            ),
+                        )
 
     return {"ok": True}
 

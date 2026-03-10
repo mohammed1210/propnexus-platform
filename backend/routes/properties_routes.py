@@ -2,14 +2,19 @@ from __future__ import annotations
 
 import asyncio
 import builtins
+import difflib
 import json
 import logging
 import os
 import re
 import threading
+from collections import deque
 from datetime import datetime, timezone
+from time import monotonic
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
+import httpx
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 from fastapi.params import Param
 from postgrest.exceptions import APIError
@@ -45,7 +50,81 @@ from backend.utils.recommended_ranker import normalize_deal_type, rerank_recomme
 from backend.utils.supabase_client import get_supabase
 from supabase import create_client
 
+try:
+    from prometheus_client import Counter
+except Exception:  # pragma: no cover - optional runtime dependency
+    Counter = None  # type: ignore[assignment]
+
 router = APIRouter(tags=["properties"])
+logger = logging.getLogger(__name__)
+
+
+if Counter is not None:
+    search_requests_total = Counter(
+        "search_requests_total",
+        "Total search requests by endpoint",
+        ["endpoint"],
+    )
+    search_zero_results_total = Counter(
+        "search_zero_results_total",
+        "Total zero-result search responses by endpoint",
+        ["endpoint"],
+    )
+    search_ml_fallback_total = Counter(
+        "search_ml_fallback_total",
+        "Total ML fallback activations by reason",
+        ["reason"],
+    )
+else:  # pragma: no cover - optional runtime dependency
+    search_requests_total = None
+    search_zero_results_total = None
+    search_ml_fallback_total = None
+
+
+_ML_FAILURE_TIMESTAMPS: deque[float] = deque()
+_ML_FALLBACK_UNTIL_MONOTONIC: float = 0.0
+
+
+def _increment_search_metrics(endpoint: str, results_count: int) -> None:
+    if search_requests_total is not None:
+        search_requests_total.labels(endpoint=endpoint).inc()
+    if results_count <= 0 and search_zero_results_total is not None:
+        search_zero_results_total.labels(endpoint=endpoint).inc()
+
+
+def _record_ml_guardrail_fallback(reason: str) -> None:
+    if search_ml_fallback_total is not None:
+        search_ml_fallback_total.labels(reason=reason).inc()
+
+
+def _prune_ml_failures(now_monotonic: float, window_seconds: int) -> None:
+    while _ML_FAILURE_TIMESTAMPS and (now_monotonic - _ML_FAILURE_TIMESTAMPS[0]) > window_seconds:
+        _ML_FAILURE_TIMESTAMPS.popleft()
+
+
+def _ml_fallback_active(now_monotonic: float) -> bool:
+    return now_monotonic < _ML_FALLBACK_UNTIL_MONOTONIC
+
+
+def _record_ml_failure(now_monotonic: float) -> None:
+    global _ML_FALLBACK_UNTIL_MONOTONIC
+
+    threshold = max(int(settings.SMART_SEARCH_ML_5XX_SPIKE_THRESHOLD), 1)
+    window_seconds = max(int(settings.SMART_SEARCH_ML_5XX_SPIKE_WINDOW_SECONDS), 10)
+    cooldown_seconds = max(int(settings.SMART_SEARCH_ML_FALLBACK_COOLDOWN_SECONDS), 30)
+
+    _prune_ml_failures(now_monotonic, window_seconds)
+    _ML_FAILURE_TIMESTAMPS.append(now_monotonic)
+
+    if len(_ML_FAILURE_TIMESTAMPS) >= threshold:
+        _ML_FALLBACK_UNTIL_MONOTONIC = now_monotonic + cooldown_seconds
+        _ML_FAILURE_TIMESTAMPS.clear()
+
+
+def _reset_ml_guardrail_state_for_tests() -> None:
+    global _ML_FALLBACK_UNTIL_MONOTONIC
+    _ML_FAILURE_TIMESTAMPS.clear()
+    _ML_FALLBACK_UNTIL_MONOTONIC = 0.0
 
 
 def _start_enrichment_thread(property_id: str) -> None:
@@ -161,6 +240,10 @@ class PropertiesPageResponse(BaseModel):
     limit: int = 50
     offset: int = 0
     has_more: bool = False
+    correction_applied: Optional[bool] = None
+    original_query: Optional[str] = None
+    corrected_query: Optional[str] = None
+    correction_source: Optional[str] = None
 
 
 class SearchRangeFilter(BaseModel):
@@ -218,19 +301,50 @@ def api_v1_search(
     sb = _get_supabase()
 
     force_ml = str(ml or "").strip().lower() in {"1", "true", "yes", "on"}
-    ml_enabled = bool(settings.SMART_SEARCH_ML_RERANK or force_ml)
+    ml_requested = bool(settings.SMART_SEARCH_ML_RERANK or force_ml)
 
-    top = search_with_optional_rerank(
-        sb,
-        query_text=query,
-        top_k=k,
-        enable_ml=ml_enabled,
-    )
+    now_monotonic = monotonic()
+    ml_blocked_by_guardrail = ml_requested and _ml_fallback_active(now_monotonic)
+    ml_enabled = bool(ml_requested and not ml_blocked_by_guardrail)
+
+    if ml_blocked_by_guardrail:
+        _record_ml_guardrail_fallback("spike_cooldown")
+
+    used_fallback = False
+    fallback_reason: str | None = "spike_cooldown" if ml_blocked_by_guardrail else None
+    try:
+        top = search_with_optional_rerank(
+            sb,
+            query_text=query,
+            top_k=k,
+            enable_ml=ml_enabled,
+        )
+    except Exception as e:
+        if not ml_enabled:
+            raise
+
+        _record_ml_failure(now_monotonic)
+        _record_ml_guardrail_fallback("ml_5xx")
+        logger.warning("ML rerank failed; falling back to legacy ranking: %s", e)
+        top = search_with_optional_rerank(
+            sb,
+            query_text=query,
+            top_k=k,
+            enable_ml=False,
+        )
+        used_fallback = True
+        fallback_reason = "ml_5xx"
+
     ids = [str(item.get("id")) for item in top if item.get("id") is not None]
+    _increment_search_metrics("api_v1_search_get", len(top))
+    effective_ml_enabled = bool(ml_enabled and not used_fallback)
 
     return {
         "query": query,
-        "ml_enabled": ml_enabled,
+        "ml_enabled": effective_ml_enabled,
+        "ml_requested": ml_requested,
+        "ml_fallback_active": bool(ml_blocked_by_guardrail or used_fallback),
+        "fallback_reason": fallback_reason if (ml_blocked_by_guardrail or used_fallback) else None,
         "count": len(top),
         "ids": ids,
         "items": top,
@@ -238,7 +352,7 @@ def api_v1_search(
 
 
 @router.post("/api/v1/search")
-def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
+def _run_local_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
     filter_payload = payload.model_dump(by_alias=True)
     queried = query_db(filter_payload)
     items = queried.get("items") if isinstance(queried, dict) else []
@@ -260,16 +374,19 @@ def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
         alt_total = alt_queried.get("total_results") if isinstance(alt_queried, dict) else 0
         alt_out_items = [dict(item) for item in alt_items] if isinstance(alt_items, list) else []
         _log_search_query_metric(filter_payload, int(alt_total or len(alt_out_items)))
+        _increment_search_metrics("api_v1_search_post", int(alt_total or len(alt_out_items)))
 
         return {
             "results": alt_out_items,
             "total": int(alt_total or len(alt_out_items)),
             "broadened": True,
             "changes": changed,
+            "served_by": "local",
         }
 
     facets = get_facets(filter_payload)
     _log_search_query_metric(filter_payload, int(total_results or len(out_items)))
+    _increment_search_metrics("api_v1_search_post", int(total_results or len(out_items)))
 
     return {
         "q": payload.q,
@@ -280,7 +397,48 @@ def api_v1_search_with_filters(payload: SearchPayload) -> dict[str, Any]:
         "facets": facets,
         "limit": payload.limit,
         "offset": payload.offset,
+        "served_by": "local",
     }
+
+
+@router.post("/internal/search", include_in_schema=False)
+def internal_search(payload: SearchPayload) -> dict[str, Any]:
+    return _run_local_search_with_filters(payload)
+
+
+@router.post("/api/v1/search")
+def api_v1_search_with_filters(payload: SearchPayload, request: Request) -> dict[str, Any]:
+    target = str(getattr(settings, "SEARCH_INSTANCE", "blue") or "blue").strip().lower()
+    if target not in {"blue", "green"}:
+        logger.warning("SEARCH_INSTANCE=%s invalid, defaulting to blue", target)
+        target = "blue"
+
+    svc_url = str(os.getenv(f"SERVICE_URL_search_{target}") or "").strip()
+    if svc_url:
+        try:
+            request_host = urlparse(str(request.base_url)).netloc.lower()
+            target_host = urlparse(svc_url).netloc.lower()
+            if request_host and target_host and request_host == target_host:
+                body = _run_local_search_with_filters(payload)
+                body["served_by"] = target
+                return body
+
+            with httpx.Client(timeout=8.0) as client:
+                resp = client.post(
+                    f"{svc_url.rstrip('/')}/internal/search",
+                    json=payload.model_dump(by_alias=True),
+                )
+                resp.raise_for_status()
+                body = resp.json()
+                if isinstance(body, dict):
+                    body["served_by"] = target
+                return body
+        except Exception as e:
+            logger.error("Blue-Green target %s failed: %s – falling back to local", target, e)
+
+    body = _run_local_search_with_filters(payload)
+    body["served_by"] = "local"
+    return body
 
 
 def _safe_order(query: Any, column: str, *, desc: bool, nulls_last: bool = True) -> Any:
@@ -337,6 +495,16 @@ def _is_mappable_coordinate_pair(lat: Any, lng: Any) -> bool:
     return True
 
 
+def _is_test_or_ci_env() -> bool:
+    env = str(os.getenv("ENVIRONMENT") or "").strip().lower()
+    ci = str(os.getenv("CI") or "").strip().lower()
+    return (
+        os.getenv("PYTEST_CURRENT_TEST") is not None
+        or env in {"test", "ci"}
+        or ci in {"1", "true", "yes", "on"}
+    )
+
+
 def _get_supabase():
     """
     Lazily create Supabase client so unit tests can patch create_client.
@@ -349,13 +517,16 @@ def _get_supabase():
         if sb is None:
             raise RuntimeError("Supabase client is not configured")
         return sb
-    except Exception:
+    except Exception as e:
         # Test/CI fallback: allow patched create_client to inject a fake client
         # even when SUPABASE_* env vars are not configured.
-        try:
-            return create_client("http://localhost", "test-key")
-        except Exception:
-            raise HTTPException(status_code=503, detail="Supabase not configured on server")
+        if _is_test_or_ci_env():
+            try:
+                return create_client("http://localhost", "test-key")
+            except Exception:
+                pass
+
+        raise HTTPException(status_code=503, detail=f"Supabase not configured on server: {e}")
 
 
 def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -865,6 +1036,32 @@ def list_properties(
         if isinstance(points_limit, Param):
             points_limit = int(getattr(points_limit, "default", 2000))
 
+        # When called directly (unit tests/scripts), scalar Query params may also be Param objects.
+        if isinstance(q, Param):
+            q = getattr(q, "default", None)
+        if isinstance(source, Param):
+            source = getattr(source, "default", None)
+        if isinstance(created_after, Param):
+            created_after = getattr(created_after, "default", None)
+        if isinstance(min, Param):
+            min = getattr(min, "default", None)
+        if isinstance(max, Param):
+            max = getattr(max, "default", None)
+        if isinstance(beds, Param):
+            beds = getattr(beds, "default", None)
+        if isinstance(baths, Param):
+            baths = getattr(baths, "default", None)
+        if isinstance(deal_type, Param):
+            deal_type = getattr(deal_type, "default", "balanced")
+        if isinstance(sort, Param):
+            sort = getattr(sort, "default", "created_at_desc")
+        if isinstance(dir, Param):
+            dir = getattr(dir, "default", "desc")
+        if isinstance(limit, Param):
+            limit = int(getattr(limit, "default", 50))
+        if isinstance(offset, Param):
+            offset = int(getattr(offset, "default", 0))
+
         # When called directly (unit tests), bool Query params may be Param objects too.
         if isinstance(deals_only, Param):
             deals_only = _parse_bool(getattr(deals_only, "default", False))
@@ -894,6 +1091,10 @@ def list_properties(
             investment_type = getattr(investment_type, "default", None)
         if isinstance(property_type, Param):
             property_type = getattr(property_type, "default", None)
+
+        deal_type = str(deal_type or "balanced")
+        sort = str(sort or "created_at_desc")
+        dir = str(dir or "desc")
 
         response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
 
@@ -953,12 +1154,68 @@ def list_properties(
                 property_type_filter.append(canon)
 
         raw_query_text = str(q or "").strip()
+        correction_applied = False
+        original_query = raw_query_text or None
+        corrected_query: str | None = None
+        correction_source: str | None = None
         search_terms_for_q: List[str] = []
         if raw_query_text:
             if settings.SMART_SEARCH_SYNONYMS:
                 search_terms_for_q = expand_query_terms(raw_query_text)
             if not search_terms_for_q:
                 search_terms_for_q = [raw_query_text]
+
+        def _build_text_search_parts(terms: List[str]) -> List[str]:
+            parts: List[str] = []
+            for term in terms[:30]:
+                q_esc = str(term).replace("%", "").replace(",", " ").strip()
+                if not q_esc:
+                    continue
+                parts.append(f"title.ilike.%{q_esc}%")
+                parts.append(f"location.ilike.%{q_esc}%")
+            return parts
+
+        def _location_terms_from_rows(rows: List[Dict[str, Any]]) -> set[str]:
+            terms: set[str] = set()
+            for row in rows[:200]:
+                loc_blob = " ".join(
+                    [
+                        str(row.get("location") or ""),
+                        str(row.get("postcode") or ""),
+                    ]
+                ).lower()
+                for tok in re.split(r"[^a-z0-9]+", loc_blob):
+                    tok_norm = str(tok or "").strip()
+                    if len(tok_norm) >= 3:
+                        terms.add(tok_norm)
+            return terms
+
+        def _best_correction_term(raw_text: str, rows: List[Dict[str, Any]]) -> str | None:
+            q_tokens = [
+                tok for tok in re.split(r"[^a-z0-9]+", str(raw_text or "").lower()) if len(tok) >= 3
+            ]
+            if not q_tokens:
+                return None
+
+            location_terms = _location_terms_from_rows(rows)
+            if not location_terms:
+                return None
+
+            primary = q_tokens[0]
+            if primary in location_terms:
+                return None
+
+            best_term: str | None = None
+            best_ratio = 0.0
+            for candidate in location_terms:
+                ratio = difflib.SequenceMatcher(None, primary, candidate).ratio()
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_term = candidate
+
+            if best_term and best_ratio >= 0.84:
+                return best_term
+            return None
 
         # We try DB filtering first; if the column doesn't exist, fall back to python filtering.
         property_type_db_value: str | None = (
@@ -1021,13 +1278,7 @@ def list_properties(
 
             # Search across common fields
             if include_text_search and raw_query_text:
-                parts: List[str] = []
-                for term in search_terms_for_q[:30]:
-                    q_esc = str(term).replace("%", "").replace(",", " ").strip()
-                    if not q_esc:
-                        continue
-                    parts.append(f"title.ilike.%{q_esc}%")
-                    parts.append(f"location.ilike.%{q_esc}%")
+                parts = _build_text_search_parts(search_terms_for_q)
 
                 if parts:
                     # Supabase .or_ expects a comma-separated filter string.
@@ -1058,8 +1309,6 @@ def list_properties(
 
             return q0
 
-        query = _build_base_query()
-
         deal_type_norm = normalize_deal_type(deal_type)
 
         # Sorting
@@ -1076,19 +1325,24 @@ def list_properties(
             "score_desc": ("score", True),
         }
 
-        if sort_key in sort_map:
-            sort_col, desc = sort_map[sort_key]
-            query = _safe_order(query, sort_col, desc=desc, nulls_last=True)
-            # Stable fallback ordering for deterministic paging.
-            if sort_col != "created_at":
-                query = _safe_order(query, "created_at", desc=True, nulls_last=True)
-        else:
+        def _apply_sorting(qobj: Any) -> Any:
+            if sort_key in sort_map:
+                sort_col, desc = sort_map[sort_key]
+                qobj = _safe_order(qobj, sort_col, desc=desc, nulls_last=True)
+                # Stable fallback ordering for deterministic paging.
+                if sort_col != "created_at":
+                    qobj = _safe_order(qobj, "created_at", desc=True, nulls_last=True)
+                return qobj
+
             # Legacy behaviour: allow sorting by a column + dir=asc|desc
             sort_col = sort_key if (sort_key in ALLOWED_SORT_COLS) else "created_at"
             ascending = (dir or "").lower() == "asc"
-            query = _safe_order(query, sort_col, desc=not ascending, nulls_last=True)
+            qobj = _safe_order(qobj, sort_col, desc=not ascending, nulls_last=True)
             if sort_col != "created_at":
-                query = _safe_order(query, "created_at", desc=True, nulls_last=True)
+                qobj = _safe_order(qobj, "created_at", desc=True, nulls_last=True)
+            return qobj
+
+        query = _apply_sorting(_build_base_query())
 
         # Pagination
         start = offset
@@ -1125,6 +1379,64 @@ def list_properties(
         inv_filter_active = bool(investment_type_filter)
         needs_pool_from_zero = False
         pool_size = 0
+
+        def _fetch_filtered_page_exact() -> tuple[List[Dict[str, Any]], int]:
+            # Exact pagination/count path for Python-side filters when the requested page
+            # sits outside the in-memory pool window.
+            batch_size = builtins.min(builtins.max(limit * 4, 200), 1000)
+            scan_offset = 0
+            filtered_total = 0
+            page_items: List[Dict[str, Any]] = []
+            requested_inv = set(investment_type_filter)
+            allowed_property_types = set(property_type_filter)
+
+            while True:
+                scan_query = _apply_sorting(_build_base_query())
+                scan_query = scan_query.range(scan_offset, scan_offset + batch_size - 1)
+                scan_res = scan_query.execute()
+                scan_rows = scan_res.data or []
+                if not isinstance(scan_rows, list) or not scan_rows:
+                    break
+
+                batch_items = [_normalize_property_row(r) for r in scan_rows if isinstance(r, dict)]
+
+                if inv_filter_active and batch_items:
+                    inv_filtered: List[Dict[str, Any]] = []
+                    for it in batch_items:
+                        try:
+                            it["investment_types"] = sorted(classify_investment_types(it))
+                        except Exception:
+                            it["investment_types"] = []
+                        if requested_inv.intersection(set(it.get("investment_types") or [])):
+                            inv_filtered.append(it)
+                    batch_items = inv_filtered
+
+                if property_type_filter and python_filter_property_type and batch_items:
+                    batch_items = [it for it in batch_items if it.get("property_type") in allowed_property_types]
+
+                if any_deal_filter and batch_items:
+                    batch_items = [_ensure_deal_fields(it) for it in batch_items if isinstance(it, dict)]
+                    batch_items = [
+                        it
+                        for it in batch_items
+                        if _matches_deal_filters(
+                            it.get("deal_signals"),
+                            deals_only=deals_only,
+                            required_signals=required_signals,
+                        )
+                    ]
+
+                for it in batch_items:
+                    if filtered_total >= offset and len(page_items) < limit:
+                        page_items.append(it)
+                    filtered_total += 1
+
+                if len(scan_rows) < batch_size:
+                    break
+                scan_offset += batch_size
+
+            return page_items, filtered_total
+
         if is_recommended or any_deal_filter:
             pool_size = builtins.min(builtins.max(offset + limit, limit * 8), 500)
             # Only fetch from zero if the requested page fits in the capped pool.
@@ -1149,19 +1461,7 @@ def list_properties(
             if missing == "property_type" and property_type_filter:
                 python_filter_property_type = True
                 property_type_db_value = None
-                query = _build_base_query()
-                # Preserve sorting behavior.
-                if sort_key in sort_map:
-                    sort_col, desc = sort_map[sort_key]
-                    query = _safe_order(query, sort_col, desc=desc, nulls_last=True)
-                    if sort_col != "created_at":
-                        query = _safe_order(query, "created_at", desc=True, nulls_last=True)
-                else:
-                    sort_col = sort_key if (sort_key in ALLOWED_SORT_COLS) else "created_at"
-                    ascending = (dir or "").lower() == "asc"
-                    query = _safe_order(query, sort_col, desc=not ascending, nulls_last=True)
-                    if sort_col != "created_at":
-                        query = _safe_order(query, "created_at", desc=True, nulls_last=True)
+                query = _apply_sorting(_build_base_query())
 
                 # If we're going to python-filter, fetch a candidate pool from zero.
                 pool_size = builtins.min(builtins.max(offset + limit, limit * 8), 500)
@@ -1196,15 +1496,94 @@ def list_properties(
             and raw_query_text
             and not items
             and total_int == 0
-            and is_postgres_detected()
             and search_terms_for_q
         ):
             try:
-                fuzzy_ids = fetch_postgres_fuzzy_ids(
-                    raw_query_text,
-                    search_terms_for_q,
-                    limit=builtins.max(limit * 3, 50),
-                )
+                fuzzy_ids: List[str] = []
+
+                if is_postgres_detected():
+                    fuzzy_ids = fetch_postgres_fuzzy_ids(
+                        raw_query_text,
+                        search_terms_for_q,
+                        limit=builtins.max(limit * 3, 50),
+                    )
+
+                if not fuzzy_ids:
+                    fuzzy_threshold = 0.88
+                    try:
+                        fuzzy_threshold = float(
+                            os.getenv("SMART_SEARCH_PY_FUZZY_THRESHOLD", "0.88")
+                        )
+                    except Exception:
+                        fuzzy_threshold = 0.88
+                    fuzzy_threshold = builtins.min(builtins.max(fuzzy_threshold, 0.65), 0.98)
+
+                    candidate_limit = builtins.max(limit * 10, 200)
+                    candidate_query = _build_base_query(include_text_search=False)
+                    candidate_query = _safe_order(
+                        candidate_query, "created_at", desc=True, nulls_last=True
+                    )
+                    candidate_query = candidate_query.range(0, int(candidate_limit) - 1)
+                    candidate_res = candidate_query.execute()
+                    candidate_rows = candidate_res.data or []
+
+                    if isinstance(candidate_rows, list):
+
+                        def _row_score(row: dict[str, Any]) -> float:
+                            raw_blob = " ".join(
+                                [
+                                    str(row.get("title") or ""),
+                                    str(row.get("description") or ""),
+                                    str(row.get("location") or ""),
+                                    str(row.get("postcode") or ""),
+                                ]
+                            ).lower()
+                            location_blob = " ".join(
+                                [
+                                    str(row.get("location") or ""),
+                                    str(row.get("postcode") or ""),
+                                ]
+                            ).lower()
+                            tokens = [
+                                tok for tok in re.split(r"[^a-z0-9]+", raw_blob) if len(tok) >= 3
+                            ]
+                            location_tokens = [
+                                tok
+                                for tok in re.split(r"[^a-z0-9]+", location_blob)
+                                if len(tok) >= 3
+                            ]
+                            if not tokens:
+                                return 0.0
+
+                            best = 0.0
+                            for term in search_terms_for_q[:10]:
+                                term_norm = str(term or "").strip().lower()
+                                if len(term_norm) < 3:
+                                    continue
+                                if term_norm in location_tokens:
+                                    return 1.2
+                                if term_norm in tokens:
+                                    best = builtins.max(best, 1.0)
+                                    continue
+                                for tok in location_tokens[:200]:
+                                    ratio = difflib.SequenceMatcher(None, term_norm, tok).ratio()
+                                    if ratio > best:
+                                        best = ratio + 0.03
+                                for tok in tokens[:500]:
+                                    ratio = difflib.SequenceMatcher(None, term_norm, tok).ratio()
+                                    if ratio > best:
+                                        best = ratio
+                            return best
+
+                        scored = [
+                            (str(r.get("id") or ""), _row_score(r))
+                            for r in candidate_rows
+                            if isinstance(r, dict) and str(r.get("id") or "").strip()
+                        ]
+                        scored = [pair for pair in scored if pair[1] >= fuzzy_threshold]
+                        scored.sort(key=lambda pair: pair[1], reverse=True)
+                        fuzzy_ids = [pid for pid, _score in scored[:500]]
+
                 if fuzzy_ids:
                     ranked_ids = [str(i) for i in fuzzy_ids[:500] if str(i).strip()]
                     id_position = {pid: idx for idx, pid in enumerate(ranked_ids)}
@@ -1227,6 +1606,15 @@ def list_properties(
 
                         total_int = len(filtered_ranked)
                         items = filtered_ranked[offset : offset + limit]
+                        if raw_query_text:
+                            maybe_corrected = _best_correction_term(raw_query_text, filtered_ranked)
+                            if (
+                                maybe_corrected
+                                and maybe_corrected.lower() != raw_query_text.lower()
+                            ):
+                                corrected_query = maybe_corrected
+                                correction_applied = True
+                                correction_source = "fuzzy_fallback"
             except Exception:
                 pass
 
@@ -1309,6 +1697,14 @@ def list_properties(
             # Non-recommended + investment type filtering: slice after filtering.
             items = items[offset : offset + limit]
 
+        needs_exact_filtered_page = (
+            not is_recommended
+            and not fetched_pool_from_zero
+            and (inv_filter_active or any_deal_filter or (property_type_filter and python_filter_property_type))
+        )
+        if needs_exact_filtered_page:
+            items, total_int = _fetch_filtered_page_exact()
+
         points: Optional[List[Dict[str, Any]]] = None
         if include_points:
             # Minimal payload for map pinning. We intentionally do not include images/raw payload.
@@ -1348,10 +1744,10 @@ def list_properties(
                     if ts:
                         q0 = q0.gte("created_at", ts)
 
-                if q:
-                    q_esc = q.replace("%", "").strip()
-                    if q_esc:
-                        q0 = q0.or_(f"title.ilike.%{q_esc}%,location.ilike.%{q_esc}%")
+                if raw_query_text:
+                    parts = _build_text_search_parts(search_terms_for_q)
+                    if parts:
+                        q0 = q0.or_(",".join(parts))
 
                 if min is not None:
                     q0 = q0.gte("price", min)
@@ -1578,6 +1974,10 @@ def list_properties(
             "limit": limit,
             "offset": offset,
             "has_more": has_more,
+            "correction_applied": correction_applied if correction_applied else None,
+            "original_query": original_query if correction_applied else None,
+            "corrected_query": corrected_query if correction_applied else None,
+            "correction_source": correction_source if correction_applied else None,
         }
 
     except HTTPException:

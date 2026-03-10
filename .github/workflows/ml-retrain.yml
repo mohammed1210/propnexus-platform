@@ -1,0 +1,91 @@
+name: Nightly Rerank Retrain
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL_RW: ${{ secrets.SUPABASE_URL_RW }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      ML_MODEL_BUCKET: ${{ secrets.ML_MODEL_BUCKET }}
+      ADMIN_ML_SECRET: ${{ secrets.ADMIN_ML_SECRET }}
+      BACKEND_URL: ${{ secrets.BACKEND_URL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install lightgbm psycopg2-binary pandas boto3
+
+      - name: Validate DB connection
+        env:
+          PGCONNECT_TIMEOUT: "10"
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+          from urllib.parse import urlparse
+
+          import psycopg2
+
+          dsn = os.environ.get("SUPABASE_URL_RW", "").strip()
+          if not dsn:
+            print("::error::SUPABASE_URL_RW is empty or missing.")
+            sys.exit(1)
+
+          parsed = urlparse(dsn)
+          if parsed.scheme not in {"postgres", "postgresql"}:
+            print("::error::SUPABASE_URL_RW must start with postgres:// or postgresql://")
+            sys.exit(1)
+
+          host = parsed.hostname or ""
+          user = parsed.username or ""
+          port = parsed.port or 5432
+          dbname = (parsed.path or "").lstrip("/") or "postgres"
+          sslmode = "require" if "sslmode=require" in (parsed.query or "") else "(not set)"
+
+          print(f"Preflight DB target: host={host} port={port} db={dbname} user={user} sslmode={sslmode}")
+
+          try:
+            conn = psycopg2.connect(dsn)
+            try:
+              with conn.cursor() as cur:
+                cur.execute("select 1")
+                cur.fetchone()
+            finally:
+              conn.close()
+            print("DB preflight: OK")
+          except Exception as e:
+            msg = str(e)
+            print(f"::error::DB preflight failed: {msg}")
+            if "Wrong password" in msg or "password authentication failed" in msg:
+              print("::error::Credential mismatch. Verify SUPABASE_URL_RW user/password/host are from the same Supabase connection string.")
+            elif "could not translate host name" in msg:
+              print("::error::Host resolution failed. Check for host typos or malformed URL.")
+            elif "network is unreachable" in msg:
+              print("::error::Network/SSL issue. Ensure ?sslmode=require is present and host/port are correct.")
+            sys.exit(1)
+          PY
+
+      - name: Train model
+        run: python analytics/train_rerank.py
+
+      - name: Promote model if uploaded
+        run: |
+          KEY=$(aws s3 ls s3://$ML_MODEL_BUCKET/ --recursive | grep 'search_rerank_.*\.json$' | tail -1 | awk '{print $4}')
+          if [ -z "$KEY" ]; then
+            echo "No model artifact found"
+            exit 0
+          fi
+          curl -sS -X POST "$BACKEND_URL/admin/ml/promote?token=$ADMIN_ML_SECRET&key=$KEY"

@@ -61,6 +61,71 @@ def test_api_v1_search_respects_flag_when_ml_not_forced(monkeypatch) -> None:
     assert body["ids"] == ["a", "b"]
 
 
+def test_api_v1_search_falls_back_to_legacy_on_ml_failure(monkeypatch) -> None:
+    from backend.routes import properties_routes
+
+    monkeypatch.setattr(properties_routes.settings, "SMART_SEARCH_ML_RERANK", True)
+    monkeypatch.setattr(properties_routes, "_get_supabase", lambda: object())
+    properties_routes._reset_ml_guardrail_state_for_tests()
+
+    def _fake_search(_sb, query_text: str, *, top_k: int, enable_ml: bool):
+        assert query_text == "flat london"
+        assert top_k == 2
+        if enable_ml:
+            raise RuntimeError("ml service 503")
+        return [{"id": "legacy-a"}, {"id": "legacy-b"}]
+
+    monkeypatch.setattr(properties_routes, "search_with_optional_rerank", _fake_search)
+
+    res = client.get("/api/v1/search", params={"query": "flat london", "k": 2})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["ml_requested"] is True
+    assert body["ml_enabled"] is False
+    assert body["ml_fallback_active"] is True
+    assert body["fallback_reason"] == "ml_5xx"
+    assert body["ids"] == ["legacy-a", "legacy-b"]
+
+
+def test_api_v1_search_guardrail_disables_ml_after_spike(monkeypatch) -> None:
+    from backend.routes import properties_routes
+
+    monkeypatch.setattr(properties_routes.settings, "SMART_SEARCH_ML_RERANK", True)
+    monkeypatch.setattr(properties_routes.settings, "SMART_SEARCH_ML_5XX_SPIKE_THRESHOLD", 1)
+    monkeypatch.setattr(properties_routes.settings, "SMART_SEARCH_ML_5XX_SPIKE_WINDOW_SECONDS", 300)
+    monkeypatch.setattr(
+        properties_routes.settings, "SMART_SEARCH_ML_FALLBACK_COOLDOWN_SECONDS", 600
+    )
+    monkeypatch.setattr(properties_routes, "_get_supabase", lambda: object())
+    properties_routes._reset_ml_guardrail_state_for_tests()
+
+    call_flags: list[bool] = []
+
+    def _fake_search(_sb, query_text: str, *, top_k: int, enable_ml: bool):
+        call_flags.append(enable_ml)
+        if enable_ml:
+            raise RuntimeError("ml service 503")
+        return [{"id": "legacy"}]
+
+    monkeypatch.setattr(properties_routes, "search_with_optional_rerank", _fake_search)
+
+    res1 = client.get("/api/v1/search", params={"query": "flat london", "k": 1})
+    assert res1.status_code == 200
+    body1 = res1.json()
+    assert body1["ml_fallback_active"] is True
+    assert body1["fallback_reason"] == "ml_5xx"
+
+    call_flags.clear()
+    res2 = client.get("/api/v1/search", params={"query": "flat london", "k": 1})
+    assert res2.status_code == 200
+    body2 = res2.json()
+    assert body2["ml_requested"] is True
+    assert body2["ml_enabled"] is False
+    assert body2["ml_fallback_active"] is True
+    assert body2["fallback_reason"] == "spike_cooldown"
+    assert call_flags == [False]
+
+
 def test_api_v1_search_post_returns_filtered_payload_shape(monkeypatch) -> None:
     from backend.routes import properties_routes
 
@@ -216,3 +281,30 @@ def test_expand_query_terms_includes_synonyms() -> None:
     terms = expand_query_terms("flat")
     assert "flat" in terms
     assert "apartment" in terms
+
+
+def test_api_v1_search_post_includes_badges_in_items(monkeypatch) -> None:
+    from backend.routes import properties_routes
+
+    monkeypatch.setattr(
+        properties_routes,
+        "query_db",
+        lambda _payload: {
+            "items": [
+                {
+                    "id": "x1",
+                    "title": "London Flat",
+                    "location": "London",
+                    "badges": ["rightmove", "floorplan"],
+                }
+            ],
+            "total_results": 1,
+        },
+    )
+    monkeypatch.setattr(properties_routes, "get_facets", lambda _payload: {})
+
+    res = client.post("/api/v1/search", json={"q": "london", "filters": {}})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["items"]
+    assert "badges" in body["items"][0]

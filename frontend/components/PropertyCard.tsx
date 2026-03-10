@@ -10,6 +10,7 @@ import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
 import { track } from '@/lib/events';
 import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import { Badge } from '@/components/Badges';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -43,6 +44,7 @@ type Property = {
   rent_pcm?: number | null;
   rent_per_month?: number | null;
   matches?: string[] | null;
+  badges?: string[] | null;
 };
 
 type InsightsPayload = {
@@ -545,14 +547,14 @@ export default function PropertyCard({
       onMouseEnter={() => onHoverChange?.(true)}
       onMouseLeave={() => onHoverChange?.(false)}
       className={cx(
-        'card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30',
+        'property-card card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30',
         isHovered && 'ring-2 ring-brand-500/20 border-brand-500/30',
       )}
     >
       <Link
         href={href}
         onClick={handleSearchClickTrack}
-        className="block relative w-full h-48 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary group"
+        className="group block relative aspect-[3/2] w-full overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         aria-label={`Open ${p.title ?? 'property'}`}
       >
         <ImageWithFallback
@@ -715,6 +717,14 @@ export default function PropertyCard({
                 fuzzy
               </span>
             )}
+          </div>
+        )}
+
+        {Array.isArray(p.badges) && p.badges.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {p.badges.map((badgeId) => (
+              <Badge key={badgeId} id={String(badgeId)} />
+            ))}
           </div>
         )}
 

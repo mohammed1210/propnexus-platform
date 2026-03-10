@@ -1,0 +1,31 @@
+name: Switch search colour
+
+on:
+  workflow_dispatch:
+    inputs:
+      colour:
+        description: "blue or green"
+        required: true
+
+jobs:
+  switch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CLIs
+        run: |
+          npm install -g vercel @railway/cli
+
+      - name: Flip traffic
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          python scripts/switch_search_colour.py "${{ github.event.inputs.colour }}"

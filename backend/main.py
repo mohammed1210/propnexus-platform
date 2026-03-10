@@ -35,6 +35,7 @@ from backend.middleware.rate_limit import limiter
 from backend.middleware.security import SecurityHeadersMiddleware
 from backend.routes import admin_schedule
 from backend.routes.admin_ingestion import router as admin_ingestion_router
+from backend.routes.admin_ml import router as admin_ml_router
 from backend.routes.admin_scrape_runs import router as admin_scrape_runs_router
 from backend.routes.ai import router as ai_router
 from backend.routes.analytics_metrics import router as analytics_metrics_router
@@ -120,11 +121,11 @@ def health(response: Response):
     # Kept intentionally stable for curl-based runbooks.
     response.headers["X-PropNexus-Properties-Normalization"] = "v1"
 
-    # Do not import Supabase client package here; just report configuration presence.
+    # Keep /health lightweight: configuration-only signal, no DB probe.
     try:
-        from backend.utils.supabase_env import is_supabase_configured
+        from backend.utils.supabase_env import resolve_supabase_env_block
 
-        supabase_configured = is_supabase_configured()
+        supabase_configured = resolve_supabase_env_block().configured
     except Exception:
         supabase_configured = False
     return {
@@ -133,6 +134,25 @@ def health(response: Response):
         "version": version,
         "environment": environment,
         "supabase_configured": supabase_configured,
+    }
+
+
+@app.get("/config")
+def config_status():
+    """Configuration and dependency status for deploy verification/monitoring."""
+    from backend.utils.supabase_health import probe_supabase
+
+    supabase = probe_supabase()
+    return {
+        "status": "ok" if supabase.configured and supabase.db_reachable else "degraded",
+        "service": "propnexus-backend",
+        "supabase": {
+            "configured": supabase.configured,
+            "required_vars": list(supabase.required_vars),
+            "missing_vars": list(supabase.missing_vars),
+            "db_reachable": supabase.db_reachable,
+            "detail": supabase.detail,
+        },
     }
 
 
@@ -171,15 +191,11 @@ def debug_supabase_env():
     Shows what the container is *actually* reading.
     Does NOT expose full secrets.
     """
-    url = (os.getenv("SUPABASE_URL") or "").strip()
+    from backend.utils.supabase_env import resolve_supabase_env_block
 
-    key = (
-        os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        or os.getenv("SUPABASE_SERVICE_ROLE")
-        or os.getenv("SUPABASE_KEY")
-        or os.getenv("SUPABASE_ANON_KEY")
-        or ""
-    ).strip()
+    env_block = resolve_supabase_env_block()
+    url = env_block.url or ""
+    key = env_block.service_role_key or ""
 
     try:
         host = urlparse(url).netloc or url
@@ -192,12 +208,7 @@ def debug_supabase_env():
         "key_present": bool(key),
         "key_len": len(key),
         "key_prefix": key[:8] if key else "",
-        "checked_vars_order": [
-            "SUPABASE_SERVICE_ROLE_KEY",
-            "SUPABASE_SERVICE_ROLE",
-            "SUPABASE_KEY",
-            "SUPABASE_ANON_KEY",
-        ],
+        "checked_vars_order": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
     }
 
 
@@ -318,6 +329,7 @@ app.include_router(scrape_router)
 app.include_router(search_health_router)
 app.include_router(tradesmen_router)
 app.include_router(admin_schedule.router)
+app.include_router(admin_ml_router)
 
 # Waitlist
 app.include_router(waitlist_router)

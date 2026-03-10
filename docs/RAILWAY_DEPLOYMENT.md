@@ -90,7 +90,7 @@ Railway typically deploys from `main` branch to production. For testing PR chang
 
 Railway environment variables are managed in the Railway dashboard:
 - `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE` or `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `OPENAI_API_KEY`

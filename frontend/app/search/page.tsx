@@ -1,8 +1,10 @@
 'use client';
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 
 import { BroadenBanner } from '@/components/BroadenBanner';
+import FilterDrawerMobile from '@/components/FilterDrawerMobile';
 import FilterBar, { type FilterBarValue } from '@/components/FilterBar';
 import PropertyCard from '@/components/PropertyCard';
 import { Skeleton } from '@/components/Skeleton';
@@ -55,16 +57,46 @@ function SkeletonResults() {
 }
 
 export default function SearchPage() {
+  const t = useTranslations('search');
+
   return (
-    <Suspense fallback={<main className="mx-auto max-w-6xl p-4">Loading…</main>}>
+    <Suspense fallback={<main className="mx-auto max-w-6xl p-4">{t('loading')}</main>}>
       <SearchInner />
     </Suspense>
   );
 }
 
 function SearchInner() {
+  const t = useTranslations('search');
   const { state, setQueryParams, resetQueryParams } = useSearchFilterParams();
   const [allowBroaden, setAllowBroaden] = useState(true);
+
+  useEffect(() => {
+    try {
+      const hasUrlFilters =
+        typeof state.bedsMin === 'number' ||
+        typeof state.bedsMax === 'number' ||
+        typeof state.priceMin === 'number' ||
+        typeof state.priceMax === 'number' ||
+        typeof state.yieldMin === 'number';
+      if (hasUrlFilters) return;
+
+      const raw = localStorage.getItem('searchFilters');
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw) as Partial<FilterBarValue>;
+      setQueryParams({
+        q: state.q || 'london',
+        bedsMin: typeof parsed.bedsMin === 'number' ? parsed.bedsMin : undefined,
+        bedsMax: typeof parsed.bedsMax === 'number' ? parsed.bedsMax : undefined,
+        priceMin: typeof parsed.priceMin === 'number' ? parsed.priceMin : undefined,
+        priceMax: typeof parsed.priceMax === 'number' ? parsed.priceMax : undefined,
+        yieldMin: typeof parsed.yieldMin === 'number' ? parsed.yieldMin : undefined,
+      });
+    } catch {
+      return;
+    }
+  }, [setQueryParams, state.bedsMax, state.bedsMin, state.priceMax, state.priceMin, state.q, state.yieldMin]);
 
   const filterBarValue: FilterBarValue = useMemo(
     () => ({
@@ -109,10 +141,29 @@ function SearchInner() {
   const total = items.length;
 
   return (
-    <main className="mx-auto max-w-6xl p-4">
-      <h1 className="mb-4 text-2xl font-semibold">Search</h1>
+    <main className="mx-auto max-w-6xl p-4 pb-20 sm:pb-4">
+      <h1 className="mb-4 text-2xl font-semibold">{t('title')}</h1>
 
-      <FilterBar
+      <div className="sticky top-0 z-20 hidden border-b border-slate-200 bg-white/80 py-2 backdrop-blur dark:border-slate-700 dark:bg-slate-900/80 sm:block">
+        <FilterBar
+          value={filterBarValue}
+          onChange={(next) => {
+            setQueryParams({
+              q: state.q,
+              bedsMin: next.bedsMin,
+              bedsMax: next.bedsMax,
+              priceMin: next.priceMin,
+              priceMax: next.priceMax,
+              yieldMin: next.yieldMin,
+            });
+          }}
+          onReset={() => {
+            resetQueryParams();
+          }}
+        />
+      </div>
+
+      <FilterDrawerMobile
         value={filterBarValue}
         onChange={(next) => {
           setQueryParams({
@@ -129,8 +180,11 @@ function SearchInner() {
         }}
       />
 
-      <p className="mt-4 text-sm text-gray-500">
-        {total} results{loading ? ' (streaming...)' : ''}
+      <p className="mt-4 text-sm text-gray-500" aria-live="polite" aria-atomic="true">
+        {t('results', { count: total })}{loading ? ` ${t('streaming')}` : ''}
+      </p>
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {t('announcement', { count: total })}
       </p>
 
       {meta.broadened && (

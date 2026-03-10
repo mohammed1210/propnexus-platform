@@ -457,6 +457,20 @@ def query_db(payload: dict[str, Any]) -> dict[str, Any]:
     for row in rows:
         row["matches"] = find_matches(row, q_terms, syn_map)
 
+    def compute_badges(row: dict[str, Any]) -> list[str]:
+        out: list[str] = []
+        src = str(row.get("source") or "").strip().lower()
+        if src in {"rightmove", "zoopla", "onthemarket"}:
+            out.append(src)
+        if bool(row.get("floorplan_verified")):
+            out.append("floorplan")
+        if bool(row.get("agent_has_photo")):
+            out.append("agent-photo")
+        return out
+
+    for row in rows:
+        row["badges"] = compute_badges(row)
+
     return {"items": rows, "total_results": total_results}
 
 

@@ -19,12 +19,11 @@ But the `properties` table schema has no `published` column.
 ## Solution
 
 ### 1. Backend Code Fix
-Updated `backend/routes/properties_routes.py` to check for multiple possible environment variable names for the Supabase key:
-- `SUPABASE_SERVICE_ROLE_KEY` (preferred)
-- `SUPABASE_SERVICE_ROLE` (fallback)
-- `SUPABASE_KEY` (last resort)
+Updated backend Supabase configuration to use one canonical environment block:
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-This ensures the backend can connect to Supabase regardless of which variable name is used.
+This removes ambiguity and makes deployment config safer.
 
 ### 2. Database Migration
 Created migration `supabase/migrations/20251122_fix_properties_rls_remove_published.sql` that:
@@ -79,13 +78,9 @@ WHERE tablename = 'properties';
 You should see two policies (`properties_read_auth` and `properties_read_anon`) with `qual` set to `true` (not referencing `published`).
 
 ### Step 2: Verify Environment Variables
-Ensure your backend `.env` file has one of these set:
-- `SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>`
-- `SUPABASE_SERVICE_ROLE=<your-service-role-key>`
-- `SUPABASE_KEY=<your-service-role-key>`
-
-And the URL:
+Ensure your backend `.env` file has:
 - `SUPABASE_URL=https://your-project.supabase.co`
+- `SUPABASE_SERVICE_ROLE_KEY=<your-service-role-key>`
 
 ### Step 3: Restart Services
 1. Restart your backend server
@@ -161,17 +156,12 @@ If you want to support a "published/draft" workflow in the future:
    If you don't see `properties_read_auth` and `properties_read_anon` policies, re-run the migration.
 
 ### 2. Check Backend Environment Variables
-Ensure one of these is set in `backend/.env` (checked in this order):
-1. `SUPABASE_SERVICE_ROLE_KEY` (preferred, standard naming)
-2. `SUPABASE_SERVICE_ROLE` (legacy, used in some deployments)
-3. `SUPABASE_KEY` (fallback, ensure this is a service role key, not anon key)
-
-   And:
-   - `SUPABASE_URL`
+Ensure these are set in `backend/.env`:
+1. `SUPABASE_URL`
+2. `SUPABASE_SERVICE_ROLE_KEY`
 
 3. **Check frontend environment variables**
-   Ensure one of these is set:
-   - `NEXT_PUBLIC_BACKEND_URL=http://localhost:8000` (or your backend URL)
+   Ensure this is set:
    - `NEXT_PUBLIC_API_BASE=http://localhost:8000` (or your backend URL)
 
 4. **Test backend directly**
@@ -200,5 +190,5 @@ This means the RLS policies are still blocking access. Verify:
 ### Frontend Shows "Loading..." Forever?
 1. Check browser console for errors
 2. Check Network tab - is the request to `/properties` failing?
-3. Verify `NEXT_PUBLIC_BACKEND_URL` or `NEXT_PUBLIC_API_BASE` is set correctly
+3. Verify `NEXT_PUBLIC_API_BASE` is set correctly
 4. Check CORS settings if backend is on a different domain

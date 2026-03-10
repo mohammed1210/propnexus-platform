@@ -13,7 +13,7 @@ This report summarizes the final tasks performed to polish the PropNexus platfor
 
 ## Supabase and Environment Variables
 - Checked `.env.example` and added a `RESEND_API_KEY=` placeholder to guide configuration of the Resend email service.
-- Confirmed environment variables `SUPABASE_URL`, `SUPABASE_KEY`, `OPENAI_API_KEY` remain intact.
+- Confirmed environment variables `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY` remain intact.
 - Ensured `utils/supabase.py` uses these variables to initialize the Supabase client.
 
 ## Scraper Pipeline

@@ -3,6 +3,7 @@
 import { useState, Fragment } from 'react';
 import { FiX, FiSend } from 'react-icons/fi';
 import type { Tradesman } from './TradesmanCard';
+import { API_BASE } from '@/lib/api';
 
 interface ContactTradesmanModalProps {
   tradesman: Tradesman | null;
@@ -37,13 +38,10 @@ export default function ContactTradesmanModal({
     setError(null);
 
     try {
-      const apiBase =
-        process.env.NEXT_PUBLIC_BACKEND_URL ||
-        process.env.NEXT_PUBLIC_API_URL ||
-        (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:8000');
+      const apiBase = (API_BASE || '').trim();
 
       if (!apiBase.trim()) {
-        throw new Error('Missing backend base URL env (NEXT_PUBLIC_BACKEND_URL / NEXT_PUBLIC_API_URL).');
+        throw new Error('Missing backend base URL env (NEXT_PUBLIC_API_BASE).');
       }
 
       const response = await fetch(`${apiBase.replace(/\/+$/, '')}/tradesmen/contact`, {
