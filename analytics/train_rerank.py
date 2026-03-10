@@ -121,9 +121,11 @@ def fetch_clicks() -> pd.DataFrame:
             ],
         )
         if not match:
-            raise RuntimeError(
-                "No search_clicks table found (checked analytics.search_clicks, public.search_clicks)"
+            print(
+                "No search_clicks table found (checked analytics.search_clicks, public.search_clicks). "
+                "Skipping retrain until analytics migrations are applied."
             )
+            return pd.DataFrame(columns=["query", "listing_id", "rank", "clicked_at"])
 
         schema, table, cols = match
         click_sql = _build_click_sql(schema, table, cols)
