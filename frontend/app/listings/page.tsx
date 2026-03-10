@@ -795,7 +795,12 @@ function ListingsInner() {
       setLoading(true);
 
       try {
-        const backendUrl = (API_BASE || '').replace(/\/+$/, '');
+        const rawBase = (API_BASE || '').replace(/\/+$/, '');
+        const origin = typeof window !== 'undefined' ? window.location.origin.replace(/\/+$/, '') : '';
+        const backendUrl =
+          rawBase && origin && (rawBase === origin || rawBase === `${origin}/`)
+            ? `${origin}/api`
+            : rawBase;
 
         if (!backendUrl.trim()) {
           throw new Error('Missing backend base URL env (NEXT_PUBLIC_API_BASE).');
