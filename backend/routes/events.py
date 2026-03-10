@@ -19,6 +19,14 @@ filter_click_total = Counter(
 )
 
 
+def _insert_minimal(table: Any, row: dict[str, Any]) -> None:
+    """Insert with minimal returning when supported by the client."""
+    try:
+        table.insert(row, returning="minimal").execute()
+    except TypeError:
+        table.insert(row).execute()
+
+
 class SearchClickEvent(BaseModel):
     query: str = ""
     property_id: UUID | None = None
@@ -77,17 +85,34 @@ def post_search_click(payload: SearchClickEvent) -> dict[str, Any]:
         "user_id": str(payload.user_id) if payload.user_id else None,
     }
 
+    legacy_row = {
+        "query_id": str(payload.query_id),
+        "listing_id": str(payload.listing_id),
+        "rank": payload.rank,
+        "user_id": str(payload.user_id) if payload.user_id else None,
+    }
+
     try:
         # Preferred: explicit analytics schema.
-        sb.schema("analytics").table("search_clicks").insert(row).execute()
+        _insert_minimal(sb.schema("analytics").table("search_clicks"), row)
     except Exception:
         try:
-            # Fallback for clients/environments without schema() support.
-            sb.table("search_clicks").insert(row).execute()
-        except HTTPException:
-            raise
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"Failed to write search click: {exc}")
+            # Handle partially-migrated table shapes where newer columns are not present.
+            _insert_minimal(sb.schema("analytics").table("search_clicks"), legacy_row)
+        except Exception:
+            try:
+                # Fallback for clients/environments without schema() support.
+                _insert_minimal(sb.table("search_clicks"), row)
+            except Exception:
+                try:
+                    # Final fallback for legacy public-schema table shape.
+                    _insert_minimal(sb.table("search_clicks"), legacy_row)
+                except HTTPException:
+                    raise
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=500, detail=f"Failed to write search click: {exc}"
+                    )
 
     return {"ok": True}
 
