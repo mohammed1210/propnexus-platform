@@ -61,4 +61,3 @@ def test_config_reports_ok_when_probe_is_healthy(monkeypatch: pytest.MonkeyPatch
     assert body["supabase"]["configured"] is True
     assert body["supabase"]["db_reachable"] is True
     assert secret_key not in resp.text
-
