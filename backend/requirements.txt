@@ -5,6 +5,7 @@ supabase
 httpx
 asyncpg
 sqlalchemy
+psycopg2-binary
 pydantic
 beautifulsoup4
 playwright

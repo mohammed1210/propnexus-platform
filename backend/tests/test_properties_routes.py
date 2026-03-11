@@ -768,7 +768,9 @@ def test_list_properties_direct_call_handles_fastapi_defaults(monkeypatch):
         def table(self, _name):
             return _FakeQuery(self.rows)
 
-    rows = [{"id": "p1", "title": "Test", "location": "London", "created_at": "2025-01-01T00:00:00Z"}]
+    rows = [
+        {"id": "p1", "title": "Test", "location": "London", "created_at": "2025-01-01T00:00:00Z"}
+    ]
     monkeypatch.setattr(routes, "_get_supabase", lambda: _FakeSupabase(rows))
 
     out = routes.list_properties(Response())

@@ -58,4 +58,3 @@ def probe_supabase() -> SupabaseProbeResult:
             db_reachable=False,
             detail="Supabase query failed.",
         )
-
