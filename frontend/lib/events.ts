@@ -1,8 +1,20 @@
 "use client";
 
 import { API_BASE } from '@/lib/api';
+import type { SearchClickPayload } from '@/contracts';
 
-const FALLBACK_QUERY_ID = '00000000-0000-4000-8000-000000000000';
+export const FALLBACK_QUERY_ID = '00000000-0000-4000-8000-000000000000';
+
+export function generateQueryId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    return FALLBACK_QUERY_ID;
+  }
+  return FALLBACK_QUERY_ID;
+}
 
 function getSessionId(): string {
   if (typeof window === 'undefined') return 'server';
@@ -26,6 +38,24 @@ export async function track(eventName: string, payload: Record<string, unknown>)
   if (eventName !== 'search_click') return;
 
   try {
+    const eventPayload: SearchClickPayload = {
+      queryId: typeof payload.queryId === 'string' ? payload.queryId : FALLBACK_QUERY_ID,
+      listingId: String(payload.listingId ?? ''),
+      rank:
+        typeof payload.rank === 'number'
+          ? payload.rank
+          : typeof payload.position === 'number'
+            ? payload.position
+            : undefined,
+      queryText: String(payload.queryText ?? '').trim(),
+      filters:
+        payload.filters && typeof payload.filters === 'object'
+          ? (payload.filters as Record<string, unknown>)
+          : {},
+      userId: typeof payload.userId === 'string' ? payload.userId : undefined,
+    };
+    if (!eventPayload.listingId) return;
+
     const queryText = String(payload.queryText ?? '').trim();
     const sessionId = getSessionId();
 
@@ -33,15 +63,15 @@ export async function track(eventName: string, payload: Record<string, unknown>)
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        query: queryText,
-        property_id: payload.listingId,
-        position: payload.rank,
-        filters_json: payload.filters ?? {},
+        query: eventPayload.queryText,
+        property_id: eventPayload.listingId,
+        position: eventPayload.rank,
+        filters_json: eventPayload.filters ?? {},
         session_id: sessionId,
-        query_id: payload.queryId ?? FALLBACK_QUERY_ID,
-        listing_id: payload.listingId,
-        rank: payload.rank ?? payload.position,
-        user_id: payload.userId,
+        query_id: eventPayload.queryId,
+        listing_id: eventPayload.listingId,
+        rank: eventPayload.rank,
+        user_id: eventPayload.userId,
       }),
       keepalive: true,
     });
