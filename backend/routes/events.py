@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -60,6 +61,9 @@ def _insert_search_click_via_postgres(row: dict[str, Any], legacy_row: dict[str,
         payload = {k: v for k, v in row.items() if k in allowed}
         if "query_id" not in payload or "listing_id" not in payload:
             payload = {k: v for k, v in legacy_row.items() if k in allowed}
+
+        if "filters_json" in payload and payload["filters_json"] is not None:
+            payload["filters_json"] = json.dumps(payload["filters_json"])
 
         if not payload:
             raise RuntimeError("No compatible columns found for analytics.search_clicks")
