@@ -16,6 +16,35 @@ export function generateQueryId(_seed?: string): string {
   return FALLBACK_QUERY_ID;
 }
 
+export type SearchClickRequestBody = {
+  query: string;
+  query_id: string;
+  listing_id: string;
+  property_id: string;
+  rank?: number;
+  position?: number;
+  session_id: string;
+  filters_json: Record<string, unknown>;
+  user_id?: string;
+};
+
+/**
+ * Fire-and-forget helper for search result clicks.
+ * This must never block navigation or throw into UI flows.
+ */
+export async function logSearchClick(body: SearchClickRequestBody): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/events/search_click`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      keepalive: true,
+    });
+  } catch {
+    // best-effort analytics event
+  }
+}
+
 function getSessionId(): string {
   if (typeof window === 'undefined') return 'server';
   const key = 'propnexus.search.session_id';
@@ -56,14 +85,10 @@ export async function track(eventName: string, payload: Record<string, unknown>)
     };
     if (!eventPayload.listingId) return;
 
-    const queryText = String(payload.queryText ?? '').trim();
     const sessionId = getSessionId();
 
-    await fetch(`${API_BASE}/events/search_click`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: eventPayload.queryText,
+    await logSearchClick({
+        query: eventPayload.queryText ?? '',
         property_id: eventPayload.listingId,
         position: eventPayload.rank,
         filters_json: eventPayload.filters ?? {},
@@ -72,8 +97,6 @@ export async function track(eventName: string, payload: Record<string, unknown>)
         listing_id: eventPayload.listingId,
         rank: eventPayload.rank,
         user_id: eventPayload.userId,
-      }),
-      keepalive: true,
     });
   } catch {
     // best-effort analytics event
