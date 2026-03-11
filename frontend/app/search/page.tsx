@@ -130,7 +130,12 @@ function SearchInner() {
   );
 
   const queryId = useMemo(
-    () => generateQueryId(),
+    () =>
+      generateQueryId(
+        [state.q, state.bedsMin, state.bedsMax, state.priceMin, state.priceMax, state.yieldMin]
+          .map((v) => String(v ?? ''))
+          .join('|'),
+      ),
     [state.q, state.bedsMin, state.bedsMax, state.priceMin, state.priceMax, state.yieldMin],
   );
 
