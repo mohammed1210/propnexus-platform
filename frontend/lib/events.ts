@@ -5,7 +5,7 @@ import type { SearchClickPayload } from '@/contracts';
 
 export const FALLBACK_QUERY_ID = '00000000-0000-4000-8000-000000000000';
 
-export function generateQueryId(): string {
+export function generateQueryId(_seed?: string): string {
   try {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID();
