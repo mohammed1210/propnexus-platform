@@ -10,6 +10,7 @@ import PropertyCard from '@/components/PropertyCard';
 import { Skeleton } from '@/components/Skeleton';
 import { useSearchFilterParams } from '@/hooks/useSearchParams';
 import { useStreamedSearch, type SearchHit } from '@/hooks/useStreamedSearch';
+import { generateQueryId } from '@/lib/events';
 
 type SearchItem = {
   id: string;
@@ -128,6 +129,11 @@ function SearchInner() {
     [allowBroaden, state],
   );
 
+  const queryId = useMemo(
+    () => generateQueryId(),
+    [state.q, state.bedsMin, state.bedsMax, state.priceMin, state.priceMax, state.yieldMin],
+  );
+
   const { hits, loading, meta } = useStreamedSearch(payload);
 
   useEffect(() => {
@@ -210,6 +216,7 @@ function SearchInner() {
               bedrooms: item.bedrooms,
               matches: item.matches,
             }}
+            queryId={queryId}
             queryText={state.q || 'london'}
             filters={payload.filters}
             rank={index + 1}

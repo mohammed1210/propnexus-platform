@@ -544,6 +544,7 @@ export default function PropertyCard({
       ref={(n) => {
         articleRef.current = n;
       }}
+      data-testid="property-card"
       onMouseEnter={() => onHoverChange?.(true)}
       onMouseLeave={() => onHoverChange?.(false)}
       className={cx(
