@@ -34,12 +34,13 @@ jobs:
 
           echo "$resp"
 
-          echo "$resp" | python - <<'PY'
+            RESP="$resp" python - <<'PY'
+            import os
           import json
           import sys
 
           try:
-              data = json.load(sys.stdin)
+              data = json.loads(os.environ.get("RESP", ""))
           except Exception as e:
               print(f"Invalid JSON response: {e}", file=sys.stderr)
               sys.exit(1)
