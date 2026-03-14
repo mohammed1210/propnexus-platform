@@ -61,6 +61,18 @@ class OutputPath:
     local_path: Path | None
 
 
+def _default_output_prefix() -> str:
+    configured = str(os.getenv("SMART_SEARCH_FEATURES_PREFIX") or "").strip()
+    if configured:
+        return configured
+
+    ml_bucket = str(os.getenv("ML_MODEL_BUCKET") or "").strip()
+    if ml_bucket:
+        return f"s3://{ml_bucket}/features"
+
+    return "artifacts/search-features"
+
+
 def _resolve_output(output_prefix: str, run_date: date) -> OutputPath:
     suffix = f"date={run_date.isoformat()}/part-00000.parquet"
     if output_prefix.startswith("s3://"):
@@ -264,7 +276,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-prefix",
-        default=os.getenv("SMART_SEARCH_FEATURES_PREFIX", "s3://propnexus-ml/features"),
+        default=_default_output_prefix(),
         help="Output prefix (S3 or local path)",
     )
     args = parser.parse_args()

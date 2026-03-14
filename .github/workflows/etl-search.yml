@@ -14,7 +14,8 @@ jobs:
       SUPABASE_URL_RW: ${{ secrets.SUPABASE_URL_RW }}
       POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
       POSTGRESQL_URL: ${{ secrets.POSTGRESQL_URL }}
-      SMART_SEARCH_FEATURES_PREFIX: s3://propnexus-ml/features
+      SMART_SEARCH_FEATURES_PREFIX: ${{ secrets.SMART_SEARCH_FEATURES_PREFIX }}
+      ML_MODEL_BUCKET: ${{ secrets.ML_MODEL_BUCKET }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -42,6 +43,38 @@ jobs:
             exit 1
           fi
 
+      - name: Resolve output prefix
+        run: |
+          set -euo pipefail
+
+          prefix="${SMART_SEARCH_FEATURES_PREFIX:-}"
+          if [[ -z "$prefix" && -n "${ML_MODEL_BUCKET:-}" ]]; then
+            prefix="s3://${ML_MODEL_BUCKET}/features"
+          fi
+          if [[ -z "$prefix" ]]; then
+            prefix="$RUNNER_TEMP/search-features"
+          fi
+
+          if [[ "$prefix" == s3://* ]]; then
+            bucket="${prefix#s3://}"
+            bucket="${bucket%%/*}"
+            if ! aws s3api head-bucket --bucket "$bucket" >/dev/null 2>&1; then
+              echo "S3 bucket $bucket is not accessible; falling back to local artifact output." >&2
+              prefix="$RUNNER_TEMP/search-features"
+            fi
+          fi
+
+          echo "SMART_SEARCH_FEATURES_PREFIX=$prefix" >> "$GITHUB_ENV"
+          echo "Resolved SMART_SEARCH_FEATURES_PREFIX=$prefix"
+
       - name: Build daily search features parquet
         run: |
           python analytics/etl/search_clicks_to_parquet.py
+
+      - name: Upload ETL artifact
+        if: ${{ !startsWith(env.SMART_SEARCH_FEATURES_PREFIX, 's3://') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: search-features-${{ github.run_id }}
+          path: ${{ env.SMART_SEARCH_FEATURES_PREFIX }}
+          if-no-files-found: error
