@@ -86,29 +86,60 @@ def _fetch_click_rows(run_date: date) -> list[dict[str, Any]]:
     except Exception as e:
         raise RuntimeError("asyncpg is required for ETL") from e
 
-    sql = """
-        SELECT
-          sc.id::text AS click_id,
-          sc.query_id::text AS query_id,
-          sc.listing_id::text AS listing_id,
-          sc.user_id::text AS user_id,
-          sc.rank AS rank,
-          sc.inserted_at AS clicked_at,
-          COALESCE(to_jsonb(sc)->>'query_text', '') AS query_text,
-          p.title AS title,
-          p.location AS location,
-          p.price AS price,
-          p.bedrooms AS beds,
-          p.yield_percent AS yield,
-          p.created_at AS listing_created_at
-        FROM analytics.search_clicks sc
-        LEFT JOIN properties p ON p.id = sc.listing_id
-        WHERE DATE(sc.inserted_at AT TIME ZONE 'UTC') = $1::date
-    """
-
     async def _run() -> list[dict[str, Any]]:
         conn = await asyncpg.connect(dsn=dsn)
         try:
+            col_rows = await conn.fetch(
+                """
+                select column_name
+                from information_schema.columns
+                where table_schema = 'analytics'
+                  and table_name = 'search_clicks'
+                """
+            )
+            cols = {str(r["column_name"]) for r in col_rows}
+            if not cols:
+                raise RuntimeError("analytics.search_clicks not found")
+
+            clicked_col = "created_at" if "created_at" in cols else None
+            if clicked_col is None and "inserted_at" in cols:
+                clicked_col = "inserted_at"
+            if clicked_col is None:
+                raise RuntimeError("analytics.search_clicks has neither created_at nor inserted_at")
+
+            query_expr = "sc.query" if "query" in cols else "''"
+            if "query" not in cols:
+                # Legacy fallback where query text was embedded in row json.
+                query_expr = "COALESCE(to_jsonb(sc)->>'query_text', '')"
+
+            listing_expr = "sc.listing_id::text" if "listing_id" in cols else "sc.property_id::text"
+            join_expr = "p.id = sc.listing_id" if "listing_id" in cols else "p.id = sc.property_id"
+            user_expr = "sc.user_id::text" if "user_id" in cols else "NULL::text"
+            rank_expr = (
+                "sc.rank" if "rank" in cols else ("sc.position" if "position" in cols else "NULL")
+            )
+            query_id_expr = "sc.query_id::text" if "query_id" in cols else "NULL::text"
+
+            sql = f"""
+                SELECT
+                  sc.id::text AS click_id,
+                  {query_id_expr} AS query_id,
+                  {listing_expr} AS listing_id,
+                  {user_expr} AS user_id,
+                  {rank_expr} AS rank,
+                  sc.{clicked_col} AS clicked_at,
+                  {query_expr} AS query_text,
+                  p.title AS title,
+                  p.location AS location,
+                  p.price AS price,
+                  p.bedrooms AS beds,
+                  p.yield_percent AS yield,
+                  p.created_at AS listing_created_at
+                FROM analytics.search_clicks sc
+                LEFT JOIN properties p ON {join_expr}
+                WHERE DATE(sc.{clicked_col} AT TIME ZONE 'UTC') = $1::date
+            """
+
             rows = await conn.fetch(sql, run_date.isoformat())
             return [dict(r) for r in rows]
         finally:
