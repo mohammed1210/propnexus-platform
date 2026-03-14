@@ -77,9 +77,17 @@ def _resolve_output(output_prefix: str, run_date: date) -> OutputPath:
 
 
 def _fetch_click_rows(run_date: date) -> list[dict[str, Any]]:
-    dsn = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_DSN") or os.getenv("PG_DSN")
+    dsn = (
+        os.getenv("DATABASE_URL")
+        or os.getenv("POSTGRES_URL")
+        or os.getenv("POSTGRESQL_URL")
+        or os.getenv("POSTGRES_DSN")
+        or os.getenv("PG_DSN")
+    )
     if not dsn:
-        raise RuntimeError("DATABASE_URL (or POSTGRES_DSN/PG_DSN) is required")
+        raise RuntimeError(
+            "DATABASE_URL (or POSTGRES_URL/POSTGRESQL_URL/POSTGRES_DSN/PG_DSN) is required"
+        )
 
     try:
         import asyncpg  # type: ignore[import-not-found]
