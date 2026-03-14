@@ -149,7 +149,7 @@ def _fetch_click_rows(run_date: date) -> list[dict[str, Any]]:
                 WHERE DATE(sc.{clicked_col} AT TIME ZONE 'UTC') = $1::date
             """
 
-            rows = await conn.fetch(sql, run_date.isoformat())
+            rows = await conn.fetch(sql, run_date)
             return [dict(r) for r in rows]
         finally:
             await conn.close()
