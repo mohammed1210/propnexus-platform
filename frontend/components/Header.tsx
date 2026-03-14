@@ -9,7 +9,6 @@ import { Bars3Icon, XMarkIcon, ChevronDownIcon } from "@heroicons/react/24/outli
 import { useTranslations } from "next-intl";
 import { SafeSignedIn, SafeSignedOut, SafeUserButton } from "./ClerkAuthSafe";
 import ThemeToggle from "./ThemeToggle";
-import ContrastToggle from "./ContrastToggle";
 import OnboardingTour from "./OnboardingTour";
 import { isAuthEnabled } from "@/lib/auth";
 
@@ -96,7 +95,6 @@ export default function Header() {
             {tourSeen ? 'Replay Tour' : 'Start Tour'}
           </button>
           <ThemeToggle />
-          <ContrastToggle />
 
           <SafeSignedIn>
             <nav className="flex items-center gap-2" aria-label="Account">
@@ -153,7 +151,6 @@ export default function Header() {
         {/* Mobile right side: Theme + Hamburger */}
         <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
-          <ContrastToggle />
           <Disclosure key={mobileMenuKey}>
             {({ open }) => (
               <>
