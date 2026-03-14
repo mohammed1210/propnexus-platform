@@ -79,6 +79,7 @@ def _resolve_output(output_prefix: str, run_date: date) -> OutputPath:
 def _fetch_click_rows(run_date: date) -> list[dict[str, Any]]:
     dsn = (
         os.getenv("DATABASE_URL")
+        or os.getenv("SUPABASE_URL_RW")
         or os.getenv("POSTGRES_URL")
         or os.getenv("POSTGRESQL_URL")
         or os.getenv("POSTGRES_DSN")
@@ -86,7 +87,7 @@ def _fetch_click_rows(run_date: date) -> list[dict[str, Any]]:
     )
     if not dsn:
         raise RuntimeError(
-            "DATABASE_URL (or POSTGRES_URL/POSTGRESQL_URL/POSTGRES_DSN/PG_DSN) is required"
+            "DATABASE_URL (or SUPABASE_URL_RW/POSTGRES_URL/POSTGRESQL_URL/POSTGRES_DSN/PG_DSN) is required"
         )
 
     try:

@@ -10,7 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      DATABASE_URL: ${{ secrets.DATABASE_URL || secrets.POSTGRES_URL || secrets.POSTGRESQL_URL }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL || secrets.SUPABASE_URL_RW || secrets.POSTGRES_URL || secrets.POSTGRESQL_URL }}
+      SUPABASE_URL_RW: ${{ secrets.SUPABASE_URL_RW }}
       POSTGRES_URL: ${{ secrets.POSTGRES_URL }}
       POSTGRESQL_URL: ${{ secrets.POSTGRESQL_URL }}
       SMART_SEARCH_FEATURES_PREFIX: s3://propnexus-ml/features
@@ -36,8 +37,8 @@ jobs:
       - name: Validate database DSN
         run: |
           set -euo pipefail
-          if [[ -z "${DATABASE_URL:-}" && -z "${POSTGRES_URL:-}" && -z "${POSTGRESQL_URL:-}" ]]; then
-            echo "Missing database DSN secret. Set one of DATABASE_URL, POSTGRES_URL, or POSTGRESQL_URL." >&2
+          if [[ -z "${DATABASE_URL:-}" && -z "${SUPABASE_URL_RW:-}" && -z "${POSTGRES_URL:-}" && -z "${POSTGRESQL_URL:-}" ]]; then
+            echo "Missing database DSN secret. Set one of DATABASE_URL, SUPABASE_URL_RW, POSTGRES_URL, or POSTGRESQL_URL." >&2
             exit 1
           fi
 
