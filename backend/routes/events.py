@@ -86,6 +86,7 @@ class SearchClickEvent(BaseModel):
     listing_id: UUID
     rank: int | None = Field(default=None, ge=1)
     user_id: UUID | None = None
+    clerk_user_id: str | None = None
 
 
 class FilterSelectEvent(BaseModel):
@@ -132,6 +133,7 @@ def post_search_click(payload: SearchClickEvent) -> dict[str, Any]:
         "listing_id": str(payload.listing_id),
         "rank": payload.rank,
         "user_id": str(payload.user_id) if payload.user_id else None,
+        "clerk_user_id": str(payload.clerk_user_id or "").strip() or None,
     }
 
     legacy_row = {
@@ -139,6 +141,7 @@ def post_search_click(payload: SearchClickEvent) -> dict[str, Any]:
         "listing_id": str(payload.listing_id),
         "rank": payload.rank,
         "user_id": str(payload.user_id) if payload.user_id else None,
+        "clerk_user_id": str(payload.clerk_user_id or "").strip() or None,
     }
 
     try:

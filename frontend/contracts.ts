@@ -5,4 +5,5 @@ export interface SearchClickPayload {
   queryText?: string;
   filters?: Record<string, unknown>;
   userId?: string;
+  clerkUserId?: string;
 }

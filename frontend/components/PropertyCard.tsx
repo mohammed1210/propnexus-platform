@@ -5,6 +5,7 @@ import { fetchWithRetry } from '@/lib/api';
 import ImageWithFallback from '@/components/ImageWithFallback';
 import { Highlight } from '@/components/Highlight';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import { FiHeart } from 'react-icons/fi';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
@@ -183,6 +184,7 @@ export default function PropertyCard({
   filters?: Record<string, unknown>;
   rank?: number;
 }) {
+  const { userId } = useAuth();
   const normalized = useMemo(() => normalizeProperty(p as any), [p]);
 
   const displayYieldPct = useMemo(
@@ -536,8 +538,9 @@ export default function PropertyCard({
       listingId: p.id,
       filters,
       rank,
+      clerkUserId: userId,
     });
-  }, [filters, p.id, queryId, queryText, rank]);
+  }, [filters, p.id, queryId, queryText, rank, userId]);
 
   return (
     <article

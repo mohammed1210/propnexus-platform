@@ -26,6 +26,7 @@ export type SearchClickRequestBody = {
   session_id: string;
   filters_json: Record<string, unknown>;
   user_id?: string;
+  clerk_user_id?: string;
 };
 
 /**
@@ -82,21 +83,23 @@ export async function track(eventName: string, payload: Record<string, unknown>)
           ? (payload.filters as Record<string, unknown>)
           : {},
       userId: typeof payload.userId === 'string' ? payload.userId : undefined,
+      clerkUserId: typeof payload.clerkUserId === 'string' ? payload.clerkUserId : undefined,
     };
     if (!eventPayload.listingId) return;
 
     const sessionId = getSessionId();
 
     await logSearchClick({
-        query: eventPayload.queryText ?? '',
-        property_id: eventPayload.listingId,
-        position: eventPayload.rank,
-        filters_json: eventPayload.filters ?? {},
-        session_id: sessionId,
-        query_id: eventPayload.queryId,
-        listing_id: eventPayload.listingId,
-        rank: eventPayload.rank,
-        user_id: eventPayload.userId,
+      query: eventPayload.queryText ?? '',
+      property_id: eventPayload.listingId,
+      position: eventPayload.rank,
+      filters_json: eventPayload.filters ?? {},
+      session_id: sessionId,
+      query_id: eventPayload.queryId,
+      listing_id: eventPayload.listingId,
+      rank: eventPayload.rank,
+      user_id: eventPayload.userId,
+      clerk_user_id: eventPayload.clerkUserId,
     });
   } catch {
     // best-effort analytics event

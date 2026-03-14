@@ -80,6 +80,7 @@ def test_search_click_event_accepts_valid_payload(monkeypatch):
         "query_id": "9f5ec88e-6a11-44d5-865e-fdf2d599f165",
         "listing_id": "4de72852-6a3c-4d1b-9a66-ddf2bafc2ced",
         "rank": 1,
+        "clerk_user_id": "user_2mYtQExampleClerkId",
     }
     res = client.post("/events/search_click", json=body)
     assert res.status_code == 200
