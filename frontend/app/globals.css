@@ -233,6 +233,15 @@ button.btn-outline {
     opacity 0.3s,
     transform 0.3s;
 }
+
+/* util classes injected by mobile drawer to reduce CLS */
+.max-h-0 {
+  max-height: 0;
+}
+
+.max-h-\[70vh\] {
+  max-height: 70vh;
+}
 .back-to-top:hover {
   opacity: 1;
   transform: translateY(-2px);
