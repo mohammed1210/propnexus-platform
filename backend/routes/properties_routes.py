@@ -505,6 +505,15 @@ def _is_test_or_ci_env() -> bool:
     )
 
 
+def _allow_local_supabase_fallback() -> bool:
+    # Local fallback is intentionally opt-in and test/CI-only so production
+    # misconfiguration is never masked.
+    if not _is_test_or_ci_env():
+        return False
+    flag = str(os.getenv("ALLOW_SUPABASE_LOCAL_FALLBACK") or "").strip().lower()
+    return flag in {"1", "true", "yes", "on"}
+
+
 def _get_supabase():
     """
     Lazily create Supabase client so unit tests can patch create_client.
@@ -518,9 +527,9 @@ def _get_supabase():
             raise RuntimeError("Supabase client is not configured")
         return sb
     except Exception as e:
-        # Test/CI fallback: allow patched create_client to inject a fake client
-        # even when SUPABASE_* env vars are not configured.
-        if _is_test_or_ci_env():
+        # Optional, explicit test fallback for unit tests that need a patched
+        # create_client without configured SUPABASE_* env vars.
+        if _allow_local_supabase_fallback():
             try:
                 return create_client("http://localhost", "test-key")
             except Exception:
@@ -1223,8 +1232,16 @@ def list_properties(
         )
         python_filter_property_type = False
 
-        def _build_base_query(*, include_text_search: bool = True):
-            q0 = sb.table("properties").select("*", count="exact")
+        def _build_base_query(
+            *,
+            include_text_search: bool = True,
+            select_cols: str = "*",
+            include_count: bool = True,
+        ):
+            if include_count:
+                q0 = sb.table("properties").select(select_cols, count="exact")
+            else:
+                q0 = sb.table("properties").select(select_cols)
 
             def _parse_csv(value: Any) -> List[str]:
                 if value is None:
@@ -1496,6 +1513,16 @@ def list_properties(
 
         items = [_normalize_property_row(r) for r in rows if isinstance(r, dict)]
 
+        needs_exact_filtered_page = bool(
+            not is_recommended
+            and (
+                inv_filter_active
+                or any_deal_filter
+                or (property_type_filter and python_filter_property_type)
+            )
+        )
+        used_exact_filtered_page = False
+
         # Postgres-only fuzzy fallback (pg_trgm + levenshtein<=1) for typo tolerance.
         if (
             settings.SMART_SEARCH_SYNONYMS
@@ -1625,6 +1652,10 @@ def list_properties(
                 pass
 
         # Attach cached enrichment (geo/crime/comps/derived) where available.
+        if needs_exact_filtered_page:
+            items, total_int = _fetch_filtered_page_exact()
+            used_exact_filtered_page = True
+
         try:
             missing_ids = _attach_enrichment_from_cache(sb, items)
 
@@ -1645,41 +1676,44 @@ def list_properties(
 
             if inv_filter_active:
                 requested = set(investment_type_filter)
-                items = [
-                    it
-                    for it in items
-                    if requested.intersection(set(it.get("investment_types") or []))
-                ]
-                if fetched_pool_from_zero:
-                    total_int = len(items)
+                if not used_exact_filtered_page:
+                    items = [
+                        it
+                        for it in items
+                        if requested.intersection(set(it.get("investment_types") or []))
+                    ]
+                    if fetched_pool_from_zero:
+                        total_int = len(items)
 
         if property_type_filter and not python_filter_property_type:
             # Even with DB filtering, ensure output is normalized for legacy rows.
             pass
 
         if property_type_filter and python_filter_property_type and items:
-            allowed = set(property_type_filter)
-            items = [it for it in items if it.get("property_type") in allowed]
-            if fetched_pool_from_zero:
-                total_int = len(items)
+            if not used_exact_filtered_page:
+                allowed = set(property_type_filter)
+                items = [it for it in items if it.get("property_type") in allowed]
+                if fetched_pool_from_zero:
+                    total_int = len(items)
 
         if (is_recommended or any_deal_filter) and items:
             items = [_ensure_deal_fields(it) for it in items if isinstance(it, dict)]
 
             if any_deal_filter:
-                items = [
-                    it
-                    for it in items
-                    if _matches_deal_filters(
-                        it.get("deal_signals"),
-                        deals_only=deals_only,
-                        required_signals=required_signals,
-                    )
-                ]
+                if not used_exact_filtered_page:
+                    items = [
+                        it
+                        for it in items
+                        if _matches_deal_filters(
+                            it.get("deal_signals"),
+                            deals_only=deals_only,
+                            required_signals=required_signals,
+                        )
+                    ]
 
-                # When filtering within a pool, the DB count is no longer meaningful.
-                if fetched_pool_from_zero:
-                    total_int = len(items)
+                    # When filtering within a pool, the DB count is no longer meaningful.
+                    if fetched_pool_from_zero:
+                        total_int = len(items)
 
         if is_recommended and items:
             # Enrich + rerank deterministically. We still return the same page size.
@@ -1693,27 +1727,20 @@ def list_properties(
                 items = ranked[offset : offset + limit]
             else:
                 items = ranked
-        elif fetched_pool_from_zero and any_deal_filter:
+        elif fetched_pool_from_zero and any_deal_filter and not used_exact_filtered_page:
             # Non-recommended + deal filters: slice after filtering.
             items = items[offset : offset + limit]
-        elif fetched_pool_from_zero and property_type_filter and python_filter_property_type:
+        elif (
+            fetched_pool_from_zero
+            and property_type_filter
+            and python_filter_property_type
+            and not used_exact_filtered_page
+        ):
             # Non-recommended + python property_type filtering: slice after filtering.
             items = items[offset : offset + limit]
-        elif fetched_pool_from_zero and inv_filter_active:
+        elif fetched_pool_from_zero and inv_filter_active and not used_exact_filtered_page:
             # Non-recommended + investment type filtering: slice after filtering.
             items = items[offset : offset + limit]
-
-        needs_exact_filtered_page = (
-            not is_recommended
-            and not fetched_pool_from_zero
-            and (
-                inv_filter_active
-                or any_deal_filter
-                or (property_type_filter and python_filter_property_type)
-            )
-        )
-        if needs_exact_filtered_page:
-            items, total_int = _fetch_filtered_page_exact()
 
         points: Optional[List[Dict[str, Any]]] = None
         if include_points:
@@ -1742,50 +1769,11 @@ def list_properties(
                 if property_type_filter and "description" not in cols:
                     cols = cols + ",description"
 
-                q0 = sb.table("properties").select(cols)
-
-                if source is not None:
-                    src = str(source).strip().lower()
-                    if src:
-                        q0 = q0.eq("source", src)
-
-                if created_after is not None:
-                    ts = str(created_after).strip()
-                    if ts:
-                        q0 = q0.gte("created_at", ts)
-
-                if raw_query_text:
-                    parts = _build_text_search_parts(search_terms_for_q)
-                    if parts:
-                        q0 = q0.or_(",".join(parts))
-
-                if min is not None:
-                    q0 = q0.gte("price", min)
-                if max is not None:
-                    q0 = q0.lte("price", max)
-                if beds is not None:
-                    q0 = q0.gte("bedrooms", beds)
-                if baths is not None:
-                    q0 = q0.gte("bathrooms", baths)
-
-                if types:
-                    type_list: List[str] = [t.strip() for t in types.split(",") if t.strip()]
-                    if type_list:
-                        q0 = q0.in_("investment_type", type_list)
-
-                # Investment type filter (new param)
-                # NOTE: we intentionally do NOT push investment_type down to the DB here.
-                # The API applies a deterministic Python-side tag filter so results are
-                # consistent even when the DB column is missing/incorrect.
-
-                # Property type filter (DB-side when possible)
-                if property_type_filter and property_type_db_value:
-                    try:
-                        q0 = q0.in_("property_type", property_type_filter)
-                    except Exception:
-                        pass
-
-                return q0
+                return _build_base_query(
+                    include_text_search=True,
+                    select_cols=cols,
+                    include_count=False,
+                )
 
             points_q = _build_points_query()
             # Deterministic ordering for stable point sets.
@@ -1853,57 +1841,43 @@ def list_properties(
                 if not isinstance(r, dict):
                     continue
 
+                point_item = _normalize_property_row(r)
+                if any_deal_filter:
+                    point_item = _ensure_deal_fields(point_item)
+
                 if inv_filter_active:
                     try:
-                        # Ensure property_type is present for HMO soft-signal (beds + house types).
-                        if not (
-                            isinstance(r.get("property_type"), str)
-                            and r.get("property_type").strip()
-                        ):
-                            pt, _raw = classify_property_type(
-                                r.get("title"),
-                                r.get("description"),
-                                None,
-                                extra=r.get("data") if isinstance(r.get("data"), dict) else None,
-                            )
-                            r["property_type"] = pt
-                        tags = classify_investment_types(r)
+                        tags = classify_investment_types(point_item)
                         if not tags.intersection(set(investment_type_filter)):
                             continue
                     except Exception:
                         continue
 
                 if property_type_filter and python_filter_property_type:
-                    try:
-                        pt, _raw = classify_property_type(
-                            r.get("title"),
-                            r.get("description"),
-                            None,
-                            extra=r.get("data") if isinstance(r.get("data"), dict) else None,
-                        )
-                        if pt not in set(property_type_filter):
-                            continue
-                    except Exception:
+                    if point_item.get("property_type") not in set(property_type_filter):
                         continue
 
                 if any_deal_filter:
-                    deal_sigs = r.get("deal_signals")
-                    if deal_sigs is None and isinstance(r.get("data"), dict):
-                        deal_sigs = r["data"].get("deal_signals")
                     if not _matches_deal_filters(
-                        deal_sigs,
+                        point_item.get("deal_signals"),
                         deals_only=deals_only,
                         required_signals=required_signals,
                     ):
                         continue
 
                 lat = _coerce_float(
-                    r.get("latitude") if r.get("latitude") is not None else r.get("lat")
+                    point_item.get("latitude")
+                    if point_item.get("latitude") is not None
+                    else point_item.get("lat")
                 )
                 lng = _coerce_float(
-                    r.get("longitude")
-                    if r.get("longitude") is not None
-                    else (r.get("lng") if r.get("lng") is not None else r.get("lon"))
+                    point_item.get("longitude")
+                    if point_item.get("longitude") is not None
+                    else (
+                        point_item.get("lng")
+                        if point_item.get("lng") is not None
+                        else point_item.get("lon")
+                    )
                 )
                 # Only treat (0,0) as placeholder.
                 if lat == 0.0 and lng == 0.0:
@@ -1912,21 +1886,23 @@ def list_properties(
 
                 points_out.append(
                     {
-                        "id": r.get("id"),
-                        "title": r.get("title"),
-                        "location": r.get("location"),
+                        "id": point_item.get("id"),
+                        "title": point_item.get("title"),
+                        "location": point_item.get("location"),
                         "price": (
-                            _coerce_int(r.get("price")) if r.get("price") is not None else None
-                        ),
-                        "bedrooms": (
-                            _coerce_int(r.get("bedrooms"))
-                            if r.get("bedrooms") is not None
+                            _coerce_int(point_item.get("price"))
+                            if point_item.get("price") is not None
                             else None
                         ),
-                        "investment_type": r.get("investment_type"),
+                        "bedrooms": (
+                            _coerce_int(point_item.get("bedrooms"))
+                            if point_item.get("bedrooms") is not None
+                            else None
+                        ),
+                        "investment_type": point_item.get("investment_type"),
                         "latitude": lat,
                         "longitude": lng,
-                        "source": r.get("source"),
+                        "source": point_item.get("source"),
                     }
                 )
 
