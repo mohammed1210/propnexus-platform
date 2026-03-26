@@ -79,10 +79,34 @@ export async function apiPost<T = any>(path: string, body: any): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+  const parseErrorMessage = async (): Promise<string> => {
+    if (contentType.includes('application/json')) {
+      const payload = await res.json().catch(() => null as any);
+      const detail =
+        payload?.detail ||
+        payload?.message ||
+        payload?.error ||
+        (typeof payload === 'string' ? payload : '');
+      if (typeof detail === 'string' && detail.trim()) return detail.trim();
+    }
+
+    if (res.status === 404) return 'Resource not found';
+    if (res.status === 503) return 'Service temporarily unavailable';
+    return res.statusText || 'Request failed';
+  };
+
   if (!res.ok) {
-    const msg = await res.text().catch(() => '');
+    const msg = await parseErrorMessage();
     throw new Error(`[POST ${res.status}] ${msg}`);
   }
+
+  if (!contentType.includes('application/json')) {
+    throw new Error('[POST 502] Invalid server response');
+  }
+
   return (await res.json()) as T;
 }
 

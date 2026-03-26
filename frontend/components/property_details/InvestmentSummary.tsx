@@ -25,7 +25,7 @@ const numOrUndef = (v: unknown): number | undefined =>
 
 export default function InvestmentSummary({ property }: Props) {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const [data, setData] = useState<SummaryResponse | null>(null);
 
   const { title, location, price, bedrooms, bathrooms, propertyType, investmentType, description } = property;
@@ -37,7 +37,7 @@ export default function InvestmentSummary({ property }: Props) {
 
     async function run() {
       setLoading(true);
-      setError(null);
+      setError(false);
       try {
         const payload: SummaryRequest = {
           title,
@@ -55,7 +55,7 @@ export default function InvestmentSummary({ property }: Props) {
         const res = await postAiSummary(payload);
         if (!cancelled) setData(res);
       } catch (e: any) {
-        if (!cancelled) setError(e?.message ?? 'Failed to load summary');
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -89,12 +89,15 @@ export default function InvestmentSummary({ property }: Props) {
     return (
       <div
         role="alert"
+        data-testid="investment-summary-fallback"
         className="rounded-lg border border-rose-200/60 dark:border-rose-800/30 bg-rose-50 dark:bg-rose-900/10 p-4"
       >
         <div className="text-xs font-semibold uppercase tracking-wide text-rose-700 dark:text-rose-300 mb-1">
           Summary unavailable
         </div>
-        <p className="text-sm text-rose-800 dark:text-rose-200">{error}</p>
+        <p className="text-sm text-rose-800 dark:text-rose-200">
+          We could not generate an investment summary right now. Please try again later.
+        </p>
       </div>
     );
 
