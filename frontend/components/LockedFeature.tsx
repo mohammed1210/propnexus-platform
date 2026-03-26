@@ -12,6 +12,8 @@ type LockedFeatureProps = {
   message?: string;
   /** Children shown blurred/minimized when locked */
   children?: React.ReactNode;
+  /** Whether to render a blurred preview of children behind lock overlay */
+  showPreview?: boolean;
 };
 
 export default function LockedFeature({
@@ -19,13 +21,14 @@ export default function LockedFeature({
   requiredPlan,
   message,
   children,
+  showPreview = true,
 }: LockedFeatureProps) {
   const defaultMessage = `Upgrade to ${requiredPlan} to unlock this feature`;
 
   return (
     <div className="relative">
       {/* Blurred content preview */}
-      {children && (
+      {children && showPreview && (
         <div
           className="relative overflow-hidden pointer-events-none"
           style={{ maxHeight: '140px' }}
