@@ -110,9 +110,24 @@ def create_portal_session(payload: PortalRequest):
 
         email = str(payload.email).lower().strip()
 
-        # Try to find customer id in Supabase first
+        # Source of truth: users.stripe_customer_id (webhook-synced)
         customer_id: Optional[str] = None
         if sb:
+            try:
+                rec = (
+                    sb.table("users")
+                    .select("stripe_customer_id")
+                    .eq("email", email)
+                    .maybe_single()
+                    .execute()
+                )
+                if rec.data and rec.data.get("stripe_customer_id"):
+                    customer_id = rec.data["stripe_customer_id"]
+            except Exception:
+                customer_id = None
+
+        # Fallback path: legacy stripe_customers lookup by email
+        if sb and not customer_id:
             try:
                 rec = (
                     sb.table("stripe_customers")

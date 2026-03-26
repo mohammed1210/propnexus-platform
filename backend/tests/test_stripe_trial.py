@@ -149,3 +149,42 @@ def test_webhook_handles_trial_ending(mock_supabase, mock_stripe, client):
     assert mock_supabase.table.return_value.upsert.called
     upsert_call = mock_supabase.table.return_value.upsert.call_args[0][0]
     assert upsert_call["plan_status"] == "active"
+
+
+@patch("backend.routes.stripe_routes.stripe")
+@patch("backend.routes.stripe_routes.sb")
+def test_portal_session_prefers_users_table_customer_id(mock_sb, mock_stripe, client):
+    """Portal lookup should prefer users.stripe_customer_id (webhook synced)."""
+    users_table = Mock()
+    legacy_table = Mock()
+
+    users_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = Mock(
+        data={"stripe_customer_id": "cus_from_users_table"}
+    )
+    legacy_table.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = Mock(
+        data={"stripe_customer_id": "cus_from_legacy_table"}
+    )
+
+    def _table(name):
+        if name == "users":
+            return users_table
+        if name == "stripe_customers":
+            return legacy_table
+        return Mock()
+
+    mock_sb.table.side_effect = _table
+
+    mock_portal = Mock(url="https://billing.stripe.com/p/session_test")
+    mock_stripe.billing_portal.Session.create.return_value = mock_portal
+
+    response = client.post(
+        "/stripe/create-portal-session",
+        json={"email": "mapped@example.com"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["url"] == "https://billing.stripe.com/p/session_test"
+
+    call_kwargs = mock_stripe.billing_portal.Session.create.call_args[1]
+    assert call_kwargs["customer"] == "cus_from_users_table"
+    assert not mock_stripe.Customer.search.called
