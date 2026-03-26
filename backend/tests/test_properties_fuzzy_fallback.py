@@ -7,7 +7,9 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    monkeypatch.setenv("ALLOW_SUPABASE_LOCAL_FALLBACK", "1")
+
     from backend.main import app
 
     return TestClient(app)

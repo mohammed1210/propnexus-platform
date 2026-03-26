@@ -1569,6 +1569,7 @@ function ListingsInner() {
                 <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 <input
                   type="text"
+                  data-testid="onboarding-search-input"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
@@ -1588,6 +1589,7 @@ function ListingsInner() {
                   <span className="hidden sm:inline">Map</span>
                   <button
                     type="button"
+                    data-testid="onboarding-map-toggle"
                     role="switch"
                     aria-checked={showMap && mapAvailable}
                     onClick={() => {
@@ -1615,6 +1617,7 @@ function ListingsInner() {
                 </label>
 
                 <select
+                  data-testid="onboarding-sort-select"
                   value={sort}
                   onChange={(e) => {
                     pushParams((p) => {
@@ -1645,6 +1648,7 @@ function ListingsInner() {
                 </button>
 
                 <button
+                  data-testid="onboarding-more-filters"
                   onClick={() => setShowFilters((v) => !v)}
                   className="more-filters-button h-10 px-3 md:px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
                   aria-expanded={showFilters}
@@ -1765,7 +1769,7 @@ function ListingsInner() {
         )}
 
         <div className="mb-4 flex items-center justify-center sm:justify-start">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+          <p data-testid="onboarding-results-summary" className="text-sm text-slate-600 dark:text-slate-400">
             Total properties:{' '}
             <span className="font-semibold text-slate-900 dark:text-white">
               {typeof total === 'number' ? total.toLocaleString() : '—'}
