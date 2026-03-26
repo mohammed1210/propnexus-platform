@@ -339,6 +339,7 @@ export default function PropertyDetailsPage() {
                 title="AI Deal Score"
                 requiredPlan="pro"
                 featureEnabled={true}
+                showPreviewWhenLocked={false}
               >
                 <DealScore property={property} />
               </GatedPanel>
