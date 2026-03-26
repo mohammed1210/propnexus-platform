@@ -16,7 +16,7 @@ openai>=1.14.0
 stripe==14.4.1
 sentry-sdk>=2.0.0
 pytest-asyncio>=0.23.0
-ruff==0.15.6
+ruff==0.15.7
 aiohttp>=3.9.0
 prometheus-fastapi-instrumentator>=7.1.0
 slowapi>=0.1.9
