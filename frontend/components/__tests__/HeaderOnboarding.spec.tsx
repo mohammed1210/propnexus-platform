@@ -37,17 +37,18 @@ jest.mock('../OnboardingTour', () => function MockOnboardingTour() {
 });
 
 describe('Header onboarding controls', () => {
-  it('launches replay from header and renders an onboarding bubble', () => {
+  it('launches replay from header and dispatches start-tour event', () => {
     render(<Header />);
 
     const replayButton = screen.getByTestId('header-tour-button');
     expect(replayButton).toHaveTextContent('Replay Tour');
 
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
     fireEvent.click(replayButton);
 
-    expect(screen.getByTestId('header-tour-bubble')).toBeInTheDocument();
     expect(
-      screen.getByText('Type a city or postcode here to start hunting deals quickly.')
-    ).toBeInTheDocument();
+      dispatchSpy.mock.calls.some((call) => (call[0] as Event)?.type === 'propnexus:start-tour')
+    ).toBe(true);
+    dispatchSpy.mockRestore();
   });
 });

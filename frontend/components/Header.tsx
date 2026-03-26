@@ -35,7 +35,6 @@ export default function Header() {
   const [mobileMenuKey, setMobileMenuKey] = useState(0);
   const [tourRunNonce, setTourRunNonce] = useState(0);
   const [tourSeen, setTourSeen] = useState(true);
-  const [showTourFallbackBubble, setShowTourFallbackBubble] = useState(false);
   const showTourControls = isListingsRoute(pathname);
 
   // Close the mobile menu by remounting Disclosure when a link is tapped
@@ -101,7 +100,6 @@ export default function Header() {
               className="hidden lg:inline-flex h-10 px-3 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               onClick={() => {
                 setTourRunNonce((n) => n + 1);
-                setShowTourFallbackBubble(true);
                 if (typeof window !== 'undefined') {
                   window.dispatchEvent(new Event('propnexus:start-tour'));
                 }
@@ -298,26 +296,6 @@ export default function Header() {
       </div>
 
       <OnboardingTour runNonce={tourRunNonce} onSeenChange={setTourSeen} />
-
-      {showTourControls && showTourFallbackBubble ? (
-        <div
-          data-testid="header-tour-bubble"
-          className="fixed bottom-4 right-4 z-[10002] max-w-sm rounded-xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900"
-        >
-          <p className="text-sm text-slate-800 dark:text-slate-100">
-            Type a city or postcode here to start hunting deals quickly.
-          </p>
-          <div className="mt-3 flex justify-end">
-            <button
-              type="button"
-              className="rounded-md bg-brand-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-600"
-              onClick={() => setShowTourFallbackBubble(false)}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      ) : null}
     </header>
   );
 }

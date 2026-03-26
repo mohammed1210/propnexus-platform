@@ -76,7 +76,7 @@ export default function OnboardingTour({ runNonce = 0, onSeenChange }: Onboardin
   useEffect(() => {
     if (!onListings || runNonce === 0) return;
     setRun(true);
-    setShowFallbackBubble(true);
+    setShowFallbackBubble(false);
   }, [onListings, runNonce]);
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function OnboardingTour({ runNonce = 0, onSeenChange }: Onboardin
 
     const handleStartTour = () => {
       setRun(true);
-      setShowFallbackBubble(true);
+      setShowFallbackBubble(false);
     };
 
     window.addEventListener('propnexus:start-tour', handleStartTour);
@@ -103,9 +103,7 @@ export default function OnboardingTour({ runNonce = 0, onSeenChange }: Onboardin
       const joyrideTooltip =
         document.querySelector('.react-joyride__tooltip') ||
         document.querySelector('[role="dialog"]');
-      if (!joyrideTooltip) {
-        setShowFallbackBubble(true);
-      }
+      setShowFallbackBubble(!joyrideTooltip);
     }, 700);
 
     return () => {
