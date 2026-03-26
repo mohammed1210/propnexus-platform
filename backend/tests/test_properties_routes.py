@@ -687,7 +687,7 @@ def test_get_property_not_found(mock_create_client, client):
     assert response.status_code == 404
 
 
-def test_get_supabase_fallback_only_in_test_env(monkeypatch):
+def test_get_supabase_misconfiguration_raises_503_without_opt_in(monkeypatch):
     from backend.routes import properties_routes as routes
 
     calls = {"count": 0}
@@ -703,12 +703,37 @@ def test_get_supabase_fallback_only_in_test_env(monkeypatch):
     monkeypatch.setattr(routes, "create_client", _fake_create_client)
 
     monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.delenv("ALLOW_SUPABASE_LOCAL_FALLBACK", raising=False)
+    with pytest.raises(HTTPException) as exc:
+        routes._get_supabase()
+    assert exc.value.status_code == 503
+    assert calls["count"] == 0
+
+
+def test_get_supabase_test_fallback_requires_explicit_opt_in(monkeypatch):
+    from backend.routes import properties_routes as routes
+
+    calls = {"count": 0}
+
+    def _raise_get_supabase(*args, **kwargs):
+        raise RuntimeError("missing config")
+
+    def _fake_create_client(url: str, key: str):
+        calls["count"] += 1
+        return object()
+
+    monkeypatch.setattr(routes, "get_supabase", _raise_get_supabase)
+    monkeypatch.setattr(routes, "create_client", _fake_create_client)
+
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setenv("ALLOW_SUPABASE_LOCAL_FALLBACK", "1")
     assert routes._get_supabase() is not None
     assert calls["count"] == 1
 
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.setenv("CI", "false")
     monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.setenv("ALLOW_SUPABASE_LOCAL_FALLBACK", "1")
     with pytest.raises(HTTPException) as exc:
         routes._get_supabase()
     assert exc.value.status_code == 503
@@ -939,6 +964,179 @@ def test_list_properties_deal_filter_high_offset_reports_filtered_total(monkeypa
     assert body["total"] == 12
     assert body["has_more"] is False
     assert body["items"] == []
+
+
+def test_list_properties_deal_filter_deep_offset_returns_tail_page(monkeypatch):
+    from backend.routes import properties_routes as routes
+
+    class _FakeRes:
+        def __init__(self, data, count):
+            self.data = data
+            self.count = count
+
+    class _FakeQuery:
+        def __init__(self, rows):
+            self.rows = rows
+            self._start = 0
+            self._end = max(len(rows) - 1, 0)
+
+        def select(self, *args, **kwargs):
+            return self
+
+        def eq(self, *args, **kwargs):
+            return self
+
+        def gte(self, *args, **kwargs):
+            return self
+
+        def lte(self, *args, **kwargs):
+            return self
+
+        def in_(self, *args, **kwargs):
+            return self
+
+        def ilike(self, *args, **kwargs):
+            return self
+
+        def or_(self, *args, **kwargs):
+            return self
+
+        def order(self, *args, **kwargs):
+            return self
+
+        def range(self, start, end):
+            self._start = int(start)
+            self._end = int(end)
+            return self
+
+        def execute(self):
+            return _FakeRes(self.rows[self._start : self._end + 1], len(self.rows))
+
+    class _FakeSupabase:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def table(self, _name):
+            return _FakeQuery(self.rows)
+
+    rows = []
+    for i in range(1500):
+        rows.append(
+            {
+                "id": str(i),
+                "title": f"Property {i}",
+                "location": "London",
+                "created_at": f"2025-01-{(i % 28) + 1:02d}T00:00:00Z",
+                "deal_signals": ["auction"] if i < 105 else [],
+            }
+        )
+
+    monkeypatch.setattr(routes, "_get_supabase", lambda: _FakeSupabase(rows))
+
+    body = routes.list_properties(
+        Response(),
+        auction_only=True,
+        limit=10,
+        offset=100,
+        sort="created_at_desc",
+        dir="desc",
+    )
+    assert body["total"] == 105
+    assert body["has_more"] is False
+    assert len(body["items"]) == 5
+
+
+def test_list_properties_include_points_parity_with_items_for_deal_filters(monkeypatch):
+    from backend.routes import properties_routes as routes
+
+    class _FakeRes:
+        def __init__(self, data, count):
+            self.data = data
+            self.count = count
+
+    class _FakeQuery:
+        def __init__(self, rows):
+            self.rows = rows
+            self._start = 0
+            self._end = max(len(rows) - 1, 0)
+
+        def select(self, *args, **kwargs):
+            return self
+
+        def eq(self, *args, **kwargs):
+            return self
+
+        def gte(self, *args, **kwargs):
+            return self
+
+        def lte(self, *args, **kwargs):
+            return self
+
+        def in_(self, *args, **kwargs):
+            return self
+
+        def ilike(self, *args, **kwargs):
+            return self
+
+        def or_(self, *args, **kwargs):
+            return self
+
+        def order(self, *args, **kwargs):
+            return self
+
+        def range(self, start, end):
+            self._start = int(start)
+            self._end = int(end)
+            return self
+
+        def execute(self):
+            return _FakeRes(self.rows[self._start : self._end + 1], len(self.rows))
+
+    class _FakeSupabase:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def table(self, _name):
+            return _FakeQuery(self.rows)
+
+    rows = [
+        {
+            "id": "p1",
+            "title": "Unmortgageable investment",
+            "description": "Cash buyers only, no mortgage available",
+            "location": "London",
+            "created_at": "2025-01-02T00:00:00Z",
+            "latitude": 51.5,
+            "longitude": -0.12,
+            "deal_signals": None,
+        },
+        {
+            "id": "p2",
+            "title": "Standard listing",
+            "description": "Family home",
+            "location": "London",
+            "created_at": "2025-01-03T00:00:00Z",
+            "latitude": 51.51,
+            "longitude": -0.11,
+            "deal_signals": [],
+        },
+    ]
+
+    monkeypatch.setattr(routes, "_get_supabase", lambda: _FakeSupabase(rows))
+
+    body = routes.list_properties(
+        Response(),
+        cash_buyers_only=True,
+        include_points=True,
+        limit=50,
+        offset=0,
+        sort="created_at_desc",
+        dir="desc",
+    )
+    item_ids = [str(i.get("id")) for i in body.get("items") or []]
+    point_ids = [str(i.get("id")) for i in body.get("points") or []]
+    assert item_ids == ["p1"]
+    assert point_ids == ["p1"]
 
 
 def test_list_properties_include_points_uses_synonym_expansion(monkeypatch):
