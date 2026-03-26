@@ -3,7 +3,7 @@
 
 import { ReactNode } from 'react';
 import { useUserPlan } from '@/lib/useUserPlan';
-import { hasAccess } from '@/lib/planPermissions';
+import { getPlanLabel, hasAccess } from '@/lib/planPermissions';
 import LockedFeature from '@/components/LockedFeature';
 import { isAuthEnabled } from '@/lib/auth';
 
@@ -12,6 +12,7 @@ interface GatedPanelProps {
   title: string;
   requiredPlan: 'pro' | 'investor';
   featureEnabled: boolean;
+  showPreviewWhenLocked?: boolean;
 }
 
 /**
@@ -23,6 +24,7 @@ export default function GatedPanel({
   title,
   requiredPlan,
   featureEnabled,
+  showPreviewWhenLocked = true,
 }: GatedPanelProps) {
   // Simple local-dev bypass so designers/PMs can preview gated UI
   const bypassGating =
@@ -45,6 +47,7 @@ export default function GatedPanel({
       requiredPlan={requiredPlan}
       featureEnabled={featureEnabled}
       bypassGating={bypassGating}
+      showPreviewWhenLocked={showPreviewWhenLocked}
     >
       {children}
     </GatedPanelAuthed>
@@ -57,6 +60,7 @@ function GatedPanelAuthed({
   requiredPlan,
   featureEnabled,
   bypassGating,
+  showPreviewWhenLocked,
 }: GatedPanelProps & { bypassGating: boolean }) {
   const { plan, loading } = useUserPlan();
 
@@ -75,11 +79,14 @@ function GatedPanelAuthed({
   const userHasAccess = bypassGating || hasAccess(plan, requiredPlan);
 
   if (!userHasAccess) {
+    const requiredLabel = requiredPlan === 'pro' ? 'Pro' : 'Investor';
+    const currentLabel = getPlanLabel(plan);
     return (
       <LockedFeature
         title={title}
-        requiredPlan={requiredPlan === 'pro' ? 'Pro' : 'Investor'}
-        message={`Unlock ${title} with ${requiredPlan === 'pro' ? 'Pro' : 'Investor'} plan`}
+        requiredPlan={requiredLabel}
+        message={`${title} is available on ${requiredLabel} and Investor plans. Your current plan is ${currentLabel}.`}
+        showPreview={showPreviewWhenLocked}
       >
         {children}
       </LockedFeature>
