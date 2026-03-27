@@ -67,12 +67,6 @@ async function getCustomerIdFromUsers(email: string): Promise<string | null> {
   return typeof customer === 'string' && customer.trim() ? customer.trim() : null;
 }
 
-async function getCustomerIdByEmailFallback(stripe: Stripe, email: string): Promise<string | null> {
-  const existing = await stripe.customers.search({ query: `email:'${email}'`, limit: 1 });
-  if (existing.data?.[0]?.id) return existing.data[0].id;
-  return null;
-}
-
 export async function POST() {
   try {
     if (!isClerkServerEnabled()) {
@@ -99,17 +93,11 @@ export async function POST() {
 
     const stripe = new Stripe(KEY, { apiVersion: '2025-09-30.clover' });
 
-    // Source of truth: users.stripe_customer_id (synced by webhook).
-    let customer = await getCustomerIdFromUsers(email);
-
-    // Email fallback is allowed when existing data paths already support it.
-    if (!customer) {
-      customer = await getCustomerIdByEmailFallback(stripe, email);
-    }
+    const customer = await getCustomerIdFromUsers(email);
 
     if (!customer) {
       return NextResponse.json(
-        { ok: false, error: 'No billing account found for your user.' },
+        { ok: false, error: 'No billing account found for your signed-in user.' },
         { status: 404 },
       );
     }

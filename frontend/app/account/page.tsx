@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
@@ -15,8 +15,6 @@ export const dynamic = 'force-dynamic';
 
 function AccountPageContent() {
   const searchParams = useSearchParams();
-  const [loadingPortal, setLoadingPortal] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const { refetch: refetchPlan } = useUserPlan();
 
   const { isLoaded: clerkLoaded, isSignedIn, user } = useUser();
@@ -25,17 +23,13 @@ function AccountPageContent() {
 
   useEffect(() => {
     (async () => {
-      // Check if returning from Stripe checkout success
       if (searchParams) {
         const success = searchParams.get('success');
         const sessionId = searchParams.get('session_id');
 
         if (success === 'true' && sessionId) {
-          // Show success message
           toast.success('Subscription updated successfully!');
 
-          // Refresh plan data to reflect the change
-          // Use a small delay to allow webhook processing
           setTimeout(async () => {
             try {
               await refetchPlan();
@@ -48,43 +42,6 @@ function AccountPageContent() {
       }
     })();
   }, [searchParams, refetchPlan]);
-
-  /** Manual/fallback Customer Portal opener (kept visible for redundancy) */
-  async function openPortalManually() {
-    const email = effectiveUser?.primaryEmailAddress?.emailAddress;
-    if (!email) return;
-    setErrorMsg(null);
-    setLoadingPortal(true);
-
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), 20_000);
-
-    try {
-      const res = await fetch(`/api/stripe/create-portal-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        let detail = '';
-        try {
-          detail = (await res.json())?.detail ?? '';
-        } catch {}
-        throw new Error(detail || `Portal request failed (${res.status})`);
-      }
-
-      const data = await res.json();
-      if (!data?.url) throw new Error('No portal URL returned');
-      window.location.href = data.url;
-    } catch (e: any) {
-      setErrorMsg(e?.message || 'Could not open customer portal');
-      setLoadingPortal(false);
-    } finally {
-      clearTimeout(t);
-    }
-  }
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-10">
@@ -110,34 +67,7 @@ function AccountPageContent() {
             </div>
           </div>
 
-          {/* Primary shadcn-styled portal button */}
-          <StripePortalButton email={effectiveUser.primaryEmailAddress?.emailAddress || ''} />
-
-          {/* Optional fallback */}
-          <button
-            onClick={openPortalManually}
-            disabled={loadingPortal}
-            className="inline-flex items-center gap-2 rounded-md bg-zinc-900 text-white px-4 py-2 font-medium hover:bg-zinc-800 disabled:opacity-60"
-            aria-label="Open Stripe Customer Portal"
-          >
-            {loadingPortal ? (
-              <>
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                Opening portal…
-              </>
-            ) : (
-              'Open Customer Portal'
-            )}
-          </button>
-
-          {errorMsg && (
-            <div
-              role="alert"
-              className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
-            >
-              {errorMsg}
-            </div>
-          )}
+          <StripePortalButton />
 
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             Looking to upgrade? See{' '}
@@ -166,8 +96,6 @@ function AccountPageContent() {
 }
 
 export default function AccountPage() {
-  // If auth is disabled (or Clerk publishable key is missing), Clerk hooks will throw.
-  // Render a safe fallback so Next.js can build/prerender.
   if (!isAuthEnabled) {
     return (
       <main className="mx-auto max-w-3xl px-6 py-10">
@@ -192,17 +120,19 @@ export default function AccountPage() {
   }
 
   return (
-    <Suspense fallback={
-      <main className="mx-auto max-w-3xl px-6 py-10">
-        <div className="flex items-center gap-3 mb-2">
-          <h1 className="text-2xl font-bold tracking-tight">Manage Subscription</h1>
-        </div>
-        <p className="text-zinc-600 dark:text-zinc-300 mb-6">
-          Update your plan, billing details, or cancel anytime.
-        </p>
-        <p>Loading…</p>
-      </main>
-    }>
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-3xl px-6 py-10">
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-2xl font-bold tracking-tight">Manage Subscription</h1>
+          </div>
+          <p className="text-zinc-600 dark:text-zinc-300 mb-6">
+            Update your plan, billing details, or cancel anytime.
+          </p>
+          <p>Loading…</p>
+        </main>
+      }
+    >
       <AccountPageContent />
     </Suspense>
   );

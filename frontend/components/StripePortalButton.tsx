@@ -1,34 +1,32 @@
 'use client';
 
 import { useState } from 'react';
-import { toast } from 'sonner'; // ✅ ensure installed: npm i sonner
+import { toast } from 'sonner';
 
-export default function StripePortalButton({ email }: { email?: string }) {
+export default function StripePortalButton() {
   const [loading, setLoading] = useState(false);
 
   const openPortal = async () => {
-    if (!email) {
-      toast.error('No email found. Please log in first.');
-      return;
-    }
-
     setLoading(true);
+
     try {
-      const res = await fetch('/api/stripe/create-portal-session', {
+      const res = await fetch('/api/stripe/portal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
       });
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data?.detail || `HTTP ${res.status}`);
 
-      if (data?.url) {
-        toast.success('Redirecting to billing portal...');
-        window.location.href = data.url;
-      } else {
+      if (!res.ok) {
+        throw new Error(data?.error || data?.detail || `HTTP ${res.status}`);
+      }
+
+      if (!data?.url) {
         throw new Error('No portal URL returned');
       }
+
+      toast.success('Redirecting to billing portal...');
+      window.location.href = data.url;
     } catch (err: any) {
       console.error(err);
       toast.error(err?.message || 'Failed to open customer portal.');
@@ -60,12 +58,12 @@ export default function StripePortalButton({ email }: { email?: string }) {
               r="10"
               stroke="currentColor"
               strokeWidth="4"
-            ></circle>
+            />
             <path
               className="opacity-75"
               fill="currentColor"
               d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-            ></path>
+            />
           </svg>
           Opening...
         </>
