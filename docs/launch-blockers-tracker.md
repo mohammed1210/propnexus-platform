@@ -4,7 +4,7 @@ Last updated: 2026-03-27
 
 ## Task status
 
-- [ ] #370 Prevent frontend API base fallback to production backend
+- [x] #370 Prevent frontend API base fallback to production backend
   - Link: https://github.com/mohammed1210/propnexus-platform/issues/370
   - Status: Complete on main (pending issue closure)
   - Notes: frontend/lib/api.ts now uses env-only base, localhost in non-production, and /api fallback in production.
