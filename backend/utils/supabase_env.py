@@ -3,6 +3,12 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
+SERVICE_ROLE_KEY_ENV_ORDER: tuple[str, ...] = (
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_SERVICE_KEY",
+    "SUPABASE_KEY",
+)
+
 
 @dataclass(frozen=True)
 class SupabaseConfig:
@@ -39,17 +45,25 @@ def _getenv_stripped(name: str) -> str | None:
     return value or None
 
 
+def _get_first_non_empty(names: tuple[str, ...]) -> str | None:
+    for name in names:
+        value = _getenv_stripped(name)
+        if value:
+            return value
+    return None
+
+
 def resolve_supabase_env_block() -> SupabaseEnvBlock:
     """Read the canonical backend Supabase env block.
 
     Required vars:
     - SUPABASE_URL
-    - SUPABASE_SERVICE_ROLE_KEY
+    - SUPABASE_SERVICE_ROLE_KEY (preferred; legacy aliases are accepted)
     """
 
     return SupabaseEnvBlock(
         url=_getenv_stripped("SUPABASE_URL"),
-        service_role_key=_getenv_stripped("SUPABASE_SERVICE_ROLE_KEY"),
+        service_role_key=_get_first_non_empty(SERVICE_ROLE_KEY_ENV_ORDER),
     )
 
 
