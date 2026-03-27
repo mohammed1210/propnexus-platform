@@ -98,7 +98,7 @@ describe('/api/stripe/portal', () => {
     const body = await res.json();
 
     expect(res.status).toBe(404);
-    expect(body).toEqual({ ok: false, error: 'No billing account found for your user.' });
+    expect(body).toEqual({ ok: false, error: 'No billing account found for your signed-in user.' });
   });
 
   it('rejects unauthenticated requests', async () => {
