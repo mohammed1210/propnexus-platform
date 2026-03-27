@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { FiHeart, FiShare2, FiDownload, FiCopy, FiCheck } from 'react-icons/fi';
 import { toast } from 'sonner';
 import { fetchWithRetry } from '@/lib/api';
+import { exportPropertyPdf } from '@/lib/propertyPdfExport';
 import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 type QuickStatsActionsProps = {
@@ -49,6 +50,7 @@ export default function QuickStatsActions({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const merged = useMemo(
     () => ({
@@ -141,9 +143,26 @@ export default function QuickStatsActions({
     }
   };
 
-  const handleExportPDF = () => {
-    // TODO(#320): Integrate the quick actions PDF export flow.
-    toast.info('PDF export coming soon!');
+  const handleExportPDF = async () => {
+    try {
+      setExporting(true);
+      await exportPropertyPdf({
+        propertyId,
+        property,
+        url: typeof window !== 'undefined' ? window.location.href : undefined,
+        price: displayPrice,
+        yieldPercent: displayYield,
+        roiPercent: displayRoi,
+        discountPercent,
+        aiScore,
+      });
+      toast.success('PDF exported successfully.');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to export PDF.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleCopyJSON = async () => {
@@ -274,11 +293,12 @@ export default function QuickStatsActions({
 
               <button
                 onClick={handleExportPDF}
+                disabled={exporting}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
                 aria-label="Export property details as PDF"
               >
                 <FiDownload className="w-5 h-5" aria-hidden="true" />
-                <span>Export PDF</span>
+                <span>{exporting ? 'Exporting…' : 'Export PDF'}</span>
               </button>
 
               <button
@@ -336,6 +356,7 @@ export default function QuickStatsActions({
           </button>
           <button
             onClick={handleExportPDF}
+            disabled={exporting}
             className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
             aria-label="Export as PDF"
           >
