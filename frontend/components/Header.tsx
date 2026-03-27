@@ -58,18 +58,6 @@ export default function Header() {
         </Link>
 
   {/* Nav */}
-        {/*
-          NOTE: Keep primary navigation visible on small screens.
-          A recent change used `className="hidden md:flex ..."` which hid the
-          entire link list on mobile without rendering an alternative (e.g.
-          hamburger/disclosure) menu. That made core routes (Listings, Pricing,
-          Account) unreachable on phones. If you need to hide the links on
-          mobile, add a replacement mobile menu before switching to `hidden md:flex`.
-
-          TODO(#319): Replace inline nav with a responsive menu (Disclosure or
-          a separate mobile nav component) so links remain accessible on all
-          breakpoints.
-        */}
         {/* Desktop navigation */}
         <nav className="hidden md:flex items-center gap-2" aria-label="Primary">
           {links.map(({ href, label }) => {
