@@ -14,15 +14,11 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    for (const key of ['x-forwarded-for', 'x-real-ip', 'cf-connecting-ip', 'true-client-ip']) {
-      const value = req.headers.get(key);
-      if (value) headers[key] = value;
-    }
-
     const upstream = await fetch(`${resolveBackendBase()}/ai/summary`, {
       method: 'POST',
-      headers,
+      // Do not forward client-controlled IP headers from the request.
+      // Trusted edge/proxy infrastructure should inject source-address headers.
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
       cache: 'no-store',
     });
