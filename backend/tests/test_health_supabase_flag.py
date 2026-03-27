@@ -45,3 +45,25 @@ def test_health_includes_supabase_configured_boolean(monkeypatch: pytest.MonkeyP
     body2 = resp2.json()
     assert body2.get("supabase_configured") is True
     assert secret_key not in resp2.text
+
+
+def test_health_accepts_legacy_service_key_aliases(monkeypatch: pytest.MonkeyPatch) -> None:
+    if app is None:  # pragma: no cover
+        pytest.skip(f"App unavailable in CI: {_import_error}")
+
+    client = TestClient(app)
+
+    monkeypatch.setenv("SUPABASE_URL", "https://fake.supabase.co")
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
+
+    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "legacy-service-key")
+    resp_service_key = client.get("/health")
+    assert resp_service_key.status_code == 200
+    assert resp_service_key.json().get("supabase_configured") is True
+
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    monkeypatch.setenv("SUPABASE_KEY", "legacy-generic-key")
+    resp_generic_key = client.get("/health")
+    assert resp_generic_key.status_code == 200
+    assert resp_generic_key.json().get("supabase_configured") is True
