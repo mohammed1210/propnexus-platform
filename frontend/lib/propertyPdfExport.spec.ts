@@ -50,4 +50,43 @@ describe('propertyPdfExport rent parsing', () => {
       value: 'N/A',
     });
   });
+
+  it('derives Yield and ROI from rent and price when explicit metrics are missing', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p4',
+      property: {
+        title: 'Deal 4',
+        location: 'Manchester',
+        price: 240000,
+        rent_monthly: 1200,
+      },
+    });
+
+    expect(sections.metrics).toContainEqual({
+      label: 'Yield',
+      value: '6.0%',
+    });
+    expect(sections.metrics).toContainEqual({
+      label: 'ROI',
+      value: '6.0%',
+    });
+  });
+
+  it('prefers explicit ROI when provided over proxy fallback', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p5',
+      property: {
+        title: 'Deal 5',
+        location: 'Liverpool',
+        price: 200000,
+        rent_monthly: 1000,
+      },
+      roiPercent: 14.2,
+    });
+
+    expect(sections.metrics).toContainEqual({
+      label: 'ROI',
+      value: '14.2%',
+    });
+  });
 });
