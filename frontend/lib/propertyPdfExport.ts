@@ -1,5 +1,7 @@
 'use client';
 
+import { getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
+
 type ExportMetric = {
   label: string;
   value: string;
@@ -135,12 +137,26 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): {
 
   const price = typeof input.price === 'number' ? input.price : toNumber(property.price);
   const rent = resolveRentMonthly(property);
+  const mergedMetricsSource: Record<string, unknown> = {
+    ...property,
+  };
+  if (typeof input.price === 'number') {
+    mergedMetricsSource.price = input.price;
+  }
+  if (typeof input.yieldPercent === 'number') {
+    mergedMetricsSource.yield_percent = input.yieldPercent;
+  }
+  if (typeof input.roiPercent === 'number') {
+    mergedMetricsSource.roi_percent = input.roiPercent;
+  }
+  const derivedYield = getYieldPercent(mergedMetricsSource) ?? undefined;
+  const derivedRoi = getRoiDisplay(mergedMetricsSource).value ?? undefined;
 
   const metrics: ExportMetric[] = [
     { label: 'Price', value: formatCurrency(price) },
     { label: 'Estimated Rent (PCM)', value: formatCurrency(rent) },
-    { label: 'Yield', value: formatPercent(input.yieldPercent) },
-    { label: 'ROI', value: formatPercent(input.roiPercent) },
+    { label: 'Yield', value: formatPercent(derivedYield) },
+    { label: 'ROI', value: formatPercent(derivedRoi) },
     { label: 'Discount', value: formatPercent(input.discountPercent) },
     {
       label: 'AI Score',
