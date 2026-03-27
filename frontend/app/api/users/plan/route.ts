@@ -1,51 +1,76 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 
-function resolveBackendBase(): string {
-  return (
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+function getBackendBase(): string {
+  const base = (
     process.env.NEXT_PUBLIC_BACKEND_URL ||
-    process.env.BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
+    process.env.BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_BASE ||
-    'http://localhost:8000'
-  ).replace(/\/+$/, '');
+    ''
+  ).trim();
+
+  if (base) return base.replace(/\/+$/, '');
+  if (process.env.NODE_ENV !== 'production') return 'http://localhost:8000';
+  throw new Error('Missing backend base URL env.');
 }
 
-export async function GET(req: NextRequest) {
-  try {
-    const email = req.nextUrl.searchParams.get('email');
-    const upstreamUrl = new URL(`${resolveBackendBase()}/users/plan`);
-    if (email) upstreamUrl.searchParams.set('email', email);
+function isClerkServerEnabled(): boolean {
+  const pk = (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '').trim();
+  const sk = (process.env.CLERK_SECRET_KEY ?? '').trim();
+  const disable = ['1', 'true', 'yes', 'on'].includes(
+    (process.env.NEXT_PUBLIC_DISABLE_AUTH ?? '').trim().toLowerCase(),
+  );
+  return !disable && pk.startsWith('pk_') && Boolean(sk);
+}
 
-    const authHeader = req.headers.get('authorization');
-    const upstream = await fetch(upstreamUrl.toString(), {
+async function getSignedInUserEmail(): Promise<string | null> {
+  if (!isClerkServerEnabled()) return null;
+
+  const a: any = await auth();
+  const userId = (a?.userId as string | null) ?? null;
+  if (!userId) return null;
+
+  const client = await clerkClient();
+  const user = await client.users.getUser(userId);
+  return user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? null;
+}
+
+export async function GET() {
+  try {
+    if (!isClerkServerEnabled()) {
+      return NextResponse.json({ detail: 'Authentication is required.' }, { status: 401 });
+    }
+
+    const email = await getSignedInUserEmail();
+    if (!email) {
+      return NextResponse.json({ detail: 'Authentication is required.' }, { status: 401 });
+    }
+
+    const res = await fetch(`${getBackendBase()}/users/plan?email=${encodeURIComponent(email)}`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(authHeader ? { Authorization: authHeader } : {}),
-      },
+      headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',
     });
 
-    const upstreamType = (upstream.headers.get('content-type') || '').toLowerCase();
+    const data = await res.json().catch(() => ({}));
 
-    if (!upstream.ok) {
-      if (upstreamType.includes('application/json')) {
-        const errorJson = await upstream.json().catch(() => null as any);
-        const detail = errorJson?.detail || errorJson?.message || errorJson?.error || 'Plan lookup failed';
-        return NextResponse.json({ detail: String(detail) }, { status: upstream.status });
-      }
-      return NextResponse.json({ detail: 'Plan lookup failed' }, { status: upstream.status });
+    if (!res.ok) {
+      return NextResponse.json(
+        { detail: data?.detail || 'Failed to load plan' },
+        { status: res.status },
+      );
     }
 
-    if (!upstreamType.includes('application/json')) {
-      return NextResponse.json({ detail: 'Invalid plan response format' }, { status: 502 });
-    }
-
-    const data = await upstream.json();
-    return NextResponse.json(data, { status: upstream.status });
-  } catch (error) {
+    return NextResponse.json({
+      plan: data?.plan || 'free',
+    });
+  } catch (err: any) {
     return NextResponse.json(
-      { detail: error instanceof Error ? error.message : 'Plan proxy error' },
+      { detail: err?.message || 'Failed to load plan' },
       { status: 500 },
     );
   }
