@@ -25,6 +25,42 @@ const toNumber = (value: unknown): number | undefined => {
   return undefined;
 };
 
+const toCurrencyNumber = (value: unknown): number | undefined => {
+  const direct = toNumber(value);
+  if (typeof direct === 'number') return direct;
+  if (typeof value !== 'string') return undefined;
+
+  const normalized = value
+    .trim()
+    .replace(/,/g, '')
+    .replace(/[\u00A0\s]+/g, ' ')
+    .toLowerCase();
+
+  const match = normalized.match(/-?\d+(?:\.\d+)?/);
+  if (!match) return undefined;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const resolveRentMonthly = (property: Record<string, unknown>): number | undefined => {
+  const rentCandidates: unknown[] = [
+    property.monthly_rent,
+    property.rent_monthly,
+    property.monthlyRent,
+    property.rent_pcm,
+    property.rent_per_month,
+    property.rentPerMonth,
+    property.rent,
+  ];
+
+  for (const candidate of rentCandidates) {
+    const parsed = toCurrencyNumber(candidate);
+    if (typeof parsed === 'number') return parsed;
+  }
+
+  return undefined;
+};
+
 const formatCurrency = (value: number | undefined): string => {
   if (typeof value !== 'number') return 'N/A';
   return new Intl.NumberFormat('en-GB', {
@@ -98,11 +134,7 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): {
   const location = getText(property.location) ?? 'Location unavailable';
 
   const price = typeof input.price === 'number' ? input.price : toNumber(property.price);
-  const rent =
-    toNumber(property.monthly_rent) ??
-    toNumber(property.rent_pcm) ??
-    toNumber(property.rent_per_month) ??
-    toNumber(property.rent);
+  const rent = resolveRentMonthly(property);
 
   const metrics: ExportMetric[] = [
     { label: 'Price', value: formatCurrency(price) },
