@@ -13,9 +13,16 @@ function resolveBackendBase(): string {
 export async function POST(req: NextRequest) {
   try {
     const payload = await req.json();
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    for (const key of ['x-forwarded-for', 'x-real-ip', 'cf-connecting-ip', 'true-client-ip']) {
+      const value = req.headers.get(key);
+      if (value) headers[key] = value;
+    }
+
     const upstream = await fetch(`${resolveBackendBase()}/ai/summary`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
       cache: 'no-store',
     });
