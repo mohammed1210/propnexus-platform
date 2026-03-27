@@ -55,6 +55,7 @@ def test_health_accepts_legacy_service_key_aliases(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setenv("SUPABASE_URL", "https://fake.supabase.co")
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
 
     monkeypatch.setenv("SUPABASE_SERVICE_KEY", "legacy-service-key")
     resp_service_key = client.get("/health")
