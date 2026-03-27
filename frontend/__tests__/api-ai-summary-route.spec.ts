@@ -13,15 +13,16 @@ describe('/api/ai/summary proxy', () => {
     global.fetch = oldFetch;
   });
 
-  it('forwards client IP headers to backend and returns JSON response', async () => {
+  it('does not forward client-supplied IP headers to backend and returns JSON response', async () => {
     process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend.example';
 
     const fetchMock = jest.fn(async (_url: any, init: any) => {
       const headers = init?.headers as Record<string, string>;
-      expect(headers['x-forwarded-for']).toBe('203.0.113.10');
-      expect(headers['x-real-ip']).toBe('203.0.113.11');
-      expect(headers['cf-connecting-ip']).toBe('203.0.113.12');
-      expect(headers['true-client-ip']).toBe('203.0.113.13');
+      expect(headers['x-forwarded-for']).toBeUndefined();
+      expect(headers['x-real-ip']).toBeUndefined();
+      expect(headers['cf-connecting-ip']).toBeUndefined();
+      expect(headers['true-client-ip']).toBeUndefined();
+      expect(headers['Content-Type']).toBe('application/json');
 
       return new Response(JSON.stringify({ summary: 'OK', bullets: ['One'] }), {
         status: 200,
