@@ -236,7 +236,34 @@ export async function sendMagicLink(email: string): Promise<{ success: boolean; 
 --------------------------------------------------- */
 
 export async function postAiSummary(data: any) {
-  return apiPost('/ai/summary', data);
+  // Always use the same-origin proxy for summary generation so browser-side
+  // CORS/origin differences in production don't break property detail summaries.
+  const res = await fetch('/api/ai/summary', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+  if (!res.ok) {
+    if (contentType.includes('application/json')) {
+      const payload = await res.json().catch(() => null as any);
+      const detail =
+        payload?.detail ||
+        payload?.message ||
+        payload?.error ||
+        'Failed to generate summary';
+      throw new Error(`[POST ${res.status}] ${String(detail)}`);
+    }
+    throw new Error(`[POST ${res.status}] Failed to generate summary`);
+  }
+
+  if (!contentType.includes('application/json')) {
+    throw new Error('[POST 502] Invalid server response');
+  }
+
+  return (await res.json()) as any;
 }
 
 export async function postAiStrategies(data: any) {
