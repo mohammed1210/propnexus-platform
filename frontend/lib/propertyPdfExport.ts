@@ -139,10 +139,16 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): {
   const rent = resolveRentMonthly(property);
   const mergedMetricsSource: Record<string, unknown> = {
     ...property,
-    price,
-    yield_percent: input.yieldPercent,
-    roi_percent: input.roiPercent,
   };
+  if (typeof input.price === 'number') {
+    mergedMetricsSource.price = input.price;
+  }
+  if (typeof input.yieldPercent === 'number') {
+    mergedMetricsSource.yield_percent = input.yieldPercent;
+  }
+  if (typeof input.roiPercent === 'number') {
+    mergedMetricsSource.roi_percent = input.roiPercent;
+  }
   const derivedYield = getYieldPercent(mergedMetricsSource) ?? undefined;
   const derivedRoi = getRoiDisplay(mergedMetricsSource).value ?? undefined;
 
