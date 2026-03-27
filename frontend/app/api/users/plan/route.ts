@@ -4,6 +4,19 @@ import { auth, clerkClient } from '@clerk/nextjs/server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+type UserPlan = 'free' | 'pro' | 'investor';
+const VALID_PLANS: readonly UserPlan[] = ['free', 'pro', 'investor'];
+
+function parsePlanFromPayload(payload: unknown): UserPlan | null {
+  const rawPlan = (payload as { plan?: unknown } | null)?.plan;
+  if (typeof rawPlan !== 'string') return null;
+  const normalized = rawPlan.trim();
+  if (VALID_PLANS.includes(normalized as UserPlan)) {
+    return normalized as UserPlan;
+  }
+  return null;
+}
+
 function getBackendBase(): string {
   const base = (
     process.env.NEXT_PUBLIC_BACKEND_URL ||
@@ -56,17 +69,27 @@ export async function GET() {
       cache: 'no-store',
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json().catch(() => null);
 
     if (!res.ok) {
       return NextResponse.json(
-        { detail: data?.detail || 'Failed to load plan' },
+        {
+          detail:
+            typeof (data as { detail?: unknown } | null)?.detail === 'string'
+              ? (data as { detail: string }).detail
+              : 'Failed to load plan',
+        },
         { status: res.status },
       );
     }
 
+    const plan = parsePlanFromPayload(data);
+    if (!plan) {
+      return NextResponse.json({ detail: 'Invalid plan response format' }, { status: 502 });
+    }
+
     return NextResponse.json({
-      plan: data?.plan || 'free',
+      plan,
     });
   } catch (err: any) {
     return NextResponse.json(
