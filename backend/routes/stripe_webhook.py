@@ -9,6 +9,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from backend.middleware.rate_limit import WEBHOOK_RATE_LIMIT, is_test_or_ci, limiter
+from backend.utils.sentry_init import capture_exception, capture_message
 from backend.utils.supabase_client import get_supabase
 
 # Set up logger
@@ -19,6 +20,33 @@ logger = logging.getLogger(__name__)
 supabase = None  # will be monkeypatched by tests
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
+
+
+def _monitor_webhook(
+    message: str,
+    *,
+    level: str = "info",
+    event_type: Optional[str] = None,
+    customer_id: Optional[str] = None,
+    subscription_id: Optional[str] = None,
+    price_id: Optional[str] = None,
+    mapped_plan: Optional[str] = None,
+    db_write_succeeded: Optional[bool] = None,
+    failure_kind: Optional[str] = None,
+) -> None:
+    capture_message(
+        message,
+        level=level,
+        stripe_webhook={
+            "event_type": event_type,
+            "customer_id": customer_id,
+            "subscription_id": subscription_id,
+            "price_id": price_id,
+            "mapped_plan": mapped_plan,
+            "db_write_succeeded": db_write_succeeded,
+            "failure_kind": failure_kind,
+        },
+    )
 
 
 def _stripe_webhook_rate_limit() -> str:
@@ -101,9 +129,9 @@ def _as_dict(obj: Any) -> Dict[str, Any]:
         return {}
 
 
-def _upsert_price_metadata(sb_client: Any, price_id: Optional[str]) -> None:
+def _upsert_price_metadata(sb_client: Any, price_id: Optional[str]) -> bool:
     if not sb_client or not price_id:
-        return
+        return True
 
     try:
         # Stripe API key is required for this call in production.
@@ -111,7 +139,7 @@ def _upsert_price_metadata(sb_client: Any, price_id: Optional[str]) -> None:
         price = _as_dict(price_obj)
     except Exception as e:
         logger.debug(f"Failed to retrieve Stripe price {price_id}: {e}")
-        return
+        return False
 
     data = {
         "stripe_price_id": price_id,
@@ -124,8 +152,10 @@ def _upsert_price_metadata(sb_client: Any, price_id: Optional[str]) -> None:
 
     try:
         sb_client.table("prices").upsert(data, on_conflict="stripe_price_id").execute()
+        return True
     except Exception as e:
         logger.warning(f"Failed to upsert price metadata for {price_id}: {e}")
+        return False
 
 
 def _upsert_subscription_record(
@@ -136,9 +166,9 @@ def _upsert_subscription_record(
     subscription_id: Optional[str],
     status: Optional[str],
     price_id: Optional[str],
-) -> None:
+) -> bool:
     if not sb_client or not email:
-        return
+        return True
 
     data = {
         "email": email,
@@ -151,8 +181,10 @@ def _upsert_subscription_record(
     try:
         # Schema uses a single row per email (email UNIQUE).
         sb_client.table("subscriptions").upsert(data, on_conflict="email").execute()
+        return True
     except Exception as e:
         logger.warning(f"Failed to upsert subscription record for {email}: {e}")
+        return False
 
 
 def _write_user_plan(
@@ -163,9 +195,9 @@ def _write_user_plan(
     plan_status: Optional[str],
     current_period_end: Optional[int],
     plan: Optional[str],
-) -> None:
+) -> bool:
     if not sb_client:
-        return
+        return True
 
     base = {
         "stripe_customer_id": customer_id,
@@ -183,8 +215,10 @@ def _write_user_plan(
             sb_client.table("users").upsert(upsert_data).execute()
         elif customer_id:
             sb_client.table("users").update(base).eq("stripe_customer_id", customer_id).execute()
+        return True
     except Exception as e:
         logger.warning(f"Failed to write user plan data for customer {customer_id}: {e}")
+        return False
 
 
 @router.post("/webhook")
@@ -204,16 +238,40 @@ async def stripe_webhook(request: Request):
     sig_header: str = request.headers.get("Stripe-Signature", "")
     webhook_secret = get_webhook_secret()
 
+    _monitor_webhook(
+        "stripe_webhook_received",
+        level="info",
+        db_write_succeeded=None,
+    )
+
     if not payload:
+        _monitor_webhook(
+            "stripe_webhook_invalid_payload",
+            level="warning",
+            failure_kind="missing_payload",
+            db_write_succeeded=False,
+        )
         return JSONResponse({"ok": False, "error": "missing_payload"}, status_code=400)
 
     # Missing signature header is always a bad request from Stripe's perspective.
     if not sig_header:
+        _monitor_webhook(
+            "stripe_webhook_signature_failure",
+            level="warning",
+            failure_kind="missing_stripe_signature",
+            db_write_succeeded=False,
+        )
         return JSONResponse({"ok": False, "error": "missing_stripe_signature"}, status_code=400)
 
     # Missing secret is a server misconfiguration (should not be a 400).
     if not webhook_secret:
         logger.error("STRIPE_WEBHOOK_SECRET is not set")
+        _monitor_webhook(
+            "stripe_webhook_unexpected_exception",
+            level="error",
+            failure_kind="missing_webhook_secret",
+            db_write_succeeded=False,
+        )
         return JSONResponse({"ok": False, "error": "missing_webhook_secret"}, status_code=500)
 
     # Ensure Stripe client is configured for any retrieve() calls below.
@@ -224,13 +282,32 @@ async def stripe_webhook(request: Request):
             payload=payload, sig_header=sig_header, secret=webhook_secret
         )
     except stripe.error.SignatureVerificationError as e:
+        _monitor_webhook(
+            "stripe_webhook_signature_failure",
+            level="warning",
+            failure_kind="bad_signature",
+            db_write_succeeded=False,
+        )
         return JSONResponse({"ok": False, "error": f"bad_signature:{e}"}, status_code=400)
     except ValueError as e:
         # Raised for invalid JSON / parsing problems.
+        _monitor_webhook(
+            "stripe_webhook_invalid_payload",
+            level="warning",
+            failure_kind="bad_payload",
+            db_write_succeeded=False,
+        )
         return JSONResponse({"ok": False, "error": f"bad_payload:{e}"}, status_code=400)
     except Exception as e:
         # Unexpected failures here are usually configuration/library issues.
         logger.exception(f"Unexpected error constructing Stripe event: {e}")
+        capture_exception(e, stripe_webhook={"failure_kind": "construct_event_exception"})
+        _monitor_webhook(
+            "stripe_webhook_unexpected_exception",
+            level="error",
+            failure_kind="construct_event_exception",
+            db_write_succeeded=False,
+        )
         return JSONResponse({"ok": False, "error": "webhook_internal_error"}, status_code=500)
 
     etype = event.get("type")
@@ -262,12 +339,13 @@ async def stripe_webhook(request: Request):
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
+            db_write_succeeded = sb_client is not None
 
             if sb_client:
                 try:
                     # Keep admin stats stable by persisting both subscription + price metadata.
-                    _upsert_price_metadata(sb_client, price_id)
-                    _upsert_subscription_record(
+                    price_ok = _upsert_price_metadata(sb_client, price_id)
+                    sub_ok = _upsert_subscription_record(
                         sb_client,
                         email=customer_email,
                         customer_id=customer_id,
@@ -277,7 +355,7 @@ async def stripe_webhook(request: Request):
                     )
 
                     # Users upsert LAST (tests inspect last upsert call).
-                    _write_user_plan(
+                    user_ok = _write_user_plan(
                         sb_client,
                         customer_id=customer_id,
                         email=customer_email,
@@ -285,10 +363,46 @@ async def stripe_webhook(request: Request):
                         current_period_end=current_period_end,
                         plan=plan,
                     )
+                    db_write_succeeded = all([price_ok, sub_ok, user_ok])
+                    if not db_write_succeeded:
+                        _monitor_webhook(
+                            "stripe_webhook_partial_db_write",
+                            level="warning",
+                            event_type=etype,
+                            customer_id=customer_id,
+                            subscription_id=sub_id,
+                            price_id=price_id,
+                            mapped_plan=plan,
+                            db_write_succeeded=False,
+                            failure_kind="db_write_soft_failure",
+                        )
                 except Exception as e:
                     # Log error but don't fail the webhook - gracefully skip DB write
                     logger.warning(f"Failed to upsert user data in checkout.session.completed: {e}")
+                    db_write_succeeded = False
+                    _monitor_webhook(
+                        "stripe_webhook_partial_db_write",
+                        level="warning",
+                        event_type=etype,
+                        customer_id=customer_id,
+                        subscription_id=sub_id,
+                        price_id=price_id,
+                        mapped_plan=plan,
+                        db_write_succeeded=False,
+                        failure_kind="db_write_exception",
+                    )
                     pass
+
+            _monitor_webhook(
+                "stripe_webhook_processed",
+                level="info",
+                event_type=etype,
+                customer_id=customer_id,
+                subscription_id=sub_id,
+                price_id=price_id,
+                mapped_plan=plan,
+                db_write_succeeded=db_write_succeeded,
+            )
 
             return JSONResponse({"ok": True})
 
@@ -321,11 +435,12 @@ async def stripe_webhook(request: Request):
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
+            db_write_succeeded = sb_client is not None
 
             if sb_client:
                 try:
-                    _upsert_price_metadata(sb_client, price_id)
-                    _upsert_subscription_record(
+                    price_ok = _upsert_price_metadata(sb_client, price_id)
+                    sub_ok = _upsert_subscription_record(
                         sb_client,
                         email=email,
                         customer_id=customer_id,
@@ -334,7 +449,7 @@ async def stripe_webhook(request: Request):
                         price_id=price_id,
                     )
 
-                    _write_user_plan(
+                    user_ok = _write_user_plan(
                         sb_client,
                         customer_id=customer_id,
                         email=email,
@@ -342,10 +457,46 @@ async def stripe_webhook(request: Request):
                         current_period_end=current_period_end,
                         plan=plan,
                     )
+                    db_write_succeeded = all([price_ok, sub_ok, user_ok])
+                    if not db_write_succeeded:
+                        _monitor_webhook(
+                            "stripe_webhook_partial_db_write",
+                            level="warning",
+                            event_type=etype,
+                            customer_id=customer_id,
+                            subscription_id=data_obj.get("id"),
+                            price_id=price_id,
+                            mapped_plan=plan,
+                            db_write_succeeded=False,
+                            failure_kind="db_write_soft_failure",
+                        )
                 except Exception as e:
                     # Log error but don't fail the webhook - gracefully skip DB write
                     logger.warning(f"Failed to upsert user data in subscription.updated: {e}")
+                    db_write_succeeded = False
+                    _monitor_webhook(
+                        "stripe_webhook_partial_db_write",
+                        level="warning",
+                        event_type=etype,
+                        customer_id=customer_id,
+                        subscription_id=data_obj.get("id"),
+                        price_id=price_id,
+                        mapped_plan=plan,
+                        db_write_succeeded=False,
+                        failure_kind="db_write_exception",
+                    )
                     pass
+
+            _monitor_webhook(
+                "stripe_webhook_processed",
+                level="info",
+                event_type=etype,
+                customer_id=customer_id,
+                subscription_id=data_obj.get("id"),
+                price_id=price_id,
+                mapped_plan=plan,
+                db_write_succeeded=db_write_succeeded,
+            )
 
             return JSONResponse({"ok": True})
 
@@ -376,11 +527,12 @@ async def stripe_webhook(request: Request):
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
+            db_write_succeeded = sb_client is not None
 
             if sb_client:
                 try:
-                    _upsert_price_metadata(sb_client, price_id)
-                    _upsert_subscription_record(
+                    price_ok = _upsert_price_metadata(sb_client, price_id)
+                    sub_ok = _upsert_subscription_record(
                         sb_client,
                         email=email,
                         customer_id=customer_id,
@@ -389,7 +541,7 @@ async def stripe_webhook(request: Request):
                         price_id=price_id,
                     )
 
-                    _write_user_plan(
+                    user_ok = _write_user_plan(
                         sb_client,
                         customer_id=customer_id,
                         email=email,
@@ -397,10 +549,46 @@ async def stripe_webhook(request: Request):
                         current_period_end=current_period_end,
                         plan=plan,
                     )
+                    db_write_succeeded = all([price_ok, sub_ok, user_ok])
+                    if not db_write_succeeded:
+                        _monitor_webhook(
+                            "stripe_webhook_partial_db_write",
+                            level="warning",
+                            event_type=etype,
+                            customer_id=customer_id,
+                            subscription_id=data_obj.get("id"),
+                            price_id=price_id,
+                            mapped_plan=plan,
+                            db_write_succeeded=False,
+                            failure_kind="db_write_soft_failure",
+                        )
                 except Exception as e:
                     # Log error but don't fail the webhook - gracefully skip DB write
                     logger.warning(f"Failed to upsert user data in subscription.created: {e}")
+                    db_write_succeeded = False
+                    _monitor_webhook(
+                        "stripe_webhook_partial_db_write",
+                        level="warning",
+                        event_type=etype,
+                        customer_id=customer_id,
+                        subscription_id=data_obj.get("id"),
+                        price_id=price_id,
+                        mapped_plan=plan,
+                        db_write_succeeded=False,
+                        failure_kind="db_write_exception",
+                    )
                     pass
+
+            _monitor_webhook(
+                "stripe_webhook_processed",
+                level="info",
+                event_type=etype,
+                customer_id=customer_id,
+                subscription_id=data_obj.get("id"),
+                price_id=price_id,
+                mapped_plan=plan,
+                db_write_succeeded=db_write_succeeded,
+            )
 
             return JSONResponse({"ok": True})
 
@@ -420,11 +608,12 @@ async def stripe_webhook(request: Request):
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
+            db_write_succeeded = sb_client is not None
 
             if sb_client:
                 try:
                     # Mark subscription as canceled if we can identify it.
-                    _upsert_subscription_record(
+                    sub_ok = _upsert_subscription_record(
                         sb_client,
                         email=email,
                         customer_id=customer_id,
@@ -434,7 +623,7 @@ async def stripe_webhook(request: Request):
                     )
 
                     # Downgrade to free plan when subscription is deleted.
-                    _write_user_plan(
+                    user_ok = _write_user_plan(
                         sb_client,
                         customer_id=customer_id,
                         email=email,
@@ -442,15 +631,74 @@ async def stripe_webhook(request: Request):
                         current_period_end=None,
                         plan="free",
                     )
+                    db_write_succeeded = all([sub_ok, user_ok])
+                    if not db_write_succeeded:
+                        _monitor_webhook(
+                            "stripe_webhook_partial_db_write",
+                            level="warning",
+                            event_type=etype,
+                            customer_id=customer_id,
+                            subscription_id=data_obj.get("id"),
+                            mapped_plan="free",
+                            db_write_succeeded=False,
+                            failure_kind="db_write_soft_failure",
+                        )
                 except Exception as e:
                     # Log error but don't fail the webhook - gracefully skip DB write
                     logger.warning(f"Failed to upsert user data in subscription.deleted: {e}")
+                    db_write_succeeded = False
+                    _monitor_webhook(
+                        "stripe_webhook_partial_db_write",
+                        level="warning",
+                        event_type=etype,
+                        customer_id=customer_id,
+                        subscription_id=data_obj.get("id"),
+                        mapped_plan="free",
+                        db_write_succeeded=False,
+                        failure_kind="db_write_exception",
+                    )
                     pass
+
+            _monitor_webhook(
+                "stripe_webhook_processed",
+                level="info",
+                event_type=etype,
+                customer_id=customer_id,
+                subscription_id=data_obj.get("id"),
+                mapped_plan="free",
+                db_write_succeeded=db_write_succeeded,
+            )
 
             return JSONResponse({"ok": True})
 
         # Unhandled but valid
+        _monitor_webhook(
+            "stripe_webhook_processed",
+            level="info",
+            event_type=etype,
+            customer_id=data_obj.get("customer"),
+            subscription_id=data_obj.get("id"),
+            db_write_succeeded=None,
+        )
         return JSONResponse({"ok": True, "ignored": etype})
     except Exception as e:
         # Keep 200 for tests; surface as ok=false so assertions can still read the result
+        capture_exception(
+            e,
+            stripe_webhook={
+                "event_type": etype,
+                "customer_id": data_obj.get("customer"),
+                "subscription_id": data_obj.get("id"),
+                "failure_kind": "unexpected_processing_exception",
+            },
+        )
+        _monitor_webhook(
+            "stripe_webhook_unexpected_exception",
+            level="error",
+            event_type=etype,
+            customer_id=data_obj.get("customer"),
+            subscription_id=data_obj.get("id"),
+            db_write_succeeded=False,
+            failure_kind="unexpected_processing_exception",
+        )
         return JSONResponse({"ok": False, "error": str(e)})
