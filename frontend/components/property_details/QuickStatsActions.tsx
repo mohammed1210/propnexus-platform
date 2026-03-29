@@ -52,16 +52,16 @@ export default function QuickStatsActions({
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  const merged = useMemo(
-    () => ({
+  const merged = useMemo(() => {
+    const next: Record<string, any> = {
       ...(property ?? {}),
       id: propertyId,
-      price,
-      yield_percent: yieldPercent,
-      roi_percent: roiPercent,
-    }),
-    [property, propertyId, price, yieldPercent, roiPercent],
-  );
+    };
+    if (typeof price === 'number') next.price = price;
+    if (typeof yieldPercent === 'number') next.yield_percent = yieldPercent;
+    if (typeof roiPercent === 'number') next.roi_percent = roiPercent;
+    return next;
+  }, [property, propertyId, price, yieldPercent, roiPercent]);
 
   const normalized = useMemo(() => normalizeProperty(merged), [merged]);
 

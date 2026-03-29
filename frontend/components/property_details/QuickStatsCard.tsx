@@ -34,12 +34,12 @@ const formatValue = (value: number | undefined, format: 'currency' | 'percent' |
 };
 
 export default function QuickStatsCard({ property, price, yieldPercent, roiPercent, aiScore }: QuickStatsCardProps) {
-  const merged = {
+  const merged: Record<string, any> = {
     ...(property ?? {}),
-    price,
-    yield_percent: yieldPercent,
-    roi_percent: roiPercent,
   };
+  if (typeof price === 'number') merged.price = price;
+  if (typeof yieldPercent === 'number') merged.yield_percent = yieldPercent;
+  if (typeof roiPercent === 'number') merged.roi_percent = roiPercent;
 
   const displayYield = getYieldPercent(merged) ?? undefined;
   const roiDisplay = getRoiDisplay(merged);
