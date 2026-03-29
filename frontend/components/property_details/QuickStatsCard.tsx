@@ -38,8 +38,8 @@ export default function QuickStatsCard({ property, price, yieldPercent, roiPerce
     ...(property ?? {}),
   };
   if (typeof price === 'number') merged.price = price;
-  if (typeof yieldPercent === 'number') merged.yield_percent = yieldPercent;
-  if (typeof roiPercent === 'number') merged.roi_percent = roiPercent;
+  if (typeof yieldPercent === 'number') merged.yieldPercent = yieldPercent;
+  if (typeof roiPercent === 'number') merged.roiPercent = roiPercent;
 
   const displayYield = getYieldPercent(merged) ?? undefined;
   const roiDisplay = getRoiDisplay(merged);

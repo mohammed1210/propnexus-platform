@@ -58,8 +58,8 @@ export default function QuickStatsActions({
       id: propertyId,
     };
     if (typeof price === 'number') next.price = price;
-    if (typeof yieldPercent === 'number') next.yield_percent = yieldPercent;
-    if (typeof roiPercent === 'number') next.roi_percent = roiPercent;
+    if (typeof yieldPercent === 'number') next.yieldPercent = yieldPercent;
+    if (typeof roiPercent === 'number') next.roiPercent = roiPercent;
     return next;
   }, [property, propertyId, price, yieldPercent, roiPercent]);
 
