@@ -90,4 +90,27 @@ describe('QuickStatsActions PDF export', () => {
       expect(mockToastError).not.toHaveBeenCalled();
     });
   });
+
+  it('preserves property Yield/ROI for export when override props are omitted', async () => {
+    render(
+      <QuickStatsActions
+        propertyId="prop-metrics"
+        property={{ title: 'Metric Deal', location: 'York', yield_percent: 7.3, roi_percent: 12.8 }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export property details as PDF' }));
+
+    await waitFor(() => {
+      expect(mockExportPropertyPdf).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockExportPropertyPdf).toHaveBeenCalledWith(
+      expect.objectContaining({
+        propertyId: 'prop-metrics',
+        yieldPercent: 7.3,
+        roiPercent: 12.8,
+      }),
+    );
+  });
 });
