@@ -33,9 +33,9 @@ Last updated: 2026-04-01
 ```
 User clicks "Start 7-Day Free Trial" on /pricing
     ↓
-Frontend: UpgradeButton → POST /api/stripe/create-checkout-session
+Frontend: UpgradeButton → POST /api/stripe/checkout
     ↓
-Next.js API Route proxies to Backend: POST /stripe/create-checkout-session
+Next.js API Route proxies to Backend: POST /stripe/checkout or /stripe/create-checkout-session
     ↓
 Backend creates Stripe Checkout Session with:
     - price_id (STRIPE_PRICE_PRO or STRIPE_PRICE_INVESTOR)
@@ -271,6 +271,12 @@ PYTHONPATH=/path/to/repo python3 -m pytest tests/ -v
 3. Database upsert failure (check backend logs)
 4. Frontend not refetching (check browser console)
 
+**Solutions**:
+1. Manually trigger webhook from Stripe dashboard
+2. Verify STRIPE_WEBHOOK_SECRET matches Stripe dashboard
+3. Check backend logs for "Failed to upsert user data"
+4. Check that useUserPlan.refetch() is called on account page
+
 ### Portal Does Not Open
 
 **Symptoms**: Signed-in user clicks billing portal and receives a 404 or safe error
@@ -284,12 +290,6 @@ PYTHONPATH=/path/to/repo python3 -m pytest tests/ -v
 1. Verify the user's Stripe-backed subscription has already produced a backend webhook update
 2. Confirm the Clerk user email matches the Supabase `users.email` row
 3. Check the frontend server env for `STRIPE_SECRET_KEY` and backend base URL settings
-
-**Solutions**:
-1. Manually trigger webhook from Stripe dashboard
-2. Verify STRIPE_WEBHOOK_SECRET matches Stripe dashboard
-3. Check backend logs for "Failed to upsert user data"
-4. Check that useUserPlan.refetch() is called on account page
 
 ### Wrong Plan Tier
 
