@@ -206,10 +206,6 @@ export async function createCheckoutSession(planId: string, email: string) {
   return apiPost('/stripe/create-checkout-session', { plan_id: planId, email });
 }
 
-export async function createPortalSession(email: string) {
-  return apiPost('/stripe/create-portal-session', { email });
-}
-
 /* ---------------------------------------------------
    Magic Link Authentication
 --------------------------------------------------- */

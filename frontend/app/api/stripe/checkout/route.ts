@@ -2,8 +2,8 @@
 import { NextRequest } from 'next/server';
 
 /**
- * Minimal proxy for Stripe checkout/portal creation.
- * Tries common backend endpoints in order and forwards the JSON body.
+ * Minimal proxy for Stripe checkout creation.
+ * Tries known backend checkout endpoints in order and forwards the JSON body.
  * Works in previews (avoids cross-origin) and production.
  */
 export async function POST(req: NextRequest) {
@@ -17,11 +17,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Try possible backend endpoints in order
+    // Keep checkout ownership explicit. Portal creation stays on /api/stripe/portal.
     const candidates = [
       '/stripe/checkout', // if you implemented this
       '/stripe/create-checkout-session', // common name
-      '/stripe/create-portal-session', // graceful fallback (opens portal)
     ];
 
     for (const path of candidates) {

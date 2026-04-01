@@ -44,7 +44,6 @@ describe('GatedPanel entitlement', () => {
   it('shows unlocked AI Deal Score content for entitled users', () => {
     mockUseUserPlan.mockReturnValue({
       plan: 'pro',
-      stripe_customer_id: 'cus_123',
       loading: false,
       error: null,
       refetch: async () => undefined,
@@ -63,7 +62,6 @@ describe('GatedPanel entitlement', () => {
   it('shows locked state only for non-entitled users', () => {
     mockUseUserPlan.mockReturnValue({
       plan: 'free',
-      stripe_customer_id: null,
       loading: false,
       error: null,
       refetch: async () => undefined,
