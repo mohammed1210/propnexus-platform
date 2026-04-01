@@ -2,11 +2,13 @@
 
 ## Auto-Deploy Triggers
 
-Railway auto-deploys when code is pushed to these branches:
+The GitHub Actions Railway deploy runs when backend-affecting files change on these branches:
 - `main` - Production deployments
 - `sprint-*` - Sprint feature branches
 - `po*` - Product owner branches
 - `copilot/*` - Copilot/AI assistant branches (temporary for testing)
+
+Backend-affecting paths include `backend/**`, `railway.toml`, `Dockerfile`, Python dependency manifests, and the deploy workflow itself. Docs-only pushes should not trigger the backend deploy workflow.
 
 ## Manual Deployment
 
@@ -52,7 +54,7 @@ curl https://propnexus-backend-production.up.railway.app/health
 
 Expected response:
 ```json
-{"status": "healthy"}
+{"status":"ok","service":"propnexus-backend","version":"<git-sha>","environment":"production","supabase_configured":true}
 ```
 
 ## Troubleshooting

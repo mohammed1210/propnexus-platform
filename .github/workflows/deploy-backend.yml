@@ -3,6 +3,13 @@ name: Deploy Backend (Railway)
 on:
   push:
     branches: [ main, sprint-*, po*, copilot/* ]
+    paths:
+      - "backend/**"
+      - "railway.toml"
+      - "Dockerfile"
+      - "requirements.txt"
+      - "pyproject.toml"
+      - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
 
 jobs:

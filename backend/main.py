@@ -24,6 +24,27 @@ except Exception:  # pragma: no cover - optional runtime dependency
 
 logger = logging.getLogger(__name__)
 
+
+def _resolve_app_version(version_file: Path | None = None) -> str:
+    """Prefer the stamped artifact version over host-provided git metadata."""
+    candidate = version_file or (Path(__file__).resolve().parent / ".app_version")
+
+    try:
+        stamped = candidate.read_text().strip()
+        if stamped:
+            return stamped
+    except Exception:
+        pass
+
+    return (
+        os.getenv("APP_VERSION")
+        or os.getenv("RAILWAY_GIT_COMMIT_SHA")
+        or os.getenv("GIT_COMMIT_SHA")
+        or os.getenv("GIT_SHA")
+        or "unknown"
+    )
+
+
 # Load env early (safe if missing)
 # NOTE: Some internal modules initialize clients (e.g. Supabase) at import time.
 # Loading dotenv after importing them would prevent local .env values from taking effect.
@@ -101,20 +122,7 @@ def health(response: Response):
     Health check endpoint with version information.
     Returns minimal system status without exposing secrets.
     """
-    version = (
-        os.getenv("APP_VERSION")
-        or os.getenv("RAILWAY_GIT_COMMIT_SHA")
-        or os.getenv("GIT_COMMIT_SHA")
-        or os.getenv("GIT_SHA")
-    )
-
-    if not version:
-        try:
-            version = (Path(__file__).resolve().parent / ".app_version").read_text().strip() or None
-        except Exception:
-            version = None
-
-    version = version or "unknown"
+    version = _resolve_app_version()
     environment = os.getenv("ENVIRONMENT") or os.getenv("RAILWAY_ENVIRONMENT") or "development"
 
     # Marker header to correlate deploy + response normalization behavior.
