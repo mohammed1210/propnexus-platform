@@ -4,19 +4,20 @@
 
 This document describes the complete billing and subscription flow in PropNexus, from Stripe checkout to frontend plan display.
 
-Last updated: 2025-11-22
+Last updated: 2026-04-01
 
 ## System Components
 
 ### Frontend
 - **Pricing Page** (`/pricing`): Displays subscription tiers with UpgradeButton components
-- **Account Page** (`/account`): Shows current plan, manages subscriptions via Stripe portal
-- **useUserPlan Hook** (`lib/useUserPlan.ts`): Fetches and caches user plan from backend
+- **Account Page** (`/account`): Shows current plan and opens the canonical same-origin Stripe portal route
+- **Stripe Portal Route** (`/api/stripe/portal`): Resolves the signed-in Clerk user on the server and creates the billing portal session
+- **useUserPlan Hook** (`lib/useUserPlan.ts`): Fetches the authenticated user's plan through the same-origin `/api/users/plan` proxy
 
 ### Backend
-- **Stripe Webhook** (`routes/stripe_webhook.py`): Handles Stripe events and updates users table
-- **Users Routes** (`routes/users_routes.py`): Provides `/users/plan` endpoint for plan queries
-- **Stripe Routes** (`routes/stripe_routes.py`): Creates checkout sessions and portal sessions
+- **Stripe Webhook** (`routes/stripe_webhook.py`): Canonical production webhook owner with monitoring instrumentation
+- **Users Routes** (`routes/users_routes.py`): Provides `/users/plan` lookup for backend consumers
+- **Stripe Routes** (`routes/stripe_routes.py`): Creates checkout sessions; legacy portal route remains deprecated in favor of `/api/stripe/portal`
 
 ### Database
 - **users Table**: Single source of truth for user plans
@@ -32,7 +33,7 @@ Last updated: 2025-11-22
 ```
 User clicks "Start 7-Day Free Trial" on /pricing
     ↓
-Frontend: UpgradeButton → POST /api/stripe/checkout
+Frontend: UpgradeButton → POST /api/stripe/create-checkout-session
     ↓
 Next.js API Route proxies to Backend: POST /stripe/create-checkout-session
     ↓
@@ -126,13 +127,31 @@ Waits 2 seconds for webhook processing
     ↓
 Calls useUserPlan.refetch()
     ↓
-Frontend: GET ${BACKEND_URL}/users/plan?email=user@example.com
+Frontend: GET /api/users/plan
     ↓
-Backend: SELECT plan, stripe_customer_id FROM users WHERE email = '...'
+Next.js route resolves the signed-in Clerk user email server-side
     ↓
-Returns: { plan: 'pro', stripe_customer_id: 'cus_...' }
+Backend: SELECT plan FROM users WHERE email = '...'
+    ↓
+Returns: { plan: 'pro' }
     ↓
 Frontend updates UI with new plan badge
+```
+
+### 5. Billing Portal Flow
+
+```
+Signed-in user clicks "Open Customer Portal" on /account
+    ↓
+Frontend: POST /api/stripe/portal
+    ↓
+Next.js route resolves signed-in Clerk user email server-side
+    ↓
+Next.js route fetches users.stripe_customer_id from Backend: GET /users/plan?email=...
+    ↓
+Stripe billing portal session created with trusted server-side customer mapping
+    ↓
+Stripe returns user to /account
 ```
 
 ## Configuration
@@ -184,14 +203,14 @@ If webhook receives an unknown price_id:
 
 If user exists in Supabase but no stripe_customer_id:
 - Webhook creates customer_id on first subscription
-- Email is used as fallback lookup
+- Portal access returns a safe 404 instead of searching Stripe from browser-provided identity
 
 ### Webhook Failures
 
 Backend webhook handler:
-- Returns HTTP 200 even on graceful failures
-- Logs errors but doesn't block Stripe
-- Upsert failures are logged, not thrown
+- Returns structured monitoring events through the existing backend monitoring layer
+- Returns HTTP 200 on graceful soft failures so Stripe can retry safely where appropriate
+- Upsert failures are captured and monitored instead of relying on console-only visibility
 
 ## Testing
 
@@ -214,7 +233,7 @@ Backend webhook handler:
    - [ ] Verify plan badge shows "Investor (trial)"
 
 4. **Subscription Cancellation**
-   - [ ] Open Stripe Customer Portal
+    - [ ] Open Stripe Customer Portal from `/account`
    - [ ] Cancel subscription
    - [ ] Verify plan remains until period_end
    - [ ] After period_end, verify downgrade to "Free"
@@ -226,6 +245,9 @@ Backend webhook handler:
 - ✅ Pro and Investor subscription creation
 - ✅ Subscription updates and cancellations
 - ✅ Email retrieval fallbacks
+
+**Stripe Webhook Monitoring Tests** (`backend/tests/test_stripe_webhook_monitoring.py`):
+- ✅ Monitoring coverage for receipt, signature failures, payload failures, partial DB writes, and unexpected exceptions
 
 **Properties Routes Tests** (`backend/tests/test_properties_routes.py`):
 - ✅ 6 tests for properties endpoint
@@ -248,6 +270,20 @@ PYTHONPATH=/path/to/repo python3 -m pytest tests/ -v
 2. Webhook signature mismatch (check STRIPE_WEBHOOK_SECRET)
 3. Database upsert failure (check backend logs)
 4. Frontend not refetching (check browser console)
+
+### Portal Does Not Open
+
+**Symptoms**: Signed-in user clicks billing portal and receives a 404 or safe error
+
+**Causes**:
+1. `users.stripe_customer_id` has not been synced yet
+2. User is signed in with an email that does not match the billing record
+3. `STRIPE_SECRET_KEY` is missing on the frontend server runtime
+
+**Solutions**:
+1. Verify the user's Stripe-backed subscription has already produced a backend webhook update
+2. Confirm the Clerk user email matches the Supabase `users.email` row
+3. Check the frontend server env for `STRIPE_SECRET_KEY` and backend base URL settings
 
 **Solutions**:
 1. Manually trigger webhook from Stripe dashboard
