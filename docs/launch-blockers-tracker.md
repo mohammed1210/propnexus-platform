@@ -21,19 +21,19 @@ Last updated: 2026-04-01
 
 - [x] #321 Add monitoring instrumentation for Stripe webhook route
   - Link: https://github.com/mohammed1210/propnexus-platform/issues/321
-  - Status: Ready for merge
-  - Notes: Backend /stripe/webhook is the monitored source of truth; the duplicate frontend webhook route is disabled.
+  - Status: Complete on main
+  - Notes: Shipped in PR #384; backend /stripe/webhook is the monitored source of truth and the duplicate frontend webhook route is disabled.
 
 - [x] #322 Map signed-in user to Stripe customer for portal session
   - Link: https://github.com/mohammed1210/propnexus-platform/issues/322
-  - Status: Ready for merge
-  - Notes: /api/stripe/portal resolves the signed-in user on the server, maps to users.stripe_customer_id via backend data, and returns users to /account.
+  - Status: Complete on main
+  - Notes: Shipped in PR #383; /api/stripe/portal resolves the signed-in user on the server, maps to users.stripe_customer_id via backend data, and returns users to /account.
 
 ## Completion checklist
 
 A blocker can be marked complete only when all are true:
 
-- [ ] Code changes merged to main
-- [ ] Focused tests added/updated
-- [ ] Related CI checks green
-- [ ] Issue closed with evidence comment
+- [x] Code changes merged to main
+- [x] Focused tests added/updated
+- [x] Related CI checks green
+- [x] Issue closed with evidence comment
