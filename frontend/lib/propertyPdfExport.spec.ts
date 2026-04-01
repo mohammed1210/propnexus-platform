@@ -131,4 +131,30 @@ describe('propertyPdfExport rent parsing', () => {
       value: '6.0%',
     });
   });
+
+  it('uses a stronger empty-state summary when no description is provided', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p8',
+      property: {
+        title: 'Deal 8',
+        location: 'Birmingham',
+      },
+    });
+
+    expect(sections.notes).toContain('does not currently include a narrative description');
+    expect(sections.notes).not.toBe('No description provided.');
+  });
+
+  it('captures the primary property image URL when available', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p9',
+      property: {
+        title: 'Deal 9',
+        location: 'York',
+        image_urls: ['https://images.example.com/cover.jpg'],
+      },
+    });
+
+    expect(sections.imageUrl).toBe('https://images.example.com/cover.jpg');
+  });
 });

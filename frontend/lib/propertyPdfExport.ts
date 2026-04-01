@@ -1,6 +1,13 @@
 'use client';
 
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
+import {
+  PDFDocument,
+  StandardFonts,
+  rgb,
+  type PDFFont,
+  type PDFImage,
+  type PDFPage,
+} from 'pdf-lib';
 import { getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
 
 type ExportMetric = {
@@ -17,6 +24,21 @@ export type PropertyPdfExportInput = {
   roiPercent?: number;
   discountPercent?: number;
   aiScore?: number;
+};
+
+type PropertyPdfSections = {
+  brandTitle: string;
+  reportTitle: string;
+  reportSubtitle: string;
+  title: string;
+  location: string;
+  titleMeta: ExportMetric[];
+  metrics: ExportMetric[];
+  overview: ExportMetric[];
+  notes: string;
+  exportedAt: string;
+  sourceUrl: string;
+  imageUrl?: string;
 };
 
 const toNumber = (value: unknown): number | undefined => {
@@ -102,6 +124,37 @@ const getText = (value: unknown): string | undefined => {
   return trimmed || undefined;
 };
 
+const resolvePrimaryImageUrl = (property: Record<string, unknown>): string | undefined => {
+  const direct = [
+    property.imageUrl,
+    property.image_url,
+    property.imageurl,
+    property.thumbnail,
+    property.cover_photo_url,
+  ];
+
+  for (const candidate of direct) {
+    const url = getText(candidate);
+    if (url) return url;
+  }
+
+  const collections = [property.image_urls, property.imageUrls, property.images, property.photos];
+  for (const collection of collections) {
+    if (!Array.isArray(collection)) continue;
+    for (const candidate of collection) {
+      const url = getText(candidate);
+      if (url) return url;
+    }
+  }
+
+  return undefined;
+};
+
+const createEmptyNotesState = (property: Record<string, unknown>): string => {
+  const title = getText(property.title) ?? 'This property';
+  return `${title} does not currently include a narrative description. This report still captures the core investment metrics, property overview, and source link for review.`;
+};
+
 export const createPropertyPdfFilename = (input: PropertyPdfExportInput): string => {
   const property = input.property ?? {};
   const title = getText(property.title);
@@ -112,16 +165,17 @@ export const createPropertyPdfFilename = (input: PropertyPdfExportInput): string
   return `propnexus-${titlePart}-${idPart}-${ymd}.pdf`;
 };
 
-export const getPropertyPdfSections = (input: PropertyPdfExportInput): {
-  heading: string;
-  subtitle: string;
-  metrics: ExportMetric[];
-  overview: ExportMetric[];
-  notes: string;
-} => {
+export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyPdfSections => {
   const property = input.property ?? {};
   const title = getText(property.title) ?? `Property ${input.propertyId}`;
   const location = getText(property.location) ?? 'Location unavailable';
+  const propertyType = getText(property.propertyType ?? property.property_type) ?? 'Property type unavailable';
+  const investmentType =
+    getText(property.investmentType ?? property.investment_type) ?? 'Investment type unavailable';
+  const bedrooms = toNumber(property.bedrooms);
+  const bathrooms = toNumber(property.bathrooms);
+  const exportedAt = formatDate();
+  const sourceUrl = input.url ?? 'Source URL unavailable';
 
   const price = typeof input.price === 'number' ? input.price : toNumber(property.price);
   const rent = resolveRentMonthly(property);
@@ -156,24 +210,35 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): {
     { label: 'Property ID', value: input.propertyId || 'N/A' },
     { label: 'Title', value: title },
     { label: 'Location', value: location },
-    { label: 'Property Type', value: getText(property.propertyType ?? property.property_type) ?? 'N/A' },
-    { label: 'Investment Type', value: getText(property.investmentType ?? property.investment_type) ?? 'N/A' },
+    { label: 'Property Type', value: propertyType },
+    { label: 'Investment Type', value: investmentType },
     {
       label: 'Bedrooms / Bathrooms',
-      value: `${toNumber(property.bedrooms) ?? 'N/A'} / ${toNumber(property.bathrooms) ?? 'N/A'}`,
+      value: `${bedrooms ?? 'N/A'} / ${bathrooms ?? 'N/A'}`,
     },
-    { label: 'Exported At', value: formatDate() },
-    { label: 'Source URL', value: input.url ?? 'N/A' },
+    { label: 'Exported At', value: exportedAt },
+    { label: 'Source URL', value: sourceUrl },
   ];
 
-  const notes = getText(property.description) ?? 'No description provided.';
+  const notes = getText(property.description) ?? createEmptyNotesState(property);
 
   return {
-    heading: 'PropNexus Property Deal Export',
-    subtitle: `${title} - ${location}`,
+    brandTitle: 'PropNexus',
+    reportTitle: 'Property Deal Export',
+    reportSubtitle: 'Investor-facing summary prepared from the live property detail view.',
+    title,
+    location,
+    titleMeta: [
+      { label: 'Property Type', value: propertyType },
+      { label: 'Bedrooms / Bathrooms', value: `${bedrooms ?? 'N/A'} / ${bathrooms ?? 'N/A'}` },
+      { label: 'Investment Type', value: investmentType },
+    ],
     metrics,
     overview,
     notes,
+    exportedAt,
+    sourceUrl,
+    imageUrl: resolvePrimaryImageUrl(property),
   };
 };
 
@@ -185,10 +250,21 @@ const PAGE = {
 };
 
 const COLORS = {
+  brand: rgb(14 / 255, 116 / 255, 144 / 255),
+  brandDark: rgb(15 / 255, 23 / 255, 42 / 255),
+  accent: rgb(56 / 255, 189 / 255, 248 / 255),
+  accentSoft: rgb(236 / 255, 254 / 255, 255 / 255),
   text: rgb(15 / 255, 23 / 255, 42 / 255),
   muted: rgb(71 / 255, 85 / 255, 105 / 255),
+  mutedSoft: rgb(148 / 255, 163 / 255, 184 / 255),
   border: rgb(226 / 255, 232 / 255, 240 / 255),
   sectionFill: rgb(248 / 255, 250 / 255, 252 / 255),
+  panelFill: rgb(255 / 255, 255 / 255, 255 / 255),
+};
+
+const IMAGE_BOX = {
+  width: 212,
+  height: 146,
 };
 
 type PdfState = {
@@ -255,8 +331,31 @@ const ensurePdfSpace = (
   state: PdfState,
   heightNeeded: number,
 ): PdfState => {
-  if (state.cursorY - heightNeeded >= PAGE.marginY) return state;
+  if (state.cursorY - heightNeeded >= PAGE.marginY + 34) return state;
   return addPdfPage(pdfDoc);
+};
+
+const ellipsizeToWidth = (text: string, font: PDFFont, size: number, maxWidth: number): string => {
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+  let value = text;
+  while (value.length > 1 && font.widthOfTextAtSize(`${value}…`, size) > maxWidth) {
+    value = value.slice(0, -1);
+  }
+  return `${value.trimEnd()}…`;
+};
+
+const wrapPdfTextLines = (
+  text: string,
+  font: PDFFont,
+  size: number,
+  maxWidth: number,
+  maxLines?: number,
+): string[] => {
+  const lines = wrapPdfText(text, font, size, maxWidth);
+  if (!maxLines || lines.length <= maxLines) return lines;
+  const limited = lines.slice(0, maxLines);
+  limited[maxLines - 1] = ellipsizeToWidth(limited[maxLines - 1], font, size, maxWidth);
+  return limited;
 };
 
 const drawPdfLine = (
@@ -348,6 +447,443 @@ const drawPdfSection = (
   return { ...next, cursorY: next.cursorY - 12 };
 };
 
+const drawMetricCards = (
+  pdfDoc: PDFDocument,
+  state: PdfState,
+  metrics: ExportMetric[],
+  regularFont: PDFFont,
+  boldFont: PDFFont,
+): PdfState => {
+  let next = ensurePdfSpace(pdfDoc, state, 170);
+  next.page.drawText('Key Investment Metrics', {
+    x: PAGE.marginX,
+    y: next.cursorY,
+    size: 13,
+    font: boldFont,
+    color: COLORS.brandDark,
+  });
+  next = { ...next, cursorY: next.cursorY - 20 };
+
+  const columns = 3;
+  const gap = 12;
+  const cardWidth = (PAGE.width - PAGE.marginX * 2 - gap * (columns - 1)) / columns;
+  const cardHeight = 72;
+
+  metrics.forEach((metric, index) => {
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    const x = PAGE.marginX + column * (cardWidth + gap);
+    const y = next.cursorY - row * (cardHeight + gap);
+
+    next.page.drawRectangle({
+      x,
+      y: y - cardHeight,
+      width: cardWidth,
+      height: cardHeight,
+      color: COLORS.panelFill,
+      borderColor: COLORS.border,
+      borderWidth: 1,
+    });
+    next.page.drawRectangle({
+      x,
+      y: y - 5,
+      width: cardWidth,
+      height: 5,
+      color: index === 5 ? COLORS.accent : COLORS.brand,
+    });
+    next.page.drawText(metric.label, {
+      x: x + 12,
+      y: y - 24,
+      size: 9,
+      font: regularFont,
+      color: COLORS.muted,
+    });
+    next.page.drawText(metric.value || 'N/A', {
+      x: x + 12,
+      y: y - 48,
+      size: 18,
+      font: boldFont,
+      color: COLORS.brandDark,
+    });
+  });
+
+  const rows = Math.ceil(metrics.length / columns);
+  return { ...next, cursorY: next.cursorY - rows * (cardHeight + gap) - 8 };
+};
+
+const drawOverviewGrid = (
+  pdfDoc: PDFDocument,
+  state: PdfState,
+  items: ExportMetric[],
+  regularFont: PDFFont,
+  boldFont: PDFFont,
+): PdfState => {
+  let next = ensurePdfSpace(pdfDoc, state, 170);
+  const boxTop = next.cursorY + 8;
+  const boxWidth = PAGE.width - PAGE.marginX * 2;
+  const headerHeight = 26;
+  const rowHeight = 28;
+  const rows = Math.ceil(items.length / 2);
+  const bodyHeight = rows * rowHeight + 18;
+  const leftX = PAGE.marginX + 14;
+  const rightX = PAGE.marginX + boxWidth / 2 + 10;
+  const columnWidth = boxWidth / 2 - 24;
+
+  next.page.drawRectangle({
+    x: PAGE.marginX,
+    y: boxTop - headerHeight,
+    width: boxWidth,
+    height: headerHeight,
+    color: COLORS.sectionFill,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+  });
+  next.page.drawRectangle({
+    x: PAGE.marginX,
+    y: boxTop - headerHeight - bodyHeight,
+    width: boxWidth,
+    height: bodyHeight,
+    color: COLORS.panelFill,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+  });
+  next.page.drawText('Property Overview', {
+    x: PAGE.marginX + 12,
+    y: boxTop - 17,
+    size: 12,
+    font: boldFont,
+    color: COLORS.brandDark,
+  });
+
+  items.forEach((item, index) => {
+    const row = Math.floor(index / 2);
+    const isRight = index % 2 === 1;
+    const baseX = isRight ? rightX : leftX;
+    const topY = boxTop - headerHeight - 18 - row * rowHeight;
+    next.page.drawText(item.label, {
+      x: baseX,
+      y: topY,
+      size: 8,
+      font: regularFont,
+      color: COLORS.muted,
+    });
+    const valueLines = wrapPdfTextLines(item.value || 'N/A', regularFont, 10, columnWidth, 2);
+    valueLines.forEach((line, lineIndex) => {
+      next.page.drawText(line, {
+        x: baseX,
+        y: topY - 12 - lineIndex * 10,
+        size: 10,
+        font: lineIndex === 0 ? boldFont : regularFont,
+        color: COLORS.text,
+      });
+    });
+  });
+
+  return { ...next, cursorY: boxTop - headerHeight - bodyHeight - 16 };
+};
+
+const drawNotesSection = (
+  pdfDoc: PDFDocument,
+  state: PdfState,
+  notes: string,
+  regularFont: PDFFont,
+  boldFont: PDFFont,
+): PdfState => {
+  const lines = wrapPdfText(notes, regularFont, 10.5, PAGE.width - PAGE.marginX * 2 - 24);
+  let next = state;
+  let offset = 0;
+  let title = 'Executive Summary';
+
+  while (offset < lines.length) {
+    next = ensurePdfSpace(pdfDoc, next, 150);
+    const availableLines = Math.max(4, Math.floor((next.cursorY - PAGE.marginY - 82) / 15));
+    const slice = lines.slice(offset, offset + availableLines);
+    const headerHeight = 26;
+    const bodyHeight = Math.max(52, slice.length * 15 + 18);
+    const boxTop = next.cursorY + 8;
+
+    next.page.drawRectangle({
+      x: PAGE.marginX,
+      y: boxTop - headerHeight,
+      width: PAGE.width - PAGE.marginX * 2,
+      height: headerHeight,
+      color: COLORS.sectionFill,
+      borderColor: COLORS.border,
+      borderWidth: 1,
+    });
+    next.page.drawRectangle({
+      x: PAGE.marginX,
+      y: boxTop - headerHeight - bodyHeight,
+      width: PAGE.width - PAGE.marginX * 2,
+      height: bodyHeight,
+      color: COLORS.panelFill,
+      borderColor: COLORS.border,
+      borderWidth: 1,
+    });
+    next.page.drawText(title, {
+      x: PAGE.marginX + 12,
+      y: boxTop - 17,
+      size: 12,
+      font: boldFont,
+      color: COLORS.brandDark,
+    });
+
+    let textY = boxTop - headerHeight - 18;
+    slice.forEach((line) => {
+      if (line) {
+        next.page.drawText(line, {
+          x: PAGE.marginX + 12,
+          y: textY,
+          size: 10.5,
+          font: regularFont,
+          color: COLORS.text,
+        });
+      }
+      textY -= 15;
+    });
+
+    next = { ...next, cursorY: boxTop - headerHeight - bodyHeight - 16 };
+    offset += slice.length;
+    title = 'Executive Summary (continued)';
+  }
+
+  return next;
+};
+
+const drawFooter = (
+  page: PDFPage,
+  regularFont: PDFFont,
+  boldFont: PDFFont,
+  sections: PropertyPdfSections,
+  pageIndex: number,
+  totalPages: number,
+): void => {
+  const y = PAGE.marginY - 12;
+  page.drawLine({
+    start: { x: PAGE.marginX, y: y + 18 },
+    end: { x: PAGE.width - PAGE.marginX, y: y + 18 },
+    thickness: 1,
+    color: COLORS.border,
+  });
+  page.drawText(sections.brandTitle, {
+    x: PAGE.marginX,
+    y: y + 2,
+    size: 9,
+    font: boldFont,
+    color: COLORS.brand,
+  });
+  page.drawText(ellipsizeToWidth(sections.sourceUrl, regularFont, 8.5, 220), {
+    x: PAGE.marginX + 58,
+    y: y + 2,
+    size: 8.5,
+    font: regularFont,
+    color: COLORS.muted,
+  });
+  const rightText = `${sections.exportedAt}  |  Page ${pageIndex + 1} of ${totalPages}`;
+  const rightWidth = regularFont.widthOfTextAtSize(rightText, 8.5);
+  page.drawText(rightText, {
+    x: PAGE.width - PAGE.marginX - rightWidth,
+    y: y + 2,
+    size: 8.5,
+    font: regularFont,
+    color: COLORS.muted,
+  });
+};
+
+const drawHeaderBand = (
+  page: PDFPage,
+  sections: PropertyPdfSections,
+  regularFont: PDFFont,
+  boldFont: PDFFont,
+): number => {
+  const top = PAGE.height - 26;
+  page.drawRectangle({
+    x: 0,
+    y: PAGE.height - 96,
+    width: PAGE.width,
+    height: 96,
+    color: COLORS.brandDark,
+  });
+  page.drawRectangle({
+    x: PAGE.marginX,
+    y: PAGE.height - 82,
+    width: 92,
+    height: 4,
+    color: COLORS.accent,
+  });
+  page.drawText(sections.brandTitle, {
+    x: PAGE.marginX,
+    y: top - 18,
+    size: 13,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
+  page.drawText(sections.reportTitle, {
+    x: PAGE.marginX,
+    y: top - 42,
+    size: 24,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
+  page.drawText(sections.reportSubtitle, {
+    x: PAGE.marginX,
+    y: top - 58,
+    size: 10.5,
+    font: regularFont,
+    color: rgb(226 / 255, 232 / 255, 240 / 255),
+  });
+  const timestamp = `Exported ${sections.exportedAt}`;
+  const width = regularFont.widthOfTextAtSize(timestamp, 9);
+  page.drawText(timestamp, {
+    x: PAGE.width - PAGE.marginX - width,
+    y: top - 18,
+    size: 9,
+    font: regularFont,
+    color: rgb(226 / 255, 232 / 255, 240 / 255),
+  });
+  return PAGE.height - 122;
+};
+
+const resolveImageFormat = (url: string, contentType?: string | null): 'png' | 'jpg' | null => {
+  const type = (contentType || '').toLowerCase();
+  if (type.includes('png')) return 'png';
+  if (type.includes('jpeg') || type.includes('jpg')) return 'jpg';
+  const normalizedUrl = url.toLowerCase();
+  if (normalizedUrl.includes('.png')) return 'png';
+  if (normalizedUrl.includes('.jpg') || normalizedUrl.includes('.jpeg')) return 'jpg';
+  return null;
+};
+
+const loadPropertyImage = async (
+  pdfDoc: PDFDocument,
+  imageUrl?: string,
+): Promise<PDFImage | null> => {
+  if (!imageUrl) return null;
+
+  try {
+    const response = await fetch(imageUrl);
+    if (!response.ok) return null;
+    const format = resolveImageFormat(imageUrl, response.headers.get('content-type'));
+    if (!format) return null;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return format === 'png' ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
+  } catch {
+    return null;
+  }
+};
+
+const drawTitleBlock = (
+  page: PDFPage,
+  sections: PropertyPdfSections,
+  regularFont: PDFFont,
+  boldFont: PDFFont,
+  image: PDFImage | null,
+  startY: number,
+): number => {
+  const boxY = startY - 182;
+  const boxHeight = 182;
+  const boxWidth = PAGE.width - PAGE.marginX * 2;
+  page.drawRectangle({
+    x: PAGE.marginX,
+    y: boxY,
+    width: boxWidth,
+    height: boxHeight,
+    color: COLORS.panelFill,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+  });
+
+  let textX = PAGE.marginX + 18;
+  let textWidth = boxWidth - 36;
+
+  if (image) {
+    const imageScale = Math.min(IMAGE_BOX.width / image.width, IMAGE_BOX.height / image.height);
+    const imageWidth = image.width * imageScale;
+    const imageHeight = image.height * imageScale;
+    const imageX = PAGE.marginX + 18 + (IMAGE_BOX.width - imageWidth) / 2;
+    const imageY = boxY + boxHeight - 18 - IMAGE_BOX.height + (IMAGE_BOX.height - imageHeight) / 2;
+
+    page.drawRectangle({
+      x: PAGE.marginX + 18,
+      y: boxY + boxHeight - 18 - IMAGE_BOX.height,
+      width: IMAGE_BOX.width,
+      height: IMAGE_BOX.height,
+      color: COLORS.sectionFill,
+      borderColor: COLORS.border,
+      borderWidth: 1,
+    });
+    page.drawImage(image, {
+      x: imageX,
+      y: imageY,
+      width: imageWidth,
+      height: imageHeight,
+    });
+
+    textX = PAGE.marginX + 18 + IMAGE_BOX.width + 18;
+    textWidth = boxWidth - IMAGE_BOX.width - 54;
+  }
+
+  const titleLines = wrapPdfTextLines(sections.title, boldFont, 21, textWidth, 2);
+  let cursorY = boxY + boxHeight - 32;
+  titleLines.forEach((line, index) => {
+    page.drawText(line, {
+      x: textX,
+      y: cursorY - index * 24,
+      size: 21,
+      font: boldFont,
+      color: COLORS.brandDark,
+    });
+  });
+  cursorY -= titleLines.length * 24 + 6;
+
+  const locationLines = wrapPdfTextLines(sections.location, regularFont, 12, textWidth, 2);
+  locationLines.forEach((line, index) => {
+    page.drawText(line, {
+      x: textX,
+      y: cursorY - index * 16,
+      size: 12,
+      font: regularFont,
+      color: COLORS.muted,
+    });
+  });
+  cursorY -= locationLines.length * 16 + 12;
+
+  const chipHeight = 24;
+  const chipGap = 8;
+  let chipX = textX;
+  let chipY = cursorY;
+  sections.titleMeta.forEach((item) => {
+    const label = `${item.label}: ${item.value}`;
+    const chipWidth = Math.min(
+      textWidth,
+      regularFont.widthOfTextAtSize(label, 9) + 20,
+    );
+    if (chipX + chipWidth > textX + textWidth) {
+      chipX = textX;
+      chipY -= chipHeight + 8;
+    }
+    page.drawRectangle({
+      x: chipX,
+      y: chipY - chipHeight + 3,
+      width: chipWidth,
+      height: chipHeight,
+      color: COLORS.accentSoft,
+      borderColor: COLORS.border,
+      borderWidth: 1,
+    });
+    page.drawText(ellipsizeToWidth(label, regularFont, 9, chipWidth - 12), {
+      x: chipX + 6,
+      y: chipY - 12,
+      size: 9,
+      font: regularFont,
+      color: COLORS.brandDark,
+    });
+    chipX += chipWidth + chipGap;
+  });
+
+  return boxY - 18;
+};
+
 const triggerPdfDownload = (filename: string, bytes: Uint8Array): void => {
   const blobBytes = Uint8Array.from(bytes);
   const blob = new Blob([blobBytes], { type: 'application/pdf' });
@@ -373,85 +909,19 @@ export async function exportPropertyPdf(input: PropertyPdfExportInput): Promise<
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   let state = addPdfPage(pdfDoc);
 
-  state.page.drawText(sections.heading, {
-    x: PAGE.marginX,
-    y: state.cursorY,
-    size: 20,
-    font: boldFont,
-    color: COLORS.text,
-  });
-  state = { ...state, cursorY: state.cursorY - 30 };
+  const image = await loadPropertyImage(pdfDoc, sections.imageUrl);
+  state = { ...state, cursorY: drawHeaderBand(state.page, sections, regularFont, boldFont) };
+  state = {
+    ...state,
+    cursorY: drawTitleBlock(state.page, sections, regularFont, boldFont, image, state.cursorY),
+  };
+  state = drawMetricCards(pdfDoc, state, sections.metrics, regularFont, boldFont);
+  state = drawOverviewGrid(pdfDoc, state, sections.overview, regularFont, boldFont);
+  state = drawNotesSection(pdfDoc, state, sections.notes, regularFont, boldFont);
 
-  state = drawPdfLine(state, sections.subtitle, {
-    font: regularFont,
-    size: 11,
-    x: PAGE.marginX,
-    color: COLORS.muted,
-  });
-  state = drawPdfLine(state, 'Key sections: Deal Metrics, Overview, Notes', {
-    font: regularFont,
-    size: 10,
-    x: PAGE.marginX,
-    color: COLORS.muted,
-  });
-  state = { ...state, cursorY: state.cursorY - 8 };
-
-  state = drawPdfSection(pdfDoc, state, 'Deal Metrics', sections.metrics, regularFont, boldFont);
-  state = drawPdfSection(pdfDoc, state, 'Property Overview', sections.overview, regularFont, boldFont);
-
-  const noteLines = wrapPdfText(sections.notes, regularFont, 10, PAGE.width - PAGE.marginX * 2 - 24);
-  state = ensurePdfSpace(pdfDoc, state, 40 + noteLines.length * 16);
-
-  const noteTop = state.cursorY + 10;
-  const noteWidth = PAGE.width - PAGE.marginX * 2;
-  const noteHeaderHeight = 24;
-  const noteBodyHeight = Math.max(36, noteLines.length * 14 + 16);
-  state.page.drawRectangle({
-    x: PAGE.marginX,
-    y: noteTop - noteHeaderHeight,
-    width: noteWidth,
-    height: noteHeaderHeight,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-    color: COLORS.sectionFill,
-  });
-  state.page.drawRectangle({
-    x: PAGE.marginX,
-    y: noteTop - noteHeaderHeight - noteBodyHeight,
-    width: noteWidth,
-    height: noteBodyHeight,
-    borderColor: COLORS.border,
-    borderWidth: 1,
-  });
-  state.page.drawText('Notes', {
-    x: PAGE.marginX + 12,
-    y: noteTop - 16,
-    size: 11,
-    font: boldFont,
-    color: COLORS.text,
-  });
-  let noteY = noteTop - noteHeaderHeight - 18;
-  for (const line of noteLines) {
-    if (line) {
-      state.page.drawText(line, {
-        x: PAGE.marginX + 12,
-        y: noteY,
-        size: 10,
-        font: regularFont,
-        color: COLORS.text,
-      });
-    }
-    noteY -= 14;
-  }
-
-  const footerText = 'Generated by PropNexus property detail export.';
-  const footerWidth = regularFont.widthOfTextAtSize(footerText, 9);
-  state.page.drawText(footerText, {
-    x: PAGE.width - PAGE.marginX - footerWidth,
-    y: PAGE.marginY - 10,
-    size: 9,
-    font: regularFont,
-    color: COLORS.muted,
+  const pages = pdfDoc.getPages();
+  pages.forEach((page, index) => {
+    drawFooter(page, regularFont, boldFont, sections, index, pages.length);
   });
 
   const bytes = await pdfDoc.save();
