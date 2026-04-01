@@ -59,36 +59,38 @@ jobs:
             --ci \
             --json
 
-      - name: Wait for health
-        env:
-          URL: https://propnexus-backend-production.up.railway.app/health
-        run: |
-          for i in {1..30}; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
-            echo "Health attempt $i -> $code"
-            [ "$code" = "200" ] && echo "✅ Healthy" && exit 0
-            sleep 5
-          done
-          echo "❌ Health check never reached 200"
-          exit 1
-
-      - name: Verify deployed version
+      - name: Wait for expected deployed version
         env:
           URL: https://propnexus-backend-production.up.railway.app/health
           EXPECT_SHA: ${{ github.sha }}
         run: |
-          actual=$(curl -fsSL "$URL" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version",""))')
-          echo "Deployed version: $actual"
-          if [ -z "$actual" ]; then
-            echo "❌ /health did not include a version"
-            exit 1
-          fi
           expect_short="${EXPECT_SHA:0:7}"
 
-          if [ "$actual" = "$EXPECT_SHA" ] || [ "$actual" = "$expect_short" ] || [ "${actual#${EXPECT_SHA}}" != "$actual" ] || [ "${EXPECT_SHA#$actual}" != "$EXPECT_SHA" ]; then
-            echo "✅ Deployed version matches commit"
-            exit 0
-          fi
+          for i in {1..36}; do
+            payload=$(curl -fsSL "$URL" 2>/dev/null || true)
 
-          echo "❌ Deployed version does not match this commit ($EXPECT_SHA)"
+            if [ -z "$payload" ]; then
+              echo "Version attempt $i -> no payload yet"
+              sleep 10
+              continue
+            fi
+
+            actual=$(printf '%s' "$payload" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version",""))')
+            status=$(printf '%s' "$payload" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("status",""))')
+            echo "Version attempt $i -> status=${status:-unknown} version=${actual:-missing}"
+
+            if [ -z "$actual" ]; then
+              sleep 10
+              continue
+            fi
+
+            if [ "$actual" = "$EXPECT_SHA" ] || [ "$actual" = "$expect_short" ] || [ "${actual#${EXPECT_SHA}}" != "$actual" ] || [ "${EXPECT_SHA#$actual}" != "$EXPECT_SHA" ]; then
+              echo "✅ Deployed version matches commit"
+              exit 0
+            fi
+
+            sleep 10
+          done
+
+          echo "❌ Deployed version did not advance to this commit ($EXPECT_SHA) in time"
           exit 1
