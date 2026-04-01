@@ -1,4 +1,4 @@
-// Lightweight CI smoke to ensure checkout + pages + webhook health
+// Lightweight CI smoke to ensure checkout + pages + portal wiring
 // Usage: node frontend/ops/smoke/stripe-check.mjs
 
 const BASE = process.env.BASE_URL?.trim();
@@ -59,19 +59,7 @@ function expect(cond, message) {
     console.log(`✅ ${path} renders`);
   }
 
-  // 4) Webhook “health” ping (optional): supports GET ?health=1, otherwise warn
-  {
-    const healthUrl = `${BASE}/api/stripe/webhook?health=1`;
-    const res = await get(healthUrl);
-    if (res.status >= 200 && res.status < 400) {
-      console.log('✅ Webhook health passes (GET ?health=1 returns OK)');
-    } else {
-      console.warn(`⚠️ Webhook health endpoint not detected (${res.status}).
-Add a GET handler that returns 200 for ?health=1 to silence this warning.`);
-    }
-  }
-
-  // 5) Customer portal endpoint (best-effort)
+  // 4) Customer portal endpoint (best-effort)
   {
     const { res } = await postJSON(`${BASE}/api/stripe/portal`, {});
     if (res.status === 200) {
@@ -80,6 +68,8 @@ Add a GET handler that returns 200 for ?health=1 to silence this warning.`);
       console.warn(`⚠️ /api/stripe/portal returned ${res.status} – acceptable if no stored customer id yet.`);
     }
   }
+
+  console.log('ℹ️ Stripe webhook source of truth is the backend /stripe/webhook route.');
 
   console.log('🎉 Stripe smoke completed OK');
 })().catch(err => {

@@ -194,6 +194,7 @@ FAIL → Next action:
 PASS:
 - Stripe dashboard test event to `$BACKEND_URL/stripe/webhook` returns 2xx.
 - At least one real event shows after a real checkout.
+- Frontend `/api/stripe/webhook` remains disabled so there is no duplicate webhook owner.
 
 FAIL → Next action:
 - Check Railway logs and Stripe “Webhook Attempts”. Verify `STRIPE_WEBHOOK_SECRET`.
