@@ -77,6 +77,19 @@ describe('/api/stripe/portal', () => {
     expect(res.status).toBe(200);
     expect(body).toEqual({ ok: true, url: 'https://billing.stripe.com/p/session_123' });
     expect(mockCustomerSearch).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://backend.example/users/plan?email=mapped%40example.com',
+      expect.objectContaining({
+        method: 'GET',
+        cache: 'no-store',
+      }),
+    );
+    expect(mockPortalCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer: 'cus_mapped_123',
+        return_url: 'http://localhost:3000/account',
+      }),
+    );
   });
 
   it('returns safe 404 when authenticated user has no mapped Stripe customer', async () => {

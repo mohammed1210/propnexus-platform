@@ -49,7 +49,7 @@ async function fetchJsonOrNull(res: Response): Promise<any> {
   return res.json().catch(() => null);
 }
 
-async function getCustomerIdFromUsers(email: string): Promise<string | null> {
+async function getCustomerIdForSignedInUser(email: string): Promise<string | null> {
   const res = await fetch(`${getBackendBase()}/users/plan?email=${encodeURIComponent(email)}`, {
     method: 'GET',
     headers: { 'content-type': 'application/json' },
@@ -93,7 +93,7 @@ export async function POST() {
 
     const stripe = new Stripe(KEY, { apiVersion: '2025-09-30.clover' });
 
-    const customer = await getCustomerIdFromUsers(email);
+    const customer = await getCustomerIdForSignedInUser(email);
 
     if (!customer) {
       return NextResponse.json(
@@ -104,7 +104,7 @@ export async function POST() {
 
     const session = await stripe.billingPortal.sessions.create({
       customer,
-      return_url: `${BASE || 'http://localhost:3000'}/billing/account`,
+      return_url: `${BASE || 'http://localhost:3000'}/account`,
     });
 
     return NextResponse.json({ ok: true, url: session.url });
