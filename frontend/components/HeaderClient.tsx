@@ -111,7 +111,7 @@ export default function HeaderClient() {
           {authed ? (
             <>
               <Link
-                href="/billing/account"
+                href="/account"
                 className="rounded-md border border-zinc-200 dark:border-zinc-700 px-3 py-2 text-sm font-medium hover:bg-zinc-50 dark:hover:bg-zinc-800"
                 aria-label="Open billing and manage subscription"
               >
