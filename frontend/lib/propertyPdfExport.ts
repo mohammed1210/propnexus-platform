@@ -36,6 +36,7 @@ type PropertyPdfSections = {
   metrics: ExportMetric[];
   overview: ExportMetric[];
   notes: string;
+  hasNarrativeDescription: boolean;
   exportedAt: string;
   sourceUrl: string;
   imageUrl?: string;
@@ -220,7 +221,8 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
     { label: 'Source URL', value: sourceUrl },
   ];
 
-  const notes = getText(property.description) ?? createEmptyNotesState(property);
+  const description = getText(property.description);
+  const notes = description ?? createEmptyNotesState(property);
 
   return {
     brandTitle: 'PropNexus',
@@ -236,6 +238,7 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
     metrics,
     overview,
     notes,
+    hasNarrativeDescription: Boolean(description),
     exportedAt,
     sourceUrl,
     imageUrl: resolvePrimaryImageUrl(property),
@@ -265,6 +268,16 @@ const COLORS = {
 const IMAGE_BOX = {
   width: 212,
   height: 146,
+};
+
+const CONTENT_BOTTOM_Y = PAGE.marginY + 34;
+
+const SECTION_SPACING = {
+  titleBottom: 14,
+  metricsTop: 2,
+  metricsBottom: 2,
+  overviewBottom: 10,
+  notesBottom: 12,
 };
 
 type PdfState = {
@@ -331,8 +344,12 @@ const ensurePdfSpace = (
   state: PdfState,
   heightNeeded: number,
 ): PdfState => {
-  if (state.cursorY - heightNeeded >= PAGE.marginY + 34) return state;
+  if (state.cursorY - heightNeeded >= CONTENT_BOTTOM_Y) return state;
   return addPdfPage(pdfDoc);
+};
+
+const getAvailableContentHeight = (state: PdfState): number => {
+  return Math.max(0, state.cursorY - CONTENT_BOTTOM_Y);
 };
 
 const ellipsizeToWidth = (text: string, font: PDFFont, size: number, maxWidth: number): string => {
@@ -467,7 +484,7 @@ const drawMetricCards = (
   const columns = 3;
   const gap = 12;
   const cardWidth = (PAGE.width - PAGE.marginX * 2 - gap * (columns - 1)) / columns;
-  const cardHeight = 72;
+  const cardHeight = 64;
 
   metrics.forEach((metric, index) => {
     const row = Math.floor(index / columns);
@@ -493,14 +510,14 @@ const drawMetricCards = (
     });
     next.page.drawText(metric.label, {
       x: x + 12,
-      y: y - 24,
+      y: y - 21,
       size: 9,
       font: regularFont,
       color: COLORS.muted,
     });
     next.page.drawText(metric.value || 'N/A', {
       x: x + 12,
-      y: y - 48,
+      y: y - 43,
       size: 18,
       font: boldFont,
       color: COLORS.brandDark,
@@ -508,7 +525,10 @@ const drawMetricCards = (
   });
 
   const rows = Math.ceil(metrics.length / columns);
-  return { ...next, cursorY: next.cursorY - rows * (cardHeight + gap) - 8 };
+  return {
+    ...next,
+    cursorY: next.cursorY - rows * (cardHeight + gap) + SECTION_SPACING.metricsBottom,
+  };
 };
 
 const drawOverviewGrid = (
@@ -521,10 +541,10 @@ const drawOverviewGrid = (
   let next = ensurePdfSpace(pdfDoc, state, 170);
   const boxTop = next.cursorY + 8;
   const boxWidth = PAGE.width - PAGE.marginX * 2;
-  const headerHeight = 26;
-  const rowHeight = 28;
+  const headerHeight = 24;
+  const rowHeight = 24;
   const rows = Math.ceil(items.length / 2);
-  const bodyHeight = rows * rowHeight + 18;
+  const bodyHeight = rows * rowHeight + 14;
   const leftX = PAGE.marginX + 14;
   const rightX = PAGE.marginX + boxWidth / 2 + 10;
   const columnWidth = boxWidth / 2 - 24;
@@ -559,7 +579,7 @@ const drawOverviewGrid = (
     const row = Math.floor(index / 2);
     const isRight = index % 2 === 1;
     const baseX = isRight ? rightX : leftX;
-    const topY = boxTop - headerHeight - 18 - row * rowHeight;
+    const topY = boxTop - headerHeight - 16 - row * rowHeight;
     next.page.drawText(item.label, {
       x: baseX,
       y: topY,
@@ -571,7 +591,7 @@ const drawOverviewGrid = (
     valueLines.forEach((line, lineIndex) => {
       next.page.drawText(line, {
         x: baseX,
-        y: topY - 12 - lineIndex * 10,
+        y: topY - 11 - lineIndex * 10,
         size: 10,
         font: lineIndex === 0 ? boldFont : regularFont,
         color: COLORS.text,
@@ -579,72 +599,153 @@ const drawOverviewGrid = (
     });
   });
 
-  return { ...next, cursorY: boxTop - headerHeight - bodyHeight - 16 };
+  return {
+    ...next,
+    cursorY: boxTop - headerHeight - bodyHeight - SECTION_SPACING.overviewBottom,
+  };
+};
+
+type NotesLayout = {
+  title: string;
+  lines: string[];
+  bodyHeight: number;
+  headerHeight: number;
+  lineHeight: number;
+  fontSize: number;
+  compact: boolean;
+};
+
+const buildNotesLayout = (
+  notes: string,
+  hasNarrativeDescription: boolean,
+  regularFont: PDFFont,
+): NotesLayout => {
+  const compact = !hasNarrativeDescription;
+  const fontSize = compact ? 10 : 10.5;
+  const lineHeight = compact ? 13 : 15;
+  const headerHeight = compact ? 24 : 26;
+  const title = compact ? 'Summary Snapshot' : 'Executive Summary';
+  const lines = wrapPdfText(notes, regularFont, fontSize, PAGE.width - PAGE.marginX * 2 - 24);
+  const minBodyHeight = compact ? 34 : 52;
+  const padding = compact ? 12 : 18;
+
+  return {
+    title,
+    lines,
+    bodyHeight: Math.max(minBodyHeight, lines.length * lineHeight + padding),
+    headerHeight,
+    lineHeight,
+    fontSize,
+    compact,
+  };
+};
+
+const getNotesSectionHeight = (layout: NotesLayout): number => {
+  return layout.headerHeight + layout.bodyHeight + SECTION_SPACING.notesBottom;
+};
+
+const getNotesLinesPerPage = (availableHeight: number, layout: NotesLayout): number => {
+  const usableBodyHeight = Math.max(0, availableHeight - layout.headerHeight - SECTION_SPACING.notesBottom);
+  return Math.max(0, Math.floor((usableBodyHeight - 12) / layout.lineHeight));
+};
+
+const drawNotesBlock = (
+  state: PdfState,
+  layout: NotesLayout,
+  lines: string[],
+  regularFont: PDFFont,
+  boldFont: PDFFont,
+  title: string,
+): PdfState => {
+  const boxTop = state.cursorY + 8;
+
+  state.page.drawRectangle({
+    x: PAGE.marginX,
+    y: boxTop - layout.headerHeight,
+    width: PAGE.width - PAGE.marginX * 2,
+    height: layout.headerHeight,
+    color: COLORS.sectionFill,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+  });
+  state.page.drawRectangle({
+    x: PAGE.marginX,
+    y: boxTop - layout.headerHeight - layout.bodyHeight,
+    width: PAGE.width - PAGE.marginX * 2,
+    height: layout.bodyHeight,
+    color: COLORS.panelFill,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+  });
+  state.page.drawText(title, {
+    x: PAGE.marginX + 12,
+    y: boxTop - 17,
+    size: 12,
+    font: boldFont,
+    color: COLORS.brandDark,
+  });
+
+  let textY = boxTop - layout.headerHeight - (layout.compact ? 14 : 18);
+  lines.forEach((line) => {
+    if (line) {
+      state.page.drawText(line, {
+        x: PAGE.marginX + 12,
+        y: textY,
+        size: layout.fontSize,
+        font: regularFont,
+        color: COLORS.text,
+      });
+    }
+    textY -= layout.lineHeight;
+  });
+
+  return {
+    ...state,
+    cursorY: boxTop - layout.headerHeight - layout.bodyHeight - SECTION_SPACING.notesBottom,
+  };
 };
 
 const drawNotesSection = (
   pdfDoc: PDFDocument,
   state: PdfState,
   notes: string,
+  hasNarrativeDescription: boolean,
   regularFont: PDFFont,
   boldFont: PDFFont,
 ): PdfState => {
-  const lines = wrapPdfText(notes, regularFont, 10.5, PAGE.width - PAGE.marginX * 2 - 24);
+  const layout = buildNotesLayout(notes, hasNarrativeDescription, regularFont);
+  const totalHeight = getNotesSectionHeight(layout);
   let next = state;
+
+  if (getAvailableContentHeight(next) >= totalHeight) {
+    return drawNotesBlock(next, layout, layout.lines, regularFont, boldFont, layout.title);
+  }
+
+  next = addPdfPage(pdfDoc);
+
+  if (getAvailableContentHeight(next) >= totalHeight) {
+    return drawNotesBlock(next, layout, layout.lines, regularFont, boldFont, layout.title);
+  }
+
   let offset = 0;
-  let title = 'Executive Summary';
-
-  while (offset < lines.length) {
-    next = ensurePdfSpace(pdfDoc, next, 150);
-    const availableLines = Math.max(4, Math.floor((next.cursorY - PAGE.marginY - 82) / 15));
-    const slice = lines.slice(offset, offset + availableLines);
-    const headerHeight = 26;
-    const bodyHeight = Math.max(52, slice.length * 15 + 18);
-    const boxTop = next.cursorY + 8;
-
-    next.page.drawRectangle({
-      x: PAGE.marginX,
-      y: boxTop - headerHeight,
-      width: PAGE.width - PAGE.marginX * 2,
-      height: headerHeight,
-      color: COLORS.sectionFill,
-      borderColor: COLORS.border,
-      borderWidth: 1,
-    });
-    next.page.drawRectangle({
-      x: PAGE.marginX,
-      y: boxTop - headerHeight - bodyHeight,
-      width: PAGE.width - PAGE.marginX * 2,
-      height: bodyHeight,
-      color: COLORS.panelFill,
-      borderColor: COLORS.border,
-      borderWidth: 1,
-    });
-    next.page.drawText(title, {
-      x: PAGE.marginX + 12,
-      y: boxTop - 17,
-      size: 12,
-      font: boldFont,
-      color: COLORS.brandDark,
-    });
-
-    let textY = boxTop - headerHeight - 18;
-    slice.forEach((line) => {
-      if (line) {
-        next.page.drawText(line, {
-          x: PAGE.marginX + 12,
-          y: textY,
-          size: 10.5,
-          font: regularFont,
-          color: COLORS.text,
-        });
-      }
-      textY -= 15;
-    });
-
-    next = { ...next, cursorY: boxTop - headerHeight - bodyHeight - 16 };
+  let title = layout.title;
+  while (offset < layout.lines.length) {
+    const availableHeight = getAvailableContentHeight(next);
+    const linesPerPage = Math.max(4, getNotesLinesPerPage(availableHeight, layout));
+    const slice = layout.lines.slice(offset, offset + linesPerPage);
+    const sliceLayout: NotesLayout = {
+      ...layout,
+      bodyHeight: Math.max(
+        layout.compact ? 34 : 52,
+        slice.length * layout.lineHeight + (layout.compact ? 12 : 18),
+      ),
+    };
+    next = drawNotesBlock(next, sliceLayout, slice, regularFont, boldFont, title);
     offset += slice.length;
-    title = 'Executive Summary (continued)';
+    if (offset < layout.lines.length) {
+      next = addPdfPage(pdfDoc);
+      title = `${layout.title} (continued)`;
+    }
   }
 
   return next;
@@ -780,8 +881,8 @@ const drawTitleBlock = (
   image: PDFImage | null,
   startY: number,
 ): number => {
-  const boxY = startY - 182;
-  const boxHeight = 182;
+  const boxY = startY - 168;
+  const boxHeight = 168;
   const boxWidth = PAGE.width - PAGE.marginX * 2;
   page.drawRectangle({
     x: PAGE.marginX,
@@ -824,32 +925,32 @@ const drawTitleBlock = (
   }
 
   const titleLines = wrapPdfTextLines(sections.title, boldFont, 21, textWidth, 2);
-  let cursorY = boxY + boxHeight - 32;
+  let cursorY = boxY + boxHeight - 28;
   titleLines.forEach((line, index) => {
     page.drawText(line, {
       x: textX,
-      y: cursorY - index * 24,
+      y: cursorY - index * 22,
       size: 21,
       font: boldFont,
       color: COLORS.brandDark,
     });
   });
-  cursorY -= titleLines.length * 24 + 6;
+  cursorY -= titleLines.length * 22 + 4;
 
   const locationLines = wrapPdfTextLines(sections.location, regularFont, 12, textWidth, 2);
   locationLines.forEach((line, index) => {
     page.drawText(line, {
       x: textX,
-      y: cursorY - index * 16,
+      y: cursorY - index * 14,
       size: 12,
       font: regularFont,
       color: COLORS.muted,
     });
   });
-  cursorY -= locationLines.length * 16 + 12;
+  cursorY -= locationLines.length * 14 + 10;
 
-  const chipHeight = 24;
-  const chipGap = 8;
+  const chipHeight = 22;
+  const chipGap = 6;
   let chipX = textX;
   let chipY = cursorY;
   sections.titleMeta.forEach((item) => {
@@ -860,7 +961,7 @@ const drawTitleBlock = (
     );
     if (chipX + chipWidth > textX + textWidth) {
       chipX = textX;
-      chipY -= chipHeight + 8;
+      chipY -= chipHeight + 6;
     }
     page.drawRectangle({
       x: chipX,
@@ -873,7 +974,7 @@ const drawTitleBlock = (
     });
     page.drawText(ellipsizeToWidth(label, regularFont, 9, chipWidth - 12), {
       x: chipX + 6,
-      y: chipY - 12,
+      y: chipY - 11,
       size: 9,
       font: regularFont,
       color: COLORS.brandDark,
@@ -881,7 +982,7 @@ const drawTitleBlock = (
     chipX += chipWidth + chipGap;
   });
 
-  return boxY - 18;
+  return boxY - SECTION_SPACING.titleBottom;
 };
 
 const triggerPdfDownload = (filename: string, bytes: Uint8Array): void => {
@@ -915,9 +1016,17 @@ export async function exportPropertyPdf(input: PropertyPdfExportInput): Promise<
     ...state,
     cursorY: drawTitleBlock(state.page, sections, regularFont, boldFont, image, state.cursorY),
   };
+  state = { ...state, cursorY: state.cursorY + SECTION_SPACING.metricsTop };
   state = drawMetricCards(pdfDoc, state, sections.metrics, regularFont, boldFont);
   state = drawOverviewGrid(pdfDoc, state, sections.overview, regularFont, boldFont);
-  state = drawNotesSection(pdfDoc, state, sections.notes, regularFont, boldFont);
+  state = drawNotesSection(
+    pdfDoc,
+    state,
+    sections.notes,
+    sections.hasNarrativeDescription,
+    regularFont,
+    boldFont,
+  );
 
   const pages = pdfDoc.getPages();
   pages.forEach((page, index) => {

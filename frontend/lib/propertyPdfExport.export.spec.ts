@@ -10,12 +10,22 @@ const mockDrawText = jest.fn();
 const mockDrawRectangle = jest.fn();
 const mockDrawLine = jest.fn();
 const mockDrawImage = jest.fn();
-const mockAddPage = jest.fn(() => ({
-  drawText: mockDrawText,
-  drawRectangle: mockDrawRectangle,
-  drawLine: mockDrawLine,
-  drawImage: mockDrawImage,
-}));
+const mockPages: Array<{
+  drawText: typeof mockDrawText;
+  drawRectangle: typeof mockDrawRectangle;
+  drawLine: typeof mockDrawLine;
+  drawImage: typeof mockDrawImage;
+}> = [];
+const mockAddPage = jest.fn(() => {
+  const page = {
+    drawText: mockDrawText,
+    drawRectangle: mockDrawRectangle,
+    drawLine: mockDrawLine,
+    drawImage: mockDrawImage,
+  };
+  mockPages.push(page);
+  return page;
+});
 
 jest.mock('pdf-lib', () => ({
   PDFDocument: {
@@ -24,7 +34,7 @@ jest.mock('pdf-lib', () => ({
       embedFont: mockEmbedFont,
       embedJpg: mockEmbedJpg,
       embedPng: mockEmbedPng,
-      getPages: () => [mockAddPage.mock.results[0]?.value ?? mockAddPage()],
+      getPages: () => mockPages,
       save: mockSave,
     })),
   },
@@ -43,6 +53,7 @@ describe('exportPropertyPdf', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPages.length = 0;
     URL.createObjectURL = jest.fn(() => 'blob:mock-pdf');
     URL.revokeObjectURL = jest.fn();
     global.fetch = jest.fn(async () =>
@@ -60,7 +71,7 @@ describe('exportPropertyPdf', () => {
     global.fetch = oldFetch;
   });
 
-  it('renders a non-empty PDF payload and triggers a download', async () => {
+  it('keeps a short executive summary on page 1 and triggers a download', async () => {
     const { exportPropertyPdf } = await import('./propertyPdfExport');
 
     await exportPropertyPdf({
@@ -95,6 +106,7 @@ describe('exportPropertyPdf', () => {
       'Key Investment Metrics',
       expect.objectContaining({ size: 13 }),
     );
+    expect(mockAddPage).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledWith('https://images.example.com/cover.jpg');
     expect(mockSave).toHaveBeenCalledTimes(1);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
@@ -124,17 +136,57 @@ describe('exportPropertyPdf', () => {
     expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('handles long titles and missing notes without producing an unfinished export', async () => {
+  it('uses a compact summary block for missing narrative without creating a mostly empty second page', async () => {
     const { exportPropertyPdf } = await import('./propertyPdfExport');
 
     await exportPropertyPdf({
-      propertyId: 'prop-long-title',
+      propertyId: 'prop-no-description',
+      property: {
+        title: 'Compact Summary Deal',
+        location: 'South East London',
+        property_type: 'House',
+        investment_type: 'BRRR',
+      },
+      price: 395000,
+      yieldPercent: 5.4,
+      roiPercent: 9.2,
+    });
+
+    expect(mockAddPage).toHaveBeenCalledTimes(1);
+    expect(
+      mockDrawText.mock.calls.some(
+        ([text, options]) =>
+          typeof text === 'string' &&
+          text.includes('Summary Snapshot') &&
+          options &&
+          (options as { size?: number }).size === 12,
+      ),
+    ).toBe(true);
+    expect(
+      mockDrawText.mock.calls.some(
+        ([text, options]) =>
+          typeof text === 'string' &&
+          text.includes('does not currently include a narrative description') &&
+          options &&
+          (options as { size?: number }).size === 10,
+      ),
+    ).toBe(true);
+  });
+
+  it('creates page 2 only when longer narrative text genuinely overflows', async () => {
+    const { exportPropertyPdf } = await import('./propertyPdfExport');
+
+    await exportPropertyPdf({
+      propertyId: 'prop-long-summary',
       property: {
         title:
           'Exceptional semi-detached investment opportunity with extensive refurbishment upside and strong commuter demand',
         location: 'South East London',
         property_type: 'House',
         investment_type: 'BRRR',
+        description: Array.from({ length: 18 }, () =>
+          'This asset combines strong rental demand, realistic refurbishment upside, and a clear refinance pathway for an investor seeking durable cash flow.',
+        ).join(' '),
       },
       price: 395000,
       yieldPercent: 5.4,
@@ -150,13 +202,10 @@ describe('exportPropertyPdf', () => {
           (options as { size?: number }).size === 21,
       ),
     ).toBe(true);
+    expect(mockAddPage).toHaveBeenCalledTimes(2);
     expect(
       mockDrawText.mock.calls.some(
-        ([text, options]) =>
-          typeof text === 'string' &&
-          text.includes('does not currently include a narrative description') &&
-          options &&
-          (options as { size?: number }).size === 10.5,
+        ([text]) => typeof text === 'string' && text.includes('Executive Summary'),
       ),
     ).toBe(true);
   });

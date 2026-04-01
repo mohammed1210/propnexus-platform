@@ -143,6 +143,20 @@ describe('propertyPdfExport rent parsing', () => {
 
     expect(sections.notes).toContain('does not currently include a narrative description');
     expect(sections.notes).not.toBe('No description provided.');
+    expect(sections.hasNarrativeDescription).toBe(false);
+  });
+
+  it('marks real narrative descriptions so the paginator can prefer the full summary block', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p8b',
+      property: {
+        title: 'Narrative Deal',
+        location: 'Birmingham',
+        description: 'Short but real investor summary.',
+      },
+    });
+
+    expect(sections.hasNarrativeDescription).toBe(true);
   });
 
   it('captures the primary property image URL when available', () => {
