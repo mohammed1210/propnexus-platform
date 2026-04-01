@@ -19,16 +19,10 @@ This document details the completion of Sprint 10, which focused on finalizing t
 
 #### Frontend Webhook Handler
 - **File**: `frontend/app/api/stripe/webhook/route.ts`
-- **Changes**:
-  - Implemented complete webhook event handling for checkout completion
-  - Added handlers for subscription lifecycle events (created, updated, deleted)
-  - Added detailed logging for monitoring and debugging
-  - Note: Backend webhook handles actual database updates; frontend is for monitoring
-- **Events Handled**:
-  - `checkout.session.completed` - When a customer completes checkout
-  - `customer.subscription.created` - When a subscription is created
-  - `customer.subscription.updated` - When a subscription is modified
-  - `customer.subscription.deleted` - When a subscription is cancelled
+- **Historical note**:
+  - This sprint originally introduced a frontend webhook handler.
+  - Current production architecture no longer uses it as a webhook consumer.
+  - On main, the frontend route is intentionally disabled and Stripe should not send events to it.
 
 #### Backend Webhook Handler
 - **File**: `backend/routes/stripe_webhook.py`
@@ -158,15 +152,14 @@ Ensure all required environment variables are set in:
 - Supabase project settings
 
 ### Webhook Configuration
-- Frontend webhook: `https://your-domain.vercel.app/api/stripe/webhook`
-- Backend webhook: `https://your-backend.railway.app/stripe/webhook`
-- Configure both in Stripe Dashboard under Webhooks
+- Current production webhook: `https://your-backend.railway.app/stripe/webhook`
+- Frontend `https://your-domain.vercel.app/api/stripe/webhook` is disabled on main and should not be configured in Stripe Dashboard.
 
 ## Files Modified/Created
 
 ### Modified
 - `frontend/tsconfig.json` - Fixed duplicate plugins
-- `frontend/app/api/stripe/webhook/route.ts` - Completed webhook handlers
+- `frontend/app/api/stripe/webhook/route.ts` - Historical implementation later disabled in favor of backend-only webhook ownership
 - `frontend/app/admin/page.tsx` - Implemented real dashboard
 
 ### Created
@@ -180,7 +173,7 @@ Ensure all required environment variables are set in:
 2. Implement caching for admin statistics
 3. Add more detailed logging for webhook events
 4. Create automated tests for webhook handlers
-5. Add monitoring/alerting for failed webhook deliveries
+5. Maintain monitoring/alerting on the backend webhook owner
 
 ### PO3+ Features (Future Sprints)
 - Rate limiting implementation

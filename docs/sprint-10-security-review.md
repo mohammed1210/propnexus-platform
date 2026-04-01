@@ -16,7 +16,7 @@ This document summarizes the security review of Sprint 10 changes for the PropNe
 
 ### Application Code
 - `frontend/app/admin/page.tsx` - Admin dashboard implementation
-- `frontend/app/api/stripe/webhook/route.ts` - Webhook handler
+- `frontend/app/api/stripe/webhook/route.ts` - Historical frontend webhook route (disabled on current main)
 - `backend/tests/test_stripe_webhook.py` - Test file
 
 ### Database
@@ -78,17 +78,15 @@ This document summarizes the security review of Sprint 10 changes for the PropNe
 
 **Potential Concerns:** None identified
 
-### Stripe Webhook (frontend/app/api/stripe/webhook/route.ts)
-**Security Features:**
-- Verifies Stripe webhook signatures
-- Uses official Stripe SDK
-- Proper error handling with logging
-- Returns generic error messages to client
+### Stripe Webhook (historical frontend route)
+**Status on current main:**
+- `frontend/app/api/stripe/webhook/route.ts` is intentionally disabled.
+- Production webhook ownership lives on backend `/stripe/webhook`.
 
-**Improvements Made:**
-- Added structured logging with timestamps
-- Enhanced error context for debugging
-- Added TODO for monitoring service integration
+**Current security/observability position:**
+- Backend webhook verifies signatures and applies dedicated rate limiting.
+- Success and failure paths emit structured monitoring events.
+- Frontend no longer acts as a second webhook consumer.
 
 ### Database Schema (supabase/schema.sql)
 **Security Features:**
