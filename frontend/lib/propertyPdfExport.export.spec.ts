@@ -99,14 +99,18 @@ describe('exportPropertyPdf', () => {
       expect.objectContaining({ size: 13 }),
     );
     expect(mockDrawText).toHaveBeenCalledWith(
-      'Property Deal Export',
+      'Investor Deal Pack',
       expect.objectContaining({ size: 24 }),
     );
     expect(mockDrawText).toHaveBeenCalledWith(
-      'Key Investment Metrics',
-      expect.objectContaining({ size: 13 }),
+      'Deal Snapshot',
+      expect.objectContaining({ size: 14 }),
     );
-    expect(mockAddPage).toHaveBeenCalledTimes(1);
+    expect(mockDrawText).toHaveBeenCalledWith(
+      'Deal Highlights',
+      expect.objectContaining({ size: 12 }),
+    );
+    expect(mockAddPage).toHaveBeenCalledTimes(2);
     expect(global.fetch).toHaveBeenCalledWith('https://images.example.com/cover.jpg');
     expect(mockSave).toHaveBeenCalledTimes(1);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
@@ -132,6 +136,11 @@ describe('exportPropertyPdf', () => {
     });
 
     expect(mockDrawImage).not.toHaveBeenCalled();
+    expect(
+      mockDrawText.mock.calls.some(
+        ([text]) => typeof text === 'string' && text.includes('Property imagery unavailable'),
+      ),
+    ).toBe(true);
     expect(mockSave).toHaveBeenCalledTimes(1);
     expect(clickSpy).toHaveBeenCalledTimes(1);
   });
@@ -152,7 +161,7 @@ describe('exportPropertyPdf', () => {
       roiPercent: 9.2,
     });
 
-    expect(mockAddPage).toHaveBeenCalledTimes(1);
+    expect(mockAddPage).toHaveBeenCalledTimes(2);
     expect(
       mockDrawText.mock.calls.some(
         ([text, options]) =>
@@ -168,7 +177,7 @@ describe('exportPropertyPdf', () => {
           typeof text === 'string' &&
           text.includes('does not currently include a narrative description') &&
           options &&
-          (options as { size?: number }).size === 10,
+          (options as { size?: number }).size === 9.5,
       ),
     ).toBe(true);
   });
@@ -199,7 +208,7 @@ describe('exportPropertyPdf', () => {
           typeof text === 'string' &&
           text.includes('Exceptional') &&
           options &&
-          (options as { size?: number }).size === 21,
+          (options as { size?: number }).size === 19,
       ),
     ).toBe(true);
     expect(mockAddPage).toHaveBeenCalledTimes(2);

@@ -152,11 +152,34 @@ describe('propertyPdfExport rent parsing', () => {
       property: {
         title: 'Narrative Deal',
         location: 'Birmingham',
-        description: 'Short but real investor summary.',
+        description:
+          'Strong local rental demand, refurbishment upside, close to the station, and clear potential to improve exit value.',
       },
     });
 
     expect(sections.hasNarrativeDescription).toBe(true);
+    expect(sections.highlights.length).toBeGreaterThan(0);
+    expect(sections.notes).not.toBe(sections.highlights.join('. '));
+  });
+
+  it('extracts concise highlights from bullet-style or comma-separated descriptions', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p8c',
+      property: {
+        title: 'Highlights Deal',
+        location: 'Nottingham',
+        description:
+          '• Close to the city centre, * newly refurbished kitchen, strong tenant demand, excellent commuter links, attractive yield profile',
+      },
+    });
+
+    expect(sections.highlights).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Close to the city centre'),
+        expect.stringContaining('newly refurbished kitchen'),
+      ]),
+    );
+    expect(sections.highlights.length).toBeLessThanOrEqual(6);
   });
 
   it('captures the primary property image URL when available', () => {
