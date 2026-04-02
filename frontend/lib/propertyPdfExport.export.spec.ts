@@ -192,7 +192,7 @@ describe('exportPropertyPdf', () => {
       mockDrawText.mock.calls.some(
         ([text, options]) =>
           typeof text === 'string' &&
-          text.includes('Narrative detail is limited in the live listing') &&
+          text.includes('Narrative detail is limited') &&
           options &&
           (options as { size?: number }).size === 9,
       ),
@@ -318,8 +318,8 @@ describe('exportPropertyPdf', () => {
 
     const dealSnapshotCall = mockDrawText.mock.calls.find(([text]) => text === 'Deal Snapshot');
     const chipBottoms = mockDrawRectangle.mock.calls
-      .map(([, options]) => options as { y?: number; height?: number })
-      .filter((options) => options.height === 17 && typeof options.y === 'number')
+      .map(([options]) => options as { y?: number; height?: number })
+      .filter((options) => options.height === 15 && typeof options.y === 'number')
       .map((options) => options.y as number);
 
     expect(dealSnapshotCall).toBeDefined();

@@ -711,7 +711,7 @@ const HERO_IMAGE = {
 const CONTENT_BOTTOM_Y = PAGE.marginY + 24;
 
 const SECTION_SPACING = {
-  titleBottom: 18,
+  titleBottom: 12,
   metricsTop: 0,
   metricsBottom: 2,
   overviewBottom: 8,
@@ -1561,9 +1561,15 @@ const drawTitleBlock = (
   const boxWidth = PAGE.width - PAGE.marginX * 2;
   const textX = PAGE.marginX + 18;
   const textWidth = boxWidth - 36;
-  const chipHeight = 17;
-  const chipGap = 6;
-  const chipRowGap = 6;
+  const titleLineHeight = 15;
+  const titleGap = 3;
+  const locationLineHeight = 10;
+  const locationGap = 5;
+  const chipHeight = 15;
+  const chipGap = 5;
+  const chipRowGap = 5;
+  const footerTitleInset = 10;
+  const footerBottomPadding = 2;
   const titleLines = wrapPdfTextLines(sections.title, boldFont, 18, textWidth, 2);
   const locationLines = wrapPdfTextLines(sections.location, regularFont, 10, textWidth, 2);
   let chipRows = sections.titleMeta.length ? 1 : 0;
@@ -1572,7 +1578,7 @@ const drawTitleBlock = (
   sections.titleMeta.forEach((item) => {
     const chipWidth = Math.min(
       textWidth,
-      regularFont.widthOfTextAtSize(`${item.label}: ${item.value}`, 9) + 20,
+      regularFont.widthOfTextAtSize(`${item.label}: ${item.value}`, 8.5) + 18,
     );
     if (chipRowWidth > 0 && chipRowWidth + chipWidth > textWidth) {
       chipRows += 1;
@@ -1581,14 +1587,14 @@ const drawTitleBlock = (
     chipRowWidth += chipWidth + chipGap;
   });
 
-  const titleCursorOffset = HERO_IMAGE.footerHeight - 14;
-  const locationCursorOffset = titleCursorOffset - titleLines.length * 16 - 4;
-  const chipCursorOffset = locationCursorOffset - locationLines.length * 11 - 7;
+  const titleCursorOffset = HERO_IMAGE.footerHeight - footerTitleInset;
+  const locationCursorOffset = titleCursorOffset - titleLines.length * titleLineHeight - titleGap;
+  const chipCursorOffset = locationCursorOffset - locationLines.length * locationLineHeight - locationGap;
   const contentBottomOffset =
     chipRows > 0
-      ? chipCursorOffset - (chipRows - 1) * (chipHeight + chipRowGap) - chipHeight + 3
+      ? chipCursorOffset - (chipRows - 1) * (chipHeight + chipRowGap) - chipHeight + 2
       : chipCursorOffset;
-  const footerHeight = HERO_IMAGE.footerHeight + Math.max(0, 10 - contentBottomOffset);
+  const footerHeight = HERO_IMAGE.footerHeight + Math.max(0, footerBottomPadding - contentBottomOffset);
   const boxHeight = HERO_IMAGE.height + footerHeight;
   const boxY = startY - boxHeight;
   page.drawRectangle({
@@ -1711,29 +1717,28 @@ const drawTitleBlock = (
     color: COLORS.brand,
   });
 
-  let cursorY = footerY + footerHeight - 14;
+  let cursorY = footerY + footerHeight - footerTitleInset;
   titleLines.forEach((line, index) => {
     page.drawText(line, {
       x: textX,
-      y: cursorY - index * 16,
+      y: cursorY - index * titleLineHeight,
       size: 18,
       font: boldFont,
       color: COLORS.brandDark,
     });
   });
-  cursorY -= titleLines.length * 16 + 4;
+  cursorY -= titleLines.length * titleLineHeight + titleGap;
 
-  const locationLines = wrapPdfTextLines(sections.location, regularFont, 10, textWidth, 2);
   locationLines.forEach((line, index) => {
     page.drawText(line, {
       x: textX,
-      y: cursorY - index * 11,
-      size: 10,
+      y: cursorY - index * locationLineHeight,
+      size: 9.5,
       font: regularFont,
       color: COLORS.muted,
     });
   });
-  cursorY -= locationLines.length * 11 + 7;
+  cursorY -= locationLines.length * locationLineHeight + locationGap;
 
   let chipX = textX;
   let chipY = cursorY;
@@ -1741,25 +1746,25 @@ const drawTitleBlock = (
     const label = `${item.label}: ${item.value}`;
     const chipWidth = Math.min(
       textWidth,
-      regularFont.widthOfTextAtSize(label, 9) + 20,
+      regularFont.widthOfTextAtSize(label, 8.5) + 18,
     );
     if (chipX + chipWidth > textX + textWidth) {
       chipX = textX;
-      chipY -= chipHeight + 6;
+      chipY -= chipHeight + chipRowGap;
     }
     page.drawRectangle({
       x: chipX,
-      y: chipY - chipHeight + 3,
+      y: chipY - chipHeight + 2,
       width: chipWidth,
       height: chipHeight,
       color: COLORS.highlightFill,
       borderColor: COLORS.border,
       borderWidth: 1,
     });
-    page.drawText(ellipsizeToWidth(label, regularFont, 9, chipWidth - 12), {
+    page.drawText(ellipsizeToWidth(label, regularFont, 8.5, chipWidth - 10), {
       x: chipX + 6,
-      y: chipY - 9,
-      size: 8,
+      y: chipY - 8,
+      size: 7.5,
       font: regularFont,
       color: COLORS.brandDark,
     });
