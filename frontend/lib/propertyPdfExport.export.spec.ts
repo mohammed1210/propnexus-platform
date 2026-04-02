@@ -194,7 +194,7 @@ describe('exportPropertyPdf', () => {
           typeof text === 'string' &&
           text.includes('does not currently include a narrative description') &&
           options &&
-          (options as { size?: number }).size === 9.5,
+          (options as { size?: number }).size === 9,
       ),
     ).toBe(true);
   });
@@ -225,7 +225,7 @@ describe('exportPropertyPdf', () => {
           typeof text === 'string' &&
           text.includes('Exceptional') &&
           options &&
-          (options as { size?: number }).size === 20,
+          (options as { size?: number }).size === 18,
       ),
     ).toBe(true);
     expect(mockAddPage).toHaveBeenCalledTimes(2);

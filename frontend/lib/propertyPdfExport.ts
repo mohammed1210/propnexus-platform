@@ -345,8 +345,7 @@ export const createInvestmentInsight = (input: PropertyPdfExportInput): string =
   const property = input.property ?? {};
   const location = getText(property.location) ?? 'the stated location';
   const propertyType = getText(property.propertyType ?? property.property_type) ?? 'property';
-  const investmentType =
-    getText(property.investmentType ?? property.investment_type) ?? 'investment opportunity';
+  const investmentType = getText(property.investmentType ?? property.investment_type) ?? 'investment';
   const bedrooms = toNumber(property.bedrooms);
   const description = getText(property.description);
   const highlights = extractDealHighlights(
@@ -436,13 +435,17 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
   }
   const derivedYield = getYieldPercent(mergedMetricsSource) ?? undefined;
   const derivedRoi = getRoiDisplay(mergedMetricsSource).value ?? undefined;
+  const derivedDiscount =
+    typeof input.discountPercent === 'number'
+      ? input.discountPercent
+      : toNumber(property.discount_percent ?? property.discount_estimate_pct);
 
   const metrics: ExportMetric[] = [
     { label: 'Price', value: formatCurrency(price) },
     { label: 'Estimated Rent (PCM)', value: formatCurrency(rent) },
     { label: 'Yield', value: formatPercent(derivedYield) },
     { label: 'ROI', value: formatPercent(derivedRoi) },
-    { label: 'Discount', value: formatPercent(input.discountPercent) },
+    { label: 'Discount', value: formatPercent(derivedDiscount) },
     {
       label: 'AI Score',
       value: typeof input.aiScore === 'number' ? `${input.aiScore.toFixed(1)}/10` : 'N/A',
@@ -516,8 +519,8 @@ const COLORS = {
 };
 
 const HERO_IMAGE = {
-  height: 156,
-  footerHeight: 72,
+  height: 124,
+  footerHeight: 58,
 };
 
 const CONTENT_BOTTOM_Y = PAGE.marginY + 24;
@@ -721,7 +724,7 @@ const drawMetricCards = (
   regularFont: PDFFont,
   boldFont: PDFFont,
 ): PdfState => {
-  let next = ensurePdfSpace(pdfDoc, state, 136);
+  let next = ensurePdfSpace(pdfDoc, state, 126);
   next.page.drawText('Deal Snapshot', {
     x: PAGE.marginX,
     y: next.cursorY,
@@ -736,12 +739,12 @@ const drawMetricCards = (
     font: regularFont,
     color: COLORS.muted,
   });
-  next = { ...next, cursorY: next.cursorY - 26 };
+  next = { ...next, cursorY: next.cursorY - 24 };
 
   const columns = 3;
-  const gap = 10;
+  const gap = 7;
   const cardWidth = (PAGE.width - PAGE.marginX * 2 - gap * (columns - 1)) / columns;
-  const cardHeight = 52;
+  const cardHeight = 46;
 
   metrics.forEach((metric, index) => {
     const row = Math.floor(index / columns);
@@ -798,11 +801,11 @@ const drawHighlightsSection = (
 ): PdfState => {
   const contentWidth = PAGE.width - PAGE.marginX * 2 - 30;
   const bulletLayouts = highlights.map((highlight) =>
-    wrapPdfTextLines(highlight, regularFont, 9.5, contentWidth - 16, 2),
+    wrapPdfTextLines(highlight, regularFont, 9, contentWidth - 16, 2),
   );
   const bodyHeight = Math.max(
-    48,
-    bulletLayouts.reduce((total, lines) => total + lines.length * 10 + 6, 14),
+    42,
+    bulletLayouts.reduce((total, lines) => total + lines.length * 9 + 5, 12),
   );
 
   let next = ensurePdfSpace(pdfDoc, state, bodyHeight + 46);
@@ -843,7 +846,7 @@ const drawHighlightsSection = (
     color: COLORS.muted,
   });
 
-  let bulletY = boxTop - headerHeight - 13;
+  let bulletY = boxTop - headerHeight - 12;
   bulletLayouts.forEach((lines, index) => {
     next.page.drawRectangle({
       x: PAGE.marginX + 13,
@@ -864,13 +867,13 @@ const drawHighlightsSection = (
     lines.forEach((line, lineIndex) => {
       next.page.drawText(line, {
         x: PAGE.marginX + 28,
-        y: bulletY - lineIndex * 10,
-        size: 9.5,
+        y: bulletY - lineIndex * 9,
+        size: 9,
         font: regularFont,
         color: COLORS.text,
       });
     });
-    bulletY -= lines.length * 10 + 6;
+    bulletY -= lines.length * 9 + 5;
   });
 
   return {
@@ -889,12 +892,12 @@ const drawInvestmentInsightSection = (
   const lines = wrapPdfTextLines(
     investmentInsight,
     regularFont,
-    9.5,
+    9,
     PAGE.width - PAGE.marginX * 2 - 28,
-    5,
+    3,
   );
   const headerHeight = 24;
-  const bodyHeight = Math.max(42, lines.length * 10 + 14);
+  const bodyHeight = Math.max(34, lines.length * 9 + 10);
   let next = ensurePdfSpace(pdfDoc, state, headerHeight + bodyHeight + 14);
   const boxTop = next.cursorY + 6;
   const boxWidth = PAGE.width - PAGE.marginX * 2;
@@ -928,11 +931,11 @@ const drawInvestmentInsightSection = (
     next.page.drawText(line, {
       x: PAGE.marginX + 12,
       y: textY,
-      size: 9.5,
+      size: 9,
       font: regularFont,
       color: COLORS.text,
     });
-    textY -= 10;
+    textY -= 9;
   });
 
   return {
@@ -948,13 +951,13 @@ const drawOverviewGrid = (
   regularFont: PDFFont,
   boldFont: PDFFont,
 ): PdfState => {
-  let next = ensurePdfSpace(pdfDoc, state, 132);
+  let next = ensurePdfSpace(pdfDoc, state, 118);
   const boxTop = next.cursorY + 6;
   const boxWidth = PAGE.width - PAGE.marginX * 2;
   const headerHeight = 22;
-  const rowHeight = 24;
+  const rowHeight = 20;
   const rows = Math.ceil(items.length / 2);
-  const bodyHeight = rows * rowHeight + 10;
+  const bodyHeight = rows * rowHeight + 8;
   const leftX = PAGE.marginX + 14;
   const rightX = PAGE.marginX + boxWidth / 2 + 12;
   const columnWidth = boxWidth / 2 - 28;
@@ -989,7 +992,7 @@ const drawOverviewGrid = (
     const row = Math.floor(index / 2);
     const isRight = index % 2 === 1;
     const baseX = isRight ? rightX : leftX;
-    const topY = boxTop - headerHeight - 13 - row * rowHeight;
+    const topY = boxTop - headerHeight - 11 - row * rowHeight;
     next.page.drawText(item.label, {
       x: baseX,
       y: topY,
@@ -1004,7 +1007,7 @@ const drawOverviewGrid = (
     valueLines.forEach((line, lineIndex) => {
       next.page.drawText(line, {
         x: baseX,
-        y: topY - 10 - lineIndex * 9,
+        y: topY - 9 - lineIndex * 8,
         size: item.label === 'Source URL' ? 9 : 9.5,
         font: lineIndex === 0 ? boldFont : regularFont,
         color: COLORS.text,
@@ -1039,7 +1042,7 @@ const buildNotesLayout = (
   const headerHeight = compact ? 22 : 24;
   const title = compact ? 'Summary Snapshot' : 'Executive Summary';
   const lines = compact
-    ? wrapPdfTextLines(notes, regularFont, fontSize, PAGE.width - PAGE.marginX * 2 - 24, 3)
+    ? wrapPdfTextLines(notes, regularFont, fontSize, PAGE.width - PAGE.marginX * 2 - 24, 2)
     : wrapPdfText(notes, regularFont, fontSize, PAGE.width - PAGE.marginX * 2 - 24);
   const minBodyHeight = compact ? 28 : 38;
   const padding = compact ? 8 : 12;
@@ -1257,7 +1260,7 @@ const drawHeaderBand = (
     font: regularFont,
     color: rgb(226 / 255, 232 / 255, 240 / 255),
   });
-  return PAGE.height - 116;
+  return PAGE.height - 112;
 };
 
 const resolveImageFormat = (
@@ -1485,25 +1488,25 @@ const drawTitleBlock = (
 
   const textX = PAGE.marginX + 18;
   const textWidth = boxWidth - 36;
-  const titleLines = wrapPdfTextLines(sections.title, boldFont, 20, textWidth, 2);
-  let cursorY = footerY + HERO_IMAGE.footerHeight - 18;
+  const titleLines = wrapPdfTextLines(sections.title, boldFont, 18, textWidth, 2);
+  let cursorY = footerY + HERO_IMAGE.footerHeight - 16;
   titleLines.forEach((line, index) => {
     page.drawText(line, {
       x: textX,
-      y: cursorY - index * 19,
-      size: 20,
+      y: cursorY - index * 16,
+      size: 18,
       font: boldFont,
       color: COLORS.brandDark,
     });
   });
-  cursorY -= titleLines.length * 19 + 2;
+  cursorY -= titleLines.length * 16 + 2;
 
-  const locationLines = wrapPdfTextLines(sections.location, regularFont, 10.5, textWidth, 2);
+  const locationLines = wrapPdfTextLines(sections.location, regularFont, 10, textWidth, 2);
   locationLines.forEach((line, index) => {
     page.drawText(line, {
       x: textX,
       y: cursorY - index * 11,
-      size: 10.5,
+      size: 10,
       font: regularFont,
       color: COLORS.muted,
     });
