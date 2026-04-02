@@ -110,8 +110,18 @@ describe('exportPropertyPdf', () => {
       'Deal Highlights',
       expect.objectContaining({ size: 12 }),
     );
-    expect(mockAddPage).toHaveBeenCalledTimes(2);
-    expect(global.fetch).toHaveBeenCalledWith('https://images.example.com/cover.jpg');
+    expect(mockDrawText).toHaveBeenCalledWith(
+      'Investment Insight',
+      expect.objectContaining({ size: 12 }),
+    );
+    expect(mockAddPage).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/pdf-image?host=images.example.com&protocol=https%3A&path=%2Fcover.jpg',
+      expect.objectContaining({
+        method: 'GET',
+        cache: 'no-store',
+      }),
+    );
     expect(mockSave).toHaveBeenCalledTimes(1);
     expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
     expect(clickSpy).toHaveBeenCalledTimes(1);
@@ -138,7 +148,14 @@ describe('exportPropertyPdf', () => {
     expect(mockDrawImage).not.toHaveBeenCalled();
     expect(
       mockDrawText.mock.calls.some(
-        ([text]) => typeof text === 'string' && text.includes('Property imagery unavailable'),
+        ([text]) => typeof text === 'string' && text.includes('Listing image unavailable at export time'),
+      ),
+    ).toBe(true);
+    expect(
+      mockDrawText.mock.calls.some(
+        ([text]) =>
+          typeof text === 'string' &&
+          text.includes('Key investment signals and deal context remain available below'),
       ),
     ).toBe(true);
     expect(mockSave).toHaveBeenCalledTimes(1);
@@ -161,7 +178,7 @@ describe('exportPropertyPdf', () => {
       roiPercent: 9.2,
     });
 
-    expect(mockAddPage).toHaveBeenCalledTimes(2);
+    expect(mockAddPage).toHaveBeenCalledTimes(1);
     expect(
       mockDrawText.mock.calls.some(
         ([text, options]) =>
@@ -177,7 +194,7 @@ describe('exportPropertyPdf', () => {
           typeof text === 'string' &&
           text.includes('does not currently include a narrative description') &&
           options &&
-          (options as { size?: number }).size === 9.5,
+          (options as { size?: number }).size === 9,
       ),
     ).toBe(true);
   });
@@ -208,7 +225,7 @@ describe('exportPropertyPdf', () => {
           typeof text === 'string' &&
           text.includes('Exceptional') &&
           options &&
-          (options as { size?: number }).size === 19,
+          (options as { size?: number }).size === 18,
       ),
     ).toBe(true);
     expect(mockAddPage).toHaveBeenCalledTimes(2);
@@ -217,5 +234,29 @@ describe('exportPropertyPdf', () => {
         ([text]) => typeof text === 'string' && text.includes('Executive Summary'),
       ),
     ).toBe(true);
+  });
+
+  it('avoids a blank PDF when imagery and narrative are both sparse', async () => {
+    global.fetch = jest.fn(async () =>
+      new Response(null, {
+        status: 502,
+        headers: { 'content-type': 'application/json' },
+      }),
+    ) as any;
+
+    const { exportPropertyPdf } = await import('./propertyPdfExport');
+
+    await exportPropertyPdf({
+      propertyId: 'prop-blank-guard',
+      property: {
+        title: 'Lean Deal',
+        location: 'Hull',
+      },
+      price: 99000,
+    });
+
+    expect(mockAddPage).toHaveBeenCalledTimes(1);
+    expect(mockDrawText.mock.calls.length).toBeGreaterThan(0);
+    expect(mockSave).toHaveBeenCalledTimes(1);
   });
 });

@@ -9,6 +9,7 @@ import {
   type PDFPage,
 } from 'pdf-lib';
 import { getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
+import { buildPdfImageProxyPath, isUnsafePdfImageUrl } from '@/lib/pdfImageProxy';
 
 type ExportMetric = {
   label: string;
@@ -35,6 +36,7 @@ type PropertyPdfSections = {
   titleMeta: ExportMetric[];
   metrics: ExportMetric[];
   highlights: string[];
+  investmentInsight: string;
   overview: ExportMetric[];
   notes: string;
   hasNarrativeDescription: boolean;
@@ -126,25 +128,51 @@ const getText = (value: unknown): string | undefined => {
   return trimmed || undefined;
 };
 
-const resolvePrimaryImageUrl = (property: Record<string, unknown>): string | undefined => {
-  const direct = [
-    property.imageUrl,
-    property.image_url,
-    property.imageurl,
-    property.thumbnail,
-    property.cover_photo_url,
-  ];
+const IMAGE_DIRECT_FIELDS = ['imageUrl', 'image_url', 'imageurl', 'thumbnail', 'cover_photo_url'] as const;
+const IMAGE_COLLECTION_FIELDS = ['image_urls', 'imageUrls', 'images', 'photos'] as const;
+const IMAGE_OBJECT_KEYS = ['url', 'src', 'imageUrl', 'image_url'] as const;
+const MAX_INSIGHT_LENGTH = 420;
 
-  for (const candidate of direct) {
-    const url = getText(candidate);
+const getImageCandidateUrl = (value: unknown): string | undefined => {
+  const direct = getText(value);
+  if (direct) return direct;
+  if (!value || typeof value !== 'object') return undefined;
+
+  for (const key of IMAGE_OBJECT_KEYS) {
+    const url = getText((value as Record<string, unknown>)[key]);
     if (url) return url;
   }
 
-  const collections = [property.image_urls, property.imageUrls, property.images, property.photos];
-  for (const collection of collections) {
-    if (!Array.isArray(collection)) continue;
-    for (const candidate of collection) {
-      const url = getText(candidate);
+  return undefined;
+};
+
+const parseImageCollection = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) return value;
+  const text = getText(value);
+  if (!text) return [];
+
+  try {
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Resolves the best available listing image from the property payload.
+ * Direct fields win first; collection fields support raw arrays, JSON-stringified arrays,
+ * and arrays of objects containing common image URL keys.
+ */
+export const resolvePrimaryImageUrl = (property: Record<string, unknown>): string | undefined => {
+  for (const field of IMAGE_DIRECT_FIELDS) {
+    const url = getImageCandidateUrl(property[field]);
+    if (url) return url;
+  }
+
+  for (const field of IMAGE_COLLECTION_FIELDS) {
+    for (const candidate of parseImageCollection(property[field])) {
+      const url = getImageCandidateUrl(candidate);
       if (url) return url;
     }
   }
@@ -236,6 +264,150 @@ const createExecutiveSummary = (
   return trimTextLength(highlights.slice(0, 3).join('. '), 320);
 };
 
+const classifyYield = (value: number | undefined): string | undefined => {
+  if (typeof value !== 'number') return undefined;
+  // Yield classification thresholds representing investment criteria:
+  // - 7%+: solid return, strong investment
+  // - 5.5-7%: steady return, reliable income
+  // - 4.5-5.5%: modest return, acceptable baseline
+  // - <4.5%: weak return, below target threshold
+  if (value >= 7) return 'solid';
+  if (value >= 5.5) return 'steady';
+  if (value >= 4.5) return 'modest';
+  return 'weak';
+};
+
+const classifyRoi = (value: number | undefined): string | undefined => {
+  if (typeof value !== 'number') return undefined;
+  if (value >= 15) return 'strong';
+  if (value >= 10) return 'attractive';
+  if (value >= 7) return 'reasonable';
+  return 'limited';
+};
+
+const classifyDiscount = (value: number | undefined): string | undefined => {
+  if (typeof value !== 'number') return undefined;
+  if (value >= 15) return 'notable';
+  if (value >= 8) return 'meaningful';
+  if (value > 0) return 'slight';
+  return undefined;
+};
+
+const detectDemandSignal = (highlights: string[], description: string | undefined): string | undefined => {
+  const text = `${highlights.join(' ')} ${description ?? ''}`.toLowerCase();
+  if (!text.trim()) return undefined;
+  if (/(refurb|renovat|moderni[sz]|upgrade)/.test(text)) return 'refurbishment upside';
+  if (/(station|transport|commuter|rail|link)/.test(text)) return 'commuter connectivity';
+  if (/(tenant demand|rental demand|yield|income)/.test(text)) return 'income-led demand';
+  if (/(family|school|garden|house)/.test(text)) return 'practical family appeal';
+  if (/(city centre|central|amenit|high street)/.test(text)) return 'everyday amenity access';
+  return undefined;
+};
+
+const describeOpportunity = (
+  investmentType: string,
+  propertyType: string,
+  bedrooms?: number,
+): { opportunity: string; strategy: string } => {
+  const investmentKey = investmentType.toLowerCase();
+  const propertyKey = propertyType.toLowerCase();
+  const familyAppeal =
+    typeof bedrooms === 'number' && bedrooms >= 3 && propertyKey.includes('house')
+      ? ' with family-house appeal'
+      : typeof bedrooms === 'number' && bedrooms <= 2
+        ? ' with practical rental appeal'
+        : '';
+
+  if (/(brrr|refurb|value add|development)/.test(investmentKey)) {
+    return {
+      opportunity: `value-add ${investmentType} opportunity${familyAppeal}`,
+      strategy: 'a hold-and-refinance angle',
+    };
+  }
+
+  if (/(flip|resale|sell)/.test(investmentKey)) {
+    return {
+      opportunity: `refurb-and-exit opportunity${familyAppeal}`,
+      strategy: 'a refurb-and-sell path',
+    };
+  }
+
+  if (/(hmo|multi-let)/.test(investmentKey)) {
+    return {
+      opportunity: `shared-accommodation income opportunity${familyAppeal}`,
+      strategy: 'an income-focused operating plan',
+    };
+  }
+
+  if (/(buy to let|rental|hold|let)/.test(investmentKey)) {
+    return {
+      opportunity: `income-oriented ${investmentType} opportunity${familyAppeal}`,
+      strategy: 'a hold-for-income profile',
+    };
+  }
+
+  return {
+    opportunity: `${investmentType} opportunity${familyAppeal}`,
+    strategy: 'cautious review until the exit path is verified',
+  };
+};
+
+export const createInvestmentInsight = (input: PropertyPdfExportInput): string => {
+  const property = input.property ?? {};
+  const location = getText(property.location) ?? 'the stated location';
+  const propertyType = getText(property.propertyType ?? property.property_type) ?? 'property';
+  const investmentType = getText(property.investmentType ?? property.investment_type) ?? 'investment';
+  const bedrooms = toNumber(property.bedrooms);
+  const description = getText(property.description);
+  const highlights = extractDealHighlights(
+    description,
+    createFallbackHighlights(location, propertyType, investmentType, bedrooms, toNumber(property.bathrooms)),
+  );
+  const mergedMetricsSource: Record<string, unknown> = { ...property };
+  if (typeof input.price === 'number') mergedMetricsSource.price = input.price;
+  if (typeof input.yieldPercent === 'number') mergedMetricsSource.yield_percent = input.yieldPercent;
+  if (typeof input.roiPercent === 'number') mergedMetricsSource.roi_percent = input.roiPercent;
+
+  const yieldPercent = getYieldPercent(mergedMetricsSource) ?? undefined;
+  const roiPercent = getRoiDisplay(mergedMetricsSource).value ?? undefined;
+  const discountPercent =
+    typeof input.discountPercent === 'number'
+      ? input.discountPercent
+      : toNumber(property.discount_percent ?? property.discount_estimate_pct);
+
+  const { opportunity, strategy } = describeOpportunity(investmentType, propertyType, bedrooms);
+  const demandSignal = detectDemandSignal(highlights, description);
+  const yieldTone = classifyYield(yieldPercent);
+  const roiTone = classifyRoi(roiPercent);
+  const discountTone = classifyDiscount(discountPercent);
+
+  const insightSentences = [`This appears to be a ${opportunity} in ${location}.`];
+
+  const metricClauses: string[] = [];
+  if (yieldTone && typeof yieldPercent === 'number') {
+    metricClauses.push(`Yield looks ${yieldTone} at ${yieldPercent.toFixed(1)}%`);
+  }
+  if (roiTone && typeof roiPercent === 'number') {
+    metricClauses.push(`ROI screens as ${roiTone} at ${roiPercent.toFixed(1)}%`);
+  }
+  if (discountTone && typeof discountPercent === 'number') {
+    metricClauses.push(`pricing indicates a ${discountTone} ${discountPercent.toFixed(1)}% discount`);
+  }
+
+  if (metricClauses.length) {
+    insightSentences.push(`${metricClauses.join(', ')}.`);
+  } else {
+    insightSentences.push('The current dataset is light, so the numbers should be validated against the live listing before committing to an execution plan.');
+  }
+
+  const strategyTail = demandSignal
+    ? `with listing signals pointing to ${demandSignal}`
+    : 'with the listing still requiring source-level diligence';
+  insightSentences.push(`The current profile suggests ${strategy}, ${strategyTail}.`);
+
+  return trimTextLength(insightSentences.join(' '), MAX_INSIGHT_LENGTH);
+};
+
 export const createPropertyPdfFilename = (input: PropertyPdfExportInput): string => {
   const property = input.property ?? {};
   const title = getText(property.title);
@@ -274,13 +446,17 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
   }
   const derivedYield = getYieldPercent(mergedMetricsSource) ?? undefined;
   const derivedRoi = getRoiDisplay(mergedMetricsSource).value ?? undefined;
+  const derivedDiscount =
+    typeof input.discountPercent === 'number'
+      ? input.discountPercent
+      : toNumber(property.discount_percent ?? property.discount_estimate_pct);
 
   const metrics: ExportMetric[] = [
     { label: 'Price', value: formatCurrency(price) },
     { label: 'Estimated Rent (PCM)', value: formatCurrency(rent) },
     { label: 'Yield', value: formatPercent(derivedYield) },
     { label: 'ROI', value: formatPercent(derivedRoi) },
-    { label: 'Discount', value: formatPercent(input.discountPercent) },
+    { label: 'Discount', value: formatPercent(derivedDiscount) },
     {
       label: 'AI Score',
       value: typeof input.aiScore === 'number' ? `${input.aiScore.toFixed(1)}/10` : 'N/A',
@@ -306,11 +482,12 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
     createFallbackHighlights(location, propertyType, investmentType, bedrooms, bathrooms),
   );
   const notes = createExecutiveSummary(description, fallbackNotes, highlights);
+  const investmentInsight = createInvestmentInsight(input);
 
   return {
     brandTitle: 'PropNexus',
     reportTitle: 'Investor Deal Pack',
-    reportSubtitle: 'Premium property summary prepared from the live property detail view.',
+    reportSubtitle: 'Investor-ready property brief prepared from the live PropNexus listing.',
     title,
     location,
     titleMeta: [
@@ -320,6 +497,7 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
     ],
     metrics,
     highlights,
+    investmentInsight,
     overview,
     notes,
     hasNarrativeDescription: Boolean(description),
@@ -341,6 +519,8 @@ const COLORS = {
   brandDark: rgb(15 / 255, 23 / 255, 42 / 255),
   accent: rgb(56 / 255, 189 / 255, 248 / 255),
   accentSoft: rgb(236 / 255, 254 / 255, 255 / 255),
+  accentStrong: rgb(8 / 255, 145 / 255, 178 / 255),
+  highlightFill: rgb(241 / 255, 245 / 255, 249 / 255),
   text: rgb(15 / 255, 23 / 255, 42 / 255),
   muted: rgb(71 / 255, 85 / 255, 105 / 255),
   mutedSoft: rgb(148 / 255, 163 / 255, 184 / 255),
@@ -350,17 +530,17 @@ const COLORS = {
 };
 
 const HERO_IMAGE = {
-  height: 140,
-  footerHeight: 62,
+  height: 124,
+  footerHeight: 58,
 };
 
-const CONTENT_BOTTOM_Y = PAGE.marginY + 34;
+const CONTENT_BOTTOM_Y = PAGE.marginY + 24;
 
 const SECTION_SPACING = {
-  titleBottom: 14,
+  titleBottom: 12,
   metricsTop: 2,
   metricsBottom: 2,
-  overviewBottom: 10,
+  overviewBottom: 8,
   notesBottom: 12,
 };
 
@@ -555,7 +735,7 @@ const drawMetricCards = (
   regularFont: PDFFont,
   boldFont: PDFFont,
 ): PdfState => {
-  let next = ensurePdfSpace(pdfDoc, state, 156);
+  let next = ensurePdfSpace(pdfDoc, state, 126);
   next.page.drawText('Deal Snapshot', {
     x: PAGE.marginX,
     y: next.cursorY,
@@ -563,32 +743,33 @@ const drawMetricCards = (
     font: boldFont,
     color: COLORS.brandDark,
   });
-  next.page.drawText('Core investment metrics curated for quick investor review.', {
+  next.page.drawText('Investment highlights arranged for a fast first read.', {
     x: PAGE.marginX,
     y: next.cursorY - 14,
     size: 8.5,
     font: regularFont,
     color: COLORS.muted,
   });
-  next = { ...next, cursorY: next.cursorY - 28 };
+  next = { ...next, cursorY: next.cursorY - 24 };
 
   const columns = 3;
-  const gap = 12;
+  const gap = 7;
   const cardWidth = (PAGE.width - PAGE.marginX * 2 - gap * (columns - 1)) / columns;
-  const cardHeight = 60;
+  const cardHeight = 46;
 
   metrics.forEach((metric, index) => {
     const row = Math.floor(index / columns);
     const column = index % columns;
     const x = PAGE.marginX + column * (cardWidth + gap);
     const y = next.cursorY - row * (cardHeight + gap);
+    const featured = ['Yield', 'ROI', 'Discount'].includes(metric.label) && metric.value !== 'N/A';
 
     next.page.drawRectangle({
       x,
       y: y - cardHeight,
       width: cardWidth,
       height: cardHeight,
-      color: COLORS.panelFill,
+      color: featured ? COLORS.accentSoft : COLORS.panelFill,
       borderColor: COLORS.border,
       borderWidth: 1,
     });
@@ -597,19 +778,19 @@ const drawMetricCards = (
       y: y - 6,
       width: cardWidth,
       height: 6,
-      color: index % 2 === 0 ? COLORS.brand : COLORS.accent,
+      color: featured ? COLORS.accentStrong : index % 2 === 0 ? COLORS.brand : COLORS.accent,
     });
     next.page.drawText(metric.label, {
       x: x + 12,
-      y: y - 20,
-      size: 8,
+      y: y - 18,
+      size: 7.5,
       font: regularFont,
       color: COLORS.muted,
     });
     next.page.drawText(metric.value || 'N/A', {
       x: x + 12,
-      y: y - 42,
-      size: 18,
+      y: y - 39,
+      size: featured ? 18 : 16,
       font: boldFont,
       color: COLORS.brandDark,
     });
@@ -631,17 +812,17 @@ const drawHighlightsSection = (
 ): PdfState => {
   const contentWidth = PAGE.width - PAGE.marginX * 2 - 30;
   const bulletLayouts = highlights.map((highlight) =>
-    wrapPdfTextLines(highlight, regularFont, 10, contentWidth - 16, 2),
+    wrapPdfTextLines(highlight, regularFont, 9, contentWidth - 16, 2),
   );
   const bodyHeight = Math.max(
-    56,
-    bulletLayouts.reduce((total, lines) => total + lines.length * 11 + 8, 16),
+    42,
+    bulletLayouts.reduce((total, lines) => total + lines.length * 9 + 5, 12),
   );
 
-  let next = ensurePdfSpace(pdfDoc, state, bodyHeight + 54);
-  const boxTop = next.cursorY + 8;
+  let next = ensurePdfSpace(pdfDoc, state, bodyHeight + 46);
+  const boxTop = next.cursorY + 6;
   const boxWidth = PAGE.width - PAGE.marginX * 2;
-  const headerHeight = 28;
+  const headerHeight = 24;
 
   next.page.drawRectangle({
     x: PAGE.marginX,
@@ -663,36 +844,114 @@ const drawHighlightsSection = (
   });
   next.page.drawText('Deal Highlights', {
     x: PAGE.marginX + 12,
-    y: boxTop - 18,
+    y: boxTop - 16,
     size: 12,
     font: boldFont,
     color: COLORS.brandDark,
   });
+  next.page.drawText('Curated signals from the listing and core deal data.', {
+    x: PAGE.marginX + 118,
+    y: boxTop - 16,
+    size: 8,
+    font: regularFont,
+    color: COLORS.muted,
+  });
 
-  let bulletY = boxTop - headerHeight - 15;
-  bulletLayouts.forEach((lines) => {
-    next.page.drawText('•', {
-      x: PAGE.marginX + 14,
+  let bulletY = boxTop - headerHeight - 12;
+  bulletLayouts.forEach((lines, index) => {
+    next.page.drawRectangle({
+      x: PAGE.marginX + 13,
+      y: bulletY - 5,
+      width: 12,
+      height: 12,
+      color: COLORS.accentSoft,
+      borderColor: COLORS.border,
+      borderWidth: 1,
+    });
+    next.page.drawText(String(index + 1), {
+      x: PAGE.marginX + 16.5,
       y: bulletY,
-      size: 12,
+      size: 8,
       font: boldFont,
       color: COLORS.brand,
     });
     lines.forEach((line, lineIndex) => {
       next.page.drawText(line, {
         x: PAGE.marginX + 28,
-        y: bulletY - lineIndex * 11,
-        size: 10,
+        y: bulletY - lineIndex * 9,
+        size: 9,
         font: regularFont,
         color: COLORS.text,
       });
     });
-    bulletY -= lines.length * 11 + 8;
+    bulletY -= lines.length * 9 + 5;
   });
 
   return {
     ...next,
-    cursorY: boxTop - headerHeight - bodyHeight - 12,
+    cursorY: boxTop - headerHeight - bodyHeight - 10,
+  };
+};
+
+const drawInvestmentInsightSection = (
+  pdfDoc: PDFDocument,
+  state: PdfState,
+  investmentInsight: string,
+  regularFont: PDFFont,
+  boldFont: PDFFont,
+): PdfState => {
+  const lines = wrapPdfTextLines(
+    investmentInsight,
+    regularFont,
+    9,
+    PAGE.width - PAGE.marginX * 2 - 28,
+    3,
+  );
+  const headerHeight = 24;
+  const bodyHeight = Math.max(34, lines.length * 9 + 10);
+  let next = ensurePdfSpace(pdfDoc, state, headerHeight + bodyHeight + 14);
+  const boxTop = next.cursorY + 6;
+  const boxWidth = PAGE.width - PAGE.marginX * 2;
+
+  next.page.drawRectangle({
+    x: PAGE.marginX,
+    y: boxTop - headerHeight,
+    width: boxWidth,
+    height: headerHeight,
+    color: COLORS.brandDark,
+  });
+  next.page.drawRectangle({
+    x: PAGE.marginX,
+    y: boxTop - headerHeight - bodyHeight,
+    width: boxWidth,
+    height: bodyHeight,
+    color: COLORS.accentSoft,
+    borderColor: COLORS.border,
+    borderWidth: 1,
+  });
+  next.page.drawText('Investment Insight', {
+    x: PAGE.marginX + 12,
+    y: boxTop - 16,
+    size: 12,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
+
+  let textY = boxTop - headerHeight - 12;
+  lines.forEach((line) => {
+    next.page.drawText(line, {
+      x: PAGE.marginX + 12,
+      y: textY,
+      size: 9,
+      font: regularFont,
+      color: COLORS.text,
+    });
+    textY -= 9;
+  });
+
+  return {
+    ...next,
+    cursorY: boxTop - headerHeight - bodyHeight - 10,
   };
 };
 
@@ -703,16 +962,16 @@ const drawOverviewGrid = (
   regularFont: PDFFont,
   boldFont: PDFFont,
 ): PdfState => {
-  let next = ensurePdfSpace(pdfDoc, state, 154);
-  const boxTop = next.cursorY + 8;
+  let next = ensurePdfSpace(pdfDoc, state, 118);
+  const boxTop = next.cursorY + 6;
   const boxWidth = PAGE.width - PAGE.marginX * 2;
   const headerHeight = 22;
-  const rowHeight = 22;
+  const rowHeight = 20;
   const rows = Math.ceil(items.length / 2);
-  const bodyHeight = rows * rowHeight + 12;
+  const bodyHeight = rows * rowHeight + 8;
   const leftX = PAGE.marginX + 14;
-  const rightX = PAGE.marginX + boxWidth / 2 + 10;
-  const columnWidth = boxWidth / 2 - 24;
+  const rightX = PAGE.marginX + boxWidth / 2 + 12;
+  const columnWidth = boxWidth / 2 - 28;
 
   next.page.drawRectangle({
     x: PAGE.marginX,
@@ -744,20 +1003,23 @@ const drawOverviewGrid = (
     const row = Math.floor(index / 2);
     const isRight = index % 2 === 1;
     const baseX = isRight ? rightX : leftX;
-    const topY = boxTop - headerHeight - 15 - row * rowHeight;
+    const topY = boxTop - headerHeight - 11 - row * rowHeight;
     next.page.drawText(item.label, {
       x: baseX,
       y: topY,
-      size: 8,
+      size: 7.5,
       font: regularFont,
       color: COLORS.muted,
     });
-    const valueLines = wrapPdfTextLines(item.value || 'N/A', regularFont, 10, columnWidth, 2);
+    const valueLines =
+      item.label === 'Source URL'
+        ? wrapPdfTextLines(item.value || 'N/A', regularFont, 9, columnWidth, 2)
+        : wrapPdfTextLines(item.value || 'N/A', regularFont, 9.5, columnWidth, 2);
     valueLines.forEach((line, lineIndex) => {
       next.page.drawText(line, {
         x: baseX,
-        y: topY - 11 - lineIndex * 10,
-        size: 10,
+        y: topY - 9 - lineIndex * 8,
+        size: item.label === 'Source URL' ? 9 : 9.5,
         font: lineIndex === 0 ? boldFont : regularFont,
         color: COLORS.text,
       });
@@ -786,13 +1048,15 @@ const buildNotesLayout = (
   regularFont: PDFFont,
 ): NotesLayout => {
   const compact = !hasNarrativeDescription;
-  const fontSize = compact ? 9.5 : 10;
-  const lineHeight = compact ? 12 : 13.5;
+  const fontSize = compact ? 9 : 9.75;
+  const lineHeight = compact ? 11 : 12.75;
   const headerHeight = compact ? 22 : 24;
   const title = compact ? 'Summary Snapshot' : 'Executive Summary';
-  const lines = wrapPdfText(notes, regularFont, fontSize, PAGE.width - PAGE.marginX * 2 - 24);
-  const minBodyHeight = compact ? 30 : 42;
-  const padding = compact ? 10 : 14;
+  const lines = compact
+    ? wrapPdfTextLines(notes, regularFont, fontSize, PAGE.width - PAGE.marginX * 2 - 24, 2)
+    : wrapPdfText(notes, regularFont, fontSize, PAGE.width - PAGE.marginX * 2 - 24);
+  const minBodyHeight = compact ? 28 : 38;
+  const padding = compact ? 8 : 12;
 
   return {
     title,
@@ -965,14 +1229,14 @@ const drawHeaderBand = (
   const top = PAGE.height - 26;
   page.drawRectangle({
     x: 0,
-    y: PAGE.height - 96,
+    y: PAGE.height - 92,
     width: PAGE.width,
-    height: 96,
+    height: 92,
     color: COLORS.brandDark,
   });
   page.drawRectangle({
     x: PAGE.marginX,
-    y: PAGE.height - 82,
+    y: PAGE.height - 78,
     width: 92,
     height: 4,
     color: COLORS.accent,
@@ -994,7 +1258,7 @@ const drawHeaderBand = (
   page.drawText(sections.reportSubtitle, {
     x: PAGE.marginX,
     y: top - 58,
-    size: 10.5,
+    size: 10,
     font: regularFont,
     color: rgb(226 / 255, 232 / 255, 240 / 255),
   });
@@ -1007,17 +1271,63 @@ const drawHeaderBand = (
     font: regularFont,
     color: rgb(226 / 255, 232 / 255, 240 / 255),
   });
-  return PAGE.height - 122;
+  return PAGE.height - 112;
 };
 
-const resolveImageFormat = (url: string, contentType?: string | null): 'png' | 'jpg' | null => {
+const resolveImageFormat = (
+  url: string,
+  contentType?: string | null,
+  bytes?: Uint8Array,
+): 'png' | 'jpg' | null => {
   const type = (contentType || '').toLowerCase();
   if (type.includes('png')) return 'png';
   if (type.includes('jpeg') || type.includes('jpg')) return 'jpg';
+  if (bytes && bytes.length >= 8) {
+    const isPng =
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47 &&
+      bytes[4] === 0x0d &&
+      bytes[5] === 0x0a &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0x0a;
+    if (isPng) return 'png';
+  }
+  if (bytes && bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return 'jpg';
+  }
   const normalizedUrl = url.toLowerCase();
   if (normalizedUrl.includes('.png')) return 'png';
   if (normalizedUrl.includes('.jpg') || normalizedUrl.includes('.jpeg')) return 'jpg';
   return null;
+};
+
+const buildPropertyImageFetchTargets = (imageUrl: string): string[] => {
+  const direct = getText(imageUrl);
+  if (!direct) return [];
+  
+  // Defensive check: This function is intended for client use, but includes a check for server environments
+  if (typeof window === 'undefined') {
+    console.warn('buildPropertyImageFetchTargets called in server environment');
+    return [];
+  }
+
+  try {
+    const absolute = new URL(direct, window.location.origin);
+    if (isUnsafePdfImageUrl(absolute, window.location.origin)) {
+      return [];
+    }
+
+    if (absolute.origin === window.location.origin) {
+      return [absolute.toString()];
+    }
+
+    const proxyPath = buildPdfImageProxyPath(absolute.toString());
+    return proxyPath ? [proxyPath, absolute.toString()] : [absolute.toString()];
+  } catch {
+    return [];
+  }
 };
 
 const loadPropertyImage = async (
@@ -1026,16 +1336,24 @@ const loadPropertyImage = async (
 ): Promise<PDFImage | null> => {
   if (!imageUrl) return null;
 
-  try {
-    const response = await fetch(imageUrl);
-    if (!response.ok) return null;
-    const format = resolveImageFormat(imageUrl, response.headers.get('content-type'));
-    if (!format) return null;
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    return format === 'png' ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
-  } catch {
-    return null;
+  for (const target of buildPropertyImageFetchTargets(imageUrl)) {
+    try {
+      const response = await fetch(target, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8' },
+      });
+      if (!response.ok) continue;
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      const format = resolveImageFormat(response.url || target, response.headers.get('content-type'), bytes);
+      if (!format) continue;
+      return format === 'png' ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
+    } catch {
+      continue;
+    }
   }
+
+  return null;
 };
 
 const drawTitleBlock = (
@@ -1067,11 +1385,16 @@ const drawTitleBlock = (
     y: heroY,
     width: boxWidth,
     height: HERO_IMAGE.height,
-    color: COLORS.sectionFill,
+    color: image ? COLORS.highlightFill : COLORS.sectionFill,
   });
 
   if (image) {
-    const imageScale = Math.min(boxWidth / image.width, HERO_IMAGE.height / image.height);
+    // Cover scaling uses Math.max to fill the hero area fully, which means the image
+    // will be cropped to fit. This creates a photographic feel rather than letterboxing.
+    // Tradeoff: Important image content may be cut off at the edges. This is acceptable
+    // for property photos where the focal point is typically centered. If this becomes
+    // an issue for specific use cases, consider making it configurable per property type.
+    const imageScale = Math.max(boxWidth / image.width, HERO_IMAGE.height / image.height);
     const imageWidth = image.width * imageScale;
     const imageHeight = image.height * imageScale;
     const imageX = PAGE.marginX + (boxWidth - imageWidth) / 2;
@@ -1082,6 +1405,31 @@ const drawTitleBlock = (
       width: imageWidth,
       height: imageHeight,
     });
+    page.drawRectangle({
+      x: PAGE.marginX,
+      y: heroY,
+      width: boxWidth,
+      height: HERO_IMAGE.height,
+      color: COLORS.brandDark,
+      opacity: 0.16,
+    });
+    const pillLabel = 'Featured Listing';
+    const pillWidth = regularFont.widthOfTextAtSize(pillLabel, 8.5) + 20;
+    page.drawRectangle({
+      x: PAGE.marginX + 18,
+      y: heroY + HERO_IMAGE.height - 24,
+      width: pillWidth,
+      height: 16,
+      color: rgb(1, 1, 1),
+      opacity: 0.9,
+    });
+    page.drawText(pillLabel, {
+      x: PAGE.marginX + 28,
+      y: heroY + HERO_IMAGE.height - 19,
+      size: 8.5,
+      font: boldFont,
+      color: COLORS.brandDark,
+    });
   } else {
     page.drawRectangle({
       x: PAGE.marginX,
@@ -1091,22 +1439,30 @@ const drawTitleBlock = (
       color: COLORS.brandDark,
     });
     page.drawRectangle({
-      x: PAGE.marginX + 22,
-      y: heroY + 24,
-      width: boxWidth - 44,
-      height: 4,
-      color: COLORS.accent,
+      x: PAGE.marginX + 20,
+      y: heroY + HERO_IMAGE.height - 40,
+      width: boxWidth - 40,
+      height: 2,
+      color: COLORS.accentStrong,
     });
-    page.drawText('Property imagery unavailable', {
+    page.drawRectangle({
+      x: PAGE.marginX + 20,
+      y: heroY + 18,
+      width: boxWidth - 40,
+      height: HERO_IMAGE.height - 76,
+      color: COLORS.brand,
+      opacity: 0.18,
+    });
+    page.drawText('Listing image unavailable at export time', {
       x: PAGE.marginX + 22,
-      y: heroY + 52,
+      y: heroY + 74,
       size: 12,
       font: boldFont,
       color: rgb(1, 1, 1),
     });
-    page.drawText('The deal pack still includes the key investment signals and listing context.', {
+    page.drawText('Key investment signals and deal context remain available below.', {
       x: PAGE.marginX + 22,
-      y: heroY + 34,
+      y: heroY + 56,
       size: 10,
       font: regularFont,
       color: rgb(226 / 255, 232 / 255, 240 / 255),
@@ -1133,32 +1489,32 @@ const drawTitleBlock = (
 
   const textX = PAGE.marginX + 18;
   const textWidth = boxWidth - 36;
-  const titleLines = wrapPdfTextLines(sections.title, boldFont, 19, textWidth, 2);
-  let cursorY = footerY + HERO_IMAGE.footerHeight - 20;
+  const titleLines = wrapPdfTextLines(sections.title, boldFont, 18, textWidth, 2);
+  let cursorY = footerY + HERO_IMAGE.footerHeight - 16;
   titleLines.forEach((line, index) => {
     page.drawText(line, {
       x: textX,
-      y: cursorY - index * 18,
-      size: 19,
+      y: cursorY - index * 16,
+      size: 18,
       font: boldFont,
       color: COLORS.brandDark,
     });
   });
-  cursorY -= titleLines.length * 18 + 3;
+  cursorY -= titleLines.length * 16 + 2;
 
-  const locationLines = wrapPdfTextLines(sections.location, regularFont, 10.5, textWidth, 2);
+  const locationLines = wrapPdfTextLines(sections.location, regularFont, 10, textWidth, 2);
   locationLines.forEach((line, index) => {
     page.drawText(line, {
       x: textX,
       y: cursorY - index * 11,
-      size: 10.5,
+      size: 10,
       font: regularFont,
       color: COLORS.muted,
     });
   });
-  cursorY -= locationLines.length * 11 + 6;
+  cursorY -= locationLines.length * 11 + 5;
 
-  const chipHeight = 18;
+  const chipHeight = 16;
   const chipGap = 5;
   let chipX = textX;
   let chipY = cursorY;
@@ -1177,7 +1533,7 @@ const drawTitleBlock = (
       y: chipY - chipHeight + 3,
       width: chipWidth,
       height: chipHeight,
-      color: COLORS.accentSoft,
+      color: COLORS.highlightFill,
       borderColor: COLORS.border,
       borderWidth: 1,
     });
@@ -1228,6 +1584,13 @@ export async function exportPropertyPdf(input: PropertyPdfExportInput): Promise<
   state = { ...state, cursorY: state.cursorY + SECTION_SPACING.metricsTop };
   state = drawMetricCards(pdfDoc, state, sections.metrics, regularFont, boldFont);
   state = drawHighlightsSection(pdfDoc, state, sections.highlights, regularFont, boldFont);
+  state = drawInvestmentInsightSection(
+    pdfDoc,
+    state,
+    sections.investmentInsight,
+    regularFont,
+    boldFont,
+  );
   state = drawOverviewGrid(pdfDoc, state, sections.overview, regularFont, boldFont);
   state = drawNotesSection(
     pdfDoc,
