@@ -711,8 +711,8 @@ const HERO_IMAGE = {
 const CONTENT_BOTTOM_Y = PAGE.marginY + 24;
 
 const SECTION_SPACING = {
-  titleBottom: 12,
-  metricsTop: 2,
+  titleBottom: 18,
+  metricsTop: 0,
   metricsBottom: 2,
   overviewBottom: 8,
   notesBottom: 12,
@@ -1558,9 +1558,39 @@ const drawTitleBlock = (
   image: PDFImage | null,
   startY: number,
 ): number => {
-  const boxHeight = HERO_IMAGE.height + HERO_IMAGE.footerHeight;
-  const boxY = startY - boxHeight;
   const boxWidth = PAGE.width - PAGE.marginX * 2;
+  const textX = PAGE.marginX + 18;
+  const textWidth = boxWidth - 36;
+  const chipHeight = 17;
+  const chipGap = 6;
+  const chipRowGap = 6;
+  const titleLines = wrapPdfTextLines(sections.title, boldFont, 18, textWidth, 2);
+  const locationLines = wrapPdfTextLines(sections.location, regularFont, 10, textWidth, 2);
+  let chipRows = sections.titleMeta.length ? 1 : 0;
+  let chipRowWidth = 0;
+
+  sections.titleMeta.forEach((item) => {
+    const chipWidth = Math.min(
+      textWidth,
+      regularFont.widthOfTextAtSize(`${item.label}: ${item.value}`, 9) + 20,
+    );
+    if (chipRowWidth > 0 && chipRowWidth + chipWidth > textWidth) {
+      chipRows += 1;
+      chipRowWidth = 0;
+    }
+    chipRowWidth += chipWidth + chipGap;
+  });
+
+  const titleCursorOffset = HERO_IMAGE.footerHeight - 14;
+  const locationCursorOffset = titleCursorOffset - titleLines.length * 16 - 4;
+  const chipCursorOffset = locationCursorOffset - locationLines.length * 11 - 7;
+  const contentBottomOffset =
+    chipRows > 0
+      ? chipCursorOffset - (chipRows - 1) * (chipHeight + chipRowGap) - chipHeight + 3
+      : chipCursorOffset;
+  const footerHeight = HERO_IMAGE.footerHeight + Math.max(0, 10 - contentBottomOffset);
+  const boxHeight = HERO_IMAGE.height + footerHeight;
+  const boxY = startY - boxHeight;
   page.drawRectangle({
     x: PAGE.marginX,
     y: boxY,
@@ -1668,23 +1698,20 @@ const drawTitleBlock = (
     x: PAGE.marginX,
     y: footerY,
     width: boxWidth,
-    height: HERO_IMAGE.footerHeight,
+    height: footerHeight,
     color: COLORS.panelFill,
     borderColor: COLORS.border,
     borderWidth: 1,
   });
   page.drawRectangle({
     x: PAGE.marginX,
-    y: footerY + HERO_IMAGE.footerHeight - 4,
+    y: footerY + footerHeight - 4,
     width: boxWidth,
     height: 4,
     color: COLORS.brand,
   });
 
-  const textX = PAGE.marginX + 18;
-  const textWidth = boxWidth - 36;
-  const titleLines = wrapPdfTextLines(sections.title, boldFont, 18, textWidth, 2);
-  let cursorY = footerY + HERO_IMAGE.footerHeight - 14;
+  let cursorY = footerY + footerHeight - 14;
   titleLines.forEach((line, index) => {
     page.drawText(line, {
       x: textX,
@@ -1708,8 +1735,6 @@ const drawTitleBlock = (
   });
   cursorY -= locationLines.length * 11 + 7;
 
-  const chipHeight = 17;
-  const chipGap = 6;
   let chipX = textX;
   let chipY = cursorY;
   sections.titleMeta.forEach((item) => {

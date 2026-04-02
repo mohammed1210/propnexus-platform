@@ -295,4 +295,35 @@ describe('exportPropertyPdf', () => {
       ),
     ).toBe(true);
   });
+
+  it('keeps title metadata chips clear of the Deal Snapshot section', async () => {
+    const { exportPropertyPdf } = await import('./propertyPdfExport');
+
+    await exportPropertyPdf({
+      propertyId: 'prop-title-spacing',
+      property: {
+        title: 'Westrow Gardens, Ilford, IG3',
+        location: 'Westrow Gardens, Ilford, IG3',
+        property_type: 'Bungalow',
+        investment_type: 'BTL',
+        bedrooms: 6,
+        bathrooms: 3,
+        rent_monthly: 5833,
+        image_urls: ['https://images.example.com/cover.jpg'],
+      },
+      price: 1000000,
+      yieldPercent: 7,
+      roiPercent: 9.4,
+    });
+
+    const dealSnapshotCall = mockDrawText.mock.calls.find(([text]) => text === 'Deal Snapshot');
+    const chipBottoms = mockDrawRectangle.mock.calls
+      .map(([, options]) => options as { y?: number; height?: number })
+      .filter((options) => options.height === 17 && typeof options.y === 'number')
+      .map((options) => options.y as number);
+
+    expect(dealSnapshotCall).toBeDefined();
+    expect(chipBottoms.length).toBeGreaterThan(0);
+    expect((dealSnapshotCall?.[1] as { y?: number }).y).toBeLessThan(Math.min(...chipBottoms) - 10);
+  });
 });
