@@ -272,6 +272,16 @@ const cleanNarrativeSegment = (value: string): string => {
   return sentenceCase(cleaned);
 };
 
+const expandNarrativeSegment = (segment: string): string[] => {
+  const closeToSplit = segment.match(
+    /^(.*?\b(?:detached|semi-detached|terraced?|bungalow|maisonette|flat|apartment|house)\b)\s+close to\s+(.+)$/i,
+  );
+  if (!closeToSplit) return [segment];
+
+  const [, propertySignal, locationSignal] = closeToSplit;
+  return [sentenceCase(propertySignal.trim()), sentenceCase(`close to ${locationSignal.trim()}`)];
+};
+
 const trimTextLength = (value: string, maxLength: number): string => {
   if (value.length <= maxLength) return value;
   const slice = value.slice(0, maxLength - 1);
@@ -320,14 +330,17 @@ const scoreHighlightCandidate = (segment: string): number => {
     if (rule.pattern.test(segment)) score += rule.score;
   }
 
-  if (segment.length < 24 && score < 4) return -1;
-  if (segment.length < 14 && score < 6) return -1;
-
   if (/^[A-Z0-9][^.]{0,100}$/.test(segment)) score += 1;
   if (segment.length >= 35 && segment.length <= 90) score += 1;
+  if (/\b(detached|semi[- ]detached|terraced?|bungalow|maisonette|flat|apartment|house)\b/i.test(segment)) {
+    score += 2;
+  }
   if (/\b(close to|well located for|chain free|newly refurbished|refurbishment upside)\b/i.test(segment)) {
     score += 2;
   }
+
+  if (segment.length < 24 && score < 4) return -1;
+  if (segment.length < 14 && score < 6) return -1;
 
   return score;
 };
@@ -341,6 +354,7 @@ const extractDealHighlights = (
   const seen = new Set<string>();
   const highlights = splitNarrativeCandidates(description)
     .map(cleanNarrativeSegment)
+    .flatMap(expandNarrativeSegment)
     .map((segment) => trimTextLength(segment, 100))
     .filter((segment) => {
       const key = segment.toLowerCase();
@@ -384,6 +398,7 @@ const createExecutiveSummary = (
 
   const sentences = splitNarrativeCandidates(description)
     .map(cleanNarrativeSegment)
+    .flatMap(expandNarrativeSegment)
     .map((segment) => trimTextLength(segment, 120))
     .filter(Boolean)
     .filter((segment) => scoreHighlightCandidate(segment) >= 2);
