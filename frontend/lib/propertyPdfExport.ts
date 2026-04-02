@@ -132,6 +132,25 @@ const IMAGE_DIRECT_FIELDS = ['imageUrl', 'image_url', 'imageurl', 'thumbnail', '
 const IMAGE_COLLECTION_FIELDS = ['image_urls', 'imageUrls', 'images', 'photos'] as const;
 const IMAGE_OBJECT_KEYS = ['url', 'src', 'imageUrl', 'image_url'] as const;
 const MAX_INSIGHT_LENGTH = 420;
+const HIGHLIGHT_LIMIT = 6;
+const HIGHLIGHT_SIGNAL_RULES = [
+  { pattern: /\b(chain free|no onward chain|vacant possession)\b/i, score: 7 },
+  { pattern: /\b(detached|semi[- ]detached|terraced?|bungalow|maisonette|flat|apartment|house)\b/i, score: 3 },
+  { pattern: /\b\d+\s*(?:bed|bedroom)s?\b|\bbed(?:room)?s?\b/i, score: 5 },
+  { pattern: /\b\d+\s*(?:bath|bathroom)s?\b|\bbath(?:room)?s?\b/i, score: 4 },
+  { pattern: /\b(driveway|garage|parking|garden|reception room|loft|annexe|extension)\b/i, score: 4 },
+  { pattern: /\b(refurb(?:ishment)?|renovat(?:e|ion)|moderni[sz]ed|project|development|planning|upside|hmo|brrr|btl|buy to let|flip)\b/i, score: 5 },
+  { pattern: /\b(station|transport|rail|commuter|school|catchment|city centre|town centre|high street|amenities)\b/i, score: 4 },
+  { pattern: /\b(freehold|leasehold|tenanted|tenant demand|rental demand|yield|income)\b/i, score: 4 },
+] as const;
+const HIGHLIGHT_REJECT_PATTERNS = [
+  /\bmust be viewed\b/i,
+  /\bviewing (?:is )?highly recommended\b/i,
+  /\bearly viewing advised\b/i,
+  /\bcontact .* today\b/i,
+  /^\b(call|contact)\b/i,
+] as const;
+const TRAILING_CONNECTOR_PATTERN = /\b(?:a|an|and|for|from|in|into|near|of|on|the|to|with)$/i;
 
 const getImageCandidateUrl = (value: unknown): string | undefined => {
   const direct = getText(value);
@@ -182,25 +201,84 @@ export const resolvePrimaryImageUrl = (property: Record<string, unknown>): strin
 
 const createEmptyNotesState = (property: Record<string, unknown>): string => {
   const title = getText(property.title) ?? 'This property';
-  return `${title} does not currently include a narrative description. This report still captures the core investment metrics, property overview, and source link for review.`;
+  return `${title} does not include a narrative description in the live listing. This export still captures the core pricing, location, and screening data, but condition and layout should be checked against the source details before progressing.`;
 };
 
 const normalizeNarrativeText = (value: string): string => {
-  return value.replace(/\r/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
+  return value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+};
+
+const sentenceCase = (value: string): string => {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1);
+};
+
+const cleanPropertyType = (propertyType: string): string => {
+  return /unavailable/i.test(propertyType) ? 'Residential asset' : propertyType;
+};
+
+const cleanInvestmentType = (investmentType: string): string => {
+  return /unavailable/i.test(investmentType) ? 'investment' : investmentType;
+};
+
+const withIndefiniteArticle = (value: string): string => {
+  if (!value) return value;
+  return /^[aeiou]/i.test(value) ? `an ${value}` : `a ${value}`;
+};
+
+const formatBedroomBathroomValue = (bedrooms?: number, bathrooms?: number): string => {
+  if (typeof bedrooms === 'number' && typeof bathrooms === 'number') {
+    return `${bedrooms} bed / ${bathrooms} bath`;
+  }
+  if (typeof bedrooms === 'number') return `${bedrooms} bed`;
+  if (typeof bathrooms === 'number') return `${bathrooms} bath`;
+  return 'Not specified';
+};
+
+const cleanListingLanguage = (value: string): string => {
+  return value
+    .replace(/\bjust a stone'?s throw(?: away)? from\b/gi, 'close to')
+    .replace(/\bwithin easy reach of\b/gi, 'close to')
+    .replace(/\bideally located for\b/gi, 'well located for')
+    .replace(/\bperfectly positioned for\b/gi, 'well placed for')
+    .replace(/\bboasting\b/gi, 'with')
+    .replace(/\bbenefitting from\b/gi, 'with')
+    .replace(/\bbenefiting from\b/gi, 'with')
+    .replace(/\boffering\b/gi, 'with')
+    .replace(/\b(?:welcome to|introducing|presenting)\s+(?:this|a|an)?\s*/gi, '')
+    .replace(/\b(?:stunning|beautiful|immaculate|fantastic|wonderful|superb|exceptional|delightful|lovely|attractive|charming)\b/gi, '')
+    .replace(/\b(?:must be viewed|viewing is highly recommended|internal viewing is highly recommended|early viewing advised)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 };
 
 const cleanNarrativeSegment = (value: string): string => {
-  return value
+  const cleaned = cleanListingLanguage(value)
     .replace(/^[\s•*\-,:;]+/, '')
+    .replace(/^(?:this|the)\s+(?:property|home)\s+/i, '')
+    .replace(/^(?:and|with|plus|including)\s+/i, '')
     .replace(/[\s,;:]+$/g, '')
+    .replace(/\s+[/-]\s+$/, '')
     .replace(/\s+/g, ' ')
     .trim();
+  return sentenceCase(cleaned);
 };
 
 const trimTextLength = (value: string, maxLength: number): string => {
   if (value.length <= maxLength) return value;
   const slice = value.slice(0, maxLength - 1);
-  const trimmed = slice.slice(0, Math.max(0, slice.lastIndexOf(' '))).trim();
+  let trimmed = slice.slice(0, Math.max(0, slice.lastIndexOf(' '))).trim();
+  while (TRAILING_CONNECTOR_PATTERN.test(trimmed)) {
+    trimmed = trimmed.replace(/\s+\S+$/, '').trim();
+  }
   return `${trimmed || slice.trim()}…`;
 };
 
@@ -211,11 +289,47 @@ const createFallbackHighlights = (
   bedrooms?: number,
   bathrooms?: number,
 ): string[] => {
-  return [
-    `${propertyType} opportunity in ${location}`,
-    `Investment profile: ${investmentType}`,
-    `Accommodation: ${bedrooms ?? 'N/A'} bedrooms and ${bathrooms ?? 'N/A'} bathrooms`,
-  ];
+  const resolvedPropertyType = cleanPropertyType(propertyType);
+  const resolvedInvestmentType = cleanInvestmentType(investmentType);
+  const highlights = [`${resolvedPropertyType} opportunity in ${location}`];
+
+  if (typeof bedrooms === 'number' || typeof bathrooms === 'number') {
+    highlights.push(`Configured as ${formatBedroomBathroomValue(bedrooms, bathrooms).toLowerCase()}`);
+  }
+
+  highlights.push(`Aligned to ${withIndefiniteArticle(resolvedInvestmentType)} strategy`);
+  highlights.push('Review the live listing to confirm finish, layout, and execution detail');
+
+  return highlights.slice(0, 4);
+};
+
+const splitNarrativeCandidates = (description: string): string[] => {
+  return normalizeNarrativeText(description)
+    .split(/(?:\n+|[•*]+|;\s+|(?<=[.!?])\s+)/)
+    .flatMap((segment) => segment.split(/\s*[—–]\s*/))
+    .flatMap((segment) => segment.split(/,\s+/))
+    .flatMap((segment) => segment.split(/\s+\band\b\s+/i));
+};
+
+const scoreHighlightCandidate = (segment: string): number => {
+  if (segment.length > 120) return -1;
+  if (HIGHLIGHT_REJECT_PATTERNS.some((pattern) => pattern.test(segment))) return -1;
+
+  let score = 0;
+  for (const rule of HIGHLIGHT_SIGNAL_RULES) {
+    if (rule.pattern.test(segment)) score += rule.score;
+  }
+
+  if (segment.length < 24 && score < 4) return -1;
+  if (segment.length < 14) return -1;
+
+  if (/^[A-Z0-9][^.]{0,100}$/.test(segment)) score += 1;
+  if (segment.length >= 35 && segment.length <= 90) score += 1;
+  if (/\b(close to|well located for|chain free|newly refurbished|refurbishment upside)\b/i.test(segment)) {
+    score += 2;
+  }
+
+  return score;
 };
 
 const extractDealHighlights = (
@@ -224,23 +338,21 @@ const extractDealHighlights = (
 ): string[] => {
   if (!description) return fallbackHighlights;
 
-  const normalized = normalizeNarrativeText(description);
-  const rawSegments = normalized
-    .split(/(?:\n+|[•*]+|;\s+|,\s+)/)
-    .flatMap((segment) => segment.split(/(?<=[.!?])\s+/));
-
   const seen = new Set<string>();
-  const highlights = rawSegments
+  const highlights = splitNarrativeCandidates(description)
     .map(cleanNarrativeSegment)
-    .filter((segment) => segment.length >= 18)
+    .map((segment) => trimTextLength(segment, 100))
     .filter((segment) => {
       const key = segment.toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     })
-    .map((segment) => trimTextLength(segment, 120))
-    .slice(0, 6);
+    .map((segment) => ({ segment, score: scoreHighlightCandidate(segment) }))
+    .filter(({ score }) => score >= 2)
+    .sort((left, right) => right.score - left.score || left.segment.length - right.segment.length)
+    .map(({ segment }) => segment)
+    .slice(0, HIGHLIGHT_LIMIT);
 
   return highlights.length ? highlights : fallbackHighlights;
 };
@@ -248,20 +360,51 @@ const extractDealHighlights = (
 const createExecutiveSummary = (
   description: string | undefined,
   fallbackText: string,
+  location: string,
+  propertyType: string,
+  investmentType: string,
+  bedrooms: number | undefined,
+  bathrooms: number | undefined,
   highlights: string[],
 ): string => {
-  if (!description) return fallbackText;
+  const resolvedPropertyType = cleanPropertyType(propertyType);
+  const resolvedInvestmentType = cleanInvestmentType(investmentType);
+  const accommodation = formatBedroomBathroomValue(bedrooms, bathrooms).toLowerCase();
+  const introParts = [`This ${resolvedInvestmentType} opportunity focuses on a ${resolvedPropertyType.toLowerCase()}`];
+  if (accommodation !== 'not specified') introParts.push(`with a ${accommodation} layout`);
+  introParts.push(`in ${location}.`);
+  const intro = introParts.join(' ').replace(/\s+\./, '.');
 
-  const normalized = normalizeNarrativeText(description);
-  const sentences = normalized
-    .split(/(?<=[.!?])\s+/)
+  if (!description) {
+    return trimTextLength(
+      `${intro} Narrative detail is limited in the live listing, so finish, configuration, and condition should be confirmed directly from the source before underwriting.`,
+      360,
+    );
+  }
+
+  const sentences = splitNarrativeCandidates(description)
     .map(cleanNarrativeSegment)
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((segment) => scoreHighlightCandidate(segment) >= 1);
 
-  const summary = trimTextLength(sentences.slice(0, 3).join(' '), 360);
-  if (summary.length >= 80) return summary;
+  const highlightKeys = new Set(
+    highlights.map((highlight) => highlight.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()),
+  );
+  const supportingPoints = sentences.filter((segment) => {
+    const key = segment.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    return key && !highlightKeys.has(key);
+  });
 
-  return trimTextLength(highlights.slice(0, 3).join('. '), 320);
+  const summaryParts = [intro];
+  if (supportingPoints.length) {
+    summaryParts.push(`${supportingPoints.slice(0, 3).join('. ')}.`);
+  } else if (highlights.length) {
+    summaryParts.push(`Key listing signals include ${highlights.slice(0, 2).map((item) => item.toLowerCase()).join(' and ')}.`);
+  } else {
+    summaryParts.push(fallbackText);
+  }
+
+  return trimTextLength(summaryParts.join(' ').replace(/\.\s*\./g, '.'), 520);
 };
 
 const classifyYield = (value: number | undefined): string | undefined => {
@@ -355,8 +498,8 @@ const describeOpportunity = (
 export const createInvestmentInsight = (input: PropertyPdfExportInput): string => {
   const property = input.property ?? {};
   const location = getText(property.location) ?? 'the stated location';
-  const propertyType = getText(property.propertyType ?? property.property_type) ?? 'property';
-  const investmentType = getText(property.investmentType ?? property.investment_type) ?? 'investment';
+  const propertyType = cleanPropertyType(getText(property.propertyType ?? property.property_type) ?? 'property');
+  const investmentType = cleanInvestmentType(getText(property.investmentType ?? property.investment_type) ?? 'investment');
   const bedrooms = toNumber(property.bedrooms);
   const description = getText(property.description);
   const highlights = extractDealHighlights(
@@ -381,31 +524,56 @@ export const createInvestmentInsight = (input: PropertyPdfExportInput): string =
   const roiTone = classifyRoi(roiPercent);
   const discountTone = classifyDiscount(discountPercent);
 
-  const insightSentences = [`This appears to be a ${opportunity} in ${location}.`];
+  const insightSentences = [`This screens as a ${opportunity} in ${location}.`];
 
   const metricClauses: string[] = [];
   if (yieldTone && typeof yieldPercent === 'number') {
-    metricClauses.push(`Yield looks ${yieldTone} at ${yieldPercent.toFixed(1)}%`);
+    metricClauses.push(`yield is ${yieldTone} at ${yieldPercent.toFixed(1)}%`);
   }
   if (roiTone && typeof roiPercent === 'number') {
-    metricClauses.push(`ROI screens as ${roiTone} at ${roiPercent.toFixed(1)}%`);
+    metricClauses.push(`ROI looks ${roiTone} at ${roiPercent.toFixed(1)}%`);
   }
-  if (discountTone && typeof discountPercent === 'number') {
-    metricClauses.push(`pricing indicates a ${discountTone} ${discountPercent.toFixed(1)}% discount`);
-  }
-
   if (metricClauses.length) {
-    insightSentences.push(`${metricClauses.join(', ')}.`);
+    insightSentences.push(
+      `Current returns suggest ${metricClauses.join(' while ')}, which points to ${strategy}.`,
+    );
+  } else if (typeof discountPercent === 'number' && discountTone) {
+    insightSentences.push(
+      `Pricing currently indicates a ${discountTone} ${discountPercent.toFixed(1)}% discount, but income assumptions still need to be validated against the live listing.`,
+    );
   } else {
-    insightSentences.push('The current dataset is light, so the numbers should be validated against the live listing before committing to an execution plan.');
+    insightSentences.push(
+      'Headline return data is incomplete, so pricing, rent, and exit assumptions should be validated before moving beyond initial screening.',
+    );
   }
 
-  const strategyTail = demandSignal
-    ? `with listing signals pointing to ${demandSignal}`
-    : 'with the listing still requiring source-level diligence';
-  insightSentences.push(`The current profile suggests ${strategy}, ${strategyTail}.`);
+  const diligenceTail = demandSignal
+    ? `Listing detail also points to ${demandSignal}, which may support the case once source diligence is complete.`
+    : 'Source-level diligence is still needed to confirm condition, timing, and execution risk.';
+  insightSentences.push(diligenceTail);
 
   return trimTextLength(insightSentences.join(' '), MAX_INSIGHT_LENGTH);
+};
+
+const stripUrlProtocol = (value: string): string => value.replace(/^https?:\/\//i, '').replace(/^www\./i, '');
+
+const truncateMiddle = (value: string, maxLength: number): string => {
+  if (value.length <= maxLength) return value;
+  const keepStart = Math.max(12, Math.ceil((maxLength - 1) * 0.68));
+  const keepEnd = Math.max(8, maxLength - keepStart - 1);
+  return `${value.slice(0, keepStart).replace(/[/?#=&-]+$/g, '')}…${value.slice(-keepEnd)}`;
+};
+
+const formatSourceUrlDisplay = (value: string, maxLength = 76): string => {
+  if (value === 'Source URL unavailable') return value;
+
+  try {
+    const url = new URL(value);
+    const normalized = `${url.hostname.replace(/^www\./i, '')}${url.pathname}${url.search}`.replace(/\/$/, '');
+    return truncateMiddle(normalized || stripUrlProtocol(value), maxLength);
+  } catch {
+    return truncateMiddle(stripUrlProtocol(value), maxLength);
+  }
 };
 
 export const createPropertyPdfFilename = (input: PropertyPdfExportInput): string => {
@@ -423,10 +591,10 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
   const title = getText(property.title) ?? `Property ${input.propertyId}`;
   const location = getText(property.location) ?? 'Location unavailable';
   const propertyType = getText(property.propertyType ?? property.property_type) ?? 'Property type unavailable';
-  const investmentType =
-    getText(property.investmentType ?? property.investment_type) ?? 'Investment type unavailable';
+  const investmentType = getText(property.investmentType ?? property.investment_type) ?? 'Investment type unavailable';
   const bedrooms = toNumber(property.bedrooms);
   const bathrooms = toNumber(property.bathrooms);
+  const bedroomBathroomValue = formatBedroomBathroomValue(bedrooms, bathrooms);
   const exportedAt = formatDate();
   const sourceUrl = input.url ?? 'Source URL unavailable';
 
@@ -456,22 +624,19 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
     { label: 'Estimated Rent (PCM)', value: formatCurrency(rent) },
     { label: 'Yield', value: formatPercent(derivedYield) },
     { label: 'ROI', value: formatPercent(derivedRoi) },
-    { label: 'Discount', value: formatPercent(derivedDiscount) },
+    { label: 'Discount', value: typeof derivedDiscount === 'number' ? formatPercent(derivedDiscount) : 'Pending' },
     {
       label: 'AI Score',
-      value: typeof input.aiScore === 'number' ? `${input.aiScore.toFixed(1)}/10` : 'N/A',
+      value: typeof input.aiScore === 'number' ? `${input.aiScore.toFixed(1)}/10` : 'Not scored',
     },
   ];
 
   const overview: ExportMetric[] = [
     { label: 'Property ID', value: input.propertyId || 'N/A' },
     { label: 'Location', value: location },
-    { label: 'Property Type', value: propertyType },
-    { label: 'Investment Type', value: investmentType },
-    {
-      label: 'Bedrooms / Bathrooms',
-      value: `${bedrooms ?? 'N/A'} / ${bathrooms ?? 'N/A'}`,
-    },
+    { label: 'Property Type', value: cleanPropertyType(propertyType) },
+    { label: 'Investment Type', value: cleanInvestmentType(investmentType) },
+    { label: 'Bedrooms / Bathrooms', value: bedroomBathroomValue },
     { label: 'Source URL', value: sourceUrl },
   ];
 
@@ -481,7 +646,16 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
     description,
     createFallbackHighlights(location, propertyType, investmentType, bedrooms, bathrooms),
   );
-  const notes = createExecutiveSummary(description, fallbackNotes, highlights);
+  const notes = createExecutiveSummary(
+    description,
+    fallbackNotes,
+    location,
+    propertyType,
+    investmentType,
+    bedrooms,
+    bathrooms,
+    highlights,
+  );
   const investmentInsight = createInvestmentInsight(input);
 
   return {
@@ -491,9 +665,9 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
     title,
     location,
     titleMeta: [
-      { label: 'Property Type', value: propertyType },
-      { label: 'Bedrooms / Bathrooms', value: `${bedrooms ?? 'N/A'} / ${bathrooms ?? 'N/A'}` },
-      { label: 'Investment Type', value: investmentType },
+      { label: 'Property Type', value: cleanPropertyType(propertyType) },
+      { label: 'Bedrooms / Bathrooms', value: bedroomBathroomValue },
+      { label: 'Investment Type', value: cleanInvestmentType(investmentType) },
     ],
     metrics,
     highlights,
@@ -625,6 +799,24 @@ const ellipsizeToWidth = (text: string, font: PDFFont, size: number, maxWidth: n
   return `${value.trimEnd()}…`;
 };
 
+const ellipsizeMiddleToWidth = (text: string, font: PDFFont, size: number, maxWidth: number): string => {
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+
+  let start = Math.ceil(text.length * 0.68);
+  let end = Math.max(8, text.length - start - 1);
+  while (start > 8 && end > 6) {
+    const candidate = `${text.slice(0, start).trimEnd()}…${text.slice(text.length - end).trimStart()}`;
+    if (font.widthOfTextAtSize(candidate, size) <= maxWidth) return candidate;
+    if (start >= end) {
+      start -= 1;
+    } else {
+      end -= 1;
+    }
+  }
+
+  return ellipsizeToWidth(text, font, size, maxWidth);
+};
+
 const wrapPdfTextLines = (
   text: string,
   font: PDFFont,
@@ -735,7 +927,7 @@ const drawMetricCards = (
   regularFont: PDFFont,
   boldFont: PDFFont,
 ): PdfState => {
-  let next = ensurePdfSpace(pdfDoc, state, 126);
+  let next = ensurePdfSpace(pdfDoc, state, 132);
   next.page.drawText('Deal Snapshot', {
     x: PAGE.marginX,
     y: next.cursorY,
@@ -743,14 +935,14 @@ const drawMetricCards = (
     font: boldFont,
     color: COLORS.brandDark,
   });
-  next.page.drawText('Investment highlights arranged for a fast first read.', {
+  next.page.drawText('Headline metrics prioritised for a fast investor read.', {
     x: PAGE.marginX,
     y: next.cursorY - 14,
     size: 8.5,
     font: regularFont,
     color: COLORS.muted,
   });
-  next = { ...next, cursorY: next.cursorY - 24 };
+  next = { ...next, cursorY: next.cursorY - 28 };
 
   const columns = 3;
   const gap = 7;
@@ -762,14 +954,16 @@ const drawMetricCards = (
     const column = index % columns;
     const x = PAGE.marginX + column * (cardWidth + gap);
     const y = next.cursorY - row * (cardHeight + gap);
-    const featured = ['Yield', 'ROI', 'Discount'].includes(metric.label) && metric.value !== 'N/A';
+    const placeholder = ['Pending', 'Not scored', 'Unavailable'].includes(metric.value);
+    const featured = ['Yield', 'ROI', 'Discount'].includes(metric.label) && metric.value !== 'N/A' && !placeholder;
+    const valueFontSize = metric.value.length > 10 ? 13 : featured ? 18 : 16;
 
     next.page.drawRectangle({
       x,
       y: y - cardHeight,
       width: cardWidth,
       height: cardHeight,
-      color: featured ? COLORS.accentSoft : COLORS.panelFill,
+      color: placeholder ? COLORS.highlightFill : featured ? COLORS.accentSoft : COLORS.panelFill,
       borderColor: COLORS.border,
       borderWidth: 1,
     });
@@ -790,9 +984,9 @@ const drawMetricCards = (
     next.page.drawText(metric.value || 'N/A', {
       x: x + 12,
       y: y - 39,
-      size: featured ? 18 : 16,
+      size: valueFontSize,
       font: boldFont,
-      color: COLORS.brandDark,
+      color: placeholder ? COLORS.muted : COLORS.brandDark,
     });
   });
 
@@ -1013,13 +1207,13 @@ const drawOverviewGrid = (
     });
     const valueLines =
       item.label === 'Source URL'
-        ? wrapPdfTextLines(item.value || 'N/A', regularFont, 9, columnWidth, 2)
+        ? wrapPdfTextLines(formatSourceUrlDisplay(item.value || 'N/A', 62), regularFont, 8.75, columnWidth, 2)
         : wrapPdfTextLines(item.value || 'N/A', regularFont, 9.5, columnWidth, 2);
     valueLines.forEach((line, lineIndex) => {
       next.page.drawText(line, {
         x: baseX,
         y: topY - 9 - lineIndex * 8,
-        size: item.label === 'Source URL' ? 9 : 9.5,
+        size: item.label === 'Source URL' ? 8.75 : 9.5,
         font: lineIndex === 0 ? boldFont : regularFont,
         color: COLORS.text,
       });
@@ -1202,7 +1396,7 @@ const drawFooter = (
     font: boldFont,
     color: COLORS.brand,
   });
-  page.drawText(ellipsizeToWidth(sections.sourceUrl, regularFont, 8.5, 220), {
+  page.drawText(ellipsizeMiddleToWidth(formatSourceUrlDisplay(sections.sourceUrl, 58), regularFont, 8.5, 220), {
     x: PAGE.marginX + 58,
     y: y + 2,
     size: 8.5,
@@ -1490,7 +1684,7 @@ const drawTitleBlock = (
   const textX = PAGE.marginX + 18;
   const textWidth = boxWidth - 36;
   const titleLines = wrapPdfTextLines(sections.title, boldFont, 18, textWidth, 2);
-  let cursorY = footerY + HERO_IMAGE.footerHeight - 16;
+  let cursorY = footerY + HERO_IMAGE.footerHeight - 14;
   titleLines.forEach((line, index) => {
     page.drawText(line, {
       x: textX,
@@ -1500,7 +1694,7 @@ const drawTitleBlock = (
       color: COLORS.brandDark,
     });
   });
-  cursorY -= titleLines.length * 16 + 2;
+  cursorY -= titleLines.length * 16 + 4;
 
   const locationLines = wrapPdfTextLines(sections.location, regularFont, 10, textWidth, 2);
   locationLines.forEach((line, index) => {
@@ -1512,10 +1706,10 @@ const drawTitleBlock = (
       color: COLORS.muted,
     });
   });
-  cursorY -= locationLines.length * 11 + 5;
+  cursorY -= locationLines.length * 11 + 7;
 
-  const chipHeight = 16;
-  const chipGap = 5;
+  const chipHeight = 17;
+  const chipGap = 6;
   let chipX = textX;
   let chipY = cursorY;
   sections.titleMeta.forEach((item) => {
