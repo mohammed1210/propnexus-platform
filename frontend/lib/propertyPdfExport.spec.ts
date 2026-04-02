@@ -194,4 +194,57 @@ describe('propertyPdfExport rent parsing', () => {
 
     expect(sections.imageUrl).toBe('https://images.example.com/cover.jpg');
   });
+
+  it('resolves stringified image_urls JSON arrays', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p10',
+      property: {
+        title: 'Deal 10',
+        location: 'York',
+        image_urls: JSON.stringify([
+          'https://images.example.com/hero-one.jpg',
+          'https://images.example.com/hero-two.jpg',
+        ]),
+      },
+    });
+
+    expect(sections.imageUrl).toBe('https://images.example.com/hero-one.jpg');
+  });
+
+  it('resolves image collections containing objects', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p11',
+      property: {
+        title: 'Deal 11',
+        location: 'Derby',
+        photos: [{ src: 'https://images.example.com/object-cover.jpg' }],
+      },
+    });
+
+    expect(sections.imageUrl).toBe('https://images.example.com/object-cover.jpg');
+  });
+
+  it('builds a deterministic investment insight from realistic property data', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p12',
+      property: {
+        title: 'Deal 12',
+        location: 'Ilford',
+        property_type: 'House',
+        investment_type: 'BRRR',
+        bedrooms: 3,
+        bathrooms: 1,
+        price: 285000,
+        rent_monthly: 1750,
+        description:
+          'Strong local rental demand, refurbishment upside, and good commuter access create a practical family-house proposition.',
+      },
+      roiPercent: 9.8,
+      discountPercent: 11.2,
+    });
+
+    expect(sections.investmentInsight).toContain('This appears to be a value-add BRRR opportunity');
+    expect(sections.investmentInsight).toContain('Yield looks');
+    expect(sections.investmentInsight).toContain('The current profile suggests');
+  });
 });
