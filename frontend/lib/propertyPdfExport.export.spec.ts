@@ -116,7 +116,7 @@ describe('exportPropertyPdf', () => {
     );
     expect(mockAddPage).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledWith(
-      '/api/pdf-image?url=https%3A%2F%2Fimages.example.com%2Fcover.jpg',
+      '/api/pdf-image?host=images.example.com&protocol=https%3A&path=%2Fcover.jpg',
       expect.objectContaining({
         method: 'GET',
         cache: 'no-store',

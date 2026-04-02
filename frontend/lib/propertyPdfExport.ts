@@ -9,6 +9,7 @@ import {
   type PDFPage,
 } from 'pdf-lib';
 import { getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
+import { buildPdfImageProxyPath, isUnsafePdfImageUrl } from '@/lib/pdfImageProxy';
 
 type ExportMetric = {
   label: string;
@@ -130,7 +131,7 @@ const getText = (value: unknown): string | undefined => {
 const IMAGE_DIRECT_FIELDS = ['imageUrl', 'image_url', 'imageurl', 'thumbnail', 'cover_photo_url'] as const;
 const IMAGE_COLLECTION_FIELDS = ['image_urls', 'imageUrls', 'images', 'photos'] as const;
 const IMAGE_OBJECT_KEYS = ['url', 'src', 'imageUrl', 'image_url'] as const;
-const HTTP_PROTOCOLS = new Set(['http:', 'https:']);
+const MAX_INSIGHT_LENGTH = 420;
 
 const getImageCandidateUrl = (value: unknown): string | undefined => {
   const direct = getText(value);
@@ -158,6 +159,11 @@ const parseImageCollection = (value: unknown): unknown[] => {
   }
 };
 
+/**
+ * Resolves the best available listing image from the property payload.
+ * Direct fields win first; collection fields support raw arrays, JSON-stringified arrays,
+ * and arrays of objects containing common image URL keys.
+ */
 export const resolvePrimaryImageUrl = (property: Record<string, unknown>): string | undefined => {
   for (const field of IMAGE_DIRECT_FIELDS) {
     const url = getImageCandidateUrl(property[field]);
@@ -260,6 +266,11 @@ const createExecutiveSummary = (
 
 const classifyYield = (value: number | undefined): string | undefined => {
   if (typeof value !== 'number') return undefined;
+  // Yield classification thresholds representing investment criteria:
+  // - 7%+: solid return, strong investment
+  // - 5.5-7%: steady return, reliable income
+  // - 4.5-5.5%: modest return, acceptable baseline
+  // - <4.5%: weak return, below target threshold
   if (value >= 7) return 'solid';
   if (value >= 5.5) return 'steady';
   if (value >= 4.5) return 'modest';
@@ -386,7 +397,7 @@ export const createInvestmentInsight = (input: PropertyPdfExportInput): string =
   if (metricClauses.length) {
     insightSentences.push(`${metricClauses.join(', ')}.`);
   } else {
-    insightSentences.push('The current data set is light, so the numbers should be validated against the live listing before committing to an execution plan.');
+    insightSentences.push('The current dataset is light, so the numbers should be validated against the live listing before committing to an execution plan.');
   }
 
   const strategyTail = demandSignal
@@ -394,7 +405,7 @@ export const createInvestmentInsight = (input: PropertyPdfExportInput): string =
     : 'with the listing still requiring source-level diligence';
   insightSentences.push(`The current profile suggests ${strategy}, ${strategyTail}.`);
 
-  return trimTextLength(insightSentences.join(' '), 420);
+  return trimTextLength(insightSentences.join(' '), MAX_INSIGHT_LENGTH);
 };
 
 export const createPropertyPdfFilename = (input: PropertyPdfExportInput): string => {
@@ -1292,35 +1303,19 @@ const resolveImageFormat = (
   return null;
 };
 
-const isPrivateImageHost = (hostname: string): boolean => {
-  const normalized = hostname.toLowerCase();
-  if (
-    normalized === 'localhost' ||
-    normalized === '0.0.0.0' ||
-    normalized === '::1' ||
-    normalized.endsWith('.local')
-  ) {
-    return true;
-  }
-  if (/^127\./.test(normalized) || /^10\./.test(normalized) || /^192\.168\./.test(normalized)) {
-    return true;
-  }
-  const private172 = normalized.match(/^172\.(\d{1,3})\./);
-  if (private172) {
-    const secondOctet = Number(private172[1]);
-    if (secondOctet >= 16 && secondOctet <= 31) return true;
-  }
-  return /^fc|^fd|^fe80/i.test(normalized);
-};
-
 const buildPropertyImageFetchTargets = (imageUrl: string): string[] => {
   const direct = getText(imageUrl);
-  if (!direct || typeof window === 'undefined') return [];
+  if (!direct) return [];
+  
+  // Defensive check: This function is intended for client use, but includes a check for server environments
+  if (typeof window === 'undefined') {
+    console.warn('buildPropertyImageFetchTargets called in server environment');
+    return [];
+  }
 
   try {
     const absolute = new URL(direct, window.location.origin);
-    if (!HTTP_PROTOCOLS.has(absolute.protocol) || absolute.username || absolute.password) return [];
-    if (absolute.hostname && isPrivateImageHost(absolute.hostname) && absolute.origin !== window.location.origin) {
+    if (isUnsafePdfImageUrl(absolute, window.location.origin)) {
       return [];
     }
 
@@ -1328,7 +1323,8 @@ const buildPropertyImageFetchTargets = (imageUrl: string): string[] => {
       return [absolute.toString()];
     }
 
-    return [`/api/pdf-image?url=${encodeURIComponent(absolute.toString())}`, absolute.toString()];
+    const proxyPath = buildPdfImageProxyPath(absolute.toString());
+    return proxyPath ? [proxyPath, absolute.toString()] : [absolute.toString()];
   } catch {
     return [];
   }
@@ -1393,6 +1389,11 @@ const drawTitleBlock = (
   });
 
   if (image) {
+    // Cover scaling uses Math.max to fill the hero area fully, which means the image
+    // will be cropped to fit. This creates a photographic feel rather than letterboxing.
+    // Tradeoff: Important image content may be cut off at the edges. This is acceptable
+    // for property photos where the focal point is typically centered. If this becomes
+    // an issue for specific use cases, consider making it configurable per property type.
     const imageScale = Math.max(boxWidth / image.width, HERO_IMAGE.height / image.height);
     const imageWidth = image.width * imageScale;
     const imageHeight = image.height * imageScale;

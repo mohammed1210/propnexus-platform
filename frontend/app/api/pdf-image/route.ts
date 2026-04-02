@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getAllowedPdfImageHost } from '@/lib/pdfImageProxy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const HTTP_PROTOCOLS = new Set(['http:', 'https:']);
 
 const noStoreHeaders = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -12,51 +11,28 @@ const noStoreHeaders = {
   'X-Robots-Tag': 'noindex',
 } as const;
 
-const isPrivateHost = (hostname: string): boolean => {
-  const normalized = hostname.toLowerCase();
-  if (
-    normalized === 'localhost' ||
-    normalized === '0.0.0.0' ||
-    normalized === '::1' ||
-    normalized.endsWith('.local')
-  ) {
-    return true;
-  }
-
-  if (/^127\./.test(normalized) || /^10\./.test(normalized) || /^192\.168\./.test(normalized)) {
-    return true;
-  }
-
-  const private172 = normalized.match(/^172\.(\d{1,3})\./);
-  if (private172) {
-    const secondOctet = Number(private172[1]);
-    if (secondOctet >= 16 && secondOctet <= 31) return true;
-  }
-
-  return /^fc|^fd|^fe80/i.test(normalized);
-};
-
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const target = searchParams.get('url')?.trim();
+  const host = searchParams.get('host')?.trim().toLowerCase();
+  const protocol = searchParams.get('protocol')?.trim();
+  const path = searchParams.get('path')?.trim();
 
-  if (!target) {
-    return NextResponse.json({ error: 'missing_url' }, { status: 400, headers: noStoreHeaders });
+  if (!host || !protocol || !path) {
+    return NextResponse.json({ error: 'missing_params' }, { status: 400, headers: noStoreHeaders });
   }
 
-  let parsed: URL;
+  const safeHost = getAllowedPdfImageHost(host);
+  if (!safeHost) {
+    return NextResponse.json({ error: 'unsupported_host' }, { status: 400, headers: noStoreHeaders });
+  }
+
+  if ((protocol !== 'http:' && protocol !== 'https:') || !path.startsWith('/') || path.startsWith('//')) {
+    return NextResponse.json({ error: 'invalid_target' }, { status: 400, headers: noStoreHeaders });
+  }
+
   try {
-    parsed = new URL(target);
-  } catch {
-    return NextResponse.json({ error: 'invalid_url' }, { status: 400, headers: noStoreHeaders });
-  }
-
-  if (!HTTP_PROTOCOLS.has(parsed.protocol) || parsed.username || parsed.password || isPrivateHost(parsed.hostname)) {
-    return NextResponse.json({ error: 'unsupported_url' }, { status: 400, headers: noStoreHeaders });
-  }
-
-  try {
-    const upstream = await fetch(parsed.toString(), {
+    const upstreamUrl = new URL(path, `${protocol}//${safeHost}`);
+    const upstream = await fetch(upstreamUrl.toString(), {
       method: 'GET',
       cache: 'no-store',
       headers: { Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8' },
@@ -70,7 +46,10 @@ export async function GET(request: Request) {
     }
 
     const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
-    if (!contentType.toLowerCase().startsWith('image/')) {
+    // Whitelist specific allowed image MIME types for stronger security
+    const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']);
+    const mimeType = contentType.toLowerCase().split(';')[0]; // Remove charset or other parameters
+    if (!allowedImageTypes.has(mimeType)) {
       return NextResponse.json({ error: 'invalid_content_type' }, { status: 415, headers: noStoreHeaders });
     }
 
