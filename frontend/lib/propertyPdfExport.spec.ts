@@ -206,6 +206,8 @@ describe('propertyPdfExport rent parsing', () => {
       ]),
     );
     expect(sections.highlights.join(' ')).not.toMatch(/welcome to|stunning|stone's throw/i);
+    expect(sections.notes).toContain('chain free');
+    expect(sections.notes).not.toMatch(/welcome to|stunning|stone's throw/i);
   });
 
   it('uses cleaner placeholder states for optional snapshot metrics', () => {

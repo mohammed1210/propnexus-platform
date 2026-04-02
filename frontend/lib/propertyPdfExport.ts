@@ -321,7 +321,7 @@ const scoreHighlightCandidate = (segment: string): number => {
   }
 
   if (segment.length < 24 && score < 4) return -1;
-  if (segment.length < 14) return -1;
+  if (segment.length < 14 && score < 6) return -1;
 
   if (/^[A-Z0-9][^.]{0,100}$/.test(segment)) score += 1;
   if (segment.length >= 35 && segment.length <= 90) score += 1;
@@ -384,8 +384,9 @@ const createExecutiveSummary = (
 
   const sentences = splitNarrativeCandidates(description)
     .map(cleanNarrativeSegment)
+    .map((segment) => trimTextLength(segment, 120))
     .filter(Boolean)
-    .filter((segment) => scoreHighlightCandidate(segment) >= 1);
+    .filter((segment) => scoreHighlightCandidate(segment) >= 2);
 
   const highlightKeys = new Set(
     highlights.map((highlight) => highlight.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()),
