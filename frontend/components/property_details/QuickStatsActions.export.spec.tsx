@@ -7,6 +7,11 @@ const mockExportPropertyPdf = jest.fn();
 const mockFetchWithRetry = jest.fn();
 const mockToastSuccess = jest.fn();
 const mockToastError = jest.fn();
+const mockRouteFetch = jest.fn();
+const clickSpy = jest.fn();
+const oldFetch = global.fetch;
+const oldCreateObjectURL = URL.createObjectURL;
+const oldRevokeObjectURL = URL.revokeObjectURL;
 
 jest.mock('@/lib/propertyPdfExport', () => ({
   exportPropertyPdf: (...args: unknown[]) => mockExportPropertyPdf(...args),
@@ -26,11 +31,28 @@ jest.mock('sonner', () => ({
 describe('QuickStatsActions PDF export', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    global.fetch = mockRouteFetch as any;
+    URL.createObjectURL = jest.fn(() => 'blob:route-pdf');
+    URL.revokeObjectURL = jest.fn();
+    HTMLAnchorElement.prototype.click = clickSpy;
     mockFetchWithRetry.mockResolvedValue({
       ok: false,
       json: async () => ({ data: [] }),
     });
     mockExportPropertyPdf.mockResolvedValue(undefined);
+    mockRouteFetch.mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob([Uint8Array.from([37, 80, 68, 70])], { type: 'application/pdf' }),
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'content-disposition' ? 'attachment; filename="propnexus-route.pdf"' : null),
+      },
+    });
+  });
+
+  afterEach(() => {
+    global.fetch = oldFetch;
+    URL.createObjectURL = oldCreateObjectURL;
+    URL.revokeObjectURL = oldRevokeObjectURL;
   });
 
   it('renders export actions in quick actions UI', () => {
@@ -48,7 +70,7 @@ describe('QuickStatsActions PDF export', () => {
     expect(screen.getAllByRole('button', { name: /export/i }).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('executes PDF export handler when export is clicked', async () => {
+  it('uses the template PDF route as the primary export path', async () => {
     render(
       <QuickStatsActions
         propertyId="prop-456"
@@ -64,20 +86,19 @@ describe('QuickStatsActions PDF export', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Export property details as PDF' }));
 
     await waitFor(() => {
-      expect(mockExportPropertyPdf).toHaveBeenCalledTimes(1);
       expect(mockToastSuccess).toHaveBeenCalledWith('PDF exported successfully.');
     });
 
-    expect(mockExportPropertyPdf).toHaveBeenCalledWith(
+    expect(mockRouteFetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/property-pdf/prop-456'),
       expect.objectContaining({
-        propertyId: 'prop-456',
-        price: 325000,
-        yieldPercent: 5.8,
-        roiPercent: 7.2,
-        discountPercent: 12.3,
-        aiScore: 8.9,
+        method: 'GET',
+        cache: 'no-store',
       }),
     );
+    expect(mockExportPropertyPdf).not.toHaveBeenCalled();
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(clickSpy).toHaveBeenCalledTimes(1);
   });
 
   it('does not crash export flow with sparse property data', async () => {
@@ -86,12 +107,16 @@ describe('QuickStatsActions PDF export', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Export property details as PDF' }));
 
     await waitFor(() => {
-      expect(mockExportPropertyPdf).toHaveBeenCalledTimes(1);
       expect(mockToastError).not.toHaveBeenCalled();
     });
+
+    expect(mockRouteFetch).toHaveBeenCalledTimes(1);
+    expect(mockExportPropertyPdf).not.toHaveBeenCalled();
   });
 
-  it('preserves property Yield/ROI for export when override props are omitted', async () => {
+  it('falls back to the pdf-lib exporter when the primary route fails', async () => {
+    mockRouteFetch.mockRejectedValueOnce(new Error('route failed'));
+
     render(
       <QuickStatsActions
         propertyId="prop-metrics"
@@ -103,6 +128,7 @@ describe('QuickStatsActions PDF export', () => {
 
     await waitFor(() => {
       expect(mockExportPropertyPdf).toHaveBeenCalledTimes(1);
+      expect(mockToastSuccess).toHaveBeenCalledWith('PDF exported successfully.');
     });
 
     expect(mockExportPropertyPdf).toHaveBeenCalledWith(

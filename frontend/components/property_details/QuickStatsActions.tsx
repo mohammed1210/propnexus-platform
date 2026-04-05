@@ -5,6 +5,7 @@ import { FiHeart, FiShare2, FiDownload, FiCopy, FiCheck } from 'react-icons/fi';
 import { toast } from 'sonner';
 import { fetchWithRetry } from '@/lib/api';
 import { exportPropertyPdf } from '@/lib/propertyPdfExport';
+import { createPropertyPdfFilename } from '@/lib/propertyDealPack';
 import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 type QuickStatsActionsProps = {
@@ -15,6 +16,12 @@ type QuickStatsActionsProps = {
   roiPercent?: number;
   discountPercent?: number;
   aiScore?: number;
+};
+
+const extractDownloadFilename = (contentDisposition: string | null): string | null => {
+  if (!contentDisposition) return null;
+  const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+  return filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/\"/g, '')) : null;
 };
 
 const formatValue = (value: number | undefined, format: 'currency' | 'percent' | 'score' = 'currency'): string => {
@@ -146,7 +153,7 @@ export default function QuickStatsActions({
   const handleExportPDF = async () => {
     try {
       setExporting(true);
-      await exportPropertyPdf({
+      const exportInput = {
         propertyId,
         property,
         url: typeof window !== 'undefined' ? window.location.href : undefined,
@@ -155,7 +162,38 @@ export default function QuickStatsActions({
         roiPercent: displayRoi,
         discountPercent,
         aiScore,
-      });
+      };
+
+      try {
+        const sourceUrl = typeof window !== 'undefined' ? window.location.href : undefined;
+        const response = await fetch(
+          `/api/property-pdf/${encodeURIComponent(propertyId)}${sourceUrl ? `?source=${encodeURIComponent(sourceUrl)}` : ''}`,
+          {
+            method: 'GET',
+            cache: 'no-store',
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`Template export failed (${response.status})`);
+        }
+
+        const blob = await response.blob();
+        const filename =
+          extractDownloadFilename(response.headers.get('content-disposition')) ?? createPropertyPdfFilename(exportInput);
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 100);
+      } catch (routeError) {
+        console.warn('Template PDF export failed, falling back to pdf-lib exporter.', routeError);
+        await exportPropertyPdf(exportInput);
+      }
+
       toast.success('PDF exported successfully.');
     } catch (err) {
       console.error(err);

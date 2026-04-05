@@ -18,6 +18,7 @@ const nextConfig = {
 
   // Silence multiple-lockfiles warning in monorepos
   outputFileTracingRoot: resolve(__dirname, ".."),
+  serverExternalPackages: ['@sparticuz/chromium', 'playwright-core'],
 
   // IMPORTANT: Fix "Invalid Server Actions request" in Codespaces / github.dev
   // Next compares the forwarded host (e.g. *.app.github.dev) with the Origin.
