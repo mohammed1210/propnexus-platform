@@ -150,6 +150,7 @@ const getText = (value: unknown): string | undefined => {
 const IMAGE_DIRECT_FIELDS = ['imageUrl', 'image_url', 'imageurl', 'thumbnail', 'cover_photo_url'] as const;
 const IMAGE_COLLECTION_FIELDS = ['image_urls', 'imageUrls', 'images', 'photos'] as const;
 const IMAGE_OBJECT_KEYS = ['url', 'src', 'imageUrl', 'image_url'] as const;
+// Keep insight copy concise so page one remains visually balanced in the template route and PDF output.
 const MAX_INSIGHT_LENGTH = 420;
 const HIGHLIGHT_LIMIT = 6;
 const HIGHLIGHT_SIGNAL_RULES = [
@@ -670,17 +671,19 @@ export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): Prope
   const summarySnapshot = sections.metrics.filter((metric) => ['Estimated Rent (PCM)', 'AI Score'].includes(metric.label));
   const supportingSections: DealPackSection[] = [
     {
-      title: sections.hasNarrativeDescription ? 'Executive Summary' : 'Summary Snapshot',
-      body: sections.hasNarrativeDescription ? executiveSummary : executiveSummaryPreview,
+      title: 'Source Notes',
+      body: sections.hasNarrativeDescription
+        ? [`Source reference: ${formatSourceUrlDisplay(sections.sourceUrl, 110)}`, sections.investmentInsight]
+        : executiveSummaryPreview,
     },
   ];
 
   const requiresSecondPage =
-    sections.notes.length > 360 ||
-    executiveSummary.length > 2 ||
+    sections.notes.length > 420 ||
+    executiveSummary.length > 3 ||
     sections.highlights.length > 5 ||
     sections.title.length > 90 ||
-    sections.sourceUrl.length > 90;
+    sections.sourceUrl.length > 110;
 
   return {
     filename: createPropertyPdfFilename(input),

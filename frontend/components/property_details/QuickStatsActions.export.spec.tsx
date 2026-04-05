@@ -40,15 +40,13 @@ describe('QuickStatsActions PDF export', () => {
       json: async () => ({ data: [] }),
     });
     mockExportPropertyPdf.mockResolvedValue(undefined);
-    mockRouteFetch.mockResolvedValue(
-      new Response(Uint8Array.from([37, 80, 68, 70]), {
-        status: 200,
-        headers: {
-          'content-type': 'application/pdf',
-          'content-disposition': 'attachment; filename="propnexus-route.pdf"',
-        },
-      }),
-    );
+    mockRouteFetch.mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob([Uint8Array.from([37, 80, 68, 70])], { type: 'application/pdf' }),
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'content-disposition' ? 'attachment; filename="propnexus-route.pdf"' : null),
+      },
+    });
   });
 
   afterEach(() => {

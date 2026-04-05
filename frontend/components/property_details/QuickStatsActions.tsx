@@ -18,6 +18,12 @@ type QuickStatsActionsProps = {
   aiScore?: number;
 };
 
+const extractDownloadFilename = (contentDisposition: string | null): string | null => {
+  if (!contentDisposition) return null;
+  const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+  return filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/\"/g, '')) : null;
+};
+
 const formatValue = (value: number | undefined, format: 'currency' | 'percent' | 'score' = 'currency'): string => {
   if (value === undefined || value === null || isNaN(value)) {
     return 'N/A';
@@ -173,11 +179,8 @@ export default function QuickStatsActions({
         }
 
         const blob = await response.blob();
-        const contentDisposition = response.headers.get('content-disposition') ?? '';
-        const filenameMatch = contentDisposition.match(/filename\\*?=(?:UTF-8''|\")?([^\";]+)/i);
-        const filename = filenameMatch
-          ? decodeURIComponent(filenameMatch[1].replace(/\"/g, ''))
-          : createPropertyPdfFilename(exportInput);
+        const filename =
+          extractDownloadFilename(response.headers.get('content-disposition')) ?? createPropertyPdfFilename(exportInput);
         const objectUrl = URL.createObjectURL(blob);
         const anchor = document.createElement('a');
         anchor.href = objectUrl;
@@ -185,7 +188,7 @@ export default function QuickStatsActions({
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 100);
       } catch (routeError) {
         console.warn('Template PDF export failed, falling back to pdf-lib exporter.', routeError);
         await exportPropertyPdf(exportInput);

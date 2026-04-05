@@ -6,6 +6,7 @@ import { fetchPropertyById, getOptionalClerkUserId } from '@/lib/server/property
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Browser launch + page render + image loading can exceed the default serverless budget.
 export const maxDuration = 60;
 
 const noStoreHeaders = {
@@ -42,7 +43,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 
     const pdfBytes = await renderDealPackPdfFromUrl(dealPackUrl.toString());
 
-    return new NextResponse(pdfBytes, {
+    return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         ...noStoreHeaders,

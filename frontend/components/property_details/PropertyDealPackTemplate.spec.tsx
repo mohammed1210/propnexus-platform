@@ -33,7 +33,7 @@ describe('PropertyDealPackTemplate', () => {
     expect(screen.getByText('Deal Highlights')).toBeInTheDocument();
     expect(screen.getByText('Investment Insight')).toBeInTheDocument();
     expect(screen.getByText('Asset Overview')).toBeInTheDocument();
-    expect(screen.getByText('Executive Summary')).toBeInTheDocument();
+    expect(screen.getAllByText('Executive Summary').length).toBeGreaterThan(0);
     expect(container.querySelector('[data-page-count="1"]')).toBeTruthy();
     expect(screen.queryByText('Visual unavailable')).not.toBeInTheDocument();
   });

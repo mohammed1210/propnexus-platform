@@ -24,6 +24,7 @@ const waitForAssets = async (page: Page) => {
 };
 
 export async function renderDealPackPdfFromUrl(url: string): Promise<Uint8Array> {
+  // Allow local/dev environments to provide a native Chrome path while Vercel/serverless uses Sparticuz Chromium.
   const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || (await chromium.executablePath());
   const browser = await playwrightChromium.launch({
     args: chromium.args,
