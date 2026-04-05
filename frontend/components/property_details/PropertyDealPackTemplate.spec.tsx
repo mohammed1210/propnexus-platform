@@ -5,9 +5,9 @@ import PropertyDealPackTemplate from './PropertyDealPackTemplate';
 import { buildPropertyDealPackModel } from '@/lib/propertyDealPack';
 
 describe('PropertyDealPackTemplate', () => {
-  it('keeps medium listings on a single compact page and groups the print sections', () => {
+  it('defaults limited-data listings to a lean single-page pack and omits placeholder-heavy sections', () => {
     const model = buildPropertyDealPackModel({
-      propertyId: 'deal-compact',
+      propertyId: 'deal-lean',
       property: {
         title: 'Central Leeds Apartment With Refreshed Interiors And Strong Commuter Appeal',
         location: 'Leeds',
@@ -23,37 +23,26 @@ describe('PropertyDealPackTemplate', () => {
       yieldPercent: 7,
       roiPercent: 10.4,
       aiScore: 8.8,
-      url: 'https://app.example/property/deal-compact?utm_source=propnexus&utm_medium=export&utm_campaign=medium-pack-layout-check',
+      url: 'https://app.example/property/deal-lean',
     });
 
     const { container } = render(<PropertyDealPackTemplate model={model} />);
 
-    // Header content
-    expect(screen.getAllByText('PropNexus').length).toBeGreaterThan(0);
-    expect(screen.getByText('Investor Deal Pack')).toBeInTheDocument();
-    // Section labels
-    expect(screen.getByText('Deal Snapshot')).toBeInTheDocument();
-    expect(screen.getByText('Deal Highlights')).toBeInTheDocument();
-    expect(screen.getByText('Property Details')).toBeInTheDocument();
-    expect(screen.getByText('Area & Demand')).toBeInTheDocument();
-    expect(screen.getByText('Financial Breakdown')).toBeInTheDocument();
-    expect(screen.getByText('Investment Insight')).toBeInTheDocument();
-    expect(screen.getAllByText(/Summary/i).length).toBeGreaterThan(0);
-    // Compact deal: single page
+    expect(screen.getByText('Lean pack')).toBeInTheDocument();
+    expect(screen.getByText('Snapshot')).toBeInTheDocument();
+    expect(screen.getByText('Highlights')).toBeInTheDocument();
+    expect(screen.getByText('Financial Snapshot')).toBeInTheDocument();
+    expect(screen.getByText('Investment View')).toBeInTheDocument();
+    expect(screen.getByText('Summary')).toBeInTheDocument();
+    expect(screen.queryByText('Asset Overview')).not.toBeInTheDocument();
+    expect(screen.queryByText('Area Context')).not.toBeInTheDocument();
     expect(container.querySelector('[data-page-count="1"]')).toBeTruthy();
-    // Print-block data attributes
-    expect(container.querySelector('[data-deal-pack-section="snapshot"][data-print-block="keep"]')).toBeTruthy();
-    expect(container.querySelector('[data-deal-pack-section="highlights"][data-print-block="keep"]')).toBeTruthy();
-    expect(container.querySelector('[data-deal-pack-section="property-details"][data-print-block="keep"]')).toBeTruthy();
-    expect(container.querySelector('[data-deal-pack-section="area-demand"][data-print-block="keep"]')).toBeTruthy();
-    expect(container.querySelector('[data-deal-pack-section="financial"][data-print-block="keep"]')).toBeTruthy();
-    expect(container.querySelector('[data-deal-pack-section="insight"][data-print-block="keep"]')).toBeTruthy();
-    expect(container.querySelector('[data-deal-pack-section="summary"][data-print-block="keep"]')).toBeTruthy();
-    // Image present — no fallback
+    expect(container.querySelector('[data-deal-pack-section="property-details"]')).toBeFalsy();
+    expect(container.querySelector('[data-deal-pack-section="area-demand"]')).toBeFalsy();
     expect(screen.queryByText(/Visual unavailable/i)).not.toBeInTheDocument();
   });
 
-  it('renders a polished fallback block when the listing has no image', () => {
+  it('renders a polished compact fallback block when the listing has no image', () => {
     const model = buildPropertyDealPackModel({
       propertyId: 'deal-no-image',
       property: {
@@ -68,10 +57,11 @@ describe('PropertyDealPackTemplate', () => {
     render(<PropertyDealPackTemplate model={model} />);
 
     expect(screen.getByText(/Visual unavailable/i)).toBeInTheDocument();
-    expect(screen.getByText(/captures pricing, strategy, and source-level context/i)).toBeInTheDocument();
+    expect(screen.getByText(/pricing, strategy, and source context remain available below/i)).toBeInTheDocument();
+    expect(screen.getByText(/Review the live listing for photos/i)).toBeInTheDocument();
   });
 
-  it('adds a second printable page for longer narratives only when needed', () => {
+  it('adds a second printable page only when longer narrative text genuinely needs overflow space', () => {
     const model = buildPropertyDealPackModel({
       propertyId: 'deal-long',
       property: {
@@ -99,16 +89,23 @@ describe('PropertyDealPackTemplate', () => {
     expect(screen.getAllByText('Executive Summary').length).toBeGreaterThan(0);
   });
 
-  it('renders property details section with bed/bath, type, and location', () => {
+  it('renders extra overview and area sections only when meaningful supporting data exists', () => {
     const model = buildPropertyDealPackModel({
-      propertyId: 'deal-details',
+      propertyId: 'deal-full',
       property: {
         title: 'Sheffield Semi With Garage',
         location: 'Sheffield',
+        description: 'Close to tram links. Near a busy high street. Strong demand from professionals.',
         property_type: 'Semi-Detached',
         investment_type: 'Buy to Let',
         bedrooms: 3,
         bathrooms: 1,
+        square_footage: 1025,
+        amenities: ['High street', 'Schools'],
+        transport_links: ['Tram stop', 'Bus interchange'],
+        tenant_type: 'Young professionals',
+        area_demand: 'Consistent rental demand from hospital and university staff',
+        growth_context: 'Recent regeneration and improving transport links',
       },
       price: 210000,
       yieldPercent: 6.5,
@@ -116,15 +113,19 @@ describe('PropertyDealPackTemplate', () => {
 
     render(<PropertyDealPackTemplate model={model} />);
 
-    expect(screen.getByText('Property Details')).toBeInTheDocument();
-    expect(screen.getByText('3 bed / 1 bath')).toBeInTheDocument();
-    expect(screen.getAllByText('Semi-Detached').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Sheffield').length).toBeGreaterThan(0);
+    expect(screen.getByText('Full pack')).toBeInTheDocument();
+    expect(screen.getByText('Asset Overview')).toBeInTheDocument();
+    expect(screen.getByText('Area Context')).toBeInTheDocument();
+    expect(screen.getByText('1,025 sq. ft.')).toBeInTheDocument();
+    expect(screen.getByText('High street, Schools')).toBeInTheDocument();
+    expect(screen.getByText('Tram stop, Bus interchange')).toBeInTheDocument();
+    expect(screen.getByText('Young professionals')).toBeInTheDocument();
+    expect(screen.getByText(/Consistent rental demand/i)).toBeInTheDocument();
   });
 
-  it('renders financial section with available data and placeholder state for missing fields', () => {
-    const model = buildPropertyDealPackModel({
-      propertyId: 'deal-financial',
+  it('keeps financial details compact unless enough real underwriting inputs exist', () => {
+    const leanModel = buildPropertyDealPackModel({
+      propertyId: 'deal-financial-lean',
       property: {
         title: 'Manchester Flat',
         location: 'Manchester',
@@ -137,47 +138,40 @@ describe('PropertyDealPackTemplate', () => {
       yieldPercent: 6.9,
     });
 
-    render(<PropertyDealPackTemplate model={model} />);
+    const { rerender } = render(<PropertyDealPackTemplate model={leanModel} />);
 
-    expect(screen.getByText('Financial Breakdown')).toBeInTheDocument();
-    // Available data rendered (may appear in multiple sections)
-    expect(screen.getAllByText('£165,000').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('£950').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('6.9%').length).toBeGreaterThan(0);
-    // Legal fees provided
-    expect(screen.getByText('£1,500')).toBeInTheDocument();
-    // Missing data shows placeholder
-    const pendingElements = screen.getAllByText('Awaiting source data');
-    expect(pendingElements.length).toBeGreaterThan(0);
-  });
+    expect(screen.getByText('Financial Snapshot')).toBeInTheDocument();
+    expect(screen.queryByText('Legal Fees')).not.toBeInTheDocument();
 
-  it('renders area and demand section with partial data showing placeholders cleanly', () => {
-    const model = buildPropertyDealPackModel({
-      propertyId: 'deal-area',
+    const fullModel = buildPropertyDealPackModel({
+      propertyId: 'deal-financial-full',
       property: {
-        title: 'Birmingham BTL',
-        location: 'Birmingham',
-        property_type: 'Terraced',
-        investment_type: 'Buy to Let',
-        rent_monthly: 850,
-        tenant_type: 'Young professionals',
-        area_demand: 'High rental demand in the area',
+        title: 'Sheffield HMO',
+        location: 'Sheffield',
+        property_type: 'House',
+        investment_type: 'HMO',
+        rent_monthly: 2400,
+        legal_fees: 1800,
+        sourcing_fee: 3500,
+        council_tax: 'Band B',
+        hmo_room_rents: '5 rooms @ £480 each',
       },
-      price: 140000,
+      price: 250000,
+      yieldPercent: 9.4,
+      roiPercent: 13.1,
     });
 
-    render(<PropertyDealPackTemplate model={model} />);
+    rerender(<PropertyDealPackTemplate model={fullModel} />);
 
-    expect(screen.getByText('Area & Demand')).toBeInTheDocument();
-    expect(screen.getByText('Young professionals')).toBeInTheDocument();
-    expect(screen.getByText('High rental demand in the area')).toBeInTheDocument();
-    // Missing growth/crime/demographic fields still show structured placeholder
-    const pendingElements = screen.getAllByText('Awaiting source data');
-    expect(pendingElements.length).toBeGreaterThan(0);
+    expect(screen.getByText('Legal Fees')).toBeInTheDocument();
+    expect(screen.getByText('Sourcing Fee')).toBeInTheDocument();
+    expect(screen.getByText('Council Tax')).toBeInTheDocument();
+    expect(screen.getByText('HMO Room Rents')).toBeInTheDocument();
+    expect(screen.getByText('5 rooms @ £480 each')).toBeInTheDocument();
   });
 
-  it('renders off-market badge when market status is off-market', () => {
-    const model = buildPropertyDealPackModel({
+  it('renders off-market and on-market badges when market status is known', () => {
+    const offMarketModel = buildPropertyDealPackModel({
       propertyId: 'deal-offmarket',
       property: {
         title: 'Off Market Gem',
@@ -189,12 +183,10 @@ describe('PropertyDealPackTemplate', () => {
       price: 180000,
     });
 
-    render(<PropertyDealPackTemplate model={model} />);
+    const { rerender } = render(<PropertyDealPackTemplate model={offMarketModel} />);
     expect(screen.getAllByText('Off-Market').length).toBeGreaterThan(0);
-  });
 
-  it('renders on-market badge when market status is on-market', () => {
-    const model = buildPropertyDealPackModel({
+    const onMarketModel = buildPropertyDealPackModel({
       propertyId: 'deal-onmarket',
       property: {
         title: 'On Market Flat',
@@ -206,41 +198,7 @@ describe('PropertyDealPackTemplate', () => {
       price: 200000,
     });
 
-    render(<PropertyDealPackTemplate model={model} />);
+    rerender(<PropertyDealPackTemplate model={onMarketModel} />);
     expect(screen.getAllByText('On-Market').length).toBeGreaterThan(0);
-  });
-
-  it('renders financial breakdown without HMO room rents for non-HMO strategies', () => {
-    const model = buildPropertyDealPackModel({
-      propertyId: 'deal-btl',
-      property: {
-        title: 'Standard BTL Flat',
-        location: 'Leeds',
-        property_type: 'Apartment',
-        investment_type: 'Buy to Let',
-      },
-      price: 200000,
-    });
-
-    render(<PropertyDealPackTemplate model={model} />);
-    expect(screen.queryByText('HMO Room Rents')).not.toBeInTheDocument();
-  });
-
-  it('renders HMO room rents row for HMO investment type', () => {
-    const model = buildPropertyDealPackModel({
-      propertyId: 'deal-hmo',
-      property: {
-        title: 'Sheffield HMO',
-        location: 'Sheffield',
-        property_type: 'House',
-        investment_type: 'HMO',
-        hmo_room_rents: '5 rooms @ £450 each',
-      },
-      price: 250000,
-    });
-
-    render(<PropertyDealPackTemplate model={model} />);
-    expect(screen.getByText('HMO Room Rents')).toBeInTheDocument();
-    expect(screen.getByText('5 rooms @ £450 each')).toBeInTheDocument();
   });
 });

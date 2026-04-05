@@ -26,8 +26,8 @@ type TemplateProps = {
 
 function SectionHeader({ label }: { label: string }) {
   return (
-    <div className="mb-3 flex items-center gap-3">
-      <h3 className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.13em] text-slate-500">{label}</h3>
+    <div className="mb-2.5 flex items-center gap-3">
+      <h3 className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</h3>
       <div className="h-px flex-1 bg-slate-200" />
     </div>
   );
@@ -65,7 +65,11 @@ function FinancialTable({ items }: { items: FinancialLineItem[] }) {
 
 export default function PropertyDealPackTemplate({ model }: TemplateProps) {
   const heroImageSrc = resolveHeroImageSrc(model.imageUrl);
-  const summaryContent = model.requiresSecondPage ? model.executiveSummaryPreview : model.executiveSummary;
+  const summaryContent = model.summaryNote;
+  const hasPropertyDetails = model.propertyDetails.length > 0;
+  const hasAreaDemand = model.areaDemand.length > 0;
+  const hasFinancialDetails = model.financialDetails.length > 0;
+  const hasOverviewRow = hasPropertyDetails || hasAreaDemand;
 
   const marketStatusBadge =
     model.marketStatus === 'off-market'
@@ -87,12 +91,17 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
           {/* ── Section A — Deal Header ── */}
           <div
             data-deal-pack-banner
-            className="bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_32%),linear-gradient(135deg,_#020617,_#0f172a_52%,_#164e63)] px-6 py-5 text-white print:px-6 print:py-4"
+            className="bg-[radial-gradient(circle_at_top_left,_rgba(14,165,233,0.18),_transparent_32%),linear-gradient(135deg,_#020617,_#0f172a_52%,_#164e63)] px-6 py-4 text-white print:px-6 print:py-4"
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="max-w-2xl space-y-1.5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200/90">{model.brandTitle}</p>
-                <p className="text-[13px] font-medium text-white/90">{model.reportTitle}</p>
+                <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-white/90">
+                  <span>{model.reportTitle}</span>
+                  <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-100">
+                    {model.packMode === 'full' ? 'Full pack' : 'Lean pack'}
+                  </span>
+                </div>
               </div>
               <div className="rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-right backdrop-blur">
                 <div className="text-[9px] font-semibold uppercase tracking-[0.12em] text-sky-100/80">Prepared</div>
@@ -116,6 +125,17 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
               </div>
               <h1 className="text-2xl font-semibold tracking-tight text-white print:text-[22px] max-w-2xl">{model.headline}</h1>
               <p className="text-sm text-slate-300">{model.location}</p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {model.metadataChips.map((chip) => (
+                  <span
+                    key={chip.label}
+                    className="inline-flex items-center rounded-full border border-white/15 bg-white/8 px-2.5 py-1 text-[10px] font-medium text-slate-100"
+                  >
+                    <span className="mr-1.5 text-sky-100/75">{chip.label}:</span>
+                    <span>{chip.value}</span>
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -127,22 +147,27 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
             style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
           >
             {heroImageSrc ? (
-              <div className="relative h-[200px] overflow-hidden bg-slate-900 print:h-[160px]">
+              <div className="relative h-[180px] overflow-hidden bg-slate-900 print:h-[148px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={heroImageSrc} alt={model.headline} className="h-full w-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
               </div>
             ) : (
-              <div className="flex h-[120px] flex-col justify-between bg-[linear-gradient(135deg,_#0f172a,_#1e293b_48%,_#164e63)] px-6 py-4 print:h-[100px]">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/90">Listing imagery</p>
-                <p className="max-w-sm text-sm leading-5 text-slate-200">
-                  Visual unavailable — this deal pack still captures pricing, strategy, and source-level context. Review the live listing for imagery before proceeding.
-                </p>
+              <div className="flex min-h-[92px] items-end justify-between gap-4 bg-[linear-gradient(135deg,_#0f172a,_#1e293b_48%,_#164e63)] px-6 py-4 print:min-h-[84px]">
+                <div className="space-y-1.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-sky-200/90">Listing imagery</p>
+                  <p className="max-w-sm text-sm leading-5 text-slate-200">
+                    Visual unavailable — pricing, strategy, and source context remain available below.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/8 px-3 py-2 text-[10px] font-medium text-slate-100 backdrop-blur">
+                  Review the live listing for photos
+                </div>
               </div>
             )}
           </section>
 
-          <div className="px-6 py-5 space-y-5 print:px-6 print:py-4">
+          <div className="space-y-4 px-6 py-4 print:px-6 print:py-4">
 
             {/* ── Section B — Deal Snapshot ── */}
             <section
@@ -152,17 +177,17 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
               className="space-y-2.5"
               style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
             >
-              <SectionHeader label="Deal Snapshot" />
+              <SectionHeader label="Snapshot" />
               <div data-deal-pack-snapshot-grid className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
                 {model.snapshotCards.map((card, index) => (
                   <div
                     key={card.label}
                     data-deal-pack-snapshot-card
                     data-deal-pack-tone={index % SNAPSHOT_CARD_TONES.length}
-                    className={`rounded-2xl border bg-gradient-to-br p-3.5 shadow-sm ${SNAPSHOT_CARD_TONES[index % SNAPSHOT_CARD_TONES.length]}`}
+                    className={`rounded-2xl border bg-gradient-to-br p-3 shadow-sm ${SNAPSHOT_CARD_TONES[index % SNAPSHOT_CARD_TONES.length]}`}
                   >
                     <div className="text-[10px] font-semibold uppercase tracking-[0.1em] opacity-70">{card.label}</div>
-                    <div className="mt-1.5 text-[22px] font-semibold tracking-tight leading-none">{card.value}</div>
+                    <div className="mt-1.5 text-[20px] font-semibold leading-none tracking-tight">{card.value}</div>
                   </div>
                 ))}
               </div>
@@ -185,7 +210,7 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
               className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
               style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
             >
-              <SectionHeader label="Deal Highlights" />
+              <SectionHeader label="Highlights" />
               <ul className="space-y-2 text-sm leading-6 text-slate-700">
                 {model.highlights.map((highlight) => (
                   <li key={highlight} className="flex gap-2.5">
@@ -197,30 +222,36 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
             </section>
 
             {/* ── Sections D + E side-by-side ── */}
-            <div className="grid gap-4 lg:grid-cols-2">
+            {hasOverviewRow ? (
+              <div className={hasPropertyDetails && hasAreaDemand ? 'grid gap-4 lg:grid-cols-2' : 'grid gap-4'}>
 
-              {/* ── Section D — Property Details ── */}
-              <section
-                data-deal-pack-section="property-details"
-                data-print-block="keep"
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-                style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
-              >
-                <SectionHeader label="Property Details" />
-                <MetricGrid items={model.propertyDetails} />
-              </section>
+                {/* ── Section D — Property Details ── */}
+                {hasPropertyDetails ? (
+                  <section
+                    data-deal-pack-section="property-details"
+                    data-print-block="keep"
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                    style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                  >
+                    <SectionHeader label="Asset Overview" />
+                    <MetricGrid items={model.propertyDetails} />
+                  </section>
+                ) : null}
 
-              {/* ── Section E — Area & Demand ── */}
-              <section
-                data-deal-pack-section="area-demand"
-                data-print-block="keep"
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
-                style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
-              >
-                <SectionHeader label="Area &amp; Demand" />
-                <MetricGrid items={model.areaDemand} />
-              </section>
-            </div>
+                {/* ── Section E — Area & Demand ── */}
+                {hasAreaDemand ? (
+                  <section
+                    data-deal-pack-section="area-demand"
+                    data-print-block="keep"
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                    style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
+                  >
+                    <SectionHeader label="Area Context" />
+                    <MetricGrid items={model.areaDemand} />
+                  </section>
+                ) : null}
+              </div>
+            ) : null}
 
             {/* ── Section F — Financial Breakdown ── */}
             <section
@@ -229,11 +260,21 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
               style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
             >
-              <SectionHeader label="Financial Breakdown" />
+              <SectionHeader label="Financial Snapshot" />
               <div className="grid gap-4 sm:grid-cols-2">
-                <FinancialTable items={model.financialBreakdown.slice(0, Math.ceil(model.financialBreakdown.length / 2))} />
-                <FinancialTable items={model.financialBreakdown.slice(Math.ceil(model.financialBreakdown.length / 2))} />
+                <FinancialTable items={model.financialSnapshot.slice(0, Math.ceil(model.financialSnapshot.length / 2))} />
+                <FinancialTable items={model.financialSnapshot.slice(Math.ceil(model.financialSnapshot.length / 2))} />
               </div>
+              {hasFinancialDetails ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {model.financialDetails.map((item) => (
+                    <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">{item.label}</div>
+                      <div className="mt-0.5 text-sm font-semibold text-slate-900">{item.value}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </section>
 
             {/* ── Section G — Investment Insight ── */}
@@ -243,7 +284,7 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
               className="rounded-2xl border border-sky-100 bg-sky-50 p-4"
               style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
             >
-              <SectionHeader label="Investment Insight" />
+              <SectionHeader label="Investment View" />
               <p className="text-[13px] leading-6 text-slate-700">{model.investmentInsight}</p>
             </section>
 
@@ -254,7 +295,7 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
               className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
               style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
             >
-              <SectionHeader label={model.requiresSecondPage ? 'Summary Snapshot' : 'Summary'} />
+              <SectionHeader label="Summary" />
               <div className="space-y-2 text-[13px] leading-6 text-slate-700">
                 {summaryContent.map((paragraph) => (
                   <p key={paragraph}>{paragraph}</p>
