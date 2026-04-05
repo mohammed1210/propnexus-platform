@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import TradesmanCard, { type Tradesman } from './TradesmanCard';
 import ContactTradesmanModal from './ContactTradesmanModal';
-import { API_BASE } from '@/lib/api';
 
 interface TradesmenListProps {
   propertyLat: number;
@@ -40,12 +39,6 @@ export default function TradesmenList({
       setError(null);
 
       try {
-        const apiBase = (API_BASE || '').trim();
-
-        if (!apiBase.trim()) {
-          throw new Error('Missing backend base URL env (NEXT_PUBLIC_API_BASE).');
-        }
-
         const params = new URLSearchParams({
           lat: propertyLat.toString(),
           lng: propertyLng.toString(),
@@ -56,7 +49,9 @@ export default function TradesmenList({
           params.append('trade_type', tradeType.toLowerCase());
         }
 
-        const response = await fetch(`${apiBase.replace(/\/+$/, '')}/tradesmen/nearby?${params}`);
+        const response = await fetch(`/api/tradesmen/nearby?${params.toString()}`, {
+          cache: 'no-store',
+        });
 
         if (!response.ok) {
           throw new Error('Failed to fetch tradesmen');

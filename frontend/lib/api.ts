@@ -345,9 +345,9 @@ export async function postAIScoreExplain(body: AIScoreExplainRequest): Promise<A
 }
 
 export async function getAreaIntel(key: string) {
-  return safeFetch(`${API_BASE}/area-intel/${encodeURIComponent(key)}`);
+  return safeFetch(`/api/area-intel/${encodeURIComponent(key)}`);
 }
 
 export async function getComps(postcode: string) {
-  return safeFetch(`${API_BASE}/comps/${encodeURIComponent(postcode)}`);
+  return safeFetch(`/api/comps/${encodeURIComponent(postcode)}`);
 }
