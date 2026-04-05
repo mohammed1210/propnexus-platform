@@ -805,6 +805,7 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
   const location = getText(property.location) ?? 'Location unavailable';
   const propertyType = getText(property.propertyType ?? property.property_type) ?? 'Property type unavailable';
   const investmentType = getText(property.investmentType ?? property.investment_type) ?? 'Investment type unavailable';
+  const description = getText(property.description);
   const bedrooms = toNumber(property.bedrooms);
   const bathrooms = toNumber(property.bathrooms);
   const bedroomBathroomValue = formatBedroomBathroomValue(bedrooms, bathrooms);
@@ -842,7 +843,6 @@ export const getPropertyPdfSections = (input: PropertyPdfExportInput): PropertyP
     { label: 'Source URL', value: sourceUrl },
   ];
 
-  const description = getText(property.description);
   const fallbackNotes = createEmptyNotesState(property);
   const highlights = extractDealHighlights(
     description,
@@ -921,6 +921,7 @@ export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): Prope
 
   const propertyType = getText(property.propertyType ?? property.property_type) ?? 'Property type unavailable';
   const investmentType = getText(property.investmentType ?? property.investment_type) ?? 'Investment type unavailable';
+  const description = getText(property.description);
   const bedrooms = toNumber(property.bedrooms);
   const bathrooms = toNumber(property.bathrooms);
 
@@ -967,10 +968,11 @@ export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): Prope
   const packMode = hasPropertyDetails || hasAreaDemand || hasFinancialDetails ? 'full' : 'lean';
 
   const requiresSecondPage =
+    (description?.length ?? 0) > 900 ||
     executiveSummary.length > 3 ||
-    summaryCharacterCount > 520 ||
+    summaryCharacterCount > 480 ||
     sections.highlights.length > 5 ||
-    contentDensityScore > 620;
+    contentDensityScore > 590;
 
   return {
     filename: createPropertyPdfFilename(input),
