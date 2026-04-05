@@ -1,6 +1,13 @@
 import { buildPdfImageProxyPath, isUnsafePdfImageUrl } from '@/lib/pdfImageProxy';
 import type { FinancialLineItem, PropertyDealPackModel } from '@/lib/propertyDealPack';
 
+const SNAPSHOT_CARD_TONES = [
+  'from-sky-950 via-slate-950 to-slate-900 text-white border-sky-900/80',
+  'from-white via-slate-50 to-slate-100 text-slate-950 border-slate-200',
+  'from-emerald-950 via-emerald-900 to-teal-900 text-white border-emerald-800/70',
+  'from-violet-950 via-indigo-950 to-slate-900 text-white border-violet-900/70',
+] as const;
+
 const resolveHeroImageSrc = (imageUrl?: string): string | null => {
   if (!imageUrl) return null;
 
@@ -147,25 +154,17 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
             >
               <SectionHeader label="Deal Snapshot" />
               <div data-deal-pack-snapshot-grid className="grid gap-2.5 grid-cols-2 sm:grid-cols-4">
-                {model.snapshotCards.map((card, index) => {
-                  const tones = [
-                    'from-sky-950 via-slate-950 to-slate-900 text-white border-sky-900/80',
-                    'from-white via-slate-50 to-slate-100 text-slate-950 border-slate-200',
-                    'from-emerald-950 via-emerald-900 to-teal-900 text-white border-emerald-800/70',
-                    'from-violet-950 via-indigo-950 to-slate-900 text-white border-violet-900/70',
-                  ] as const;
-                  return (
-                    <div
-                      key={card.label}
-                      data-deal-pack-snapshot-card
-                      data-deal-pack-tone={index % tones.length}
-                      className={`rounded-2xl border bg-gradient-to-br p-3.5 shadow-sm ${tones[index % tones.length]}`}
-                    >
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.1em] opacity-70">{card.label}</div>
-                      <div className="mt-1.5 text-[22px] font-semibold tracking-tight leading-none">{card.value}</div>
-                    </div>
-                  );
-                })}
+                {model.snapshotCards.map((card, index) => (
+                  <div
+                    key={card.label}
+                    data-deal-pack-snapshot-card
+                    data-deal-pack-tone={index % SNAPSHOT_CARD_TONES.length}
+                    className={`rounded-2xl border bg-gradient-to-br p-3.5 shadow-sm ${SNAPSHOT_CARD_TONES[index % SNAPSHOT_CARD_TONES.length]}`}
+                  >
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.1em] opacity-70">{card.label}</div>
+                    <div className="mt-1.5 text-[22px] font-semibold tracking-tight leading-none">{card.value}</div>
+                  </div>
+                ))}
               </div>
               {model.summarySnapshot.length > 0 && (
                 <div data-deal-pack-summary-grid className="grid gap-2 sm:grid-cols-2">

@@ -703,15 +703,27 @@ const buildAreaDemandSection = (property: Record<string, unknown>, rentMonthly: 
 const resolveStampDuty = (property: Record<string, unknown>, price: number | undefined): string => {
   const explicit = resolveFirstNumber(property, 'stamp_duty', 'stampDuty', 'sdlt', 'stamp_duty_amount');
   if (typeof explicit === 'number') return formatCurrency(explicit);
-  // Simple heuristic for England/Wales BTL if price is known
+  // Estimated England/Wales SDLT for additional residential property (Finance Act 2024 rates).
+  // Thresholds and rates in ascending order: [upper limit, marginal rate]
+  // The 3% additional-dwelling surcharge is baked into each rate band below.
   if (typeof price === 'number') {
-    // Estimated SDLT for additional property: 3% surcharge
+    const SDLT_BANDS: Array<{ threshold: number; rate: number }> = [
+      { threshold: 125_000, rate: 0.03 },  // 0–£125k: 3%
+      { threshold: 250_000, rate: 0.05 },  // £125k–£250k: 5%
+      { threshold: 925_000, rate: 0.10 },  // £250k–£925k: 10%
+      { threshold: 1_500_000, rate: 0.15 }, // £925k–£1.5m: 15%
+      { threshold: Infinity, rate: 0.17 },  // >£1.5m: 17%
+    ];
     let sdlt = 0;
-    if (price > 1_500_000) sdlt = (price - 1_500_000) * 0.17 + (1_500_000 - 925_000) * 0.15 + (925_000 - 250_000) * 0.10 + (250_000 - 125_000) * 0.05 + 125_000 * 0.03;
-    else if (price > 925_000) sdlt = (price - 925_000) * 0.15 + (925_000 - 250_000) * 0.10 + (250_000 - 125_000) * 0.05 + 125_000 * 0.03;
-    else if (price > 250_000) sdlt = (price - 250_000) * 0.10 + (250_000 - 125_000) * 0.05 + 125_000 * 0.03;
-    else if (price > 125_000) sdlt = (price - 125_000) * 0.05 + 125_000 * 0.03;
-    else sdlt = price * 0.03;
+    let remaining = price;
+    let prevThreshold = 0;
+    for (const band of SDLT_BANDS) {
+      const bandSize = Math.min(remaining, band.threshold - prevThreshold);
+      if (bandSize <= 0) break;
+      sdlt += bandSize * band.rate;
+      remaining -= bandSize;
+      prevThreshold = band.threshold;
+    }
     return `~${formatCurrency(Math.round(sdlt))} (est.)`;
   }
   return PENDING;
@@ -758,10 +770,6 @@ const buildFinancialBreakdown = (
     { label: 'Tenancy Status', value: tenancyStatus ?? PENDING, isPlaceholder: !tenancyStatus },
     ...(isHmo ? [{ label: 'HMO Room Rents', value: hmoRoomRents ?? PENDING, isPlaceholder: !hmoRoomRents }] : []),
   ];
-
-  if (!isHmo && input.aiScore) {
-    lines.push({ label: 'AI Score', value: `${input.aiScore.toFixed(1)}/10` });
-  }
 
   return lines;
 };
