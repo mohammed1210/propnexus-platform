@@ -60,4 +60,18 @@ describe('/api/property-pdf/[id]', () => {
     expect(res.status).toBe(500);
     expect(body).toEqual({ error: 'pdf_generation_failed', message: 'browser launch failed' });
   });
+
+  it('returns not_found when the property lookup resolves to null', async () => {
+    mockFetchPropertyById.mockResolvedValue(null);
+
+    const { GET } = await import('@/app/api/property-pdf/[id]/route');
+    const res = await GET(new Request('https://app.example/api/property-pdf/missing-prop'), {
+      params: Promise.resolve({ id: 'missing-prop' }),
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(404);
+    expect(body).toEqual({ error: 'not_found' });
+    expect(mockRenderDealPackPdfFromUrl).not.toHaveBeenCalled();
+  });
 });
