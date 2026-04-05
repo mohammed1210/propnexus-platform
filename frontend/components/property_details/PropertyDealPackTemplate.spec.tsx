@@ -5,11 +5,11 @@ import PropertyDealPackTemplate from './PropertyDealPackTemplate';
 import { buildPropertyDealPackModel } from '@/lib/propertyDealPack';
 
 describe('PropertyDealPackTemplate', () => {
-  it('renders the premium template sections for a compact deal pack', () => {
+  it('keeps medium listings on a single compact page and groups the print sections', () => {
     const model = buildPropertyDealPackModel({
       propertyId: 'deal-compact',
       property: {
-        title: 'Central Leeds Apartment',
+        title: 'Central Leeds Apartment With Refreshed Interiors And Strong Commuter Appeal',
         location: 'Leeds',
         description: 'Chain free. Close to the station. Strong tenant demand.',
         property_type: 'Apartment',
@@ -23,18 +23,23 @@ describe('PropertyDealPackTemplate', () => {
       yieldPercent: 7,
       roiPercent: 10.4,
       aiScore: 8.8,
-      url: 'https://app.example/property/deal-compact',
+      url: 'https://app.example/property/deal-compact?utm_source=propnexus&utm_medium=export&utm_campaign=medium-pack-layout-check',
     });
 
     const { container } = render(<PropertyDealPackTemplate model={model} />);
 
     expect(screen.getByText('Investor Deal Pack')).toBeInTheDocument();
+    expect(screen.getByText('Premium deal pack')).toBeInTheDocument();
     expect(screen.getByText('Deal Snapshot')).toBeInTheDocument();
     expect(screen.getByText('Deal Highlights')).toBeInTheDocument();
     expect(screen.getByText('Investment Insight')).toBeInTheDocument();
     expect(screen.getByText('Asset Overview')).toBeInTheDocument();
     expect(screen.getAllByText('Executive Summary').length).toBeGreaterThan(0);
     expect(container.querySelector('[data-page-count="1"]')).toBeTruthy();
+    expect(container.querySelector('[data-deal-pack-section="snapshot"][data-print-block="keep"]')).toBeTruthy();
+    expect(container.querySelector('[data-deal-pack-section="highlights"][data-print-block="keep"]')).toBeTruthy();
+    expect(container.querySelector('[data-deal-pack-section="insight"][data-print-block="keep"]')).toBeTruthy();
+    expect(container.querySelector('[data-deal-pack-section="overview"][data-print-block="keep"]')).toBeTruthy();
     expect(screen.queryByText('Visual unavailable')).not.toBeInTheDocument();
   });
 
@@ -60,9 +65,10 @@ describe('PropertyDealPackTemplate', () => {
     const model = buildPropertyDealPackModel({
       propertyId: 'deal-long',
       property: {
-        title: 'Long Narrative Deal',
+        title:
+          'Long Narrative Deal With Refurbishment Upside, Flexible Exit Routes, Family Accommodation, And Layered Demand Signals Across South Manchester',
         location: 'Manchester',
-        description: Array.from({ length: 18 }, () =>
+        description: Array.from({ length: 30 }, () =>
           'This asset combines commuter appeal, refurbishment upside, durable tenant demand, and a practical family-house layout with multiple levers still to verify during diligence.'
         ).join(' '),
         property_type: 'House',
@@ -73,12 +79,13 @@ describe('PropertyDealPackTemplate', () => {
       price: 395000,
       yieldPercent: 5.4,
       roiPercent: 9.2,
-      url: 'https://www.example.com/properties/investments/north-west/manchester/very-long-source-path/with-additional-context?utm_source=propnexus&utm_medium=pdf&utm_campaign=deal-pack',
+      url: 'https://www.example.com/properties/investments/north-west/manchester/very-long-source-path/with-additional-context/that-keeps-going/for-diligence-reviewers/who-need-full-provenance?utm_source=propnexus&utm_medium=pdf&utm_campaign=deal-pack&ref=investment-committee-pack',
     });
 
     const { container } = render(<PropertyDealPackTemplate model={model} />);
 
     expect(container.querySelector('[data-page-count="2"]')).toBeTruthy();
+    expect(container.querySelectorAll('[data-deal-pack-page]').length).toBe(2);
     expect(screen.getAllByText('Executive Summary').length).toBeGreaterThan(0);
   });
 });

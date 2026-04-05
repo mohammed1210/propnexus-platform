@@ -665,7 +665,7 @@ export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): Prope
   const sections = getPropertyPdfSections(input);
   const executiveSummary = splitSummaryIntoParagraphs(sections.notes);
   const executiveSummaryPreview =
-    executiveSummary.length > 2 ? executiveSummary.slice(0, 2) : splitSummaryIntoParagraphs(trimTextLength(sections.notes, 260));
+    executiveSummary.length > 2 ? executiveSummary.slice(0, 2) : splitSummaryIntoParagraphs(trimTextLength(sections.notes, 220));
 
   const snapshotCards = sections.metrics.filter((metric) => ['Price', 'Yield', 'ROI', 'Discount'].includes(metric.label));
   const summarySnapshot = sections.metrics.filter((metric) => ['Estimated Rent (PCM)', 'AI Score'].includes(metric.label));
@@ -678,12 +678,20 @@ export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): Prope
     },
   ];
 
+  const summaryCharacterCount = executiveSummary.join(' ').length;
+  const highlightsCharacterCount = sections.highlights.join(' ').length;
+  const contentDensityScore =
+    summaryCharacterCount +
+    Math.round(highlightsCharacterCount * 0.65) +
+    Math.round(sections.title.length * 1.15) +
+    (sections.imageUrl ? 0 : 40) +
+    (sections.sourceUrl.length > 160 ? 30 : 0);
+
   const requiresSecondPage =
-    sections.notes.length > 420 ||
     executiveSummary.length > 3 ||
+    summaryCharacterCount > 420 ||
     sections.highlights.length > 5 ||
-    sections.title.length > 90 ||
-    sections.sourceUrl.length > 110;
+    contentDensityScore > 460;
 
   return {
     filename: createPropertyPdfFilename(input),
