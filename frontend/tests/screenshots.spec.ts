@@ -24,6 +24,25 @@ async function openCollapsible(page: Page, title: string) {
   }
 }
 
+async function ensureLightMode(page: Page) {
+  const themeToggle = page.getByTestId('theme-toggle');
+  await expect(themeToggle).toBeVisible();
+
+  const label = await themeToggle.getAttribute('aria-label');
+  if (label?.toLowerCase().includes('switch to light mode')) {
+    await themeToggle.click();
+  }
+}
+
+async function openPropertyForScreenshot(page: Page) {
+  await page.setViewportSize({ width: 1600, height: 1400 });
+  await page.goto(`/property/${DEMO_PREMIUM_SCREENSHOT_PROPERTY_ID}`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await ensureLightMode(page);
+}
+
 test.describe('Demo Screenshots', () => {
   test('capture demo landing page screenshot', async ({ page }) => {
     // Navigate to demo page
@@ -43,13 +62,10 @@ test.describe('Demo Screenshots', () => {
   });
 
   test('capture investment analytics preview', async ({ page }) => {
-    await page.goto(`/property/${DEMO_PREMIUM_SCREENSHOT_PROPERTY_ID}`, {
-      waitUntil: 'domcontentloaded',
-    });
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await openPropertyForScreenshot(page);
     await openCollapsible(page, 'Investment Calculator');
 
-    const calculator = page.getByRole('button', { name: /Investment Calculator/i }).locator('..');
+    const calculator = page.locator('#calculator-content').locator('..');
     await expect.soft(calculator).toBeVisible();
 
     await calculator.screenshot({
@@ -58,10 +74,7 @@ test.describe('Demo Screenshots', () => {
   });
 
   test('capture tradesmen preview', async ({ page }) => {
-    await page.goto(`/property/${DEMO_PREMIUM_SCREENSHOT_PROPERTY_ID}`, {
-      waitUntil: 'domcontentloaded',
-    });
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await openPropertyForScreenshot(page);
     await openCollapsible(page, 'Local Tradesmen & Services');
 
     const tradesmen = page.locator('section[aria-label="Local Tradesmen & Services"]');
@@ -74,10 +87,7 @@ test.describe('Demo Screenshots', () => {
   });
 
   test('capture ai deal score preview', async ({ page }) => {
-    await page.goto(`/property/${DEMO_PREMIUM_SCREENSHOT_PROPERTY_ID}`, {
-      waitUntil: 'domcontentloaded',
-    });
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await openPropertyForScreenshot(page);
 
     const aiScore = page.locator('section[aria-label="AI Deal Score"]');
     await expect(aiScore).toContainText('AI Deal Score');
@@ -91,10 +101,7 @@ test.describe('Demo Screenshots', () => {
   });
 
   test('capture area intel preview', async ({ page }) => {
-    await page.goto(`/property/${DEMO_PREMIUM_SCREENSHOT_PROPERTY_ID}`, {
-      waitUntil: 'domcontentloaded',
-    });
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await openPropertyForScreenshot(page);
     await openCollapsible(page, 'Area Insights');
 
     const areaInsights = page.locator('section[aria-label="Area Insights"]');

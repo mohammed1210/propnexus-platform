@@ -12,13 +12,13 @@ interface GalleryImageProps {
 export function GalleryImage({ src, alt, title, description }: GalleryImageProps) {
   return (
     <div className="card p-0 overflow-hidden group">
-      <div className="relative w-full aspect-[4/3] bg-slate-200 dark:bg-slate-800">
+      <div className="relative w-full aspect-[4/3] bg-slate-100 dark:bg-slate-800/80 p-3 sm:p-4">
         <Image
           src={src}
           alt={alt}
           fill
-          style={{ objectFit: 'cover' }}
-          className="transition-transform duration-300 group-hover:scale-105"
+          style={{ objectFit: 'contain' }}
+          className="transition-transform duration-300 group-hover:scale-[1.02] p-3 sm:p-4"
           loading="lazy"
           onError={(e) => {
             const target = e.target as HTMLImageElement;

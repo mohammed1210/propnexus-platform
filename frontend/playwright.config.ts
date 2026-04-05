@@ -20,7 +20,7 @@ export default defineConfig({
   use: {
     baseURL: isScreenshotTest ? 'http://127.0.0.1:3000' : BASE,
     trace: 'on-first-retry',
-    colorScheme: isScreenshotTest ? 'dark' : undefined,
+    colorScheme: isScreenshotTest ? 'light' : undefined,
   },
   webServer: {
     command: isScreenshotTest

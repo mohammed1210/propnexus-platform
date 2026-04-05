@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FiSearch, FiTrendingUp, FiZap, FiMapPin, FiDollarSign, FiBarChart2, FiShield } from 'react-icons/fi';
@@ -64,9 +65,23 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900">
       {/* Hero Section with Gradient */}
-      <section className="hero-gradient text-white">
+      <section className="hero-gradient relative overflow-hidden text-white">
         {/* Decorative Elements */}
         <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,black)]" />
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-y-0 right-0 hidden lg:block w-[44rem] xl:w-[54rem] opacity-30 xl:opacity-40">
+            <Image
+              src="/images/home-cart-house.webp"
+              alt=""
+              fill
+              priority
+              sizes="(max-width: 1279px) 0px, 54rem"
+              className="object-contain object-right-bottom"
+            />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-brand-950/55 via-brand-900/35 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-brand-950/25 to-transparent" />
+        </div>
         {mounted && (
           <>
             <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-96 h-96 bg-cyan-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse" />
