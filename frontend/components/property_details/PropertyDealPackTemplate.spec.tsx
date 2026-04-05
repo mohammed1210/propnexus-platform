@@ -116,7 +116,7 @@ describe('PropertyDealPackTemplate', () => {
     expect(screen.getByText('Full pack')).toBeInTheDocument();
     expect(screen.getByText('Asset Overview')).toBeInTheDocument();
     expect(screen.getByText('Area Context')).toBeInTheDocument();
-    expect(screen.getByText('1,025 sq ft')).toBeInTheDocument();
+    expect(screen.getByText('1,025 sq. ft.')).toBeInTheDocument();
     expect(screen.getByText('High street, Schools')).toBeInTheDocument();
     expect(screen.getByText('Tram stop, Bus interchange')).toBeInTheDocument();
     expect(screen.getByText('Young professionals')).toBeInTheDocument();

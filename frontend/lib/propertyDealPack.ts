@@ -630,7 +630,7 @@ const resolveMarketStatus = (property: Record<string, unknown>): 'on-market' | '
 
 const resolveSquareFootage = (property: Record<string, unknown>): string | undefined => {
   const sqft = resolveFirstNumber(property, 'square_footage', 'squareFootage', 'floor_area', 'floorArea', 'size_sqft', 'area_sqft');
-  if (typeof sqft === 'number') return `${sqft.toLocaleString('en-GB')} sq ft`;
+  if (typeof sqft === 'number') return `${sqft.toLocaleString('en-GB')} sq. ft.`;
   const sqm = resolveFirstNumber(property, 'square_metres', 'squareMetres', 'area_sqm', 'floor_area_sqm');
   if (typeof sqm === 'number') return `${sqm.toLocaleString('en-GB')} m²`;
   return undefined;
@@ -971,7 +971,7 @@ export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): Prope
   const packMode = hasPropertyDetails || hasAreaDemand || hasFinancialDetails ? 'full' : 'lean';
 
   const requiresSecondPage =
-    (description?.length ?? 0) > MAX_DESCRIPTION_LENGTH_SINGLE_PAGE ||
+    (description ? description.length : 0) > MAX_DESCRIPTION_LENGTH_SINGLE_PAGE ||
     executiveSummary.length > 3 ||
     summaryCharacterCount > MAX_SUMMARY_CHARS_SINGLE_PAGE ||
     sections.highlights.length > 5 ||
