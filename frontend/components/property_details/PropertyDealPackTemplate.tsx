@@ -98,7 +98,7 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-200/90">{model.brandTitle}</p>
                 <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-white/90">
                   <span>{model.reportTitle}</span>
-                  <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-sky-100">
+                  <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-sky-100">
                     {model.packMode === 'full' ? 'Full pack' : 'Lean pack'}
                   </span>
                 </div>
@@ -223,7 +223,7 @@ export default function PropertyDealPackTemplate({ model }: TemplateProps) {
 
             {/* ── Sections D + E side-by-side ── */}
             {hasOverviewRow ? (
-              <div className={`grid gap-4 ${hasPropertyDetails && hasAreaDemand ? 'lg:grid-cols-2' : ''}`}>
+              <div className={hasPropertyDetails && hasAreaDemand ? 'grid gap-4 lg:grid-cols-2' : 'grid gap-4'}>
 
                 {/* ── Section D — Property Details ── */}
                 {hasPropertyDetails ? (

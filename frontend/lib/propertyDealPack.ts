@@ -175,6 +175,9 @@ const IMAGE_COLLECTION_FIELDS = ['image_urls', 'imageUrls', 'images', 'photos'] 
 const IMAGE_OBJECT_KEYS = ['url', 'src', 'imageUrl', 'image_url'] as const;
 // Keep insight copy concise so page one remains visually balanced in the template route and PDF output.
 const MAX_INSIGHT_LENGTH = 420;
+const MAX_DESCRIPTION_LENGTH_SINGLE_PAGE = 900;
+const MAX_SUMMARY_CHARS_SINGLE_PAGE = 480;
+const MAX_CONTENT_DENSITY_SINGLE_PAGE = 590;
 const HIGHLIGHT_LIMIT = 6;
 const HIGHLIGHT_SIGNAL_RULES = [
   { pattern: /\b(chain free|no onward chain|vacant possession)\b/i, score: 7 },
@@ -895,7 +898,7 @@ const buildSummaryNote = (
   executiveSummary: string[],
 ): string[] => {
   const lines = executiveSummary.slice(0, 2).map((paragraph) => trimTextLength(paragraph, 180));
-  return lines.length ? lines : ['Further underwriting inputs are not yet available.'];
+  return lines.length ? lines : ['Summary detail will expand as more verified listing context becomes available.'];
 };
 
 export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): PropertyDealPackModel => {
@@ -968,11 +971,11 @@ export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): Prope
   const packMode = hasPropertyDetails || hasAreaDemand || hasFinancialDetails ? 'full' : 'lean';
 
   const requiresSecondPage =
-    (description?.length ?? 0) > 900 ||
+    (description?.length ?? 0) > MAX_DESCRIPTION_LENGTH_SINGLE_PAGE ||
     executiveSummary.length > 3 ||
-    summaryCharacterCount > 480 ||
+    summaryCharacterCount > MAX_SUMMARY_CHARS_SINGLE_PAGE ||
     sections.highlights.length > 5 ||
-    contentDensityScore > 590;
+    contentDensityScore > MAX_CONTENT_DENSITY_SINGLE_PAGE;
 
   return {
     filename: createPropertyPdfFilename(input),
