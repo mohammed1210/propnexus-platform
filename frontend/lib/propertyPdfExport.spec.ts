@@ -141,9 +141,14 @@ describe('propertyPdfExport rent parsing', () => {
       },
     });
 
-    expect(sections.notes).toContain('does not currently include a narrative description');
+    expect(sections.notes).toContain('Narrative detail is limited in the live listing');
     expect(sections.notes).not.toBe('No description provided.');
     expect(sections.hasNarrativeDescription).toBe(false);
+    expect(sections.highlights).toEqual([
+      'Residential asset opportunity in Birmingham',
+      'Aligned to an investment strategy',
+      'Review the live listing to confirm finish, layout, and execution detail',
+    ]);
   });
 
   it('marks real narrative descriptions so the paginator can prefer the full summary block', () => {
@@ -176,10 +181,50 @@ describe('propertyPdfExport rent parsing', () => {
     expect(sections.highlights).toEqual(
       expect.arrayContaining([
         expect.stringContaining('Close to the city centre'),
-        expect.stringContaining('newly refurbished kitchen'),
+        expect.stringContaining('Newly refurbished kitchen'),
       ]),
     );
     expect(sections.highlights.length).toBeLessThanOrEqual(6);
+  });
+
+  it('filters estate-agent fluff and keeps curated investor-facing highlights', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p8d',
+      property: {
+        title: 'Curated Highlights Deal',
+        location: 'Croydon',
+        description:
+          "Welcome to this stunning semi-detached house just a stone's throw away from East Croydon station, chain free, with driveway parking, rear garden, and scope for refurbishment.",
+      },
+    });
+
+    expect(sections.highlights).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Chain free'),
+        expect.stringContaining('Semi-detached house'),
+        expect.stringContaining('Close to East Croydon station'),
+      ]),
+    );
+    expect(sections.highlights.join(' ')).not.toMatch(/welcome to|stunning|stone's throw/i);
+    expect(sections.notes).toContain('chain free');
+    expect(sections.notes).not.toMatch(/welcome to|stunning|stone's throw/i);
+  });
+
+  it('uses cleaner placeholder states for optional snapshot metrics', () => {
+    const sections = getPropertyPdfSections({
+      propertyId: 'p8e',
+      property: {
+        title: 'Metrics Deal',
+        location: 'Leeds',
+        price: 180000,
+        rent_monthly: 1200,
+      },
+    });
+
+    expect(sections.metrics).toContainEqual({ label: 'Discount', value: 'Pending' });
+    expect(sections.metrics).toContainEqual({ label: 'AI Score', value: 'Not scored' });
+    expect(sections.metrics.find((metric) => metric.label === 'Discount')?.value).not.toBe('N/A');
+    expect(sections.metrics.find((metric) => metric.label === 'AI Score')?.value).not.toBe('N/A');
   });
 
   it('captures the primary property image URL when available', () => {
@@ -243,8 +288,9 @@ describe('propertyPdfExport rent parsing', () => {
       discountPercent: 11.2,
     });
 
-    expect(sections.investmentInsight).toContain('This appears to be a value-add BRRR opportunity');
-    expect(sections.investmentInsight).toContain('Yield looks');
-    expect(sections.investmentInsight).toContain('The current profile suggests');
+    expect(sections.investmentInsight).toContain('This screens as a value-add BRRR opportunity');
+    expect(sections.investmentInsight).toContain('yield is solid');
+    expect(sections.investmentInsight).toContain('ROI looks reasonable');
+    expect(sections.investmentInsight).toContain('Listing detail also points to');
   });
 });

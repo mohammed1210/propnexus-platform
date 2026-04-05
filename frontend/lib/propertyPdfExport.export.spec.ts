@@ -192,7 +192,7 @@ describe('exportPropertyPdf', () => {
       mockDrawText.mock.calls.some(
         ([text, options]) =>
           typeof text === 'string' &&
-          text.includes('does not currently include a narrative description') &&
+          text.includes('Narrative detail is limited') &&
           options &&
           (options as { size?: number }).size === 9,
       ),
@@ -211,7 +211,7 @@ describe('exportPropertyPdf', () => {
         property_type: 'House',
         investment_type: 'BRRR',
         description: Array.from({ length: 18 }, () =>
-          'This asset combines strong rental demand, realistic refurbishment upside, and a clear refinance pathway for an investor seeking durable cash flow.',
+          'This asset combines strong rental demand, realistic refurbishment upside, commuter access, family-house appeal, and a clear refinance pathway for an investor seeking durable cash flow with multiple operational levers still to verify on inspection.',
         ).join(' '),
       },
       price: 395000,
@@ -258,5 +258,72 @@ describe('exportPropertyPdf', () => {
     expect(mockAddPage).toHaveBeenCalledTimes(1);
     expect(mockDrawText.mock.calls.length).toBeGreaterThan(0);
     expect(mockSave).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders cleaner placeholder metric states and truncated source URLs', async () => {
+    const { exportPropertyPdf } = await import('./propertyPdfExport');
+
+    await exportPropertyPdf({
+      propertyId: 'prop-clean-url',
+      property: {
+        title: 'URL Deal',
+        location: 'Manchester',
+        description: 'Chain free terrace with straightforward rental appeal and solid commuter access.',
+        rent_monthly: 1250,
+      },
+      price: 180000,
+      url: 'https://www.example.com/properties/investments/north-west/manchester/very-long-source-path/with-additional-context?utm_source=propnexus&utm_medium=pdf&utm_campaign=deal-pack',
+    });
+
+    expect(
+      mockDrawText.mock.calls.some(
+        ([text]) => typeof text === 'string' && text.includes('Not scored'),
+      ),
+    ).toBe(true);
+    expect(
+      mockDrawText.mock.calls.some(
+        ([text]) => typeof text === 'string' && text.includes('Pending'),
+      ),
+    ).toBe(true);
+    expect(
+      mockDrawText.mock.calls.some(
+        ([text]) =>
+          typeof text === 'string' &&
+          text.includes('example.com/properties/investments') &&
+          text.includes('…') &&
+          !text.includes('https://'),
+      ),
+    ).toBe(true);
+  });
+
+  it('keeps title metadata chips clear of the Deal Snapshot section', async () => {
+    const { exportPropertyPdf } = await import('./propertyPdfExport');
+
+    await exportPropertyPdf({
+      propertyId: 'prop-title-spacing',
+      property: {
+        title: 'Westrow Gardens, Ilford, IG3',
+        location: 'Westrow Gardens, Ilford, IG3',
+        property_type: 'Bungalow',
+        investment_type: 'BTL',
+        bedrooms: 6,
+        bathrooms: 3,
+        rent_monthly: 5833,
+        image_urls: ['https://images.example.com/cover.jpg'],
+      },
+      price: 1000000,
+      yieldPercent: 7,
+      roiPercent: 9.4,
+    });
+
+    const dealSnapshotCall = mockDrawText.mock.calls.find(([text]) => text === 'Deal Snapshot');
+    const chipBottoms = mockDrawRectangle.mock.calls
+      .map(([options]) => options as { y?: number; height?: number })
+      .filter((options) => options.height === 15 && typeof options.y === 'number')
+      .map((options) => options.y as number);
+
+    expect(dealSnapshotCall).toBeDefined();
+    expect(chipBottoms.length).toBeGreaterThan(0);
+    expect((dealSnapshotCall?.[1] as { y?: number }).y).toBeLessThan(Math.min(...chipBottoms) - 10);
   });
 });
