@@ -5,6 +5,13 @@ export type ExportMetric = {
   value: string;
 };
 
+/** A financial line item. `isPlaceholder` flags rows where data is not yet available. */
+export type FinancialLineItem = {
+  label: string;
+  value: string;
+  isPlaceholder?: boolean;
+};
+
 export type PropertyPdfExportInput = {
   propertyId: string;
   property?: Record<string, unknown> | null;
@@ -43,6 +50,9 @@ export type PropertyDealPackModel = {
   filename: string;
   headline: string;
   location: string;
+  propertyType: string;
+  investmentType: string;
+  marketStatus: 'on-market' | 'off-market' | null;
   brandTitle: string;
   reportTitle: string;
   reportSubtitle: string;
@@ -50,9 +60,16 @@ export type PropertyDealPackModel = {
   snapshotCards: ExportMetric[];
   highlights: string[];
   investmentInsight: string;
-  assetOverview: ExportMetric[];
+  /** Section D — Property Details */
+  propertyDetails: ExportMetric[];
+  /** Section E — Area & Demand */
+  areaDemand: ExportMetric[];
+  /** Section F — Financial Breakdown */
+  financialBreakdown: FinancialLineItem[];
   executiveSummary: string[];
   executiveSummaryPreview: string[];
+  /** Section H — Summary / Underwriting Note */
+  summaryNote: string[];
   summarySnapshot: ExportMetric[];
   supportingSections: DealPackSection[];
   exportedAt: string;
@@ -559,6 +576,196 @@ export const formatSourceUrlDisplay = (value: string, maxLength = 76): string =>
   }
 };
 
+// ─── New field resolvers ────────────────────────────────────────────────────
+
+const PENDING = 'Awaiting source data';
+
+const resolveFirstText = (property: Record<string, unknown>, ...keys: string[]): string | undefined => {
+  for (const key of keys) {
+    const value = getText(property[key]);
+    if (value) return value;
+  }
+  return undefined;
+};
+
+const resolveFirstNumber = (property: Record<string, unknown>, ...keys: string[]): number | undefined => {
+  for (const key of keys) {
+    const value = toNumber(property[key]);
+    if (typeof value === 'number') return value;
+  }
+  return undefined;
+};
+
+const resolveMarketStatus = (property: Record<string, unknown>): 'on-market' | 'off-market' | null => {
+  const statusText = resolveFirstText(property, 'market_status', 'marketStatus', 'listing_status', 'listingStatus');
+  if (statusText) {
+    if (/off[- ]?market/i.test(statusText)) return 'off-market';
+    if (/on[- ]?market|active|listed/i.test(statusText)) return 'on-market';
+  }
+  const offMarketBool = property.off_market ?? property.offMarket;
+  if (offMarketBool === true || offMarketBool === 'true') return 'off-market';
+  if (offMarketBool === false || offMarketBool === 'false') return 'on-market';
+  return null;
+};
+
+const resolveSquareFootage = (property: Record<string, unknown>): string => {
+  const sqft = resolveFirstNumber(property, 'square_footage', 'squareFootage', 'floor_area', 'floorArea', 'size_sqft', 'area_sqft');
+  if (typeof sqft === 'number') return `${sqft.toLocaleString('en-GB')} sq ft`;
+  const sqm = resolveFirstNumber(property, 'square_metres', 'squareMetres', 'area_sqm', 'floor_area_sqm');
+  if (typeof sqm === 'number') return `${sqm.toLocaleString('en-GB')} m²`;
+  return 'Not supplied';
+};
+
+const resolveFloorPlan = (property: Record<string, unknown>): string => {
+  const fp = property.floor_plan ?? property.floorPlan ?? property.has_floor_plan ?? property.hasFloorPlan;
+  if (fp === true || fp === 'true' || fp === 'yes') return 'Available';
+  if (fp === false || fp === 'false' || fp === 'no') return 'Not available';
+  const fpUrl = resolveFirstText(property, 'floor_plan_url', 'floorPlanUrl', 'floor_plan');
+  if (fpUrl && /^https?:\/\//i.test(fpUrl)) return 'Available';
+  return 'Not supplied';
+};
+
+const resolveAmenities = (property: Record<string, unknown>): string => {
+  const value = property.amenities;
+  if (Array.isArray(value) && value.length > 0) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean)
+      .join(', ');
+  }
+  const text = resolveFirstText(property, 'amenities', 'nearby_amenities', 'nearbyAmenities');
+  return text ?? 'Not supplied';
+};
+
+const resolveTransport = (property: Record<string, unknown>): string => {
+  const value = property.transport_links ?? property.transportLinks ?? property.transport;
+  if (Array.isArray(value) && value.length > 0) {
+    return value
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean)
+      .join(', ');
+  }
+  const text = resolveFirstText(property, 'transport_links', 'transportLinks', 'transport', 'nearby_transport');
+  return text ?? 'Not supplied';
+};
+
+const resolveAreaDemandField = (property: Record<string, unknown>, ...keys: string[]): string | undefined => {
+  const text = resolveFirstText(property, ...keys);
+  return text || undefined;
+};
+
+// ─── Section builders ───────────────────────────────────────────────────────
+
+const buildPropertyDetailsSection = (
+  property: Record<string, unknown>,
+  propertyId: string,
+  bedrooms: number | undefined,
+  bathrooms: number | undefined,
+  location: string,
+  propertyType: string,
+): ExportMetric[] => {
+  const marketStatus = resolveMarketStatus(property);
+  const marketStatusLabel = marketStatus === 'off-market' ? 'Off-Market' : marketStatus === 'on-market' ? 'On-Market' : 'Not specified';
+  return [
+    { label: 'Bedrooms / Bathrooms', value: formatBedroomBathroomValue(bedrooms, bathrooms) },
+    { label: 'Property Type', value: cleanPropertyType(propertyType) },
+    { label: 'Location', value: location },
+    { label: 'Square Footage', value: resolveSquareFootage(property) },
+    { label: 'Floor Plan', value: resolveFloorPlan(property) },
+    { label: 'Amenities', value: resolveAmenities(property) },
+    { label: 'Transport Links', value: resolveTransport(property) },
+    { label: 'Market Status', value: marketStatusLabel },
+    { label: 'Property ID', value: propertyId || 'N/A' },
+  ];
+};
+
+const buildAreaDemandSection = (property: Record<string, unknown>, rentMonthly: number | undefined): ExportMetric[] => {
+  const expectedRent = resolveAreaDemandField(property, 'expected_rent', 'expectedRent', 'avg_area_rent', 'area_avg_rent');
+  const tenantType = resolveAreaDemandField(property, 'tenant_type', 'tenantType', 'likely_tenant', 'likelyTenant', 'demand_profile', 'demandProfile');
+  const areaDemand = resolveAreaDemandField(property, 'area_demand', 'areaDemand', 'demand_notes', 'demandNotes');
+  const growthContext = resolveAreaDemandField(property, 'growth_context', 'growthContext', 'price_growth', 'priceGrowth', 'capital_growth');
+  const crimeNotes = resolveAreaDemandField(property, 'crime_notes', 'crimeNotes', 'crime_rate', 'crimeRate');
+  const demographicNotes = resolveAreaDemandField(property, 'demographic_notes', 'demographicNotes', 'demographics', 'area_notes', 'areaNotes');
+
+  const expectedRentDisplay =
+    expectedRent ?? (typeof rentMonthly === 'number' ? `~${formatCurrency(rentMonthly)} PCM (from listing)` : PENDING);
+
+  return [
+    { label: 'Expected Rent', value: expectedRentDisplay },
+    { label: 'Likely Tenant Type', value: tenantType ?? PENDING },
+    { label: 'Area Demand', value: areaDemand ?? PENDING },
+    { label: 'Growth / Price Context', value: growthContext ?? PENDING },
+    { label: 'Crime / Safety Notes', value: crimeNotes ?? PENDING },
+    { label: 'Demographic / Area Notes', value: demographicNotes ?? PENDING },
+  ];
+};
+
+const resolveStampDuty = (property: Record<string, unknown>, price: number | undefined): string => {
+  const explicit = resolveFirstNumber(property, 'stamp_duty', 'stampDuty', 'sdlt', 'stamp_duty_amount');
+  if (typeof explicit === 'number') return formatCurrency(explicit);
+  // Simple heuristic for England/Wales BTL if price is known
+  if (typeof price === 'number') {
+    // Estimated SDLT for additional property: 3% surcharge
+    let sdlt = 0;
+    if (price > 1_500_000) sdlt = (price - 1_500_000) * 0.17 + (1_500_000 - 925_000) * 0.15 + (925_000 - 250_000) * 0.10 + (250_000 - 125_000) * 0.05 + 125_000 * 0.03;
+    else if (price > 925_000) sdlt = (price - 925_000) * 0.15 + (925_000 - 250_000) * 0.10 + (250_000 - 125_000) * 0.05 + 125_000 * 0.03;
+    else if (price > 250_000) sdlt = (price - 250_000) * 0.10 + (250_000 - 125_000) * 0.05 + 125_000 * 0.03;
+    else if (price > 125_000) sdlt = (price - 125_000) * 0.05 + 125_000 * 0.03;
+    else sdlt = price * 0.03;
+    return `~${formatCurrency(Math.round(sdlt))} (est.)`;
+  }
+  return PENDING;
+};
+
+const buildFinancialBreakdown = (
+  input: PropertyPdfExportInput,
+  property: Record<string, unknown>,
+  rentMonthly: number | undefined,
+  price: number | undefined,
+  derivedYield: number | undefined,
+  derivedRoi: number | undefined,
+  discountPercent: number | undefined,
+): FinancialLineItem[] => {
+  const legalFees = resolveFirstNumber(property, 'legal_fees', 'legalFees', 'conveyancing_fees', 'conveyancingFees');
+  const sourcingFee = resolveFirstNumber(property, 'sourcing_fee', 'sourcingFee', 'sourcingFees');
+  const councilTax = resolveFirstText(property, 'council_tax', 'councilTax', 'council_tax_band', 'councilTaxBand');
+  const bills = resolveFirstText(property, 'bills', 'monthly_bills', 'monthlyBills', 'bills_estimate');
+  const yearlyIncome = resolveFirstNumber(property, 'yearly_income', 'yearlyIncome', 'annual_income', 'annualIncome');
+  const tenancyStatus = resolveFirstText(property, 'tenancy_status', 'tenancyStatus', 'tenants_in_situ', 'tenantsInSitu', 'tenancy');
+  const hmoRoomRents = resolveFirstText(property, 'hmo_room_rents', 'hmoRoomRents', 'room_rents', 'roomRents');
+
+  const investmentType = getText(property.investment_type ?? property.investmentType) ?? '';
+  const isHmo = /hmo|multi[- ]?let/i.test(investmentType);
+
+  const yearlyIncomeEstimate = typeof yearlyIncome === 'number'
+    ? formatCurrency(yearlyIncome)
+    : typeof rentMonthly === 'number'
+    ? `~${formatCurrency(rentMonthly * 12)} (est.)`
+    : PENDING;
+
+  const lines: FinancialLineItem[] = [
+    { label: 'Purchase Price', value: typeof price === 'number' ? formatCurrency(price) : PENDING, isPlaceholder: typeof price !== 'number' },
+    { label: 'Estimated Rent (PCM)', value: typeof rentMonthly === 'number' ? formatCurrency(rentMonthly) : PENDING, isPlaceholder: typeof rentMonthly !== 'number' },
+    { label: 'Gross Yield', value: typeof derivedYield === 'number' ? formatPercent(derivedYield) : PENDING, isPlaceholder: typeof derivedYield !== 'number' },
+    { label: 'ROI', value: typeof derivedRoi === 'number' ? formatPercent(derivedRoi) : PENDING, isPlaceholder: typeof derivedRoi !== 'number' },
+    { label: 'Discount', value: typeof discountPercent === 'number' ? formatPercent(discountPercent) : PENDING, isPlaceholder: typeof discountPercent !== 'number' },
+    { label: 'Stamp Duty (SDLT)', value: resolveStampDuty(property, price), isPlaceholder: false },
+    { label: 'Legal Fees', value: typeof legalFees === 'number' ? formatCurrency(legalFees) : PENDING, isPlaceholder: typeof legalFees !== 'number' },
+    { label: 'Sourcing Fee', value: typeof sourcingFee === 'number' ? formatCurrency(sourcingFee) : PENDING, isPlaceholder: typeof sourcingFee !== 'number' },
+    { label: 'Yearly Income (Gross)', value: yearlyIncomeEstimate, isPlaceholder: typeof yearlyIncome !== 'number' && typeof rentMonthly !== 'number' },
+    { label: 'Council Tax', value: councilTax ?? PENDING, isPlaceholder: !councilTax },
+    { label: 'Bills', value: bills ?? PENDING, isPlaceholder: !bills },
+    { label: 'Tenancy Status', value: tenancyStatus ?? PENDING, isPlaceholder: !tenancyStatus },
+    ...(isHmo ? [{ label: 'HMO Room Rents', value: hmoRoomRents ?? PENDING, isPlaceholder: !hmoRoomRents }] : []),
+  ];
+
+  if (!isHmo && input.aiScore) {
+    lines.push({ label: 'AI Score', value: `${input.aiScore.toFixed(1)}/10` });
+  }
+
+  return lines;
+};
+
 export const createPropertyPdfFilename = (input: PropertyPdfExportInput): string => {
   const property = input.property ?? {};
   const title = getText(property.title);
@@ -661,11 +868,66 @@ const splitSummaryIntoParagraphs = (value: string): string[] => {
   return paragraphs.length ? paragraphs : [value];
 };
 
+const buildSummaryNote = (
+  executiveSummary: string[],
+  investmentInsight: string,
+  sourceUrl: string,
+): string[] => {
+  const lines: string[] = [];
+  if (executiveSummary.length > 0) lines.push(...executiveSummary.slice(0, 2));
+  lines.push(`Investment note: ${investmentInsight}`);
+  lines.push(`Source: ${formatSourceUrlDisplay(sourceUrl, 90)}`);
+  return lines;
+};
+
 export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): PropertyDealPackModel => {
   const sections = getPropertyPdfSections(input);
+  const property = input.property ?? {};
+
   const executiveSummary = splitSummaryIntoParagraphs(sections.notes);
   const executiveSummaryPreview =
     executiveSummary.length > 2 ? executiveSummary.slice(0, 2) : splitSummaryIntoParagraphs(trimTextLength(sections.notes, 220));
+
+  const price = typeof input.price === 'number' ? input.price : toNumber(property.price);
+  const rent = resolveRentMonthly(property);
+  const mergedMetricsSource: Record<string, unknown> = { ...property };
+  if (typeof input.price === 'number') mergedMetricsSource.price = input.price;
+  if (typeof input.yieldPercent === 'number') mergedMetricsSource.yield_percent = input.yieldPercent;
+  if (typeof input.roiPercent === 'number') mergedMetricsSource.roi_percent = input.roiPercent;
+  const derivedYield = getYieldPercent(mergedMetricsSource) ?? undefined;
+  const derivedRoi = getRoiDisplay(mergedMetricsSource).value ?? undefined;
+  const derivedDiscount =
+    typeof input.discountPercent === 'number'
+      ? input.discountPercent
+      : toNumber(property.discount_percent ?? property.discount_estimate_pct);
+
+  const propertyType = getText(property.propertyType ?? property.property_type) ?? 'Property type unavailable';
+  const investmentType = getText(property.investmentType ?? property.investment_type) ?? 'Investment type unavailable';
+  const bedrooms = toNumber(property.bedrooms);
+  const bathrooms = toNumber(property.bathrooms);
+
+  const propertyDetails = buildPropertyDetailsSection(
+    property,
+    input.propertyId,
+    bedrooms,
+    bathrooms,
+    sections.location,
+    propertyType,
+  );
+
+  const areaDemand = buildAreaDemandSection(property, rent);
+
+  const financialBreakdown = buildFinancialBreakdown(
+    input,
+    property,
+    rent,
+    price,
+    derivedYield,
+    derivedRoi,
+    derivedDiscount,
+  );
+
+  const summaryNote = buildSummaryNote(executiveSummary, sections.investmentInsight, sections.sourceUrl);
 
   const snapshotCards = sections.metrics.filter((metric) => ['Price', 'Yield', 'ROI', 'Discount'].includes(metric.label));
   const summarySnapshot = sections.metrics.filter((metric) => ['Estimated Rent (PCM)', 'AI Score'].includes(metric.label));
@@ -697,6 +959,9 @@ export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): Prope
     filename: createPropertyPdfFilename(input),
     headline: sections.title,
     location: sections.location,
+    propertyType: cleanPropertyType(propertyType),
+    investmentType: cleanInvestmentType(investmentType),
+    marketStatus: resolveMarketStatus(property),
     brandTitle: sections.brandTitle,
     reportTitle: sections.reportTitle,
     reportSubtitle: sections.reportSubtitle,
@@ -704,9 +969,12 @@ export const buildPropertyDealPackModel = (input: PropertyPdfExportInput): Prope
     snapshotCards,
     highlights: sections.highlights,
     investmentInsight: sections.investmentInsight,
-    assetOverview: sections.overview,
+    propertyDetails,
+    areaDemand,
+    financialBreakdown,
     executiveSummary,
     executiveSummaryPreview,
+    summaryNote,
     summarySnapshot,
     supportingSections,
     exportedAt: sections.exportedAt,
