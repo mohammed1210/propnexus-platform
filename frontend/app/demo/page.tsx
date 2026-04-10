@@ -145,10 +145,12 @@ export default function DemoPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
-            {DEMO_PREMIUM_FEATURES.map((feature) => (
+          <div className="space-y-8">
+            {DEMO_PREMIUM_FEATURES.map((feature, index) => (
               <GalleryImage
                 key={feature.title}
+                index={index + 1}
+                layout={index % 2 === 0 ? 'default' : 'reverse'}
                 src={feature.src}
                 alt={feature.alt}
                 title={feature.title}
