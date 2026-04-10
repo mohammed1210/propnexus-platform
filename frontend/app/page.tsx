@@ -65,7 +65,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900">
       {/* Hero Section with Gradient */}
-      <section className="hero-gradient relative isolate overflow-hidden text-white">
+      <section className="hero-gradient relative isolate min-h-[72vh] overflow-hidden text-white lg:min-h-[82vh]">
         <div className="absolute inset-0">
           <Image
             src="/images/home-cart-house.webp"
@@ -73,12 +73,13 @@ export default function HomePage() {
             fill
             priority
             sizes="100vw"
-            className="object-cover object-center"
+            className="object-cover object-[74%_center] sm:object-[72%_center] lg:object-[78%_center]"
           />
         </div>
-        <div className="absolute inset-0 bg-slate-950/40" />
-        <div className="absolute inset-0 bg-gradient-to-r from-brand-950/88 via-brand-950/68 to-brand-950/38" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.22),transparent_28rem)]" />
+        <div className="absolute inset-0 bg-slate-950/28" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-950/90 via-brand-950/58 via-45% to-brand-950/14" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_48%,rgba(255,255,255,0.16),transparent_20rem)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_28rem)]" />
         <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-brand-950 via-brand-950/35 to-transparent" />
         <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(180deg,black,transparent)]" />
         {mounted && (
@@ -88,8 +89,8 @@ export default function HomePage() {
           </>
         )}
 
-        <div className="relative max-w-7xl mx-auto px-4 py-24 sm:px-6 sm:py-32 lg:px-8 lg:py-40">
-          <div className="mx-auto max-w-4xl text-center">
+        <div className="relative mx-auto flex min-h-[72vh] max-w-7xl items-center px-4 py-24 sm:px-6 sm:py-28 lg:min-h-[82vh] lg:px-8 lg:py-32">
+          <div className="max-w-3xl text-center lg:max-w-2xl lg:text-left">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 mb-8">
               <FiZap className="w-4 h-4 text-white" />
@@ -105,12 +106,12 @@ export default function HomePage() {
               </span>
             </h1>
 
-            <p className="text-xl sm:text-2xl text-brand-50 max-w-3xl mx-auto mb-10 leading-relaxed">
+            <p className="mb-10 max-w-3xl text-xl leading-relaxed text-brand-50 sm:text-2xl lg:mx-0">
               Smart property sourcing powered by AI. Analyze yields, calculate ROI, and find the perfect investment with confidence.
             </p>
 
             {/* Search Form */}
-            <form onSubmit={onSubmit} className="max-w-2xl mx-auto mb-10">
+            <form onSubmit={onSubmit} className="mb-10 max-w-2xl lg:mx-0">
               <div className="relative group">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-400 to-brand-400 rounded-xl blur opacity-30 group-hover:opacity-50 transition duration-300"></div>
                 <div className="relative flex w-full overflow-hidden rounded-xl border border-white/20 bg-white shadow-2xl focus-within:ring-2 focus-within:ring-white/50">
@@ -137,7 +138,7 @@ export default function HomePage() {
             </form>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+            <div className="mb-16 flex flex-col items-center justify-center gap-4 sm:flex-row lg:justify-start">
               <Link
                 href="/listings"
                 className="btn-primary text-lg px-8 py-4"
@@ -153,7 +154,7 @@ export default function HomePage() {
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-1 gap-6 max-w-3xl mx-auto rounded-3xl border border-white/15 bg-white/10 p-6 pt-8 backdrop-blur-md sm:grid-cols-3 sm:gap-8">
+            <div className="grid max-w-3xl grid-cols-1 gap-6 rounded-3xl border border-white/15 bg-white/10 p-6 pt-8 backdrop-blur-md sm:grid-cols-3 sm:gap-8 lg:mx-0 lg:bg-white/12">
               <div>
                 <div className="text-4xl font-bold text-white mb-2">10k+</div>
                 <div className="text-brand-100 text-sm">Properties</div>
