@@ -65,7 +65,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900">
       {/* Hero Section with Gradient */}
-      <section className="hero-gradient relative isolate min-h-[72vh] overflow-hidden text-white lg:min-h-[82vh]">
+      <section className="hero-gradient relative isolate min-h-[68vh] overflow-hidden text-white sm:min-h-[40rem] lg:min-h-[42rem] xl:min-h-[46rem]">
         <div className="absolute inset-0">
           <Image
             src="/images/home-cart-house.webp"
@@ -73,7 +73,7 @@ export default function HomePage() {
             fill
             priority
             sizes="100vw"
-            className="object-cover object-[74%_center] sm:object-[72%_center] lg:object-[78%_center]"
+            className="object-cover object-[74%_center] sm:object-[73%_center] lg:object-[76%_center] xl:object-[78%_center]"
           />
         </div>
         <div className="absolute inset-0 bg-slate-950/28" />
@@ -89,7 +89,7 @@ export default function HomePage() {
           </>
         )}
 
-        <div className="relative mx-auto flex min-h-[72vh] max-w-7xl items-center px-4 py-24 sm:px-6 sm:py-28 lg:min-h-[82vh] lg:px-8 lg:py-32">
+        <div className="relative mx-auto flex min-h-[68vh] max-w-7xl items-center px-4 py-20 sm:min-h-[40rem] sm:px-6 sm:py-24 lg:min-h-[42rem] lg:px-8 lg:py-24 xl:min-h-[46rem] xl:py-28">
           <div className="max-w-3xl text-center lg:max-w-2xl lg:text-left">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 mb-8">
