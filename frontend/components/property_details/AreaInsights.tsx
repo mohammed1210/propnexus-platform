@@ -275,9 +275,6 @@ export default function AreaInsights({
   if (!pc) return null;
   if (!intelLoading && !compsLoading && !usableIntel && !usableComps) return null;
 
-  const showIntelSection = showIntel && (intelLoading || usableIntel);
-  const showCompsSection = showComps && (compsLoading || usableComps);
-
   return (
     <CollapsibleCard
       title={UI_TEXT.title}
@@ -287,7 +284,7 @@ export default function AreaInsights({
       defaultExpanded={defaultExpanded}
     >
       <div className="space-y-4">
-        {showIntelSection ? (
+        {showIntel && (intelLoading || usableIntel) ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 p-4">
             <GatedPanel title="Area Intelligence" requiredPlan="pro" featureEnabled={showIntel}>
               <div className="space-y-3">
@@ -316,7 +313,7 @@ export default function AreaInsights({
           </div>
         ) : null}
 
-        {showCompsSection ? (
+        {showComps && (compsLoading || usableComps) ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 p-4">
             <GatedPanel title="Comparable Sales" requiredPlan="pro" featureEnabled={showComps}>
               <div className="space-y-3">
