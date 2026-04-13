@@ -65,6 +65,36 @@ describe('/api/users/plan', () => {
     );
   });
 
+  it('uses session claim email when Clerk secret lookup is unavailable', async () => {
+    process.env.CLERK_SECRET_KEY = '';
+    mockAuth.mockResolvedValue({
+      userId: 'user_1',
+      sessionClaims: { email: 'claims@example.com' },
+    });
+
+    global.fetch = jest.fn(async () => {
+      return new Response(JSON.stringify({ plan: 'investor' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as any;
+
+    const { GET } = await import('@/app/api/users/plan/route');
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ plan: 'investor' });
+    expect(mockGetUser).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://backend.example/users/plan?email=claims%40example.com',
+      expect.objectContaining({
+        method: 'GET',
+        cache: 'no-store',
+      }),
+    );
+  });
+
   it('does not expose stripe customer id to the browser payload', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_1' });
     mockGetUser.mockResolvedValue({
@@ -85,6 +115,27 @@ describe('/api/users/plan', () => {
     expect(res.status).toBe(200);
     expect(body).toEqual({ plan: 'investor' });
     expect(body).not.toHaveProperty('stripe_customer_id');
+  });
+
+  it('normalizes mixed-case upstream plans', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_1' });
+    mockGetUser.mockResolvedValue({
+      primaryEmailAddress: { emailAddress: 'user@example.com' },
+      emailAddresses: [{ emailAddress: 'user@example.com' }],
+    });
+    global.fetch = jest.fn(async () => {
+      return new Response(JSON.stringify({ plan: 'Investor' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as any;
+
+    const { GET } = await import('@/app/api/users/plan/route');
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ plan: 'investor' });
   });
 
   it('rejects malformed upstream payload with 502', async () => {

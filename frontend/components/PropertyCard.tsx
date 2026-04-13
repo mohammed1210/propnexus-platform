@@ -186,6 +186,10 @@ export default function PropertyCard({
 }) {
   const { userId } = useAuth();
   const normalized = useMemo(() => normalizeProperty(p as any), [p]);
+  const displayScore = useMemo(() => {
+    const raw = typeof p.ai_score === 'number' ? p.ai_score : p.score;
+    return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+  }, [p.ai_score, p.score]);
 
   const displayYieldPct = useMemo(
     () => getYieldPercent(normalized as any) ?? getYieldPercent(p as any),
@@ -642,16 +646,16 @@ export default function PropertyCard({
 
         {/* Badges for yield and ROI - moved to top-right */}
         <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-          {typeof p.score === 'number' && (
+          {typeof displayScore === 'number' && (
             <span
               className={cx(
                 'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
                 'bg-slate-900/60 text-white dark:bg-slate-50/10 dark:text-slate-100',
               )}
-              aria-label={`Deal score: ${Math.round(p.score)}/100`}
-              title={`Deal score: ${Math.round(p.score)}/100`}
+              aria-label={`Deal score: ${Math.round(displayScore)}/100`}
+              title={`Deal score: ${Math.round(displayScore)}/100`}
             >
-              Score {Math.round(p.score)}
+              Score {Math.round(displayScore)}
             </span>
           )}
           {typeof displayYieldPct === 'number' && (

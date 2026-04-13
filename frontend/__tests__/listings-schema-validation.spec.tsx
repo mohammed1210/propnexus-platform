@@ -19,6 +19,7 @@ describe('Listings Schema Validation', () => {
       bedrooms: 3,
       bathrooms: 2,
       description: 'A lovely property',
+      score: 81,
       yield_percent: 5.5,
       roi_percent: 10.2,
       imageurl: 'https://example.com/image.jpg',
@@ -38,6 +39,8 @@ describe('Listings Schema Validation', () => {
       bedrooms: backendProperty.bedrooms,
       bathrooms: backendProperty.bathrooms,
       description: backendProperty.description,
+      ai_score: backendProperty.ai_score ?? backendProperty.score,
+      score: backendProperty.score ?? backendProperty.ai_score,
       yield_percent: backendProperty.yield_percent,
       roi_percent: backendProperty.roi_percent,
       imageurl: backendProperty.imageurl,
@@ -56,6 +59,8 @@ describe('Listings Schema Validation', () => {
     expect(mappedProperty.bedrooms).toBe(3);
     expect(mappedProperty.bathrooms).toBe(2);
     expect(mappedProperty.description).toBe('A lovely property');
+    expect(mappedProperty.ai_score).toBe(81);
+    expect(mappedProperty.score).toBe(81);
     expect(mappedProperty.yield_percent).toBe(5.5);
     expect(mappedProperty.roi_percent).toBe(10.2);
     expect(mappedProperty.imageurl).toBe('https://example.com/image.jpg');
@@ -81,6 +86,8 @@ describe('Listings Schema Validation', () => {
       bedrooms: null,
       bathrooms: null,
       description: null,
+      ai_score: null,
+      score: null,
       yield_percent: null,
       roi_percent: null,
       imageurl: null,
@@ -99,6 +106,8 @@ describe('Listings Schema Validation', () => {
       bedrooms: backendProperty.bedrooms,
       bathrooms: backendProperty.bathrooms,
       description: backendProperty.description,
+      ai_score: backendProperty.ai_score ?? backendProperty.score,
+      score: backendProperty.score ?? backendProperty.ai_score,
       yield_percent: backendProperty.yield_percent,
       roi_percent: backendProperty.roi_percent,
       imageurl: backendProperty.imageurl,
@@ -114,6 +123,8 @@ describe('Listings Schema Validation', () => {
     expect(mappedProperty.location).toBeNull();
     expect(mappedProperty.price).toBe(150000);
     expect(mappedProperty.source).toBeNull();
+    expect(mappedProperty.ai_score).toBeNull();
+    expect(mappedProperty.score).toBeNull();
     expect(mappedProperty.yield_percent).toBeNull();
     expect(mappedProperty.roi_percent).toBeNull();
     expect(mappedProperty.investment_type).toBeNull();
@@ -129,14 +140,22 @@ describe('Listings Schema Validation', () => {
       title: 'Test Property',
       investmentType: 'HMO', // OLD CAMELCASE - should not be used
       investment_type: 'BTL', // NEW SNAKE_CASE - should be used
+      ai_score: null,
+      score: 72,
     };
 
     const mappedProperty = {
       investment_type: backendPropertyWithCamelCase.investment_type,
+      ai_score:
+        backendPropertyWithCamelCase.ai_score ?? backendPropertyWithCamelCase.score,
+      score:
+        backendPropertyWithCamelCase.score ?? backendPropertyWithCamelCase.ai_score,
     };
 
     // Should use snake_case version
     expect(mappedProperty.investment_type).toBe('BTL');
     expect(mappedProperty.investment_type).not.toBe('HMO');
+    expect(mappedProperty.ai_score).toBe(72);
+    expect(mappedProperty.score).toBe(72);
   });
 });

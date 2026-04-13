@@ -10,7 +10,7 @@ const VALID_PLANS: readonly UserPlan[] = ['free', 'pro', 'investor'];
 function parsePlanFromPayload(payload: unknown): UserPlan | null {
   const rawPlan = (payload as { plan?: unknown } | null)?.plan;
   if (typeof rawPlan !== 'string') return null;
-  const normalized = rawPlan.trim();
+  const normalized = rawPlan.trim().toLowerCase();
   if (VALID_PLANS.includes(normalized as UserPlan)) {
     return normalized as UserPlan;
   }
@@ -33,19 +33,38 @@ function getBackendBase(): string {
 
 function isClerkServerEnabled(): boolean {
   const pk = (process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '').trim();
-  const sk = (process.env.CLERK_SECRET_KEY ?? '').trim();
   const disable = ['1', 'true', 'yes', 'on'].includes(
     (process.env.NEXT_PUBLIC_DISABLE_AUTH ?? '').trim().toLowerCase(),
   );
-  return !disable && pk.startsWith('pk_') && Boolean(sk);
+  return !disable && pk.startsWith('pk_');
+}
+
+function getEmailFromSessionClaims(claims: unknown): string | null {
+  if (!claims || typeof claims !== 'object') return null;
+
+  const candidateKeys = ['email', 'email_address', 'primary_email_address'] as const;
+  for (const key of candidateKeys) {
+    const value = (claims as Record<string, unknown>)[key];
+    if (typeof value === 'string' && value.includes('@')) {
+      return value;
+    }
+  }
+
+  return null;
 }
 
 async function getSignedInUserEmail(): Promise<string | null> {
   if (!isClerkServerEnabled()) return null;
 
   const a: any = await auth();
+  const sessionEmail = getEmailFromSessionClaims(a?.sessionClaims);
+  if (sessionEmail) return sessionEmail;
+
   const userId = (a?.userId as string | null) ?? null;
   if (!userId) return null;
+
+  const sk = (process.env.CLERK_SECRET_KEY ?? '').trim();
+  if (!sk) return null;
 
   const client = await clerkClient();
   const user = await client.users.getUser(userId);
