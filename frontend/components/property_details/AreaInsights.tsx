@@ -369,7 +369,7 @@ export default function AreaInsights({
 
                 {rents.length > 0 ? (
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Rental comparables available: {rents.length}
+                    Available rental comparables: {rents.length}
                   </div>
                 ) : null}
               </div>
