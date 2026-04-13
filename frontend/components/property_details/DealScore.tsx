@@ -77,6 +77,12 @@ export default function DealScore({ property }: DealScoreProps) {
   const [animatedScore, setAnimatedScore] = useState(0);
 
   useEffect(() => {
+    if (scoreData) {
+      setAnimatedScore(scoreData.score);
+    }
+  }, [scoreData]);
+
+  useEffect(() => {
     const element = scoreRef.current;
     if (!element) return;
 
@@ -101,19 +107,24 @@ export default function DealScore({ property }: DealScoreProps) {
     const duration = 1000;
     const start = performance.now();
     const targetScore = scoreData.score;
+    const startScore = animatedScore;
+
+    if (Math.round(startScore) === Math.round(targetScore)) {
+      return;
+    }
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - start;
       const progress = Math.min(elapsed / duration, 1);
 
       const easeProgress = 1 - Math.pow(1 - progress, 3);
-      setAnimatedScore(targetScore * easeProgress);
+      setAnimatedScore(startScore + (targetScore - startScore) * easeProgress);
 
       if (progress < 1) requestAnimationFrame(animate);
     };
 
     requestAnimationFrame(animate);
-  }, [isVisible, scoreData]);
+  }, [animatedScore, isVisible, scoreData]);
 
   if (!scoreData) return null;
 
@@ -133,7 +144,7 @@ export default function DealScore({ property }: DealScoreProps) {
 
   return (
     <div ref={scoreRef}>
-      <div className="sticky top-3 z-10 -mx-2 px-2 py-2 mb-4 bg-white/80 dark:bg-slate-900/40 backdrop-blur rounded-lg">
+      <div className="sticky top-3 z-10 px-2 py-2 mb-4 bg-white/80 dark:bg-slate-900/40 backdrop-blur rounded-lg">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className={`text-6xl font-bold ${getScoreColor(score)}`}>{Math.round(animatedScore)}</div>

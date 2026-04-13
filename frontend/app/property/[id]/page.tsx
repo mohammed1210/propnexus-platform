@@ -478,8 +478,8 @@ export default function PropertyDetailsPage() {
             </CollapsibleCard>
 
             <AreaInsights
-              areaKey={property.location || ''}
-              postcode={property.location || ''}
+              areaKey={String((property as any)?.area_key ?? (property as any)?.postcode ?? property.location ?? '')}
+              postcode={String((property as any)?.postcode ?? '')}
               rentSource={(property as any)?.score_breakdown?.inputs?.rent_source}
               version={(property as any)?.score_breakdown?.version}
               defaultExpanded={false}

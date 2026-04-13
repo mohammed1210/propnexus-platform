@@ -38,6 +38,9 @@ export async function fetchPropertyById(propertyId: string, userId?: string | nu
   });
 
   if (!res.ok) {
+    if (res.status === 404) {
+      return null;
+    }
     const text = await res.text().catch(() => '');
     throw new Error(text || `Failed to load property (${res.status})`);
   }

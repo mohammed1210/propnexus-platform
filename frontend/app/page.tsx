@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FiSearch, FiTrendingUp, FiZap, FiMapPin, FiDollarSign, FiBarChart2, FiShield } from 'react-icons/fi';
@@ -64,9 +65,23 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900">
       {/* Hero Section with Gradient */}
-      <section className="hero-gradient text-white">
-        {/* Decorative Elements */}
-        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,transparent,black)]" />
+      <section className="hero-gradient relative isolate min-h-[62vh] overflow-hidden text-white sm:min-h-[36rem] lg:min-h-[38rem] xl:min-h-[40rem]">
+        <div className="absolute inset-0">
+          <Image
+            src="/images/home-cart-house.webp"
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-[74%_center] sm:object-[73%_center] lg:object-[84%_center] xl:object-[86%_center]"
+          />
+        </div>
+        <div className="absolute inset-0 bg-slate-950/28" />
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-950/90 via-brand-950/58 via-45% to-brand-950/14" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_48%,rgba(255,255,255,0.16),transparent_20rem)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.18),transparent_28rem)]" />
+        <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-brand-950 via-brand-950/35 to-transparent lg:h-24" />
+        <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(180deg,black,transparent)]" />
         {mounted && (
           <>
             <div className="absolute top-0 right-0 -translate-y-12 translate-x-12 w-96 h-96 bg-cyan-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-pulse" />
@@ -74,16 +89,16 @@ export default function HomePage() {
           </>
         )}
 
-        <div className="relative max-w-7xl mx-auto px-4 py-24 sm:py-32">
-          <div className="text-center">
+        <div className="relative mx-auto flex min-h-[62vh] max-w-7xl items-center px-4 py-16 sm:min-h-[36rem] sm:px-6 sm:py-[4.5rem] lg:min-h-[38rem] lg:px-8 lg:py-14 xl:min-h-[40rem] xl:py-16">
+          <div className="max-w-3xl text-center lg:max-w-xl lg:text-left xl:max-w-2xl">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 mb-8">
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 backdrop-blur-sm lg:mb-4">
               <FiZap className="w-4 h-4 text-white" />
-              <span className="text-sm font-semibold text-white">AI-Powered Property Platform</span>
+              <span className="text-xs font-semibold tracking-[0.16em] text-white sm:text-sm">AI-Powered Property Platform</span>
             </div>
 
             {/* Headline */}
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
+            <h1 className="mb-4 text-4xl font-bold leading-[1.02] text-white sm:text-5xl lg:mb-4 lg:text-6xl xl:text-[4rem]">
               Discover Your Next
               <br />
               <span className="bg-gradient-to-r from-white to-cyan-100 bg-clip-text text-transparent">
@@ -91,28 +106,28 @@ export default function HomePage() {
               </span>
             </h1>
 
-            <p className="text-xl sm:text-2xl text-brand-50 max-w-3xl mx-auto mb-10 leading-relaxed">
+            <p className="mb-14 max-w-2xl text-lg leading-7 text-brand-50 sm:text-xl lg:mx-0 lg:mb-12 xl:text-[1.35rem] xl:leading-8">
               Smart property sourcing powered by AI. Analyze yields, calculate ROI, and find the perfect investment with confidence.
             </p>
 
             {/* Search Form */}
-            <form onSubmit={onSubmit} className="max-w-2xl mx-auto mb-10">
+            <form onSubmit={onSubmit} className="mb-7 max-w-2xl lg:mx-0 lg:mb-6">
               <div className="relative group">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-cyan-400 to-brand-400 rounded-xl blur opacity-30 group-hover:opacity-50 transition duration-300"></div>
                 <div className="relative flex w-full overflow-hidden rounded-xl border border-white/20 bg-white shadow-2xl focus-within:ring-2 focus-within:ring-white/50">
-                  <div className="flex items-center pl-4">
+                  <div className="flex items-center pl-3 lg:pl-4">
                     <FiSearch className="text-slate-400 w-5 h-5" />
                   </div>
                   <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
                     placeholder="Enter location, city, or postcode…"
-                    className="flex-1 h-14 px-3 text-slate-900 placeholder-slate-500 outline-none bg-transparent"
+                    className="h-[3.25rem] flex-1 bg-transparent px-3 text-slate-900 outline-none placeholder-slate-500 sm:h-14 lg:h-12"
                     aria-label="Search by location or postcode"
                   />
                   <button
                     type="submit"
-                    className="h-14 px-6 font-semibold bg-gradient-to-r from-brand-500 to-brand-600 text-white hover:from-brand-600 hover:to-brand-700 transition-all duration-300 flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                    className="flex h-[3.25rem] items-center gap-2 bg-gradient-to-r from-brand-500 to-brand-600 px-5 font-semibold text-white transition-all duration-300 hover:from-brand-600 hover:to-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:h-14 sm:px-6 lg:h-12 lg:px-5"
                     aria-label="Search for properties"
                   >
                     <FiZap className="w-4 h-4" aria-hidden="true" />
@@ -123,34 +138,34 @@ export default function HomePage() {
             </form>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+            <div className="mb-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:mb-7 lg:justify-start">
               <Link
                 href="/listings"
-                className="btn-primary text-lg px-8 py-4"
+                className="btn-primary px-7 py-3 text-base lg:text-lg"
               >
                 Browse listings
               </Link>
               <Link
                 href="/pricing"
-                className="btn-secondary text-lg px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white/50 text-white hover:bg-white/20"
+                className="btn-secondary border-2 border-white/50 bg-white/10 px-7 py-3 text-base text-white backdrop-blur-sm hover:bg-white/20 lg:text-lg"
               >
                 View Pricing
               </Link>
             </div>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-8 max-w-3xl mx-auto pt-8 border-t border-white/20">
+            <div className="grid max-w-3xl grid-cols-1 gap-4 rounded-3xl border border-white/15 bg-white/10 p-5 backdrop-blur-md sm:grid-cols-3 sm:gap-5 lg:mx-0 lg:max-w-2xl lg:bg-white/12 lg:p-4">
               <div>
-                <div className="text-4xl font-bold text-white mb-2">10k+</div>
-                <div className="text-brand-100 text-sm">Properties</div>
+                <div className="mb-1 text-3xl font-bold text-white lg:text-[2rem]">10k+</div>
+                <div className="text-xs text-brand-100 sm:text-sm">Properties</div>
               </div>
               <div>
-                <div className="text-4xl font-bold text-white mb-2">98%</div>
-                <div className="text-brand-100 text-sm">Satisfaction</div>
+                <div className="mb-1 text-3xl font-bold text-white lg:text-[2rem]">98%</div>
+                <div className="text-xs text-brand-100 sm:text-sm">Satisfaction</div>
               </div>
               <div>
-                <div className="text-4xl font-bold text-white mb-2">£2.4B</div>
-                <div className="text-brand-100 text-sm">Total Value</div>
+                <div className="mb-1 text-3xl font-bold text-white lg:text-[2rem]">£2.4B</div>
+                <div className="text-xs text-brand-100 sm:text-sm">Total Value</div>
               </div>
             </div>
           </div>
@@ -158,7 +173,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Grid */}
-      <section className="max-w-7xl mx-auto px-4 py-24">
+      <section className="max-w-7xl mx-auto px-4 pb-24 pt-20">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">
             Everything You Need to Invest Smarter

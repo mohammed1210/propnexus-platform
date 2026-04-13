@@ -20,6 +20,12 @@ type DealPackPageProps = {
   searchParams: Promise<{ source?: string }>;
 };
 
+const isNextNotFoundError = (error: unknown): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const digest = 'digest' in error ? (error as { digest?: string }).digest : undefined;
+  return digest === 'NEXT_NOT_FOUND' || digest === 'NEXT_HTTP_ERROR_FALLBACK;404';
+};
+
 export default async function PropertyDealPackPage({ params, searchParams }: DealPackPageProps) {
   if (!FF.DEAL_PACK) notFound();
 
@@ -37,6 +43,9 @@ export default async function PropertyDealPackPage({ params, searchParams }: Dea
       url: source,
     });
   } catch (error) {
+    if (isNextNotFoundError(error)) {
+      throw error;
+    }
     console.error('Failed to render deal pack page', error);
   }
 
