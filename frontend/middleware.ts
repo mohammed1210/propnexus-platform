@@ -3,14 +3,20 @@ import type { NextRequest } from "next/server";
 import { clerkMiddleware, createRouteMatcher, clerkClient } from "@clerk/nextjs/server";
 import { hasValidClerkKey } from "@/lib/clerk-utils";
 import { disableAuth, isAuthEnabled } from "@/lib/auth";
+import { FF } from "@/lib/flags";
 
 const DEFAULT_ADMIN_EMAILS = ["abbas_m90@hotmail.com", "ysoserious360@gmail.com"];
+const OFF_MARKET_ENABLED = FF.OFF_MARKET;
 
 function parseAdminEmails(raw: string | undefined): string[] {
   return (raw || "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
+}
+
+function isOffMarketPath(pathname: string) {
+  return pathname === "/off-market-deals" || pathname === "/off-market" || pathname.startsWith("/off-market/");
 }
 
 function handleRedirects(req: NextRequest) {
@@ -20,7 +26,10 @@ function handleRedirects(req: NextRequest) {
   if (pathname === "/saved-deals" || pathname === "/saved-deals-deals") {
     return NextResponse.redirect(new URL("/saved", req.url));
   }
-  if (pathname === "/off-market-deals") {
+  if (!OFF_MARKET_ENABLED && isOffMarketPath(pathname)) {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
+  if (OFF_MARKET_ENABLED && pathname === "/off-market-deals") {
     return NextResponse.redirect(new URL("/off-market", req.url));
   }
 

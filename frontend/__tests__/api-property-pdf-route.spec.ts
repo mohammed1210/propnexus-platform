@@ -19,6 +19,8 @@ describe('/api/property-pdf/[id]', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_FEATURE_DEAL_PACK = 'true';
+    delete process.env.NEXT_PUBLIC_FEATURE_PROPERTY_EXPORTS;
     mockGetOptionalClerkUserId.mockResolvedValue('user_123');
     mockFetchPropertyById.mockResolvedValue({
       id: 'prop-123',
@@ -61,17 +63,17 @@ describe('/api/property-pdf/[id]', () => {
     expect(body).toEqual({ error: 'pdf_generation_failed', message: 'browser launch failed' });
   });
 
-  it('returns not_found when the property lookup resolves to null', async () => {
-    mockFetchPropertyById.mockResolvedValue(null);
-
+  it('returns 404 when the deal pack flag is disabled', async () => {
+    process.env.NEXT_PUBLIC_FEATURE_DEAL_PACK = 'false';
     const { GET } = await import('@/app/api/property-pdf/[id]/route');
-    const res = await GET(new Request('https://app.example/api/property-pdf/missing-prop'), {
-      params: Promise.resolve({ id: 'missing-prop' }),
+
+    const res = await GET(new Request('https://app.example/api/property-pdf/prop-123'), {
+      params: Promise.resolve({ id: 'prop-123' }),
     });
-    const body = await res.json();
 
     expect(res.status).toBe(404);
-    expect(body).toEqual({ error: 'not_found' });
+    expect(await res.json()).toEqual({ error: 'not_found' });
+    expect(mockFetchPropertyById).not.toHaveBeenCalled();
     expect(mockRenderDealPackPdfFromUrl).not.toHaveBeenCalled();
   });
 });

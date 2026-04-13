@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { FF } from '@/lib/flags';
 import { normalizeProperty } from '@/lib/normalizeProperty';
 
 interface PropertyData {
@@ -125,18 +126,10 @@ export default function DealScore({ property }: DealScoreProps) {
     requestAnimationFrame(animate);
   }, [animatedScore, isVisible, scoreData]);
 
-  if (!scoreData) {
-    return (
-      <div className="text-gray-600 dark:text-neutral-400">
-        <p>Score pending</p>
-        <p className="mt-1 text-xs">
-          This property doesn’t have a stored deal score yet.
-        </p>
-      </div>
-    );
-  }
+  if (!scoreData) return null;
 
   const { score, categories, version } = scoreData;
+  const showBreakdown = FF.AI_SCORE_BREAKDOWN;
 
   void categories;
 
@@ -177,7 +170,7 @@ export default function DealScore({ property }: DealScoreProps) {
         </div>
       </div>
 
-      {derivedCategories && (
+      {showBreakdown && derivedCategories && (
         <div className="space-y-3 mb-4">
           {Object.entries(derivedCategories)
             .filter(([k, v]) => typeof v === 'number' && typeof MAX_POINTS[k] === 'number')
@@ -215,9 +208,11 @@ export default function DealScore({ property }: DealScoreProps) {
         </div>
       )}
 
-      <div className="mt-4 text-xs text-gray-500 dark:text-neutral-500">
-        Version {version ?? 'v1.0'} • Scores are indicative and based on available data
-      </div>
+      {showBreakdown ? (
+        <div className="mt-4 text-xs text-gray-500 dark:text-neutral-500">
+          Version {version ?? 'v1.0'} • Scores are indicative and based on available data
+        </div>
+      ) : null}
     </div>
   );
 }

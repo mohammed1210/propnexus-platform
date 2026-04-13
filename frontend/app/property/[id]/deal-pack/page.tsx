@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 
 import PropertyDealPackTemplate from '@/components/property_details/PropertyDealPackTemplate';
+import { FF } from '@/lib/flags';
 import { buildPropertyDealPackModel } from '@/lib/propertyDealPack';
 import { fetchPropertyById, getOptionalClerkUserId } from '@/lib/server/propertyData';
 
@@ -26,6 +27,8 @@ const isNextNotFoundError = (error: unknown): boolean => {
 };
 
 export default async function PropertyDealPackPage({ params, searchParams }: DealPackPageProps) {
+  if (!FF.DEAL_PACK) notFound();
+
   const [{ id }, { source }] = await Promise.all([params, searchParams]);
   const userId = await getOptionalClerkUserId();
   let model: ReturnType<typeof buildPropertyDealPackModel> | null = null;

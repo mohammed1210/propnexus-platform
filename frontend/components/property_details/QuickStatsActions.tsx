@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { fetchWithRetry } from '@/lib/api';
 import { exportPropertyPdf } from '@/lib/propertyPdfExport';
 import { createPropertyPdfFilename } from '@/lib/propertyDealPack';
+import { FF } from '@/lib/flags';
 import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 type QuickStatsActionsProps = {
@@ -58,6 +59,8 @@ export default function QuickStatsActions({
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const showDealPackExport = FF.DEAL_PACK;
+  const showCrmExports = FF.CRM_EXPORT;
 
   const merged = useMemo(() => {
     const next: Record<string, any> = {
@@ -329,33 +332,36 @@ export default function QuickStatsActions({
                 <span>Share Property</span>
               </button>
 
-              <button
-                onClick={handleExportPDF}
-                disabled={exporting}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
-                aria-label="Export property details as PDF"
-              >
-                <FiDownload className="w-5 h-5" aria-hidden="true" />
-                <span>{exporting ? 'Exporting…' : 'Export PDF'}</span>
-              </button>
-
-              <button
-                onClick={handleCopyJSON}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
-                aria-label={copied ? 'Property data copied' : 'Copy property data as JSON'}
-              >
-                {copied ? (
-                  <>
-                    <FiCheck className="w-5 h-5" aria-hidden="true" />
-                    <span>Data Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <FiCopy className="w-5 h-5" aria-hidden="true" />
-                    <span>Copy Data</span>
-                  </>
-                )}
-              </button>
+              {showDealPackExport ? (
+                <button
+                  onClick={handleExportPDF}
+                  disabled={exporting}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                  aria-label="Export property details as PDF"
+                >
+                  <FiDownload className="w-5 h-5" aria-hidden="true" />
+                  <span>{exporting ? 'Exporting…' : 'Export PDF'}</span>
+                </button>
+              ) : null}
+              {showCrmExports ? (
+                <button
+                  onClick={handleCopyJSON}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                  aria-label={copied ? 'Property data copied' : 'Copy property data as JSON'}
+                >
+                  {copied ? (
+                    <>
+                      <FiCheck className="w-5 h-5" aria-hidden="true" />
+                      <span>Data Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiCopy className="w-5 h-5" aria-hidden="true" />
+                      <span>Copy Data</span>
+                    </>
+                  )}
+                </button>
+              ) : null}
             </div>
           </div>
         </div>
@@ -392,14 +398,16 @@ export default function QuickStatsActions({
           >
             <FiShare2 className="w-5 h-5" aria-hidden="true" />
           </button>
-          <button
-            onClick={handleExportPDF}
-            disabled={exporting}
-            className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
-            aria-label="Export as PDF"
-          >
-            <FiDownload className="w-5 h-5" aria-hidden="true" />
-          </button>
+          {showDealPackExport ? (
+            <button
+              onClick={handleExportPDF}
+              disabled={exporting}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+              aria-label="Export as PDF"
+            >
+              <FiDownload className="w-5 h-5" aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       </div>
     </>

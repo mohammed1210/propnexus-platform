@@ -37,6 +37,12 @@ jest.mock('../OnboardingTour', () => function MockOnboardingTour() {
 });
 
 describe('Header onboarding controls', () => {
+  it('hides the off-market nav link by default', () => {
+    render(<Header />);
+
+    expect(screen.queryByText('nav.offMarket')).not.toBeInTheDocument();
+  });
+
   it('launches replay from header and dispatches start-tour event', () => {
     render(<Header />);
 

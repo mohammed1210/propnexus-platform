@@ -1,61 +1,35 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-
+import { render, screen } from '@testing-library/react';
 import QuickStatsActions from './QuickStatsActions';
 
-const mockExportPropertyPdf = jest.fn();
 const mockFetchWithRetry = jest.fn();
-const mockToastSuccess = jest.fn();
-const mockToastError = jest.fn();
-const mockRouteFetch = jest.fn();
-const clickSpy = jest.fn();
-const oldFetch = global.fetch;
-const oldCreateObjectURL = URL.createObjectURL;
-const oldRevokeObjectURL = URL.revokeObjectURL;
-
-jest.mock('@/lib/propertyPdfExport', () => ({
-  exportPropertyPdf: (...args: unknown[]) => mockExportPropertyPdf(...args),
-}));
+const mockFlagState = {
+  DEAL_PACK: false,
+  CRM_EXPORT: false,
+};
 
 jest.mock('@/lib/api', () => ({
   fetchWithRetry: (...args: unknown[]) => mockFetchWithRetry(...args),
 }));
 
-jest.mock('sonner', () => ({
-  toast: {
-    success: (...args: unknown[]) => mockToastSuccess(...args),
-    error: (...args: unknown[]) => mockToastError(...args),
+jest.mock('@/lib/flags', () => ({
+  get FF() {
+    return mockFlagState;
   },
 }));
 
-describe('QuickStatsActions PDF export', () => {
+describe('QuickStatsActions launch controls', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    global.fetch = mockRouteFetch as any;
-    URL.createObjectURL = jest.fn(() => 'blob:route-pdf');
-    URL.revokeObjectURL = jest.fn();
-    HTMLAnchorElement.prototype.click = clickSpy;
+    mockFlagState.DEAL_PACK = false;
+    mockFlagState.CRM_EXPORT = false;
     mockFetchWithRetry.mockResolvedValue({
       ok: false,
       json: async () => ({ data: [] }),
     });
-    mockExportPropertyPdf.mockResolvedValue(undefined);
-    mockRouteFetch.mockResolvedValue({
-      ok: true,
-      blob: async () => new Blob([Uint8Array.from([37, 80, 68, 70])], { type: 'application/pdf' }),
-      headers: {
-        get: (name: string) => (name.toLowerCase() === 'content-disposition' ? 'attachment; filename="propnexus-route.pdf"' : null),
-      },
-    });
   });
 
-  afterEach(() => {
-    global.fetch = oldFetch;
-    URL.createObjectURL = oldCreateObjectURL;
-    URL.revokeObjectURL = oldRevokeObjectURL;
-  });
-
-  it('renders export actions in quick actions UI', () => {
+  it('keeps save and share visible while hiding export actions by default', () => {
     render(
       <QuickStatsActions
         propertyId="prop-123"
@@ -66,77 +40,24 @@ describe('QuickStatsActions PDF export', () => {
       />,
     );
 
-    expect(screen.getByText('Quick Actions')).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /export/i }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole('button', { name: /save this deal/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('button', { name: /share this property/i }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: /export property details as pdf/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /copy property data as json/i })).not.toBeInTheDocument();
   });
 
-  it('uses the template PDF route as the primary export path', async () => {
+  it('can re-enable deal pack and CRM export actions independently', () => {
+    mockFlagState.DEAL_PACK = true;
+    mockFlagState.CRM_EXPORT = true;
+
     render(
       <QuickStatsActions
         propertyId="prop-456"
-        property={{ title: 'Riverside House', location: 'Manchester', bedrooms: 3, bathrooms: 2 }}
-        price={325000}
-        yieldPercent={5.8}
-        roiPercent={7.2}
-        discountPercent={12.3}
-        aiScore={8.9}
+        property={{ title: 'Riverside House', location: 'Manchester' }}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Export property details as PDF' }));
-
-    await waitFor(() => {
-      expect(mockToastSuccess).toHaveBeenCalledWith('PDF exported successfully.');
-    });
-
-    expect(mockRouteFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/property-pdf/prop-456'),
-      expect.objectContaining({
-        method: 'GET',
-        cache: 'no-store',
-      }),
-    );
-    expect(mockExportPropertyPdf).not.toHaveBeenCalled();
-    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not crash export flow with sparse property data', async () => {
-    render(<QuickStatsActions propertyId="prop-sparse" property={{}} />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Export property details as PDF' }));
-
-    await waitFor(() => {
-      expect(mockToastError).not.toHaveBeenCalled();
-    });
-
-    expect(mockRouteFetch).toHaveBeenCalledTimes(1);
-    expect(mockExportPropertyPdf).not.toHaveBeenCalled();
-  });
-
-  it('falls back to the pdf-lib exporter when the primary route fails', async () => {
-    mockRouteFetch.mockRejectedValueOnce(new Error('route failed'));
-
-    render(
-      <QuickStatsActions
-        propertyId="prop-metrics"
-        property={{ title: 'Metric Deal', location: 'York', yield_percent: 7.3, roi_percent: 12.8 }}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Export property details as PDF' }));
-
-    await waitFor(() => {
-      expect(mockExportPropertyPdf).toHaveBeenCalledTimes(1);
-      expect(mockToastSuccess).toHaveBeenCalledWith('PDF exported successfully.');
-    });
-
-    expect(mockExportPropertyPdf).toHaveBeenCalledWith(
-      expect.objectContaining({
-        propertyId: 'prop-metrics',
-        yieldPercent: 7.3,
-        roiPercent: 12.8,
-      }),
-    );
+    expect(screen.getAllByRole('button', { name: /export property details as pdf/i }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /copy property data as json/i })).toBeInTheDocument();
   });
 });
