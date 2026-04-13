@@ -20,6 +20,9 @@ describe('Property Details Page - Feature Flags', () => {
   it('should have all AI feature flags disabled by default', () => {
     // Remove all feature flag env vars
     delete process.env.NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE;
+    delete process.env.NEXT_PUBLIC_FEATURE_OFF_MARKET;
+    delete process.env.NEXT_PUBLIC_FEATURE_PROPERTY_EXPORTS;
+    delete process.env.NEXT_PUBLIC_FEATURE_TRADESMEN;
     delete process.env.NEXT_PUBLIC_FEATURE_AREA_INTEL;
     delete process.env.NEXT_PUBLIC_FEATURE_COMPS;
     delete process.env.NEXT_PUBLIC_FEATURE_AI_CHATBOT;
@@ -29,6 +32,9 @@ describe('Property Details Page - Feature Flags', () => {
 
       // All should default to false
       expect(FF.DEAL_SCORE).toBe(false);
+      expect(FF.OFF_MARKET).toBe(false);
+      expect(FF.PROPERTY_EXPORTS).toBe(false);
+      expect(FF.TRADESMEN).toBe(false);
       // Area Intel + Comps are default-on (can be explicitly disabled via env)
       expect(FF.AREA_INTEL).toBe(true);
       expect(FF.COMPS).toBe(true);
@@ -83,6 +89,9 @@ describe('Property Details Page - Feature Flags', () => {
 
   it('should enable all AI panels when all flags are true', () => {
     process.env.NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE = 'true';
+    process.env.NEXT_PUBLIC_FEATURE_OFF_MARKET = 'true';
+    process.env.NEXT_PUBLIC_FEATURE_PROPERTY_EXPORTS = 'true';
+    process.env.NEXT_PUBLIC_FEATURE_TRADESMEN = 'true';
     process.env.NEXT_PUBLIC_FEATURE_AREA_INTEL = 'true';
     process.env.NEXT_PUBLIC_FEATURE_COMPS = 'true';
     process.env.NEXT_PUBLIC_FEATURE_AI_CHATBOT = 'true';
@@ -92,6 +101,9 @@ describe('Property Details Page - Feature Flags', () => {
 
       // All flags should be enabled
       expect(FF.DEAL_SCORE).toBe(true);
+      expect(FF.OFF_MARKET).toBe(true);
+      expect(FF.PROPERTY_EXPORTS).toBe(true);
+      expect(FF.TRADESMEN).toBe(true);
       expect(FF.AREA_INTEL).toBe(true);
       expect(FF.COMPS).toBe(true);
       expect(FF.AI_CHAT).toBe(true);
@@ -118,6 +130,9 @@ describe('Property Details Page - Feature Flags', () => {
   it('should treat undefined flags as false', () => {
     // Explicitly delete all flags
     delete process.env.NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE;
+    delete process.env.NEXT_PUBLIC_FEATURE_OFF_MARKET;
+    delete process.env.NEXT_PUBLIC_FEATURE_PROPERTY_EXPORTS;
+    delete process.env.NEXT_PUBLIC_FEATURE_TRADESMEN;
     delete process.env.NEXT_PUBLIC_FEATURE_AREA_INTEL;
     delete process.env.NEXT_PUBLIC_FEATURE_COMPS;
     delete process.env.NEXT_PUBLIC_FEATURE_AI_CHATBOT;
@@ -127,6 +142,9 @@ describe('Property Details Page - Feature Flags', () => {
 
       // All should be false when undefined
       expect(FF.DEAL_SCORE).toBe(false);
+      expect(FF.OFF_MARKET).toBe(false);
+      expect(FF.PROPERTY_EXPORTS).toBe(false);
+      expect(FF.TRADESMEN).toBe(false);
       // Area Intel + Comps default to true when undefined
       expect(FF.AREA_INTEL).toBe(true);
       expect(FF.COMPS).toBe(true);

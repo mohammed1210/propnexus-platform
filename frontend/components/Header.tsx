@@ -11,6 +11,7 @@ import { SafeSignedIn, SafeSignedOut, SafeUserButton } from "./ClerkAuthSafe";
 import ThemeToggle from "./ThemeToggle";
 import OnboardingTour from "./OnboardingTour";
 import { isAuthEnabled } from "@/lib/auth";
+import { FF } from "@/lib/flags";
 
 function isListingsRoute(pathname: string | null): boolean {
   const path = String(pathname || '').toLowerCase();
@@ -24,7 +25,7 @@ export default function Header() {
     { href: '/', label: t('nav.home') },
     { href: '/listings', label: t('nav.listings') },
     { href: '/saved', label: t('nav.savedDeals') },
-    { href: '/off-market', label: t('nav.offMarket') },
+    ...(FF.OFF_MARKET ? [{ href: '/off-market', label: t('nav.offMarket') }] : []),
     { href: '/demo', label: t('nav.demo') },
     { href: '/pricing', label: t('nav.pricing') },
   ];

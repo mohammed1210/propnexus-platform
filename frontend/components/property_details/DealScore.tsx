@@ -114,16 +114,7 @@ export default function DealScore({ property }: DealScoreProps) {
     requestAnimationFrame(animate);
   }, [isVisible, scoreData]);
 
-  if (!scoreData) {
-    return (
-      <div className="text-gray-600 dark:text-neutral-400">
-        <p>Score pending</p>
-        <p className="mt-1 text-xs">
-          This property doesn’t have a stored deal score yet.
-        </p>
-      </div>
-    );
-  }
+  if (!scoreData) return null;
 
   const { score, categories, version } = scoreData;
 

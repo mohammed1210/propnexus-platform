@@ -40,9 +40,6 @@ type Status = 'live' | 'proxy' | 'missing';
 const UI_TEXT = {
   title: 'Area Insights',
   subtitle: 'Intel + Comps',
-  emptyIntel: 'No area intel available for this postcode yet.',
-  emptyComps: 'No comps available for this postcode yet.',
-  missingPostcode: 'Postcode not detected — insights unavailable.',
 } as const;
 
 function normStr(v: unknown): string {
@@ -232,13 +229,35 @@ export default function AreaInsights({
     };
   }, [pc, showIntel, showComps, areaKey, hasAny]);
 
-  if (!hasAny) return null;
-
   const sales = Array.isArray(comps?.sales) ? comps!.sales! : [];
   const rents = Array.isArray(comps?.rents) ? comps!.rents! : [];
+  const intelChips = useMemo(() => {
+    if (!intel) return [] as Array<{ label: string; value: string }>;
 
-  const usableIntel = !!intel;
-  const usableComps = sales.length > 0 || rents.length > 0;
+    const chips: Array<{ label: string; value: string }> = [];
+    if (Number.isFinite(intel.avg_rent) && intel.avg_rent > 0) {
+      chips.push({ label: 'Rent/mo', value: fmtGBP(intel.avg_rent) });
+    }
+    if (Number.isFinite(intel.rental_yield_percent) && intel.rental_yield_percent > 0) {
+      chips.push({ label: 'Yield', value: `${intel.rental_yield_percent.toFixed(1)}%` });
+    }
+    if (Number.isFinite(intel.avg_price) && intel.avg_price > 0) {
+      chips.push({ label: 'Avg price', value: fmtGBP(intel.avg_price) });
+    }
+    if (Number.isFinite(intel.crime_index) && intel.crime_index > 0) {
+      chips.push({ label: 'Crime', value: `${Math.round(intel.crime_index)}/100` });
+    }
+    if (Number.isFinite(intel.schools_rating) && intel.schools_rating > 0) {
+      chips.push({ label: 'Schools', value: `${intel.schools_rating.toFixed(1)}/5` });
+    }
+
+    return chips;
+  }, [intel]);
+
+  const usableIntel = intelChips.length > 0;
+  const usableComps = sales.length > 0;
+  const showIntelSection = showIntel && (intelLoading || usableIntel);
+  const showCompsSection = showComps && (compsLoading || usableComps);
 
   const status: Status = (() => {
     if (!pc) return 'missing';
@@ -254,19 +273,9 @@ export default function AreaInsights({
     </div>
   );
 
-  if (!pc) {
-    return (
-      <CollapsibleCard
-        title={UI_TEXT.title}
-        subtitle={UI_TEXT.subtitle}
-        icon={icon}
-        headerRight={headerRight}
-        defaultExpanded={defaultExpanded}
-      >
-        <div className="text-sm text-slate-700 dark:text-slate-300">{UI_TEXT.missingPostcode}</div>
-      </CollapsibleCard>
-    );
-  }
+  if (!hasAny) return null;
+  if (!pc) return null;
+  if (!intelLoading && !compsLoading && !usableIntel && !usableComps) return null;
 
   return (
     <CollapsibleCard
@@ -277,7 +286,7 @@ export default function AreaInsights({
       defaultExpanded={defaultExpanded}
     >
       <div className="space-y-4">
-        {showIntel ? (
+        {showIntelSection ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 p-4">
             <GatedPanel title="Area Intelligence" requiredPlan="pro" featureEnabled={showIntel}>
               <div className="space-y-3">
@@ -287,65 +296,26 @@ export default function AreaInsights({
                   </div>
                 </div>
 
-                {intelLoading ? (
-                  <SkeletonLines />
-                ) : intel ? (
-                  (() => {
-                    const chips: Array<{ label: string; value: string }> = [];
-
-                    if (Number.isFinite(intel.avg_rent) && intel.avg_rent > 0) {
-                      chips.push({ label: 'Rent/mo', value: fmtGBP(intel.avg_rent) });
-                    }
-                    if (Number.isFinite(intel.rental_yield_percent) && intel.rental_yield_percent > 0) {
-                      chips.push({ label: 'Yield', value: `${intel.rental_yield_percent.toFixed(1)}%` });
-                    }
-                    if (Number.isFinite(intel.avg_price) && intel.avg_price > 0) {
-                      chips.push({ label: 'Avg price', value: fmtGBP(intel.avg_price) });
-                    }
-                    if (Number.isFinite(intel.crime_index) && intel.crime_index > 0) {
-                      chips.push({ label: 'Crime', value: `${Math.round(intel.crime_index)}/100` });
-                    }
-                    if (Number.isFinite(intel.schools_rating) && intel.schools_rating > 0) {
-                      chips.push({ label: 'Schools', value: `${intel.schools_rating.toFixed(1)}/5` });
-                    }
-
-                    const shown = chips.slice(0, 5);
-
-                    if (shown.length === 0) {
-                      return (
-                        <div className="text-xs text-slate-600 dark:text-slate-400">{UI_TEXT.emptyIntel}</div>
-                      );
-                    }
-
-                    const sourceHint =
-                      vLabel && rentSrc
-                        ? rentSrc === 'proxy'
-                          ? `Source: proxy rent estimate • ${vLabel}`
-                          : `Source: live • ${vLabel}`
-                        : undefined;
-
-                    return (
-                      <>
-                        <div className="flex flex-wrap gap-2">{
-                          shown.map((c) => (
-                            <Chip key={c.label} label={c.label} value={c.value} />
-                          ))
-                        }</div>
-                        {sourceHint ? (
-                          <div className="text-[11px] text-slate-500 dark:text-slate-400">{sourceHint}</div>
-                        ) : null}
-                      </>
-                    );
-                  })()
-                ) : (
-                  <div className="text-xs text-slate-600 dark:text-slate-400">{UI_TEXT.emptyIntel}</div>
+                {intelLoading ? <SkeletonLines /> : (
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {intelChips.slice(0, 5).map((c) => (
+                        <Chip key={c.label} label={c.label} value={c.value} />
+                      ))}
+                    </div>
+                    {vLabel && rentSrc ? (
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {rentSrc === 'proxy' ? `Source: proxy rent estimate • ${vLabel}` : `Source: live • ${vLabel}`}
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </div>
             </GatedPanel>
           </div>
         ) : null}
 
-        {showComps ? (
+        {showCompsSection ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 p-4">
             <GatedPanel title="Comparable Sales" requiredPlan="pro" featureEnabled={showComps}>
               <div className="space-y-3">
@@ -358,11 +328,7 @@ export default function AreaInsights({
                   </div>
                 </div>
 
-                {compsLoading ? (
-                  <SkeletonLines />
-                ) : sales.length === 0 ? (
-                  <div className="text-xs text-slate-600 dark:text-slate-400">{UI_TEXT.emptyComps}</div>
-                ) : (
+                {compsLoading ? <SkeletonLines /> : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>

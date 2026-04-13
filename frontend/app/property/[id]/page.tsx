@@ -26,6 +26,7 @@ import PropertyHeader from '@/components/property_details/PropertyHeader';
 import TradesmenList from '@/components/tradesmen/TradesmenList';
 
 import type { Property } from '@/types';
+import { FF } from '@/lib/flags';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
@@ -269,6 +270,8 @@ export default function PropertyDetailsPage() {
     investmentType: (property as any).investmentType,
     propertyType: (property as any).propertyType,
   });
+  const showDealScore = FF.DEAL_SCORE && typeof (property as any).score === 'number';
+  const showTradesmen = FF.TRADESMEN && typeof property.latitude === 'number' && typeof property.longitude === 'number';
 
   return (
     <div className="page-wrapper">
@@ -326,24 +329,26 @@ export default function PropertyDetailsPage() {
               Showing the most relevant insights first
             </div>
             {/* AI Deal Score - Always visible, gated for non-pro users */}
-            <CollapsibleCard
-              title="AI Deal Score"
-              icon={
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
-                  <FiDollarSign className="w-5 h-5 text-white" />
-                </div>
-              }
-              defaultExpanded={true}
-            >
-              <GatedPanel
+            {showDealScore ? (
+              <CollapsibleCard
                 title="AI Deal Score"
-                requiredPlan="pro"
-                featureEnabled={true}
-                showPreviewWhenLocked={false}
+                icon={
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                    <FiDollarSign className="w-5 h-5 text-white" />
+                  </div>
+                }
+                defaultExpanded={true}
               >
-                <DealScore property={property} />
-              </GatedPanel>
-            </CollapsibleCard>
+                <GatedPanel
+                  title="AI Deal Score"
+                  requiredPlan="pro"
+                  featureEnabled={true}
+                  showPreviewWhenLocked={false}
+                >
+                  <DealScore property={property} />
+                </GatedPanel>
+              </CollapsibleCard>
+            ) : null}
 
             {/* Investment Summary (AI-generated text) */}
             <CollapsibleCard
@@ -479,7 +484,7 @@ export default function PropertyDetailsPage() {
             />
 
             {/* Local Tradesmen & Services */}
-            {typeof property.latitude === 'number' && typeof property.longitude === 'number' && (
+            {showTradesmen && (
               <CollapsibleCard
                 title="Local Tradesmen & Services"
                 icon={

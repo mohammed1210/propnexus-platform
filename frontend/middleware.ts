@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { clerkMiddleware, createRouteMatcher, clerkClient } from "@clerk/nextjs/server";
 import { hasValidClerkKey } from "@/lib/clerk-utils";
 import { disableAuth, isAuthEnabled } from "@/lib/auth";
+import { flag } from "@/lib/flags";
 
 const DEFAULT_ADMIN_EMAILS = ["abbas_m90@hotmail.com", "ysoserious360@gmail.com"];
 
@@ -15,10 +16,14 @@ function parseAdminEmails(raw: string | undefined): string[] {
 
 function handleRedirects(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const offMarketEnabled = flag("NEXT_PUBLIC_FEATURE_OFF_MARKET", false);
 
   // Canonical Saved Deals route is `/saved`.
   if (pathname === "/saved-deals" || pathname === "/saved-deals-deals") {
     return NextResponse.redirect(new URL("/saved", req.url));
+  }
+  if (!offMarketEnabled && (pathname === "/off-market-deals" || pathname === "/off-market" || pathname.startsWith("/off-market/"))) {
+    return NextResponse.redirect(new URL("/", req.url));
   }
   if (pathname === "/off-market-deals") {
     return NextResponse.redirect(new URL("/off-market", req.url));
