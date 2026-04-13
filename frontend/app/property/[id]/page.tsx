@@ -54,6 +54,7 @@ const MapSingle = dynamic(
 /** ------------------------------------- */
 
 type LooseProperty = Partial<Property> & {
+  score?: number | null;
   latitude?: number | null;
   longitude?: number | null;
   imageurl?: string | null;
@@ -222,17 +223,17 @@ export default function PropertyDetailsPage() {
     return typeof d === 'string' ? d.trim() : '';
   }, [property]);
 
-  const hasDealScore = typeof (property as any)?.score === 'number' && Number.isFinite((property as any).score);
+  const hasDealScore = typeof property?.score === 'number' && Number.isFinite(property.score);
   const summaryMetrics = [
-    { label: 'Est. value', value: estValue, render: () => fmtGBP(estValue) },
+    { label: 'Est. value', value: estValue, display: fmtGBP(estValue) },
     {
       label: 'Discount',
       value: discountPercent,
-      render: () => `${discountPercent!.toFixed(0)}%`,
+      display: typeof discountPercent === 'number' ? `${discountPercent.toFixed(0)}%` : '',
     },
-    { label: 'Yield', value: yieldPercent, render: () => formatPercent(yieldPercent) },
-    { label: 'ROI', value: roiDisplay.value, render: () => formatPercent(roiDisplay.value) },
-    { label: 'Rent est.', value: rentMonthly, render: () => `${fmtGBP(rentMonthly)}/mo` },
+    { label: 'Yield', value: yieldPercent, display: formatPercent(yieldPercent) },
+    { label: 'ROI', value: roiDisplay.value, display: formatPercent(roiDisplay.value) },
+    { label: 'Rent est.', value: rentMonthly, display: `${fmtGBP(rentMonthly)}/mo` },
   ].filter((metric) => typeof metric.value === 'number' && Number.isFinite(metric.value));
 
   if (loading) {
@@ -400,7 +401,7 @@ export default function PropertyDetailsPage() {
                       >
                         <div className="text-xs text-slate-500 dark:text-slate-400">{metric.label}</div>
                         <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                          {metric.render()}
+                          {metric.display}
                         </div>
                       </div>
                     ))}
