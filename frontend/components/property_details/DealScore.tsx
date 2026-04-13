@@ -6,6 +6,7 @@ import { FF } from '@/lib/flags';
 import { normalizeProperty } from '@/lib/normalizeProperty';
 
 interface PropertyData {
+  ai_score?: number | null;
   score?: number | null;
   score_breakdown?: {
     version?: string;
@@ -48,7 +49,12 @@ export default function DealScore({ property }: DealScoreProps) {
   const normalized = useMemo(() => normalizeProperty(property as any), [property]);
 
   const scoreData = useMemo(() => {
-    const score = property?.score;
+    const score =
+      typeof property?.score === 'number'
+        ? property.score
+        : typeof property?.ai_score === 'number'
+          ? property.ai_score
+          : null;
     if (typeof score !== 'number') return null;
 
     const breakdown = property?.score_breakdown;

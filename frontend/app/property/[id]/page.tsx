@@ -153,6 +153,18 @@ export default function PropertyDetailsPage() {
         const p: LooseProperty | null = data
           ? {
               ...data,
+              ai_score:
+                typeof (data as any).ai_score === 'number'
+                  ? (data as any).ai_score
+                  : typeof (data as any).score === 'number'
+                    ? (data as any).score
+                    : null,
+              score:
+                typeof (data as any).score === 'number'
+                  ? (data as any).score
+                  : typeof (data as any).ai_score === 'number'
+                    ? (data as any).ai_score
+                    : null,
               price: toNum((data as any).price),
               bedrooms: toNum((data as any).bedrooms),
               bathrooms: toNum((data as any).bathrooms),
@@ -272,7 +284,8 @@ export default function PropertyDetailsPage() {
   });
   const propertyLat = typeof property.latitude === 'number' ? property.latitude : null;
   const propertyLng = typeof property.longitude === 'number' ? property.longitude : null;
-  const showDealScore = FF.DEAL_SCORE && typeof (property as any).score === 'number';
+  const showDealScore =
+    typeof (property as any).score === 'number' || typeof (property as any).ai_score === 'number';
   const showTradesmen = FF.TRADESMEN && propertyLat !== null && propertyLng !== null;
 
   return (
