@@ -9,6 +9,7 @@ interface GalleryImageProps {
   alt: string;
   title: string;
   description: string;
+  eyebrow?: string;
 }
 
 export function GalleryImage({
@@ -18,6 +19,7 @@ export function GalleryImage({
   alt,
   title,
   description,
+  eyebrow = 'Product Walkthrough',
 }: GalleryImageProps) {
   const imageOrderClass = layout === 'reverse' ? 'lg:order-2' : 'lg:order-1';
   const contentOrderClass = layout === 'reverse' ? 'lg:order-1' : 'lg:order-2';
@@ -55,7 +57,7 @@ export function GalleryImage({
                 {String(index ?? 0).padStart(2, '0')}
               </span>
               <span className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-500 dark:text-slate-400">
-                Premium Feature Preview
+                {eyebrow}
               </span>
             </div>
             <h3 className="text-2xl font-semibold text-slate-900 dark:text-white sm:text-3xl">

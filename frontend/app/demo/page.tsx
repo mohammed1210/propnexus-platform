@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Metadata } from 'next';
 import { GalleryImage } from '@/components/GalleryImage';
-import { DEMO_PREMIUM_FEATURES, DEMO_SAMPLE_PROPERTIES } from '@/lib/demoContent';
+import { DEMO_FEATURE_GALLERY, DEMO_SAMPLE_PROPERTIES } from '@/lib/demoContent';
 import { formatPercent, getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
 
 export const dynamic = "force-dynamic";
@@ -133,20 +133,20 @@ export default function DemoPage() {
         </div>
       </section>
 
-      {/* Premium Features Preview Gallery */}
+      {/* Product Gallery */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-slate-50 dark:bg-slate-900/30">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">
-              Premium Features Preview
+              Product Walkthrough
             </h2>
             <p className="text-slate-600 dark:text-slate-400">
-              Real captures from working property detail sections that are live in the product today
+              Clear live captures from the current property detail experience
             </p>
           </div>
 
           <div className="space-y-8">
-            {DEMO_PREMIUM_FEATURES.map((feature, index) => (
+            {DEMO_FEATURE_GALLERY.map((feature, index) => (
               <GalleryImage
                 key={feature.title}
                 index={index + 1}
@@ -155,6 +155,7 @@ export default function DemoPage() {
                 alt={feature.alt}
                 title={feature.title}
                 description={feature.description}
+                eyebrow="Live Product Capture"
               />
             ))}
           </div>

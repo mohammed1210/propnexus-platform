@@ -61,33 +61,26 @@ export const DEMO_SAMPLE_PROPERTIES: DemoSampleProperty[] = [
 export const DEMO_PREMIUM_SCREENSHOT_PROPERTY_ID =
   '57d1a817-17fa-461a-bde5-3bad8843e349';
 
-export const DEMO_PREMIUM_FEATURES = [
-  {
-    src: '/images/demo/screenshots/premium-analytics.png',
-    alt: 'Investment analytics section from a real PropNexus property detail page',
-    title: 'Investment Analytics',
-    description:
-      'Live investment summary and calculator views captured from a working property detail page.',
-  },
-  {
-    src: '/images/demo/screenshots/premium-tradesmen.png',
-    alt: 'Local tradesmen and services section from a real PropNexus property detail page',
-    title: 'Tradesmen Services',
-    description:
-      'Nearby builders, plumbers, electricians, roofers, and surveyors shown against live property coordinates.',
-  },
+export const DEMO_FEATURE_GALLERY = [
   {
     src: '/images/demo/screenshots/premium-ai-score.png',
     alt: 'AI deal score section from a real PropNexus property detail page',
     title: 'AI Deal Score',
     description:
-      'Stored score breakdown, category bars, and scoring version metadata from a real listing record.',
+      'Live score, scoring breakdown, and category graph captured from the property detail experience.',
   },
   {
     src: '/images/demo/screenshots/premium-area-intel.png',
     alt: 'Area insights section from a real PropNexus property detail page',
     title: 'Area Intel',
     description:
-      'Live postcode intelligence including rent, yield, average price, crime, and schools data.',
+      'Postcode intelligence with rent, yield, average price, crime, schools, and local comparables.',
+  },
+  {
+    src: '/images/demo/screenshots/premium-analytics.png',
+    alt: 'Investment analytics section from a real PropNexus property detail page',
+    title: 'Investment Analytics',
+    description:
+      'Scenario-based calculations for leverage, payments, stress testing, yield, and return planning.',
   },
 ];

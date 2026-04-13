@@ -32,9 +32,19 @@ async function ensureLightMode(page: Page) {
   if (label?.toLowerCase().includes('switch to light mode')) {
     await themeToggle.click();
   }
+
+  await expect
+    .poll(async () => {
+      const rootClass = await page.evaluate(() => document.documentElement.className);
+      return rootClass.includes('light');
+    })
+    .toBe(true);
 }
 
 async function openPropertyForScreenshot(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('propnexus-theme', 'light');
+  });
   await page.setViewportSize({ width: 1600, height: 1400 });
   await page.goto(`/property/${DEMO_PREMIUM_SCREENSHOT_PROPERTY_ID}`, {
     waitUntil: 'domcontentloaded',
@@ -65,7 +75,7 @@ test.describe('Demo Screenshots', () => {
     await openPropertyForScreenshot(page);
     await openCollapsible(page, 'Investment Calculator');
 
-    const calculator = page.locator('#calculator-content').locator('..');
+    const calculator = page.locator('#calculator-content');
     await expect.soft(calculator).toBeVisible();
 
     await calculator.screenshot({
@@ -93,6 +103,8 @@ test.describe('Demo Screenshots', () => {
     await expect(aiScore).toContainText('AI Deal Score');
     await expect(aiScore).toContainText('Version');
     await expect(aiScore).toContainText('73', { timeout: 5000 });
+    await expect(aiScore).toContainText('Rental Yield', { timeout: 5000 });
+    await expect(aiScore).toContainText('ROI Potential', { timeout: 5000 });
 
     await aiScore.screenshot({
       path: 'public/images/demo/screenshots/premium-ai-score.png',
