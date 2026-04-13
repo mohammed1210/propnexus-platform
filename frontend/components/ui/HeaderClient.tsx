@@ -3,13 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { FF } from '@/lib/flags';
+
 const links = [
   { href: '/listings', label: 'Listings' },
-  { href: '/off-market', label: 'Off-Market' },
   { href: '/saved', label: 'Saved Deals' },
   { href: '/analytics', label: 'Analytics' },
   { href: '/pricing', label: 'Pricing' },
 ];
+
+if (FF.OFF_MARKET) {
+  links.splice(1, 0, { href: '/off-market', label: 'Off-Market' });
+}
 
 export default function HeaderClient() {
   const pathname = usePathname();

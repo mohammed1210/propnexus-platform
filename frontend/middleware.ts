@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { clerkMiddleware, createRouteMatcher, clerkClient } from "@clerk/nextjs/server";
 import { hasValidClerkKey } from "@/lib/clerk-utils";
 import { disableAuth, isAuthEnabled } from "@/lib/auth";
+import { FF } from "@/lib/flags";
 
 const DEFAULT_ADMIN_EMAILS = ["abbas_m90@hotmail.com", "ysoserious360@gmail.com"];
 
@@ -20,8 +21,11 @@ function handleRedirects(req: NextRequest) {
   if (pathname === "/saved-deals" || pathname === "/saved-deals-deals") {
     return NextResponse.redirect(new URL("/saved", req.url));
   }
+  if (!FF.OFF_MARKET && pathname.startsWith("/off-market")) {
+    return NextResponse.redirect(new URL("/", req.url));
+  }
   if (pathname === "/off-market-deals") {
-    return NextResponse.redirect(new URL("/off-market", req.url));
+    return NextResponse.redirect(new URL(FF.OFF_MARKET ? "/off-market" : "/", req.url));
   }
 
   return NextResponse.next();

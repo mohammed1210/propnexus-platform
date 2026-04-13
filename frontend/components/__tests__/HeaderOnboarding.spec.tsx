@@ -40,6 +40,7 @@ describe('Header onboarding controls', () => {
   it('launches replay from header and dispatches start-tour event', () => {
     render(<Header />);
 
+    expect(screen.queryByRole('link', { name: 'header.nav.offMarket' })).not.toBeInTheDocument();
     const replayButton = screen.getByTestId('header-tour-button');
     expect(replayButton).toHaveTextContent('Replay Tour');
 

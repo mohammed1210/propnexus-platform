@@ -136,6 +136,17 @@ function countCaption(salesCount: number, rentsCount: number): string {
   return parts.join(' • ');
 }
 
+function hasMeaningfulIntel(intel: AreaIntelData | null): intel is AreaIntelData {
+  if (!intel) return false;
+  return [
+    intel.avg_rent,
+    intel.rental_yield_percent,
+    intel.avg_price,
+    intel.crime_index,
+    intel.schools_rating,
+  ].some((value) => Number.isFinite(value) && value > 0);
+}
+
 export default function AreaInsights({
   areaKey,
   postcode,
@@ -232,16 +243,20 @@ export default function AreaInsights({
     };
   }, [pc, showIntel, showComps, areaKey, hasAny]);
 
-  if (!hasAny) return null;
+  if (!hasAny || !pc) return null;
 
   const sales = Array.isArray(comps?.sales) ? comps!.sales! : [];
   const rents = Array.isArray(comps?.rents) ? comps!.rents! : [];
 
-  const usableIntel = !!intel;
+  const usableIntel = hasMeaningfulIntel(intel);
   const usableComps = sales.length > 0 || rents.length > 0;
+  const showIntelPanel = showIntel && (intelLoading || usableIntel);
+  const showCompsPanel = showComps && (compsLoading || usableComps);
+  const shouldRenderCard = intelLoading || compsLoading || showIntelPanel || showCompsPanel;
+
+  if (!shouldRenderCard) return null;
 
   const status: Status = (() => {
-    if (!pc) return 'missing';
     if (rentSrc === 'missing') return 'missing';
     if (!usableIntel && !usableComps && !intelLoading && !compsLoading) return 'missing';
     if (rentSrc === 'proxy') return 'proxy';
@@ -254,20 +269,6 @@ export default function AreaInsights({
     </div>
   );
 
-  if (!pc) {
-    return (
-      <CollapsibleCard
-        title={UI_TEXT.title}
-        subtitle={UI_TEXT.subtitle}
-        icon={icon}
-        headerRight={headerRight}
-        defaultExpanded={defaultExpanded}
-      >
-        <div className="text-sm text-slate-700 dark:text-slate-300">{UI_TEXT.missingPostcode}</div>
-      </CollapsibleCard>
-    );
-  }
-
   return (
     <CollapsibleCard
       title={UI_TEXT.title}
@@ -277,7 +278,7 @@ export default function AreaInsights({
       defaultExpanded={defaultExpanded}
     >
       <div className="space-y-4">
-        {showIntel ? (
+        {showIntelPanel ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 p-4">
             <GatedPanel title="Area Intelligence" requiredPlan="pro" featureEnabled={showIntel}>
               <div className="space-y-3">
@@ -289,7 +290,7 @@ export default function AreaInsights({
 
                 {intelLoading ? (
                   <SkeletonLines />
-                ) : intel ? (
+                ) : usableIntel && intel ? (
                   (() => {
                     const chips: Array<{ label: string; value: string }> = [];
 
@@ -311,12 +312,6 @@ export default function AreaInsights({
 
                     const shown = chips.slice(0, 5);
 
-                    if (shown.length === 0) {
-                      return (
-                        <div className="text-xs text-slate-600 dark:text-slate-400">{UI_TEXT.emptyIntel}</div>
-                      );
-                    }
-
                     const sourceHint =
                       vLabel && rentSrc
                         ? rentSrc === 'proxy'
@@ -337,15 +332,13 @@ export default function AreaInsights({
                       </>
                     );
                   })()
-                ) : (
-                  <div className="text-xs text-slate-600 dark:text-slate-400">{UI_TEXT.emptyIntel}</div>
-                )}
+                  ) : null}
               </div>
             </GatedPanel>
           </div>
         ) : null}
 
-        {showComps ? (
+        {showCompsPanel ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/20 p-4">
             <GatedPanel title="Comparable Sales" requiredPlan="pro" featureEnabled={showComps}>
               <div className="space-y-3">
@@ -360,9 +353,7 @@ export default function AreaInsights({
 
                 {compsLoading ? (
                   <SkeletonLines />
-                ) : sales.length === 0 ? (
-                  <div className="text-xs text-slate-600 dark:text-slate-400">{UI_TEXT.emptyComps}</div>
-                ) : (
+                ) : sales.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -399,7 +390,7 @@ export default function AreaInsights({
                       </tbody>
                     </table>
                   </div>
-                )}
+                ) : null}
 
                 {rents.length > 0 ? (
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">

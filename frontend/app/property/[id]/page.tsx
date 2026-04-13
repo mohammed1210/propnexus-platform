@@ -26,6 +26,7 @@ import PropertyHeader from '@/components/property_details/PropertyHeader';
 import TradesmenList from '@/components/tradesmen/TradesmenList';
 
 import type { Property } from '@/types';
+import { FF } from '@/lib/flags';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
@@ -221,6 +222,19 @@ export default function PropertyDetailsPage() {
     return typeof d === 'string' ? d.trim() : '';
   }, [property]);
 
+  const hasDealScore = typeof (property as any)?.score === 'number' && Number.isFinite((property as any).score);
+  const summaryMetrics = [
+    { label: 'Est. value', value: estValue, render: () => fmtGBP(estValue) },
+    {
+      label: 'Discount',
+      value: discountPercent,
+      render: () => `${discountPercent!.toFixed(0)}%`,
+    },
+    { label: 'Yield', value: yieldPercent, render: () => formatPercent(yieldPercent) },
+    { label: 'ROI', value: roiDisplay.value, render: () => formatPercent(roiDisplay.value) },
+    { label: 'Rent est.', value: rentMonthly, render: () => `${fmtGBP(rentMonthly)}/mo` },
+  ].filter((metric) => typeof metric.value === 'number' && Number.isFinite(metric.value));
+
   if (loading) {
     return (
       <div className="page-wrapper">
@@ -325,25 +339,26 @@ export default function PropertyDetailsPage() {
             <div className="text-xs text-slate-500 dark:text-slate-400">
               Showing the most relevant insights first
             </div>
-            {/* AI Deal Score - Always visible, gated for non-pro users */}
-            <CollapsibleCard
-              title="AI Deal Score"
-              icon={
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
-                  <FiDollarSign className="w-5 h-5 text-white" />
-                </div>
-              }
-              defaultExpanded={true}
-            >
-              <GatedPanel
+            {hasDealScore ? (
+              <CollapsibleCard
                 title="AI Deal Score"
-                requiredPlan="pro"
-                featureEnabled={true}
-                showPreviewWhenLocked={false}
+                icon={
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                    <FiDollarSign className="w-5 h-5 text-white" />
+                  </div>
+                }
+                defaultExpanded={true}
               >
-                <DealScore property={property} />
-              </GatedPanel>
-            </CollapsibleCard>
+                <GatedPanel
+                  title="AI Deal Score"
+                  requiredPlan="pro"
+                  featureEnabled={true}
+                  showPreviewWhenLocked={false}
+                >
+                  <DealScore property={property} />
+                </GatedPanel>
+              </CollapsibleCard>
+            ) : null}
 
             {/* Investment Summary (AI-generated text) */}
             <CollapsibleCard
@@ -378,36 +393,17 @@ export default function PropertyDetailsPage() {
                         {fmtGBP(property.price)}
                       </div>
                     </div>
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Est. value</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {fmtGBP(estValue)}
+                    {summaryMetrics.map((metric) => (
+                      <div
+                        key={metric.label}
+                        className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3"
+                      >
+                        <div className="text-xs text-slate-500 dark:text-slate-400">{metric.label}</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                          {metric.render()}
+                        </div>
                       </div>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Discount</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {typeof discountPercent === 'number' ? `${discountPercent.toFixed(0)}%` : 'N/A'}
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Yield</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {formatPercent(yieldPercent)}
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
-                      <div className="text-xs text-slate-500 dark:text-slate-400">ROI</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {formatPercent(roiDisplay.value)}
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3">
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Rent est.</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {typeof rentMonthly === 'number' ? `${fmtGBP(rentMonthly)}/mo` : 'N/A'}
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
@@ -479,7 +475,7 @@ export default function PropertyDetailsPage() {
             />
 
             {/* Local Tradesmen & Services */}
-            {typeof property.latitude === 'number' && typeof property.longitude === 'number' && (
+            {FF.TRADESMEN && typeof property.latitude === 'number' && typeof property.longitude === 'number' && (
               <CollapsibleCard
                 title="Local Tradesmen & Services"
                 icon={
