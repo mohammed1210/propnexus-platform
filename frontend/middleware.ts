@@ -15,6 +15,10 @@ function parseAdminEmails(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+function isOffMarketPath(pathname: string) {
+  return pathname === "/off-market-deals" || pathname === "/off-market" || pathname.startsWith("/off-market/");
+}
+
 function handleRedirects(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -22,7 +26,7 @@ function handleRedirects(req: NextRequest) {
   if (pathname === "/saved-deals" || pathname === "/saved-deals-deals") {
     return NextResponse.redirect(new URL("/saved", req.url));
   }
-  if (!OFF_MARKET_ENABLED && (pathname === "/off-market-deals" || pathname === "/off-market" || pathname.startsWith("/off-market/"))) {
+  if (!OFF_MARKET_ENABLED && isOffMarketPath(pathname)) {
     return NextResponse.redirect(new URL("/", req.url));
   }
   if (OFF_MARKET_ENABLED && pathname === "/off-market-deals") {
