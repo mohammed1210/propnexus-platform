@@ -37,6 +37,22 @@ async function backendFetch(path: string, init?: RequestInit) {
   return fetch(url, { ...init, cache: 'no-store' });
 }
 
+async function getSafeUserId(): Promise<string | null> {
+  if (
+    process.env.SCREENSHOT_TEST === 'true' ||
+    ['1', 'true', 'yes', 'on'].includes((process.env.NEXT_PUBLIC_DISABLE_AUTH ?? '').trim().toLowerCase())
+  ) {
+    return null;
+  }
+
+  try {
+    const { userId } = await auth();
+    return userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function getPropertyId(row: SavedDealRow): string | null {
   const direct = (row.property_id ?? '').toString().trim();
   if (direct) return direct;
@@ -61,7 +77,7 @@ function mergeMissing(target: Record<string, any>, source: Record<string, any>, 
 }
 
 export async function GET() {
-  const { userId } = await auth();
+  const userId = await getSafeUserId();
   if (!userId) {
     return NextResponse.json(
       { error: 'unauthorized', message: 'You must be signed in to view saved deals.' },
@@ -192,7 +208,7 @@ export async function GET() {
 }
 
 export async function DELETE(req: Request) {
-  const { userId } = await auth();
+  const userId = await getSafeUserId();
   if (!userId) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401, headers: { ...noStoreHeaders } });
   }

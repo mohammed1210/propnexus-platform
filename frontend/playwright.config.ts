@@ -4,6 +4,10 @@ const PORT = Number(process.env.PORT || process.env.E2E_PORT || 3050);
 const HOST = process.env.HOST || '127.0.0.1';
 const BASE = process.env.E2E_BASE_URL || `http://${HOST}:${PORT}`;
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+const SCREENSHOT_API_BASE =
+  process.env.SCREENSHOT_API_BASE ||
+  process.env.NEXT_PUBLIC_API_BASE ||
+  'https://propnexus-backend-production.up.railway.app';
 
 // Check if we're running screenshot tests
 const isScreenshotTest = process.env.SCREENSHOT_TEST === 'true';
@@ -16,11 +20,11 @@ export default defineConfig({
   use: {
     baseURL: isScreenshotTest ? 'http://127.0.0.1:3000' : BASE,
     trace: 'on-first-retry',
-    colorScheme: isScreenshotTest ? 'dark' : undefined,
+    colorScheme: isScreenshotTest ? 'light' : undefined,
   },
   webServer: {
     command: isScreenshotTest
-      ? 'npm run build && npm run start'
+      ? `NEXT_PUBLIC_BACKEND_URL="${SCREENSHOT_API_BASE}" NEXT_PUBLIC_API_BASE="${SCREENSHOT_API_BASE}" NEXT_PUBLIC_BYPASS_GATING="true" NEXT_PUBLIC_DISABLE_AUTH="true" npm run build && npm run start`
       : `NEXT_PUBLIC_API_BASE="${API_BASE}" npx next build && npx next start -H ${HOST} -p ${PORT}`,
     url: isScreenshotTest ? 'http://127.0.0.1:3000' : BASE,
     reuseExistingServer: !process.env.CI,

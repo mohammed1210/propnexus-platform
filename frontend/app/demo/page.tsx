@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Metadata } from 'next';
 import { GalleryImage } from '@/components/GalleryImage';
+import { DEMO_PREMIUM_FEATURES, DEMO_SAMPLE_PROPERTIES } from '@/lib/demoContent';
 import { formatPercent, getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
 
 export const dynamic = "force-dynamic";
@@ -10,43 +11,6 @@ export const metadata: Metadata = {
   title: 'Demo - PropNexus Platform',
   description: 'Explore PropNexus features with sample property data and analytics.',
 };
-
-// Sample property data for demo
-const sampleProperties = [
-  {
-    id: 'demo-1',
-    title: '2 Bedroom Apartment in Manchester',
-    location: 'Manchester City Centre, M1',
-    price: 185000,
-    bedrooms: 2,
-    bathrooms: 1,
-    yield_percent: 6.2,
-    roi_percent: 14.5,
-    imageurl: '/placeholder.jpg',
-  },
-  {
-    id: 'demo-2',
-    title: '3 Bedroom House in Birmingham',
-    location: 'Edgbaston, Birmingham, B15',
-    price: 275000,
-    bedrooms: 3,
-    bathrooms: 2,
-    yield_percent: 5.8,
-    roi_percent: 12.3,
-    imageurl: '/placeholder.jpg',
-  },
-  {
-    id: 'demo-3',
-    title: 'Studio Flat in Leeds',
-    location: 'Leeds City Centre, LS1',
-    price: 125000,
-    bedrooms: 1,
-    bathrooms: 1,
-    yield_percent: 7.1,
-    roi_percent: 15.8,
-    imageurl: '/placeholder.jpg',
-  },
-];
 
 export default function DemoPage() {
   return (
@@ -95,12 +59,12 @@ export default function DemoPage() {
               Sample Investment Properties
             </h2>
             <p className="text-slate-600 dark:text-slate-400">
-              Explore these example properties to see our investment analytics
+              Curated from live property records so the preview cards use real listing photos and metrics
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sampleProperties.map((property) => (
+            {DEMO_SAMPLE_PROPERTIES.map((property) => (
               <div
                 key={property.id}
                 className="card p-0 overflow-hidden hover:shadow-lg transition-shadow"
@@ -111,10 +75,15 @@ export default function DemoPage() {
                     src={property.imageurl}
                     alt={property.title}
                     fill
+                    unoptimized
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     style={{ objectFit: 'cover' }}
-                    className="opacity-80"
+                    className="opacity-90"
                   />
                   <div className="absolute top-2 right-2 flex flex-col gap-1">
+                    <span className="text-xs font-semibold px-2 py-1 rounded-md bg-slate-900/85 text-white">
+                      {Math.round(property.score)}/100 Score
+                    </span>
                     <span className="text-xs font-semibold px-2 py-1 rounded-md bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                       {formatPercent(getYieldPercent(property as any))} Yield
                     </span>
@@ -135,7 +104,7 @@ export default function DemoPage() {
                   </h3>
 
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    📍 {property.location}
+                    📍 {property.location} · {property.postcode}
                   </p>
 
                   <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
@@ -150,8 +119,11 @@ export default function DemoPage() {
                   </div>
 
                   <div className="pt-2">
-                    <div className="text-xs text-slate-500 dark:text-slate-400 italic">
-                      ℹ️ Demo data - Sign up to view real properties
+                    <div className="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+                      <span>Source: {property.source}</span>
+                      <Link href={`/property/${property.id}`} className="font-medium text-brand-600 dark:text-brand-400 hover:underline">
+                        Open detail page
+                      </Link>
                     </div>
                   </div>
                 </div>
@@ -169,34 +141,22 @@ export default function DemoPage() {
               Premium Features Preview
             </h2>
             <p className="text-slate-600 dark:text-slate-400">
-              See what&apos;s possible with PropNexus premium features
+              Real captures from working property detail sections that are live in the product today
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Investment Analytics Preview */}
-            <GalleryImage
-              src="/images/demo/screenshots/premium-demo-1.png"
-              alt="Investment Analytics - ROI Calculator, Yield Analysis, and Cashflow Projections"
-              title="Investment Analytics"
-              description="Advanced calculators for yield, ROI, cashflow projections, and investment performance tracking"
-            />
-
-            {/* Local Tradesmen Services Preview */}
-            <GalleryImage
-              src="/images/demo/screenshots/premium-demo-2.png"
-              alt="Local Tradesmen Services - Find verified local contractors and get instant quotes"
-              title="Local Tradesmen Services"
-              description="Connect with verified local contractors, get quotes, and manage property maintenance all in one place"
-            />
-
-            {/* AI Deal Score + Area Intel Preview */}
-            <GalleryImage
-              src="/images/demo/screenshots/premium-demo-3.png"
-              alt="AI Deal Score and Area Intelligence - AI-powered investment scoring with market insights"
-              title="AI Deal Score + Area Intel"
-              description="Get AI-powered investment scores, demographics, crime data, and comprehensive market intelligence"
-            />
+          <div className="space-y-8">
+            {DEMO_PREMIUM_FEATURES.map((feature, index) => (
+              <GalleryImage
+                key={feature.title}
+                index={index + 1}
+                layout={index % 2 === 0 ? 'default' : 'reverse'}
+                src={feature.src}
+                alt={feature.alt}
+                title={feature.title}
+                description={feature.description}
+              />
+            ))}
           </div>
         </div>
       </section>
