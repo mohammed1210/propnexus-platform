@@ -255,7 +255,7 @@ export default function AreaInsights({
   }, [intel]);
 
   const usableIntel = intelChips.length > 0;
-  const usableComps = sales.length > 0;
+  const usableComps = sales.length > 0 || rents.length > 0;
   const showIntelSection = showIntel && (intelLoading || usableIntel);
   const showCompsSection = showComps && (compsLoading || usableComps);
 
@@ -328,7 +328,9 @@ export default function AreaInsights({
                   </div>
                 </div>
 
-                {compsLoading ? <SkeletonLines /> : (
+                {compsLoading ? (
+                  <SkeletonLines />
+                ) : sales.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
@@ -364,6 +366,10 @@ export default function AreaInsights({
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-600 dark:text-slate-400">
+                    Rental comparables available: {rents.length}
                   </div>
                 )}
 

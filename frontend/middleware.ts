@@ -25,7 +25,7 @@ function handleRedirects(req: NextRequest) {
   if (!offMarketEnabled && (pathname === "/off-market-deals" || pathname === "/off-market" || pathname.startsWith("/off-market/"))) {
     return NextResponse.redirect(new URL("/", req.url));
   }
-  if (pathname === "/off-market-deals") {
+  if (offMarketEnabled && pathname === "/off-market-deals") {
     return NextResponse.redirect(new URL("/off-market", req.url));
   }
 
