@@ -2,7 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FF } from '@/lib/flags';
+import AIScoreBars from '@/components/property_details/AIScoreBars';
 import { normalizeProperty } from '@/lib/normalizeProperty';
 
 interface PropertyData {
@@ -78,6 +78,21 @@ export default function DealScore({ property }: DealScoreProps) {
     };
   }, [scoreData?.categories, normalized.roiPercent, normalized.roiProxyPercent]);
 
+  const chartItems = useMemo(() => {
+    if (!derivedCategories) return [];
+
+    return Object.entries(derivedCategories)
+      .filter(([key, value]) => typeof value === 'number' && typeof MAX_POINTS[key] === 'number')
+      .map(([key, value]) => {
+        const max = MAX_POINTS[key];
+        const percentage = max > 0 ? (value / max) * 100 : 0;
+        return {
+          label: CATEGORY_LABELS[key] ?? key,
+          value: Math.round(Math.max(0, Math.min(100, percentage))),
+        };
+      });
+  }, [derivedCategories]);
+
   // Animation state (kept from prior UX)
   const [isVisible, setIsVisible] = useState(false);
   const [animatedScore, setAnimatedScore] = useState(0);
@@ -134,10 +149,9 @@ export default function DealScore({ property }: DealScoreProps) {
 
   if (!scoreData) return null;
 
-  const { score, categories, version } = scoreData;
-  const showBreakdown = FF.AI_SCORE_BREAKDOWN;
+  const { score, version } = scoreData;
 
-  void categories;
+  const showBreakdown = chartItems.length > 0;
 
   const barGradient =
     'bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 dark:from-red-400 dark:via-yellow-400 dark:to-green-400';
@@ -176,43 +190,11 @@ export default function DealScore({ property }: DealScoreProps) {
         </div>
       </div>
 
-      {showBreakdown && derivedCategories && (
-        <div className="space-y-3 mb-4">
-          {Object.entries(derivedCategories)
-            .filter(([k, v]) => typeof v === 'number' && typeof MAX_POINTS[k] === 'number')
-            .map(([key, value]) => {
-              const max = MAX_POINTS[key];
-              const percentage = max > 0 ? (value / max) * 100 : 0;
-              return (
-                <div key={key}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-700 dark:text-neutral-300">
-                      {CATEGORY_LABELS[key] ?? key}
-                    </span>
-                    <span className="text-gray-600 dark:text-neutral-400">
-                      {value.toFixed(1)}/{max}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 dark:bg-neutral-700 rounded-full h-2 overflow-hidden relative">
-                    <div
-                      aria-hidden
-                      className={`absolute inset-0 ${barGradient} ${isVisible ? 'score-bar-glow' : ''}`}
-                    />
-                    <div
-                      aria-hidden
-                      className="absolute inset-y-0 right-0 bg-gray-200 dark:bg-neutral-700 transition-[width] duration-1000 ease-out"
-                      style={{
-                        width: isVisible
-                          ? `${100 - Math.max(0, Math.min(100, percentage))}%`
-                          : '100%',
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+      {showBreakdown ? (
+        <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+          <AIScoreBars overall={Math.round(score)} items={chartItems} showHeader={false} />
         </div>
-      )}
+      ) : null}
 
       {showBreakdown ? (
         <div className="mt-4 text-xs text-gray-500 dark:text-neutral-500">

@@ -3,12 +3,6 @@ import { render, screen } from '@testing-library/react';
 
 import DealScore from '../property_details/DealScore';
 
-jest.mock('@/lib/flags', () => ({
-  FF: {
-    AI_SCORE_BREAKDOWN: false,
-  },
-}));
-
 jest.mock('@/lib/normalizeProperty', () => ({
   normalizeProperty: (value: unknown) => value,
 }));
@@ -33,13 +27,23 @@ describe('DealScore', () => {
       <DealScore
         property={{
           ai_score: 78,
-          score_breakdown: { version: 'v1.1' },
+          score_breakdown: {
+            version: 'v1.1',
+            categories: {
+              yield: 14,
+              roi: 16,
+              price_to_rent: 11,
+              area_demand: 12,
+            },
+          },
         }}
       />,
     );
 
     expect(screen.getByText('AI Deal Score')).toBeInTheDocument();
     expect(screen.getByText('78')).toBeInTheDocument();
+    expect(screen.getByText('Rental Yield')).toBeInTheDocument();
+    expect(screen.getByText('ROI Potential')).toBeInTheDocument();
   });
 
   it('prefers score when both score fields are present', () => {
