@@ -73,7 +73,7 @@ export default function HomePage() {
             fill
             priority
             sizes="100vw"
-            className="object-cover object-[74%_center] sm:object-[73%_center] lg:object-[77%_center] xl:object-[79%_center]"
+            className="object-cover object-[74%_center] sm:object-[73%_center] lg:object-[80%_center] xl:object-[82%_center]"
           />
         </div>
         <div className="absolute inset-0 bg-slate-950/28" />
@@ -106,7 +106,7 @@ export default function HomePage() {
               </span>
             </h1>
 
-            <p className="mb-9 max-w-2xl text-lg leading-7 text-brand-50 sm:text-xl lg:mx-0 lg:mb-8 xl:text-[1.35rem] xl:leading-8">
+            <p className="mb-11 max-w-2xl text-lg leading-7 text-brand-50 sm:text-xl lg:mx-0 lg:mb-10 xl:text-[1.35rem] xl:leading-8">
               Smart property sourcing powered by AI. Analyze yields, calculate ROI, and find the perfect investment with confidence.
             </p>
 
