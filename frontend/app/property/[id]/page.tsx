@@ -224,15 +224,16 @@ export default function PropertyDetailsPage() {
 
   const hasDealScore = typeof property?.score === 'number' && Number.isFinite(property.score);
   const summaryMetrics = [
-    { label: 'Est. value', value: estValue, display: fmtGBP(estValue) },
+    { id: 'estimated-value', label: 'Est. value', value: estValue, display: fmtGBP(estValue) },
     {
+      id: 'discount',
       label: 'Discount',
       value: discountPercent,
       display: typeof discountPercent === 'number' ? `${discountPercent.toFixed(0)}%` : '',
     },
-    { label: 'Yield', value: yieldPercent, display: formatPercent(yieldPercent) },
-    { label: 'ROI', value: roiDisplay.value, display: formatPercent(roiDisplay.value) },
-    { label: 'Rent est.', value: rentMonthly, display: `${fmtGBP(rentMonthly)}/mo` },
+    { id: 'yield', label: 'Yield', value: yieldPercent, display: formatPercent(yieldPercent) },
+    { id: 'roi', label: 'ROI', value: roiDisplay.value, display: formatPercent(roiDisplay.value) },
+    { id: 'rent-estimate', label: 'Rent est.', value: rentMonthly, display: `${fmtGBP(rentMonthly)}/mo` },
   ].filter((metric) => typeof metric.value === 'number' && Number.isFinite(metric.value));
 
   if (loading) {
@@ -395,7 +396,7 @@ export default function PropertyDetailsPage() {
                     </div>
                     {summaryMetrics.map((metric) => (
                       <div
-                        key={metric.label}
+                        key={metric.id}
                         className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-slate-900/20 p-3"
                       >
                         <div className="text-xs text-slate-500 dark:text-slate-400">{metric.label}</div>
