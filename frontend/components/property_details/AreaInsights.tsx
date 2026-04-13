@@ -256,8 +256,6 @@ export default function AreaInsights({
 
   const usableIntel = intelChips.length > 0;
   const usableComps = sales.length > 0 || rents.length > 0;
-  const showIntelSection = showIntel && (intelLoading || usableIntel);
-  const showCompsSection = showComps && (compsLoading || usableComps);
 
   const status: Status = (() => {
     if (!pc) return 'missing';
@@ -276,6 +274,9 @@ export default function AreaInsights({
   if (!hasAny) return null;
   if (!pc) return null;
   if (!intelLoading && !compsLoading && !usableIntel && !usableComps) return null;
+
+  const showIntelSection = showIntel && (intelLoading || usableIntel);
+  const showCompsSection = showComps && (compsLoading || usableComps);
 
   return (
     <CollapsibleCard
@@ -367,15 +368,11 @@ export default function AreaInsights({
                       </tbody>
                     </table>
                   </div>
-                ) : (
-                  <div className="text-xs text-slate-600 dark:text-slate-400">
-                    Rental comparables available: {rents.length}
-                  </div>
-                )}
+                ) : null}
 
                 {rents.length > 0 ? (
                   <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Also available: {rents.length} rental comparable{rents.length === 1 ? '' : 's'}
+                    Rental comparables available: {rents.length}
                   </div>
                 ) : null}
               </div>
