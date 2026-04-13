@@ -136,7 +136,7 @@ function countCaption(salesCount: number, rentsCount: number): string {
   return parts.join(' • ');
 }
 
-function hasMeaningfulIntel(intel: AreaIntelData | null): intel is AreaIntelData {
+export function hasMeaningfulIntel(intel: AreaIntelData | null): intel is AreaIntelData {
   if (!intel) return false;
   return [
     intel.avg_rent,
@@ -178,8 +178,8 @@ export default function AreaInsights({
   const rentSrc = normStr(rentSource).toLowerCase();
   const vLabel = fmtVersion(version);
 
-  const [intelLoading, setIntelLoading] = useState<boolean>(showIntel);
-  const [compsLoading, setCompsLoading] = useState<boolean>(showComps);
+  const [intelLoading, setIntelLoading] = useState<boolean>(showIntel && !!pc);
+  const [compsLoading, setCompsLoading] = useState<boolean>(showComps && !!pc);
   const [intel, setIntel] = useState<AreaIntelData | null>(null);
   const [comps, setComps] = useState<CompsData | null>(null);
 
@@ -244,7 +244,6 @@ export default function AreaInsights({
   }, [pc, showIntel, showComps, areaKey, hasAny]);
 
   if (!hasAny) return null;
-  if (!pc) return null;
 
   const sales = Array.isArray(comps?.sales) ? comps!.sales! : [];
   const rents = Array.isArray(comps?.rents) ? comps!.rents! : [];
