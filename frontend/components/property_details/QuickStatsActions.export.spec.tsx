@@ -4,7 +4,8 @@ import QuickStatsActions from './QuickStatsActions';
 
 const mockFetchWithRetry = jest.fn();
 const mockFlagState = {
-  PROPERTY_EXPORTS: false,
+  DEAL_PACK: false,
+  CRM_EXPORT: false,
 };
 
 jest.mock('@/lib/api', () => ({
@@ -20,7 +21,8 @@ jest.mock('@/lib/flags', () => ({
 describe('QuickStatsActions launch controls', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFlagState.PROPERTY_EXPORTS = false;
+    mockFlagState.DEAL_PACK = false;
+    mockFlagState.CRM_EXPORT = false;
     mockFetchWithRetry.mockResolvedValue({
       ok: false,
       json: async () => ({ data: [] }),
@@ -44,8 +46,9 @@ describe('QuickStatsActions launch controls', () => {
     expect(screen.queryByRole('button', { name: /copy property data as json/i })).not.toBeInTheDocument();
   });
 
-  it('can re-enable export actions with the feature flag', () => {
-    mockFlagState.PROPERTY_EXPORTS = true;
+  it('can re-enable deal pack and CRM export actions independently', () => {
+    mockFlagState.DEAL_PACK = true;
+    mockFlagState.CRM_EXPORT = true;
 
     render(
       <QuickStatsActions

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { createPropertyPdfFilename } from '@/lib/propertyDealPack';
+import { FF } from '@/lib/flags';
 import { renderDealPackPdfFromUrl } from '@/lib/server/propertyPdfRenderer';
 import { fetchPropertyById, getOptionalClerkUserId } from '@/lib/server/propertyData';
 
@@ -24,6 +25,10 @@ const encodeDispositionFilename = (filename: string) =>
     .replace(/\*/g, '%2A');
 
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!FF.DEAL_PACK) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404, headers: noStoreHeaders });
+  }
+
   const { id } = await context.params;
   const url = new URL(request.url);
   const source = url.searchParams.get('source')?.trim() || undefined;

@@ -3,10 +3,10 @@ import type { NextRequest } from "next/server";
 import { clerkMiddleware, createRouteMatcher, clerkClient } from "@clerk/nextjs/server";
 import { hasValidClerkKey } from "@/lib/clerk-utils";
 import { disableAuth, isAuthEnabled } from "@/lib/auth";
-import { flag } from "@/lib/flags";
+import { FF } from "@/lib/flags";
 
 const DEFAULT_ADMIN_EMAILS = ["abbas_m90@hotmail.com", "ysoserious360@gmail.com"];
-const OFF_MARKET_ENABLED = flag("NEXT_PUBLIC_FEATURE_OFF_MARKET", false);
+const OFF_MARKET_ENABLED = FF.OFF_MARKET;
 
 function parseAdminEmails(raw: string | undefined): string[] {
   return (raw || "")
