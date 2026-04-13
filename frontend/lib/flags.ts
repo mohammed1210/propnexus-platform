@@ -5,7 +5,13 @@ export const flag = (name: string, fallback = false): boolean => {
   return ['1', 'true', 'yes', 'on'].includes(String(val).toLowerCase());
 };
 
-const LAUNCH_FLAG_CONFIG = {
+type LaunchFlagConfig = {
+  env: string;
+  aliases?: readonly string[];
+  default: boolean;
+};
+
+const LAUNCH_FLAG_CONFIG: Record<string, LaunchFlagConfig> = {
   AI_CHAT: { env: 'NEXT_PUBLIC_FEATURE_AI_CHATBOT', default: false },
   DEAL_SCORE: { env: 'NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE', default: false },
   AI_SCORE_BREAKDOWN: { env: 'NEXT_PUBLIC_FEATURE_AI_SCORE_BREAKDOWN', default: false },
