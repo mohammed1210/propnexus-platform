@@ -106,7 +106,7 @@ export default function HomePage() {
               </span>
             </h1>
 
-            <p className="mb-7 max-w-2xl text-lg leading-7 text-brand-50 sm:text-xl lg:mx-0 lg:mb-6 xl:text-[1.35rem] xl:leading-8">
+            <p className="mb-9 max-w-2xl text-lg leading-7 text-brand-50 sm:text-xl lg:mx-0 lg:mb-8 xl:text-[1.35rem] xl:leading-8">
               Smart property sourcing powered by AI. Analyze yields, calculate ROI, and find the perfect investment with confidence.
             </p>
 
@@ -173,7 +173,7 @@ export default function HomePage() {
       </section>
 
       {/* Features Grid */}
-      <section className="max-w-7xl mx-auto px-4 py-24">
+      <section className="max-w-7xl mx-auto px-4 pb-24 pt-20">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-slate-900 dark:text-white mb-4">
             Everything You Need to Invest Smarter
