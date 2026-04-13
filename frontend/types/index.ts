@@ -10,6 +10,7 @@ export interface Property {
   imageurl: string;
   yield_percent: number;
   roi_percent: number;
+  score?: number | null;
   source: string;
   created_at: string;
   latitude: number;

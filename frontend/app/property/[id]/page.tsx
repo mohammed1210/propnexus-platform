@@ -222,8 +222,7 @@ export default function PropertyDetailsPage() {
     return typeof d === 'string' ? d.trim() : '';
   }, [property]);
 
-  const propertyScore = toNum((property as Record<string, unknown> | null)?.score);
-  const hasDealScore = typeof propertyScore === 'number' && Number.isFinite(propertyScore);
+  const hasDealScore = typeof property?.score === 'number' && Number.isFinite(property.score);
   const summaryMetrics = [
     { label: 'Est. value', value: estValue, display: fmtGBP(estValue) },
     {
