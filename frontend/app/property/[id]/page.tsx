@@ -270,8 +270,10 @@ export default function PropertyDetailsPage() {
     investmentType: (property as any).investmentType,
     propertyType: (property as any).propertyType,
   });
+  const propertyLat = typeof property.latitude === 'number' ? property.latitude : null;
+  const propertyLng = typeof property.longitude === 'number' ? property.longitude : null;
   const showDealScore = FF.DEAL_SCORE && typeof (property as any).score === 'number';
-  const showTradesmen = FF.TRADESMEN && typeof property.latitude === 'number' && typeof property.longitude === 'number';
+  const showTradesmen = FF.TRADESMEN && propertyLat !== null && propertyLng !== null;
 
   return (
     <div className="page-wrapper">
@@ -532,8 +534,8 @@ export default function PropertyDetailsPage() {
 
                   {/* Tradesmen List */}
                   <TradesmenList
-                    propertyLat={property.latitude}
-                    propertyLng={property.longitude}
+                    propertyLat={propertyLat!}
+                    propertyLng={propertyLng!}
                     propertyId={String(property.id ?? id)}
                     tradeType={selectedTradeType || undefined}
                     radius={20}
