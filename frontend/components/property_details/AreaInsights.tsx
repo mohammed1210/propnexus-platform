@@ -243,7 +243,8 @@ export default function AreaInsights({
     };
   }, [pc, showIntel, showComps, areaKey, hasAny]);
 
-  if (!hasAny || !pc) return null;
+  if (!hasAny) return null;
+  if (!pc) return null;
 
   const sales = Array.isArray(comps?.sales) ? comps!.sales! : [];
   const rents = Array.isArray(comps?.rents) ? comps!.rents! : [];

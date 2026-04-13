@@ -54,7 +54,6 @@ const MapSingle = dynamic(
 /** ------------------------------------- */
 
 type LooseProperty = Partial<Property> & {
-  score?: number | null;
   latitude?: number | null;
   longitude?: number | null;
   imageurl?: string | null;
@@ -223,7 +222,8 @@ export default function PropertyDetailsPage() {
     return typeof d === 'string' ? d.trim() : '';
   }, [property]);
 
-  const hasDealScore = typeof property?.score === 'number' && Number.isFinite(property.score);
+  const propertyScore = toNum((property as Record<string, unknown> | null)?.score);
+  const hasDealScore = typeof propertyScore === 'number' && Number.isFinite(propertyScore);
   const summaryMetrics = [
     { label: 'Est. value', value: estValue, display: fmtGBP(estValue) },
     {
