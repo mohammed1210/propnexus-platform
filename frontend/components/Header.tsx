@@ -25,12 +25,10 @@ export default function Header() {
     { href: '/', label: t('nav.home') },
     { href: '/listings', label: t('nav.listings') },
     { href: '/saved', label: t('nav.savedDeals') },
+    ...(FF.OFF_MARKET ? [{ href: '/off-market', label: t('nav.offMarket') }] : []),
     { href: '/demo', label: t('nav.demo') },
     { href: '/pricing', label: t('nav.pricing') },
   ];
-  if (FF.OFF_MARKET) {
-    links.splice(3, 0, { href: '/off-market', label: t('nav.offMarket') });
-  }
   const accountLinks = [
     { href: '/account', label: t('account') },
   ];
