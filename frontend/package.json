@@ -27,7 +27,7 @@
     "screenshots": "SCREENSHOT_TEST=true playwright test tests/screenshots.spec.ts"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.39.0",
+    "@clerk/nextjs": "^7.2.7",
     "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.2.0",
     "@pdf-lib/standard-fonts": "^1.0.0",
