@@ -38,7 +38,7 @@
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.99.2",
     "@swc/helpers": "0.5.21",
-    "@vis.gl/react-google-maps": "^1.8.1",
+    "@vis.gl/react-google-maps": "^1.8.3",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "html2canvas": "^1.4.1",
