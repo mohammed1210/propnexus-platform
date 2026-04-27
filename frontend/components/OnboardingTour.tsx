@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import Joyride, { type CallBackProps, STATUS, type Step } from 'react-joyride';
+import { Joyride, type CallBackProps, STATUS, type Step } from 'react-joyride';
 
 const TOUR_STORAGE_KEY = 'propnexus_onboarding_seen';
 

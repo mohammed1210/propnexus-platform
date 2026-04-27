@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AIScoreBars from '@/components/property_details/AIScoreBars';
+import { FF } from '@/lib/flags';
 import { normalizeProperty } from '@/lib/normalizeProperty';
 
 interface PropertyData {
@@ -151,7 +152,7 @@ export default function DealScore({ property }: DealScoreProps) {
 
   const { score, version } = scoreData;
 
-  const showBreakdown = chartItems.length > 0;
+  const showBreakdown = FF.AI_SCORE_BREAKDOWN && chartItems.length > 0;
 
   const barGradient =
     'bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 dark:from-red-400 dark:via-yellow-400 dark:to-green-400';
