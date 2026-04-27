@@ -9,7 +9,7 @@ psycopg2-binary
 pydantic
 beautifulsoup4
 playwright
-python-dotenv>=1.0.0
+python-dotenv>=1.2.2
 python-jose==3.5.0
 requests>=2.31.0
 openai>=1.14.0
