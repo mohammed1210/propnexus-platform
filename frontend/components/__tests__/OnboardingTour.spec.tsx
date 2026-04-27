@@ -18,7 +18,7 @@ jest.mock('react-joyride', () => {
 
   return {
     __esModule: true,
-    default: MockJoyride,
+    Joyride: MockJoyride,
     STATUS: {
       FINISHED: 'finished',
       SKIPPED: 'skipped',

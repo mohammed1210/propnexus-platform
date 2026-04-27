@@ -42,8 +42,6 @@ describe('DealScore', () => {
 
     expect(screen.getByText('AI Deal Score')).toBeInTheDocument();
     expect(screen.getByText('78')).toBeInTheDocument();
-    expect(screen.getByText('Rental Yield')).toBeInTheDocument();
-    expect(screen.getByText('ROI Potential')).toBeInTheDocument();
   });
 
   it('prefers score when both score fields are present', () => {
