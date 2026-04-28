@@ -59,17 +59,17 @@ export default function ExitStrategyGenerator(props: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div className="text-sm text-slate-600 dark:text-slate-400">
-          Common exit routes investors consider for similar properties.
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+          Generate a route-by-route exit plan using the deal metrics above.
         </div>
         <button
           onClick={handleGenerate}
           disabled={loading}
-          className="btn-primary"
+          className="inline-flex items-center justify-center rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-70"
           data-loading={loading ? 'true' : undefined}
         >
-          {loading ? 'Generating…' : 'Generate strategies'}
+          {loading ? 'Generating…' : 'Generate exit plan'}
         </button>
       </div>
 
@@ -96,7 +96,7 @@ export default function ExitStrategyGenerator(props: Props) {
           <article
             key={i}
             aria-label={`strategy-${i + 1}`}
-            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/20 p-4"
+            className="rounded-2xl border border-brand-200/70 bg-white/80 p-4 dark:border-brand-900/70 dark:bg-slate-950/40"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -104,7 +104,7 @@ export default function ExitStrategyGenerator(props: Props) {
                   <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 text-xs font-bold">
                     {i + 1}
                   </span>
-                  <h4 className="font-semibold text-slate-900 dark:text-white truncate">{s.title}</h4>
+                  <h4 className="font-semibold text-slate-900 dark:text-white">{s.title}</h4>
                   <span
                     className="inline-flex items-center rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/20 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200"
                     aria-label="Strategy horizon"

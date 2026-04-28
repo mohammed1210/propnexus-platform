@@ -80,9 +80,12 @@ export default function InvestmentSummary({ property }: Props) {
 
   if (loading)
     return (
-      <p data-testid="investment-summary-loading" className="text-sm text-slate-600 dark:text-slate-400">
-        Loading summary…
-      </p>
+      <div
+        data-testid="investment-summary-loading"
+        className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-400"
+      >
+        Loading AI investment notes…
+      </div>
     );
 
   if (error)
@@ -109,22 +112,17 @@ export default function InvestmentSummary({ property }: Props) {
     );
 
   return (
-    <div data-testid="investment-summary-text" className="space-y-4">
+    <div data-testid="investment-summary-text" className="rounded-2xl border border-slate-200 bg-white/80 p-4 dark:border-slate-800 dark:bg-slate-950/30 sm:p-5">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+        AI analyst note
+      </div>
       {data.summary && (
-        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/30 p-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
-            Summary
-          </div>
-          <p className="text-sm leading-relaxed text-slate-800 dark:text-slate-200">{data.summary}</p>
-        </div>
+        <p className="mt-3 text-sm leading-relaxed text-slate-800 dark:text-slate-200">{data.summary}</p>
       )}
 
       {Array.isArray(data.bullets) && data.bullets.length > 0 && (
-        <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-4">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-2">
-            Key points
-          </div>
-          <ul className="space-y-2">
+        <div className="mt-4 border-t border-slate-200 pt-4 dark:border-slate-800">
+          <ul className="grid gap-2 sm:grid-cols-2">
             {data.bullets.map((b, i) => (
               <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300">
                 <span className="mt-1 h-1.5 w-1.5 rounded-full bg-brand-500 shrink-0" aria-hidden />
