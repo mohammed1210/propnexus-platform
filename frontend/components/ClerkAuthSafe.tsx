@@ -3,23 +3,34 @@
 
 import { ReactNode } from 'react';
 import {
-  SignedIn,
-  SignedOut,
   SignInButton,
   SignUpButton,
   UserButton,
-} from '@clerk/nextjs';
+  useUser,
+} from '@clerk/react';
 
 import { isAuthEnabled } from '@/lib/auth';
 
 export function SafeSignedIn({ children }: { children: ReactNode }) {
   if (!isAuthEnabled) return <>{children}</>;
-  return <SignedIn>{children}</SignedIn>;
+  return <SignedInState>{children}</SignedInState>;
 }
 
 export function SafeSignedOut({ children }: { children: ReactNode }) {
   if (!isAuthEnabled) return <>{children}</>;
-  return <SignedOut>{children}</SignedOut>;
+  return <SignedOutState>{children}</SignedOutState>;
+}
+
+function SignedInState({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn } = useUser();
+  if (!isLoaded || !isSignedIn) return null;
+  return <>{children}</>;
+}
+
+function SignedOutState({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn } = useUser();
+  if (!isLoaded || isSignedIn) return null;
+  return <>{children}</>;
 }
 
 export function SafeUserButton(props: any) {
