@@ -134,19 +134,19 @@ function toneClasses(tone: MetricTone): string {
 
 function MarketMetricCard({ label, value, helper, tone, icon }: MarketMetric) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
+    <div className="rounded-2xl border border-slate-200 bg-white/90 p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
             {label}
           </div>
-          <div className="mt-2 text-2xl font-bold tracking-tight text-slate-950 dark:text-white">{value}</div>
+          <div className="mt-1.5 text-xl font-bold tracking-tight text-slate-950 dark:text-white">{value}</div>
         </div>
-        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${toneClasses(tone)}`}>
+        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${toneClasses(tone)}`}>
           {icon}
         </div>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{helper}</p>
+      <p className="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{helper}</p>
     </div>
   );
 }
@@ -159,17 +159,17 @@ function SignalBar({ label, value, max, lowerIsBetter = false }: { label: string
   const bar = good ? 'bg-emerald-500' : mid ? 'bg-amber-500' : 'bg-rose-500';
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/30">
-      <div className="flex items-center justify-between gap-3 text-sm">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/30">
+      <div className="flex items-center justify-between gap-3 text-[13px]">
         <span className="font-medium text-slate-700 dark:text-slate-200">{label}</span>
         <span className="font-semibold text-slate-950 dark:text-white">
           {safeValue === undefined ? '—' : max === 5 ? `${safeValue.toFixed(1)}/5` : `${Math.round(safeValue)}/100`}
         </span>
       </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
         <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
       </div>
-      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+      <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
         {lowerIsBetter ? 'Lower is generally more attractive for tenant demand.' : 'Higher indicates stronger local support for the deal.'}
       </p>
     </div>
@@ -357,22 +357,22 @@ export default function AreaInsights({
       headerRight={headerRight}
       defaultExpanded={defaultExpanded}
     >
-      <div className="space-y-5">
-        <div className="rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
-          <div className="border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-brand-50/40 p-5 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-brand-950/20">
+      <div className="space-y-6">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
+          <div className="border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-brand-50/40 p-4 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-brand-950/20 sm:p-5">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                   Local market intelligence
                 </div>
-                <h3 className="mt-2 text-2xl font-bold tracking-tight text-slate-950 dark:text-white">
+                <h3 className="mt-2 text-xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-[1.35rem]">
                   Demand, yield and comparable evidence
                 </h3>
-                <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-slate-600 dark:text-slate-300 sm:text-sm">
                   Read the area like an investor: local rent benchmarks, demand signals and nearby transactions in one place.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 sm:text-xs">
                 {pc ? (
                   <span className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
                     {pc.toUpperCase()}
@@ -387,34 +387,34 @@ export default function AreaInsights({
             </div>
           </div>
 
-          <div className="space-y-5 p-5">
+          <div className="space-y-6 p-4 sm:p-5">
         {showIntel && (intelLoading || usableIntel) ? (
           <div>
             <GatedPanel title="Area Intelligence" requiredPlan="pro" featureEnabled={showIntel}>
-              <div className="space-y-5">
+              <div className="space-y-6">
                 {intelLoading ? (
                   <SkeletonLines />
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                       {marketMetrics.map((metric) => (
                         <MarketMetricCard key={metric.label} {...metric} />
                       ))}
                     </div>
 
                     {intel ? (
-                      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                         <SignalBar label="Crime index" value={intel.crime_index} max={100} lowerIsBetter />
                         <SignalBar label="Schools rating" value={intel.schools_rating} max={5} />
                       </div>
                     ) : null}
 
                     {intel?.notes ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900/30">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/30">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                           Local read
                         </div>
-                        <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">{intel.notes}</p>
+                        <p className="mt-2 text-[13px] leading-relaxed text-slate-700 dark:text-slate-300 sm:text-sm">{intel.notes}</p>
                       </div>
                     ) : null}
                   </>
@@ -425,10 +425,10 @@ export default function AreaInsights({
         ) : null}
 
         {showComps && (compsLoading || usableComps) ? (
-          <div className="border-t border-slate-200 pt-5 dark:border-slate-800">
+          <div className="border-t border-slate-200 pt-6 dark:border-slate-800">
             <GatedPanel title="Comparable Sales" requiredPlan="pro" featureEnabled={showComps}>
-              <div className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="space-y-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                       Comparable evidence
@@ -437,12 +437,12 @@ export default function AreaInsights({
                       Recent nearby transactions
                     </h4>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:min-w-72">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/30">
+                  <div className="grid grid-cols-2 gap-3 sm:min-w-72">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/30 sm:p-3.5">
                       <div className="text-[11px] text-slate-500 dark:text-slate-400">Avg sale comp</div>
                       <div className="mt-1 text-sm font-bold text-slate-950 dark:text-white">{fmtGBP(avgSalePrice)}</div>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/30">
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/30 sm:p-3.5">
                       <div className="text-[11px] text-slate-500 dark:text-slate-400">Avg rent comp</div>
                       <div className="mt-1 text-sm font-bold text-slate-950 dark:text-white">{fmtGBP(avgRentPrice)}</div>
                     </div>
@@ -452,11 +452,11 @@ export default function AreaInsights({
                 {compsLoading ? (
                   <SkeletonLines />
                 ) : sales.length > 0 ? (
-                  <div className="grid gap-3 lg:grid-cols-2">
+                  <div className="grid gap-4 lg:grid-cols-2">
                     {sales.slice(0, 6).map((line, idx) => (
                       <article
                         key={`sale-${idx}`}
-                        className="rounded-2xl border border-slate-200 bg-white/90 p-4 dark:border-slate-800 dark:bg-slate-950/40"
+                        className="rounded-2xl border border-slate-200 bg-white/90 p-3.5 dark:border-slate-800 dark:bg-slate-950/40"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -479,7 +479,7 @@ export default function AreaInsights({
                 ) : null}
 
                 {rents.length > 0 ? (
-                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/20">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700 dark:text-emerald-300">
