@@ -3,6 +3,9 @@
   "outputDirectory": ".next",
   "framework": "nextjs",
   "installCommand": "npm install",
+  "env": {
+    "NEXT_PUBLIC_FEATURE_AI_CHATBOT": "true"
+  },
   "routes": [
     {
       "src": "/(.*)",

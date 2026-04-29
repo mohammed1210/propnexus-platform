@@ -360,7 +360,34 @@ export interface AIScoreExplainResponse {
 }
 
 export async function postAIChat(body: AIChatRequest): Promise<AIChatResponse> {
-  return apiPost('/gpt/chat', body);
+  // Route browser chat requests through the same-origin Next proxy so Vercel
+  // deployments don't depend on NEXT_PUBLIC_API_BASE being exposed to clients.
+  const res = await fetch('/api/gpt/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+  if (!res.ok) {
+    if (contentType.includes('application/json')) {
+      const payload = await res.json().catch(() => null as any);
+      const detail =
+        payload?.detail ||
+        payload?.message ||
+        payload?.error ||
+        'Failed to generate AI chat response';
+      throw new Error(`[POST ${res.status}] ${typeof detail === 'string' ? detail : JSON.stringify(detail)}`);
+    }
+    throw new Error(`[POST ${res.status}] Failed to generate AI chat response`);
+  }
+
+  if (!contentType.includes('application/json')) {
+    throw new Error('[POST 502] Invalid server response');
+  }
+
+  return (await res.json()) as AIChatResponse;
 }
 
 export async function postAIScore(body: Record<string, any>): Promise<AIScoreResponse> {

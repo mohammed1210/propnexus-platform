@@ -115,8 +115,8 @@ function AIChatbotInner({
     return base;
   };
 
-  const handleSend = async () => {
-    const text = input.trim();
+  const handleSend = async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if (!text || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: text };
@@ -168,9 +168,7 @@ function AIChatbotInner({
   };
 
   const handleQuickPrompt = (prompt: string) => {
-    setInput(prompt);
-    // Trigger send after a brief delay to show the prompt in input
-    setTimeout(() => handleSend(), 100);
+    void handleSend(prompt);
   };
 
   useEffect(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), [messages]);
@@ -281,7 +279,7 @@ function AIChatbotInner({
               className="flex-1 px-3 py-2 text-sm border rounded-md outline-none bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700"
             />
             <button
-              onClick={handleSend}
+              onClick={() => handleSend()}
               disabled={isLoading}
               className="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               aria-label="Send message"
