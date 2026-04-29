@@ -28,6 +28,7 @@ import type { Property } from '@/types';
 import { FF } from '@/lib/flags';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import { buildInvestmentDescription } from '@/lib/propertyInvestmentDescription';
 
 /** ---- Client-only widgets (no SSR) ---- */
 const StampDutyCalculator = dynamic(
@@ -294,6 +295,27 @@ export default function PropertyDetailsPage() {
       value: formatPercent(roiDisplay.value),
     },
   ];
+  const investmentDescription = buildInvestmentDescription({
+    title: property.title ? String(property.title) : undefined,
+    location: property.location ? String(property.location) : undefined,
+    propertyType: (property as any).propertyType ?? undefined,
+    investmentType: (property as any).investmentType ?? undefined,
+    bedrooms: typeof property.bedrooms === 'number' ? property.bedrooms : undefined,
+    bathrooms: typeof property.bathrooms === 'number' ? property.bathrooms : undefined,
+    price: typeof property.price === 'number' ? property.price : undefined,
+    yieldPercent,
+    roiPercent: roiDisplay.value ?? undefined,
+    roiIsProxy: roiDisplay.isProxy,
+    aiScore:
+      typeof (property as any).ai_score === 'number'
+        ? (property as any).ai_score
+        : typeof (property as any).score === 'number'
+          ? (property as any).score
+          : undefined,
+    dealQuality: tldr.label,
+    strategyFit: bestFitStrategy,
+    description,
+  });
 
   return (
     <div className="page-wrapper">
@@ -330,16 +352,57 @@ export default function PropertyDetailsPage() {
             />
           </div>
 
-          {description ? (
-            <div className="p-6 pt-5 border-t border-slate-200 dark:border-slate-800">
-              <div className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Description</div>
-              <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed space-y-2">
-                {description.split(/\n{2,}/).map((para, idx) => {
-                  const t = para.trim();
-                  if (!t) return null;
-                  return <p key={idx}>{t}</p>;
-                })}
+          {investmentDescription.paragraph ? (
+            <div className="border-t border-slate-200 bg-gradient-to-br from-white via-slate-50/70 to-brand-50/30 p-5 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-brand-950/20 sm:p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="max-w-3xl">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-300">
+                    Investment Description
+                  </div>
+                  <p className="mt-2 text-[15px] leading-7 text-slate-800 dark:text-slate-200">
+                    {investmentDescription.paragraph}
+                  </p>
+                </div>
+                {investmentDescription.checks.length > 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white/80 p-3 dark:border-slate-800 dark:bg-slate-950/40 lg:w-80">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      Checks before offer
+                    </div>
+                    <ul className="mt-2 space-y-1.5">
+                      {investmentDescription.checks.map((check) => (
+                        <li key={check} className="flex gap-2 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
+                          <span>{check}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
+
+              {investmentDescription.keySignals.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {investmentDescription.keySignals.map((signal) => (
+                    <span
+                      key={signal}
+                      className="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-300"
+                    >
+                      {signal}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+
+              {investmentDescription.originalNotes ? (
+                <details className="mt-4 rounded-2xl border border-slate-200 bg-white/60 p-3 dark:border-slate-800 dark:bg-slate-950/30">
+                  <summary className="cursor-pointer text-xs font-semibold text-slate-600 marker:text-slate-400 dark:text-slate-300">
+                    Original listing notes
+                  </summary>
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                    {investmentDescription.originalNotes}
+                  </p>
+                </details>
+              ) : null}
             </div>
           ) : null}
         </div>
