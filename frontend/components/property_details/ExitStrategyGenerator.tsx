@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { postAiStrategies } from '@/lib/api';
 import type { StrategiesRequest, StrategiesResponse, Strategy } from '@/types/ai';
 
@@ -17,18 +17,18 @@ type Props = {
 
 const MAX_VISIBLE_STRATEGIES = 3;
 
-function compactText(value: unknown, maxLength = 180): string {
+function compactText(value: unknown, maxLength = 120): string {
   if (typeof value !== 'string') return '';
   const clean = value.replace(/\s+/g, ' ').trim();
   if (clean.length <= maxLength) return clean;
   const slice = clean.slice(0, maxLength - 1);
   const boundary = slice.lastIndexOf(' ');
-  return `${slice.slice(0, boundary > 80 ? boundary : slice.length).trim()}…`;
+  return `${slice.slice(0, boundary > 60 ? boundary : slice.length).trim()}…`;
 }
 
-function compactSteps(steps: Strategy['steps']): string[] {
-  if (!Array.isArray(steps)) return [];
-  return steps.map((step) => compactText(step, 115)).filter(Boolean).slice(0, 3);
+function compactStep(steps: Strategy['steps']): string {
+  if (!Array.isArray(steps)) return '';
+  return steps.map((step) => compactText(step, 95)).find(Boolean) ?? '';
 }
 
 function bestForSummary(strategy: Strategy, horizon: string): string {
@@ -37,6 +37,33 @@ function bestForSummary(strategy: Strategy, horizon: string): string {
   if (/refinanc|brrr|brr|remortgage|stabil/.test(hay)) return 'Ideal if rent supports refinance debt.';
   if (/hold|btl|rent|hmo|cashflow/.test(hay)) return 'Best for income-led investors.';
   return horizon === 'Short-term' ? 'Best for faster capital recycling.' : 'Best for a balanced risk route.';
+}
+
+function upsideSummary(strategy: Strategy): string {
+  const hay = `${strategy.title ?? ''} ${strategy.rationale ?? ''}`.toLowerCase();
+  if (/flip|resale|sell|auction|refurb/.test(hay)) return 'Potential value uplift on resale.';
+  if (/refinanc|brrr|brr|remortgage/.test(hay)) return 'Recycle capital after stabilisation.';
+  if (/hold|btl|rent|hmo|cashflow/.test(hay)) return 'Income-led route with optional later sale.';
+  return compactText(strategy.rationale, 90) || 'Keeps the exit route flexible.';
+}
+
+function riskSummary(strategy: Strategy): string {
+  return compactText(strategy.risk, 90) || 'Validate rent, costs and resale evidence first.';
+}
+
+function uniqueTopStrategies(strategies: Strategy[]): Strategy[] {
+  const seen = new Set<string>();
+  const out: Strategy[] = [];
+
+  for (const strategy of strategies) {
+    const key = compactText(strategy.title, 36).toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(strategy);
+    if (out.length >= MAX_VISIBLE_STRATEGIES) break;
+  }
+
+  return out;
 }
 
 export default function ExitStrategyGenerator(props: Props) {
@@ -73,7 +100,7 @@ export default function ExitStrategyGenerator(props: Props) {
       };
 
       const res: StrategiesResponse = await postAiStrategies(payload);
-      setStrategies((res?.strategies ?? []).slice(0, MAX_VISIBLE_STRATEGIES));
+      setStrategies(uniqueTopStrategies(res?.strategies ?? []));
     } catch (e: any) {
       setError(e?.message ?? 'Failed to generate strategies');
     } finally {
@@ -83,16 +110,16 @@ export default function ExitStrategyGenerator(props: Props) {
 
   return (
     <div className="rounded-2xl border border-brand-200 bg-white/90 p-4 shadow-sm dark:border-brand-900/70 dark:bg-slate-950/40 sm:p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-300">
-            Exit plan generator
+            Top exit routes
           </div>
           <h4 className="mt-1 text-lg font-semibold tracking-tight text-slate-950 dark:text-white">
-            Compare the top investor routes
+            Compare route choices
           </h4>
           <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-            Generate a concise route-by-route plan using the deal metrics above, then compare timing, execution steps and risk.
+            Generate a short, investor-ready comparison of the clearest sell, refinance or hold routes.
           </p>
         </div>
         <button
@@ -103,17 +130,6 @@ export default function ExitStrategyGenerator(props: Props) {
         >
           {loading ? 'Generating…' : 'Generate exit plan'}
         </button>
-      </div>
-
-      <div className="mt-4 grid gap-2 text-xs text-slate-600 dark:text-slate-300 sm:grid-cols-3">
-        {['Sell for uplift', 'Refinance and recycle', 'Hold for income'].map((route) => (
-          <div
-            key={route}
-            className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 font-semibold dark:border-slate-800 dark:bg-slate-900/30"
-          >
-            {route}
-          </div>
-        ))}
       </div>
 
       {error && (
@@ -137,98 +153,60 @@ export default function ExitStrategyGenerator(props: Props) {
       ) : null}
 
       {strategies && strategies.length > 0 ? (
-        <div className="mt-5 grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
           {strategies.map((s, i) => {
             const horizon = horizonTag(s);
-            const rationale = compactText(s.rationale, 155);
-            const steps = compactSteps(s.steps);
-            const risk = compactText(s.risk, 115);
+            const nextStep = compactStep(s.steps) || 'Verify costs, rent and comparable values.';
+            const upside = upsideSummary(s);
+            const risk = riskSummary(s);
             const bestFor = bestForSummary(s, horizon);
             return (
               <article
                 key={i}
                 aria-label={`strategy-${i + 1}`}
-                className="flex min-h-full flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/50"
+                className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/50"
               >
-                <div className="flex items-start gap-3">
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-600 text-sm font-bold text-white shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white shadow-sm">
                     {i + 1}
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="inline-flex items-center rounded-full border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/20 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200"
-                        aria-label="Strategy horizon"
-                      >
-                        {horizon}
-                      </span>
-                      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                        Route {i + 1}
-                      </span>
-                    </div>
-                    <h5 className="mt-2 text-base font-semibold leading-snug text-slate-950 dark:text-white">
-                      {compactText(s.title, 72) || 'Exit route'}
-                    </h5>
-                    <p className="mt-1 text-xs font-medium text-brand-700 dark:text-brand-300">{bestFor}</p>
-                  </div>
-                </div>
-
-                {rationale ? (
-                  <div className="mt-3">
-                    <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                      Why this fits
-                    </div>
-                    <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">{rationale}</p>
-                  </div>
-                ) : null}
-
-                {steps.length > 0 ? (
-                  <div className="mt-3">
-                    <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
-                      Next steps
-                    </div>
-                    <ol className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
-                      {steps.map((st, idx) => (
-                        <li key={idx} className="flex gap-2">
-                          <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
-                            {idx + 1}
-                          </span>
-                          <span>{st}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                ) : null}
-
-                <div className="mt-auto pt-4">
-                  {risk ? (
-                    <div className="rounded-xl border border-amber-200/70 bg-amber-50/80 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
-                      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800 dark:text-amber-300">
-                        Watch-out
-                      </div>
-                      <p className="text-xs leading-relaxed text-amber-900 dark:text-amber-100">{risk}</p>
-                    </div>
-                  ) : null}
-                  <button
-                    className="mt-3 inline-flex h-8 items-center rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-900"
-                    onClick={() => {
-                      const text =
-                        `${s.title}\n\n` +
-                        (rationale ? `Why:\n${rationale}\n\n` : '') +
-                        (steps.length ? `How:\n${steps.map((x, n) => `${n + 1}. ${x}`).join('\n')}\n\n` : '') +
-                        (risk ? `Risk:\n${risk}` : '');
-                      if (navigator?.clipboard) {
-                        navigator.clipboard.writeText(text);
-                      }
-                    }}
+                  <span
+                    className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-900/20 dark:text-slate-200"
+                    aria-label="Strategy horizon"
                   >
-                    Copy route
-                  </button>
+                    {horizon}
+                  </span>
                 </div>
+
+                <h5 className="mt-3 text-base font-semibold leading-snug text-slate-950 dark:text-white">
+                  {compactText(s.title, 58) || 'Exit route'}
+                </h5>
+                <p className="mt-1 text-xs font-medium text-brand-700 dark:text-brand-300">{bestFor}</p>
+
+                <dl className="mt-3 space-y-2 text-sm">
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      Upside
+                    </dt>
+                    <dd className="mt-0.5 leading-relaxed text-slate-700 dark:text-slate-300">{upside}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      Risk
+                    </dt>
+                    <dd className="mt-0.5 leading-relaxed text-slate-700 dark:text-slate-300">{risk}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                      Next step
+                    </dt>
+                    <dd className="mt-0.5 leading-relaxed text-slate-700 dark:text-slate-300">{nextStep}</dd>
+                  </div>
+                </dl>
               </article>
             );
           })}
-            </div>
+        </div>
       ) : null}
     </div>
   );

@@ -39,7 +39,7 @@ describe('InvestmentSummary', () => {
     expect(screen.getByText('Good local demand')).toBeInTheDocument();
   });
 
-  it('renders a safe fallback when summary request fails with non-JSON/404 style error', async () => {
+  it('hides the optional analyst note when summary request fails', async () => {
     mockPostAiSummary.mockRejectedValue(
       new Error('[POST 404] <!doctype html><html><body><h1>Not Found</h1></body></html>'),
     );
@@ -47,13 +47,11 @@ describe('InvestmentSummary', () => {
     render(<InvestmentSummary property={propertyFixture as any} />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('investment-summary-fallback')).toBeInTheDocument();
+      expect(mockPostAiSummary).toHaveBeenCalledTimes(1);
     });
 
-    expect(screen.getByText('Summary unavailable')).toBeInTheDocument();
-    expect(
-      screen.getByText('We could not generate an investment summary right now. Please try again later.'),
-    ).toBeInTheDocument();
+    expect(screen.queryByTestId('investment-summary-fallback')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('investment-summary-text')).not.toBeInTheDocument();
     expect(screen.queryByText(/<!doctype html>/i)).not.toBeInTheDocument();
   });
 });

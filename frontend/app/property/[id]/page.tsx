@@ -8,7 +8,6 @@ import {
   FiTool,
   FiFileText,
   FiBarChart2,
-  FiGitBranch,
   FiEdit3,
   FiMap,
 } from 'react-icons/fi';
@@ -69,51 +68,20 @@ type LooseProperty = Partial<Property> & {
   rent?: number | null;
 };
 
-type InvestmentMetric = {
-  label: string;
-  value: string;
-  helper: string;
-  emphasis?: boolean;
-};
-
 const toNum = (v: unknown) =>
   typeof v === 'number' ? v : v == null || v === '' ? undefined : Number(v);
 
-const fmtGBP = (n: unknown): string => {
-  const v = typeof n === 'number' ? n : Number(n);
-  if (!Number.isFinite(v) || v <= 0) return 'N/A';
-  try {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-      maximumFractionDigits: 0,
-    }).format(v);
-  } catch {
-    return `£${Math.round(v).toLocaleString('en-GB')}`;
-  }
+const investmentFitLabel = (investmentType?: unknown, propertyType?: unknown): string => {
+  const raw = String(investmentType || propertyType || '').trim();
+  if (!raw) return 'Cautious review';
+  const hay = raw.toLowerCase();
+  if (/hmo|house in multiple/.test(hay)) return 'HMO';
+  if (/flip|refurb|auction|below market|bmv/.test(hay)) return 'Flip';
+  if (/develop|land|conversion/.test(hay)) return 'Development';
+  if (/hybrid|brr|brrr|refinance/.test(hay)) return 'Hybrid';
+  if (/btl|buy.?to.?let|rental|rent|flat|apartment|house|terrace|detached|semi/.test(hay)) return 'BTL';
+  return raw.length > 18 ? `${raw.slice(0, 17).trim()}…` : raw;
 };
-
-const fmtPct = (n: unknown): string => {
-  const v = typeof n === 'number' ? n : Number(n);
-  if (!Number.isFinite(v)) return 'N/A';
-  return `${v.toFixed(1)}%`;
-};
-
-const InvestmentMetricTile = ({ label, value, helper, emphasis = false }: InvestmentMetric) => (
-  <div
-    className={`rounded-2xl border p-4 ${
-      emphasis
-        ? 'border-brand-200 bg-brand-50/80 dark:border-brand-800/60 dark:bg-brand-950/30'
-        : 'border-slate-200 bg-white/80 dark:border-slate-800 dark:bg-slate-950/30'
-    }`}
-  >
-    <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-      {label}
-    </div>
-    <div className="mt-2 text-2xl font-bold tracking-tight text-slate-950 dark:text-white">{value}</div>
-    <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{helper}</p>
-  </div>
-);
 
 export default function PropertyDetailsPage() {
   const { id } = useParams() as { id: string };
@@ -216,7 +184,6 @@ export default function PropertyDetailsPage() {
   const normalized = useMemo(() => (property ? normalizeProperty(property as any) : null), [property]);
 
   const price = normalized?.price ?? 0;
-  const rentMonthly = normalized?.rentMonthly ?? undefined;
   const yieldPercent = useMemo(
     () =>
       normalized
@@ -231,12 +198,6 @@ export default function PropertyDetailsPage() {
     if (a.value != null) return a;
     return getRoiDisplay(property as any);
   }, [normalized, property]);
-
-  const estValue = useMemo((): number | undefined => {
-    if (!property) return undefined;
-    const v = toNum((property as any)?.estimated_value);
-    return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined;
-  }, [property]);
 
   const discountPercent = useMemo((): number | undefined => {
     if (!property) return undefined;
@@ -310,33 +271,28 @@ export default function PropertyDetailsPage() {
   const showDealScore =
     typeof (property as any).score === 'number' || typeof (property as any).ai_score === 'number';
   const showTradesmen = FF.TRADESMEN && propertyLat !== null && propertyLng !== null;
-  const investmentMetrics: InvestmentMetric[] = [
+  const bestFitStrategy = investmentFitLabel(
+    (property as any).investmentType,
+    (property as any).propertyType,
+  );
+  const summaryMetrics = [
     {
-      label: 'Purchase price',
-      value: fmtGBP(property.price),
-      helper: estValue ? `Estimated value ${fmtGBP(estValue)}` : 'Current asking price',
-      emphasis: true,
+      label: 'Best fit',
+      value: bestFitStrategy,
     },
     {
-      label: 'Gross yield',
+      label: 'Quality',
+      value: tldr.label,
+      tone: tldr.tone,
+    },
+    {
+      label: 'Yield',
       value: formatPercent(yieldPercent),
-      helper: typeof rentMonthly === 'number' ? `${fmtGBP(rentMonthly)} estimated monthly rent` : 'Based on available rent data',
     },
     {
       label: roiDisplay.isProxy ? 'ROI proxy' : 'ROI',
       value: formatPercent(roiDisplay.value),
-      helper: roiDisplay.isProxy ? 'Proxy return where full ROI is unavailable' : 'Indicative return from source data',
     },
-    {
-      label: 'Below value',
-      value: typeof discountPercent === 'number' ? fmtPct(discountPercent) : 'N/A',
-      helper: 'Estimated discount to market value',
-    },
-  ];
-  const exitPlanSummary = [
-    'Sell after value-add works to realise uplift.',
-    'Refinance once rent is stabilised to recycle capital.',
-    'Hold as a rental if yield and area demand remain resilient.',
   ];
 
   return (
@@ -427,105 +383,48 @@ export default function PropertyDetailsPage() {
               defaultExpanded={true}
             >
               <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
-                <div className="border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-brand-50/50 p-5 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-brand-950/20 sm:p-6">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="border-b border-slate-200 bg-gradient-to-br from-slate-50 via-white to-brand-50/40 p-5 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-brand-950/20 sm:p-6">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                     <div className="max-w-3xl">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-slate-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white dark:bg-white dark:text-slate-950">
-                          Investor memo
-                        </span>
-                        <span
-                          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${verdictToneClasses(
-                            tldr.tone,
-                          )}`}
-                          aria-label={`Verdict: ${tldr.label}`}
-                        >
-                          {tldr.label}
-                        </span>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                        Investment summary
                       </div>
-                      <h3 className="mt-4 text-2xl font-bold tracking-tight text-slate-950 dark:text-white">
-                        Investment thesis
+                      <h3 className="mt-2 text-xl font-bold tracking-tight text-slate-950 dark:text-white">
+                        {bestFitStrategy} · {tldr.label}
                       </h3>
-                      <p className="mt-2 text-base leading-relaxed text-slate-700 dark:text-slate-300">
+                      <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                         {tldr.sentence}
                       </p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm dark:border-slate-800 dark:bg-slate-900/50 lg:w-72">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                        Strategy fit
-                      </div>
-                      <div className="mt-2 text-lg font-semibold text-slate-950 dark:text-white">
-                        {(property as any).investmentType || (property as any).propertyType || 'Property investment'}
-                      </div>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                        Use the exit generator below to turn these figures into sell, refinance, or hold scenarios.
-                      </p>
-                    </div>
+                    <span
+                      className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-xs font-semibold ${verdictToneClasses(
+                        tldr.tone,
+                      )}`}
+                      aria-label={`Deal quality: ${tldr.label}`}
+                    >
+                      {tldr.label}
+                    </span>
                   </div>
                 </div>
 
-                <div className="space-y-6 p-5 sm:p-6">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    {investmentMetrics.map((metric) => (
-                      <InvestmentMetricTile key={metric.label} {...metric} />
+                <div className="space-y-5 p-5 sm:p-6">
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {summaryMetrics.map((metric) => (
+                      <div
+                        key={metric.label}
+                        className="rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-800 dark:bg-slate-950/30"
+                      >
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                          {metric.label}
+                        </div>
+                        <div className="mt-1 text-base font-bold tracking-tight text-slate-950 dark:text-white">
+                          {metric.value}
+                        </div>
+                      </div>
                     ))}
                   </div>
 
-                  <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-                    <div className="space-y-5">
-                      {tldr.bullets.length > 0 ? (
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                            Key investment read
-                          </div>
-                          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                            {tldr.bullets.slice(0, 4).map((b) => (
-                              <li
-                                key={b}
-                                className="flex gap-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-300"
-                              >
-                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" aria-hidden />
-                                <span>{b}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-
-                      <InvestmentSummary property={property as any} />
-                    </div>
-
-                    <aside className="rounded-2xl border border-brand-200 bg-brand-50/70 p-4 dark:border-brand-900/60 dark:bg-brand-950/20 sm:p-5">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-600 text-white shadow-sm">
-                          <FiGitBranch className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-300">
-                            Exit planning
-                          </div>
-                          <h4 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
-                            Match the deal to a route out
-                          </h4>
-                          <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
-                            Start with the common investor routes below, then generate a tailored exit plan from the property data.
-                          </p>
-                        </div>
-                      </div>
-
-                      <ol className="mt-4 space-y-2">
-                        {exitPlanSummary.map((item, index) => (
-                          <li key={item} className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-brand-700 ring-1 ring-brand-200 dark:bg-slate-950 dark:text-brand-300 dark:ring-brand-900">
-                              {index + 1}
-                            </span>
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ol>
-
-                    </aside>
-                  </div>
+                  <InvestmentSummary property={property as any} />
 
                   <ExitStrategyGenerator
                     title={String(property.title ?? '')}
