@@ -623,55 +623,6 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
                 return v
         return None
 
-    def _clean_description(v: Any) -> str | None:
-        if not isinstance(v, str):
-            return None
-        s = v.replace("\r\n", "\n").replace("\r", "\n").strip()
-        return s if s else None
-
-    def _looks_truncated(s: str | None) -> bool:
-        return bool(s and re.search(r"(?:\.\.\.|…)\s*$", s.strip()))
-
-    def _description_candidates() -> List[str]:
-        keys = [
-            "description",
-            "full_description",
-            "description_full",
-            "long_description",
-            "listing_description",
-            "property_description",
-            "propertyDescription",
-            "summaryDescription",
-        ]
-        candidates: List[str] = []
-        for source in (out, data_obj if isinstance(data_obj, dict) else {}, raw_obj):
-            if not isinstance(source, dict):
-                continue
-            for key in keys:
-                cleaned = _clean_description(source.get(key))
-                if cleaned and cleaned not in candidates:
-                    candidates.append(cleaned)
-        return candidates
-
-    # Prefer the fullest scraped description available. Older rows sometimes
-    # stored a card/listing snippet in the top-level column while the complete
-    # detail-page copy lives in the raw data payload.
-    try:
-        current_description = _clean_description(out.get("description"))
-        best_description = current_description
-        for candidate in _description_candidates():
-            if not best_description:
-                best_description = candidate
-                continue
-            if len(candidate) <= len(best_description):
-                continue
-            if _looks_truncated(best_description) or not _looks_truncated(candidate):
-                best_description = candidate
-        if best_description:
-            out["description"] = best_description
-    except Exception:
-        pass
-
     # Ensure property_type is always present in API response (canonical, deterministic).
     # - Prefer DB column
     # - Else embedded data

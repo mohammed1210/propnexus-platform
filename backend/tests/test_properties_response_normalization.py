@@ -53,25 +53,3 @@ def test_normalize_property_row_image_urls_invalid_json_string_becomes_empty_lis
     out = _normalize_property_row({"id": "3", "image_urls": "not json", "imageurl": None})
     assert isinstance(out.get("image_urls"), list)
     assert out["image_urls"] == []
-
-
-def test_normalize_property_row_prefers_full_raw_description():
-    out = _normalize_property_row(
-        {
-            "id": "4",
-            "description": "Guide Price £650,000 to £675,000 NO CHAIN INVOLVED - Tu...",
-            "data": {
-                "raw": {
-                    "description": (
-                        "Guide Price £650,000 to £675,000 NO CHAIN INVOLVED - Reeds Rains "
-                        "Estate Agents are pleased to offer this Three Double Bedroom Extended "
-                        "Family Home with scope and potential to transform into a Five Bedroom "
-                        "Home subject to permissions. Located close to Gants Hill Central Line."
-                    )
-                }
-            },
-        }
-    )
-
-    assert out["description"].endswith("Gants Hill Central Line.")
-    assert "Tu..." not in out["description"]
