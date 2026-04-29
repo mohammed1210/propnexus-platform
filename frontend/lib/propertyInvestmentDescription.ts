@@ -50,12 +50,55 @@ function uniquePush(items: string[], value: string) {
   if (!items.includes(value)) items.push(value);
 }
 
+function joinNatural(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+function articleFor(value: string): string {
+  if (value.trim() === 'HMO') return 'an';
+  return /^[aeiou]/i.test(value.trim()) ? 'an' : 'a';
+}
+
+function normalizePropertyType(value: unknown): string {
+  const raw = cleanText(value).toLowerCase();
+  if (!raw) return 'property';
+  if (/\bdetached\b/.test(raw) && !/house|home|property/.test(raw)) return 'detached house';
+  if (/\bsemi[-\s]?detached\b/.test(raw) && !/house|home|property/.test(raw)) return 'semi-detached house';
+  if (/\bterraced\b|\bterrace\b/.test(raw) && !/house|home|property/.test(raw)) return 'terraced house';
+  if (/\bflat\b|\bapartment\b/.test(raw)) return raw.includes('apartment') ? 'apartment' : 'flat';
+  return raw;
+}
+
+function normalizeStrategy(value: string): string {
+  const clean = cleanText(value);
+  const lower = clean.toLowerCase();
+  if (!clean || lower === 'cautious review') return 'cautious review';
+  if (lower === 'btl' || /buy.?to.?let/.test(lower)) return 'buy-to-let';
+  if (lower === 'hmo' || /house in multiple/.test(lower)) return 'HMO';
+  if (/flip/.test(lower)) return 'value-add or resale';
+  if (/hybrid|brr|brrr|refinance/.test(lower)) return 'hybrid buy-to-let/refinance';
+  return clean;
+}
+
+function strategyAudience(strategy: string): string {
+  if (strategy === 'cautious review') return 'a cautious-review buyer';
+  if (strategy === 'value-add or resale') return 'a value-add or resale buyer';
+  return `${articleFor(strategy)} ${strategy} investor`;
+}
+
+function lowerFirst(value: string): string {
+  if (!value) return value;
+  return `${value.charAt(0).toLowerCase()}${value.slice(1)}`;
+}
+
 function describeAsset(input: InvestmentDescriptionInput): string {
-  const type = cleanText(input.propertyType) || 'property';
-  const beds = typeof input.bedrooms === 'number' && input.bedrooms > 0 ? `${input.bedrooms}-bed ` : '';
+  const type = normalizePropertyType(input.propertyType);
+  const beds = typeof input.bedrooms === 'number' && input.bedrooms > 0 ? `${input.bedrooms}-bedroom ` : '';
   const baths =
     typeof input.bathrooms === 'number' && input.bathrooms > 0
-      ? ` with ${input.bathrooms} bath${input.bathrooms === 1 ? '' : 's'}`
+      ? ` with ${input.bathrooms} bathroom${input.bathrooms === 1 ? '' : 's'}`
       : '';
   const location = cleanText(input.location);
 
@@ -68,25 +111,25 @@ function extractListingSignals(description: string): string[] {
   const signals: string[] = [];
 
   if (/chain\s*free|no\s+chain/.test(lower)) {
-    uniquePush(signals, 'Chain-free status may reduce transaction friction.');
+    uniquePush(signals, 'Chain-free status.');
   }
   if (/station|tube|underground|rail|train|crossrail|elizabeth line/.test(lower)) {
-    uniquePush(signals, 'Transport access is mentioned in the listing.');
+    uniquePush(signals, 'Transport access.');
   }
   if (/garden|outdoor|terrace|balcony/.test(lower)) {
-    uniquePush(signals, 'Outdoor space is a visible tenant/resale signal.');
+    uniquePush(signals, 'Outdoor space.');
   }
   if (/extend|extension|stpp|planning|potential/.test(lower)) {
-    uniquePush(signals, 'There may be value-add potential subject to checks.');
+    uniquePush(signals, 'Value-add potential, subject to checks.');
   }
   if (/refurb|renovat|modernis|improv|scope/.test(lower)) {
-    uniquePush(signals, 'Condition or refurbishment upside should be assessed.');
+    uniquePush(signals, 'Refurbishment upside should be assessed.');
   }
-  if (/tenant|tenanted|let\b|rental/.test(lower)) uniquePush(signals, 'Rental use is referenced in the source listing.');
-  if (/parking|driveway|garage/.test(lower)) uniquePush(signals, 'Parking or garage provision is mentioned.');
-  if (/school|ofsted/.test(lower)) uniquePush(signals, 'School access is mentioned in the listing.');
-  if (/auction|cash buyer/.test(lower)) uniquePush(signals, 'Purchase route may require faster diligence or specialist funding.');
-  if (/reduced|below market|bmv|discount/.test(lower)) uniquePush(signals, 'Pricing language suggests a possible value angle.');
+  if (/tenant|tenanted|let\b|rental/.test(lower)) uniquePush(signals, 'Rental use referenced.');
+  if (/parking|driveway|garage/.test(lower)) uniquePush(signals, 'Parking or garage provision.');
+  if (/school|ofsted/.test(lower)) uniquePush(signals, 'School access mentioned.');
+  if (/auction|cash buyer/.test(lower)) uniquePush(signals, 'Faster diligence may be needed.');
+  if (/reduced|below market|bmv|discount/.test(lower)) uniquePush(signals, 'Possible value angle.');
 
   return signals.slice(0, MAX_SIGNALS);
 }
@@ -105,7 +148,7 @@ function buildChecks(input: InvestmentDescriptionInput, listingSignals: string[]
   const checks: string[] = [];
 
   if (typeof input.yieldPercent !== 'number') uniquePush(checks, 'Verify achievable rent before underwriting.');
-  if (typeof input.roiPercent !== 'number' || input.roiIsProxy) uniquePush(checks, 'Confirm true ROI after finance, works and fees.');
+  if (typeof input.roiPercent !== 'number' || input.roiIsProxy) uniquePush(checks, 'Confirm the true ROI after finance, works and fees.');
   if (listingSignals.some((s) => /value-add|refurbishment|condition/.test(s))) {
     uniquePush(checks, 'Price refurbishment and planning risk before offer.');
   }
@@ -121,7 +164,7 @@ export function buildInvestmentDescription(input: InvestmentDescriptionInput): I
   const metrics = metricSignals(input);
   const checks = buildChecks(input, listingSignals);
 
-  const strategy = cleanText(input.strategyFit) || cleanText(input.investmentType) || 'cautious review';
+  const strategy = normalizeStrategy(cleanText(input.strategyFit) || cleanText(input.investmentType) || 'cautious review');
   const quality = cleanText(input.dealQuality);
   const asset = describeAsset(input);
 
@@ -133,24 +176,22 @@ export function buildInvestmentDescription(input: InvestmentDescriptionInput): I
   }
   if (typeof input.aiScore === 'number') metricParts.push(`${Math.round(input.aiScore)}/100 AI score`);
 
-  const opening = `${asset} appears best suited to a ${strategy} investor${
-    quality ? `, with a ${quality.toLowerCase()} deal read` : ''
-  }.`;
+  const opening = `${asset} appears best suited to ${strategyAudience(strategy)}.`;
+  const qualitySentence = quality ? `The current deal quality reads as ${quality.toLowerCase()}.` : '';
   const metricsSentence = metricParts.length
-    ? `The headline numbers show ${metricParts.join(' · ')}.`
+    ? `The headline figures show ${joinNatural(metricParts)}.`
     : 'Headline yield, ROI and score data are limited, so the case should be treated as early-stage.';
   const strengthSentence = listingSignals.length
-    ? `Key source-listing signals include ${listingSignals
+    ? `Key listing signals include ${joinNatural(listingSignals
         .slice(0, 3)
-        .map((signal) => signal.replace(/\.$/, '').toLowerCase())
-        .join(', ')}.`
+        .map((signal) => signal.replace(/\.$/, '').toLowerCase()))}.`
     : 'The source listing gives limited investment signals, so the structured facts should drive the first-pass review.';
   const checksSentence = checks.length
-    ? `Before committing, ${checks[0].replace(/\.$/, '').toLowerCase()}.`
+    ? `Before committing, ${lowerFirst(checks[0].replace(/\.$/, ''))}.`
     : 'Before committing, confirm the rent, costs and comparable values.';
 
   return {
-    paragraph: compactText(`${opening} ${metricsSentence} ${strengthSentence} ${checksSentence}`, 520),
+    paragraph: compactText(`${opening} ${qualitySentence} ${metricsSentence} ${strengthSentence} ${checksSentence}`, 520),
     keySignals: [...metrics, ...listingSignals].slice(0, MAX_SIGNALS),
     checks,
     originalNotes,
