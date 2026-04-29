@@ -99,6 +99,37 @@ const fmtPct = (n: unknown): string => {
   return `${v.toFixed(1)}%`;
 };
 
+const descriptionParagraphs = (description: string): string[] => {
+  const paragraphs = description
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split(/\n{2,}/)
+    .map((para) => para.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  if (paragraphs.length !== 1 || paragraphs[0].length < 700) {
+    return paragraphs;
+  }
+
+  const sentences = paragraphs[0].match(/[^.!?]+[.!?]+(?:["'”’)]*)|[^.!?]+$/g) ?? [paragraphs[0]];
+  const grouped: string[] = [];
+  let current = '';
+
+  sentences.forEach((sentence) => {
+    const next = sentence.trim();
+    if (!next) return;
+    if (current && `${current} ${next}`.length > 420) {
+      grouped.push(current);
+      current = next;
+    } else {
+      current = current ? `${current} ${next}` : next;
+    }
+  });
+
+  if (current) grouped.push(current);
+  return grouped;
+};
+
 const InvestmentMetricTile = ({ label, value, helper, emphasis = false }: InvestmentMetric) => (
   <div
     className={`rounded-2xl border p-4 ${
@@ -256,6 +287,7 @@ export default function PropertyDetailsPage() {
     const d = (property as any)?.description;
     return typeof d === 'string' ? d.trim() : '';
   }, [property]);
+  const descriptionBlocks = useMemo(() => descriptionParagraphs(description), [description]);
 
   if (loading) {
     return (
@@ -375,14 +407,29 @@ export default function PropertyDetailsPage() {
           </div>
 
           {description ? (
-            <div className="p-6 pt-5 border-t border-slate-200 dark:border-slate-800">
-              <div className="text-sm font-semibold text-slate-900 dark:text-white mb-2">Description</div>
-              <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed space-y-2">
-                {description.split(/\n{2,}/).map((para, idx) => {
-                  const t = para.trim();
-                  if (!t) return null;
-                  return <p key={idx}>{t}</p>;
-                })}
+            <div className="border-t border-slate-200 bg-gradient-to-br from-white via-slate-50/60 to-brand-50/30 p-5 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-brand-950/20 sm:p-6">
+              <div className="mb-4 flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800/70 dark:bg-brand-950/40 dark:text-brand-300">
+                  <FiFileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Source listing copy
+                  </div>
+                  <h2 className="mt-1 text-xl font-bold tracking-tight text-slate-950 dark:text-white">
+                    Property description
+                  </h2>
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                    Full scraped description for condition, layout and value-add context.
+                  </p>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40 sm:p-5">
+                <div className="space-y-4 text-[15px] leading-7 text-slate-800 dark:text-slate-200 sm:text-base sm:leading-8">
+                  {descriptionBlocks.map((para, idx) => (
+                    <p key={idx}>{para}</p>
+                  ))}
+                </div>
               </div>
             </div>
           ) : null}
