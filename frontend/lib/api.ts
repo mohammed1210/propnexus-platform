@@ -263,7 +263,34 @@ export async function postAiSummary(data: any) {
 }
 
 export async function postAiStrategies(data: any) {
-  return apiPost('/ai/strategies', data);
+  // Always use the same-origin proxy for strategy generation so production
+  // deployments without NEXT_PUBLIC_API_BASE do not call a missing /api fallback.
+  const res = await fetch('/api/ai/strategies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  const contentType = (res.headers.get('content-type') || '').toLowerCase();
+
+  if (!res.ok) {
+    if (contentType.includes('application/json')) {
+      const payload = await res.json().catch(() => null as any);
+      const detail =
+        payload?.detail ||
+        payload?.message ||
+        payload?.error ||
+        'Failed to generate strategies';
+      throw new Error(`[POST ${res.status}] ${String(detail)}`);
+    }
+    throw new Error(`[POST ${res.status}] Failed to generate strategies`);
+  }
+
+  if (!contentType.includes('application/json')) {
+    throw new Error('[POST 502] Invalid server response');
+  }
+
+  return (await res.json()) as any;
 }
 
 /* ---------------------------------------------------
