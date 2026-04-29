@@ -524,20 +524,19 @@ export default function PropertyDetailsPage() {
                         ))}
                       </ol>
 
-                      <div className="mt-5 border-t border-brand-200/70 pt-5 dark:border-brand-900/70">
-                        <ExitStrategyGenerator
-                          title={String(property.title ?? '')}
-                          location={String(property.location ?? '')}
-                          price={typeof property.price === 'number' ? property.price : undefined}
-                          yieldPercent={yieldPercent}
-                          roiPercent={roiDisplay.value ?? undefined}
-                          propertyType={(property as any).propertyType ?? undefined}
-                          investmentType={(property as any).investmentType ?? undefined}
-                          description={(property as any).description ?? undefined}
-                        />
-                      </div>
                     </aside>
                   </div>
+
+                  <ExitStrategyGenerator
+                    title={String(property.title ?? '')}
+                    location={String(property.location ?? '')}
+                    price={typeof property.price === 'number' ? property.price : undefined}
+                    yieldPercent={yieldPercent}
+                    roiPercent={roiDisplay.value ?? undefined}
+                    propertyType={(property as any).propertyType ?? undefined}
+                    investmentType={(property as any).investmentType ?? undefined}
+                    description={(property as any).description ?? undefined}
+                  />
                 </div>
               </section>
             </CollapsibleCard>
