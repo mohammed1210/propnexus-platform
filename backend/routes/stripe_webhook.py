@@ -89,8 +89,38 @@ def map_price_to_plan(price_id: str) -> Optional[str]:
 
     # Remove empty keys from mapping
     price_to_plan = {k: v for k, v in price_to_plan.items() if k}
+    direct_plan = price_to_plan.get(price_id)
+    if direct_plan:
+        return direct_plan
 
-    return price_to_plan.get(price_id)
+    product_to_plan = {
+        (
+            os.getenv("STRIPE_PRODUCT_PRO") or os.getenv("NEXT_PUBLIC_STRIPE_PRODUCT_PRO") or ""
+        ): "pro",
+        (
+            os.getenv("STRIPE_PRODUCT_INVESTOR")
+            or os.getenv("NEXT_PUBLIC_STRIPE_PRODUCT_INVESTOR")
+            or "prod_TGprLukyGJfRBH"
+        ): "investor",
+    }
+    product_to_plan = {k: v for k, v in product_to_plan.items() if k}
+
+    if not product_to_plan:
+        return None
+
+    try:
+        _ensure_stripe_api_key()
+        price = stripe.Price.retrieve(price_id)
+        product_id = (
+            price.get("product") if isinstance(price, dict) else getattr(price, "product", None)
+        )
+        return product_to_plan.get(product_id)
+    except Exception as exc:
+        logger.warning(
+            "Could not map Stripe price to plan by product",
+            extra={"price_id": price_id, "error": str(exc)},
+        )
+        return None
 
 
 def get_supabase_client():

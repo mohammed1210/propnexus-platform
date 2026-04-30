@@ -4,8 +4,7 @@ import StartFreeButton from '@/components/StartFreeButton';
 import UpgradeButton from '@/components/UpgradeButton';
 import WaitlistForm from '@/components/WaitlistForm';
 
-const PRICE_INVESTOR =
-  process.env.NEXT_PUBLIC_STRIPE_PRICE_INVESTOR || 'price_1SNDCSRvsQUM0wWd5c5RaJiA';
+const INVESTOR_PRODUCT_ID = process.env.NEXT_PUBLIC_STRIPE_PRODUCT_INVESTOR || 'prod_TGprLukyGJfRBH';
 
 const freeFeatures = [
   'Browse property listings',
@@ -100,7 +99,7 @@ export default function PricingPage() {
             </p>
             <div className="mt-6">
               <div className="flex items-end gap-1">
-                <span className="text-4xl font-bold tracking-tight text-slate-950 dark:text-slate-50">£49</span>
+                <span className="text-4xl font-bold tracking-tight text-slate-950 dark:text-slate-50">£19</span>
                 <span className="pb-1 text-sm font-medium text-slate-500 dark:text-slate-400">/month</span>
               </div>
               <div className="mt-2 text-sm font-medium text-brand-600 dark:text-brand-400">
@@ -117,7 +116,7 @@ export default function PricingPage() {
             </ul>
           </div>
           <div className="mt-8">
-            <UpgradeButton priceId={PRICE_INVESTOR}>Start 7-Day Free Trial</UpgradeButton>
+            <UpgradeButton productId={INVESTOR_PRODUCT_ID}>Start 7-Day Free Trial</UpgradeButton>
           </div>
         </section>
       </div>

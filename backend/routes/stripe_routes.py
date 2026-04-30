@@ -18,7 +18,8 @@ sb = None  # tests patch backend.routes.stripe_routes.sb
 
 class CheckoutRequest(BaseModel):
     email: str
-    price_id: str
+    price_id: Optional[str] = None
+    product_id: Optional[str] = None
 
 
 class PortalRequest(BaseModel):
@@ -32,6 +33,36 @@ def _get_supabase():
 
 def _frontend_url() -> str:
     return os.getenv("FRONTEND_URL") or os.getenv("NEXT_PUBLIC_SITE_URL") or "http://localhost:3000"
+
+
+def _resolve_price_id_from_product(product_id: str) -> str:
+    product = stripe.Product.retrieve(product_id)
+    default_price = (
+        product.get("default_price")
+        if isinstance(product, dict)
+        else getattr(product, "default_price", None)
+    )
+
+    if isinstance(default_price, str) and default_price:
+        return default_price
+
+    prices = stripe.Price.list(product=product_id, active=True, type="recurring", limit=10)
+    price_items = prices.get("data") if isinstance(prices, dict) else getattr(prices, "data", [])
+    for price in price_items or []:
+        recurring = (
+            price.get("recurring") if isinstance(price, dict) else getattr(price, "recurring", None)
+        )
+        interval = (
+            recurring.get("interval")
+            if isinstance(recurring, dict)
+            else getattr(recurring, "interval", None)
+        )
+        if interval == "month":
+            price_id = price.get("id") if isinstance(price, dict) else getattr(price, "id", None)
+            if price_id:
+                return price_id
+
+    raise HTTPException(status_code=400, detail="No active monthly Stripe price found for product")
 
 
 @router.post("/create-checkout-session")
@@ -51,7 +82,11 @@ def create_checkout_session(payload: CheckoutRequest):
             stripe.api_key = secret
 
         email = str(payload.email).lower().strip()
-        price_id = payload.price_id
+        price_id = payload.price_id or (
+            _resolve_price_id_from_product(payload.product_id) if payload.product_id else None
+        )
+        if not price_id:
+            raise HTTPException(status_code=400, detail="price_id or product_id is required")
 
         # 1) Find existing customer in Stripe (mocked in tests)
         existing = stripe.Customer.search(query=f"email:'{email}'")

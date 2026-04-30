@@ -6,12 +6,13 @@ import { toast } from 'sonner';
 import { isAuthEnabled } from '@/lib/auth';
 
 type Props = {
-  priceId: string;
+  priceId?: string;
+  productId?: string;
   children?: React.ReactNode;
   className?: string;
 };
 
-export default function UpgradeButton({ priceId, children = 'Upgrade', className }: Props) {
+export default function UpgradeButton({ priceId, productId, children = 'Upgrade', className }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
@@ -47,7 +48,7 @@ export default function UpgradeButton({ priceId, children = 'Upgrade', className
       const r = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, price_id: priceId }),
+        body: JSON.stringify({ email, ...(priceId ? { price_id: priceId } : { product_id: productId }) }),
       });
 
       if (!r.ok) {

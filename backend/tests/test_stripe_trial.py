@@ -61,6 +61,29 @@ def test_checkout_session_includes_trial(mock_sb, mock_stripe, client):
     assert call_kwargs["mode"] == "subscription"
 
 
+@patch("backend.routes.stripe_routes.stripe")
+@patch("backend.routes.stripe_routes.sb")
+def test_checkout_session_accepts_product_id(mock_sb, mock_stripe, client):
+    """Test that checkout can resolve a Stripe product catalog ID to its default price."""
+    mock_sb.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
+    mock_stripe.Customer.search.return_value = Mock(data=[])
+    mock_stripe.Customer.create.return_value = Mock(id="cus_test123")
+    mock_stripe.Product.retrieve.return_value = {
+        "id": "prod_TGprLukyGJfRBH",
+        "default_price": "price_investor_19",
+    }
+    mock_stripe.checkout.Session.create.return_value = Mock(url="https://checkout.stripe.com/test")
+
+    response = client.post(
+        "/stripe/create-checkout-session",
+        json={"email": "test@example.com", "product_id": "prod_TGprLukyGJfRBH"},
+    )
+
+    assert response.status_code == 200
+    call_kwargs = mock_stripe.checkout.Session.create.call_args[1]
+    assert call_kwargs["line_items"] == [{"price": "price_investor_19", "quantity": 1}]
+
+
 @patch("backend.routes.stripe_webhook.stripe")
 @patch("backend.routes.stripe_webhook.supabase")
 def test_webhook_handles_trialing_status(mock_supabase, mock_stripe, client):

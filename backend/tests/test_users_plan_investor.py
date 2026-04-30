@@ -8,6 +8,22 @@ from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 
 
+def test_map_price_to_plan_supports_investor_product(monkeypatch):
+    """Unknown price IDs can still map when Stripe price belongs to the Investor product."""
+    from backend.routes import stripe_webhook
+
+    monkeypatch.delenv("STRIPE_PRICE_INVESTOR", raising=False)
+    monkeypatch.delenv("NEXT_PUBLIC_STRIPE_PRICE_INVESTOR", raising=False)
+    monkeypatch.setenv("STRIPE_PRODUCT_INVESTOR", "prod_TGprLukyGJfRBH")
+    monkeypatch.setattr(
+        stripe_webhook.stripe.Price,
+        "retrieve",
+        lambda price_id: {"id": price_id, "product": "prod_TGprLukyGJfRBH"},
+    )
+
+    assert stripe_webhook.map_price_to_plan("price_investor_19") == "investor"
+
+
 def test_webhook_investor_plan_checkout():
     """Test checkout.session.completed event with investor price_id."""
     from backend.main import app

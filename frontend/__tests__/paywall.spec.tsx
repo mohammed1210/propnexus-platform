@@ -11,6 +11,7 @@ describe("PricingPage", () => {
     expect(screen.queryByRole("heading", { name: "Pro" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start free/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start 7-day free trial/i })).toBeInTheDocument();
+    expect(screen.getByText("£19")).toBeInTheDocument();
     expect(screen.queryByText(/off-market|pdf deal packs|portfolio analytics|alerts|crm|zapier|webhook/i)).not.toBeInTheDocument();
   });
 });
