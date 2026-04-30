@@ -354,7 +354,7 @@ export default function PropertyDetailsPage() {
 
           {investmentDescription.paragraph ? (
             <div className="border-t border-slate-200 bg-gradient-to-br from-white via-slate-50/70 to-brand-50/30 p-5 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-brand-950/20 sm:p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex flex-col gap-4">
                 <div className="max-w-3xl">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-300">
                     Investment Description

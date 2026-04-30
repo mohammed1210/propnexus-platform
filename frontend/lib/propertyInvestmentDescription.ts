@@ -82,9 +82,9 @@ function normalizeStrategy(value: string): string {
   return clean;
 }
 
-function strategyAudience(strategy: string): string {
-  if (strategy === 'cautious review') return 'a cautious-review buyer';
-  if (strategy === 'value-add or resale') return 'a value-add or resale buyer';
+function strategyFitPhrase(strategy: string): string {
+  if (strategy === 'cautious review') return 'a cautious review before offer';
+  if (strategy === 'value-add or resale') return 'a value-add buyer or resale-led investor';
   return `${articleFor(strategy)} ${strategy} investor`;
 }
 
@@ -111,46 +111,46 @@ function extractListingSignals(description: string): string[] {
   const signals: string[] = [];
 
   if (/chain\s*free|no\s+chain/.test(lower)) {
-    uniquePush(signals, 'Chain-free status.');
+    uniquePush(signals, 'Chain-free');
   }
   if (/station|tube|underground|rail|train|crossrail|elizabeth line/.test(lower)) {
-    uniquePush(signals, 'Transport access.');
+    uniquePush(signals, 'Transport access');
   }
   if (/garden|outdoor|terrace|balcony/.test(lower)) {
-    uniquePush(signals, 'Outdoor space.');
+    uniquePush(signals, 'Outdoor space');
   }
   if (/extend|extension|stpp|planning|potential/.test(lower)) {
-    uniquePush(signals, 'Value-add potential, subject to checks.');
+    uniquePush(signals, 'Value-add potential');
   }
   if (/refurb|renovat|modernis|improv|scope/.test(lower)) {
-    uniquePush(signals, 'Refurbishment upside should be assessed.');
+    uniquePush(signals, 'Refurbishment upside');
   }
-  if (/tenant|tenanted|let\b|rental/.test(lower)) uniquePush(signals, 'Rental use referenced.');
-  if (/parking|driveway|garage/.test(lower)) uniquePush(signals, 'Parking or garage provision.');
-  if (/school|ofsted/.test(lower)) uniquePush(signals, 'School access mentioned.');
-  if (/auction|cash buyer/.test(lower)) uniquePush(signals, 'Faster diligence may be needed.');
-  if (/reduced|below market|bmv|discount/.test(lower)) uniquePush(signals, 'Possible value angle.');
+  if (/tenant|tenanted|let\b|rental/.test(lower)) uniquePush(signals, 'Rental use referenced');
+  if (/parking|driveway|garage/.test(lower)) uniquePush(signals, 'Parking or garage');
+  if (/school|ofsted/.test(lower)) uniquePush(signals, 'School access');
+  if (/auction|cash buyer/.test(lower)) uniquePush(signals, 'Faster diligence needed');
+  if (/reduced|below market|bmv|discount/.test(lower)) uniquePush(signals, 'Possible value angle');
 
   return signals.slice(0, MAX_SIGNALS);
 }
 
 function metricSignals(input: InvestmentDescriptionInput): string[] {
   const signals: string[] = [];
-  if (typeof input.yieldPercent === 'number') uniquePush(signals, `${formatPercent(input.yieldPercent)} yield.`);
+  if (typeof input.yieldPercent === 'number') uniquePush(signals, `${formatPercent(input.yieldPercent)} yield`);
   if (typeof input.roiPercent === 'number') {
-    uniquePush(signals, `${formatPercent(input.roiPercent)} ${input.roiIsProxy ? 'ROI proxy' : 'ROI'}.`);
+    uniquePush(signals, `${formatPercent(input.roiPercent)} ${input.roiIsProxy ? 'ROI proxy' : 'ROI'}`);
   }
-  if (typeof input.aiScore === 'number') uniquePush(signals, `${Math.round(input.aiScore)}/100 AI deal score.`);
+  if (typeof input.aiScore === 'number') uniquePush(signals, `${Math.round(input.aiScore)}/100 AI score`);
   return signals;
 }
 
 function buildChecks(input: InvestmentDescriptionInput, listingSignals: string[]): string[] {
   const checks: string[] = [];
 
-  if (typeof input.yieldPercent !== 'number') uniquePush(checks, 'Verify achievable rent before underwriting.');
+  if (typeof input.yieldPercent !== 'number') uniquePush(checks, 'Verify the achievable rent before underwriting.');
   if (typeof input.roiPercent !== 'number' || input.roiIsProxy) uniquePush(checks, 'Confirm the true ROI after finance, works and fees.');
   if (listingSignals.some((s) => /value-add|refurbishment|condition/.test(s))) {
-    uniquePush(checks, 'Price refurbishment and planning risk before offer.');
+    uniquePush(checks, 'Price the works and planning risk before offer.');
   }
   uniquePush(checks, 'Check local comparables and resale evidence.');
   uniquePush(checks, 'Stress-test mortgage costs, voids and exit timing.');
@@ -176,19 +176,19 @@ export function buildInvestmentDescription(input: InvestmentDescriptionInput): I
   }
   if (typeof input.aiScore === 'number') metricParts.push(`${Math.round(input.aiScore)}/100 AI score`);
 
-  const opening = `${asset} appears best suited to ${strategyAudience(strategy)}.`;
-  const qualitySentence = quality ? `The current deal quality reads as ${quality.toLowerCase()}.` : '';
+  const opening = `${asset} looks best suited to ${strategyFitPhrase(strategy)}.`;
+  const qualitySentence = quality ? `Overall, the deal looks ${quality.toLowerCase()} on the information available.` : '';
   const metricsSentence = metricParts.length
-    ? `The headline figures show ${joinNatural(metricParts)}.`
-    : 'Headline yield, ROI and score data are limited, so the case should be treated as early-stage.';
+    ? `The headline figures are ${joinNatural(metricParts)}.`
+    : 'Yield, ROI and score data are limited, so treat this as an early-stage review.';
   const strengthSentence = listingSignals.length
-    ? `Key listing signals include ${joinNatural(listingSignals
+    ? `The listing highlights ${joinNatural(listingSignals
         .slice(0, 3)
         .map((signal) => signal.replace(/\.$/, '').toLowerCase()))}.`
-    : 'The source listing gives limited investment signals, so the structured facts should drive the first-pass review.';
+    : 'The listing gives limited investment signals, so the first-pass view should lean on the structured deal metrics.';
   const checksSentence = checks.length
-    ? `Before committing, ${lowerFirst(checks[0].replace(/\.$/, ''))}.`
-    : 'Before committing, confirm the rent, costs and comparable values.';
+    ? `Before making an offer, ${lowerFirst(checks[0].replace(/\.$/, ''))}.`
+    : 'Before making an offer, confirm the rent, costs and comparable values.';
 
   return {
     paragraph: compactText(`${opening} ${qualitySentence} ${metricsSentence} ${strengthSentence} ${checksSentence}`, 520),
