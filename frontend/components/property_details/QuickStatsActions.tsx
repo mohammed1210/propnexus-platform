@@ -40,7 +40,7 @@ const formatValue = (value: number | undefined, format: 'currency' | 'percent' |
     case 'percent':
       return formatPercent(value);
     case 'score':
-      return `${value.toFixed(1)}/10`;
+      return Number.isInteger(value) ? String(value) : value.toFixed(1);
     default:
       return value.toLocaleString('en-GB');
   }
