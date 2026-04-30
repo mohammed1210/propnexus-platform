@@ -268,25 +268,16 @@ export default function QuickStatsActions({
                 </div>
               </div>
 
-              <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Discount</div>
+              <div>
+                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">AI Score</div>
                 <div
                   className={`text-2xl font-bold ${
-                    typeof discountPercent === 'number' ? 'text-purple-600 dark:text-purple-400' : 'text-slate-700 dark:text-slate-300'
+                    typeof aiScore === 'number' ? 'text-brand-600 dark:text-brand-400' : 'text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  {formatValue(discountPercent, 'percent')}
+                  {formatValue(aiScore, 'score')}
                 </div>
               </div>
-
-              {aiScore !== undefined && (
-                <div>
-                  <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">AI Score</div>
-                  <div className="text-2xl font-bold text-brand-600 dark:text-brand-400">
-                    {formatValue(aiScore, 'score')}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 

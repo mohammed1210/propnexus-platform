@@ -269,8 +269,14 @@ export default function PropertyDetailsPage() {
   });
   const propertyLat = typeof property.latitude === 'number' ? property.latitude : null;
   const propertyLng = typeof property.longitude === 'number' ? property.longitude : null;
+  const aiScore =
+    typeof (property as any).ai_score === 'number'
+      ? (property as any).ai_score
+      : typeof (property as any).score === 'number'
+        ? (property as any).score
+        : undefined;
   const showDealScore =
-    typeof (property as any).score === 'number' || typeof (property as any).ai_score === 'number';
+    typeof aiScore === 'number';
   const showTradesmen = FF.TRADESMEN && propertyLat !== null && propertyLng !== null;
   const bestFitStrategy = investmentFitLabel(
     (property as any).investmentType,
@@ -306,12 +312,7 @@ export default function PropertyDetailsPage() {
     yieldPercent,
     roiPercent: roiDisplay.value ?? undefined,
     roiIsProxy: roiDisplay.isProxy,
-    aiScore:
-      typeof (property as any).ai_score === 'number'
-        ? (property as any).ai_score
-        : typeof (property as any).score === 'number'
-          ? (property as any).score
-          : undefined,
+    aiScore,
     dealQuality: tldr.label,
     strategyFit: bestFitStrategy,
     description,
@@ -327,6 +328,7 @@ export default function PropertyDetailsPage() {
         yieldPercent={yieldPercent}
         roiPercent={roiRealPercent}
         discountPercent={discountPercent}
+        aiScore={aiScore}
       />
 
       <div className="max-w-7xl mx-auto px-4 py-8 lg:pr-72">{/* Add right padding on desktop for floating sidebar */}

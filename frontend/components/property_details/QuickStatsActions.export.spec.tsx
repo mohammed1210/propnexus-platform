@@ -37,9 +37,14 @@ describe('QuickStatsActions launch controls', () => {
         price={210000}
         yieldPercent={6.4}
         roiPercent={8.1}
+        discountPercent={undefined}
+        aiScore={8.4}
       />,
     );
 
+    expect(screen.getByText('AI Score')).toBeInTheDocument();
+    expect(screen.getByText('8.4/10')).toBeInTheDocument();
+    expect(screen.queryByText('Discount')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /save this deal/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: /share this property/i }).length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /export property details as pdf/i })).not.toBeInTheDocument();
