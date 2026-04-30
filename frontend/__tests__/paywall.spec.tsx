@@ -3,17 +3,14 @@ import { render, screen } from "@testing-library/react";
 import PricingPage from "@/app/pricing/page";
 
 describe("PricingPage", () => {
-  it("renders paywall CTA buttons", () => {
+  it("renders the soft-launch Free and Investor tiers", () => {
     render(<PricingPage />);
 
-    // Buttons are accessible by their visible name (no aria-label now)
-    const ctas = screen.getAllByRole("button", {
-      name: /start 7-day free trial/i,
-    });
-
-    expect(ctas.length).toBeGreaterThan(0);
-
-    // Optional: if you expect exactly 2 CTAs (Pro + Investor), enforce it:
-    // expect(ctas).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "Free" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Investor" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Pro" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /start free/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /start 7-day free trial/i })).toBeInTheDocument();
+    expect(screen.queryByText(/off-market|pdf deal packs|portfolio analytics|alerts|crm|zapier|webhook/i)).not.toBeInTheDocument();
   });
 });
