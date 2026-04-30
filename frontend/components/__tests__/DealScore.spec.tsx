@@ -42,6 +42,8 @@ describe('DealScore', () => {
 
     expect(screen.getByText('AI Deal Score')).toBeInTheDocument();
     expect(screen.getByText('78')).toBeInTheDocument();
+    expect(screen.getByText('Rental Yield')).toBeInTheDocument();
+    expect(screen.getByText(/Scores are indicative/i)).toBeInTheDocument();
   });
 
   it('prefers score when both score fields are present', () => {
@@ -57,5 +59,7 @@ describe('DealScore', () => {
 
     expect(screen.getByText('84')).toBeInTheDocument();
     expect(screen.queryByText('61')).not.toBeInTheDocument();
+    expect(screen.getByText('Overall')).toBeInTheDocument();
+    expect(screen.getByText(/Scores are indicative/i)).toBeInTheDocument();
   });
 });

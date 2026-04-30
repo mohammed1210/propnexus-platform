@@ -2,16 +2,6 @@ import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 import DealScore from './DealScore';
 
-const mockFlagState = {
-  AI_SCORE_BREAKDOWN: false,
-};
-
-jest.mock('@/lib/flags', () => ({
-  get FF() {
-    return mockFlagState;
-  },
-}));
-
 beforeAll(() => {
   class MockIntersectionObserver {
     observe() {}
@@ -26,7 +16,7 @@ beforeAll(() => {
   });
 });
 
-describe('DealScore breakdown flag', () => {
+describe('DealScore breakdown display', () => {
   const property = {
     score: 82,
     score_breakdown: {
@@ -40,23 +30,10 @@ describe('DealScore breakdown flag', () => {
     monthly_rent: 1500,
   };
 
-  beforeEach(() => {
-    mockFlagState.AI_SCORE_BREAKDOWN = false;
-  });
-
-  it('keeps the top-line score visible while hiding detailed breakdowns by default', () => {
+  it('keeps the top-line score and detailed breakdown visible by default', () => {
     render(<DealScore property={property} />);
 
     expect(screen.getByText('AI Deal Score')).toBeInTheDocument();
-    expect(screen.queryByText('Rental Yield')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Scores are indicative/i)).not.toBeInTheDocument();
-  });
-
-  it('shows detailed breakdowns when the flag is enabled', () => {
-    mockFlagState.AI_SCORE_BREAKDOWN = true;
-
-    render(<DealScore property={property} />);
-
     expect(screen.getByText('Rental Yield')).toBeInTheDocument();
     expect(screen.getByText(/Scores are indicative/i)).toBeInTheDocument();
   });
