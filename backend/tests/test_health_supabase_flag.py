@@ -85,6 +85,21 @@ def test_supabase_config_normalizes_copied_env_values(
     assert cfg.key == "service-role-key"
 
 
+def test_supabase_config_normalizes_cross_pasted_url_assignment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_URL=https://real-project.supabase.co",
+    )
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+
+    cfg = resolve_supabase_config()
+
+    assert cfg is not None
+    assert cfg.url == "https://real-project.supabase.co"
+
+
 def test_supabase_config_falls_back_from_placeholder_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

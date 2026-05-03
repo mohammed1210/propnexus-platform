@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -63,6 +64,11 @@ def _getenv_stripped(name: str) -> str | None:
             value = value[len(export_prefix) :].strip()
         elif value.startswith(assignment_prefix):
             value = value[len(assignment_prefix) :].strip()
+        else:
+            # Also recover if the value for one Supabase env var was pasted as
+            # a different env assignment, e.g. SUPABASE_URL contains
+            # `NEXT_PUBLIC_SUPABASE_URL=https://...`.
+            value = re.sub(r"^(?:export\s+)?[A-Z0-9_]*SUPABASE[A-Z0-9_]*=", "", value).strip()
 
     return value or None
 
