@@ -10,6 +10,12 @@ SERVICE_ROLE_KEY_ENV_ORDER: tuple[str, ...] = (
     "SUPABASE_KEY",
 )
 
+SUPABASE_URL_ENV_ORDER: tuple[str, ...] = (
+    "SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "PUBLIC_SUPABASE_URL",
+)
+
 
 @dataclass(frozen=True)
 class SupabaseConfig:
@@ -75,10 +81,28 @@ def _normalize_supabase_url(value: str | None) -> str | None:
     return url.rstrip("/") or None
 
 
+def _looks_like_placeholder_url(value: str | None) -> bool:
+    url = (value or "").strip().lower()
+    return bool(
+        not url
+        or "<supabase-url>" in url
+        or "your-project.supabase.co" in url
+        or "project-ref.supabase.co" in url
+    )
+
+
 def _get_first_non_empty(names: tuple[str, ...]) -> str | None:
     for name in names:
         value = _getenv_stripped(name)
         if value:
+            return value
+    return None
+
+
+def _get_first_non_placeholder_url(names: tuple[str, ...]) -> str | None:
+    for name in names:
+        value = _normalize_supabase_url(_getenv_stripped(name))
+        if value and not _looks_like_placeholder_url(value):
             return value
     return None
 
@@ -92,7 +116,7 @@ def resolve_supabase_env_block() -> SupabaseEnvBlock:
     """
 
     return SupabaseEnvBlock(
-        url=_getenv_stripped("SUPABASE_URL"),
+        url=_get_first_non_placeholder_url(SUPABASE_URL_ENV_ORDER),
         service_role_key=_get_first_non_empty(SERVICE_ROLE_KEY_ENV_ORDER),
     )
 
@@ -101,10 +125,7 @@ def resolve_supabase_config() -> SupabaseConfig | None:
     env_block = resolve_supabase_env_block()
     if not env_block.configured:
         return None
-    url = _normalize_supabase_url(env_block.url)
-    if not url:
-        return None
-    return SupabaseConfig(url=url, key=env_block.service_role_key or "")
+    return SupabaseConfig(url=env_block.url or "", key=env_block.service_role_key or "")
 
 
 def is_supabase_configured() -> bool:

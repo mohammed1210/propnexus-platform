@@ -19,7 +19,11 @@ def test_config_reports_missing_supabase_env(monkeypatch: pytest.MonkeyPatch) ->
     client = TestClient(app)
 
     monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("NEXT_PUBLIC_SUPABASE_URL", raising=False)
+    monkeypatch.delenv("PUBLIC_SUPABASE_URL", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
 
     resp = client.get("/config")
     assert resp.status_code == 200
