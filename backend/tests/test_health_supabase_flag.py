@@ -172,7 +172,7 @@ def test_supabase_client_uses_public_url_fallback_in_production(
     monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
     monkeypatch.setenv("SUPABASE_URL", "https://bad-project.supabase.co")
     monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_URL", "https://real-project.supabase.co")
-    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "real-service-role-jwt")
 
     def fake_resolver(host: str) -> str:
         if host == "real-project.supabase.co":
