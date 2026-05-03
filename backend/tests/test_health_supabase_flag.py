@@ -99,7 +99,7 @@ def test_supabase_config_normalizes_cross_pasted_url_assignment(
         "SUPABASE_URL",
         "NEXT_PUBLIC_SUPABASE_URL=https://real-project.supabase.co",
     )
-    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "real-service-role-jwt")
 
     cfg = resolve_supabase_config()
 
@@ -112,7 +112,7 @@ def test_supabase_config_falls_back_from_placeholder_url(
 ) -> None:
     monkeypatch.setenv("SUPABASE_URL", "https://your-project.supabase.co")
     monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_URL", "https://real-project.supabase.co")
-    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "real-service-role-jwt")
 
     cfg = resolve_supabase_config()
 
