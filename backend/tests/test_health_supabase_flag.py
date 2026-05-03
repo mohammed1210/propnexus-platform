@@ -3,6 +3,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.utils.supabase_env import resolve_supabase_config
+
 try:
     from backend.main import app  # type: ignore
 
@@ -67,3 +69,16 @@ def test_health_accepts_legacy_service_key_aliases(monkeypatch: pytest.MonkeyPat
     resp_generic_key = client.get("/health")
     assert resp_generic_key.status_code == 200
     assert resp_generic_key.json().get("supabase_configured") is True
+
+
+def test_supabase_config_normalizes_copied_env_values(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SUPABASE_URL", '"SUPABASE_URL=fake.supabase.co"')
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+
+    cfg = resolve_supabase_config()
+
+    assert cfg is not None
+    assert cfg.url == "https://fake.supabase.co"
+    assert cfg.key == "service-role-key"
