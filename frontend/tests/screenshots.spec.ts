@@ -118,7 +118,7 @@ test.describe('Demo Screenshots', () => {
 
     const areaInsights = page.locator('section[aria-label="Area Insights"]');
     await expect(areaInsights).toContainText('Avg price', { timeout: 15000 });
-    await expect(areaInsights).toContainText('Schools');
+    await expect(areaInsights).toContainText(/Source confidence|Comparable evidence/);
 
     await areaInsights.screenshot({
       path: 'public/images/demo/screenshots/premium-area-intel.png',

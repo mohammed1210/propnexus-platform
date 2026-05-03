@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { FiBarChart2, FiBookOpen, FiHome, FiMapPin, FiShield } from 'react-icons/fi';
+import { FiBarChart2, FiHome, FiMapPin, FiShield } from 'react-icons/fi';
 
 import CollapsibleCard from '@/components/property_details/CollapsibleCard';
 import GatedPanel from '@/components/property_details/GatedPanel';
@@ -10,32 +10,51 @@ import { FF } from '@/lib/flags';
 
 type AreaIntelData = {
   key: string;
-  population: number;
-  avg_price: number;
-  avg_rent: number;
-  rental_yield_percent: number;
-  crime_index: number;
-  schools_rating: number;
+  postcode?: string;
+  avg_price?: number | null;
+  avg_rent?: number | null;
+  rental_yield_percent?: number | null;
+  crime_index?: number | null;
+  crime_index_source?: string | null;
+  crime?: {
+    count?: number | null;
+    month?: string | null;
+    source?: string | null;
+  } | null;
+  schools_rating?: number | null;
+  population?: number | null;
+  transport_links?: string[];
   notes?: string;
-  source?: 'provider' | 'cache';
+  source?: string;
+  source_details?: Record<string, string>;
+  confidence?: string;
+  fetched_at?: string;
+  is_live?: boolean;
+  is_proxy?: boolean;
 };
 
 type CompLine = {
   address: string;
   price: number;
-  date: string;
-  type: string;
-  distance_km: number;
+  rent_monthly?: number;
+  date?: string;
+  type?: string;
+  property_type?: string;
+  tenure?: string;
+  distance_km?: number | null;
+  source?: string;
 };
 
 type CompsData = {
   postcode: string;
   sales?: CompLine[];
   rents?: CompLine[];
-  source?: 'provider' | 'cache';
+  source?: string;
+  source_details?: Record<string, string>;
+  fetched_at?: string;
 };
 
-type Status = 'live' | 'proxy' | 'missing';
+type Status = 'live' | 'partial' | 'derived' | 'cached' | 'missing';
 
 type MetricTone = 'brand' | 'emerald' | 'amber' | 'rose' | 'slate';
 
@@ -99,9 +118,23 @@ function StatusPill({ status }: { status: Status }) {
           cls:
             'border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-900/20 dark:text-emerald-200',
         }
-      : status === 'proxy'
+      : status === 'cached'
         ? {
-            label: 'Proxy',
+            label: 'Cached',
+            dot: 'bg-sky-500',
+            cls:
+              'border-sky-200/80 bg-sky-50 text-sky-800 dark:border-sky-900/50 dark:bg-sky-900/20 dark:text-sky-200',
+          }
+        : status === 'partial'
+          ? {
+              label: 'Partial',
+              dot: 'bg-brand-500',
+              cls:
+                'border-brand-200/80 bg-brand-50 text-brand-800 dark:border-brand-900/50 dark:bg-brand-900/20 dark:text-brand-200',
+            }
+          : status === 'derived'
+        ? {
+            label: 'Derived',
             dot: 'bg-amber-500',
             cls:
               'border-amber-200/80 bg-amber-50 text-amber-800 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-200',
@@ -120,6 +153,14 @@ function StatusPill({ status }: { status: Status }) {
     >
       <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
       {cfg.label}
+    </span>
+  );
+}
+
+function SourceBadge({ label }: { label: string }) {
+  return (
+    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+      {label}
     </span>
   );
 }
@@ -180,6 +221,28 @@ function avgPrice(lines: CompLine[]): number | null {
   const valid = lines.filter((line) => Number.isFinite(line.price) && line.price > 0);
   if (valid.length === 0) return null;
   return valid.reduce((sum, line) => sum + line.price, 0) / valid.length;
+}
+
+function hasPositiveNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function hasFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function sourceLabel(source?: string | null): string | null {
+  if (!source) return null;
+  if (source === 'not_available') return null;
+  const map: Record<string, string> = {
+    land_registry_ppd: 'Land Registry PPD',
+    internal_property_listings: 'Internal listing comps',
+    police: 'police.uk',
+    'police.uk': 'police.uk',
+    cache: 'Cached',
+    partial_live: 'Partial live',
+  };
+  return map[source] ?? source.replace(/_/g, ' ');
 }
 
 function fmtDistance(km: unknown): string {
@@ -287,55 +350,54 @@ export default function AreaInsights({
   const rents = Array.isArray(comps?.rents) ? comps!.rents! : [];
   const avgSalePrice = avgPrice(sales);
   const avgRentPrice = avgPrice(rents);
+  const transportLinks = Array.isArray(intel?.transport_links) ? intel!.transport_links!.filter(Boolean) : [];
   const marketMetrics = useMemo(() => {
     if (!intel) return [] as MarketMetric[];
 
-    return [
-      {
+    const metrics: MarketMetric[] = [];
+    if (hasPositiveNumber(intel.avg_price)) {
+      metrics.push({
         label: 'Avg price',
         value: fmtGBP(intel.avg_price),
-        helper: 'Typical local sale value benchmark',
+        helper: 'Land Registry sold-price benchmark',
         tone: 'brand' as const,
         icon: <FiHome className="h-5 w-5" />,
-      },
-      {
+      });
+    }
+    if (hasPositiveNumber(intel.avg_rent)) {
+      metrics.push({
         label: 'Rent / month',
         value: fmtGBP(intel.avg_rent),
-        helper: rentSrc === 'proxy' ? 'Proxy rent estimate' : 'Local monthly rent benchmark',
-        tone: rentSrc === 'proxy' ? ('amber' as const) : ('emerald' as const),
+        helper: 'Derived from internal rental listing comps',
+        tone: 'amber' as const,
         icon: <FiBarChart2 className="h-5 w-5" />,
-      },
-      {
+      });
+    }
+    if (hasPositiveNumber(intel.rental_yield_percent)) {
+      metrics.push({
         label: 'Rental yield',
-        value:
-          Number.isFinite(intel.rental_yield_percent) && intel.rental_yield_percent > 0
-            ? `${intel.rental_yield_percent.toFixed(1)}%`
-            : '—',
-        helper: 'Area-level gross yield signal',
+        value: `${intel.rental_yield_percent.toFixed(1)}%`,
+        helper: 'Derived from sale and rent benchmarks',
         tone: 'emerald' as const,
         icon: <FiMapPin className="h-5 w-5" />,
-      },
-      {
-        label: 'Population',
-        value:
-          Number.isFinite(intel.population) && intel.population > 0
-            ? Math.round(intel.population).toLocaleString('en-GB')
-            : '—',
-        helper: 'Local demand depth indicator',
-        tone: 'slate' as const,
-        icon: <FiBookOpen className="h-5 w-5" />,
-      },
-    ];
-  }, [intel, rentSrc]);
+      });
+    }
+    return metrics;
+  }, [intel]);
 
-  const usableIntel = marketMetrics.length > 0;
+  const hasCrime = hasFiniteNumber(intel?.crime?.count) || hasFiniteNumber(intel?.crime_index);
+  const hasSchools = hasPositiveNumber(intel?.schools_rating);
+  const hasTransport = transportLinks.length > 0;
+  const usableIntel = marketMetrics.length > 0 || hasCrime || hasSchools || hasTransport;
   const usableComps = sales.length > 0 || rents.length > 0;
 
   const status: Status = (() => {
     if (!pc) return 'missing';
     if (rentSrc === 'missing') return 'missing';
     if (!usableIntel && !usableComps && !intelLoading && !compsLoading) return 'missing';
-    if (rentSrc === 'proxy') return 'proxy';
+    if (intel?.source === 'cache' || comps?.source === 'cache') return 'cached';
+    if (intel?.is_proxy || rentSrc === 'proxy') return 'derived';
+    if (intel?.source === 'partial_live' || comps?.source === 'partial_live') return 'partial';
     return 'live';
   })();
 
@@ -379,9 +441,7 @@ export default function AreaInsights({
                   </span>
                 ) : null}
                 {vLabel && rentSrc ? (
-                  <span>
-                    {rentSrc === 'proxy' ? `Proxy rent • ${vLabel}` : `Live source • ${vLabel}`}
-                  </span>
+                  <span>{rentSrc === 'proxy' ? `Derived rent • ${vLabel}` : `Score version • ${vLabel}`}</span>
                 ) : null}
               </div>
             </div>
@@ -402,19 +462,51 @@ export default function AreaInsights({
                       ))}
                     </div>
 
-                    {intel ? (
+                    {intel && (hasCrime || hasSchools || hasTransport) ? (
                       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        <SignalBar label="Crime index" value={intel.crime_index} max={100} lowerIsBetter />
-                        <SignalBar label="Schools rating" value={intel.schools_rating} max={5} />
+                        {hasCrime ? (
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/30">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                                  Crime signal
+                                </div>
+                                <div className="mt-1 text-xl font-bold text-slate-950 dark:text-white">
+                                  {hasFiniteNumber(intel.crime?.count) ? `${intel.crime.count} reports` : `${intel.crime_index}/100`}
+                                </div>
+                              </div>
+                              <FiShield className="mt-1 h-5 w-5 text-brand-500" />
+                            </div>
+                            <p className="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                              {intel.crime?.month ? `police.uk street-level incidents for ${intel.crime.month}.` : 'Derived local crime signal.'}
+                            </p>
+                          </div>
+                        ) : null}
+                        {hasSchools ? <SignalBar label="Schools rating" value={intel.schools_rating ?? undefined} max={5} /> : null}
+                        {hasTransport ? (
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/30">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                              Transport evidence
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {transportLinks.map((item) => <SourceBadge key={item} label={item} />)}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
 
                     {intel?.notes ? (
                       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/30">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                          Local read
+                          Source confidence
                         </div>
                         <p className="mt-2 text-[13px] leading-relaxed text-slate-700 dark:text-slate-300 sm:text-sm">{intel.notes}</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {sourceLabel(intel.source_details?.sales) ? <SourceBadge label={sourceLabel(intel.source_details?.sales)!} /> : null}
+                          {sourceLabel(intel.source_details?.rent) ? <SourceBadge label={sourceLabel(intel.source_details?.rent)!} /> : null}
+                          {sourceLabel(intel.source_details?.crime) ? <SourceBadge label={sourceLabel(intel.source_details?.crime)!} /> : null}
+                        </div>
                       </div>
                     ) : null}
                   </>
@@ -471,7 +563,8 @@ export default function AreaInsights({
                         </div>
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                           <span>{line.date || 'Date unavailable'}</span>
-                          {line.type ? <span>• {line.type}</span> : null}
+                          {line.type || line.property_type ? <span>• {line.type || line.property_type}</span> : null}
+                          {sourceLabel(line.source) ? <span>• {sourceLabel(line.source)}</span> : null}
                         </div>
                       </article>
                     ))}
@@ -486,7 +579,7 @@ export default function AreaInsights({
                           Rental comps
                         </div>
                         <div className="mt-1 text-sm text-slate-700 dark:text-slate-300">
-                          {rents.length} rental comparable{rents.length === 1 ? '' : 's'} available for this postcode.
+                          {rents.length} internal rental comparable{rents.length === 1 ? '' : 's'} available for this postcode.
                         </div>
                       </div>
                       <div className="text-lg font-bold text-slate-950 dark:text-white">{fmtGBP(avgRentPrice)}</div>

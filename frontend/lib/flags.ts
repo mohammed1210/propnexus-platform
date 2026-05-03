@@ -27,7 +27,7 @@ const LAUNCH_FLAG_CONFIG: Record<string, LaunchFlagConfig> = {
     default: false,
   },
   TRADESMEN: { env: 'NEXT_PUBLIC_FEATURE_TRADESMEN', default: false },
-  AREA_INTEL: { env: 'NEXT_PUBLIC_FEATURE_AREA_INTEL', default: true },
+  AREA_INTEL: { env: 'NEXT_PUBLIC_FEATURE_AREA_INTEL', aliases: ['NEXT_PUBLIC_FEATURE_AREA_INSIGHTS'], default: true },
   COMPS: { env: 'NEXT_PUBLIC_FEATURE_COMPS', default: true },
 } as const;
 

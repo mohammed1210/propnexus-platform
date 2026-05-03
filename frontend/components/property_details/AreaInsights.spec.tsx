@@ -53,4 +53,48 @@ describe('AreaInsights launch trimming', () => {
     expect(screen.queryByText('No area intel available for this postcode yet.')).not.toBeInTheDocument();
     expect(screen.queryByText('No comps available for this postcode yet.')).not.toBeInTheDocument();
   });
+
+  it('renders only available live or derived facts with source labels', async () => {
+    mockGetAreaIntel.mockResolvedValue({
+      key: 'IG3',
+      avg_price: 305000,
+      avg_rent: 1350,
+      rental_yield_percent: 5.31,
+      crime: { count: 42, month: '2026-03', source: 'police.uk' },
+      crime_index: 42,
+      source: 'partial_live',
+      source_details: {
+        sales: 'land_registry_ppd',
+        rent: 'internal_property_listings',
+        crime: 'police.uk',
+        schools: 'not_available',
+        population: 'not_available',
+      },
+      notes: 'Based on real available sources.',
+      fetched_at: '2026-04-30T00:00:00Z',
+    });
+    mockGetComps.mockResolvedValue({
+      postcode: 'IG3',
+      source: 'partial_live',
+      sales: [
+        {
+          address: '12 High Road, Ilford',
+          price: 305000,
+          date: '2026-01-12',
+          type: 'T',
+          source: 'land_registry_ppd',
+        },
+      ],
+      rents: [],
+    });
+
+    const AreaInsights = require('./AreaInsights').default;
+    render(<AreaInsights areaKey="IG3" postcode="IG3 8AA" />);
+
+    expect(await screen.findByText('Avg price')).toBeInTheDocument();
+    expect(screen.getByText('Land Registry PPD')).toBeInTheDocument();
+    expect(screen.getByText('Internal listing comps')).toBeInTheDocument();
+    expect(screen.getAllByText('police.uk').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/Mock intel|Replace with live sources|10 IG3 Street|Schools rating|Population/i)).not.toBeInTheDocument();
+  });
 });
