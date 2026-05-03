@@ -117,7 +117,8 @@ def test_supabase_config_falls_back_from_placeholder_url(
 def test_supabase_client_uses_public_url_fallback_in_production(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
     monkeypatch.setenv("SUPABASE_URL", "https://bad-project.supabase.co")
     monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_URL", "https://real-project.supabase.co")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")

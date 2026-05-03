@@ -14,7 +14,11 @@ _PUBLIC_SUPABASE_URL_FALLBACK = "https://wsfemkhxttddztnhthkc.supabase.co"
 
 
 def _is_production_env() -> bool:
-    env = (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or "").strip().lower()
+    env = (
+        (os.getenv("ENVIRONMENT") or os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("APP_ENV") or "")
+        .strip()
+        .lower()
+    )
     return env in {"prod", "production"}
 
 
