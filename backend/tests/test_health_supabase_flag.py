@@ -3,6 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from backend.utils.supabase_client import get_supabase
 from backend.utils.supabase_env import resolve_supabase_config
 
 try:
@@ -111,3 +112,23 @@ def test_supabase_config_falls_back_from_placeholder_url(
 
     assert cfg is not None
     assert cfg.url == "https://real-project.supabase.co"
+
+
+def test_supabase_client_uses_public_url_fallback_in_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setenv("SUPABASE_URL", "https://bad-project.supabase.co")
+    monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_URL", "https://real-project.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+
+    def fake_resolver(host: str) -> str:
+        if host == "real-project.supabase.co":
+            return "127.0.0.1"
+        raise OSError("not found")
+
+    monkeypatch.setattr("backend.utils.supabase_client.socket.gethostbyname", fake_resolver)
+
+    client = get_supabase(required=True, create_client_fn=lambda url, key: {"url": url})
+
+    assert client == {"url": "https://real-project.supabase.co"}
