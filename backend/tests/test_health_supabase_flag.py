@@ -25,6 +25,8 @@ def test_health_includes_supabase_configured_boolean(monkeypatch: pytest.MonkeyP
     monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
     monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
     monkeypatch.delenv("SUPABASE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_ANON_KEY", raising=False)
+    monkeypatch.delenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", raising=False)
 
     resp = client.get("/health")
     assert resp.status_code == 200
@@ -77,13 +79,17 @@ def test_supabase_config_normalizes_copied_env_values(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("SUPABASE_URL", '"SUPABASE_URL=fake.supabase.co"')
-    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "real-service-role-jwt")
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_ANON_KEY", raising=False)
+    monkeypatch.delenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", raising=False)
 
     cfg = resolve_supabase_config()
 
     assert cfg is not None
     assert cfg.url == "https://fake.supabase.co"
-    assert cfg.key == "service-role-key"
+    assert cfg.key == "real-service-role-jwt"
 
 
 def test_supabase_config_normalizes_cross_pasted_url_assignment(
@@ -112,6 +118,51 @@ def test_supabase_config_falls_back_from_placeholder_url(
 
     assert cfg is not None
     assert cfg.url == "https://real-project.supabase.co"
+
+
+def test_supabase_config_falls_back_from_placeholder_service_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SUPABASE_URL", "https://real-project.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "your-service-role-key")
+    monkeypatch.setenv("SUPABASE_KEY", "legacy-valid-key")
+    monkeypatch.delenv("SUPABASE_ANON_KEY", raising=False)
+    monkeypatch.delenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", raising=False)
+
+    cfg = resolve_supabase_config()
+
+    assert cfg is not None
+    assert cfg.key == "legacy-valid-key"
+
+
+def test_supabase_config_can_fall_back_to_public_anon_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SUPABASE_URL", "https://real-project.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key")
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_ANON_KEY", raising=False)
+    monkeypatch.setenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "public-anon-jwt")
+
+    cfg = resolve_supabase_config()
+
+    assert cfg is not None
+    assert cfg.key == "public-anon-jwt"
+
+
+def test_supabase_config_prefers_real_legacy_key_over_placeholder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real_key = "eyJhbGciOiJIUzI1NiJ9.payload.signature"
+    monkeypatch.setenv("SUPABASE_URL", "https://real-project.supabase.co")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "your-service-role-key")
+    monkeypatch.setenv("SUPABASE_KEY", real_key)
+
+    cfg = resolve_supabase_config()
+
+    assert cfg is not None
+    assert cfg.key == real_key
 
 
 def test_supabase_client_uses_public_url_fallback_in_production(

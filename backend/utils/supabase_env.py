@@ -9,6 +9,8 @@ SERVICE_ROLE_KEY_ENV_ORDER: tuple[str, ...] = (
     "SUPABASE_SERVICE_ROLE_KEY",
     "SUPABASE_SERVICE_KEY",
     "SUPABASE_KEY",
+    "SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
 )
 
 SUPABASE_URL_ENV_ORDER: tuple[str, ...] = (
@@ -97,10 +99,47 @@ def _looks_like_placeholder_url(value: str | None) -> bool:
     )
 
 
+def _looks_like_placeholder_key(value: str | None) -> bool:
+    key = (value or "").strip().lower()
+    return bool(
+        not key
+        or key.startswith("<")
+        or key in {"your-service-role-key", "your-anon-key", "service-role-key"}
+        or key.startswith("your-")
+        or key.endswith("-key")
+    )
+
+
+def _looks_like_placeholder_key(value: str | None) -> bool:
+    key = (value or "").strip().lower()
+    return bool(
+        not key
+        or key in {"jwt", "key", "service-role-key", "your-service-role-key"}
+        or key.startswith("your-")
+        or "placeholder" in key
+    )
+
+
+def _looks_like_supabase_jwt(value: str | None) -> bool:
+    key = (value or "").strip()
+    return key.startswith("eyJ") and key.count(".") >= 2
+
+
 def _get_first_non_empty(names: tuple[str, ...]) -> str | None:
     for name in names:
         value = _getenv_stripped(name)
-        if value:
+        if value and not _looks_like_placeholder_key(value):
+            return value
+    return None
+
+
+def _get_best_service_key(names: tuple[str, ...]) -> str | None:
+    values = [v for name in names if (v := _getenv_stripped(name))]
+    for value in values:
+        if _looks_like_supabase_jwt(value):
+            return value
+    for value in values:
+        if not _looks_like_placeholder_key(value):
             return value
     return None
 
@@ -123,7 +162,7 @@ def resolve_supabase_env_block() -> SupabaseEnvBlock:
 
     return SupabaseEnvBlock(
         url=_get_first_non_placeholder_url(SUPABASE_URL_ENV_ORDER),
-        service_role_key=_get_first_non_empty(SERVICE_ROLE_KEY_ENV_ORDER),
+        service_role_key=_get_best_service_key(SERVICE_ROLE_KEY_ENV_ORDER),
     )
 
 
