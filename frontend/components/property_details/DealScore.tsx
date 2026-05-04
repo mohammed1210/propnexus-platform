@@ -259,7 +259,11 @@ export default function DealScore({ property }: DealScoreProps) {
 
   return (
     <div ref={scoreRef} className="space-y-4">
-      <div className="relative overflow-hidden rounded-[1.35rem] border border-brand-200/70 bg-gradient-to-br from-brand-600 via-brand-700 to-indigo-800 text-white shadow-sm dark:border-brand-900/60 dark:from-brand-950 dark:via-brand-900 dark:to-slate-950">
+      <div
+        className={`relative overflow-hidden rounded-[1.35rem] border border-emerald-200/70 bg-gradient-to-br from-emerald-500 via-teal-600 to-green-700 text-white shadow-sm transition-all duration-700 ease-out motion-reduce:translate-y-0 motion-reduce:scale-100 motion-reduce:opacity-100 motion-reduce:transition-none dark:border-emerald-900/60 dark:from-emerald-950 dark:via-teal-950 dark:to-green-950 ${
+          isVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-3 scale-[0.98] opacity-0'
+        }`}
+      >
         <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
         <div className="absolute -bottom-24 left-10 h-56 w-56 rounded-full bg-emerald-300/15 blur-3xl" />
 
@@ -315,13 +319,13 @@ export default function DealScore({ property }: DealScoreProps) {
             {kpis.map((kpi) => (
               <div
                 key={kpi.label}
-                className="rounded-xl border border-white/10 bg-white/[0.1] p-3 backdrop-blur-md"
+                className="rounded-xl border border-white/10 bg-white/[0.1] p-3 text-center backdrop-blur-md"
               >
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-50/80">
                   {kpi.label}
                 </div>
                 <div className="mt-1.5 text-xl font-bold text-white">{kpi.value}</div>
-                <div className="mt-1 text-xs text-slate-400">{kpi.helper}</div>
+                <div className="mt-1 text-xs text-emerald-50/70">{kpi.helper}</div>
               </div>
             ))}
           </div>
