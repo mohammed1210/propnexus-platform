@@ -258,13 +258,13 @@ export default function DealScore({ property }: DealScoreProps) {
   };
 
   return (
-    <div ref={scoreRef} className="space-y-5">
-      <div className="relative overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-950 text-white shadow-sm dark:border-slate-800 dark:bg-slate-950">
-        <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-brand-500/25 blur-3xl" />
-        <div className="absolute -bottom-28 left-10 h-64 w-64 rounded-full bg-emerald-400/15 blur-3xl" />
+    <div ref={scoreRef} className="space-y-4">
+      <div className="relative overflow-hidden rounded-[1.35rem] border border-brand-200/70 bg-gradient-to-br from-brand-600 via-brand-700 to-indigo-800 text-white shadow-sm dark:border-brand-900/60 dark:from-brand-950 dark:via-brand-900 dark:to-slate-950">
+        <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
+        <div className="absolute -bottom-24 left-10 h-56 w-56 rounded-full bg-emerald-300/15 blur-3xl" />
 
-        <div className="relative grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(280px,0.95fr)] lg:items-center">
-          <div className="space-y-5">
+        <div className="relative grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(250px,0.72fr)] lg:items-center">
+          <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-200 backdrop-blur">
                 <FiTrendingUp className="h-3.5 w-3.5 text-emerald-300" />
@@ -277,9 +277,9 @@ export default function DealScore({ property }: DealScoreProps) {
               </span>
             </div>
 
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <div
-                className="relative grid h-40 w-40 shrink-0 place-items-center rounded-full p-3 shadow-2xl shadow-black/30"
+                className="relative grid h-32 w-32 shrink-0 place-items-center rounded-full p-2.5 shadow-2xl shadow-black/25 sm:h-36 sm:w-36"
                 style={{
                   background: `conic-gradient(rgb(16 185 129) ${clampScore(animatedRoundedScore)}%, rgba(255,255,255,0.12) 0)`,
                 }}
@@ -288,7 +288,7 @@ export default function DealScore({ property }: DealScoreProps) {
                 <div className="grid h-full w-full place-items-center rounded-full border border-white/10 bg-slate-950/95">
                   <div className="text-center">
                     <div
-                      className={`text-6xl font-black leading-none tracking-tight ${getScoreColor(score)}`}
+                      className={`text-5xl font-black leading-none tracking-tight ${getScoreColor(score)}`}
                     >
                       {animatedRoundedScore}
                     </div>
@@ -299,30 +299,28 @@ export default function DealScore({ property }: DealScoreProps) {
                 </div>
               </div>
 
-              <div className="max-w-xl pb-1">
+              <div className="max-w-xl">
                 <div className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-200">
                   AI Deal Score
                 </div>
-                <h3 className="mt-2 text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                <h3 className="mt-1.5 text-xl font-bold tracking-tight text-white sm:text-2xl">
                   Deal quality at a glance
                 </h3>
-                <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-[15px]">
-                  {dealBand.summary}
-                </p>
+                <p className="mt-2 text-sm leading-5 text-slate-200">{dealBand.summary}</p>
               </div>
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
             {kpis.map((kpi) => (
               <div
                 key={kpi.label}
-                className="rounded-2xl border border-white/10 bg-white/[0.08] p-4 backdrop-blur-md"
+                className="rounded-xl border border-white/10 bg-white/[0.1] p-3 backdrop-blur-md"
               >
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                   {kpi.label}
                 </div>
-                <div className="mt-2 text-2xl font-bold text-white">{kpi.value}</div>
+                <div className="mt-1.5 text-xl font-bold text-white">{kpi.value}</div>
                 <div className="mt-1 text-xs text-slate-400">{kpi.helper}</div>
               </div>
             ))}
@@ -332,8 +330,8 @@ export default function DealScore({ property }: DealScoreProps) {
 
       {showBreakdown ? (
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.78fr)]">
-          <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/50 sm:p-5">
-            <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div className="rounded-[1.25rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/50">
+            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                   Score drivers
@@ -347,8 +345,8 @@ export default function DealScore({ property }: DealScoreProps) {
             <AIScoreBars overall={roundedScore} items={chartItems} showHeader={false} />
           </div>
 
-          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40 sm:p-5">
-            <div className="mb-4 flex items-center gap-2">
+          <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
+            <div className="mb-3 flex items-center gap-2">
               <FiAlertTriangle className="h-4 w-4 text-amber-500" />
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
@@ -360,16 +358,16 @@ export default function DealScore({ property }: DealScoreProps) {
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {rankedFactors.slice(0, 4).map((factor) => {
                 const Icon = factor.icon;
                 return (
                   <div
                     key={factor.key}
-                    className="rounded-2xl border border-slate-200 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-950/50"
+                    className="rounded-xl border border-slate-200 bg-white/90 p-2.5 dark:border-slate-800 dark:bg-slate-950/50"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300">
+                      <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300">
                         <Icon className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -381,7 +379,7 @@ export default function DealScore({ property }: DealScoreProps) {
                             {factor.value}%
                           </div>
                         </div>
-                        <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                        <p className="mt-0.5 text-xs leading-4 text-slate-500 dark:text-slate-400">
                           {factor.helper}
                         </p>
                       </div>
