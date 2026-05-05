@@ -228,26 +228,26 @@ export default function QuickStatsActions({
   return (
     <>
       {/* Desktop floating sidebar - combined stats and actions */}
-      <div className="hidden lg:block fixed right-6 top-24 w-64 z-10 no-print">
-        <div className="sticky top-24 space-y-4">
+      <div className="hidden lg:block fixed right-4 top-24 w-56 z-10 no-print">
+        <div className="sticky top-24 space-y-3">
           {/* Quick Stats */}
-          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xl p-6">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wider mb-5">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-lg p-4">
+            <h3 className="font-bold text-[11px] text-slate-900 dark:text-white uppercase tracking-[0.16em] mb-3.5">
               Quick Stats
             </h3>
 
-            <div className="space-y-5">
-              <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Price</div>
-                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            <div className="space-y-3.5">
+              <div className="pb-3 border-b border-slate-200 dark:border-slate-800">
+                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Price</div>
+                <div className="text-xl font-bold leading-tight text-slate-900 dark:text-slate-100">
                   {formatValue(displayPrice, 'currency')}
                 </div>
               </div>
 
-              <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Rental Yield</div>
+              <div className="pb-3 border-b border-slate-200 dark:border-slate-800">
+                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Rental Yield</div>
                 <div
-                  className={`text-2xl font-bold ${
+                  className={`text-xl font-bold leading-tight ${
                     typeof displayYield === 'number' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'
                   }`}
                 >
@@ -255,12 +255,12 @@ export default function QuickStatsActions({
                 </div>
               </div>
 
-              <div className="pb-4 border-b border-slate-200 dark:border-slate-800">
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+              <div className="pb-3 border-b border-slate-200 dark:border-slate-800">
+                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
                   ROI{roiDisplay.isProxy ? ' (proxy)' : ''}
                 </div>
                 <div
-                  className={`text-2xl font-bold ${
+                  className={`text-xl font-bold leading-tight ${
                     typeof displayRoi === 'number' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'
                   }`}
                 >
@@ -269,9 +269,9 @@ export default function QuickStatsActions({
               </div>
 
               <div>
-                <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">AI Score</div>
+                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">AI Score</div>
                 <div
-                  className={`text-2xl font-bold ${
+                  className={`text-xl font-bold leading-tight ${
                     typeof aiScore === 'number' ? 'text-brand-600 dark:text-brand-400' : 'text-slate-700 dark:text-slate-300'
                   }`}
                 >
@@ -282,15 +282,15 @@ export default function QuickStatsActions({
           </div>
 
           {/* Quick Actions */}
-          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-xl p-6">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white uppercase tracking-wider mb-4">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-lg p-4">
+            <h3 className="font-bold text-[11px] text-slate-900 dark:text-white uppercase tracking-[0.16em] mb-3">
               Quick Actions
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-2">
               <button
                 onClick={handleSave}
                 disabled={saving || saved}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-white font-semibold hover:from-brand-600 hover:to-brand-700 transition-all disabled:opacity-70 shadow-md hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-sm text-white font-semibold hover:from-brand-600 hover:to-brand-700 transition-all disabled:opacity-70 shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
                 aria-label={saved ? 'Deal saved' : saving ? 'Saving deal' : 'Save this deal'}
                 aria-pressed={saved}
               >
@@ -299,7 +299,7 @@ export default function QuickStatsActions({
                     <svg
                       aria-hidden
                       viewBox="0 0 24 24"
-                      className="w-5 h-5 text-red-300"
+                      className="w-4 h-4 text-red-300"
                       fill="currentColor"
                     >
                       <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
@@ -308,7 +308,7 @@ export default function QuickStatsActions({
                   </>
                 ) : (
                   <>
-                    <FiHeart className="w-5 h-5" aria-hidden="true" />
+                    <FiHeart className="w-4 h-4" aria-hidden="true" />
                     <span>{saving ? 'Saving...' : 'Save Deal'}</span>
                   </>
                 )}
@@ -316,10 +316,10 @@ export default function QuickStatsActions({
 
               <button
                 onClick={handleShare}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
                 aria-label="Share this property"
               >
-                <FiShare2 className="w-5 h-5" aria-hidden="true" />
+                <FiShare2 className="w-4 h-4" aria-hidden="true" />
                 <span>Share Property</span>
               </button>
 
@@ -327,27 +327,27 @@ export default function QuickStatsActions({
                 <button
                   onClick={handleExportPDF}
                   disabled={exporting}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
                   aria-label="Export property details as PDF"
                 >
-                  <FiDownload className="w-5 h-5" aria-hidden="true" />
+                  <FiDownload className="w-4 h-4" aria-hidden="true" />
                   <span>{exporting ? 'Exporting…' : 'Export PDF'}</span>
                 </button>
               ) : null}
               {showCrmExports ? (
                 <button
                   onClick={handleCopyJSON}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm text-slate-700 dark:text-slate-300 font-semibold hover:border-brand-500 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2"
                   aria-label={copied ? 'Property data copied' : 'Copy property data as JSON'}
                 >
                   {copied ? (
                     <>
-                      <FiCheck className="w-5 h-5" aria-hidden="true" />
+                      <FiCheck className="w-4 h-4" aria-hidden="true" />
                       <span>Data Copied!</span>
                     </>
                   ) : (
                     <>
-                      <FiCopy className="w-5 h-5" aria-hidden="true" />
+                      <FiCopy className="w-4 h-4" aria-hidden="true" />
                       <span>Copy Data</span>
                     </>
                   )}
