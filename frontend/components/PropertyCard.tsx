@@ -6,7 +6,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import { Highlight } from '@/components/Highlight';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
-import { FiBarChart2, FiHeart, FiHome, FiMapPin, FiTarget, FiTrendingUp } from 'react-icons/fi';
+import { FiBarChart2, FiChevronLeft, FiChevronRight, FiHeart, FiHome, FiMapPin, FiTarget, FiTrendingUp } from 'react-icons/fi';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
 import { track } from '@/lib/events';
@@ -198,6 +198,7 @@ export default function PropertyCard({
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [carouselIndex, setCarouselIndex] = useState(0);
 
   const articleRef = useRef<HTMLElement | null>(null);
   const [shouldLoadInsights, setShouldLoadInsights] = useState(false);
@@ -451,10 +452,30 @@ export default function PropertyCard({
     }
   }, [p.id]);
 
-  const imageSrc =
-    p.imageurl ||
-    (Array.isArray(p.image_urls) && p.image_urls.length > 0 ? p.image_urls[0] : null) ||
-    '/placeholder.jpg';
+  const imageSources = useMemo(() => {
+    const seen = new Set<string>();
+    const rawSources = [
+      p.imageurl,
+      ...(Array.isArray(p.image_urls) ? p.image_urls : []),
+    ];
+
+    const sources = rawSources
+      .map((src) => (typeof src === 'string' ? src.trim() : ''))
+      .filter((src) => {
+        if (!src || seen.has(src)) return false;
+        seen.add(src);
+        return true;
+      });
+
+    return sources.length > 0 ? sources : ['/placeholder.jpg'];
+  }, [p.image_urls, p.imageurl]);
+
+  useEffect(() => {
+    setCarouselIndex((index) => (index >= imageSources.length ? 0 : index));
+  }, [imageSources.length]);
+
+  const imageSrc = imageSources[carouselIndex] ?? imageSources[0] ?? '/placeholder.jpg';
+  const hasCarousel = imageSources.length > 1;
 
   const matchInfo = useMemo(() => {
     const raw = Array.isArray(p.matches) ? p.matches : [];
@@ -527,23 +548,26 @@ export default function PropertyCard({
         isHovered && 'ring-2 ring-brand-500/20 border-brand-500/40 shadow-xl shadow-brand-950/10',
       )}
     >
-      <Link
-        href={href}
-        onClick={handleSearchClickTrack}
-        className="group block relative aspect-[3/2] w-full overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        aria-label={`Open ${p.title ?? 'property'}`}
-      >
-        <ImageWithFallback
-          src={imageSrc}
-          alt={p.title || 'Property image'}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          style={{ objectFit: 'cover' }}
-          className="transition-transform duration-300 group-hover:scale-110"
-          loading="lazy"
-          priority={false}
-        />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/20 via-transparent to-transparent opacity-70" aria-hidden="true" />
+      <div className="relative aspect-[3/2] w-full overflow-hidden">
+        <Link
+          href={href}
+          onClick={handleSearchClickTrack}
+          className="group block h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label={`Open ${p.title ?? 'property'}`}
+        >
+          <ImageWithFallback
+            key={imageSrc}
+            src={imageSrc}
+            alt={p.title || 'Property image'}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            style={{ objectFit: 'cover' }}
+            className="transition-transform duration-300 group-hover:scale-110"
+            loading="lazy"
+            priority={false}
+          />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/20 via-transparent to-transparent opacity-70" aria-hidden="true" />
+        </Link>
 
         {/* Sprint 11.3: Prominent Save button in top-left */}
         <button
@@ -613,14 +637,46 @@ export default function PropertyCard({
           )}
         </button>
 
-      </Link>
+        {hasCarousel && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCarouselIndex((index) => (index - 1 + imageSources.length) % imageSources.length);
+              }}
+              className="absolute left-3 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/50 bg-white/85 text-slate-900 shadow-sm backdrop-blur-sm transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white dark:bg-slate-950/75 dark:text-white dark:hover:bg-slate-900"
+              aria-label="Show previous property image"
+            >
+              <FiChevronLeft className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCarouselIndex((index) => (index + 1) % imageSources.length);
+              }}
+              className="absolute right-3 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/50 bg-white/85 text-slate-900 shadow-sm backdrop-blur-sm transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white dark:bg-slate-950/75 dark:text-white dark:hover:bg-slate-900"
+              aria-label="Show next property image"
+            >
+              <FiChevronRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-slate-950/45 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm" aria-hidden="true">
+              {carouselIndex + 1}/{imageSources.length}
+            </div>
+          </>
+        )}
 
-      <div className="p-4 space-y-3">
+      </div>
+
+      <div className="space-y-2.5 p-3.5">
         <Link href={href} onClick={handleSearchClickTrack} className="block group">
-          <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
             <span
               className={cx(
-                'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold',
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold',
                 sourceBadgeClasses,
               )}
               aria-label={`Source: ${sourceBadgeText}`}
@@ -628,17 +684,17 @@ export default function PropertyCard({
             >
               {sourceBadgeText}
             </span>
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-600 dark:text-brand-300">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-300">
               Investor view
             </span>
           </div>
-          <h3 className="text-base font-black leading-snug text-slate-950 line-clamp-2 transition-colors group-hover:text-brand-600 dark:text-white dark:group-hover:text-brand-300">
+          <h3 className="text-[15px] font-black leading-snug text-slate-950 line-clamp-2 transition-colors group-hover:text-brand-600 dark:text-white dark:group-hover:text-brand-300">
             <Highlight text={p.title || 'Untitled property'} tokens={matchInfo.tokens} />
           </h3>
         </Link>
 
         {matchInfo.hasAny && (
-          <div className="flex flex-wrap gap-1 pt-1">
+          <div className="flex flex-wrap gap-1">
             {matchInfo.exact && (
               <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-300">
                 exact
@@ -658,50 +714,50 @@ export default function PropertyCard({
         )}
 
         {Array.isArray(p.badges) && p.badges.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1">
             {p.badges.map((badgeId) => (
               <Badge key={badgeId} id={String(badgeId)} />
             ))}
           </div>
         )}
 
-        <p className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400">
-          <FiMapPin className="h-4 w-4 shrink-0 text-brand-500" aria-hidden="true" />
+        <p className="flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+          <FiMapPin className="h-3.5 w-3.5 shrink-0 text-brand-500" aria-hidden="true" />
           <span className="truncate">{p.location || '—'}</span>
         </p>
 
-        <div className="grid grid-cols-3 gap-2 rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/90 via-white to-emerald-50/60 p-2 shadow-sm dark:border-brand-900/50 dark:from-brand-950/30 dark:via-slate-950 dark:to-emerald-950/20">
-          <div className="rounded-xl border border-white/80 bg-white px-2 py-2.5 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
-            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
+        <div className="grid grid-cols-3 gap-1.5 rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/90 via-white to-emerald-50/60 p-1.5 shadow-sm dark:border-brand-900/50 dark:from-brand-950/30 dark:via-slate-950 dark:to-emerald-950/20">
+          <div className="rounded-xl border border-white/80 bg-white px-1.5 py-2 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+            <div className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
               <FiTarget className="h-3.5 w-3.5" aria-hidden="true" />
             </div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Score</div>
-            <div className="text-lg font-black leading-tight text-slate-950 dark:text-white">
+            <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">Score</div>
+            <div className="text-base font-black leading-tight text-slate-950 dark:text-white">
               {typeof displayScore === 'number' ? Math.round(displayScore) : '—'}
             </div>
           </div>
-          <div className="rounded-xl border border-white/80 bg-white px-2 py-2.5 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
-            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+          <div className="rounded-xl border border-white/80 bg-white px-1.5 py-2 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+            <div className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
               <FiTrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
             </div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Yield</div>
-            <div className="text-lg font-black leading-tight text-slate-950 dark:text-white">
+            <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">Yield</div>
+            <div className="text-base font-black leading-tight text-slate-950 dark:text-white">
               {typeof displayYieldPct === 'number' ? formatPercent(displayYieldPct) : '—'}
             </div>
           </div>
-          <div className="rounded-xl border border-white/80 bg-white px-2 py-2.5 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
-            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
+          <div className="rounded-xl border border-white/80 bg-white px-1.5 py-2 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+            <div className="mx-auto mb-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
               <FiBarChart2 className="h-3.5 w-3.5" aria-hidden="true" />
             </div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">ROI</div>
-            <div className="text-lg font-black leading-tight text-slate-950 dark:text-white">
+            <div className="text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">ROI</div>
+            <div className="text-base font-black leading-tight text-slate-950 dark:text-white">
               {typeof displayRoiPct === 'number' ? formatPercent(displayRoiPct) : '—'}
             </div>
           </div>
         </div>
 
         {(FF.AREA_INTEL || FF.COMPS) && (
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/30">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-900/30">
             <div className="flex items-center justify-between">
               <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200 tracking-wide uppercase">
                 Market pulse
@@ -713,7 +769,7 @@ export default function PropertyCard({
             </div>
 
             {showDealReasonChip && dealChipText && Array.isArray(p.deal_reasons) && p.deal_reasons[0] && (
-              <div className="mt-2">
+              <div className="mt-1.5">
                 <span
                   className={cx(
                     'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold',
@@ -729,7 +785,7 @@ export default function PropertyCard({
             )}
 
             {postcodeKey ? (
-              <div className="mt-2">
+              <div className="mt-1.5">
                 {insightsLoading ? (
                   <div className="space-y-1.5">
                     <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
@@ -791,17 +847,17 @@ export default function PropertyCard({
                 )}
               </div>
             ) : (
-              <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+              <div className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                 Add postcode to load insights.
               </div>
             )}
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2 dark:border-slate-800">
           <span
             className={cx(
-              'inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-semibold',
+              'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold',
               verdictToneClasses(verdict.tone),
             )}
             aria-label={`Verdict: ${verdict.label}`}
@@ -811,8 +867,8 @@ export default function PropertyCard({
           </span>
         </div>
 
-        <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-slate-50 to-brand-50/60 px-3 py-2 dark:from-slate-900/60 dark:to-brand-950/30">
-          <div className="text-sm">
+        <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-slate-50 to-brand-50/60 px-2.5 py-1.5 dark:from-slate-900/60 dark:to-brand-950/30">
+          <div className="text-[13px]">
             <span className="font-black text-slate-950 dark:text-white">{priceText}</span>
             <span className="opacity-70 ml-2 inline-flex items-center gap-1 text-xs">
               <FiHome className="h-3.5 w-3.5" aria-hidden="true" />
