@@ -51,9 +51,6 @@ export default function CollapsibleCard({
           ) : null}
 
           <span className="min-w-0 flex-1">
-            <span className="mb-1 inline-flex rounded-full border border-white/10 bg-white/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-white/80 backdrop-blur">
-              Investor section
-            </span>
             <span className="block truncate text-lg font-black leading-tight tracking-tight text-white sm:text-xl">
               {title}
             </span>

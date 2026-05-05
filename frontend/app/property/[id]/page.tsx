@@ -597,7 +597,7 @@ export default function PropertyDetailsPage() {
               defaultExpanded={false}
             >
               <div className="rounded-lg overflow-hidden">
-                <MapSingle property={property} height={400} zoom={14} scrollWheelZoom={false} />
+                <MapSingle property={property} height={400} zoom={16} scrollWheelZoom={false} />
               </div>
             </CollapsibleCard>
           </div>

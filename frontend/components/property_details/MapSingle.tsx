@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L, { LatLngExpression } from "leaflet";
 
 type MinimalProperty = {
-  latitude?: number | null;
-  longitude?: number | null;
+  lat?: number | string | null;
+  lng?: number | string | null;
+  latitude?: number | string | null;
+  longitude?: number | string | null;
+  lon?: number | string | null;
   title?: string | null;
 };
 
@@ -25,19 +28,63 @@ type MapSingleProps = {
   className?: string;
 };
 
+function toCoordinate(value: unknown): number | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function isValidCoordinate(lat: number | undefined, lng: number | undefined): lat is number {
+  return (
+    typeof lat === 'number' &&
+    typeof lng === 'number' &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}
+
+function MapFocus({ position, zoom }: { position: LatLngExpression; zoom: number }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const focusMap = () => {
+      map.invalidateSize({ animate: false });
+      map.setView(position, zoom, { animate: false });
+    };
+
+    focusMap();
+    const timers = [window.setTimeout(focusMap, 80), window.setTimeout(focusMap, 250)];
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(focusMap) : null;
+    observer?.observe(map.getContainer());
+    window.addEventListener('resize', focusMap);
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+      observer?.disconnect();
+      window.removeEventListener('resize', focusMap);
+    };
+  }, [map, position, zoom]);
+
+  return null;
+}
+
 export default function MapSingle(props: MapSingleProps) {
-  const lat = props.property?.latitude ?? props.latitude;
-  const lng = props.property?.longitude ?? props.longitude;
+  const lat = toCoordinate(props.property?.latitude ?? props.property?.lat ?? props.latitude);
+  const lng = toCoordinate(props.property?.longitude ?? props.property?.lng ?? props.property?.lon ?? props.longitude);
   const title = props.property?.title ?? props.title ?? 'Property';
 
   const height = props.height ?? 320;
   const zoom = props.zoom ?? 13;
   const scrollWheelZoom = props.scrollWheelZoom ?? false;
 
-  const hasCoords =
-    typeof lat === "number" && !Number.isNaN(lat) && typeof lng === "number" && !Number.isNaN(lng);
+  const hasCoords = isValidCoordinate(lat, lng);
   const position: LatLngExpression = useMemo(
-    () => (hasCoords ? [lat as number, lng as number] : [52.5, -1.5]),
+    () => (hasCoords ? [lat, lng as number] : [52.5, -1.5]),
     [hasCoords, lat, lng],
   );
 
@@ -100,6 +147,7 @@ export default function MapSingle(props: MapSingleProps) {
         scrollWheelZoom={scrollWheelZoom}
         style={{ height: "100%", width: "100%" }}
       >
+        <MapFocus position={position} zoom={zoom} />
         <TileLayer
           attribution={darkMode ? darkAttr : lightAttr}
           url={darkMode ? darkUrl : lightUrl}
