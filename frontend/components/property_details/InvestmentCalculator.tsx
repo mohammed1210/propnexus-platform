@@ -115,53 +115,36 @@ export default function InvestmentCalculator({
   return (
     <div className="rounded-[1.35rem] border border-brand-200/70 bg-white shadow-sm transition-all duration-300 dark:border-brand-900/60 dark:bg-slate-950">
       {/* Polished Header */}
-      <div className="relative rounded-t-[1.35rem] bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 p-4 text-white md:p-5 dark:from-brand-950 dark:via-brand-900 dark:to-brand-800">
+      <div className="relative rounded-t-[1.35rem] bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 p-3.5 text-white md:p-4 dark:from-brand-950 dark:via-brand-900 dark:to-brand-800">
         <div
-          className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-white/15 blur-3xl"
+          className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-white/15 blur-3xl"
           aria-hidden="true"
         />
         <div
-          className="pointer-events-none absolute -bottom-24 left-10 h-56 w-56 rounded-full bg-emerald-300/15 blur-3xl"
+          className="pointer-events-none absolute -bottom-20 left-10 h-44 w-44 rounded-full bg-emerald-300/15 blur-3xl"
           aria-hidden="true"
         />
 
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl space-y-3">
+        <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="max-w-2xl space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-200 backdrop-blur">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-200 backdrop-blur">
                 <FiDollarSign className="h-3.5 w-3.5 text-emerald-300" aria-hidden="true" />
                 Investor calculator
               </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-semibold text-white/90 backdrop-blur">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur">
                 <FiCreditCard className="h-3.5 w-3.5 text-emerald-300" aria-hidden="true" />
                 Stamp duty included
               </span>
             </div>
 
             <div>
-              <h3 className="text-2xl font-black leading-tight tracking-tight md:text-3xl">
+              <h3 className="text-xl font-black leading-tight tracking-tight md:text-2xl">
                 Investment Calculator
               </h3>
-              <p className="mt-2 text-sm font-medium leading-6 text-white/80">
+              <p className="mt-1 text-sm font-medium leading-5 text-white/80">
                 Model finance, returns and acquisition costs in one investor-ready workspace.
               </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2" aria-label="Investment strategies">
-              {(['BTL', 'BRRR', 'Flip', 'SA', 'HMO'] as InvestmentStrategy[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => handleStrategyChange(s)}
-                  className={`rounded-full px-3 py-1 text-xs font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
-                    strategy === s
-                      ? 'bg-white text-brand-700 shadow-lg shadow-black/10'
-                      : 'border border-white/10 bg-white/10 text-white/85 hover:bg-white/15'
-                  }`}
-                  type="button"
-                >
-                  {s}
-                </button>
-              ))}
             </div>
           </div>
 
@@ -188,7 +171,7 @@ export default function InvestmentCalculator({
 
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-bold text-brand-700 shadow-lg shadow-black/10 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+              className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-sm font-bold text-brand-700 shadow-lg shadow-black/10 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
               aria-expanded={isExpanded}
               aria-controls="calculator-content"
               type="button"
