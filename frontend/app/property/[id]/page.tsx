@@ -31,11 +31,6 @@ import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from
 import { buildInvestmentDescription } from '@/lib/propertyInvestmentDescription';
 
 /** ---- Client-only widgets (no SSR) ---- */
-const StampDutyCalculator = dynamic(
-  () => import('@/components/property_details/StampDutyCalculator'),
-  { ssr: false }
-);
-
 const NotesFields = dynamic(
   () => import('@/components/property_details/NotesFields'),
   { ssr: false }
@@ -590,9 +585,6 @@ export default function PropertyDetailsPage() {
               propertyId={String(property.id ?? id)}
               initialPrice={price}
             />
-
-            {/* Stamp Duty Calculator */}
-            <StampDutyCalculator price={price} />
 
             {/* Location Map */}
             <CollapsibleCard
