@@ -5,10 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   FiBarChart2,
   FiChevronDown,
-  FiChevronUp,
-  FiCreditCard,
   FiDollarSign,
-  FiInfo,
 } from 'react-icons/fi';
 import BTLCalculator from './calculators/BTLCalculator';
 import BRRRCalculator from './calculators/BRRRCalculator';
@@ -46,7 +43,6 @@ export default function InvestmentCalculator({
   const [isExpanded, setIsExpanded] = useState(false);
   const [strategy, setStrategy] = useState<InvestmentStrategy>('BTL');
   const [calculatorInputs, setCalculatorInputs] = useState<any>({});
-  const [showTooltip, setShowTooltip] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -114,78 +110,46 @@ export default function InvestmentCalculator({
 
   return (
     <div className="rounded-[1.35rem] border border-brand-200/70 bg-white shadow-sm transition-all duration-300 dark:border-brand-900/60 dark:bg-slate-950">
-      {/* Polished Header */}
-      <div className="relative rounded-t-[1.35rem] bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 p-3.5 text-white md:p-4 dark:from-brand-950 dark:via-brand-900 dark:to-brand-800">
-        <div
-          className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-white/15 blur-3xl"
-          aria-hidden="true"
-        />
-        <div
-          className="pointer-events-none absolute -bottom-20 left-10 h-44 w-44 rounded-full bg-emerald-300/15 blur-3xl"
-          aria-hidden="true"
-        />
+      {/* Header */}
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={
+          'relative w-full overflow-hidden rounded-t-[1.35rem] bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 px-4 py-3 text-left text-white md:px-5 md:py-3.5 ' +
+          'transition-all hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 dark:from-brand-950 dark:via-brand-900 dark:to-brand-800'
+        }
+        aria-expanded={isExpanded}
+        aria-controls="calculator-content"
+      >
+        <span className="pointer-events-none absolute -right-12 -top-16 h-36 w-36 rounded-full bg-white/15 blur-3xl" aria-hidden="true" />
+        <span className="pointer-events-none absolute -bottom-16 left-10 h-36 w-36 rounded-full bg-emerald-300/15 blur-3xl" aria-hidden="true" />
 
-        <div className="relative flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-2xl space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-200 backdrop-blur">
-                <FiDollarSign className="h-3.5 w-3.5 text-emerald-300" aria-hidden="true" />
-                Investor calculator
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur">
-                <FiCreditCard className="h-3.5 w-3.5 text-emerald-300" aria-hidden="true" />
-                Stamp duty included
-              </span>
-            </div>
+        <span className="relative flex w-full items-center gap-3">
+          <span className="shrink-0 rounded-xl border border-white/10 bg-white/10 p-0.5 shadow-sm backdrop-blur">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-600">
+              <FiDollarSign className="h-5 w-5 text-white" aria-hidden="true" />
+            </span>
+          </span>
 
-            <div>
-              <h3 className="text-xl font-black leading-tight tracking-tight md:text-2xl">
-                Investment Calculator
-              </h3>
-              <p className="mt-1 text-sm font-medium leading-5 text-white/80">
-                Model finance, returns and acquisition costs in one investor-ready workspace.
-              </p>
-            </div>
-          </div>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-lg font-black leading-tight tracking-tight text-white sm:text-xl">
+              Investment Calculator
+            </span>
+            <span className="mt-0.5 block text-xs font-medium leading-4 text-white/80">
+              Model finance, returns and acquisition costs in one investor-ready workspace.
+            </span>
+          </span>
 
-          <div className="flex items-center gap-3 lg:justify-end">
-            <div className="relative">
-              <button
-                onMouseEnter={() => setShowTooltip(true)}
-                onMouseLeave={() => setShowTooltip(false)}
-                onFocus={() => setShowTooltip(true)}
-                onBlur={() => setShowTooltip(false)}
-                className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/70"
-                aria-label="Calculator help"
-                type="button"
-              >
-                <FiInfo className="h-4 w-4" />
-              </button>
-              {showTooltip && (
-                <div className="absolute right-0 top-full z-10 mt-2 w-72 rounded-xl bg-slate-950 p-3 text-xs leading-5 text-white shadow-xl ring-1 ring-white/10 dark:bg-white dark:text-slate-900">
-                  Compare investor strategies, model returns and keep stamp duty costs in the same view. Your inputs are saved
-                  automatically.
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2 text-sm font-bold text-brand-700 shadow-lg shadow-black/10 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-              aria-expanded={isExpanded}
-              aria-controls="calculator-content"
-              type="button"
-            >
-              {isExpanded ? 'Hide calculator' : 'Open calculator'}
-              {isExpanded ? (
-                <FiChevronUp className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <FiChevronDown className="h-4 w-4" aria-hidden="true" />
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
+          <span
+            className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white shadow-sm backdrop-blur transition-transform"
+            aria-hidden="true"
+          >
+            <FiChevronDown
+              className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : 'rotate-0'}`}
+            />
+          </span>
+        </span>
+      </button>
 
       {/* Expanded Content */}
       {isExpanded && (
