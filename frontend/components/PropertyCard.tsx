@@ -125,12 +125,6 @@ async function postJSON<T>(
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
-// Badge color thresholds for yield and ROI percentages
-const YIELD_THRESHOLD_EXCELLENT = 6; // >= 6% is green
-const YIELD_THRESHOLD_GOOD = 4; // >= 4% is amber, < 4% is red
-const ROI_THRESHOLD_EXCELLENT = 12; // >= 12% is green
-const ROI_THRESHOLD_GOOD = 8; // >= 8% is amber, < 8% is red
-
 function formatSourceBadge(source: string | null | undefined): string {
   const raw = (source ?? '').trim();
   const normalized = raw.toLowerCase();
@@ -201,7 +195,6 @@ export default function PropertyCard({
     return getRoiDisplay((normalized as any)?.raw ?? (normalized as any));
   }, [normalized, p]);
   const displayRoiPct = roiDisplay.value;
-  const roiIsProxyDisplay = roiDisplay.isProxy;
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -443,24 +436,6 @@ export default function PropertyCard({
 
   const href = useMemo(() => `/property/${encodeURIComponent(p.id)}`, [p.id]);
 
-  // Helper to determine badge color based on value and thresholds
-  const getBadgeColor = (type: 'yield' | 'roi', value: number) => {
-    if (type === 'yield') {
-      if (value >= YIELD_THRESHOLD_EXCELLENT)
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-      if (value >= YIELD_THRESHOLD_GOOD)
-        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-    } else {
-      // ROI
-      if (value >= ROI_THRESHOLD_EXCELLENT)
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-      if (value >= ROI_THRESHOLD_GOOD)
-        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-    }
-  };
-
   const handleSaveDeal = useCallback(async () => {
     try {
       setSaving(true);
@@ -480,13 +455,6 @@ export default function PropertyCard({
     p.imageurl ||
     (Array.isArray(p.image_urls) && p.image_urls.length > 0 ? p.image_urls[0] : null) ||
     '/placeholder.jpg';
-
-  const descriptionSnippet = useMemo(() => {
-    if (!p.description) return '';
-    const trimmed = p.description.trim();
-    if (trimmed.length <= 180) return trimmed;
-    return trimmed.slice(0, 177) + '...';
-  }, [p.description]);
 
   const matchInfo = useMemo(() => {
     const raw = Array.isArray(p.matches) ? p.matches : [];
@@ -575,7 +543,7 @@ export default function PropertyCard({
           loading="lazy"
           priority={false}
         />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent opacity-90" aria-hidden="true" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/20 via-transparent to-transparent opacity-70" aria-hidden="true" />
 
         {/* Sprint 11.3: Prominent Save button in top-left */}
         <button
@@ -645,63 +613,7 @@ export default function PropertyCard({
           )}
         </button>
 
-        {/* Badges for yield and ROI - moved to top-right */}
-        <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end">
-          {typeof displayScore === 'number' && (
-            <span
-              className={cx(
-                'inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm',
-                'bg-slate-950/70 text-white ring-1 ring-white/15 dark:bg-slate-50/10 dark:text-slate-100',
-              )}
-              aria-label={`Deal score: ${Math.round(displayScore)}/100`}
-              title={`Deal score: ${Math.round(displayScore)}/100`}
-            >
-              <FiTarget className="h-3.5 w-3.5" aria-hidden="true" />
-              Score {Math.round(displayScore)}
-            </span>
-          )}
-          {typeof displayYieldPct === 'number' && (
-            <span
-              className={cx(
-                'inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm',
-                getBadgeColor('yield', displayYieldPct),
-              )}
-              aria-label={`Yield percentage: ${formatPercent(displayYieldPct)}`}
-            >
-              <FiTrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
-              {formatPercent(displayYieldPct)} Yield
-            </span>
-          )}
-          {typeof displayRoiPct === 'number' && (
-            <span
-              className={cx(
-                'inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm',
-                getBadgeColor('roi', displayRoiPct),
-              )}
-              aria-label={`ROI percentage: ${formatPercent(displayRoiPct)}`}
-            >
-              <FiBarChart2 className="h-3.5 w-3.5" aria-hidden="true" />
-              {formatPercent(displayRoiPct)} ROI{roiIsProxyDisplay ? ' (proxy)' : ''}
-            </span>
-          )}
-        </div>
-
-        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3 text-white">
-          <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">Guide price</div>
-            <div className="truncate text-xl font-black tracking-tight drop-shadow-sm">{priceText}</div>
-          </div>
-          <div className="shrink-0 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold backdrop-blur-md">
-            {p.bedrooms ?? '—'} bd · {p.bathrooms ?? '—'} ba
-          </div>
-        </div>
       </Link>
-
-      {descriptionSnippet && (
-        <div className="px-4 pt-3 text-sm leading-6 text-slate-700 dark:text-slate-300 line-clamp-3">
-          <Highlight text={descriptionSnippet} tokens={matchInfo.tokens} />
-        </div>
-      )}
 
       <div className="p-4 space-y-3">
         <Link href={href} onClick={handleSearchClickTrack} className="block group">
@@ -758,31 +670,31 @@ export default function PropertyCard({
           <span className="truncate">{p.location || '—'}</span>
         </p>
 
-        <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/40">
-          <div className="rounded-xl bg-white px-2 py-2 text-center shadow-sm dark:bg-slate-950/70">
-            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
+        <div className="grid grid-cols-3 gap-2 rounded-2xl border border-brand-100 bg-gradient-to-br from-brand-50/90 via-white to-emerald-50/60 p-2 shadow-sm dark:border-brand-900/50 dark:from-brand-950/30 dark:via-slate-950 dark:to-emerald-950/20">
+          <div className="rounded-xl border border-white/80 bg-white px-2 py-2.5 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
               <FiTarget className="h-3.5 w-3.5" aria-hidden="true" />
             </div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Score</div>
-            <div className="text-sm font-black text-slate-950 dark:text-white">
+            <div className="text-lg font-black leading-tight text-slate-950 dark:text-white">
               {typeof displayScore === 'number' ? Math.round(displayScore) : '—'}
             </div>
           </div>
-          <div className="rounded-xl bg-white px-2 py-2 text-center shadow-sm dark:bg-slate-950/70">
-            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+          <div className="rounded-xl border border-white/80 bg-white px-2 py-2.5 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
               <FiTrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
             </div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Yield</div>
-            <div className="text-sm font-black text-slate-950 dark:text-white">
+            <div className="text-lg font-black leading-tight text-slate-950 dark:text-white">
               {typeof displayYieldPct === 'number' ? formatPercent(displayYieldPct) : '—'}
             </div>
           </div>
-          <div className="rounded-xl bg-white px-2 py-2 text-center shadow-sm dark:bg-slate-950/70">
-            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
+          <div className="rounded-xl border border-white/80 bg-white px-2 py-2.5 text-center shadow-sm dark:border-slate-800 dark:bg-slate-950/80">
+            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
               <FiBarChart2 className="h-3.5 w-3.5" aria-hidden="true" />
             </div>
             <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">ROI</div>
-            <div className="text-sm font-black text-slate-950 dark:text-white">
+            <div className="text-lg font-black leading-tight text-slate-950 dark:text-white">
               {typeof displayRoiPct === 'number' ? formatPercent(displayRoiPct) : '—'}
             </div>
           </div>
@@ -897,11 +809,6 @@ export default function PropertyCard({
           >
             {verdict.label}
           </span>
-          {verdict.highlights.map((h) => (
-            <span key={h} className="text-xs text-slate-600 dark:text-slate-400">
-              {h}
-            </span>
-          ))}
         </div>
 
         <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-slate-50 to-brand-50/60 px-3 py-2 dark:from-slate-900/60 dark:to-brand-950/30">
@@ -916,73 +823,6 @@ export default function PropertyCard({
             View details →
           </span>
         </div>
-
-        {/* Deal Pulse (micro row) */}
-        {(derived.rentMonthly || derived.crimeLabel || typeof derived.compsCount === 'number') && (
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-700 dark:text-slate-200">
-            {derived.rentMonthly ? (
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  aria-hidden
-                  className={cx(
-                    'inline-block h-2 w-2 rounded-sm',
-                    derived.rentSource === 'proxy'
-                      ? 'bg-teal-500/70'
-                      : 'bg-slate-400/70 dark:bg-slate-500/60',
-                  )}
-                />
-                <span className="text-slate-600 dark:text-slate-400">
-                  {derived.rentSource === 'proxy' ? 'Yield proxy:' : 'Yield:'}
-                </span>
-                <span className="font-semibold">£{(derived.rentMonthly / 1000).toFixed(1)}k/mo</span>
-              </span>
-            ) : null}
-
-            {(() => {
-              const n = typeof derived.compsCount === 'number' ? derived.compsCount : undefined;
-              const schools = typeof derived.schoolsRating === 'number' ? derived.schoolsRating : undefined;
-              if (n == null && schools == null) return null;
-
-              let label: 'High' | 'Avg' | 'Low' = 'Avg';
-              if ((typeof n === 'number' && n >= 6) || (typeof schools === 'number' && schools >= 4.0)) label = 'High';
-              else if ((typeof n === 'number' && n <= 1) && (typeof schools === 'number' && schools < 3.0)) label = 'Low';
-
-              const dot =
-                label === 'High'
-                  ? 'bg-teal-500/70'
-                  : label === 'Avg'
-                    ? 'bg-amber-500/60'
-                    : 'bg-slate-400/70 dark:bg-slate-500/60';
-
-              return (
-                <span className="inline-flex items-center gap-1.5">
-                  <span aria-hidden className={cx('inline-block h-2 w-2 rounded-full', dot)} />
-                  <span className="text-slate-600 dark:text-slate-400">Area demand:</span>
-                  <span className="font-semibold">{label}</span>
-                </span>
-              );
-            })()}
-
-            {derived.crimeLabel ? (
-              (() => {
-                const label = derived.crimeLabel === 'Low' ? 'Good' : derived.crimeLabel === 'Med' ? 'Avg' : 'Risk';
-                const dot =
-                  label === 'Good'
-                    ? 'bg-teal-500/70'
-                    : label === 'Avg'
-                      ? 'bg-amber-500/60'
-                      : 'bg-slate-400/70 dark:bg-slate-500/60';
-                return (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span aria-hidden className={cx('inline-block h-2 w-2 rounded-sm', dot)} />
-                    <span className="text-slate-600 dark:text-slate-400">Safety:</span>
-                    <span className="font-semibold">{label}</span>
-                  </span>
-                );
-              })()
-            ) : null}
-          </div>
-        )}
       </div>
     </article>
   );
