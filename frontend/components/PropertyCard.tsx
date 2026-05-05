@@ -6,7 +6,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import { Highlight } from '@/components/Highlight';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
-import { FiHeart } from 'react-icons/fi';
+import { FiBarChart2, FiHeart, FiHome, FiMapPin, FiTarget, FiTrendingUp } from 'react-icons/fi';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
 import { track } from '@/lib/events';
@@ -555,8 +555,8 @@ export default function PropertyCard({
       onMouseEnter={() => onHoverChange?.(true)}
       onMouseLeave={() => onHoverChange?.(false)}
       className={cx(
-        'property-card card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30',
-        isHovered && 'ring-2 ring-brand-500/20 border-brand-500/30',
+        'property-card group/card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-2xl hover:shadow-slate-950/10 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-brand-700',
+        isHovered && 'ring-2 ring-brand-500/20 border-brand-500/40 shadow-xl shadow-brand-950/10',
       )}
     >
       <Link
@@ -575,6 +575,7 @@ export default function PropertyCard({
           loading="lazy"
           priority={false}
         />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent opacity-90" aria-hidden="true" />
 
         {/* Sprint 11.3: Prominent Save button in top-left */}
         <button
@@ -586,7 +587,7 @@ export default function PropertyCard({
           }}
           disabled={saving || saveSuccess}
           className={cx(
-            'absolute top-2 left-2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+            'absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
             'active:scale-[0.98]',
             saveSuccess
@@ -645,56 +646,69 @@ export default function PropertyCard({
         </button>
 
         {/* Badges for yield and ROI - moved to top-right */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
+        <div className="absolute top-3 right-3 flex flex-col gap-1.5 items-end">
           {typeof displayScore === 'number' && (
             <span
               className={cx(
-                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
-                'bg-slate-900/60 text-white dark:bg-slate-50/10 dark:text-slate-100',
+                'inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm',
+                'bg-slate-950/70 text-white ring-1 ring-white/15 dark:bg-slate-50/10 dark:text-slate-100',
               )}
               aria-label={`Deal score: ${Math.round(displayScore)}/100`}
               title={`Deal score: ${Math.round(displayScore)}/100`}
             >
+              <FiTarget className="h-3.5 w-3.5" aria-hidden="true" />
               Score {Math.round(displayScore)}
             </span>
           )}
           {typeof displayYieldPct === 'number' && (
             <span
               className={cx(
-                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
+                'inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm',
                 getBadgeColor('yield', displayYieldPct),
               )}
               aria-label={`Yield percentage: ${formatPercent(displayYieldPct)}`}
             >
+              <FiTrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
               {formatPercent(displayYieldPct)} Yield
             </span>
           )}
           {typeof displayRoiPct === 'number' && (
             <span
               className={cx(
-                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
+                'inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full backdrop-blur-md shadow-sm',
                 getBadgeColor('roi', displayRoiPct),
               )}
               aria-label={`ROI percentage: ${formatPercent(displayRoiPct)}`}
             >
+              <FiBarChart2 className="h-3.5 w-3.5" aria-hidden="true" />
               {formatPercent(displayRoiPct)} ROI{roiIsProxyDisplay ? ' (proxy)' : ''}
             </span>
           )}
         </div>
+
+        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3 text-white">
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">Guide price</div>
+            <div className="truncate text-xl font-black tracking-tight drop-shadow-sm">{priceText}</div>
+          </div>
+          <div className="shrink-0 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold backdrop-blur-md">
+            {p.bedrooms ?? '—'} bd · {p.bathrooms ?? '—'} ba
+          </div>
+        </div>
       </Link>
 
       {descriptionSnippet && (
-        <div className="px-4 pt-3 text-sm text-slate-700 dark:text-slate-300 line-clamp-3">
+        <div className="px-4 pt-3 text-sm leading-6 text-slate-700 dark:text-slate-300 line-clamp-3">
           <Highlight text={descriptionSnippet} tokens={matchInfo.tokens} />
         </div>
       )}
 
-      <div className="p-4 space-y-2">
+      <div className="p-4 space-y-3">
         <Link href={href} onClick={handleSearchClickTrack} className="block group">
-          <div className="mb-1">
+          <div className="mb-2 flex items-center justify-between gap-2">
             <span
               className={cx(
-                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+                'inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold',
                 sourceBadgeClasses,
               )}
               aria-label={`Source: ${sourceBadgeText}`}
@@ -702,8 +716,11 @@ export default function PropertyCard({
             >
               {sourceBadgeText}
             </span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-600 dark:text-brand-300">
+              Investor view
+            </span>
           </div>
-          <h3 className="font-semibold leading-snug line-clamp-2 group-hover:underline">
+          <h3 className="text-base font-black leading-snug text-slate-950 line-clamp-2 transition-colors group-hover:text-brand-600 dark:text-white dark:group-hover:text-brand-300">
             <Highlight text={p.title || 'Untitled property'} tokens={matchInfo.tokens} />
           </h3>
         </Link>
@@ -736,13 +753,46 @@ export default function PropertyCard({
           </div>
         )}
 
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">{p.location || '—'}</p>
+        <p className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400">
+          <FiMapPin className="h-4 w-4 shrink-0 text-brand-500" aria-hidden="true" />
+          <span className="truncate">{p.location || '—'}</span>
+        </p>
+
+        <div className="grid grid-cols-3 gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-2 dark:border-slate-800 dark:bg-slate-900/40">
+          <div className="rounded-xl bg-white px-2 py-2 text-center shadow-sm dark:bg-slate-950/70">
+            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-300">
+              <FiTarget className="h-3.5 w-3.5" aria-hidden="true" />
+            </div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Score</div>
+            <div className="text-sm font-black text-slate-950 dark:text-white">
+              {typeof displayScore === 'number' ? Math.round(displayScore) : '—'}
+            </div>
+          </div>
+          <div className="rounded-xl bg-white px-2 py-2 text-center shadow-sm dark:bg-slate-950/70">
+            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300">
+              <FiTrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
+            </div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Yield</div>
+            <div className="text-sm font-black text-slate-950 dark:text-white">
+              {typeof displayYieldPct === 'number' ? formatPercent(displayYieldPct) : '—'}
+            </div>
+          </div>
+          <div className="rounded-xl bg-white px-2 py-2 text-center shadow-sm dark:bg-slate-950/70">
+            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300">
+              <FiBarChart2 className="h-3.5 w-3.5" aria-hidden="true" />
+            </div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">ROI</div>
+            <div className="text-sm font-black text-slate-950 dark:text-white">
+              {typeof displayRoiPct === 'number' ? formatPercent(displayRoiPct) : '—'}
+            </div>
+          </div>
+        </div>
 
         {(FF.AREA_INTEL || FF.COMPS) && (
-          <div className="pt-3 border-t border-slate-200/80 dark:border-slate-700/80">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-3 dark:border-slate-800 dark:bg-slate-900/30">
             <div className="flex items-center justify-between">
-              <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 tracking-wide uppercase">
-                Insights
+              <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200 tracking-wide uppercase">
+                Market pulse
               </div>
               <div className="text-[10px] text-slate-500 dark:text-slate-400">
                 {derived.freshnessText ? derived.freshnessText : ''}
@@ -836,7 +886,7 @@ export default function PropertyCard({
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3 dark:border-slate-800">
           <span
             className={cx(
               'inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-semibold',
@@ -854,13 +904,17 @@ export default function PropertyCard({
           ))}
         </div>
 
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between rounded-2xl bg-gradient-to-r from-slate-50 to-brand-50/60 px-3 py-2 dark:from-slate-900/60 dark:to-brand-950/30">
           <div className="text-sm">
-            <span className="font-medium">{priceText}</span>
-            <span className="opacity-60 ml-2">
+            <span className="font-black text-slate-950 dark:text-white">{priceText}</span>
+            <span className="opacity-70 ml-2 inline-flex items-center gap-1 text-xs">
+              <FiHome className="h-3.5 w-3.5" aria-hidden="true" />
               {p.bedrooms ?? '—'} bd · {p.bathrooms ?? '—'} ba
             </span>
           </div>
+          <span className="text-xs font-bold text-brand-600 transition-colors group-hover/card:text-brand-700 dark:text-brand-300">
+            View details →
+          </span>
         </div>
 
         {/* Deal Pulse (micro row) */}
