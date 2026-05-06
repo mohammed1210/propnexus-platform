@@ -222,6 +222,9 @@ const COUNT_OPTIONS = [
   { key: '5', label: '5+' },
 ] as const;
 
+const DEFAULT_LISTINGS_LIMIT = 25;
+const MAP_POINTS_LIMIT = 2000;
+
 type RawProperty = {
   id: string;
   title: string;
@@ -535,7 +538,7 @@ function ListingsInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(() => searchParams?.get('map') === '1');
   const [showFilters, setShowFilters] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [controlsCollapsed, setControlsCollapsed] = useState(false);
@@ -649,7 +652,7 @@ function ListingsInner() {
     const raw = searchParams?.get('limit') ?? '';
     const v = parsePositiveInt(raw);
     if (v === 25 || v === 50 || v === 100) return v;
-    return 50;
+    return DEFAULT_LISTINGS_LIMIT;
   })();
 
   const offset = ((): number => {
@@ -795,6 +798,7 @@ function ListingsInner() {
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
 
     (async () => {
       setLoading(true);
@@ -838,13 +842,14 @@ function ListingsInner() {
         // matching properties (not just the current paged list).
         if (showMap) {
           params.set('include_points', '1');
-          params.set('points_limit', '5000');
+          params.set('points_limit', String(MAP_POINTS_LIMIT));
         }
 
         const response = await fetch(`${backendUrl}/properties?${params.toString()}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           cache: 'no-store',
+          signal: controller.signal,
         });
 
         if (cancelled) return;
@@ -940,6 +945,7 @@ function ListingsInner() {
         setCorrectedQuery(correctionFlag ? correctionTo : null);
         setOriginalQuery(correctionFlag ? correctionFrom : null);
       } catch (error) {
+        if (cancelled || (error as any)?.name === 'AbortError') return;
         console.error('[listings] fetch error', error);
         setRows([]);
         setMapRows(null);
@@ -950,12 +956,13 @@ function ListingsInner() {
         setCorrectedQuery(null);
         setOriginalQuery(null);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, [
     q,
