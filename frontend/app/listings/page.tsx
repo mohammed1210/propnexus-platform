@@ -1567,18 +1567,20 @@ function ListingsInner() {
           <div className="flex flex-col md:flex-row md:items-center gap-2">
             {/* Left: location search */}
             <div className="flex-1">
-              <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <div className="relative group/search">
+                <div className="pointer-events-none absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-emerald-500 text-white shadow-sm shadow-brand-500/20 transition-transform group-focus-within/search:scale-105">
+                  <FiSearch className="w-4 h-4" aria-hidden="true" />
+                </div>
                 <input
                   type="text"
                   data-testid="onboarding-search-input"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-                  placeholder="Search location or postcode…"
-                  className="search-location-input input-field w-full"
-                  style={{ height: 40, paddingLeft: 40, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
-                  aria-label="Search by location"
+                  placeholder="Search property deals — location, postcode, auction, HMO…"
+                  className="search-location-input w-full rounded-2xl border-2 border-brand-200 bg-white/95 text-sm font-semibold text-slate-950 shadow-sm shadow-brand-950/5 outline-none transition-all placeholder:text-slate-400 hover:border-brand-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-brand-900/70 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:hover:border-brand-700 dark:focus:border-brand-400"
+                  style={{ height: 44, paddingLeft: 48, paddingRight: 14, paddingTop: 8, paddingBottom: 8 }}
+                  aria-label="Search property deals by location, postcode or keyword"
                 />
               </div>
             </div>
