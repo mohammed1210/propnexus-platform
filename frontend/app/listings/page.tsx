@@ -1562,30 +1562,53 @@ function ListingsInner() {
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Compact sticky controls bar */}
-      <div className={`sticky-filter ${isScrolled ? 'shadow-md' : ''}`}>
-        <div className="max-w-7xl mx-auto px-4 py-2">
-          <div className="flex flex-col md:flex-row md:items-center gap-2">
+      <div className={`sticky-filter ${isScrolled ? 'shadow-lg' : ''}`}>
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div
+            className={`rounded-3xl border border-brand-200/80 bg-gradient-to-br from-white via-brand-50/70 to-emerald-50/50 p-3 shadow-xl shadow-brand-950/5 transition-all dark:border-brand-900/50 dark:from-slate-950 dark:via-brand-950/30 dark:to-emerald-950/20 ${
+              controlsCollapsed ? 'rounded-2xl p-2 shadow-md' : ''
+            }`}
+          >
+            {!controlsCollapsed ? (
+              <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <div className="inline-flex items-center rounded-full border border-brand-200 bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700 shadow-sm dark:border-brand-800 dark:bg-slate-950/70 dark:text-brand-300">
+                    Property deal search
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
+                    Find investor-ready opportunities by location, postcode or deal keyword.
+                  </p>
+                </div>
+                <p className="hidden text-xs font-medium text-slate-500 dark:text-slate-400 sm:block">
+                  Search first, then refine with filters.
+                </p>
+              </div>
+            ) : null}
+
+            <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
             {/* Left: location search */}
-            <div className="flex-1">
-              <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <div className="flex-[1.6]">
+              <div className="relative group/search">
+                <div className="absolute left-2.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 to-emerald-500 text-white shadow-md shadow-brand-500/20 transition-transform group-focus-within/search:scale-105">
+                  <FiSearch className="h-5 w-5" aria-hidden="true" />
+                </div>
                 <input
                   type="text"
                   data-testid="onboarding-search-input"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-                  placeholder="Search location or postcode…"
-                  className="search-location-input input-field w-full"
-                  style={{ height: 40, paddingLeft: 40, paddingRight: 12, paddingTop: 8, paddingBottom: 8 }}
-                  aria-label="Search by location"
+                  placeholder="Search for property deals — e.g. Ilford, IG3, auction, HMO…"
+                  className="search-location-input w-full rounded-2xl border-2 border-brand-200 bg-white/95 py-3 pl-16 pr-4 text-base font-semibold text-slate-950 shadow-inner shadow-slate-950/5 outline-none transition-all placeholder:text-slate-400 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-brand-900/70 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-brand-400"
+                  style={{ height: controlsCollapsed ? 48 : 58 }}
+                  aria-label="Search property deals by location, postcode or keyword"
                 />
               </div>
             </div>
 
             {/* Right: controls */}
             {!controlsCollapsed ? (
-              <div className="flex items-center gap-2 justify-between md:justify-end">
+              <div className="flex flex-wrap items-center gap-2 justify-between lg:justify-end">
                 <label className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">
                   <FiMap className="w-4 h-4" />
                   <span className="hidden sm:inline">Map</span>
@@ -1629,7 +1652,7 @@ function ListingsInner() {
                     });
                   }}
                   className="investment-type-select input-field"
-                  style={{ height: 40, padding: '0.5rem 0.75rem' }}
+                  style={{ height: 48, padding: '0.65rem 0.85rem' }}
                   aria-label="Sort"
                 >
                   <option value="recommended">Top deals (Recommended)</option>
@@ -1642,17 +1665,17 @@ function ListingsInner() {
 
                 <button
                   onClick={applyFilters}
-                  className="h-10 px-3 md:px-4 rounded-lg bg-brand-500 hover:bg-brand-600 text-white font-semibold transition-all duration-200 flex items-center gap-2"
+                  className="h-12 px-4 md:px-6 rounded-2xl bg-gradient-to-r from-brand-500 via-brand-600 to-emerald-500 text-white font-black shadow-lg shadow-brand-500/25 transition-all duration-200 flex items-center gap-2 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-brand-500/30 disabled:opacity-70 disabled:hover:translate-y-0"
                   disabled={loading}
                 >
-                  <FiSearch className="w-4 h-4" />
-                  <span className="hidden sm:inline">Search</span>
+                  <FiSearch className="w-4 h-4" aria-hidden="true" />
+                  <span className="hidden sm:inline">Search deals</span>
                 </button>
 
                 <button
                   data-testid="onboarding-more-filters"
                   onClick={() => setShowFilters((v) => !v)}
-                  className="more-filters-button h-10 px-3 md:px-4 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200"
+                  className="more-filters-button h-12 px-3 md:px-4 rounded-2xl border border-slate-300 bg-white/90 dark:border-slate-600 dark:bg-slate-900/80 hover:border-brand-300 hover:bg-white dark:hover:bg-slate-800 flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-200 transition-all duration-200 shadow-sm"
                   aria-expanded={showFilters}
                   aria-controls="listings-filters-popover"
                 >
@@ -1668,7 +1691,7 @@ function ListingsInner() {
                 {isLoaded && isAdmin && (
                   <button
                     onClick={runScrape}
-                    className="h-10 px-3 md:px-4 rounded-lg border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-200"
+                    className="h-12 px-3 md:px-4 rounded-2xl border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-200"
                     disabled={scrapeLoading}
                     title="Admin: run scrapers and import fresh listings"
                   >
@@ -1677,6 +1700,7 @@ function ListingsInner() {
                 )}
               </div>
             ) : null}
+            </div>
           </div>
 
           {!mapAvailable && !loading && rows.length > 0 && (
