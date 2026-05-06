@@ -328,24 +328,24 @@ export default function PropertyDetailsPage() {
 
       <div className="max-w-7xl mx-auto px-4 py-8 lg:pr-64">{/* Add right padding on desktop for floating sidebar */}
         {/* Image-first (focal) carousel + details */}
-        <div className="card mb-6 overflow-hidden">
-          <PropertyHeader
-            property={{
-              title: (property as any).title ?? null,
-              location: (property as any).location ?? null,
-              bedrooms: (property as any).bedrooms ?? null,
-              bathrooms: (property as any).bathrooms ?? null,
-              price: (property as any).price ?? null,
-              propertyType: (property as any).propertyType ?? null,
-            }}
+        <div className="card mb-6 overflow-hidden !p-0">
+          <ImageGallery
+            imageUrls={imageUrls}
+            fallbackImageUrl={fallbackImageUrl}
+            placeholderSrc={PLACEHOLDER_IMG}
+            title={property.title ? String(property.title) : undefined}
           />
 
           <div className="border-t border-slate-200 dark:border-slate-800">
-            <ImageGallery
-              imageUrls={imageUrls}
-              fallbackImageUrl={fallbackImageUrl}
-              placeholderSrc={PLACEHOLDER_IMG}
-              title={property.title ? String(property.title) : undefined}
+            <PropertyHeader
+              property={{
+                title: (property as any).title ?? null,
+                location: (property as any).location ?? null,
+                bedrooms: (property as any).bedrooms ?? null,
+                bathrooms: (property as any).bathrooms ?? null,
+                price: (property as any).price ?? null,
+                propertyType: (property as any).propertyType ?? null,
+              }}
             />
           </div>
 
