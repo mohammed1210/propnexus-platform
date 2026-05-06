@@ -584,6 +584,11 @@ function ListingsInner() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle('listings-search-only', controlsCollapsed);
+    return () => document.body.classList.remove('listings-search-only');
+  }, [controlsCollapsed]);
+
   // Auto-dismiss filters dropdown on meaningful scroll.
   useEffect(() => {
     if (!showFilters) return;
@@ -1568,8 +1573,12 @@ function ListingsInner() {
             {/* Left: location search */}
             <div className="flex-1">
               <div className="relative group/search">
-                <div className="pointer-events-none absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-emerald-500 text-white shadow-sm shadow-brand-500/20 transition-transform group-focus-within/search:scale-105">
-                  <FiSearch className="w-4 h-4" aria-hidden="true" />
+                <div
+                  className={`pointer-events-none absolute left-2 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-emerald-500 text-white shadow-sm shadow-brand-500/20 transition-all group-focus-within/search:scale-105 ${
+                    controlsCollapsed ? 'h-10 w-10 shadow-md' : 'h-8 w-8'
+                  }`}
+                >
+                  <FiSearch className={controlsCollapsed ? 'w-5 h-5' : 'w-4 h-4'} aria-hidden="true" />
                 </div>
                 <input
                   type="text"
@@ -1578,8 +1587,16 @@ function ListingsInner() {
                   onChange={(e) => setSearchInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
                   placeholder="Search property deals — location, postcode, auction, HMO…"
-                  className="search-location-input w-full rounded-2xl border-2 border-brand-200 bg-white/95 text-sm font-semibold text-slate-950 shadow-sm shadow-brand-950/5 outline-none transition-all placeholder:text-slate-400 hover:border-brand-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-brand-900/70 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:hover:border-brand-700 dark:focus:border-brand-400"
-                  style={{ height: 44, paddingLeft: 48, paddingRight: 14, paddingTop: 8, paddingBottom: 8 }}
+                  className={`search-location-input w-full rounded-2xl border-2 border-brand-200 bg-white/95 font-semibold text-slate-950 shadow-sm shadow-brand-950/5 outline-none transition-all placeholder:text-slate-400 hover:border-brand-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/15 dark:border-brand-900/70 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:hover:border-brand-700 dark:focus:border-brand-400 ${
+                    controlsCollapsed ? 'text-base shadow-lg shadow-brand-950/10' : 'text-sm'
+                  }`}
+                  style={{
+                    height: controlsCollapsed ? 52 : 44,
+                    paddingLeft: controlsCollapsed ? 56 : 48,
+                    paddingRight: 14,
+                    paddingTop: 8,
+                    paddingBottom: 8,
+                  }}
                   aria-label="Search property deals by location, postcode or keyword"
                 />
               </div>
