@@ -588,6 +588,11 @@ function ListingsInner() {
   }, []);
 
   useEffect(() => {
+    document.body.classList.add('listings-page');
+    return () => document.body.classList.remove('listings-page');
+  }, []);
+
+  useEffect(() => {
     document.body.classList.toggle('listings-search-only', controlsCollapsed);
     return () => document.body.classList.remove('listings-search-only');
   }, [controlsCollapsed]);
