@@ -106,7 +106,7 @@ export default function ImageGallery({
   return (
     <>
       <div
-        className="aspect-[16/9] bg-slate-100 dark:bg-slate-900 relative"
+        className="aspect-[2/1] bg-slate-100 dark:bg-slate-900 relative"
         style={{ touchAction: 'pan-y' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
