@@ -749,73 +749,73 @@ export default function PropertyCard({
           <span className="truncate">{p.location || '—'}</span>
         </p>
 
-        <div className="overflow-hidden rounded-2xl border border-brand-200/80 bg-slate-950 shadow-xl shadow-slate-950/10 ring-1 ring-white/10 dark:border-brand-700/50 dark:shadow-black/30">
-          <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-gradient-to-r from-brand-500/25 via-emerald-500/15 to-cyan-500/20 px-3 py-2">
+        <div className="overflow-hidden rounded-2xl border border-brand-100 bg-gradient-to-br from-white via-brand-50/45 to-emerald-50/45 shadow-md shadow-slate-950/5 ring-1 ring-brand-100/60 dark:border-brand-900/50 dark:from-slate-950 dark:via-brand-950/20 dark:to-emerald-950/15 dark:shadow-black/20 dark:ring-white/5">
+          <div className="flex items-center justify-between gap-2 border-b border-brand-100/80 bg-gradient-to-r from-brand-50/90 via-white/80 to-emerald-50/80 px-3 py-2 dark:border-white/10 dark:from-brand-500/15 dark:via-slate-950/70 dark:to-emerald-500/10">
             <div>
-              <div className="text-[9px] font-black uppercase tracking-[0.18em] text-brand-100">Investor scorecard</div>
-              <div className="text-[11px] font-semibold text-white/75">Model-ranked deal signals</div>
+              <div className="text-[9px] font-black uppercase tracking-[0.18em] text-brand-700 dark:text-brand-200">Investor scorecard</div>
+              <div className="text-[11px] font-semibold text-slate-500 dark:text-white/65">Model-ranked deal signals</div>
             </div>
-            <div className="rounded-full border border-emerald-300/30 bg-emerald-400/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-100">
+            <div className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 dark:border-emerald-300/25 dark:bg-emerald-400/10 dark:text-emerald-100">
               {scoreVerdict}
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-px bg-white/10">
-            <div className="bg-slate-950/95 px-2 py-2.5">
+          <div className="grid grid-cols-3 gap-px bg-brand-100/70 dark:bg-white/10">
+            <div className="bg-white/85 px-2 py-2.5 dark:bg-slate-950/80">
               <div className="mb-1.5 flex items-center justify-between gap-1">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-400/15 text-brand-200 ring-1 ring-brand-300/20">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-brand-700 ring-1 ring-brand-200/70 dark:bg-brand-400/15 dark:text-brand-200 dark:ring-brand-300/20">
                   <FiTarget className="h-3.5 w-3.5" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Score</span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Score</span>
               </div>
-              <div className="text-lg font-black leading-none text-white">
+              <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
                 {typeof displayScore === 'number' ? Math.round(displayScore) : '—'}
               </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10" aria-hidden="true">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-brand-400 to-cyan-300"
                   style={{ width: `${scoreProgress}%` }}
                 />
               </div>
-              <div className="mt-1 text-[9px] font-semibold text-slate-400">model edge</div>
+              <div className="mt-1 text-[9px] font-semibold text-slate-500 dark:text-slate-400">model edge</div>
             </div>
 
-            <div className="bg-slate-950/95 px-2 py-2.5">
+            <div className="bg-white/85 px-2 py-2.5 dark:bg-slate-950/80">
               <div className="mb-1.5 flex items-center justify-between gap-1">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-300/20">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-400/15 dark:text-emerald-200 dark:ring-emerald-300/20">
                   <FiTrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">Yield</span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Yield</span>
               </div>
-              <div className="text-lg font-black leading-none text-white">
+              <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
                 {typeof displayYieldPct === 'number' ? formatPercent(displayYieldPct) : '—'}
               </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10" aria-hidden="true">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-lime-300"
                   style={{ width: `${yieldProgress}%` }}
                 />
               </div>
-              <div className="mt-1 text-[9px] font-semibold text-slate-400">cash yield</div>
+              <div className="mt-1 text-[9px] font-semibold text-slate-500 dark:text-slate-400">cash yield</div>
             </div>
 
-            <div className="bg-slate-950/95 px-2 py-2.5">
+            <div className="bg-white/85 px-2 py-2.5 dark:bg-slate-950/80">
               <div className="mb-1.5 flex items-center justify-between gap-1">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-400/15 text-blue-200 ring-1 ring-blue-300/20">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 ring-1 ring-blue-200/70 dark:bg-blue-400/15 dark:text-blue-200 dark:ring-blue-300/20">
                   <FiBarChart2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">ROI</span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">ROI</span>
               </div>
-              <div className="text-lg font-black leading-none text-white">
+              <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
                 {typeof displayRoiPct === 'number' ? formatPercent(displayRoiPct) : '—'}
               </div>
-              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10" aria-hidden="true">
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10" aria-hidden="true">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-blue-400 to-violet-300"
                   style={{ width: `${roiProgress}%` }}
                 />
               </div>
-              <div className="mt-1 text-[9px] font-semibold text-slate-400">return lens</div>
+              <div className="mt-1 text-[9px] font-semibold text-slate-500 dark:text-slate-400">return lens</div>
             </div>
           </div>
         </div>
