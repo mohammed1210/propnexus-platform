@@ -66,7 +66,10 @@ jobs:
         run: |
           expect_short="${EXPECT_SHA:0:7}"
 
-          for i in {1..36}; do
+          # Railway can report the build as scheduled before the new container is live.
+          # Keep this window long enough for dependency-heavy backend builds without
+          # marking successful deploys as failed prematurely.
+          for i in {1..90}; do
             payload=$(curl -fsSL "$URL" 2>/dev/null || true)
 
             if [ -z "$payload" ]; then
