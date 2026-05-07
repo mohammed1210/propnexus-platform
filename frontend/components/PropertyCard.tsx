@@ -28,6 +28,7 @@ type Property = {
   bedrooms?: number | null;
   bathrooms?: number | null;
   description?: string | null;
+  postcode?: string | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
   ai_score?: number | null;
@@ -232,9 +233,9 @@ export default function PropertyCard({
   const [timeTick, setTimeTick] = useState(0);
 
   const postcodeKey = useMemo(() => {
-    const haystack = `${p.location ?? ''} ${p.title ?? ''} ${p.description ?? ''}`;
+    const haystack = `${p.postcode ?? ''} ${p.location ?? ''} ${p.title ?? ''} ${p.description ?? ''}`;
     return extractLikelyUkPostcode(haystack);
-  }, [p.description, p.location, p.title]);
+  }, [p.description, p.location, p.postcode, p.title]);
 
   const dealChipText = useMemo(() => {
     if (!Array.isArray(p.deal_reasons) || !p.deal_reasons[0]) return null;

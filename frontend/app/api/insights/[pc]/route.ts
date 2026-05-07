@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 // Keep this route dependency-light and server-safe.
 // It aggregates backend endpoints so the listings card only does ONE request per postcode.
 export async function GET(request: Request, ctx: any) {
-  const pc = String(ctx?.params?.pc ?? '').trim();
+  const params = await ctx?.params;
+  const pc = String(params?.pc ?? '').trim();
   if (!pc) return NextResponse.json({ error: 'postcode required' }, { status: 400 });
 
   const url = new URL(request.url);
