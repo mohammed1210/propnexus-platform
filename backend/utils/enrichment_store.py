@@ -145,14 +145,16 @@ def safe_select_ppd_sales(
         return []
 
     # We intentionally avoid complex geospatial filtering here.
-    # v1: match postcode prefix (e.g. outward code) and recent transfers.
+    # v1: match exact outward code plus the standard postcode space.
+    # Avoid a broad `RM1%`-style match because that incorrectly includes
+    # RM10/RM11/RM12 rows when the requested outward code is RM1.
     try:
         q = (
             sb.table("ppd_sales")
             .select(
                 "price,date_of_transfer,postcode,property_type,new_build,tenure,paon,saon,street,town_city,district,county,latitude,longitude"
             )
-            .ilike("postcode", f"{prefix}%")
+            .ilike("postcode", f"{prefix} %")
             .order("date_of_transfer", desc=True)
             .limit(max(1, min(int(limit or 0), 100)))
         )

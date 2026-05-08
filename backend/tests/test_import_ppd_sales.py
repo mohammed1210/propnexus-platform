@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+from postgrest.exceptions import APIError
+
 from backend.scripts import import_ppd_sales
 
 
@@ -91,3 +93,55 @@ def test_main_upserts_launch_prefix_rows_by_transaction_id(monkeypatch, tmp_path
         "22222222-2222-2222-2222-222222222222",
     ]
     assert all(row["postcode"] == row["postcode"].upper() for row in upserted)
+
+
+def test_main_inserts_when_transaction_id_conflict_index_is_missing(monkeypatch, tmp_path):
+    csv_path = tmp_path / "ppd.csv"
+    _write_ppd_csv(csv_path)
+    calls = []
+
+    class _Table:
+        def upsert(self, rows, *, on_conflict=None):
+            calls.append(("upsert", rows, on_conflict))
+            return self
+
+        def insert(self, rows):
+            calls.append(("insert", rows, None))
+            return self
+
+        def execute(self):
+            if calls[-1][0] == "upsert":
+                raise APIError(
+                    {
+                        "message": "there is no unique or exclusion constraint matching the ON CONFLICT specification",
+                        "code": "42P10",
+                        "hint": None,
+                        "details": None,
+                    }
+                )
+            return SimpleNamespace(data=None)
+
+    class _Supabase:
+        def table(self, name):
+            assert name == "ppd_sales"
+            return _Table()
+
+    monkeypatch.setattr(import_ppd_sales, "get_supabase", lambda required=True: _Supabase())
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "import_ppd_sales.py",
+            "--csv",
+            str(csv_path),
+            "--prefix",
+            "IG",
+            "--batch-size",
+            "1",
+        ],
+    )
+
+    assert import_ppd_sales.main() == 0
+
+    assert [call[0] for call in calls] == ["upsert", "insert"]
+    assert calls[1][1][0]["transaction_id"] == "11111111-1111-1111-1111-111111111111"
