@@ -111,7 +111,7 @@ describe('AreaInsights launch trimming', () => {
 
     expect(await screen.findByText('Avg price')).toBeInTheDocument();
     expect(screen.getByText('Land Registry PPD')).toBeInTheDocument();
-    expect(screen.getByText('Internal listing comps')).toBeInTheDocument();
+    expect(screen.getByText('Internal rental listings')).toBeInTheDocument();
     expect(screen.getAllByText('police.uk').length).toBeGreaterThan(0);
     expect(screen.queryByText(/Mock intel|Replace with live sources|10 IG3 Street|Schools rating|Population/i)).not.toBeInTheDocument();
   });

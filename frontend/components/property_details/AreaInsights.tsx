@@ -423,7 +423,7 @@ export default function AreaInsights({
   const crimeSignal = normStr(intel?.crime_signal) || normStr(intel?.crime?.signal);
   const crimeRadius = normStr(intel?.crime_radius_label) || normStr(intel?.crime?.radius_label);
   const crimeNote = normStr(intel?.crime_note) || normStr(intel?.crime?.note);
-  const hasCrime = intel?.crime_source === 'police.uk' && hasFiniteNumber(crimeCount);
+  const hasCrime = (intel?.crime_source === 'police.uk' || intel?.crime?.source === 'police.uk') && hasFiniteNumber(crimeCount);
   const rentSourceForMetric = normStr(intel?.rent_source) || sourceDetail(intel?.source_details, 'rent');
   const rentCopy = rentMetricCopy(rentSourceForMetric);
 
@@ -465,7 +465,7 @@ export default function AreaInsights({
       : hasFiniteNumber(intel.crime?.count)
         ? intel.crime?.count
         : null;
-    if (intel.crime_source === 'police.uk' && hasFiniteNumber(count)) {
+    if ((intel.crime_source === 'police.uk' || intel.crime?.source === 'police.uk') && hasFiniteNumber(count)) {
       const signal = normStr(intel.crime_signal) || normStr(intel.crime?.signal);
       metrics.push({
         label: 'Reported nearby crime',
