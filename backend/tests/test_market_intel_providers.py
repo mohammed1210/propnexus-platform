@@ -112,6 +112,56 @@ def test_comps_returns_ppd_and_internal_rent_comps(monkeypatch):
     assert payload["rents"][0]["source"] == "internal_property_listings"
 
 
+def test_comps_for_full_postcode_prefers_exact_then_sector_then_outward(monkeypatch):
+    fake = _FakeSupabase()
+    monkeypatch.setattr(providers, "get_supabase", lambda required=False: fake)
+    calls = []
+
+    def _fake_ppd(_sb, *, postcode_prefix, match_mode, **_kwargs):
+        calls.append((match_mode, postcode_prefix))
+        if match_mode == "exact":
+            return [
+                {
+                    "price": 300000,
+                    "date_of_transfer": "2026-03-01",
+                    "postcode": "IG3 8AA",
+                    "paon": "1",
+                    "street": "Exact Road",
+                }
+            ]
+        if match_mode == "sector":
+            return [
+                {
+                    "price": 310000,
+                    "date_of_transfer": "2026-03-02",
+                    "postcode": "IG3 8AB",
+                    "paon": "2",
+                    "street": "Sector Road",
+                }
+            ]
+        return [
+            {
+                "price": 320000,
+                "date_of_transfer": "2026-03-03",
+                "postcode": "IG3 9AA",
+                "paon": "3",
+                "street": "Outward Road",
+            }
+        ]
+
+    monkeypatch.setattr(providers, "safe_select_ppd_sales", _fake_ppd)
+
+    payload = providers.get_comps_from_provider("IG3 8AA")
+
+    assert calls == [("exact", "IG3 8AA"), ("sector", "IG3 8"), ("outward", "IG3")]
+    assert [sale["match_level"] for sale in payload["sales"][:3]] == [
+        "exact",
+        "sector",
+        "outward",
+    ]
+    assert payload["source_details"]["sales_match_level"] == "exact"
+
+
 def test_area_intel_uses_real_sources_and_derived_metadata(monkeypatch):
     fake = _FakeSupabase()
     monkeypatch.setattr(providers, "get_supabase", lambda required=False: fake)

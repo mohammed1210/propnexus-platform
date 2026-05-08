@@ -66,6 +66,27 @@ def _is_full_postcode(value: str | None) -> bool:
     return bool(re.match(r"^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$", compact, re.I))
 
 
+def _full_postcode(value: str | None) -> str:
+    key = _normalise_key(value)
+    if not key:
+        return ""
+    if _FULL_POSTCODE_RE.match(key) and " " in key:
+        outward, inward = key.split()
+        return f"{outward} {inward}"
+    compact = re.sub(r"\s+", "", key)
+    if len(compact) >= 5 and re.match(r"^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$", compact, re.I):
+        return f"{compact[:-3]} {compact[-3:]}"
+    return ""
+
+
+def _postcode_sector(value: str | None) -> str:
+    full = _full_postcode(value)
+    if not full:
+        return ""
+    outward, inward = full.split()
+    return f"{outward} {inward[0]}"
+
+
 def _num(value: Any) -> Optional[float]:
     if value is None or isinstance(value, bool):
         return None
@@ -130,30 +151,62 @@ def _format_ppd_address(row: Dict[str, Any]) -> str:
     return text or str(row.get("postcode") or "Sold property")
 
 
-def _sold_comps(sb: Any, outward: str, *, limit: int = 8) -> List[Dict[str, Any]]:
+def _sold_comps(sb: Any, key: str, outward: str, *, limit: int = 8) -> List[Dict[str, Any]]:
     if not sb or not outward:
         return []
-    rows = safe_select_ppd_sales(sb, postcode_prefix=outward, limit=limit, months_back=36)
+
+    search_specs: list[tuple[str, str]] = []
+    full = _full_postcode(key)
+    sector = _postcode_sector(key)
+    if full:
+        search_specs.append(("exact", full))
+    if sector:
+        search_specs.append(("sector", sector))
+    search_specs.append(("outward", outward))
+
     comps: List[Dict[str, Any]] = []
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        price = _num(row.get("price"))
-        if not price:
-            continue
-        comps.append(
-            {
-                "address": _format_ppd_address(row),
-                "price": int(price),
-                "date": row.get("date_of_transfer"),
-                "type": row.get("property_type"),
-                "property_type": row.get("property_type"),
-                "tenure": row.get("tenure"),
-                "postcode": row.get("postcode"),
-                "distance_km": row.get("distance_km"),
-                "source": "land_registry_ppd",
-            }
+    seen: set[tuple[Any, ...]] = set()
+    for match_level, postcode_filter in search_specs:
+        rows = safe_select_ppd_sales(
+            sb,
+            postcode_prefix=postcode_filter,
+            limit=limit,
+            months_back=36,
+            match_mode=match_level,
         )
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            price = _num(row.get("price"))
+            if not price:
+                continue
+            dedupe_key = (
+                row.get("postcode"),
+                row.get("price"),
+                row.get("date_of_transfer"),
+                row.get("paon"),
+                row.get("saon"),
+                row.get("street"),
+            )
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            comps.append(
+                {
+                    "address": _format_ppd_address(row),
+                    "price": int(price),
+                    "date": row.get("date_of_transfer"),
+                    "type": row.get("property_type"),
+                    "property_type": row.get("property_type"),
+                    "tenure": row.get("tenure"),
+                    "postcode": row.get("postcode"),
+                    "distance_km": row.get("distance_km"),
+                    "source": "land_registry_ppd",
+                    "match_level": match_level,
+                }
+            )
+            if len(comps) >= limit:
+                return comps
     return comps
 
 
@@ -303,13 +356,14 @@ def get_comps_from_provider(postcode: str) -> dict:
     outward = _outward_code(key)
     fetched_at = _iso_now()
     sb = get_supabase(required=False)
-    cache_key = outward or key
+    cache_key = _full_postcode(key) or outward or key
     cached = _get_cache(sb, "comps_cache", "postcode", cache_key, _ttl_hours("COMPS_TTL_HOURS"))
     if cached:
         return cached
 
-    sales = _sold_comps(sb, outward)
+    sales = _sold_comps(sb, key, outward)
     rents = _rental_comps(sb, outward)
+    sales_match_level = sales[0].get("match_level") if sales else None
     payload = {
         "postcode": key or outward,
         "outward_code": outward or None,
@@ -318,6 +372,7 @@ def get_comps_from_provider(postcode: str) -> dict:
         "source": "partial_live" if sales or rents else "unavailable",
         "source_details": {
             "sales": "land_registry_ppd" if sales else "not_available",
+            "sales_match_level": sales_match_level,
             "rent": "internal_property_listings" if rents else "not_available",
         },
         "confidence": "medium" if sales or rents else "none",
@@ -334,14 +389,14 @@ def get_area_intel_from_provider(key: str) -> dict:
     outward = _outward_code(normalised)
     fetched_at = _iso_now()
     sb = get_supabase(required=False)
-    cache_key = outward or normalised
+    cache_key = _full_postcode(normalised) or outward or normalised
     cached = _get_cache(
         sb, "area_intel_cache", "key", cache_key, _ttl_hours("AREA_INTEL_TTL_HOURS")
     )
     if cached:
         return cached
 
-    sales = _sold_comps(sb, outward, limit=20)
+    sales = _sold_comps(sb, normalised, outward, limit=20)
     rents = _rental_comps(sb, outward, limit=20)
 
     sale_prices = [float(item["price"]) for item in sales if _num(item.get("price"))]
@@ -360,6 +415,7 @@ def get_area_intel_from_provider(key: str) -> dict:
 
     source_details = {
         "sales": "land_registry_ppd" if sale_prices else "not_available",
+        "sales_match_level": sales[0].get("match_level") if sales else None,
         "rent": "internal_property_listings" if rent_prices else "not_available",
         "crime": "police.uk" if crime else "not_available",
         "geo": geo_source,

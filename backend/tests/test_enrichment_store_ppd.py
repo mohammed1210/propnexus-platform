@@ -13,6 +13,12 @@ class _Query:
     def select(self, *_args, **_kwargs):
         return self
 
+    def eq(self, column, value):
+        assert column == "postcode"
+        self.pattern = value
+        self.rows = [row for row in self.rows if str(row.get("postcode") or "") == value]
+        return self
+
     def ilike(self, column, pattern):
         assert column == "postcode"
         self.pattern = pattern
@@ -60,3 +66,39 @@ def test_safe_select_ppd_sales_matches_exact_outward_code_boundary():
 
     assert sb.query.pattern == "RM1 %"
     assert rows == [{"postcode": "RM1 1AA", "price": 300000}]
+
+
+def test_safe_select_ppd_sales_can_match_full_postcode_exactly():
+    sb = _Supabase(
+        [
+            {"postcode": "IG3 8AA", "price": 300000},
+            {"postcode": "IG3 8AB", "price": 310000},
+        ]
+    )
+
+    rows = safe_select_ppd_sales(
+        sb, postcode_prefix="IG3 8AA", limit=10, months_back=36, match_mode="exact"
+    )
+
+    assert sb.query.pattern == "IG3 8AA"
+    assert rows == [{"postcode": "IG3 8AA", "price": 300000}]
+
+
+def test_safe_select_ppd_sales_can_match_postcode_sector():
+    sb = _Supabase(
+        [
+            {"postcode": "IG3 8AA", "price": 300000},
+            {"postcode": "IG3 8AB", "price": 310000},
+            {"postcode": "IG3 9AA", "price": 320000},
+        ]
+    )
+
+    rows = safe_select_ppd_sales(
+        sb, postcode_prefix="IG3 8", limit=10, months_back=36, match_mode="sector"
+    )
+
+    assert sb.query.pattern == "IG3 8%"
+    assert rows == [
+        {"postcode": "IG3 8AA", "price": 300000},
+        {"postcode": "IG3 8AB", "price": 310000},
+    ]
