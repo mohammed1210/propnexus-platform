@@ -48,6 +48,7 @@ from backend.utils.listing_keys import (
     best_postcode,
     ensure_external_id,
     extract_postcode,
+    is_full_postcode,
     strip_empty_for_upsert,
 )
 from backend.utils.postcode import get_lat_lng_from_postcode
@@ -1417,6 +1418,7 @@ def _needs_enrichment(row: dict[str, Any]) -> bool:
     img_count = _image_count(row.get("image_urls"))
     pc = extract_postcode(row.get("postcode"))
     pc_missing = not (isinstance(pc, str) and pc.strip())
+    pc_outward_only = bool(pc and not is_full_postcode(pc))
 
     def _pos_int(v: Any) -> int:
         try:
@@ -1432,7 +1434,14 @@ def _needs_enrichment(row: dict[str, Any]) -> bool:
     # Heuristic: allow single-photo records to be enriched (detail pages
     # frequently have full galleries).
     weak_images = img_missing or img_count < 2
-    return bool(weak_images or pc_missing or beds_missing or baths_missing or price_missing)
+    return bool(
+        weak_images
+        or pc_missing
+        or pc_outward_only
+        or beds_missing
+        or baths_missing
+        or price_missing
+    )
 
 
 def _extract_int_from_text(text: str, pattern: str) -> int | None:
@@ -2476,12 +2485,12 @@ async def enrich_missing_properties(
             cover = pick_cover_image(merged_imgs) if merged_imgs else None
 
             # Extract postcode
-            pc = (
-                extract_postcode(row.get("postcode"))
-                or extract_postcode(row.get("address"))
-                or extract_postcode(row.get("location"))
-                or extract_postcode(row.get("title"))
-                or extract_postcode(html)
+            pc = best_postcode(
+                row.get("postcode"),
+                row.get("address"),
+                row.get("location"),
+                row.get("title"),
+                html,
             )
 
             # Extract beds/baths/price (very conservative)
@@ -2495,7 +2504,7 @@ async def enrich_missing_properties(
                 payload["image_urls"] = merged_imgs
             if cover and not (isinstance(row.get("imageurl"), str) and row["imageurl"].strip()):
                 payload["imageurl"] = cover
-            if pc and not (isinstance(row.get("postcode"), str) and row["postcode"].strip()):
+            if pc and best_postcode(row.get("postcode")) != pc:
                 payload["postcode"] = pc
             if beds and int(row.get("bedrooms") or 0) <= 0:
                 payload["bedrooms"] = beds

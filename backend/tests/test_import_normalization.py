@@ -1,4 +1,4 @@
-from backend.routes.import_routes import _clean_row
+from backend.routes.import_routes import _clean_row, _needs_enrichment
 
 
 def test_clean_row_hydrates_from_data_raw_and_normalizes_urls():
@@ -102,3 +102,27 @@ def test_clean_row_upgrades_outward_postcode_from_raw_address():
 
     assert row.get("postcode") == "IG3 8DN"
     assert row.get("postcode_band") == "IG3"
+
+
+def test_needs_enrichment_treats_outward_only_postcode_as_weak():
+    assert _needs_enrichment(
+        {
+            "postcode": "IG3",
+            "imageurl": "https://img.example/a.jpg",
+            "image_urls": ["https://img.example/a.jpg", "https://img.example/b.jpg"],
+            "bedrooms": 2,
+            "bathrooms": 1,
+            "price": 300000,
+        }
+    )
+
+    assert not _needs_enrichment(
+        {
+            "postcode": "IG3 8DN",
+            "imageurl": "https://img.example/a.jpg",
+            "image_urls": ["https://img.example/a.jpg", "https://img.example/b.jpg"],
+            "bedrooms": 2,
+            "bathrooms": 1,
+            "price": 300000,
+        }
+    )
