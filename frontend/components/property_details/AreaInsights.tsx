@@ -19,14 +19,27 @@ type AreaIntelData = {
   crime?: {
     count?: number | null;
     month?: string | null;
+    period?: string | null;
     source?: string | null;
+    signal?: 'low' | 'moderate' | 'elevated' | null;
+    radius_label?: string | null;
+    note?: string | null;
   } | null;
+  crime_source?: 'police.uk' | 'unavailable' | string | null;
+  crime_period?: string | null;
+  crime_count?: number | null;
+  crime_signal?: 'low' | 'moderate' | 'elevated' | string | null;
+  crime_radius_label?: string | null;
+  crime_note?: string | null;
+  rent_source?: string | null;
+  rent_evidence_count?: number | null;
+  rent_estimate_count?: number | null;
   schools_rating?: number | null;
   population?: number | null;
   transport_links?: string[];
   notes?: string;
   source?: string;
-  source_details?: Record<string, string>;
+  source_details?: Record<string, unknown>;
   confidence?: string;
   fetched_at?: string;
   is_live?: boolean;
@@ -50,7 +63,7 @@ type CompsData = {
   sales?: CompLine[];
   rents?: CompLine[];
   source?: string;
-  source_details?: Record<string, string>;
+  source_details?: Record<string, unknown>;
   fetched_at?: string;
 };
 
@@ -248,12 +261,51 @@ function sourceLabel(source?: string | null): string | null {
   const map: Record<string, string> = {
     land_registry_ppd: 'Land Registry PPD',
     internal_property_listings: 'Internal listing comps',
+    derived_internal_estimate: 'Derived rent estimate',
+    ons_local_area: 'Area rent benchmark',
     police: 'police.uk',
     'police.uk': 'police.uk',
     cache: 'Cached',
     partial_live: 'Partial live',
   };
   return map[source] ?? source.replace(/_/g, ' ');
+}
+
+function sourceDetail(details: Record<string, unknown> | undefined, key: string): string | null {
+  const value = details?.[key];
+  return typeof value === 'string' ? value : null;
+}
+
+function rentMetricCopy(source?: string | null): { label: string; helper: string; badge: string | null } | null {
+  if (source === 'internal_property_listings') {
+    return {
+      label: 'Avg rent comp',
+      helper: 'Average from internal rental listing evidence',
+      badge: 'Internal rental listings',
+    };
+  }
+  if (source === 'derived_internal_estimate') {
+    return {
+      label: 'Rent estimate',
+      helper: 'Derived internal estimate; not a rental comp',
+      badge: 'Derived estimate',
+    };
+  }
+  if (source === 'ons_local_area') {
+    return {
+      label: 'Area rent benchmark',
+      helper: 'Broad official local-area benchmark',
+      badge: 'Area benchmark',
+    };
+  }
+  return null;
+}
+
+function crimeSignalCopy(signal?: string | null): string {
+  if (signal === 'low') return 'Low';
+  if (signal === 'moderate') return 'Moderate';
+  if (signal === 'elevated') return 'Elevated';
+  return 'Reported nearby crime';
 }
 
 function fmtDistance(km: unknown): string {
@@ -362,6 +414,19 @@ export default function AreaInsights({
   const avgSalePrice = avgPrice(sales);
   const avgRentPrice = avgPrice(rents);
   const transportLinks = Array.isArray(intel?.transport_links) ? intel!.transport_links!.filter(Boolean) : [];
+  const crimeCount = hasFiniteNumber(intel?.crime_count)
+    ? intel!.crime_count!
+    : hasFiniteNumber(intel?.crime?.count)
+      ? intel!.crime!.count!
+      : null;
+  const crimePeriod = normStr(intel?.crime_period) || normStr(intel?.crime?.period) || normStr(intel?.crime?.month);
+  const crimeSignal = normStr(intel?.crime_signal) || normStr(intel?.crime?.signal);
+  const crimeRadius = normStr(intel?.crime_radius_label) || normStr(intel?.crime?.radius_label);
+  const crimeNote = normStr(intel?.crime_note) || normStr(intel?.crime?.note);
+  const hasCrime = intel?.crime_source === 'police.uk' && hasFiniteNumber(crimeCount);
+  const rentSourceForMetric = normStr(intel?.rent_source) || sourceDetail(intel?.source_details, 'rent');
+  const rentCopy = rentMetricCopy(rentSourceForMetric);
+
   const marketMetrics = useMemo(() => {
     if (!intel) return [] as MarketMetric[];
 
@@ -376,10 +441,12 @@ export default function AreaInsights({
       });
     }
     if (hasPositiveNumber(intel.avg_rent)) {
+      const copy = rentMetricCopy(normStr(intel.rent_source) || sourceDetail(intel.source_details, 'rent'));
+      if (!copy) return metrics;
       metrics.push({
-        label: 'Rent / month',
+        label: copy.label,
         value: fmtGBP(intel.avg_rent),
-        helper: 'Derived from internal rental listing comps',
+        helper: copy.helper,
         tone: 'amber' as const,
         icon: <FiBarChart2 className="h-5 w-5" />,
       });
@@ -393,10 +460,24 @@ export default function AreaInsights({
         icon: <FiMapPin className="h-5 w-5" />,
       });
     }
+    const count = hasFiniteNumber(intel.crime_count)
+      ? intel.crime_count
+      : hasFiniteNumber(intel.crime?.count)
+        ? intel.crime?.count
+        : null;
+    if (intel.crime_source === 'police.uk' && hasFiniteNumber(count)) {
+      const signal = normStr(intel.crime_signal) || normStr(intel.crime?.signal);
+      metrics.push({
+        label: 'Reported nearby crime',
+        value: `${count} reports`,
+        helper: `${crimeSignalCopy(signal)} signal${intel.crime_period || intel.crime?.month ? ` • ${intel.crime_period || intel.crime?.month}` : ''}`,
+        tone: signal === 'elevated' ? 'rose' : signal === 'moderate' ? 'amber' : 'emerald',
+        icon: <FiShield className="h-5 w-5" />,
+      });
+    }
     return metrics;
   }, [intel]);
 
-  const hasCrime = hasFiniteNumber(intel?.crime?.count) || hasFiniteNumber(intel?.crime_index);
   const hasSchools = hasPositiveNumber(intel?.schools_rating);
   const hasTransport = transportLinks.length > 0;
   const usableIntel = marketMetrics.length > 0 || hasCrime || hasSchools || hasTransport;
@@ -483,13 +564,13 @@ export default function AreaInsights({
                                   Crime signal
                                 </div>
                                 <div className="mt-1 text-xl font-bold text-slate-950 dark:text-white">
-                                  {hasFiniteNumber(intel.crime?.count) ? `${intel.crime.count} reports` : `${intel.crime_index}/100`}
+                                  {crimeSignalCopy(crimeSignal)}
                                 </div>
                               </div>
                               <FiShield className="mt-1 h-5 w-5 text-brand-500" />
                             </div>
                             <p className="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                              {intel.crime?.month ? `police.uk street-level incidents for ${intel.crime.month}.` : 'Derived local crime signal.'}
+                              police.uk reported {crimeCount} nearby incident{crimeCount === 1 ? '' : 's'}{crimePeriod ? ` for ${crimePeriod}` : ''}{crimeRadius ? ` (${crimeRadius})` : ''}. {crimeNote || 'Not a safety rating.'}
                             </p>
                           </div>
                         ) : null}
@@ -514,9 +595,10 @@ export default function AreaInsights({
                         </div>
                         <p className="mt-2 text-[13px] leading-relaxed text-slate-700 dark:text-slate-300 sm:text-sm">{intel.notes}</p>
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {sourceLabel(intel.source_details?.sales) ? <SourceBadge label={sourceLabel(intel.source_details?.sales)!} /> : null}
-                          {sourceLabel(intel.source_details?.rent) ? <SourceBadge label={sourceLabel(intel.source_details?.rent)!} /> : null}
-                          {sourceLabel(intel.source_details?.crime) ? <SourceBadge label={sourceLabel(intel.source_details?.crime)!} /> : null}
+                          {sourceLabel(sourceDetail(intel.source_details, 'sales')) ? <SourceBadge label={sourceLabel(sourceDetail(intel.source_details, 'sales'))!} /> : null}
+                          {rentCopy?.badge ? <SourceBadge label={rentCopy.badge} /> : null}
+                          {sourceLabel(sourceDetail(intel.source_details, 'crime')) ? <SourceBadge label={sourceLabel(sourceDetail(intel.source_details, 'crime'))!} /> : null}
+                          {intel.source === 'cache' ? <SourceBadge label="Cached" /> : null}
                         </div>
                       </div>
                     ) : null}
@@ -540,16 +622,22 @@ export default function AreaInsights({
                       Recent nearby transactions
                     </h4>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 sm:min-w-72">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/30 sm:p-3.5">
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400">Avg sale comp</div>
-                      <div className="mt-1 text-sm font-bold text-slate-950 dark:text-white">{fmtGBP(avgSalePrice)}</div>
+                  {hasPositiveNumber(avgSalePrice) || hasPositiveNumber(avgRentPrice) ? (
+                    <div className="grid grid-cols-1 gap-3 sm:min-w-72 sm:grid-cols-2">
+                      {hasPositiveNumber(avgSalePrice) ? (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/30 sm:p-3.5">
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">Avg sale comp</div>
+                          <div className="mt-1 text-sm font-bold text-slate-950 dark:text-white">{fmtGBP(avgSalePrice)}</div>
+                        </div>
+                      ) : null}
+                      {hasPositiveNumber(avgRentPrice) ? (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/30 sm:p-3.5">
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400">Avg rent comp</div>
+                          <div className="mt-1 text-sm font-bold text-slate-950 dark:text-white">{fmtGBP(avgRentPrice)}</div>
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/30 sm:p-3.5">
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400">Avg rent comp</div>
-                      <div className="mt-1 text-sm font-bold text-slate-950 dark:text-white">{fmtGBP(avgRentPrice)}</div>
-                    </div>
-                  </div>
+                  ) : null}
                 </div>
 
                 {compsLoading ? (
@@ -568,12 +656,14 @@ export default function AreaInsights({
                             </div>
                             <div className="mt-1 truncate text-sm text-slate-700 dark:text-slate-300">{line.address}</div>
                           </div>
-                          <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
-                            {fmtDistance(line.distance_km)}
-                          </span>
+                          {Number.isFinite(Number(line.distance_km)) ? (
+                            <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                              {fmtDistance(line.distance_km)}
+                            </span>
+                          ) : null}
                         </div>
                         <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                          <span>{line.date || 'Date unavailable'}</span>
+                          {line.date ? <span>{line.date}</span> : null}
                           {line.type || line.property_type ? <span>• {line.type || line.property_type}</span> : null}
                           {sourceLabel(line.source) ? <span>• {sourceLabel(line.source)}</span> : null}
                         </div>
