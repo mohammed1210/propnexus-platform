@@ -86,3 +86,19 @@ def test_clean_row_sets_postcode_band_from_full_or_outward_postcode():
     )
     assert row2.get("postcode") == "SW11"
     assert row2.get("postcode_band") == "SW11"
+
+
+def test_clean_row_upgrades_outward_postcode_from_raw_address():
+    row = _clean_row(
+        {
+            "title": "Ilford flat",
+            "source": "rightmove",
+            "external_id": "c",
+            "postcode": "IG3",
+            "data": {"raw": {"displayAddress": "Flat 2, Example Street, IG3 8DN"}},
+        },
+        "2026-01-01T00:00:00Z",
+    )
+
+    assert row.get("postcode") == "IG3 8DN"
+    assert row.get("postcode_band") == "IG3"

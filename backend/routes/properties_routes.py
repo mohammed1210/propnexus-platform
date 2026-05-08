@@ -41,7 +41,7 @@ from backend.utils.enrichment_store import (
 )
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from backend.utils.investment_type_classifier import classify_investment_types
-from backend.utils.listing_keys import extract_postcode
+from backend.utils.listing_keys import best_postcode
 from backend.utils.property_type_classifier import (
     classify_property_type,
     normalize_property_type_value,
@@ -227,7 +227,7 @@ ALLOWED_SORT_COLS = {
 }
 
 
-PROPERTIES_NORMALIZATION_VERSION = "v1"
+PROPERTIES_NORMALIZATION_VERSION = "v2-postcode-precision"
 
 
 class PropertiesPageResponse(BaseModel):
@@ -623,6 +623,14 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
                 return v
         return None
 
+    def _postcode_search_blob(value: Any) -> str | None:
+        if not isinstance(value, dict):
+            return None
+        try:
+            return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+        except Exception:
+            return str(value)
+
     # Ensure property_type is always present in API response (canonical, deterministic).
     # - Prefer DB column
     # - Else embedded data
@@ -763,6 +771,25 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
         out["location"] = _pick_raw(["location", "displayAddress", "display_address", "address"])
     if not out.get("address"):
         out["address"] = _pick_raw(["address", "displayAddress", "display_address", "location"])
+
+    # Postcode hydration: prefer a full postcode if it exists in any listing
+    # text/raw payload. This is response-only, but it lets current listing cards
+    # hit exact/sector comparable endpoints even before a DB backfill has run.
+    try:
+        precise_postcode = best_postcode(
+            out.get("postcode"),
+            out.get("address"),
+            out.get("location"),
+            out.get("title"),
+            out.get("url"),
+            _pick_raw(["postcode", "postalCode", "postal_code", "outcode"]),
+            _pick_raw(["address", "displayAddress", "display_address", "location"]),
+            _postcode_search_blob(raw_obj),
+        )
+        if precise_postcode:
+            out["postcode"] = precise_postcode
+    except Exception:
+        pass
 
     # Numeric hydration
     # Price: keep numeric for sorting + UX. Attempt to coerce common string formats.
@@ -2578,6 +2605,8 @@ def backfill_property_postcodes(
         "title",
         "location",
         "address",
+        "url",
+        "data",
         "created_at",
     ]
 
@@ -2660,17 +2689,26 @@ def backfill_property_postcodes(
                 continue
 
             existing_raw = r.get("postcode")
-            existing_norm = extract_postcode(existing_raw)
+            existing_norm = best_postcode(existing_raw)
 
             missing_pc = not (isinstance(existing_raw, str) and existing_raw.strip())
             if (not force) and (not missing_pc):
                 continue
 
-            candidate = (
-                existing_norm
-                or extract_postcode(r.get("title"))
-                or extract_postcode(r.get("location"))
-                or extract_postcode(r.get("address"))
+            data_blob = None
+            if isinstance(r.get("data"), dict):
+                try:
+                    data_blob = json.dumps(r.get("data"), ensure_ascii=False, separators=(",", ":"))
+                except Exception:
+                    data_blob = str(r.get("data"))
+
+            candidate = best_postcode(
+                existing_raw,
+                r.get("title"),
+                r.get("location"),
+                r.get("address"),
+                r.get("url"),
+                data_blob,
             )
             if not candidate:
                 continue

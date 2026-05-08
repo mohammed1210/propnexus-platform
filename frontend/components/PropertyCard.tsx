@@ -23,6 +23,11 @@ type Property = {
   title: string;
   source?: string | null;
   location?: string | null;
+  address?: string | null;
+  postal_code?: string | null;
+  postalCode?: string | null;
+  postcode_full?: string | null;
+  postcodeFull?: string | null;
   price?: number | null;
   asking_price?: number | null;
   bedrooms?: number | null;
@@ -65,7 +70,7 @@ type InsightsCacheEntry = {
 
 const insightsCache = new Map<string, InsightsCacheEntry>();
 
-function extractLikelyUkPostcode(text: string): string | null {
+export function extractLikelyUkPostcode(text: string): string | null {
   const t = String(text || '')
     .toUpperCase()
     .replace(/[^A-Z0-9\s]/g, ' ')
@@ -233,9 +238,9 @@ export default function PropertyCard({
   const [timeTick, setTimeTick] = useState(0);
 
   const postcodeKey = useMemo(() => {
-    const haystack = `${p.postcode ?? ''} ${p.location ?? ''} ${p.title ?? ''} ${p.description ?? ''}`;
+    const haystack = `${p.postcode ?? ''} ${p.postcode_full ?? ''} ${p.postcodeFull ?? ''} ${p.postal_code ?? ''} ${p.postalCode ?? ''} ${p.address ?? ''} ${p.location ?? ''} ${p.title ?? ''} ${p.description ?? ''}`;
     return extractLikelyUkPostcode(haystack);
-  }, [p.description, p.location, p.postcode, p.title]);
+  }, [p.address, p.description, p.location, p.postalCode, p.postal_code, p.postcode, p.postcodeFull, p.postcode_full, p.title]);
 
   const dealChipText = useMemo(() => {
     if (!Array.isArray(p.deal_reasons) || !p.deal_reasons[0]) return null;
