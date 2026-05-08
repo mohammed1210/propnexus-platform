@@ -6,7 +6,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import { Highlight } from '@/components/Highlight';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
-import { FiHeart } from 'react-icons/fi';
+import { FiBarChart2, FiChevronLeft, FiChevronRight, FiHeart, FiHome, FiMapPin, FiTarget, FiTrendingUp } from 'react-icons/fi';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
 import { track } from '@/lib/events';
@@ -28,6 +28,7 @@ type Property = {
   bedrooms?: number | null;
   bathrooms?: number | null;
   description?: string | null;
+  postcode?: string | null;
   yield_percent?: number | null;
   roi_percent?: number | null;
   ai_score?: number | null;
@@ -125,12 +126,6 @@ async function postJSON<T>(
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
-// Badge color thresholds for yield and ROI percentages
-const YIELD_THRESHOLD_EXCELLENT = 6; // >= 6% is green
-const YIELD_THRESHOLD_GOOD = 4; // >= 4% is amber, < 4% is red
-const ROI_THRESHOLD_EXCELLENT = 12; // >= 12% is green
-const ROI_THRESHOLD_GOOD = 8; // >= 8% is amber, < 8% is red
-
 function formatSourceBadge(source: string | null | undefined): string {
   const raw = (source ?? '').trim();
   const normalized = raw.toLowerCase();
@@ -163,6 +158,19 @@ function getSourceBadgeClasses(source: string | null | undefined): string {
   }
 
   return 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700';
+}
+
+function clampMetricPercent(value: number | null | undefined, target: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || target <= 0) return 0;
+  return Math.max(0, Math.min(100, (value / target) * 100));
+}
+
+function getScoreVerdict(score: number | null): string {
+  if (score === null) return 'No model score';
+  if (score >= 80) return 'Prime deal';
+  if (score >= 65) return 'Strong signal';
+  if (score >= 50) return 'Watchlist';
+  return 'Needs review';
 }
 
 export default function PropertyCard({
@@ -201,10 +209,20 @@ export default function PropertyCard({
     return getRoiDisplay((normalized as any)?.raw ?? (normalized as any));
   }, [normalized, p]);
   const displayRoiPct = roiDisplay.value;
-  const roiIsProxyDisplay = roiDisplay.isProxy;
+  const normalizedScore =
+    typeof displayScore === 'number' && Number.isFinite(displayScore)
+      ? displayScore <= 1
+        ? displayScore * 100
+        : displayScore
+      : null;
+  const scoreProgress = normalizedScore === null ? 0 : Math.max(0, Math.min(100, normalizedScore));
+  const yieldProgress = clampMetricPercent(displayYieldPct, 10);
+  const roiProgress = clampMetricPercent(displayRoiPct, 20);
+  const scoreVerdict = getScoreVerdict(normalizedScore);
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [carouselIndex, setCarouselIndex] = useState(0);
 
   const articleRef = useRef<HTMLElement | null>(null);
   const [shouldLoadInsights, setShouldLoadInsights] = useState(false);
@@ -215,9 +233,9 @@ export default function PropertyCard({
   const [timeTick, setTimeTick] = useState(0);
 
   const postcodeKey = useMemo(() => {
-    const haystack = `${p.location ?? ''} ${p.title ?? ''} ${p.description ?? ''}`;
+    const haystack = `${p.postcode ?? ''} ${p.location ?? ''} ${p.title ?? ''} ${p.description ?? ''}`;
     return extractLikelyUkPostcode(haystack);
-  }, [p.description, p.location, p.title]);
+  }, [p.description, p.location, p.postcode, p.title]);
 
   const dealChipText = useMemo(() => {
     if (!Array.isArray(p.deal_reasons) || !p.deal_reasons[0]) return null;
@@ -443,24 +461,6 @@ export default function PropertyCard({
 
   const href = useMemo(() => `/property/${encodeURIComponent(p.id)}`, [p.id]);
 
-  // Helper to determine badge color based on value and thresholds
-  const getBadgeColor = (type: 'yield' | 'roi', value: number) => {
-    if (type === 'yield') {
-      if (value >= YIELD_THRESHOLD_EXCELLENT)
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-      if (value >= YIELD_THRESHOLD_GOOD)
-        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-    } else {
-      // ROI
-      if (value >= ROI_THRESHOLD_EXCELLENT)
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
-      if (value >= ROI_THRESHOLD_GOOD)
-        return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
-      return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-    }
-  };
-
   const handleSaveDeal = useCallback(async () => {
     try {
       setSaving(true);
@@ -476,17 +476,30 @@ export default function PropertyCard({
     }
   }, [p.id]);
 
-  const imageSrc =
-    p.imageurl ||
-    (Array.isArray(p.image_urls) && p.image_urls.length > 0 ? p.image_urls[0] : null) ||
-    '/placeholder.jpg';
+  const imageSources = useMemo(() => {
+    const seen = new Set<string>();
+    const rawSources = [
+      p.imageurl,
+      ...(Array.isArray(p.image_urls) ? p.image_urls : []),
+    ];
 
-  const descriptionSnippet = useMemo(() => {
-    if (!p.description) return '';
-    const trimmed = p.description.trim();
-    if (trimmed.length <= 180) return trimmed;
-    return trimmed.slice(0, 177) + '...';
-  }, [p.description]);
+    const sources = rawSources
+      .map((src) => (typeof src === 'string' ? src.trim() : ''))
+      .filter((src) => {
+        if (!src || seen.has(src)) return false;
+        seen.add(src);
+        return true;
+      });
+
+    return sources.length > 0 ? sources : ['/placeholder.jpg'];
+  }, [p.image_urls, p.imageurl]);
+
+  useEffect(() => {
+    setCarouselIndex((index) => (index >= imageSources.length ? 0 : index));
+  }, [imageSources.length]);
+
+  const imageSrc = imageSources[carouselIndex] ?? imageSources[0] ?? '/placeholder.jpg';
+  const hasCarousel = imageSources.length > 1;
 
   const matchInfo = useMemo(() => {
     const raw = Array.isArray(p.matches) ? p.matches : [];
@@ -555,26 +568,30 @@ export default function PropertyCard({
       onMouseEnter={() => onHoverChange?.(true)}
       onMouseLeave={() => onHoverChange?.(false)}
       className={cx(
-        'property-card card p-0 overflow-hidden transition-all hover:shadow-lg hover:border-primary/30',
-        isHovered && 'ring-2 ring-brand-500/20 border-brand-500/30',
+        'property-card group/card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-2xl hover:shadow-slate-950/10 dark:border-slate-800 dark:bg-slate-950 dark:hover:border-brand-700',
+        isHovered && 'ring-2 ring-brand-500/20 border-brand-500/40 shadow-xl shadow-brand-950/10',
       )}
     >
-      <Link
-        href={href}
-        onClick={handleSearchClickTrack}
-        className="group block relative aspect-[3/2] w-full overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-        aria-label={`Open ${p.title ?? 'property'}`}
-      >
-        <ImageWithFallback
-          src={imageSrc}
-          alt={p.title || 'Property image'}
-          fill
-          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-          style={{ objectFit: 'cover' }}
-          className="transition-transform duration-300 group-hover:scale-110"
-          loading="lazy"
-          priority={false}
-        />
+      <div className="relative aspect-[3/2] w-full overflow-hidden">
+        <Link
+          href={href}
+          onClick={handleSearchClickTrack}
+          className="group block h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label={`Open ${p.title ?? 'property'}`}
+        >
+          <ImageWithFallback
+            key={imageSrc}
+            src={imageSrc}
+            alt={p.title || 'Property image'}
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            style={{ objectFit: 'cover' }}
+            className="transition-transform duration-300 group-hover:scale-110"
+            loading="lazy"
+            priority={false}
+          />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/20 via-transparent to-transparent opacity-70" aria-hidden="true" />
+        </Link>
 
         {/* Sprint 11.3: Prominent Save button in top-left */}
         <button
@@ -586,7 +603,7 @@ export default function PropertyCard({
           }}
           disabled={saving || saveSuccess}
           className={cx(
-            'absolute top-2 left-2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
+            'absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
             'active:scale-[0.98]',
             saveSuccess
@@ -644,57 +661,46 @@ export default function PropertyCard({
           )}
         </button>
 
-        {/* Badges for yield and ROI - moved to top-right */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
-          {typeof displayScore === 'number' && (
-            <span
-              className={cx(
-                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
-                'bg-slate-900/60 text-white dark:bg-slate-50/10 dark:text-slate-100',
-              )}
-              aria-label={`Deal score: ${Math.round(displayScore)}/100`}
-              title={`Deal score: ${Math.round(displayScore)}/100`}
+        {hasCarousel && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCarouselIndex((index) => (index - 1 + imageSources.length) % imageSources.length);
+              }}
+              className="absolute left-3 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/50 bg-white/85 text-slate-900 shadow-sm backdrop-blur-sm transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white dark:bg-slate-950/75 dark:text-white dark:hover:bg-slate-900"
+              aria-label="Show previous property image"
             >
-              Score {Math.round(displayScore)}
-            </span>
-          )}
-          {typeof displayYieldPct === 'number' && (
-            <span
-              className={cx(
-                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
-                getBadgeColor('yield', displayYieldPct),
-              )}
-              aria-label={`Yield percentage: ${formatPercent(displayYieldPct)}`}
+              <FiChevronLeft className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCarouselIndex((index) => (index + 1) % imageSources.length);
+              }}
+              className="absolute right-3 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-white/50 bg-white/85 text-slate-900 shadow-sm backdrop-blur-sm transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white dark:bg-slate-950/75 dark:text-white dark:hover:bg-slate-900"
+              aria-label="Show next property image"
             >
-              {formatPercent(displayYieldPct)} Yield
-            </span>
-          )}
-          {typeof displayRoiPct === 'number' && (
-            <span
-              className={cx(
-                'text-xs font-semibold px-2 py-1 rounded-md backdrop-blur-sm',
-                getBadgeColor('roi', displayRoiPct),
-              )}
-              aria-label={`ROI percentage: ${formatPercent(displayRoiPct)}`}
-            >
-              {formatPercent(displayRoiPct)} ROI{roiIsProxyDisplay ? ' (proxy)' : ''}
-            </span>
-          )}
-        </div>
-      </Link>
+              <FiChevronRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-slate-950/45 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm" aria-hidden="true">
+              {carouselIndex + 1}/{imageSources.length}
+            </div>
+          </>
+        )}
 
-      {descriptionSnippet && (
-        <div className="px-4 pt-3 text-sm text-slate-700 dark:text-slate-300 line-clamp-3">
-          <Highlight text={descriptionSnippet} tokens={matchInfo.tokens} />
-        </div>
-      )}
+      </div>
 
-      <div className="p-4 space-y-2">
+      <div className="space-y-2.5 p-3.5">
         <Link href={href} onClick={handleSearchClickTrack} className="block group">
-          <div className="mb-1">
+          <div className="mb-1.5 flex items-center justify-between gap-2">
             <span
               className={cx(
-                'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium',
+                'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold',
                 sourceBadgeClasses,
               )}
               aria-label={`Source: ${sourceBadgeText}`}
@@ -702,14 +708,31 @@ export default function PropertyCard({
             >
               {sourceBadgeText}
             </span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-600 dark:text-brand-300">
+              Investor view
+            </span>
           </div>
-          <h3 className="font-semibold leading-snug line-clamp-2 group-hover:underline">
+          <h3 className="text-[15px] font-black leading-snug text-slate-950 line-clamp-2 transition-colors group-hover:text-brand-600 dark:text-white dark:group-hover:text-brand-300">
             <Highlight text={p.title || 'Untitled property'} tokens={matchInfo.tokens} />
           </h3>
         </Link>
 
+        <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-brand-50/50 px-3 py-2 shadow-sm dark:border-slate-800 dark:from-slate-900/80 dark:via-slate-950 dark:to-brand-950/20">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-base font-black leading-none text-slate-950 dark:text-white">{priceText}</span>
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700">
+              <FiHome className="h-3.5 w-3.5 text-brand-500" aria-hidden="true" />
+              {p.bedrooms ?? '—'} bd · {p.bathrooms ?? '—'} ba
+            </span>
+          </div>
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400">
+            <FiMapPin className="h-3.5 w-3.5 shrink-0 text-brand-500" aria-hidden="true" />
+            <span className="truncate">{p.location || 'Address unavailable'}</span>
+          </div>
+        </div>
+
         {matchInfo.hasAny && (
-          <div className="flex flex-wrap gap-1 pt-1">
+          <div className="flex flex-wrap gap-1">
             {matchInfo.exact && (
               <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-700/60 dark:bg-emerald-900/20 dark:text-emerald-300">
                 exact
@@ -729,20 +752,89 @@ export default function PropertyCard({
         )}
 
         {Array.isArray(p.badges) && p.badges.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1">
             {p.badges.map((badgeId) => (
               <Badge key={badgeId} id={String(badgeId)} />
             ))}
           </div>
         )}
 
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">{p.location || '—'}</p>
+        <div className="overflow-hidden rounded-2xl border border-brand-100 bg-gradient-to-br from-white via-brand-50/45 to-emerald-50/45 shadow-md shadow-slate-950/5 ring-1 ring-brand-100/60 dark:border-brand-900/50 dark:from-slate-950 dark:via-brand-950/20 dark:to-emerald-950/15 dark:shadow-black/20 dark:ring-white/5">
+          <div className="flex items-center justify-between gap-2 border-b border-brand-100/80 bg-gradient-to-r from-brand-50/90 via-white/80 to-emerald-50/80 px-3 py-2 dark:border-white/10 dark:from-brand-500/15 dark:via-slate-950/70 dark:to-emerald-500/10">
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-[0.18em] text-brand-700 dark:text-brand-200">Investor scorecard</div>
+              <div className="text-[11px] font-semibold text-slate-500 dark:text-white/65">Model-ranked deal signals</div>
+            </div>
+            <div className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 dark:border-emerald-300/25 dark:bg-emerald-400/10 dark:text-emerald-100">
+              {scoreVerdict}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-px bg-brand-100/70 dark:bg-white/10">
+            <div className="bg-white/85 px-2 py-2.5 dark:bg-slate-950/80">
+              <div className="mb-1.5 flex items-center justify-between gap-1">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-brand-700 ring-1 ring-brand-200/70 dark:bg-brand-400/15 dark:text-brand-200 dark:ring-brand-300/20">
+                  <FiTarget className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Score</span>
+              </div>
+              <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
+                {typeof displayScore === 'number' ? Math.round(displayScore) : '—'}
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10" aria-hidden="true">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-brand-400 to-cyan-300"
+                  style={{ width: `${scoreProgress}%` }}
+                />
+              </div>
+              <div className="mt-1 text-[9px] font-semibold text-slate-500 dark:text-slate-400">model edge</div>
+            </div>
+
+            <div className="bg-white/85 px-2 py-2.5 dark:bg-slate-950/80">
+              <div className="mb-1.5 flex items-center justify-between gap-1">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-400/15 dark:text-emerald-200 dark:ring-emerald-300/20">
+                  <FiTrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Yield</span>
+              </div>
+              <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
+                {typeof displayYieldPct === 'number' ? formatPercent(displayYieldPct) : '—'}
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10" aria-hidden="true">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-lime-300"
+                  style={{ width: `${yieldProgress}%` }}
+                />
+              </div>
+              <div className="mt-1 text-[9px] font-semibold text-slate-500 dark:text-slate-400">cash yield</div>
+            </div>
+
+            <div className="bg-white/85 px-2 py-2.5 dark:bg-slate-950/80">
+              <div className="mb-1.5 flex items-center justify-between gap-1">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 ring-1 ring-blue-200/70 dark:bg-blue-400/15 dark:text-blue-200 dark:ring-blue-300/20">
+                  <FiBarChart2 className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">ROI</span>
+              </div>
+              <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
+                {typeof displayRoiPct === 'number' ? formatPercent(displayRoiPct) : '—'}
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10" aria-hidden="true">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-400 to-violet-300"
+                  style={{ width: `${roiProgress}%` }}
+                />
+              </div>
+              <div className="mt-1 text-[9px] font-semibold text-slate-500 dark:text-slate-400">return lens</div>
+            </div>
+          </div>
+        </div>
 
         {(FF.AREA_INTEL || FF.COMPS) && (
-          <div className="pt-3 border-t border-slate-200/80 dark:border-slate-700/80">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-900/30">
             <div className="flex items-center justify-between">
-              <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 tracking-wide uppercase">
-                Insights
+              <div className="text-[11px] font-bold text-slate-700 dark:text-slate-200 tracking-wide uppercase">
+                Market pulse
               </div>
               <div className="text-[10px] text-slate-500 dark:text-slate-400">
                 {derived.freshnessText ? derived.freshnessText : ''}
@@ -751,7 +843,7 @@ export default function PropertyCard({
             </div>
 
             {showDealReasonChip && dealChipText && Array.isArray(p.deal_reasons) && p.deal_reasons[0] && (
-              <div className="mt-2">
+              <div className="mt-1.5">
                 <span
                   className={cx(
                     'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold',
@@ -767,7 +859,7 @@ export default function PropertyCard({
             )}
 
             {postcodeKey ? (
-              <div className="mt-2">
+              <div className="mt-1.5">
                 {insightsLoading ? (
                   <div className="space-y-1.5">
                     <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded animate-pulse" />
@@ -829,17 +921,17 @@ export default function PropertyCard({
                 )}
               </div>
             ) : (
-              <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+              <div className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
                 Add postcode to load insights.
               </div>
             )}
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2 dark:border-slate-800">
           <span
             className={cx(
-              'inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-semibold',
+              'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold',
               verdictToneClasses(verdict.tone),
             )}
             aria-label={`Verdict: ${verdict.label}`}
@@ -847,88 +939,13 @@ export default function PropertyCard({
           >
             {verdict.label}
           </span>
-          {verdict.highlights.map((h) => (
-            <span key={h} className="text-xs text-slate-600 dark:text-slate-400">
-              {h}
-            </span>
-          ))}
         </div>
 
-        <div className="flex items-center justify-between pt-2">
-          <div className="text-sm">
-            <span className="font-medium">{priceText}</span>
-            <span className="opacity-60 ml-2">
-              {p.bedrooms ?? '—'} bd · {p.bathrooms ?? '—'} ba
-            </span>
-          </div>
+        <div className="flex items-center justify-end rounded-2xl bg-gradient-to-r from-slate-50 to-brand-50/60 px-2.5 py-1.5 dark:from-slate-900/60 dark:to-brand-950/30">
+          <span className="text-xs font-bold text-brand-600 transition-colors group-hover/card:text-brand-700 dark:text-brand-300">
+            View details →
+          </span>
         </div>
-
-        {/* Deal Pulse (micro row) */}
-        {(derived.rentMonthly || derived.crimeLabel || typeof derived.compsCount === 'number') && (
-          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-700 dark:text-slate-200">
-            {derived.rentMonthly ? (
-              <span className="inline-flex items-center gap-1.5">
-                <span
-                  aria-hidden
-                  className={cx(
-                    'inline-block h-2 w-2 rounded-sm',
-                    derived.rentSource === 'proxy'
-                      ? 'bg-teal-500/70'
-                      : 'bg-slate-400/70 dark:bg-slate-500/60',
-                  )}
-                />
-                <span className="text-slate-600 dark:text-slate-400">
-                  {derived.rentSource === 'proxy' ? 'Yield proxy:' : 'Yield:'}
-                </span>
-                <span className="font-semibold">£{(derived.rentMonthly / 1000).toFixed(1)}k/mo</span>
-              </span>
-            ) : null}
-
-            {(() => {
-              const n = typeof derived.compsCount === 'number' ? derived.compsCount : undefined;
-              const schools = typeof derived.schoolsRating === 'number' ? derived.schoolsRating : undefined;
-              if (n == null && schools == null) return null;
-
-              let label: 'High' | 'Avg' | 'Low' = 'Avg';
-              if ((typeof n === 'number' && n >= 6) || (typeof schools === 'number' && schools >= 4.0)) label = 'High';
-              else if ((typeof n === 'number' && n <= 1) && (typeof schools === 'number' && schools < 3.0)) label = 'Low';
-
-              const dot =
-                label === 'High'
-                  ? 'bg-teal-500/70'
-                  : label === 'Avg'
-                    ? 'bg-amber-500/60'
-                    : 'bg-slate-400/70 dark:bg-slate-500/60';
-
-              return (
-                <span className="inline-flex items-center gap-1.5">
-                  <span aria-hidden className={cx('inline-block h-2 w-2 rounded-full', dot)} />
-                  <span className="text-slate-600 dark:text-slate-400">Area demand:</span>
-                  <span className="font-semibold">{label}</span>
-                </span>
-              );
-            })()}
-
-            {derived.crimeLabel ? (
-              (() => {
-                const label = derived.crimeLabel === 'Low' ? 'Good' : derived.crimeLabel === 'Med' ? 'Avg' : 'Risk';
-                const dot =
-                  label === 'Good'
-                    ? 'bg-teal-500/70'
-                    : label === 'Avg'
-                      ? 'bg-amber-500/60'
-                      : 'bg-slate-400/70 dark:bg-slate-500/60';
-                return (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span aria-hidden className={cx('inline-block h-2 w-2 rounded-sm', dot)} />
-                    <span className="text-slate-600 dark:text-slate-400">Safety:</span>
-                    <span className="font-semibold">{label}</span>
-                  </span>
-                );
-              })()
-            ) : null}
-          </div>
-        )}
       </div>
     </article>
   );

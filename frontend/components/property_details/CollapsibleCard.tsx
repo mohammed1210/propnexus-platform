@@ -26,50 +26,62 @@ export default function CollapsibleCard({
   const contentId = useId();
 
   return (
-    <section className={`card p-0 overflow-hidden ${className}`} aria-label={title}>
+    <section
+      className={`overflow-hidden rounded-[1.35rem] border border-brand-200/70 bg-white shadow-sm dark:border-brand-900/60 dark:bg-slate-950 ${className}`}
+      aria-label={title}
+    >
       <button
         type="button"
         onClick={() => setIsExpanded((v) => !v)}
         className={
-          'w-full flex items-center gap-3 px-6 py-4 text-left ' +
-          'hover:bg-black/5 dark:hover:bg-white/5 transition-colors ' +
-          'focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500'
+          'relative w-full overflow-hidden bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 px-4 py-3 text-left text-white md:px-5 md:py-3.5 ' +
+          'transition-all hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 dark:from-brand-950 dark:via-brand-900 dark:to-brand-800'
         }
         aria-expanded={isExpanded}
         aria-controls={contentId}
       >
-        {icon ? <span className="shrink-0">{icon}</span> : null}
-        <span className="flex-1 min-w-0">
-          <span className="block text-base sm:text-lg font-semibold text-slate-900 dark:text-white truncate">
-            {title}
-          </span>
-          <span className="block text-xs text-slate-600 dark:text-slate-400">
-            {subtitle ?? (isExpanded ? 'Click to collapse' : 'Click to expand')}
-          </span>
-        </span>
+        <span className="pointer-events-none absolute -right-12 -top-16 h-36 w-36 rounded-full bg-white/15 blur-3xl" aria-hidden="true" />
+        <span className="pointer-events-none absolute -bottom-16 left-10 h-36 w-36 rounded-full bg-emerald-300/15 blur-3xl" aria-hidden="true" />
 
-        {headerRight ? <span className="shrink-0 flex items-center gap-2">{headerRight}</span> : null}
+        <span className="relative flex w-full items-center gap-3">
+          {icon ? (
+            <span className="shrink-0 rounded-xl border border-white/10 bg-white/10 p-0.5 shadow-sm backdrop-blur">
+              {icon}
+            </span>
+          ) : null}
 
-        <span
-          className={
-            'shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-lg ' +
-            'border border-slate-200/80 dark:border-slate-800/80 ' +
-            'bg-white/60 dark:bg-slate-900/40 backdrop-blur-sm'
-          }
-          aria-hidden="true"
-        >
-          <FiChevronDown
-            className={`h-5 w-5 text-slate-700 dark:text-slate-300 transition-transform ${
-              isExpanded ? 'rotate-180' : 'rotate-0'
-            }`}
-          />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-lg font-black leading-tight tracking-tight text-white sm:text-xl">
+              {title}
+            </span>
+            <span className="mt-0.5 block text-xs font-medium leading-4 text-white/80">
+              {subtitle ?? 'Investor due diligence workspace'}
+            </span>
+          </span>
+
+          {headerRight ? (
+            <span className="hidden shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/10 px-2.5 py-1.5 backdrop-blur sm:flex">
+              {headerRight}
+            </span>
+          ) : null}
+
+          <span
+            className="shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white shadow-sm backdrop-blur transition-transform"
+            aria-hidden="true"
+          >
+            <FiChevronDown
+              className={`h-4 w-4 transition-transform ${
+                isExpanded ? 'rotate-180' : 'rotate-0'
+              }`}
+            />
+          </span>
         </span>
       </button>
 
       <div
         id={contentId}
         hidden={!isExpanded}
-        className="border-t border-slate-200/70 dark:border-slate-800/70 px-6 pb-6"
+        className="border-t border-brand-100 bg-white px-4 pb-5 dark:border-brand-900/50 dark:bg-slate-950 md:px-6 md:pb-6"
       >
         <div className="pt-5">{children}</div>
       </div>

@@ -31,11 +31,6 @@ import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from
 import { buildInvestmentDescription } from '@/lib/propertyInvestmentDescription';
 
 /** ---- Client-only widgets (no SSR) ---- */
-const StampDutyCalculator = dynamic(
-  () => import('@/components/property_details/StampDutyCalculator'),
-  { ssr: false }
-);
-
 const NotesFields = dynamic(
   () => import('@/components/property_details/NotesFields'),
   { ssr: false }
@@ -331,26 +326,26 @@ export default function PropertyDetailsPage() {
         aiScore={aiScore}
       />
 
-      <div className="max-w-7xl mx-auto px-4 py-8 lg:pr-72">{/* Add right padding on desktop for floating sidebar */}
+      <div className="max-w-7xl mx-auto px-4 py-8 lg:pr-64">{/* Add right padding on desktop for floating sidebar */}
         {/* Image-first (focal) carousel + details */}
-        <div className="card mb-6 overflow-hidden">
-          <PropertyHeader
-            property={{
-              title: (property as any).title ?? null,
-              location: (property as any).location ?? null,
-              bedrooms: (property as any).bedrooms ?? null,
-              bathrooms: (property as any).bathrooms ?? null,
-              price: (property as any).price ?? null,
-              propertyType: (property as any).propertyType ?? null,
-            }}
+        <div className="card mb-6 overflow-hidden !p-0">
+          <ImageGallery
+            imageUrls={imageUrls}
+            fallbackImageUrl={fallbackImageUrl}
+            placeholderSrc={PLACEHOLDER_IMG}
+            title={property.title ? String(property.title) : undefined}
           />
 
           <div className="border-t border-slate-200 dark:border-slate-800">
-            <ImageGallery
-              imageUrls={imageUrls}
-              fallbackImageUrl={fallbackImageUrl}
-              placeholderSrc={PLACEHOLDER_IMG}
-              title={property.title ? String(property.title) : undefined}
+            <PropertyHeader
+              property={{
+                title: (property as any).title ?? null,
+                location: (property as any).location ?? null,
+                bedrooms: (property as any).bedrooms ?? null,
+                bathrooms: (property as any).bathrooms ?? null,
+                price: (property as any).price ?? null,
+                propertyType: (property as any).propertyType ?? null,
+              }}
             />
           </div>
 
@@ -591,9 +586,6 @@ export default function PropertyDetailsPage() {
               initialPrice={price}
             />
 
-            {/* Stamp Duty Calculator */}
-            <StampDutyCalculator price={price} />
-
             {/* Location Map */}
             <CollapsibleCard
               title="Location"
@@ -605,7 +597,7 @@ export default function PropertyDetailsPage() {
               defaultExpanded={false}
             >
               <div className="rounded-lg overflow-hidden">
-                <MapSingle property={property} height={400} zoom={14} scrollWheelZoom={false} />
+                <MapSingle property={property} height={400} zoom={16} scrollWheelZoom={false} />
               </div>
             </CollapsibleCard>
           </div>

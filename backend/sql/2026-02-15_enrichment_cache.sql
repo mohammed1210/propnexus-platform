@@ -58,6 +58,10 @@ CREATE TABLE IF NOT EXISTS public.ppd_sales (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ppd_sales_transaction_id
+  ON public.ppd_sales (transaction_id)
+  WHERE transaction_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_ppd_sales_postcode_date
   ON public.ppd_sales (postcode, date_of_transfer DESC);
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
@@ -46,16 +47,51 @@ def _int(value: str | None) -> int | None:
         return None
 
 
+def _date(value: str | None) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+
+    # Official HM Land Registry PPD exports use values like
+    # `2024-01-31 00:00`; Supabase `date` columns should receive YYYY-MM-DD.
+    candidate = raw[:10]
+    try:
+        datetime.strptime(candidate, "%Y-%m-%d")
+        return candidate
+    except Exception:
+        pass
+
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(raw, fmt).date().isoformat()
+        except Exception:
+            continue
+    return None
+
+
+def _normalise_prefixes(values: Iterable[str | None]) -> tuple[str, ...]:
+    prefixes: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        for part in str(value or "").replace(";", ",").split(","):
+            prefix = part.strip().upper().replace(" ", "")
+            if prefix and prefix not in seen:
+                prefixes.append(prefix)
+                seen.add(prefix)
+    return tuple(prefixes)
+
+
 def _normalise_row(row: Dict[str, Any]) -> Dict[str, Any] | None:
-    postcode = str(row.get("postcode") or "").strip().upper()
+    postcode = " ".join(str(row.get("postcode") or "").strip().upper().split())
     transaction_id = str(row.get("transaction_id") or "").strip().strip("{}")
     price = _int(row.get("price"))
-    if not postcode or not transaction_id or not price:
+    date_of_transfer = _date(row.get("date_of_transfer"))
+    if not postcode or not transaction_id or not price or not date_of_transfer:
         return None
     return {
         "transaction_id": transaction_id,
         "price": price,
-        "date_of_transfer": str(row.get("date_of_transfer") or "").strip() or None,
+        "date_of_transfer": date_of_transfer,
         "postcode": postcode,
         "property_type": str(row.get("property_type") or "").strip() or None,
         "new_build": _bool(row.get("new_build")),
@@ -70,12 +106,13 @@ def _normalise_row(row: Dict[str, Any]) -> Dict[str, Any] | None:
     }
 
 
-def _iter_rows(path: Path, postcode_prefix: str | None) -> Iterable[Dict[str, Any]]:
-    prefix = (postcode_prefix or "").strip().upper()
+def _iter_rows(path: Path, postcode_prefixes: Iterable[str | None]) -> Iterable[Dict[str, Any]]:
+    prefixes = _normalise_prefixes(postcode_prefixes)
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        sample = handle.read(2048)
+        first_line = handle.readline()
         handle.seek(0)
-        has_header = "transaction" in sample.lower() or "postcode" in sample.lower()
+        first_line_lower = first_line.lower()
+        has_header = "transaction" in first_line_lower or "postcode" in first_line_lower
         if has_header:
             reader = csv.DictReader(handle)
         else:
@@ -84,7 +121,8 @@ def _iter_rows(path: Path, postcode_prefix: str | None) -> Iterable[Dict[str, An
             normalised = _normalise_row(row)
             if not normalised:
                 continue
-            if prefix and not str(normalised["postcode"]).startswith(prefix):
+            postcode = str(normalised["postcode"]).replace(" ", "")
+            if prefixes and not any(postcode.startswith(prefix) for prefix in prefixes):
                 continue
             yield normalised
 
@@ -104,28 +142,42 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Import Land Registry PPD CSV rows into Supabase ppd_sales."
     )
+    parser.add_argument("csv_path", nargs="?", help="Path to PPD CSV file")
     parser.add_argument(
-        "csv_path", nargs="?", default=os.getenv("PPD_CSV_PATH"), help="Path to PPD CSV file"
+        "--csv",
+        dest="csv_path_option",
+        default=None,
+        help="Path to PPD CSV file (alternative to positional csv_path)",
     )
     parser.add_argument(
+        "--prefix",
         "--postcode-prefix",
-        default=os.getenv("PPD_POSTCODE_PREFIX"),
-        help="Optional outward postcode filter, e.g. IG3",
+        dest="postcode_prefixes",
+        action="append",
+        default=None,
+        help="Optional postcode prefix filter; repeat for launch areas, e.g. --prefix IG --prefix RM",
     )
     parser.add_argument(
         "--batch-size", type=int, default=int(os.getenv("PPD_IMPORT_BATCH_SIZE", "500"))
     )
     args = parser.parse_args()
 
-    if not args.csv_path:
+    csv_path = args.csv_path_option or args.csv_path or os.getenv("PPD_CSV_PATH")
+    if not csv_path:
         raise SystemExit("csv_path or PPD_CSV_PATH is required")
-    path = Path(args.csv_path)
+    path = Path(csv_path)
     if not path.exists():
         raise SystemExit(f"CSV not found: {path}")
 
+    prefixes = _normalise_prefixes(
+        [*(args.postcode_prefixes or []), os.getenv("PPD_POSTCODE_PREFIX")]
+    )
+    if prefixes:
+        print(f"Filtering PPD import to postcode prefixes: {', '.join(prefixes)}")
+
     sb = get_supabase(required=True)
     total = 0
-    for batch in _chunks(_iter_rows(path, args.postcode_prefix), max(1, args.batch_size)):
+    for batch in _chunks(_iter_rows(path, prefixes), max(1, args.batch_size)):
         sb.table("ppd_sales").upsert(batch, on_conflict="transaction_id").execute()
         total += len(batch)
         print(f"Imported {total} rows...", flush=True)

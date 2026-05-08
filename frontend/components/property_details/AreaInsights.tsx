@@ -75,6 +75,17 @@ function normStr(v: unknown): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
+function extractUkPostcode(value: unknown): string {
+  const s = normStr(value).toUpperCase();
+  if (!s) return '';
+
+  const full = s.match(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i)?.[0];
+  if (full) return full.replace(/\s+/g, ' ').trim().toUpperCase();
+
+  const outward = s.match(/\b[A-Z]{1,2}\d{1,2}[A-Z]?\b/i)?.[0];
+  return outward ? outward.toUpperCase() : '';
+}
+
 function fmtVersion(v: unknown): string | undefined {
   const s = normStr(v);
   if (!s) return undefined;
@@ -277,7 +288,7 @@ export default function AreaInsights({
     [],
   );
 
-  const pc = normStr(postcode);
+  const pc = normStr(postcode) || extractUkPostcode(areaKey);
   const rentSrc = normStr(rentSource).toLowerCase();
   const vLabel = fmtVersion(version);
 

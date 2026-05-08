@@ -54,6 +54,24 @@ describe('AreaInsights launch trimming', () => {
     expect(screen.queryByText('No comps available for this postcode yet.')).not.toBeInTheDocument();
   });
 
+  it('uses a postcode embedded in the area key when postcode is missing', async () => {
+    mockGetAreaIntel.mockResolvedValue({
+      key: 'B15',
+      postcode: 'B15 2QJ',
+      source: 'partial_live',
+      crime: { count: 0, month: '2026-04', source: 'police.uk' },
+      source_details: { crime: 'police.uk' },
+    });
+    mockGetComps.mockResolvedValue({ sales: [], rents: [] });
+
+    const AreaInsights = require('./AreaInsights').default;
+    render(<AreaInsights areaKey="Farquhar Road, Birmingham, Edgbaston B15 2QJ" postcode="" />);
+
+    expect(await screen.findByText('Crime signal')).toBeInTheDocument();
+    expect(mockGetAreaIntel).toHaveBeenCalledWith('Farquhar Road, Birmingham, Edgbaston B15 2QJ');
+    expect(mockGetComps).toHaveBeenCalledWith('B15 2QJ');
+  });
+
   it('renders only available live or derived facts with source labels', async () => {
     mockGetAreaIntel.mockResolvedValue({
       key: 'IG3',

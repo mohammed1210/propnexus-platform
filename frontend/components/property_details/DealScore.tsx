@@ -2,6 +2,15 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  FiActivity,
+  FiAlertTriangle,
+  FiBarChart2,
+  FiHome,
+  FiMapPin,
+  FiShield,
+  FiTrendingUp,
+} from 'react-icons/fi';
 import AIScoreBars from '@/components/property_details/AIScoreBars';
 import { normalizeProperty } from '@/lib/normalizeProperty';
 
@@ -37,10 +46,45 @@ const CATEGORY_LABELS: Record<string, string> = {
   schools_access: 'Schools Access',
 };
 
+const CATEGORY_HELPERS: Record<string, string> = {
+  yield: 'Income strength against purchase price',
+  roi: 'Projected upside after costs and strategy fit',
+  price_to_rent: 'Affordability versus rental evidence',
+  area_demand: 'Local demand and liquidity signals',
+  crime_index_inverse: 'Risk-adjusted neighbourhood safety',
+  schools_access: 'Family tenant demand support',
+};
+
+const CATEGORY_ICONS: Record<string, typeof FiTrendingUp> = {
+  yield: FiTrendingUp,
+  roi: FiActivity,
+  price_to_rent: FiHome,
+  area_demand: FiMapPin,
+  crime_index_inverse: FiShield,
+  schools_access: FiBarChart2,
+};
+
 function percentToScore20(pct: number) {
   // 0% => 0 points, 10%+ => 20 points
   const clamped = Math.max(0, Math.min(10, pct));
   return (clamped / 10) * 20;
+}
+
+function clampScore(n: number) {
+  return Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0));
+}
+
+function fmtPct(n: number | null | undefined) {
+  return typeof n === 'number' && Number.isFinite(n) ? `${n.toFixed(1)}%` : '—';
+}
+
+function fmtGBP(n: number | null | undefined) {
+  if (typeof n !== 'number' || !Number.isFinite(n) || n <= 0) return '—';
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
 export default function DealScore({ property }: DealScoreProps) {
@@ -58,7 +102,8 @@ export default function DealScore({ property }: DealScoreProps) {
     if (typeof score !== 'number') return null;
 
     const breakdown = property?.score_breakdown;
-    const categories = breakdown && typeof breakdown === 'object' ? breakdown.categories : undefined;
+    const categories =
+      breakdown && typeof breakdown === 'object' ? breakdown.categories : undefined;
     const version = breakdown && typeof breakdown === 'object' ? breakdown.version : undefined;
 
     return { score, categories: categories ?? undefined, version: version ?? undefined };
@@ -91,6 +136,25 @@ export default function DealScore({ property }: DealScoreProps) {
           value: Math.round(Math.max(0, Math.min(100, percentage))),
         };
       });
+  }, [derivedCategories]);
+
+  const rankedFactors = useMemo(() => {
+    if (!derivedCategories) return [];
+
+    return Object.entries(derivedCategories)
+      .filter(([key, value]) => typeof value === 'number' && typeof MAX_POINTS[key] === 'number')
+      .map(([key, value]) => {
+        const max = MAX_POINTS[key];
+        const percentage = max > 0 ? clampScore((value / max) * 100) : 0;
+        return {
+          key,
+          label: CATEGORY_LABELS[key] ?? key,
+          helper: CATEGORY_HELPERS[key] ?? 'Scored from available investment data',
+          value: Math.round(percentage),
+          icon: CATEGORY_ICONS[key] ?? FiBarChart2,
+        };
+      })
+      .sort((a, b) => b.value - a.value);
   }, [derivedCategories]);
 
   // Animation state (kept from prior UX)
@@ -153,6 +217,40 @@ export default function DealScore({ property }: DealScoreProps) {
 
   const showBreakdown = true;
 
+  const roundedScore = Math.round(score);
+  const animatedRoundedScore = Math.round(animatedScore);
+  const dealBand =
+    score >= 75
+      ? {
+          label: 'Investor-grade opportunity',
+          chip: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300',
+          summary:
+            'Strong fundamentals. Prioritise offer strategy, finance terms and diligence checks.',
+        }
+      : score >= 50
+        ? {
+            label: 'Watchlist deal',
+            chip: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300',
+            summary:
+              'Mixed fundamentals. Validate rent, costs and exit assumptions before bidding.',
+          }
+        : {
+            label: 'Needs stronger evidence',
+            chip: 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300',
+            summary:
+              'Higher risk profile. Look for price discount, stronger comps or clearer demand.',
+          };
+
+  const kpis = [
+    { label: 'Gross yield', value: fmtPct(normalized.yieldPercent), helper: 'Income quality' },
+    {
+      label: normalized.roiIsProxy ? 'ROI proxy' : 'ROI',
+      value: fmtPct(normalized.roiPercent ?? normalized.roiProxyPercent),
+      helper: normalized.roiIsProxy ? 'Derived estimate' : 'Return potential',
+    },
+    { label: 'Monthly rent', value: fmtGBP(normalized.rentMonthly), helper: 'Rent evidence' },
+  ];
+
   const getScoreColor = (s: number) => {
     if (s >= 75) return 'text-green-600 dark:text-green-400';
     if (s >= 50) return 'text-yellow-600 dark:text-yellow-400';
@@ -160,41 +258,146 @@ export default function DealScore({ property }: DealScoreProps) {
   };
 
   return (
-    <div ref={scoreRef}>
-      <div className="sticky top-3 z-10 px-2 py-2 mb-4 bg-white/80 dark:bg-slate-900/40 backdrop-blur rounded-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className={`text-6xl font-bold ${getScoreColor(score)}`}>{Math.round(animatedScore)}</div>
-            <div className="text-gray-600 dark:text-neutral-400">
-              <div className="text-sm font-medium">AI Deal Score</div>
-              <div className="text-xs">Out of 100</div>
+    <div ref={scoreRef} className="space-y-4">
+      <div
+        className={`relative overflow-hidden rounded-[1.35rem] border border-brand-200/70 bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 text-white shadow-sm transition-all duration-700 ease-out motion-reduce:translate-y-0 motion-reduce:scale-100 motion-reduce:opacity-100 motion-reduce:transition-none dark:border-brand-900/60 dark:from-brand-950 dark:via-brand-900 dark:to-brand-800 ${
+          isVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-3 scale-[0.98] opacity-0'
+        }`}
+      >
+        <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-white/15 blur-3xl" />
+        <div className="absolute -bottom-24 left-10 h-56 w-56 rounded-full bg-emerald-300/15 blur-3xl" />
+
+        <div className="relative grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_minmax(250px,0.72fr)] lg:items-center">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-200 backdrop-blur">
+                <FiTrendingUp className="h-3.5 w-3.5 text-emerald-300" />
+                Investor scorecard
+              </span>
+              <span
+                className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${dealBand.chip}`}
+              >
+                {dealBand.label}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div
+                className="relative grid h-32 w-32 shrink-0 place-items-center rounded-full p-2.5 shadow-2xl shadow-black/25 sm:h-36 sm:w-36"
+                style={{
+                  background: `conic-gradient(rgb(16 185 129) ${clampScore(animatedRoundedScore)}%, rgba(255,255,255,0.12) 0)`,
+                }}
+                aria-label={`AI Deal Score ${roundedScore} out of 100`}
+              >
+                <div className="grid h-full w-full place-items-center rounded-full border border-white/10 bg-slate-950/95">
+                  <div className="text-center">
+                    <div
+                      className={`text-5xl font-black leading-none tracking-tight ${getScoreColor(score)}`}
+                    >
+                      {animatedRoundedScore}
+                    </div>
+                    <div className="mt-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                      / 100
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="max-w-xl">
+                <div className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-200">
+                  AI Deal Score
+                </div>
+                <h3 className="mt-1.5 text-xl font-bold tracking-tight text-white sm:text-2xl">
+                  Deal quality at a glance
+                </h3>
+                <p className="mt-2 text-sm leading-5 text-slate-200">{dealBand.summary}</p>
+              </div>
             </div>
           </div>
-          <div className="hidden sm:flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
-            <span className="inline-flex items-center gap-1.5">
-              <span aria-hidden className="h-2 w-2 rounded-full bg-green-500" />
-              Strong
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span aria-hidden className="h-2 w-2 rounded-full bg-yellow-500" />
-              Average
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span aria-hidden className="h-2 w-2 rounded-full bg-red-500" />
-              Weak
-            </span>
+
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
+            {kpis.map((kpi) => (
+              <div
+                key={kpi.label}
+                className="rounded-xl border border-white/10 bg-white/[0.1] p-3 text-center backdrop-blur-md"
+              >
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-50/85">
+                  {kpi.label}
+                </div>
+                <div className="mt-1.5 text-xl font-bold text-white">{kpi.value}</div>
+                <div className="mt-1 text-xs text-brand-50/75">{kpi.helper}</div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
       {showBreakdown ? (
-        <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/40">
-          <AIScoreBars overall={Math.round(score)} items={chartItems} showHeader={false} />
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.78fr)]">
+          <div className="rounded-[1.25rem] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/50">
+            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Score drivers
+                </div>
+                <h4 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                  Return, demand and risk balance
+                </h4>
+              </div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Weighted factor view</div>
+            </div>
+            <AIScoreBars overall={roundedScore} items={chartItems} showHeader={false} />
+          </div>
+
+          <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
+            <div className="mb-3 flex items-center gap-2">
+              <FiAlertTriangle className="h-4 w-4 text-amber-500" />
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Investor lens
+                </div>
+                <h4 className="text-base font-semibold text-slate-950 dark:text-white">
+                  Top scoring factors
+                </h4>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              {rankedFactors.slice(0, 4).map((factor) => {
+                const Icon = factor.icon;
+                return (
+                  <div
+                    key={factor.key}
+                    className="rounded-xl border border-slate-200 bg-white/90 p-2.5 dark:border-slate-800 dark:bg-slate-950/50"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300">
+                        <Icon className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">
+                            {factor.label} signal
+                          </div>
+                          <div className={`text-sm font-bold ${getScoreColor(factor.value)}`}>
+                            {factor.value}%
+                          </div>
+                        </div>
+                        <p className="mt-0.5 text-xs leading-4 text-slate-500 dark:text-slate-400">
+                          {factor.helper}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       ) : null}
 
       {showBreakdown ? (
-        <div className="mt-4 text-xs text-gray-500 dark:text-neutral-500">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-neutral-500">
           Version {version ?? 'v1.0'} • Scores are indicative and based on available data
         </div>
       ) : null}

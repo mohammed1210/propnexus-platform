@@ -195,6 +195,25 @@ p {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
+header[role='banner'] {
+  transition: transform 220ms ease, opacity 220ms ease, box-shadow 220ms ease;
+}
+
+body.listings-page header[role='banner'] {
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.1);
+}
+
+body.listings-search-only header[role='banner'] {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-100%);
+}
+
+body.listings-search-only .sticky-filter {
+  top: 0;
+  z-index: 60;
+}
+
 /* ========================================
 4) INPUTS / BUTTONS (tiny utility classes)
 ======================================== */
