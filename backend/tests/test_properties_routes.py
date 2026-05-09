@@ -9,6 +9,8 @@ import pytest
 from fastapi import HTTPException, Response
 from fastapi.testclient import TestClient
 
+from backend.routes.properties_routes import PROPERTIES_NORMALIZATION_VERSION
+
 
 @pytest.fixture
 def client():
@@ -41,7 +43,10 @@ def test_list_properties_endpoint_exists(mock_create_client, client):
     # Should not be 404 (endpoint exists)
     assert response.status_code != 404
     assert response.status_code == 200
-    assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
+    assert (
+        response.headers.get("X-PropNexus-Properties-Normalization")
+        == PROPERTIES_NORMALIZATION_VERSION
+    )
 
     data = response.json()
     assert isinstance(data, dict)
@@ -99,7 +104,10 @@ def test_list_properties_with_filters(mock_create_client, client):
     )
 
     assert response.status_code == 200
-    assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
+    assert (
+        response.headers.get("X-PropNexus-Properties-Normalization")
+        == PROPERTIES_NORMALIZATION_VERSION
+    )
     data = response.json()
     assert isinstance(data, dict)
     assert isinstance(data.get("items"), list)
@@ -137,7 +145,10 @@ def test_list_properties_default_sort(mock_create_client, client):
     response = client.get("/properties")
 
     assert response.status_code == 200
-    assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
+    assert (
+        response.headers.get("X-PropNexus-Properties-Normalization")
+        == PROPERTIES_NORMALIZATION_VERSION
+    )
 
     # Should order by created_at by default
     assert mock_query.order.call_count >= 1
@@ -662,7 +673,10 @@ def test_get_property_by_id(mock_create_client, client):
     response = client.get("/properties/123")
 
     assert response.status_code == 200
-    assert response.headers.get("X-PropNexus-Properties-Normalization") == "v1"
+    assert (
+        response.headers.get("X-PropNexus-Properties-Normalization")
+        == PROPERTIES_NORMALIZATION_VERSION
+    )
     data = response.json()
     assert data["id"] == "123"
     assert data["title"] == "Test Property"

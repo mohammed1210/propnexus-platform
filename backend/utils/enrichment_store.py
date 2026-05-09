@@ -134,28 +134,38 @@ def safe_select_ppd_sales(
     postcode_prefix: str,
     limit: int = 20,
     months_back: int = 24,
+    match_mode: str = "outward",
 ) -> list[dict[str, Any]]:
     """Best-effort PPD query.
 
     Returns [] if the table doesn't exist or query fails.
     """
 
-    prefix = (postcode_prefix or "").strip().upper()
+    prefix = " ".join((postcode_prefix or "").strip().upper().split())
     if not prefix:
         return []
 
+    mode = (match_mode or "outward").strip().lower()
+
     # We intentionally avoid complex geospatial filtering here.
-    # v1: match postcode prefix (e.g. outward code) and recent transfers.
+    # v1: match exact outward code plus the standard postcode space.
+    # Avoid a broad `RM1%`-style match because that incorrectly includes
+    # RM10/RM11/RM12 rows when the requested outward code is RM1.
     try:
         q = (
             sb.table("ppd_sales")
             .select(
                 "price,date_of_transfer,postcode,property_type,new_build,tenure,paon,saon,street,town_city,district,county,latitude,longitude"
             )
-            .ilike("postcode", f"{prefix}%")
             .order("date_of_transfer", desc=True)
             .limit(max(1, min(int(limit or 0), 100)))
         )
+        if mode == "exact":
+            q = q.eq("postcode", prefix)
+        elif mode == "sector":
+            q = q.ilike("postcode", f"{prefix}%")
+        else:
+            q = q.ilike("postcode", f"{prefix} %")
 
         # If date filtering fails for any reason, we still return limited rows.
         try:

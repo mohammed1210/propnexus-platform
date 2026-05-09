@@ -1,4 +1,4 @@
-from backend.utils.listing_keys import extract_postcode
+from backend.utils.listing_keys import best_postcode, extract_full_postcode, extract_postcode
 
 
 def test_extract_postcode_prefers_full_postcode_when_present():
@@ -23,3 +23,15 @@ def test_extract_postcode_does_not_grab_flat_numbers_like_1f2_or_3f2():
 
     # If there's no real postcode, we prefer returning None over a false positive.
     assert extract_postcode("Flat 1F2, no postcode given") is None
+
+
+def test_extract_full_postcode_returns_canonical_spaced_value():
+    assert extract_full_postcode("Ilford IG3 8DN") == "IG3 8DN"
+    assert extract_full_postcode("Ilford IG38DN") == "IG3 8DN"
+    assert extract_full_postcode("Ilford IG3") is None
+
+
+def test_best_postcode_upgrades_outward_to_full_from_listing_text():
+    assert best_postcode("IG3", "Flat 2, Example Street, IG3 8DN") == "IG3 8DN"
+    assert best_postcode("IG3 8AA", "Flat 2, Example Street, IG3 8DN") == "IG3 8AA"
+    assert best_postcode("IG3", "Ilford") == "IG3"

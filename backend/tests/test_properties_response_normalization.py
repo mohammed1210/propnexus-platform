@@ -53,3 +53,16 @@ def test_normalize_property_row_image_urls_invalid_json_string_becomes_empty_lis
     out = _normalize_property_row({"id": "3", "image_urls": "not json", "imageurl": None})
     assert isinstance(out.get("image_urls"), list)
     assert out["image_urls"] == []
+
+
+def test_normalize_property_row_upgrades_outward_postcode_from_raw_payload():
+    out = _normalize_property_row(
+        {
+            "id": "4",
+            "postcode": "IG3",
+            "location": "Ilford",
+            "data": {"raw": {"displayAddress": "Flat 2, Example Street, IG3 8DN"}},
+        }
+    )
+
+    assert out["postcode"] == "IG3 8DN"

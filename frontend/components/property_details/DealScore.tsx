@@ -11,7 +11,8 @@ import {
   FiShield,
   FiTrendingUp,
 } from 'react-icons/fi';
-import AIScoreBars from '@/components/property_details/AIScoreBars';
+import { getAreaIntel, getComps } from '@/lib/api';
+import { buildDealScoreFactors, type AreaIntelEvidence, type CompsEvidence, type DisplayScoreFactor } from '@/lib/dealScoreFactors';
 import { normalizeProperty } from '@/lib/normalizeProperty';
 
 interface PropertyData {
@@ -28,47 +29,14 @@ interface DealScoreProps {
   property: PropertyData;
 }
 
-const MAX_POINTS: Record<string, number> = {
-  yield: 20,
-  roi: 20,
-  price_to_rent: 15,
-  area_demand: 15,
-  crime_index_inverse: 15,
-  schools_access: 15,
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  yield: 'Rental Yield',
-  roi: 'ROI Potential',
-  price_to_rent: 'Price-to-Rent',
-  area_demand: 'Area Demand',
-  crime_index_inverse: 'Safety Index',
-  schools_access: 'Schools Access',
-};
-
-const CATEGORY_HELPERS: Record<string, string> = {
-  yield: 'Income strength against purchase price',
-  roi: 'Projected upside after costs and strategy fit',
-  price_to_rent: 'Affordability versus rental evidence',
-  area_demand: 'Local demand and liquidity signals',
-  crime_index_inverse: 'Risk-adjusted neighbourhood safety',
-  schools_access: 'Family tenant demand support',
-};
-
-const CATEGORY_ICONS: Record<string, typeof FiTrendingUp> = {
+const FACTOR_ICONS: Record<string, typeof FiTrendingUp> = {
   yield: FiTrendingUp,
   roi: FiActivity,
   price_to_rent: FiHome,
   area_demand: FiMapPin,
-  crime_index_inverse: FiShield,
+  reported_crime: FiShield,
   schools_access: FiBarChart2,
 };
-
-function percentToScore20(pct: number) {
-  // 0% => 0 points, 10%+ => 20 points
-  const clamped = Math.max(0, Math.min(10, pct));
-  return (clamped / 10) * 20;
-}
 
 function clampScore(n: number) {
   return Math.max(0, Math.min(100, Number.isFinite(n) ? n : 0));
@@ -87,10 +55,181 @@ function fmtGBP(n: number | null | undefined) {
   }).format(n);
 }
 
+function normStr(v: unknown): string {
+  return typeof v === 'string' ? v.trim() : '';
+}
+
+function extractUkPostcode(value: unknown): string {
+  const s = normStr(value).toUpperCase();
+  if (!s) return '';
+  const full = s.match(/\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i)?.[0];
+  if (full) return full.replace(/\s+/g, ' ').trim().toUpperCase();
+  const outward = s.match(/\b[A-Z]{1,2}\d{1,2}[A-Z]?\b/i)?.[0];
+  return outward ? outward.toUpperCase() : '';
+}
+
+function factorToneClasses(tone: DisplayScoreFactor['tone']): string {
+  if (tone === 'emerald') return 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300';
+  if (tone === 'amber') return 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300';
+  if (tone === 'rose') return 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300';
+  if (tone === 'brand') return 'border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-900/60 dark:bg-brand-950/30 dark:text-brand-300';
+  return 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-300';
+}
+
+type DealVerdict = {
+  label: 'Investor-grade' | 'Watchlist' | 'Needs stronger evidence';
+  tone: DisplayScoreFactor['tone'];
+  summary: string;
+};
+
+type VerdictRow = {
+  label: string;
+  value: string;
+  helper: string;
+};
+
+function getDealVerdict(score: number): DealVerdict {
+  if (score >= 75) {
+    return {
+      label: 'Investor-grade',
+      tone: 'emerald',
+      summary: 'Strong evidence base. Move into offer diligence, not blind bidding.',
+    };
+  }
+  if (score >= 50) {
+    return {
+      label: 'Watchlist',
+      tone: 'amber',
+      summary: 'Promising, but validate the assumptions before bidding.',
+    };
+  }
+  return {
+    label: 'Needs stronger evidence',
+    tone: 'rose',
+    summary: 'Require stronger comps, rent proof or discount before proceeding.',
+  };
+}
+
+function getBestFit(property: PropertyData, factors: DisplayScoreFactor[]): VerdictRow {
+  const normalized = normalizeProperty(property as any);
+  const text = [property?.title, property?.description, property?.property_type, property?.type, property?.strategy]
+    .map(normStr)
+    .join(' ')
+    .toLowerCase();
+  const hasFlipSignal = /refurb|renovat|modernis|development|auction|cash buyer|value[- ]add|project/.test(text);
+  const yieldFactor = factors.find((factor) => factor.key === 'yield');
+  const ptrFactor = factors.find((factor) => factor.key === 'price_to_rent');
+  const roiFactor = factors.find((factor) => factor.key === 'roi');
+
+  if (hasFlipSignal && (!yieldFactor || yieldFactor.value < 60)) {
+    return {
+      label: 'Best fit',
+      value: 'Flip',
+      helper: 'Value-add language found; confirm works budget and resale comps.',
+    };
+  }
+
+  if ((normalized.yieldPercent ?? 0) >= 5 || (yieldFactor?.value ?? 0) >= 55 || (ptrFactor?.value ?? 0) >= 55) {
+    return {
+      label: 'Best fit',
+      value: 'BTL',
+      helper: 'Gross yield from available rent evidence is the clearest route.',
+    };
+  }
+
+  if ((roiFactor?.value ?? 0) >= 65) {
+    return {
+      label: 'Best fit',
+      value: 'Refinance',
+      helper: 'Return signal is strongest; verify finance, costs and exit value.',
+    };
+  }
+
+  return {
+    label: 'Best fit',
+    value: 'Hold',
+    helper: 'Use as a watchlist hold until rent and comparable evidence improves.',
+  };
+}
+
+function getStrongestFactor(factors: DisplayScoreFactor[]): VerdictRow {
+  const strongest = [...factors].sort((a, b) => b.value - a.value)[0];
+  if (!strongest) {
+    return {
+      label: 'Strongest signal',
+      value: 'Evidence pending',
+      helper: 'Add rent or comparable evidence before relying on the score.',
+    };
+  }
+
+  return {
+    label: 'Strongest signal',
+    value: strongest.label,
+    helper: strongest.badge === 'Land Registry PPD' ? 'Comps backed by Land Registry PPD.' : strongest.helper,
+  };
+}
+
+function getMainRisk(factors: DisplayScoreFactor[]): VerdictRow {
+  const proxyRoi = factors.find((factor) => factor.key === 'roi' && factor.source === 'derived');
+  if (proxyRoi) {
+    return {
+      label: 'Main check before offer',
+      value: 'ROI proxy',
+      helper: 'ROI is proxy-based; validate finance and costs.',
+    };
+  }
+
+  const weakest = [...factors].sort((a, b) => a.value - b.value)[0];
+  if (weakest) {
+    return {
+      label: 'Main check before offer',
+      value: weakest.label,
+      helper: weakest.key === 'reported_crime'
+        ? 'Crime shown only where police.uk full-postcode evidence exists.'
+        : weakest.helper,
+    };
+  }
+
+  return {
+    label: 'Main check before offer',
+    value: 'Evidence depth',
+    helper: 'Validate rent, condition and comparable sales before bidding.',
+  };
+}
+
+function getBeforeOfferChecks(property: PropertyData, factors: DisplayScoreFactor[]): string[] {
+  const normalized = normalizeProperty(property as any);
+  const checks: string[] = [];
+  const add = (check: string) => {
+    if (!checks.includes(check) && checks.length < 3) checks.push(check);
+  };
+
+  if (factors.some((factor) => factor.key === 'roi' && factor.source === 'derived') || normalized.roiIsProxy) {
+    add('Validate finance, refurb costs and fees.');
+  }
+  if (factors.some((factor) => factor.key === 'yield' || factor.key === 'price_to_rent')) {
+    add('Confirm achievable rent and void assumptions.');
+  }
+  if (factors.some((factor) => factor.key === 'area_demand' && factor.badge === 'Land Registry PPD')) {
+    add('Compare latest Land Registry PPD sales.');
+  }
+  if (factors.some((factor) => factor.key === 'reported_crime')) {
+    add('Review police.uk incidents at full postcode level.');
+  }
+
+  add('Inspect condition, lease, EPC and legal pack.');
+  add('Stress-test exit value and resale demand.');
+  add('Set a walk-away price before bidding.');
+
+  return checks;
+}
+
 export default function DealScore({ property }: DealScoreProps) {
   const scoreRef = useRef<HTMLDivElement>(null);
 
   const normalized = useMemo(() => normalizeProperty(property as any), [property]);
+  const [areaIntel, setAreaIntel] = useState<AreaIntelEvidence | null>(null);
+  const [comps, setComps] = useState<CompsEvidence | null>(null);
 
   const scoreData = useMemo(() => {
     const score =
@@ -109,53 +248,64 @@ export default function DealScore({ property }: DealScoreProps) {
     return { score, categories: categories ?? undefined, version: version ?? undefined };
   }, [property]);
 
-  const derivedCategories = useMemo(() => {
-    const categories = scoreData?.categories;
-    if (!categories) return categories;
+  const areaKey = useMemo(
+    () =>
+      normStr((property as any)?.area_key) ||
+      normStr((property as any)?.postcode) ||
+      extractUkPostcode((property as any)?.location) ||
+      normStr(normalized.area) ||
+      normStr(normalized.location),
+    [normalized.area, normalized.location, property],
+  );
+  const postcodeKey = useMemo(
+    () =>
+      extractUkPostcode((property as any)?.postcode) ||
+      extractUkPostcode((property as any)?.address) ||
+      extractUkPostcode((property as any)?.location) ||
+      extractUkPostcode((property as any)?.title) ||
+      areaKey,
+    [areaKey, property],
+  );
 
-    const roiPctForScore = normalized.roiPercent ?? normalized.roiProxyPercent ?? 0;
-    const roiScoreFallback = percentToScore20(roiPctForScore);
-    const current = typeof categories.roi === 'number' ? categories.roi : 0;
+  useEffect(() => {
+    let cancelled = false;
+    setAreaIntel(null);
+    setComps(null);
 
-    return {
-      ...categories,
-      roi: current > 0 ? current : roiScoreFallback,
+    if (areaKey) {
+      getAreaIntel(areaKey)
+        .then((payload) => {
+          if (!cancelled) setAreaIntel((payload ?? null) as AreaIntelEvidence | null);
+        })
+        .catch(() => {
+          if (!cancelled) setAreaIntel(null);
+        });
+    }
+    if (postcodeKey) {
+      getComps(postcodeKey)
+        .then((payload) => {
+          if (!cancelled) setComps((payload ?? null) as CompsEvidence | null);
+        })
+        .catch(() => {
+          if (!cancelled) setComps(null);
+        });
+    }
+
+    return () => {
+      cancelled = true;
     };
-  }, [scoreData?.categories, normalized.roiPercent, normalized.roiProxyPercent]);
+  }, [areaKey, postcodeKey]);
 
-  const chartItems = useMemo(() => {
-    if (!derivedCategories) return [];
-
-    return Object.entries(derivedCategories)
-      .filter(([key, value]) => typeof value === 'number' && typeof MAX_POINTS[key] === 'number')
-      .map(([key, value]) => {
-        const max = MAX_POINTS[key];
-        const percentage = max > 0 ? (value / max) * 100 : 0;
-        return {
-          label: CATEGORY_LABELS[key] ?? key,
-          value: Math.round(Math.max(0, Math.min(100, percentage))),
-        };
-      });
-  }, [derivedCategories]);
-
-  const rankedFactors = useMemo(() => {
-    if (!derivedCategories) return [];
-
-    return Object.entries(derivedCategories)
-      .filter(([key, value]) => typeof value === 'number' && typeof MAX_POINTS[key] === 'number')
-      .map(([key, value]) => {
-        const max = MAX_POINTS[key];
-        const percentage = max > 0 ? clampScore((value / max) * 100) : 0;
-        return {
-          key,
-          label: CATEGORY_LABELS[key] ?? key,
-          helper: CATEGORY_HELPERS[key] ?? 'Scored from available investment data',
-          value: Math.round(percentage),
-          icon: CATEGORY_ICONS[key] ?? FiBarChart2,
-        };
-      })
-      .sort((a, b) => b.value - a.value);
-  }, [derivedCategories]);
+  const evidenceFactors = useMemo(
+    () =>
+      buildDealScoreFactors({
+        property: property as Record<string, unknown>,
+        score_breakdown: property?.score_breakdown,
+        areaIntel,
+        comps,
+      }),
+    [property, areaIntel, comps],
+  );
 
   // Animation state (kept from prior UX)
   const [isVisible, setIsVisible] = useState(false);
@@ -215,10 +365,15 @@ export default function DealScore({ property }: DealScoreProps) {
 
   const { score, version } = scoreData;
 
-  const showBreakdown = true;
+  const showBreakdown = evidenceFactors.length > 0;
 
   const roundedScore = Math.round(score);
   const animatedRoundedScore = Math.round(animatedScore);
+  const investorVerdict = getDealVerdict(score);
+  const bestFit = getBestFit(property, evidenceFactors);
+  const strongestFactor = getStrongestFactor(evidenceFactors);
+  const mainRisk = getMainRisk(evidenceFactors);
+  const beforeOfferChecks = getBeforeOfferChecks(property, evidenceFactors);
   const dealBand =
     score >= 75
       ? {
@@ -341,56 +496,98 @@ export default function DealScore({ property }: DealScoreProps) {
                   Score drivers
                 </div>
                 <h4 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
-                  Return, demand and risk balance
+                  Evidence-backed score drivers
                 </h4>
               </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">Weighted factor view</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">Evidence-backed factor view</div>
             </div>
-            <AIScoreBars overall={roundedScore} items={chartItems} showHeader={false} />
-          </div>
-
-          <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
-            <div className="mb-3 flex items-center gap-2">
-              <FiAlertTriangle className="h-4 w-4 text-amber-500" />
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Investor lens
-                </div>
-                <h4 className="text-base font-semibold text-slate-950 dark:text-white">
-                  Top scoring factors
-                </h4>
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              {rankedFactors.slice(0, 4).map((factor) => {
-                const Icon = factor.icon;
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {evidenceFactors.map((factor) => {
+                const Icon = FACTOR_ICONS[factor.key] ?? FiBarChart2;
                 return (
                   <div
                     key={factor.key}
-                    className="rounded-xl border border-slate-200 bg-white/90 p-2.5 dark:border-slate-800 dark:bg-slate-950/50"
+                    className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/30"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300">
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                            {factor.label} signal
-                          </div>
-                          <div className={`text-sm font-bold ${getScoreColor(factor.value)}`}>
-                            {factor.value}%
-                          </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                          {factor.label}
                         </div>
-                        <p className="mt-0.5 text-xs leading-4 text-slate-500 dark:text-slate-400">
-                          {factor.helper}
-                        </p>
+                        <div className="mt-1 text-xl font-bold text-slate-950 dark:text-white">
+                          {factor.displayValue}
+                        </div>
                       </div>
+                      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${factorToneClasses(factor.tone)}`}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                      {factor.helper}
+                    </p>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
+                        {factor.badge}
+                      </span>
+                      <span className={`text-sm font-bold ${getScoreColor(factor.value)}`}>{factor.value}%</span>
                     </div>
                   </div>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                  Investor verdict
+                </div>
+                <h4 className="mt-1 text-base font-semibold text-slate-950 dark:text-white">
+                  Decision-ready readout
+                </h4>
+              </div>
+              <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${factorToneClasses(investorVerdict.tone)}`}>
+                {investorVerdict.label}
+              </span>
+            </div>
+
+            <p className="mb-3 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-xs leading-5 text-slate-600 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-300">
+              {investorVerdict.summary}
+            </p>
+
+            <div className="space-y-2.5">
+              {[bestFit, strongestFactor, mainRisk].map((row) => (
+                <div
+                  key={row.label}
+                  className="rounded-xl border border-slate-200 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-950/50"
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                    {row.label}
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">
+                    {row.value}
+                  </div>
+                  <p className="mt-1 text-xs leading-4 text-slate-500 dark:text-slate-400">
+                    {row.helper}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+                <FiAlertTriangle className="h-3.5 w-3.5" />
+                Before bidding
+              </div>
+              <ul className="space-y-1.5 text-xs leading-4 text-amber-800 dark:text-amber-200">
+                {beforeOfferChecks.map((check) => (
+                  <li key={check} className="flex gap-2">
+                    <span aria-hidden="true" className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    <span>{check}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
@@ -398,7 +595,7 @@ export default function DealScore({ property }: DealScoreProps) {
 
       {showBreakdown ? (
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-neutral-500">
-          Version {version ?? 'v1.0'} • Scores are indicative and based on available data
+          Version {version ?? 'v1.0'} • Scores are indicative and only display factors backed by available data. Overall score may include legacy model weighting; visible factors show available evidence only.
         </div>
       ) : null}
     </div>

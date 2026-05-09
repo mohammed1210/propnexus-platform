@@ -44,7 +44,13 @@ from backend.utils.ingest import (
     postcode_band,
     scrape_all_sources,
 )
-from backend.utils.listing_keys import ensure_external_id, extract_postcode, strip_empty_for_upsert
+from backend.utils.listing_keys import (
+    best_postcode,
+    ensure_external_id,
+    extract_postcode,
+    is_full_postcode,
+    strip_empty_for_upsert,
+)
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.property_type_classifier import classify_property_type
 from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run, update_scrape_run_data
@@ -882,44 +888,39 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
     if not row.get("address"):
         row["address"] = _pick_raw(["address", "displayAddress", "display_address", "location"])
 
-    # Fill postcode if missing (support outward codes like N22).
-    if not (
-        isinstance(row.get("postcode"), str) and row.get("postcode") and row["postcode"].strip()
-    ):
+    # Prefer a full postcode over an outward-only district whenever scraped
+    # address/location/title/url data exposes one. This lets listing cards call
+    # the tighter exact/sector comparable endpoints instead of broad outward comps.
+    pc = None
+    try:
+        pc = best_postcode(
+            row.get("postcode"),
+            row.get("address"),
+            row.get("location"),
+            row.get("title"),
+            row.get("url"),
+            _pick_raw(["postcode", "postalCode", "postal_code", "outcode"]),
+            _pick_raw(["address", "displayAddress", "display_address", "location"]),
+        )
+    except Exception:
         pc = None
-        try:
-            pc = (
-                extract_postcode(row.get("postcode"))
-                or extract_postcode(row.get("address"))
-                or extract_postcode(row.get("location"))
-                or extract_postcode(row.get("title"))
-                or extract_postcode(row.get("url"))
-            )
-        except Exception:
-            pc = None
-        if not pc:
-            for cand in (row.get("address"), row.get("title"), row.get("url")):
-                found = extract_postcode_from_text(str(cand)) if cand else None
-                if found:
-                    pc = found
-                    break
-        if pc:
-            if isinstance(pc, str):
-                compact = re.sub(r"\s+", "", pc).upper()
-                if len(compact) >= 5 and re.search(r"\d[A-Z]{2}$", compact):
-                    pc = f"{compact[:-3]} {compact[-3:]}"
-                else:
-                    pc = compact
-            row["postcode"] = pc
+    if not pc:
+        for cand in (row.get("address"), row.get("title"), row.get("url")):
+            found = extract_postcode_from_text(str(cand)) if cand else None
+            if found:
+                pc = best_postcode(None, found)
+                break
+    if pc:
+        row["postcode"] = pc
 
-        # Store outward postcode (district) for downstream scoring/filters.
-        if not (isinstance(row.get("postcode_band"), str) and row["postcode_band"].strip()):
-            try:
-                band = postcode_band(row.get("postcode"))
-                if band:
-                    row["postcode_band"] = band
-            except Exception:
-                pass
+    # Store outward postcode (district) for downstream scoring/filters.
+    if not (isinstance(row.get("postcode_band"), str) and row["postcode_band"].strip()):
+        try:
+            band = postcode_band(row.get("postcode"))
+            if band:
+                row["postcode_band"] = band
+        except Exception:
+            pass
 
     if row.get("price") in (None, 0, 0.0, ""):
         raw_price = _pick_raw(["price", "displayPrice", "display_price"])
@@ -1417,6 +1418,7 @@ def _needs_enrichment(row: dict[str, Any]) -> bool:
     img_count = _image_count(row.get("image_urls"))
     pc = extract_postcode(row.get("postcode"))
     pc_missing = not (isinstance(pc, str) and pc.strip())
+    pc_outward_only = bool(pc and not is_full_postcode(pc))
 
     def _pos_int(v: Any) -> int:
         try:
@@ -1432,7 +1434,14 @@ def _needs_enrichment(row: dict[str, Any]) -> bool:
     # Heuristic: allow single-photo records to be enriched (detail pages
     # frequently have full galleries).
     weak_images = img_missing or img_count < 2
-    return bool(weak_images or pc_missing or beds_missing or baths_missing or price_missing)
+    return bool(
+        weak_images
+        or pc_missing
+        or pc_outward_only
+        or beds_missing
+        or baths_missing
+        or price_missing
+    )
 
 
 def _extract_int_from_text(text: str, pattern: str) -> int | None:
@@ -1581,12 +1590,12 @@ async def _enrich_rows_best_effort(*, rows: list[dict[str, Any]], max_items: int
                 merged_imgs = dedupe_image_urls([*imgs, *existing_imgs], base_url=url)
                 cover = pick_cover_image(merged_imgs) if merged_imgs else None
 
-                pc = (
-                    extract_postcode(r.get("postcode"))
-                    or extract_postcode(r.get("address"))
-                    or extract_postcode(r.get("location"))
-                    or extract_postcode(r.get("title"))
-                    or extract_postcode(html)
+                pc = best_postcode(
+                    r.get("postcode"),
+                    r.get("address"),
+                    r.get("location"),
+                    r.get("title"),
+                    html,
                 )
 
                 beds = _extract_int_from_text(html, r"\b(\d+)\s*(?:bed|bedroom)s?\b")
@@ -1605,9 +1614,7 @@ async def _enrich_rows_best_effort(*, rows: list[dict[str, Any]], max_items: int
                     isinstance(r.get("imageurl"), str) and str(r.get("imageurl")).strip()
                 ):
                     patch["imageurl"] = cover
-                if pc and not (
-                    isinstance(r.get("postcode"), str) and str(r.get("postcode")).strip()
-                ):
+                if pc and best_postcode(r.get("postcode")) != pc:
                     patch["postcode"] = pc
                 if beds and int(r.get("bedrooms") or 0) <= 0:
                     patch["bedrooms"] = beds
@@ -2478,12 +2485,12 @@ async def enrich_missing_properties(
             cover = pick_cover_image(merged_imgs) if merged_imgs else None
 
             # Extract postcode
-            pc = (
-                extract_postcode(row.get("postcode"))
-                or extract_postcode(row.get("address"))
-                or extract_postcode(row.get("location"))
-                or extract_postcode(row.get("title"))
-                or extract_postcode(html)
+            pc = best_postcode(
+                row.get("postcode"),
+                row.get("address"),
+                row.get("location"),
+                row.get("title"),
+                html,
             )
 
             # Extract beds/baths/price (very conservative)
@@ -2497,7 +2504,7 @@ async def enrich_missing_properties(
                 payload["image_urls"] = merged_imgs
             if cover and not (isinstance(row.get("imageurl"), str) and row["imageurl"].strip()):
                 payload["imageurl"] = cover
-            if pc and not (isinstance(row.get("postcode"), str) and row["postcode"].strip()):
+            if pc and best_postcode(row.get("postcode")) != pc:
                 payload["postcode"] = pc
             if beds and int(row.get("bedrooms") or 0) <= 0:
                 payload["bedrooms"] = beds

@@ -229,6 +229,12 @@ type RawProperty = {
   id: string;
   title: string;
   location: string | null;
+  address?: string | null;
+  postcode?: string | null;
+  postal_code?: string | null;
+  postalCode?: string | null;
+  postcode_full?: string | null;
+  postcodeFull?: string | null;
   price: number | null;
   bedrooms?: number | null;
   bathrooms?: number | null;
@@ -892,6 +898,14 @@ function ListingsInner() {
             id: String(prop?.id ?? ''),
             title: String(prop?.title ?? ''),
             location: prop?.location,
+            address: prop?.address,
+            postcode:
+              prop?.postcode ??
+              prop?.postcode_full ??
+              prop?.postcodeFull ??
+              prop?.postal_code ??
+              prop?.postalCode ??
+              null,
             price: prop?.price,
             bedrooms: prop?.bedrooms,
             bathrooms: prop?.bathrooms,
@@ -920,6 +934,14 @@ function ListingsInner() {
                 id: String(prop?.id ?? ''),
                 title: String(prop?.title ?? ''),
                 location: prop?.location,
+                address: prop?.address,
+                postcode:
+                  prop?.postcode ??
+                  prop?.postcode_full ??
+                  prop?.postcodeFull ??
+                  prop?.postal_code ??
+                  prop?.postalCode ??
+                  null,
                 price: prop?.price,
                 bedrooms: prop?.bedrooms,
                 bathrooms: prop?.bathrooms,

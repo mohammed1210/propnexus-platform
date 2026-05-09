@@ -253,11 +253,14 @@ def compute_deal_score(property_row: Dict[str, Any]) -> Tuple[int, Dict[str, Any
         or 0.0
     )
 
-    # Preserve explicit 0 values; only default on None.
+    # Preserve explicit 0 values; only default on None. Source flags make it
+    # clear to launch UI consumers when these are legacy model assumptions.
     crime_raw = _to_float(data.get("crime_index"))
+    has_crime_index = crime_raw is not None
     crime = 50.0 if crime_raw is None else float(crime_raw)
 
     schools_raw = _to_float(data.get("schools_rating"))
+    has_schools_rating = schools_raw is not None
     schools = 3.0 if schools_raw is None else float(schools_raw)
 
     band = _postcode_band(data)
@@ -269,6 +272,8 @@ def compute_deal_score(property_row: Dict[str, Any]) -> Tuple[int, Dict[str, Any
         rent_proxy = (price * (cap_rate_pct / 100.0)) / 12.0
 
     rent = rent_raw if rent_raw > 0.0 else rent_proxy
+    rent_source = "provided" if rent_raw > 0.0 else ("proxy" if rent_proxy > 0.0 else "missing")
+    has_rent_evidence = rent_source == "provided"
     yield_pct = yield_pct_raw
     if yield_pct is None and rent > 0.0 and price > 0.0:
         yield_pct = (rent * 12.0 / price) * 100.0
@@ -360,9 +365,12 @@ def compute_deal_score(property_row: Dict[str, Any]) -> Tuple[int, Dict[str, Any
             "roi_percent": round(float(roi_pct), 2),
             "roi_source": roi_source,
             "rent_monthly": round(rent, 2),
-            "rent_source": (
-                "provided" if rent_raw > 0.0 else ("proxy" if rent_proxy > 0.0 else "missing")
-            ),
+            "rent_source": rent_source,
+            "has_rent_evidence": has_rent_evidence,
+            "has_crime_index": has_crime_index,
+            "crime_source": "provided" if has_crime_index else "legacy_default",
+            "has_schools_rating": has_schools_rating,
+            "schools_source": "provided" if has_schools_rating else "legacy_default",
             "cap_rate_proxy_percent": (
                 round(float(cap_rate_pct), 2) if cap_rate_pct is not None else None
             ),

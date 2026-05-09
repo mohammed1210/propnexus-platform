@@ -5,6 +5,7 @@ import re
 from typing import Any, Dict
 
 _POSTCODE_RE = re.compile(r"\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b", re.I)
+_COMPACT_FULL_POSTCODE_RE = re.compile(r"^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$", re.I)
 
 # Outward-only district (e.g., SW11, EC1V, W1K, E8, EH7, G72, M1).
 # We deliberately avoid matching inside flat numbers like "1F2" / "3F2".
@@ -70,6 +71,71 @@ def extract_postcode(text: Any) -> str | None:
         return None
 
     return re.sub(r"\s+", "", best.upper())
+
+
+def format_postcode(postcode: Any) -> str | None:
+    """Normalize a UK postcode for storage/display.
+
+    Full postcodes are stored with the canonical inward-code space (``IG3 8DN``),
+    while outward-only districts remain compact (``IG3``). Returns ``None`` for
+    non-string/blank values.
+    """
+
+    if not isinstance(postcode, str):
+        return None
+    compact = re.sub(r"\s+", "", postcode.strip().upper())
+    if not compact:
+        return None
+    if _COMPACT_FULL_POSTCODE_RE.match(compact):
+        return f"{compact[:-3]} {compact[-3:]}"
+    return compact
+
+
+def extract_full_postcode(text: Any) -> str | None:
+    """Extract only a full UK postcode, returning canonical spaced form."""
+
+    if not isinstance(text, str):
+        return None
+    m = _POSTCODE_RE.search(text)
+    if not m:
+        return None
+    return format_postcode(m.group(0))
+
+
+def is_full_postcode(value: Any) -> bool:
+    formatted = format_postcode(value)
+    if not formatted:
+        return False
+    return bool(_POSTCODE_RE.fullmatch(formatted))
+
+
+def best_postcode(existing: Any, *candidates: Any) -> str | None:
+    """Prefer the most precise postcode available.
+
+    This preserves a valid existing full postcode, upgrades outward-only values
+    when a full postcode is available in address/location/title/url/detail HTML,
+    and only falls back to outward-only districts when no full postcode exists.
+    """
+
+    existing_full = extract_full_postcode(existing)
+    if existing_full:
+        return existing_full
+
+    for candidate in candidates:
+        full = extract_full_postcode(candidate)
+        if full:
+            return full
+
+    existing_pc = extract_postcode(existing)
+    if existing_pc:
+        return format_postcode(existing_pc)
+
+    for candidate in candidates:
+        pc = extract_postcode(candidate)
+        if pc:
+            return format_postcode(pc)
+
+    return None
 
 
 def _coerce_int(v: Any) -> int | None:
