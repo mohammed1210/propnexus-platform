@@ -216,31 +216,6 @@ function MarketMetricCard({ label, value, helper, tone, icon }: MarketMetric) {
   );
 }
 
-function SignalBar({ label, value, max, lowerIsBetter = false }: { label: string; value?: number; max: number; lowerIsBetter?: boolean }) {
-  const safeValue = typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(max, value)) : undefined;
-  const pct = safeValue === undefined ? 0 : (safeValue / max) * 100;
-  const good = safeValue === undefined ? false : lowerIsBetter ? safeValue <= max * 0.4 : safeValue >= max * 0.7;
-  const mid = safeValue === undefined ? false : lowerIsBetter ? safeValue <= max * 0.7 : safeValue >= max * 0.45;
-  const bar = good ? 'bg-emerald-500' : mid ? 'bg-amber-500' : 'bg-rose-500';
-
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/30">
-      <div className="flex items-center justify-between gap-3 text-[13px]">
-        <span className="font-medium text-slate-700 dark:text-slate-200">{label}</span>
-        <span className="font-semibold text-slate-950 dark:text-white">
-          {safeValue === undefined ? '—' : max === 5 ? `${safeValue.toFixed(1)}/5` : `${Math.round(safeValue)}/100`}
-        </span>
-      </div>
-      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
-        <div className={`h-full rounded-full ${bar}`} style={{ width: `${pct}%` }} />
-      </div>
-      <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-        {lowerIsBetter ? 'Lower is generally more attractive for tenant demand.' : 'Higher indicates stronger local support for the deal.'}
-      </p>
-    </div>
-  );
-}
-
 function avgPrice(lines: CompLine[]): number | null {
   const valid = lines.filter((line) => Number.isFinite(line.price) && line.price > 0);
   if (valid.length === 0) return null;
@@ -279,14 +254,14 @@ function sourceDetail(details: Record<string, unknown> | undefined, key: string)
 function rentMetricCopy(source?: string | null): { label: string; helper: string; badge: string | null } | null {
   if (source === 'internal_property_listings') {
     return {
-      label: 'Avg rent comp',
-      helper: 'Average from internal rental listing evidence',
+      label: 'Rent evidence',
+      helper: 'Average from real internal rental listing evidence',
       badge: 'Internal rental listings',
     };
   }
   if (source === 'derived_internal_estimate') {
     return {
-      label: 'Rent estimate',
+      label: 'Derived rent estimate',
       helper: 'Derived internal estimate; not a rental comp',
       badge: 'Derived estimate',
     };
@@ -311,6 +286,11 @@ function crimeSignalCopy(signal?: string | null): string {
 function fmtDistance(km: unknown): string {
   const v = typeof km === 'number' ? km : Number(km);
   return Number.isFinite(v) ? `${v.toFixed(2)} km` : '—';
+}
+
+function hasMeaningfulDistance(km: unknown): km is number {
+  const v = typeof km === 'number' ? km : Number(km);
+  return Number.isFinite(v) && v > 0;
 }
 
 export default function AreaInsights({
@@ -413,34 +393,28 @@ export default function AreaInsights({
   const rents = Array.isArray(comps?.rents) ? comps!.rents! : [];
   const avgSalePrice = avgPrice(sales);
   const avgRentPrice = avgPrice(rents);
-  const transportLinks = Array.isArray(intel?.transport_links) ? intel!.transport_links!.filter(Boolean) : [];
   const crimeCount = hasFiniteNumber(intel?.crime_count)
     ? intel!.crime_count!
     : hasFiniteNumber(intel?.crime?.count)
       ? intel!.crime!.count!
       : null;
-  const crimePeriod = normStr(intel?.crime_period) || normStr(intel?.crime?.period) || normStr(intel?.crime?.month);
-  const crimeSignal = normStr(intel?.crime_signal) || normStr(intel?.crime?.signal);
-  const crimeRadius = normStr(intel?.crime_radius_label) || normStr(intel?.crime?.radius_label);
-  const crimeNote = normStr(intel?.crime_note) || normStr(intel?.crime?.note);
   const hasCrime = (intel?.crime_source === 'police.uk' || intel?.crime?.source === 'police.uk') && hasFiniteNumber(crimeCount);
   const rentSourceForMetric = normStr(intel?.rent_source) || sourceDetail(intel?.source_details, 'rent');
   const rentCopy = rentMetricCopy(rentSourceForMetric);
 
   const marketMetrics = useMemo(() => {
-    if (!intel) return [] as MarketMetric[];
-
     const metrics: MarketMetric[] = [];
-    if (hasPositiveNumber(intel.avg_price)) {
+    const soldBenchmark = hasPositiveNumber(intel?.avg_price) ? intel!.avg_price! : avgSalePrice;
+    if (hasPositiveNumber(soldBenchmark)) {
       metrics.push({
-        label: 'Avg price',
-        value: fmtGBP(intel.avg_price),
-        helper: 'Land Registry sold-price benchmark',
+        label: 'Sold-price benchmark',
+        value: fmtGBP(soldBenchmark),
+        helper: 'Based on available Land Registry sold-price records',
         tone: 'brand' as const,
         icon: <FiHome className="h-5 w-5" />,
       });
     }
-    if (hasPositiveNumber(intel.avg_rent)) {
+    if (hasPositiveNumber(intel?.avg_rent)) {
       const copy = rentMetricCopy(normStr(intel.rent_source) || sourceDetail(intel.source_details, 'rent'));
       if (!copy) return metrics;
       metrics.push({
@@ -451,37 +425,41 @@ export default function AreaInsights({
         icon: <FiBarChart2 className="h-5 w-5" />,
       });
     }
-    if (hasPositiveNumber(intel.rental_yield_percent)) {
+    if (rentCopy && hasPositiveNumber(intel?.rental_yield_percent)) {
       metrics.push({
         label: 'Rental yield',
         value: `${intel.rental_yield_percent.toFixed(1)}%`,
-        helper: 'Derived from sale and rent benchmarks',
+        helper: `Derived from sold-price benchmark and ${rentCopy.label.toLowerCase()}`,
         tone: 'emerald' as const,
         icon: <FiMapPin className="h-5 w-5" />,
       });
     }
-    const count = hasFiniteNumber(intel.crime_count)
+    const count = hasFiniteNumber(intel?.crime_count)
       ? intel.crime_count
-      : hasFiniteNumber(intel.crime?.count)
-        ? intel.crime?.count
+      : hasFiniteNumber(intel?.crime?.count)
+        ? intel.crime.count
         : null;
-    if ((intel.crime_source === 'police.uk' || intel.crime?.source === 'police.uk') && hasFiniteNumber(count)) {
-      const signal = normStr(intel.crime_signal) || normStr(intel.crime?.signal);
+    if ((intel?.crime_source === 'police.uk' || intel?.crime?.source === 'police.uk') && hasFiniteNumber(count)) {
+      const signal = normStr(intel?.crime_signal) || normStr(intel?.crime?.signal);
       metrics.push({
-        label: 'Reported nearby crime',
+        label: 'Reported crime signal',
         value: `${count} reports`,
-        helper: `${crimeSignalCopy(signal)} signal${intel.crime_period || intel.crime?.month ? ` • ${intel.crime_period || intel.crime?.month}` : ''}`,
+        helper: `police.uk reported incident count; not a safety score. ${crimeSignalCopy(signal)}${intel?.crime_period || intel?.crime?.month ? ` • ${intel?.crime_period || intel?.crime?.month}` : ''}`,
         tone: signal === 'elevated' ? 'rose' : signal === 'moderate' ? 'amber' : 'emerald',
         icon: <FiShield className="h-5 w-5" />,
       });
     }
     return metrics;
-  }, [intel]);
+  }, [avgSalePrice, intel, rentCopy]);
 
-  const hasSchools = hasPositiveNumber(intel?.schools_rating);
-  const hasTransport = transportLinks.length > 0;
-  const usableIntel = marketMetrics.length > 0 || hasCrime || hasSchools || hasTransport;
+  const usableIntel = marketMetrics.length > 0;
   const usableComps = sales.length > 0 || rents.length > 0;
+  const dataSourceBadges = [
+    sourceLabel(sourceDetail(intel?.source_details, 'sales')) || (sales.length > 0 ? 'Land Registry PPD' : null),
+    rentCopy?.badge,
+    hasCrime ? 'police.uk' : null,
+    comps?.source === 'cache' || intel?.source === 'cache' ? 'Cached' : null,
+  ].filter((value): value is string => Boolean(value));
 
   const status: Status = (() => {
     if (!pc) return 'missing';
@@ -539,69 +517,33 @@ export default function AreaInsights({
             </div>
           </div>
 
-          <div className="space-y-6 p-4 sm:p-5">
+          <div className="space-y-4 p-4 sm:p-5">
         {showIntel && (intelLoading || usableIntel) ? (
           <div>
             <GatedPanel title="Area Intelligence" requiredPlan="pro" featureEnabled={showIntel}>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {intelLoading ? (
                   <SkeletonLines />
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className={`grid grid-cols-1 gap-3 ${marketMetrics.length === 1 ? 'sm:max-w-sm' : 'sm:grid-cols-2 xl:grid-cols-4'}`}>
                       {marketMetrics.map((metric) => (
                         <MarketMetricCard key={metric.label} {...metric} />
                       ))}
                     </div>
 
-                    {intel && (hasCrime || hasSchools || hasTransport) ? (
-                      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                        {hasCrime ? (
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/30">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                                  Crime signal
-                                </div>
-                                <div className="mt-1 text-xl font-bold text-slate-950 dark:text-white">
-                                  {crimeSignalCopy(crimeSignal)}
-                                </div>
-                              </div>
-                              <FiShield className="mt-1 h-5 w-5 text-brand-500" />
-                            </div>
-                            <p className="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                              police.uk reported {crimeCount} nearby incident{crimeCount === 1 ? '' : 's'}{crimePeriod ? ` for ${crimePeriod}` : ''}{crimeRadius ? ` (${crimeRadius})` : ''}. {crimeNote || 'Not a safety rating.'}
-                            </p>
-                          </div>
-                        ) : null}
-                        {hasSchools ? <SignalBar label="Schools rating" value={intel.schools_rating ?? undefined} max={5} /> : null}
-                        {hasTransport ? (
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/30">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                              Transport evidence
-                            </div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {transportLinks.map((item) => <SourceBadge key={item} label={item} />)}
-                            </div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/30">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs leading-5 text-slate-600 dark:text-slate-300">
+                          Based on available Land Registry sold-price records. Rent, crime and other demand signals only appear when live evidence is available.
+                        </p>
+                        {dataSourceBadges.length > 0 ? (
+                          <div className="flex shrink-0 flex-wrap gap-2">
+                            {dataSourceBadges.map((badge) => <SourceBadge key={badge} label={badge} />)}
                           </div>
                         ) : null}
                       </div>
-                    ) : null}
-
-                    {intel?.notes ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/30">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                          Source confidence
-                        </div>
-                        <p className="mt-2 text-[13px] leading-relaxed text-slate-700 dark:text-slate-300 sm:text-sm">{intel.notes}</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {sourceLabel(sourceDetail(intel.source_details, 'sales')) ? <SourceBadge label={sourceLabel(sourceDetail(intel.source_details, 'sales'))!} /> : null}
-                          {rentCopy?.badge ? <SourceBadge label={rentCopy.badge} /> : null}
-                          {sourceLabel(sourceDetail(intel.source_details, 'crime')) ? <SourceBadge label={sourceLabel(sourceDetail(intel.source_details, 'crime'))!} /> : null}
-                          {intel.source === 'cache' ? <SourceBadge label="Cached" /> : null}
-                        </div>
-                      </div>
-                    ) : null}
+                    </div>
                   </>
                 )}
               </div>
@@ -610,9 +552,9 @@ export default function AreaInsights({
         ) : null}
 
         {showComps && (compsLoading || usableComps) ? (
-          <div className="border-t border-slate-200 pt-6 dark:border-slate-800">
+          <div className="border-t border-slate-200 pt-4 dark:border-slate-800">
             <GatedPanel title="Comparable Sales" requiredPlan="pro" featureEnabled={showComps}>
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
@@ -656,7 +598,7 @@ export default function AreaInsights({
                             </div>
                             <div className="mt-1 truncate text-sm text-slate-700 dark:text-slate-300">{line.address}</div>
                           </div>
-                          {Number.isFinite(Number(line.distance_km)) ? (
+                          {hasMeaningfulDistance(line.distance_km) ? (
                             <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
                               {fmtDistance(line.distance_km)}
                             </span>

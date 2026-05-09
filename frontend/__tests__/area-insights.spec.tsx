@@ -45,7 +45,7 @@ describe('AreaInsights', () => {
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 
-  it('labels internal rental evidence as an average rent comp', async () => {
+  it('labels internal rental evidence as rent evidence', async () => {
     mockGetAreaIntel.mockResolvedValue({
       key: 'IG3',
       source: 'partial_live',
@@ -61,8 +61,8 @@ describe('AreaInsights', () => {
 
     render(<AreaInsights areaKey="IG3" postcode="IG3 8AA" defaultExpanded />);
 
-    expect(await screen.findByText('Avg rent comp')).toBeInTheDocument();
-    expect(screen.getByText('Average from internal rental listing evidence')).toBeInTheDocument();
+    expect(await screen.findByText('Rent evidence')).toBeInTheDocument();
+    expect(screen.getByText('Average from real internal rental listing evidence')).toBeInTheDocument();
     expect(screen.getByText('Internal rental listings')).toBeInTheDocument();
     expect(screen.queryByText('N/A')).not.toBeInTheDocument();
   });
@@ -81,7 +81,7 @@ describe('AreaInsights', () => {
 
     render(<AreaInsights areaKey="IG3" postcode="IG3 8AA" defaultExpanded />);
 
-    expect(await screen.findByText('Rent estimate')).toBeInTheDocument();
+    expect(await screen.findByText('Derived rent estimate')).toBeInTheDocument();
     expect(screen.getByText('Derived internal estimate; not a rental comp')).toBeInTheDocument();
     expect(screen.queryByText('Avg rent comp')).not.toBeInTheDocument();
   });
@@ -102,9 +102,56 @@ describe('AreaInsights', () => {
 
     render(<AreaInsights areaKey="IG3" postcode="IG3 8AA" defaultExpanded />);
 
-    expect(await screen.findByText('Reported nearby crime')).toBeInTheDocument();
+    expect(await screen.findByText('Reported crime signal')).toBeInTheDocument();
     expect(screen.getByText('42 reports')).toBeInTheDocument();
-    expect(screen.getByText(/police\.uk reported 42 nearby incidents for 2026-03/)).toBeInTheDocument();
+    expect(screen.getByText(/police\.uk reported incident count; not a safety score/i)).toBeInTheDocument();
     expect(screen.getByText('police.uk')).toBeInTheDocument();
+    expect(screen.queryByText(/Safety Index/i)).not.toBeInTheDocument();
+  });
+
+  it('renders sold-only evidence compactly without unavailable cards or unknown distance', async () => {
+    mockGetAreaIntel.mockResolvedValue({
+      key: 'RM1',
+      source: 'partial_live',
+      avg_price: 410000,
+      avg_rent: null,
+      rental_yield_percent: null,
+      crime_source: 'unavailable',
+      crime: null,
+      source_details: { sales: 'land_registry_ppd', rent: 'not_available', crime: 'not_available' },
+    });
+    mockGetComps.mockResolvedValue({
+      postcode: 'RM1',
+      source: 'cache',
+      sales: [
+        {
+          address: '56 Manor Road, Romford',
+          price: 405000,
+          date: '2026-03-20',
+          source: 'land_registry_ppd',
+          distance_km: null,
+        },
+        {
+          address: '190 Brentwood Road, Romford',
+          price: 415000,
+          date: '2026-03-18',
+          source: 'land_registry_ppd',
+          distance_km: 0,
+        },
+      ],
+      rents: [],
+    });
+
+    render(<AreaInsights areaKey="RM1" postcode="RM1" defaultExpanded />);
+
+    expect(await screen.findByText('Sold-price benchmark')).toBeInTheDocument();
+    expect(screen.getByText('Comparable evidence')).toBeInTheDocument();
+    expect(screen.getAllByText('Land Registry PPD').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Rent evidence')).not.toBeInTheDocument();
+    expect(screen.queryByText('Reported crime signal')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Schools/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Transport/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('0.00 km')).not.toBeInTheDocument();
+    expect(screen.queryByText(/No area intel available/i)).not.toBeInTheDocument();
   });
 });

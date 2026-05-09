@@ -67,7 +67,7 @@ describe('AreaInsights launch trimming', () => {
     const AreaInsights = require('./AreaInsights').default;
     render(<AreaInsights areaKey="Farquhar Road, Birmingham, Edgbaston B15 2QJ" postcode="" />);
 
-    expect(await screen.findByText('Crime signal')).toBeInTheDocument();
+    expect(await screen.findByText('Reported crime signal')).toBeInTheDocument();
     expect(mockGetAreaIntel).toHaveBeenCalledWith('Farquhar Road, Birmingham, Edgbaston B15 2QJ');
     expect(mockGetComps).toHaveBeenCalledWith('B15 2QJ');
   });
@@ -109,10 +109,11 @@ describe('AreaInsights launch trimming', () => {
     const AreaInsights = require('./AreaInsights').default;
     render(<AreaInsights areaKey="IG3" postcode="IG3 8AA" />);
 
-    expect(await screen.findByText('Avg price')).toBeInTheDocument();
+    expect(await screen.findByText('Sold-price benchmark')).toBeInTheDocument();
     expect(screen.getByText('Land Registry PPD')).toBeInTheDocument();
     expect(screen.getByText('Internal rental listings')).toBeInTheDocument();
     expect(screen.getAllByText('police.uk').length).toBeGreaterThan(0);
     expect(screen.queryByText(/Mock intel|Replace with live sources|10 IG3 Street|Schools rating|Population/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Safety Index/i)).not.toBeInTheDocument();
   });
 });
