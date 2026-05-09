@@ -8,7 +8,7 @@ import { useAuth } from '@clerk/nextjs';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
-import { normalizeProperty } from '@/lib/normalizeProperty';
+import { formatRoiDisplay, getRoiProxyValidationNote, normalizeProperty } from '@/lib/normalizeProperty';
 
 type Property = {
   id?: string;
@@ -417,8 +417,10 @@ export default function SavedDealsView() {
               const y = formatPercent(norm.yieldPercent);
               const roiReal = norm.roiPercent;
               const roiProxy = norm.roiProxyPercent;
-              const roi = formatPercent(roiReal ?? roiProxy);
+              const roiDisplay = { value: roiReal ?? roiProxy, isProxy: norm.roiIsProxy || (roiReal == null && roiProxy != null) };
+              const roi = formatRoiDisplay(roiDisplay);
               const roiIsProxyDisplay = norm.roiIsProxy || (roiReal == null && roiProxy != null);
+              const roiValidationNote = getRoiProxyValidationNote(roiDisplay);
               const savedOn = formatDate(d.saved_at ?? d.created_at ?? null);
               const scoreRaw = Number((p as any)?.ai_score ?? (p as any)?.score);
               const score = Number.isFinite(scoreRaw) ? scoreRaw : 60;
@@ -493,6 +495,10 @@ export default function SavedDealsView() {
                       <span className="font-semibold">Rent/mo:</span> {rent} ·{' '}
                       <span className="font-semibold">Area:</span> {area}
                     </div>
+
+                    {roiValidationNote ? (
+                      <div className="mt-2 text-xs text-amber-700 dark:text-amber-300">{roiValidationNote}</div>
+                    ) : null}
 
                     {!p ? (
                       <div className="mt-2 text-xs text-amber-700 dark:text-amber-300">

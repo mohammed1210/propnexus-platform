@@ -173,6 +173,22 @@ export function formatPercent(n: number | null | undefined): string {
   return `${round1(n).toFixed(1)}%`;
 }
 
+export const ROI_PROXY_VALIDATION_THRESHOLD = 40;
+export const ROI_PROXY_VALIDATION_LABEL = 'Needs validation';
+export const ROI_PROXY_VALIDATION_NOTE = 'ROI proxy above normal range. Check rent, costs and finance assumptions.';
+
+export function isRoiProxyAboveNormalRange(roiDisplay: { value: number | null | undefined; isProxy: boolean }): boolean {
+  return roiDisplay.isProxy && typeof roiDisplay.value === 'number' && Number.isFinite(roiDisplay.value) && roiDisplay.value > ROI_PROXY_VALIDATION_THRESHOLD;
+}
+
+export function formatRoiDisplay(roiDisplay: { value: number | null | undefined; isProxy: boolean }): string {
+  return isRoiProxyAboveNormalRange(roiDisplay) ? ROI_PROXY_VALIDATION_LABEL : formatPercent(roiDisplay.value);
+}
+
+export function getRoiProxyValidationNote(roiDisplay: { value: number | null | undefined; isProxy: boolean }): string | null {
+  return isRoiProxyAboveNormalRange(roiDisplay) ? ROI_PROXY_VALIDATION_NOTE : null;
+}
+
 
 function isFiniteNumber(v: any): v is number {
   return typeof v === 'number' && Number.isFinite(v);

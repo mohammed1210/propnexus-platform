@@ -3,6 +3,7 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
+import AIChatbot from '@/components/ai/AIChatbot';
 import DealActionPanel from '@/components/property_details/DealActionPanel';
 import { getOriginalListingUrl } from '@/lib/propertyDealActions';
 
@@ -11,6 +12,18 @@ jest.mock('sonner', () => ({
     success: jest.fn(),
     error: jest.fn(),
   },
+}));
+
+jest.mock('@/lib/auth', () => ({
+  isAuthEnabled: false,
+}));
+
+jest.mock('@/lib/flags', () => ({
+  FF: { AI_CHAT: false },
+}));
+
+jest.mock('@/lib/api', () => ({
+  postAIChat: jest.fn(),
 }));
 
 const fetchMock = jest.fn();
@@ -39,6 +52,20 @@ describe('DealActionPanel', () => {
     expect(link).toHaveAttribute('href', 'https://www.rightmove.co.uk/properties/123');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  it('renders a valid external listing link in compact mode', () => {
+    render(
+      <DealActionPanel
+        compact
+        propertyId="prop-1"
+        property={{ source_url: 'https://www.onthemarket.com/details/123', source: 'onthemarket' }}
+      />,
+    );
+
+    const link = screen.getByRole('link', { name: /view on onthemarket/i });
+    expect(link).toHaveAttribute('href', 'https://www.onthemarket.com/details/123');
+    expect(link).toHaveAttribute('target', '_blank');
   });
 
   it('does not render original listing button without a URL', () => {
@@ -83,14 +110,15 @@ describe('DealActionPanel', () => {
       />,
     );
 
-    expect(screen.getByRole('link', { name: /contact agent on original listing/i })).toBeInTheDocument();
+    expect(screen.getAllByText('Contact via original listing').length).toBeGreaterThan(0);
+    expect(screen.getByText(/verified source listing/i)).toBeInTheDocument();
   });
 
-  it('updates status through the saved-deals status API', async () => {
+  it('loads current status and updates through the saved-deals status API', async () => {
     fetchMock
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ deals: [{ id: 'deal-1', property_id: 'prop-1', deal_status: 'not_contacted' }] }),
+        json: async () => ({ deals: [{ id: 'deal-1', property_id: 'prop-1', deal_status: 'viewing_booked' }] }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -100,6 +128,8 @@ describe('DealActionPanel', () => {
     render(<DealActionPanel propertyId="prop-1" property={{ title: 'Tracked deal' }} />);
 
     const select = await screen.findByLabelText(/contact status/i);
+    expect(select).toHaveValue('viewing_booked');
+
     fireEvent.change(select, { target: { value: 'contacted' } });
 
     await waitFor(() =>
@@ -111,5 +141,15 @@ describe('DealActionPanel', () => {
         }),
       ),
     );
+  });
+});
+
+describe('AIChatbot floating button placement', () => {
+  it('does not render with the same desktop right offset as the sidebar', () => {
+    const { container } = render(<AIChatbot property={{ id: 'prop-1' } as any} />);
+
+    const floatingRoot = container.querySelector('.fixed');
+    expect(floatingRoot).toHaveClass('lg:right-[280px]');
+    expect(floatingRoot).not.toHaveClass('right-4');
   });
 });

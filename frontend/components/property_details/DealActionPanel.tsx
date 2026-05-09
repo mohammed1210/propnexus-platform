@@ -65,6 +65,8 @@ export default function DealActionPanel({ propertyId, property, compact = false 
   const agentEmail = useMemo(() => getAgentEmail(property), [property]);
   const enquiry = useMemo(() => buildInvestorEnquiry(property), [property]);
   const checklist = useMemo(() => getDealActionChecklist(property).slice(0, compact ? 5 : 6), [compact, property]);
+  const hasDirectContact = Boolean(agentPhone || agentEmail);
+  const contactHeading = originalUrl && !hasDirectContact ? 'Contact via original listing' : 'Contact agent';
 
   useEffect(() => {
     let cancelled = false;
@@ -77,7 +79,7 @@ export default function DealActionPanel({ propertyId, property, compact = false 
         if (cancelled) return;
         const deal = findSavedDeal(json, propertyId);
         setSavedDeal(deal);
-        const nextStatus = deal?.deal_status;
+        const nextStatus = deal?.deal_status ?? deal?.property?.deal_status;
         if (DEAL_STATUS_OPTIONS.some(([value]) => value === nextStatus)) {
           setStatus(nextStatus);
         }
@@ -131,33 +133,33 @@ export default function DealActionPanel({ propertyId, property, compact = false 
   };
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
-      <div className="mb-3">
+    <section className={`rounded-xl border border-slate-200 bg-white/95 shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 ${compact ? 'p-3' : 'p-4'}`}>
+      <div className={compact ? 'mb-2' : 'mb-3'}>
         <h3 className="font-bold text-[11px] uppercase tracking-[0.16em] text-slate-900 dark:text-white">
           Deal Action
         </h3>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Move from analysis to enquiry.</p>
+        <p className={`${compact ? 'mt-0.5' : 'mt-1'} text-xs text-slate-500 dark:text-slate-400`}>Move from analysis to enquiry.</p>
       </div>
 
-      <div className="space-y-3">
+      <div className={compact ? 'space-y-2' : 'space-y-3'}>
         {originalUrl ? (
           <a
             href={originalUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+            className={`flex w-full items-center justify-center gap-1.5 rounded-lg bg-slate-950 text-center text-sm font-semibold leading-tight text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200 ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'}`}
           >
             <FiExternalLink className="h-4 w-4" aria-hidden="true" />
-            <span>{sourceButtonLabel(sourceLabel)}</span>
+            <span className="whitespace-normal">{sourceButtonLabel(sourceLabel)}</span>
           </a>
         ) : null}
 
-        <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+        <div className={`rounded-lg border border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/40 ${compact ? 'p-2.5' : 'p-3'}`}>
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-            Contact agent
+            {contactHeading}
           </div>
           {agentName ? <div className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">{agentName}</div> : null}
-          <div className="mt-2 space-y-2">
+          <div className={`${compact ? 'mt-1.5 space-y-1.5' : 'mt-2 space-y-2'}`}>
             {agentPhone ? (
               <a href={`tel:${agentPhone}`} className="flex items-center gap-2 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-300">
                 <FiPhone className="h-4 w-4" aria-hidden="true" />
@@ -171,15 +173,20 @@ export default function DealActionPanel({ propertyId, property, compact = false 
               </a>
             ) : null}
             {!agentPhone && !agentEmail && originalUrl ? (
-              <a
-                href={originalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-300"
-              >
-                Contact agent on original listing
-                <FiExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              </a>
+              <div>
+                <a
+                  href={originalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-300"
+                >
+                  Contact via original listing
+                  <FiExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
+                <p className="mt-1 text-[11px] leading-4 text-slate-500 dark:text-slate-400">
+                  PropNexus sends you to the verified source listing so you can enquire directly.
+                </p>
+              </div>
             ) : null}
             {!agentPhone && !agentEmail && !originalUrl ? (
               <div>
@@ -195,17 +202,17 @@ export default function DealActionPanel({ propertyId, property, compact = false 
         <button
           type="button"
           onClick={handleCopyEnquiry}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand-500 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-brand-300"
+          className={`flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-brand-500 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-brand-300 ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'}`}
         >
           {copied ? <FiCheckCircle className="h-4 w-4" aria-hidden="true" /> : <FiClipboard className="h-4 w-4" aria-hidden="true" />}
           <span>{copied ? 'Copied' : 'Copy enquiry'}</span>
         </button>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/30">
+        <div className={`rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/30 ${compact ? 'p-2.5' : 'p-3'}`}>
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
             Before offer checklist
           </div>
-          <ul className="mt-2 space-y-1.5">
+          <ul className={`${compact ? 'mt-1.5 space-y-1' : 'mt-2 space-y-1.5'}`}>
             {checklist.map((item) => (
               <li key={item} className="flex gap-2 text-xs leading-4 text-slate-600 dark:text-slate-300">
                 <FiCheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
@@ -215,7 +222,7 @@ export default function DealActionPanel({ propertyId, property, compact = false 
           </ul>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-950/40">
+        <div className={`rounded-lg border border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/40 ${compact ? 'p-2.5' : 'p-3'}`}>
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
             Deal progress
           </div>

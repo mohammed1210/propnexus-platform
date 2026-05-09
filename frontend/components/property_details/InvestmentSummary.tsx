@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { postAiSummary } from '@/lib/api';
 import type { SummaryRequest, SummaryResponse } from '@/types/ai';
-import { normalizeProperty } from '@/lib/normalizeProperty';
+import { formatRoiDisplay, getRoiProxyValidationNote, normalizeProperty } from '@/lib/normalizeProperty';
 
 type Props = {
   property: {
@@ -40,6 +40,11 @@ export default function InvestmentSummary({ property }: Props) {
   const { title, location, price, bedrooms, bathrooms, propertyType, investmentType, description } = property;
 
   const normalized = useMemo(() => normalizeProperty(property as any), [property]);
+  const roiDisplay = useMemo(
+    () => ({ value: normalized.roiPct, isProxy: normalized.roiIsProxy }),
+    [normalized.roiIsProxy, normalized.roiPct],
+  );
+  const roiValidationNote = getRoiProxyValidationNote(roiDisplay);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +60,7 @@ export default function InvestmentSummary({ property }: Props) {
           bedrooms: numOrUndef(bedrooms), // ✅ narrowed
           bathrooms: numOrUndef(bathrooms), // ✅ narrowed
           yield_percent: normalized.yieldPct ?? undefined,
-          roi_percent: normalized.roiPct ?? undefined,
+          roi_percent: roiValidationNote ? undefined : (normalized.roiPct ?? undefined),
           propertyType: propertyType ?? undefined,
           investmentType: investmentType ?? undefined,
           description: description ?? undefined,
@@ -85,6 +90,7 @@ export default function InvestmentSummary({ property }: Props) {
     description,
     normalized.yieldPct,
     normalized.roiPct,
+    roiValidationNote,
   ]);
 
   if (loading)
@@ -116,6 +122,11 @@ export default function InvestmentSummary({ property }: Props) {
       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
         Short analyst note
       </div>
+      {roiValidationNote ? (
+        <div className="mt-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+          ROI proxy: {formatRoiDisplay(roiDisplay)}. {roiValidationNote}
+        </div>
+      ) : null}
       {summary && (
         <p className="mt-1.5 text-sm leading-relaxed text-slate-700 dark:text-slate-300">{summary}</p>
       )}

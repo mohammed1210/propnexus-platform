@@ -7,7 +7,14 @@ import { fetchWithRetry } from '@/lib/api';
 import { exportPropertyPdf } from '@/lib/propertyPdfExport';
 import { createPropertyPdfFilename } from '@/lib/propertyDealPack';
 import { FF } from '@/lib/flags';
-import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import {
+  formatPercent,
+  formatRoiDisplay,
+  getRoiDisplay,
+  getRoiProxyValidationNote,
+  getYieldPercent,
+  normalizeProperty,
+} from '@/lib/normalizeProperty';
 import { buildInvestorEnquiry, getOriginalListingUrl, getSourceLabel } from '@/lib/propertyDealActions';
 import DealActionPanel from './DealActionPanel';
 
@@ -82,6 +89,7 @@ export default function QuickStatsActions({
   const displayYield = getYieldPercent(merged) ?? undefined;
   const roiDisplay = getRoiDisplay(merged);
   const displayRoi = roiDisplay.value ?? undefined;
+  const roiValidationNote = getRoiProxyValidationNote(roiDisplay);
   const originalListingUrl = useMemo(() => getOriginalListingUrl(merged), [merged]);
   const sourceLabel = useMemo(() => getSourceLabel(merged), [merged]);
   const enquiryMessage = useMemo(() => buildInvestorEnquiry(merged), [merged]);
@@ -281,8 +289,13 @@ export default function QuickStatsActions({
                     typeof displayRoi === 'number' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  {formatValue(displayRoi, 'percent')}
+                  {formatRoiDisplay(roiDisplay)}
                 </div>
+                {roiValidationNote ? (
+                  <p className="mt-1 text-[11px] leading-4 text-amber-600 dark:text-amber-300">
+                    {roiValidationNote}
+                  </p>
+                ) : null}
               </div>
 
               <div>
@@ -373,7 +386,7 @@ export default function QuickStatsActions({
             </div>
           </div>
 
-          <DealActionPanel propertyId={propertyId} property={merged} />
+          <DealActionPanel propertyId={propertyId} property={merged} compact />
         </div>
       </div>
 

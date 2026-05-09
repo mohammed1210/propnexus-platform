@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import clsx from 'clsx';
 import type { SavedDeal } from './types';
-import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import { formatPercent, formatRoiDisplay, getRoiDisplay, getRoiProxyValidationNote, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
 
 function fmtGBP(n: unknown): string {
   const v = typeof n === 'number' ? n : Number(n);
@@ -60,6 +60,7 @@ export default function SavedDealCard({
   const yieldDisplay = getYieldPercent(deal as any);
   const roiDisplay = getRoiDisplay(deal as any);
   const statusLabel = formatDealStatus(deal.deal_status);
+  const roiValidationNote = getRoiProxyValidationNote(roiDisplay);
 
   return (
     <article
@@ -123,10 +124,14 @@ export default function SavedDealCard({
               Yield {formatPercent(yieldDisplay)}
             </span>
             <span className="px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
-              ROI{roiDisplay.isProxy ? ' (proxy)' : ''} {formatPercent(roiDisplay.value)}
+              ROI{roiDisplay.isProxy ? ' (proxy)' : ''} {formatRoiDisplay(roiDisplay)}
             </span>
           </div>
         </div>
+
+        {roiValidationNote ? (
+          <div className="text-xs text-amber-700 dark:text-amber-300">{roiValidationNote}</div>
+        ) : null}
 
         <div className="text-xs text-slate-600 dark:text-slate-400">
           {(deal.bedrooms ?? 0) || '—'} beds • {(deal.bathrooms ?? 0) || '—'} baths

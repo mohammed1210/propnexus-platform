@@ -27,7 +27,14 @@ import TradesmenList from '@/components/tradesmen/TradesmenList';
 import type { Property } from '@/types';
 import { FF } from '@/lib/flags';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
-import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import {
+  formatPercent,
+  formatRoiDisplay,
+  getRoiDisplay,
+  getRoiProxyValidationNote,
+  getYieldPercent,
+  normalizeProperty,
+} from '@/lib/normalizeProperty';
 import { buildInvestmentDescription } from '@/lib/propertyInvestmentDescription';
 
 /** ---- Client-only widgets (no SSR) ---- */
@@ -214,6 +221,7 @@ export default function PropertyDetailsPage() {
     if (a.value != null) return a;
     return getRoiDisplay(property as any);
   }, [normalized, property]);
+  const roiValidationNote = getRoiProxyValidationNote(roiDisplay);
 
   const discountPercent = useMemo((): number | undefined => {
     if (!property) return undefined;
@@ -313,7 +321,7 @@ export default function PropertyDetailsPage() {
     },
     {
       label: roiDisplay.isProxy ? 'ROI proxy' : 'ROI',
-      value: formatPercent(roiDisplay.value),
+      value: formatRoiDisplay(roiDisplay),
     },
   ];
   const investmentDescription = buildInvestmentDescription({
@@ -325,7 +333,7 @@ export default function PropertyDetailsPage() {
     bathrooms: typeof property.bathrooms === 'number' ? property.bathrooms : undefined,
     price: typeof property.price === 'number' ? property.price : undefined,
     yieldPercent,
-    roiPercent: roiDisplay.value ?? undefined,
+    roiPercent: roiValidationNote ? undefined : (roiDisplay.value ?? undefined),
     roiIsProxy: roiDisplay.isProxy,
     aiScore,
     dealQuality: tldr.label,

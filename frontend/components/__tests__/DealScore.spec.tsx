@@ -13,6 +13,14 @@ jest.mock('@/lib/api', () => ({
 
 jest.mock('@/lib/normalizeProperty', () => ({
   normalizeProperty: (value: unknown) => value,
+  formatRoiDisplay: (roiDisplay: { value: number | null | undefined; isProxy: boolean }) => {
+    if (roiDisplay.isProxy && typeof roiDisplay.value === 'number' && roiDisplay.value > 40) return 'Needs validation';
+    return typeof roiDisplay.value === 'number' ? `${roiDisplay.value.toFixed(1)}%` : 'N/A';
+  },
+  getRoiProxyValidationNote: (roiDisplay: { value: number | null | undefined; isProxy: boolean }) =>
+    roiDisplay.isProxy && typeof roiDisplay.value === 'number' && roiDisplay.value > 40
+      ? 'ROI proxy above normal range. Check rent, costs and finance assumptions.'
+      : null,
   parseMoney: (value: unknown) => (typeof value === 'number' ? value : null),
   parseRent: (value: unknown) => (typeof value === 'number' ? value : null),
 }));

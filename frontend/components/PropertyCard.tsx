@@ -10,7 +10,14 @@ import { FiBarChart2, FiChevronLeft, FiChevronRight, FiHeart, FiHome, FiMapPin, 
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
 import { track } from '@/lib/events';
-import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import {
+  formatPercent,
+  formatRoiDisplay,
+  getRoiDisplay,
+  getRoiProxyValidationNote,
+  getYieldPercent,
+  normalizeProperty,
+} from '@/lib/normalizeProperty';
 import { Badge } from '@/components/Badges';
 
 // tiny classnames helper – keeps conditional class logic tidy
@@ -214,6 +221,7 @@ export default function PropertyCard({
     return getRoiDisplay((normalized as any)?.raw ?? (normalized as any));
   }, [normalized, p]);
   const displayRoiPct = roiDisplay.value;
+  const roiValidationNote = getRoiProxyValidationNote(roiDisplay);
   const normalizedScore =
     typeof displayScore === 'number' && Number.isFinite(displayScore)
       ? displayScore <= 1
@@ -822,7 +830,7 @@ export default function PropertyCard({
                 <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">ROI</span>
               </div>
               <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
-                {typeof displayRoiPct === 'number' ? formatPercent(displayRoiPct) : '—'}
+                {typeof displayRoiPct === 'number' ? formatRoiDisplay(roiDisplay) : '—'}
               </div>
               <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10" aria-hidden="true">
                 <div
@@ -830,7 +838,9 @@ export default function PropertyCard({
                   style={{ width: `${roiProgress}%` }}
                 />
               </div>
-              <div className="mt-1 text-[9px] font-semibold text-slate-500 dark:text-slate-400">return lens</div>
+              <div className="mt-1 text-[9px] font-semibold leading-tight text-slate-500 dark:text-slate-400">
+                {roiValidationNote ?? 'return lens'}
+              </div>
             </div>
           </div>
         </div>

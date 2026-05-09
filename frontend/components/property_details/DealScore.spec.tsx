@@ -60,6 +60,37 @@ describe('DealScore breakdown display', () => {
     expect(screen.getByText(/Scores are indicative/i)).toBeInTheDocument();
   });
 
+  it('shows Needs validation instead of an unrealistic ROI proxy percentage', () => {
+    render(
+      <DealScore
+        property={{
+          score: 70,
+          price: 100000,
+          rent_monthly: 5000,
+          score_breakdown: { version: 'v2.1', categories: { yield: 12, roi: 10 } },
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Needs validation')).toBeInTheDocument();
+    expect(screen.getByText('ROI proxy above normal range. Check rent, costs and finance assumptions.')).toBeInTheDocument();
+  });
+
+  it('keeps normal ROI values displayed normally', () => {
+    render(
+      <DealScore
+        property={{
+          score: 70,
+          roi_percent: 12,
+          score_breakdown: { version: 'v2.1', categories: { yield: 12, roi: 10 } },
+        }}
+      />,
+    );
+
+    expect(screen.getAllByText('12.0%').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Needs validation')).not.toBeInTheDocument();
+  });
+
   it('hides schools and safety labels when live evidence is missing', async () => {
     render(
       <DealScore

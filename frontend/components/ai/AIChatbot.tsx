@@ -10,7 +10,7 @@ import { FF } from '@/lib/flags';
 import { useUserPlan } from '@/lib/useUserPlan';
 import { hasAccess } from '@/lib/planPermissions';
 import { isAuthEnabled } from '@/lib/auth';
-import { formatPercent, getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
+import { formatPercent, formatRoiDisplay, getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
 
 type LooseProperty = Property & {
   latitude?: number | null;
@@ -95,7 +95,7 @@ function AIChatbotInner({
 
     if (typeof yieldPct === 'number') hints.push(`yield ≈ ${formatPercent(yieldPct)}`);
     if (typeof roiDisplay.value === 'number') {
-      hints.push(`ROI${roiDisplay.isProxy ? ' (proxy)' : ''} ≈ ${formatPercent(roiDisplay.value)}`);
+      hints.push(`ROI${roiDisplay.isProxy ? ' (proxy)' : ''} ≈ ${formatRoiDisplay(roiDisplay)}`);
     }
     if (typeof property?.price === 'number')
       hints.push(`price ≈ £${property.price.toLocaleString()}`);
@@ -185,7 +185,7 @@ function AIChatbotInner({
 
   return (
     <>
-      <div className="fixed bottom-5 right-5 z-[9999]">
+      <div className="fixed bottom-24 right-5 z-[9999] lg:bottom-6 lg:right-[280px]">
         {!isOpen ? (
           <button
             onClick={handleButtonClick}

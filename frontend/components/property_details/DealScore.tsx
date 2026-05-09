@@ -13,7 +13,7 @@ import {
 } from 'react-icons/fi';
 import { getAreaIntel, getComps } from '@/lib/api';
 import { buildDealScoreFactors, type AreaIntelEvidence, type CompsEvidence, type DisplayScoreFactor } from '@/lib/dealScoreFactors';
-import { normalizeProperty } from '@/lib/normalizeProperty';
+import { formatRoiDisplay, getRoiProxyValidationNote, normalizeProperty } from '@/lib/normalizeProperty';
 
 interface PropertyData {
   ai_score?: number | null;
@@ -374,6 +374,11 @@ export default function DealScore({ property }: DealScoreProps) {
   const strongestFactor = getStrongestFactor(evidenceFactors);
   const mainRisk = getMainRisk(evidenceFactors);
   const beforeOfferChecks = getBeforeOfferChecks(property, evidenceFactors);
+  const normalizedRoiDisplay = {
+    value: normalized.roiPercent ?? normalized.roiProxyPercent,
+    isProxy: normalized.roiIsProxy,
+  };
+  const roiValidationNote = getRoiProxyValidationNote(normalizedRoiDisplay);
   const dealBand =
     score >= 75
       ? {
@@ -400,8 +405,8 @@ export default function DealScore({ property }: DealScoreProps) {
     { label: 'Gross yield', value: fmtPct(normalized.yieldPercent), helper: 'Income quality' },
     {
       label: normalized.roiIsProxy ? 'ROI proxy' : 'ROI',
-      value: fmtPct(normalized.roiPercent ?? normalized.roiProxyPercent),
-      helper: normalized.roiIsProxy ? 'Derived estimate' : 'Return potential',
+      value: formatRoiDisplay(normalizedRoiDisplay),
+      helper: roiValidationNote ?? (normalized.roiIsProxy ? 'Derived estimate' : 'Return potential'),
     },
     { label: 'Monthly rent', value: fmtGBP(normalized.rentMonthly), helper: 'Rent evidence' },
   ];
