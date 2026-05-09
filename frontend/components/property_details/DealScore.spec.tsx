@@ -50,6 +50,13 @@ describe('DealScore breakdown display', () => {
 
     expect(screen.getByText('AI Deal Score')).toBeInTheDocument();
     expect(screen.getAllByText('Rental Yield').length).toBeGreaterThan(0);
+    expect(screen.getByText('Evidence-backed score drivers')).toBeInTheDocument();
+    expect(screen.getByText('Investor verdict')).toBeInTheDocument();
+    expect(screen.getByText('Best fit')).toBeInTheDocument();
+    expect(screen.getByText('Strongest signal')).toBeInTheDocument();
+    expect(screen.getByText('Main check before offer')).toBeInTheDocument();
+    expect(screen.queryByText('Top scoring factors')).not.toBeInTheDocument();
+    expect(screen.queryByText('Investor lens')).not.toBeInTheDocument();
     expect(screen.getByText(/Scores are indicative/i)).toBeInTheDocument();
   });
 
@@ -78,6 +85,21 @@ describe('DealScore breakdown display', () => {
     expect(screen.queryByText(/Schools Access/i)).not.toBeInTheDocument();
   });
 
+  it('shows schools access only when backed by a real schools source', async () => {
+    mockGetAreaIntel.mockResolvedValue({
+      source: 'partial_live',
+      crime_source: 'unavailable',
+      schools_rating: 4.2,
+      source_details: { schools: 'local_authority' },
+    });
+
+    render(<DealScore property={property} />);
+
+    expect(await screen.findByText('Schools Access')).toBeInTheDocument();
+    expect(screen.getByText('4.2/5')).toBeInTheDocument();
+    expect(screen.getByText('Schools source')).toBeInTheDocument();
+  });
+
   it('shows reported crime only when police.uk evidence exists', async () => {
     mockGetAreaIntel.mockResolvedValue({
       source: 'partial_live',
@@ -93,6 +115,20 @@ describe('DealScore breakdown display', () => {
     expect((await screen.findAllByText('Reported Crime Signal')).length).toBeGreaterThan(0);
     expect(screen.getByText('police.uk • 2026-04')).toBeInTheDocument();
     expect(screen.getAllByText(/Not a safety rating/i).length).toBeGreaterThan(0);
+  });
+
+  it('does not show reported crime without police.uk evidence', async () => {
+    mockGetAreaIntel.mockResolvedValue({
+      source: 'partial_live',
+      crime_source: 'unavailable',
+      crime_count: null,
+      source_details: { crime: 'not_available' },
+    });
+
+    render(<DealScore property={property} />);
+
+    await waitFor(() => expect(mockGetAreaIntel).toHaveBeenCalled());
+    expect(screen.queryByText('Reported Crime Signal')).not.toBeInTheDocument();
   });
 
   it('shows price-to-rent when rent evidence exists', async () => {

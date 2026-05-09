@@ -76,6 +76,154 @@ function factorToneClasses(tone: DisplayScoreFactor['tone']): string {
   return 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900/30 dark:text-slate-300';
 }
 
+type DealVerdict = {
+  label: 'Investor-grade' | 'Watchlist' | 'Needs stronger evidence';
+  tone: DisplayScoreFactor['tone'];
+  summary: string;
+};
+
+type VerdictRow = {
+  label: string;
+  value: string;
+  helper: string;
+};
+
+function getDealVerdict(score: number): DealVerdict {
+  if (score >= 75) {
+    return {
+      label: 'Investor-grade',
+      tone: 'emerald',
+      summary: 'Strong evidence base. Move into offer diligence, not blind bidding.',
+    };
+  }
+  if (score >= 50) {
+    return {
+      label: 'Watchlist',
+      tone: 'amber',
+      summary: 'Promising, but validate the assumptions before bidding.',
+    };
+  }
+  return {
+    label: 'Needs stronger evidence',
+    tone: 'rose',
+    summary: 'Require stronger comps, rent proof or discount before proceeding.',
+  };
+}
+
+function getBestFit(property: PropertyData, factors: DisplayScoreFactor[]): VerdictRow {
+  const normalized = normalizeProperty(property as any);
+  const text = [property?.title, property?.description, property?.property_type, property?.type, property?.strategy]
+    .map(normStr)
+    .join(' ')
+    .toLowerCase();
+  const hasFlipSignal = /refurb|renovat|modernis|development|auction|cash buyer|value[- ]add|project/.test(text);
+  const yieldFactor = factors.find((factor) => factor.key === 'yield');
+  const ptrFactor = factors.find((factor) => factor.key === 'price_to_rent');
+  const roiFactor = factors.find((factor) => factor.key === 'roi');
+
+  if (hasFlipSignal && (!yieldFactor || yieldFactor.value < 60)) {
+    return {
+      label: 'Best fit',
+      value: 'Flip',
+      helper: 'Value-add language found; confirm works budget and resale comps.',
+    };
+  }
+
+  if ((normalized.yieldPercent ?? 0) >= 5 || (yieldFactor?.value ?? 0) >= 55 || (ptrFactor?.value ?? 0) >= 55) {
+    return {
+      label: 'Best fit',
+      value: 'BTL',
+      helper: 'Gross yield from available rent evidence is the clearest route.',
+    };
+  }
+
+  if ((roiFactor?.value ?? 0) >= 65) {
+    return {
+      label: 'Best fit',
+      value: 'Refinance',
+      helper: 'Return signal is strongest; verify finance, costs and exit value.',
+    };
+  }
+
+  return {
+    label: 'Best fit',
+    value: 'Hold',
+    helper: 'Use as a watchlist hold until rent and comparable evidence improves.',
+  };
+}
+
+function getStrongestFactor(factors: DisplayScoreFactor[]): VerdictRow {
+  const strongest = [...factors].sort((a, b) => b.value - a.value)[0];
+  if (!strongest) {
+    return {
+      label: 'Strongest signal',
+      value: 'Evidence pending',
+      helper: 'Add rent or comparable evidence before relying on the score.',
+    };
+  }
+
+  return {
+    label: 'Strongest signal',
+    value: strongest.label,
+    helper: strongest.badge === 'Land Registry PPD' ? 'Comps backed by Land Registry PPD.' : strongest.helper,
+  };
+}
+
+function getMainRisk(factors: DisplayScoreFactor[]): VerdictRow {
+  const proxyRoi = factors.find((factor) => factor.key === 'roi' && factor.source === 'derived');
+  if (proxyRoi) {
+    return {
+      label: 'Main check before offer',
+      value: 'ROI proxy',
+      helper: 'ROI is proxy-based; validate finance and costs.',
+    };
+  }
+
+  const weakest = [...factors].sort((a, b) => a.value - b.value)[0];
+  if (weakest) {
+    return {
+      label: 'Main check before offer',
+      value: weakest.label,
+      helper: weakest.key === 'reported_crime'
+        ? 'Crime shown only where police.uk full-postcode evidence exists.'
+        : weakest.helper,
+    };
+  }
+
+  return {
+    label: 'Main check before offer',
+    value: 'Evidence depth',
+    helper: 'Validate rent, condition and comparable sales before bidding.',
+  };
+}
+
+function getBeforeOfferChecks(property: PropertyData, factors: DisplayScoreFactor[]): string[] {
+  const normalized = normalizeProperty(property as any);
+  const checks: string[] = [];
+  const add = (check: string) => {
+    if (!checks.includes(check) && checks.length < 3) checks.push(check);
+  };
+
+  if (factors.some((factor) => factor.key === 'roi' && factor.source === 'derived') || normalized.roiIsProxy) {
+    add('Validate finance, refurb costs and fees.');
+  }
+  if (factors.some((factor) => factor.key === 'yield' || factor.key === 'price_to_rent')) {
+    add('Confirm achievable rent and void assumptions.');
+  }
+  if (factors.some((factor) => factor.key === 'area_demand' && factor.badge === 'Land Registry PPD')) {
+    add('Compare latest Land Registry PPD sales.');
+  }
+  if (factors.some((factor) => factor.key === 'reported_crime')) {
+    add('Review police.uk incidents at full postcode level.');
+  }
+
+  add('Inspect condition, lease, EPC and legal pack.');
+  add('Stress-test exit value and resale demand.');
+  add('Set a walk-away price before bidding.');
+
+  return checks;
+}
+
 export default function DealScore({ property }: DealScoreProps) {
   const scoreRef = useRef<HTMLDivElement>(null);
 
@@ -221,6 +369,11 @@ export default function DealScore({ property }: DealScoreProps) {
 
   const roundedScore = Math.round(score);
   const animatedRoundedScore = Math.round(animatedScore);
+  const investorVerdict = getDealVerdict(score);
+  const bestFit = getBestFit(property, evidenceFactors);
+  const strongestFactor = getStrongestFactor(evidenceFactors);
+  const mainRisk = getMainRisk(evidenceFactors);
+  const beforeOfferChecks = getBeforeOfferChecks(property, evidenceFactors);
   const dealBand =
     score >= 75
       ? {
@@ -343,7 +496,7 @@ export default function DealScore({ property }: DealScoreProps) {
                   Score drivers
                 </div>
                 <h4 className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
-                  Return, demand and risk balance
+                  Evidence-backed score drivers
                 </h4>
               </div>
               <div className="text-xs text-slate-500 dark:text-slate-400">Evidence-backed factor view</div>
@@ -385,47 +538,56 @@ export default function DealScore({ property }: DealScoreProps) {
           </div>
 
           <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
-            <div className="mb-3 flex items-center gap-2">
-              <FiAlertTriangle className="h-4 w-4 text-amber-500" />
+            <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                  Investor lens
+                  Investor verdict
                 </div>
-                <h4 className="text-base font-semibold text-slate-950 dark:text-white">
-                  Top scoring factors
+                <h4 className="mt-1 text-base font-semibold text-slate-950 dark:text-white">
+                  Decision-ready readout
                 </h4>
               </div>
+              <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${factorToneClasses(investorVerdict.tone)}`}>
+                {investorVerdict.label}
+              </span>
             </div>
 
+            <p className="mb-3 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-xs leading-5 text-slate-600 dark:border-slate-800 dark:bg-slate-950/50 dark:text-slate-300">
+              {investorVerdict.summary}
+            </p>
+
             <div className="space-y-2.5">
-              {evidenceFactors.slice(0, 4).map((factor) => {
-                const Icon = FACTOR_ICONS[factor.key] ?? FiBarChart2;
-                return (
-                  <div
-                    key={factor.key}
-                    className="rounded-xl border border-slate-200 bg-white/90 p-2.5 dark:border-slate-800 dark:bg-slate-950/50"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 dark:bg-brand-950/40 dark:text-brand-300">
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                            {factor.label}
-                          </div>
-                          <div className={`text-sm font-bold ${getScoreColor(factor.value)}`}>
-                            {factor.value}%
-                          </div>
-                        </div>
-                        <p className="mt-0.5 text-xs leading-4 text-slate-500 dark:text-slate-400">
-                          {factor.helper}
-                        </p>
-                      </div>
-                    </div>
+              {[bestFit, strongestFactor, mainRisk].map((row) => (
+                <div
+                  key={row.label}
+                  className="rounded-xl border border-slate-200 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-950/50"
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                    {row.label}
                   </div>
-                );
-              })}
+                  <div className="mt-1 text-sm font-semibold text-slate-950 dark:text-white">
+                    {row.value}
+                  </div>
+                  <p className="mt-1 text-xs leading-4 text-slate-500 dark:text-slate-400">
+                    {row.helper}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-700 dark:text-amber-300">
+                <FiAlertTriangle className="h-3.5 w-3.5" />
+                Before bidding
+              </div>
+              <ul className="space-y-1.5 text-xs leading-4 text-amber-800 dark:text-amber-200">
+                {beforeOfferChecks.map((check) => (
+                  <li key={check} className="flex gap-2">
+                    <span aria-hidden="true" className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                    <span>{check}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
