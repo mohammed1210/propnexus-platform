@@ -17,6 +17,10 @@ export type SavedDeal = {
   imageurl?: string | null;
   saved_at?: string | null;
   created_at?: string | null;
+  deal_status?: string | null;
+  contacted_at?: string | null;
+  last_action_at?: string | null;
+  action_notes?: string | null;
   investment_type?: string | null;
   property_type?: string | null;
 };

@@ -476,6 +476,11 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
     listing_url = _norm_url(
         pick_first(raw, ["listing_url", "url", "raw_url", "link", "href", "propertyUrl"])
     )
+    agent_name = clean_str(
+        pick_first(raw, ["agent_name", "branch_name", "advertiser_name", "agency_name", "agent"])
+    )
+    agent_phone = clean_str(pick_first(raw, ["agent_phone", "phone", "telephone", "contact_phone"]))
+    agent_email = clean_str(pick_first(raw, ["agent_email", "email", "contact_email"]))
 
     # Preserve gallery photos when available.
     image_urls = _normalize_image_urls(
@@ -504,6 +509,12 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
         "source": clean_str(source),
         # DB schema uses `url`; prefer it as the single canonical field.
         "url": listing_url,
+        # Preserve the real source URL for investor handoff when DB columns exist.
+        "source_url": listing_url,
+        "original_listing_url": listing_url,
+        "agent_name": agent_name,
+        "agent_phone": agent_phone,
+        "agent_email": agent_email,
     }
 
     # Property type classification: deterministic + additive.

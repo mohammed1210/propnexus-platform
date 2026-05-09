@@ -101,6 +101,22 @@ async def scrape_endpoint(req: ScrapeRequest):
             "longitude",
             "source",
             "url",
+            "source_url",
+            "original_listing_url",
+            "listing_url",
+            "property_url",
+            "external_url",
+            "original_url",
+            "rightmove_url",
+            "zoopla_url",
+            "onthemarket_url",
+            "agent_name",
+            "agency_name",
+            "branch_name",
+            "agent_phone",
+            "contact_phone",
+            "agent_email",
+            "contact_email",
             "image_urls",
             "data",
             "yield_percent",
@@ -122,8 +138,18 @@ async def scrape_endpoint(req: ScrapeRequest):
                 row.pop("ai_ready", None)
 
                 # DB schema uses `url`; scrapers may emit `listing_url`/`raw_url`.
+                source_url = (
+                    row.get("source_url")
+                    or row.get("original_listing_url")
+                    or row.get("url")
+                    or row.get("listing_url")
+                    or row.get("raw_url")
+                )
                 if not row.get("url"):
-                    row["url"] = row.get("listing_url") or row.get("raw_url")
+                    row["url"] = source_url
+                if source_url:
+                    row.setdefault("source_url", source_url)
+                    row.setdefault("original_listing_url", source_url)
                 row.pop("listing_url", None)
                 row.pop("raw_url", None)
 

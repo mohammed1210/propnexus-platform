@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FiHeart, FiShare2, FiDownload, FiCopy, FiCheck } from 'react-icons/fi';
+import { FiHeart, FiShare2, FiDownload, FiCopy, FiCheck, FiExternalLink } from 'react-icons/fi';
 import { toast } from 'sonner';
 import { fetchWithRetry } from '@/lib/api';
 import { exportPropertyPdf } from '@/lib/propertyPdfExport';
 import { createPropertyPdfFilename } from '@/lib/propertyDealPack';
 import { FF } from '@/lib/flags';
 import { formatPercent, getRoiDisplay, getYieldPercent, normalizeProperty } from '@/lib/normalizeProperty';
+import { buildInvestorEnquiry, getOriginalListingUrl, getSourceLabel } from '@/lib/propertyDealActions';
+import DealActionPanel from './DealActionPanel';
 
 type QuickStatsActionsProps = {
   propertyId: string;
@@ -58,6 +60,7 @@ export default function QuickStatsActions({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [dealEnquiryCopied, setDealEnquiryCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
   const showDealPackExport = FF.DEAL_PACK;
   const showCrmExports = FF.CRM_EXPORT;
@@ -79,6 +82,9 @@ export default function QuickStatsActions({
   const displayYield = getYieldPercent(merged) ?? undefined;
   const roiDisplay = getRoiDisplay(merged);
   const displayRoi = roiDisplay.value ?? undefined;
+  const originalListingUrl = useMemo(() => getOriginalListingUrl(merged), [merged]);
+  const sourceLabel = useMemo(() => getSourceLabel(merged), [merged]);
+  const enquiryMessage = useMemo(() => buildInvestorEnquiry(merged), [merged]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,7 +96,7 @@ export default function QuickStatsActions({
         if (!res.ok) return;
 
         const json: any = await res.json().catch(() => null);
-        const items = Array.isArray(json) ? json : json?.data;
+        const items = Array.isArray(json) ? json : Array.isArray(json?.deals) ? json.deals : json?.data;
         if (cancelled) return;
         if (Array.isArray(items) && items.length > 0) setSaved(true);
       } catch {
@@ -225,6 +231,17 @@ export default function QuickStatsActions({
     }
   };
 
+  const handleCopyEnquiry = async () => {
+    try {
+      await navigator.clipboard.writeText(enquiryMessage);
+      setDealEnquiryCopied(true);
+      toast.success('Enquiry message copied.');
+      setTimeout(() => setDealEnquiryCopied(false), 1800);
+    } catch (err) {
+      toast.error('Failed to copy enquiry');
+    }
+  };
+
   return (
     <>
       {/* Desktop floating sidebar - combined stats and actions */}
@@ -355,6 +372,8 @@ export default function QuickStatsActions({
               ) : null}
             </div>
           </div>
+
+          <DealActionPanel propertyId={propertyId} property={merged} />
         </div>
       </div>
 
@@ -399,6 +418,24 @@ export default function QuickStatsActions({
               <FiDownload className="w-5 h-5" aria-hidden="true" />
             </button>
           ) : null}
+          {originalListingUrl ? (
+            <a
+              href={originalListingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+              aria-label={`View original listing${sourceLabel ? ` on ${sourceLabel}` : ''}`}
+            >
+              <FiExternalLink className="w-5 h-5" aria-hidden="true" />
+            </a>
+          ) : null}
+          <button
+            onClick={handleCopyEnquiry}
+            className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+            aria-label={dealEnquiryCopied ? 'Enquiry copied' : 'Copy enquiry message'}
+          >
+            {dealEnquiryCopied ? <FiCheck className="w-5 h-5" aria-hidden="true" /> : <FiCopy className="w-5 h-5" aria-hidden="true" />}
+          </button>
         </div>
       </div>
     </>

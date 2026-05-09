@@ -6,7 +6,7 @@ import base64
 import json
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from dotenv import load_dotenv
 from fastapi import APIRouter, Header, HTTPException, Query, Request
@@ -17,10 +17,10 @@ from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.enrichment_store import get_property_enrichment_cache
 
-try:
-    from supabase import Client  # type: ignore
-except Exception:  # pragma: no cover
-    Client = object  # type: ignore
+if TYPE_CHECKING:
+    from supabase import Client as SupabaseClient
+else:  # pragma: no cover - annotations are postponed by __future__ import
+    SupabaseClient = Any
 
 load_dotenv()
 
@@ -31,9 +31,20 @@ _SAVED_DEALS_HAS_CLERK_USER_ID: Optional[bool] = None
 _SAVED_DEALS_HAS_PROPERTY_ID: Optional[bool] = None
 _SAVED_DEALS_HAS_DATA: Optional[bool] = None
 _SAVED_DEALS_HAS_SAVED_AT: Optional[bool] = None
+_SAVED_DEALS_ACTION_COLUMNS: Optional[bool] = None
+
+SUPPORTED_DEAL_STATUSES = {
+    "not_contacted",
+    "contacted",
+    "viewing_booked",
+    "offer_prepared",
+    "offer_made",
+    "rejected",
+    "archived",
+}
 
 
-def _require_supabase() -> Client:
+def _require_supabase() -> SupabaseClient:
     return require_sb()  # type: ignore[return-value]
 
 
@@ -50,7 +61,7 @@ def _is_uuid(value: str) -> bool:
     return bool(_UUID_RE.match(value))
 
 
-def _saved_deals_has_clerk_user_id(sb: Client) -> bool:
+def _saved_deals_has_clerk_user_id(sb: SupabaseClient) -> bool:
     global _SAVED_DEALS_HAS_CLERK_USER_ID
     if _SAVED_DEALS_HAS_CLERK_USER_ID is not None:
         return _SAVED_DEALS_HAS_CLERK_USER_ID
@@ -65,7 +76,7 @@ def _saved_deals_has_clerk_user_id(sb: Client) -> bool:
         return False
 
 
-def _saved_deals_has_property_id(sb: Client) -> bool:
+def _saved_deals_has_property_id(sb: SupabaseClient) -> bool:
     global _SAVED_DEALS_HAS_PROPERTY_ID
     if _SAVED_DEALS_HAS_PROPERTY_ID is not None:
         return _SAVED_DEALS_HAS_PROPERTY_ID
@@ -79,7 +90,7 @@ def _saved_deals_has_property_id(sb: Client) -> bool:
         return False
 
 
-def _saved_deals_has_data(sb: Client) -> bool:
+def _saved_deals_has_data(sb: SupabaseClient) -> bool:
     global _SAVED_DEALS_HAS_DATA
     if _SAVED_DEALS_HAS_DATA is not None:
         return _SAVED_DEALS_HAS_DATA
@@ -93,7 +104,7 @@ def _saved_deals_has_data(sb: Client) -> bool:
         return False
 
 
-def _saved_deals_has_saved_at(sb: Client) -> bool:
+def _saved_deals_has_saved_at(sb: SupabaseClient) -> bool:
     global _SAVED_DEALS_HAS_SAVED_AT
     if _SAVED_DEALS_HAS_SAVED_AT is not None:
         return _SAVED_DEALS_HAS_SAVED_AT
@@ -107,12 +118,33 @@ def _saved_deals_has_saved_at(sb: Client) -> bool:
         return False
 
 
+def _saved_deals_has_action_columns(sb: SupabaseClient) -> bool:
+    global _SAVED_DEALS_ACTION_COLUMNS
+    if _SAVED_DEALS_ACTION_COLUMNS is not None:
+        return _SAVED_DEALS_ACTION_COLUMNS
+
+    try:
+        (
+            sb.table("saved_deals")
+            .select("deal_status,contacted_at,last_action_at,action_notes")
+            .limit(1)
+            .execute()
+        )
+        _SAVED_DEALS_ACTION_COLUMNS = True
+        return True
+    except Exception:
+        _SAVED_DEALS_ACTION_COLUMNS = False
+        return False
+
+
 def _is_unique_violation(err: Exception) -> bool:
     msg = str(err).lower()
     return "duplicate key" in msg or "unique constraint" in msg or "23505" in msg
 
 
-def _fetch_properties_by_ids(sb: Client, property_ids: list[str]) -> Dict[str, Dict[str, Any]]:
+def _fetch_properties_by_ids(
+    sb: SupabaseClient, property_ids: list[str]
+) -> Dict[str, Dict[str, Any]]:
     if not property_ids:
         return {}
     try:
@@ -120,12 +152,25 @@ def _fetch_properties_by_ids(sb: Client, property_ids: list[str]) -> Dict[str, D
             "id,title,location,postcode,price,bedrooms,bathrooms,yield_percent,roi_percent,imageurl,"
             "source,property_type,investment_type,ai_score,score,score_breakdown"
         )
-        extended_cols = base_cols + ",rent,avg_rent"
+        action_cols = (
+            ",url,source_url,original_listing_url,listing_url,property_url,external_url,original_url,"
+            "rightmove_url,zoopla_url,onthemarket_url,agent_name,agency_name,branch_name,"
+            "agent_phone,contact_phone,agent_email,contact_email"
+        )
+        extended_cols = base_cols + ",rent,avg_rent" + action_cols
 
         try:
             res = sb.table("properties").select(extended_cols).in_("id", property_ids).execute()
         except Exception:
-            res = sb.table("properties").select(base_cols).in_("id", property_ids).execute()
+            try:
+                res = (
+                    sb.table("properties")
+                    .select(base_cols + ",rent,avg_rent")
+                    .in_("id", property_ids)
+                    .execute()
+                )
+            except Exception:
+                res = sb.table("properties").select(base_cols).in_("id", property_ids).execute()
 
         out: Dict[str, Dict[str, Any]] = {}
         for r in res.data or []:
@@ -137,7 +182,7 @@ def _fetch_properties_by_ids(sb: Client, property_ids: list[str]) -> Dict[str, D
         return {}
 
 
-def _fetch_property_snapshot(sb: Client, property_id: str) -> Optional[Dict[str, Any]]:
+def _fetch_property_snapshot(sb: SupabaseClient, property_id: str) -> Optional[Dict[str, Any]]:
     """Fetch a minimal property row for save-time metric stamping.
 
     Best-effort: handles missing columns by retrying with a reduced select list.
@@ -207,7 +252,7 @@ def _merge_data_payload(row: Dict[str, Any]) -> Dict[str, Any]:
     return row
 
 
-def _identity_filter(sb: Client, subject: str, x_clerk_user_id: Optional[str] = None):
+def _identity_filter(sb: SupabaseClient, subject: str, x_clerk_user_id: Optional[str] = None):
     """Return (column, value) pair to filter saved_deals for the current user."""
     clerk_id = _extract_clerk_user_id_from_header(x_clerk_user_id)
     if clerk_id:
@@ -532,6 +577,74 @@ async def list_saved_deals(
         return {"data": merged_rows}
     except Exception as e:
         print(f"[list-saved-deals-error] {e}")
+        raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
+
+
+@router.patch("/saved-deals/status")
+async def update_saved_deal_status(
+    request: Request,
+    authorization: Optional[str] = Header(None),
+    x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
+) -> Dict[str, Any]:
+    """Update launch-action progress for a saved deal owned by the current user."""
+    sb = _require_supabase()
+    try:
+        payload = await request.json()
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="Body must be a JSON object")
+
+        property_id = payload.get("property_id")
+        if not property_id:
+            raise HTTPException(status_code=400, detail="Missing property_id")
+
+        status = str(payload.get("status") or payload.get("deal_status") or "").strip()
+        if status not in SUPPORTED_DEAL_STATUSES:
+            raise HTTPException(status_code=400, detail="Invalid deal status")
+
+        if not _saved_deals_has_property_id(sb):
+            raise HTTPException(
+                status_code=500,
+                detail="saved_deals schema unsupported: missing property_id column",
+            )
+
+        if not _saved_deals_has_action_columns(sb):
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Database schema not migrated for saved deal action tracking. "
+                    "Run supabase/migrations/20260509_deal_action_fields.sql."
+                ),
+            )
+
+        subject = _extract_user_id_from_token(authorization)
+        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+        now = _now_iso()
+        update_payload: Dict[str, Any] = {
+            "deal_status": status,
+            "last_action_at": now,
+        }
+        if status in {"contacted", "viewing_booked", "offer_prepared", "offer_made"}:
+            update_payload["contacted_at"] = now
+        if "action_notes" in payload:
+            notes = payload.get("action_notes")
+            update_payload["action_notes"] = (
+                str(notes).strip()[:2000] if notes is not None else None
+            )
+
+        res = (
+            sb.table("saved_deals")
+            .update(update_payload)
+            .eq("property_id", property_id)
+            .eq(identity_col, identity_val)
+            .execute()
+        )
+        if not res.data:
+            raise HTTPException(status_code=404, detail="Saved deal not found")
+        return {"ok": True, "data": res.data}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[saved-deal-status-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
 
 

@@ -29,6 +29,15 @@ function fmtDate(s?: string | null): string {
   }
 }
 
+function formatDealStatus(status?: string | null): string | null {
+  if (!status) return null;
+  return status
+    .split('_')
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
+}
+
 export default function SavedDealCard({
   deal,
   selected,
@@ -50,6 +59,7 @@ export default function SavedDealCard({
 
   const yieldDisplay = getYieldPercent(deal as any);
   const roiDisplay = getRoiDisplay(deal as any);
+  const statusLabel = formatDealStatus(deal.deal_status);
 
   return (
     <article
@@ -90,11 +100,18 @@ export default function SavedDealCard({
           <Link href={href} className="block font-semibold hover:underline leading-snug">
             {deal.title ?? '—'}
           </Link>
-          {deal.investment_type ? (
-            <span className="shrink-0 text-[11px] px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300 tracking-wide">
-              {String(deal.investment_type).toUpperCase()}
-            </span>
-          ) : null}
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {deal.investment_type ? (
+              <span className="text-[11px] px-2 py-1 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300 tracking-wide">
+                {String(deal.investment_type).toUpperCase()}
+              </span>
+            ) : null}
+            {statusLabel ? (
+              <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                {statusLabel}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <div className="text-sm text-slate-600 dark:text-slate-300">{deal.location ?? '—'}</div>

@@ -10,6 +10,10 @@ type SavedDealRow = {
   created_at?: string | null;
   saved_at?: string | null;
   clerk_user_id?: string | null;
+  deal_status?: string | null;
+  contacted_at?: string | null;
+  last_action_at?: string | null;
+  action_notes?: string | null;
   data?: unknown;
 };
 
@@ -127,6 +131,10 @@ export async function GET() {
             id: String(d.id),
             property_id: '',
             saved_at: (d.saved_at ?? d.created_at ?? null) as string | null,
+            deal_status: d.deal_status ?? null,
+            contacted_at: d.contacted_at ?? null,
+            last_action_at: d.last_action_at ?? null,
+            action_notes: d.action_notes ?? null,
             property: null,
           };
         }
@@ -144,6 +152,10 @@ export async function GET() {
             id: String(d.id),
             property_id: propertyId,
             saved_at: (d.saved_at ?? d.created_at ?? null) as string | null,
+            deal_status: d.deal_status ?? null,
+            contacted_at: d.contacted_at ?? null,
+            last_action_at: d.last_action_at ?? null,
+            action_notes: d.action_notes ?? null,
             property: null,
           };
         }
@@ -172,15 +184,44 @@ export async function GET() {
           'title',
           'imageurl',
           'image_url',
+          'url',
+          'source_url',
+          'listing_url',
+          'property_url',
+          'external_url',
+          'original_url',
+          'original_listing_url',
+          'rightmove_url',
+          'zoopla_url',
+          'onthemarket_url',
+          'agent_name',
+          'agency_name',
+          'branch_name',
+          'agent_phone',
+          'contact_phone',
+          'agent_email',
+          'contact_email',
+          'deal_status',
+          'contacted_at',
+          'last_action_at',
+          'action_notes',
         ];
 
         mergeMissing(propObj, dealObj, canonicalKeys);
         mergeMissing(propObj, dataObj, canonicalKeys);
+        if (d.deal_status) propObj.deal_status = d.deal_status;
+        if (d.contacted_at) propObj.contacted_at = d.contacted_at;
+        if (d.last_action_at) propObj.last_action_at = d.last_action_at;
+        if (d.action_notes) propObj.action_notes = d.action_notes;
 
         return {
           id: String(d.id),
           property_id: propertyId,
           saved_at: (d.saved_at ?? d.created_at ?? null) as string | null,
+          deal_status: d.deal_status ?? propObj.deal_status ?? null,
+          contacted_at: d.contacted_at ?? propObj.contacted_at ?? null,
+          last_action_at: d.last_action_at ?? propObj.last_action_at ?? null,
+          action_notes: d.action_notes ?? propObj.action_notes ?? null,
           property: propObj,
         };
       }),
@@ -194,6 +235,10 @@ export async function GET() {
         id: d?.id ? String(d.id) : String(i),
         property_id: propertyId ?? '',
         saved_at: (d?.saved_at ?? d?.created_at ?? null) as string | null,
+        deal_status: d?.deal_status ?? null,
+        contacted_at: d?.contacted_at ?? null,
+        last_action_at: d?.last_action_at ?? null,
+        action_notes: d?.action_notes ?? null,
         property: null,
       };
     });

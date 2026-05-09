@@ -951,8 +951,18 @@ def _clean_row(p: Dict[str, Any], now_iso: str) -> Dict[str, Any]:
     # DB schema uses `url` (see supabase/schema.sql). Scrapers/normalizers may
     # emit `listing_url` or `raw_url`; map those into `url` and drop the alias
     # to avoid PostgREST "column does not exist" failures.
+    source_url = (
+        row.get("source_url")
+        or row.get("original_listing_url")
+        or row.get("url")
+        or row.get("listing_url")
+        or row.get("raw_url")
+    )
     if not row.get("url"):
-        row["url"] = row.get("listing_url") or row.get("raw_url")
+        row["url"] = source_url
+    if source_url:
+        row.setdefault("source_url", source_url)
+        row.setdefault("original_listing_url", source_url)
     row.pop("listing_url", None)
     row.pop("raw_url", None)
 
@@ -1139,6 +1149,22 @@ def _upsert_properties_rows(
         "longitude",
         "source",
         "url",
+        "source_url",
+        "original_listing_url",
+        "listing_url",
+        "property_url",
+        "external_url",
+        "original_url",
+        "rightmove_url",
+        "zoopla_url",
+        "onthemarket_url",
+        "agent_name",
+        "agency_name",
+        "branch_name",
+        "agent_phone",
+        "contact_phone",
+        "agent_email",
+        "contact_email",
         "image_urls",
         "data",
         "yield_percent",

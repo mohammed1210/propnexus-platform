@@ -44,6 +44,10 @@ type SavedDeal = {
   property_id: string;
   created_at?: string | null;
   saved_at?: string | null;
+  deal_status?: string | null;
+  contacted_at?: string | null;
+  last_action_at?: string | null;
+  action_notes?: string | null;
   property: Property | null;
 };
 
@@ -98,6 +102,15 @@ function formatDate(value?: string | null) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-GB');
+}
+
+function formatDealStatus(status?: string | null) {
+  if (!status) return '';
+  return status
+    .split('_')
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(' ');
 }
 
 function areaLabel(p: Property | null): string {
@@ -411,6 +424,7 @@ export default function SavedDealsView() {
               const score = Number.isFinite(scoreRaw) ? scoreRaw : 60;
               const rent = moneyGBP(norm.rentMonthly);
               const area = norm.area || norm.areaLabel || areaLabel(p);
+              const dealStatus = formatDealStatus(d.deal_status ?? (p as any)?.deal_status);
 
               const selectedOn = !!selected[pid];
               const compareDisabled = !selectedOn && selectedIds.length >= 4;
@@ -467,6 +481,11 @@ export default function SavedDealsView() {
                       <span className="rounded-full bg-blue-50 dark:bg-blue-900/20 px-2.5 py-1 font-semibold text-blue-700 dark:text-blue-200">
                         ROI{roiIsProxyDisplay ? ' (proxy)' : ''} {roi}
                       </span>
+                      {dealStatus ? (
+                        <span className="rounded-full bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1 font-semibold text-amber-700 dark:text-amber-200">
+                          {dealStatus}
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">

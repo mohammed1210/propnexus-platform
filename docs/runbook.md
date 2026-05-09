@@ -25,6 +25,12 @@ to anon, authenticated
 using (true);
 ```
 
+## Deal Action / Contact Agent workflow
+- Run `supabase/migrations/20260509_deal_action_fields.sql` in Supabase before enabling saved-deal progress tracking.
+- The migration adds nullable original listing/contact columns on `properties` and `deal_status`, `contacted_at`, `last_action_at`, `action_notes` on `saved_deals`.
+- If this migration has not been applied, `PATCH /saved-deals/status` returns a clear migration-required error while the rest of the property detail page remains usable.
+- Do not backfill or fabricate agent details. Only copy real source URLs/contact fields from scraper/provider payloads.
+
 ## Search Guardrails (#331)
 - **Alert rule file**: `infra/prometheus/alerts/search-alerts.yml`
 - **Zero-result alert**: `SearchZeroResultsRateHigh` fires when zero-result rate exceeds 15% for 10 minutes.
