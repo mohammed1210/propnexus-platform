@@ -68,6 +68,21 @@ def test_safe_select_ppd_sales_matches_exact_outward_code_boundary():
     assert rows == [{"postcode": "RM1 1AA", "price": 300000}]
 
 
+def test_safe_select_ppd_sales_keeps_ub10_separate_from_ub1():
+    sb = _Supabase(
+        [
+            {"postcode": "UB10 1AA", "price": 300000},
+            {"postcode": "UB1 1AA", "price": 310000},
+            {"postcode": "UB11 1AA", "price": 320000},
+        ]
+    )
+
+    rows = safe_select_ppd_sales(sb, postcode_prefix="UB10", limit=10, months_back=36)
+
+    assert sb.query.pattern == "UB10 %"
+    assert rows == [{"postcode": "UB10 1AA", "price": 300000}]
+
+
 def test_safe_select_ppd_sales_can_match_full_postcode_exactly():
     sb = _Supabase(
         [

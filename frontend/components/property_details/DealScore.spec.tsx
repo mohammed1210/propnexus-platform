@@ -1,6 +1,14 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import DealScore from './DealScore';
+
+const mockGetAreaIntel = jest.fn();
+const mockGetComps = jest.fn();
+
+jest.mock('@/lib/api', () => ({
+  getAreaIntel: (...args: unknown[]) => mockGetAreaIntel(...args),
+  getComps: (...args: unknown[]) => mockGetComps(...args),
+}));
 
 beforeAll(() => {
   class MockIntersectionObserver {
@@ -17,6 +25,12 @@ beforeAll(() => {
 });
 
 describe('DealScore breakdown display', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockGetAreaIntel.mockResolvedValue({ source: 'unavailable', crime_source: 'unavailable' });
+    mockGetComps.mockResolvedValue({ sales: [], rents: [] });
+  });
+
   const property = {
     score: 82,
     score_breakdown: {
@@ -27,6 +41,7 @@ describe('DealScore breakdown display', () => {
       },
     },
     price: 250000,
+    postcode: 'IG3 8AA',
     monthly_rent: 1500,
   };
 
@@ -34,7 +49,108 @@ describe('DealScore breakdown display', () => {
     render(<DealScore property={property} />);
 
     expect(screen.getByText('AI Deal Score')).toBeInTheDocument();
-    expect(screen.getByText('Rental Yield')).toBeInTheDocument();
+    expect(screen.getAllByText('Rental Yield').length).toBeGreaterThan(0);
     expect(screen.getByText(/Scores are indicative/i)).toBeInTheDocument();
+  });
+
+  it('hides schools and safety labels when live evidence is missing', async () => {
+    render(
+      <DealScore
+        property={{
+          ...property,
+          score_breakdown: {
+            version: 'v2.1',
+            categories: {
+              yield: 14,
+              roi: 12,
+              price_to_rent: 11,
+              area_demand: 12,
+              crime_index_inverse: 7.5,
+              schools_access: 9,
+            },
+          },
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(mockGetAreaIntel).toHaveBeenCalled());
+    expect(screen.queryByText(/Safety Index/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Schools Access/i)).not.toBeInTheDocument();
+  });
+
+  it('shows reported crime only when police.uk evidence exists', async () => {
+    mockGetAreaIntel.mockResolvedValue({
+      source: 'partial_live',
+      crime_source: 'police.uk',
+      crime_count: 18,
+      crime_signal: 'low',
+      crime_period: '2026-04',
+      source_details: { crime: 'police.uk' },
+    });
+
+    render(<DealScore property={property} />);
+
+    expect((await screen.findAllByText('Reported Crime Signal')).length).toBeGreaterThan(0);
+    expect(screen.getByText('police.uk • 2026-04')).toBeInTheDocument();
+    expect(screen.getAllByText(/Not a safety rating/i).length).toBeGreaterThan(0);
+  });
+
+  it('shows price-to-rent when rent evidence exists', async () => {
+    mockGetAreaIntel.mockResolvedValue({
+      source: 'partial_live',
+      avg_rent: 1450,
+      rent_source: 'internal_property_listings',
+      rent_evidence_count: 2,
+      crime_source: 'unavailable',
+      source_details: { rent: 'internal_property_listings' },
+    });
+
+    render(
+      <DealScore
+        property={{
+          score: 70,
+          postcode: 'IG3 8AA',
+          price: 260000,
+          yield_percent: 5,
+          score_breakdown: { version: 'v2.1', categories: { yield: 12, roi: 10 } },
+        }}
+      />,
+    );
+
+    expect((await screen.findAllByText('Price-to-Rent')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Rent evidence').length).toBeGreaterThan(0);
+  });
+
+  it('hides price-to-rent when rent evidence is missing', async () => {
+    render(
+      <DealScore
+        property={{
+          score: 70,
+          postcode: 'IG3 8AA',
+          price: 260000,
+          yield_percent: 5,
+          score_breakdown: { version: 'v2.1', categories: { yield: 12, roi: 10, price_to_rent: 15 } },
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(mockGetAreaIntel).toHaveBeenCalled());
+    expect(screen.queryByText('Price-to-Rent')).not.toBeInTheDocument();
+  });
+
+  it('shows area demand when sold comps exist', async () => {
+    mockGetComps.mockResolvedValue({
+      sales: [
+        { price: 300000, date: '2026-03-01', source: 'land_registry_ppd' },
+        { price: 315000, date: '2026-02-01', source: 'land_registry_ppd' },
+      ],
+      rents: [],
+      source_details: { sales: 'land_registry_ppd' },
+    });
+
+    render(<DealScore property={property} />);
+
+    expect((await screen.findAllByText('Area Demand')).length).toBeGreaterThan(0);
+    expect(screen.getByText('Land Registry PPD')).toBeInTheDocument();
   });
 });
