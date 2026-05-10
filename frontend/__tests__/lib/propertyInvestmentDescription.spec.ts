@@ -1,7 +1,7 @@
 import { buildInvestmentDescription } from '@/lib/propertyInvestmentDescription';
 
 describe('buildInvestmentDescription', () => {
-  it('uses scraped signals and available metrics without making unsupported claims', () => {
+  it('uses scraped signals without repeating headline metrics in the paragraph', () => {
     const result = buildInvestmentDescription({
       title: 'Detached family home',
       location: 'Forest Road, Ilford',
@@ -20,15 +20,18 @@ describe('buildInvestmentDescription', () => {
     });
 
     expect(result.paragraph).toContain('4-bedroom detached house');
-    expect(result.paragraph).toContain('looks best suited to a buy-to-let investor');
-    expect(result.paragraph).toContain('Overall, the deal looks promising on the information available.');
-    expect(result.paragraph).toContain('6.4% yield');
-    expect(result.paragraph).toContain('2.4% ROI proxy');
-    expect(result.paragraph).toContain('72/100 AI score');
-    expect(result.paragraph).toContain('The listing highlights chain-free, transport access and outdoor space.');
-    expect(result.keySignals).toContain('Chain-free');
-    expect(result.keySignals).toContain('Transport access');
-    expect(result.checks).toContain('Confirm the true ROI after finance, works and fees.');
+    expect(result.paragraph).toContain('appears best suited to a value-add investor');
+    expect(result.paragraph).toContain('chain-free status');
+    expect(result.paragraph).not.toContain('£650,000');
+    expect(result.paragraph).not.toContain('6.4% yield');
+    expect(result.paragraph).not.toContain('2.4% ROI proxy');
+    expect(result.paragraph).not.toContain('72/100 AI score');
+    expect(result.cards).toHaveLength(3);
+    expect(result.cards[0]).toMatchObject({ title: 'Best suited for', value: 'Value-add' });
+    expect(result.cards[1].value).toContain('Chain-free status');
+    expect(result.keySignals.length).toBeLessThanOrEqual(4);
+    expect(result.keySignals).not.toContain('6.4% yield');
+    expect(result.checks).toContain('Validate achievable rent against nearby rental evidence.');
     expect(result.originalNotes).toContain('Offered Chain Free');
     expect(result.paragraph.toLowerCase()).not.toContain('guaranteed');
     expect(result.paragraph).not.toContain('source-listing');
@@ -46,10 +49,10 @@ describe('buildInvestmentDescription', () => {
     });
 
     expect(result.paragraph).toContain('2-bedroom terraced house');
-    expect(result.paragraph).toContain('looks best suited to a cautious review before offer');
-    expect(result.paragraph).toContain('Yield, ROI and score data are limited');
+    expect(result.paragraph).toContain('appears best suited to a buy-to-let investor');
+    expect(result.paragraph).toContain('available listing evidence is limited');
     expect(result.keySignals).toEqual([]);
-    expect(result.checks).toContain('Verify the achievable rent before underwriting.');
+    expect(result.checks).toContain('Validate achievable rent against nearby rental evidence.');
     expect(result.originalNotes).toBe('');
   });
 });
