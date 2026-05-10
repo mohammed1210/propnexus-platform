@@ -57,4 +57,20 @@ describe('Header onboarding controls', () => {
     ).toBe(true);
     dispatchSpy.mockRestore();
   });
+
+  it('offers the tour from the mobile menu', () => {
+    render(<Header />);
+
+    fireEvent.click(screen.getByLabelText('openMenu'));
+    const mobileTourButton = screen.getByTestId('mobile-tour-button');
+    expect(mobileTourButton).toHaveTextContent('Replay Tour');
+
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+    fireEvent.click(mobileTourButton);
+
+    expect(
+      dispatchSpy.mock.calls.some((call) => (call[0] as Event)?.type === 'propnexus:start-tour')
+    ).toBe(true);
+    dispatchSpy.mockRestore();
+  });
 });

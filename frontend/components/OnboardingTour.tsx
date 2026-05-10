@@ -2,9 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { useUser } from '@clerk/react';
 import { Joyride, type CallBackProps, STATUS, type Step } from 'react-joyride';
+import { isAuthEnabled } from '@/lib/auth';
 
 const TOUR_STORAGE_KEY = 'propnexus_onboarding_seen';
+const TOUR_METADATA_KEY = 'propnexusOnboardingSeen';
 
 interface OnboardingTourProps {
   runNonce?: number;
@@ -18,11 +21,62 @@ function isListingsRoute(pathname: string | null | undefined): boolean {
 }
 
 export default function OnboardingTour({ runNonce = 0, onSeenChange }: OnboardingTourProps) {
+  if (isAuthEnabled) {
+    return <AuthenticatedOnboardingTour runNonce={runNonce} onSeenChange={onSeenChange} />;
+  }
+
+  return <OnboardingTourInner runNonce={runNonce} onSeenChange={onSeenChange} authLoaded signedIn={false} />;
+}
+
+function AuthenticatedOnboardingTour(props: OnboardingTourProps) {
+  const { isLoaded, isSignedIn, user } = useUser();
+  const userId = user?.id;
+  const metadata = ((user?.unsafeMetadata ?? user?.publicMetadata ?? {}) as Record<string, unknown>);
+
+  return (
+    <OnboardingTourInner
+      {...props}
+      authLoaded={isLoaded}
+      signedIn={Boolean(isSignedIn)}
+      userId={userId}
+      metadataSeen={metadata[TOUR_METADATA_KEY] === true}
+      markMetadataSeen={async () => {
+        if (!user || typeof (user as any).update !== 'function') return;
+        await (user as any).update({
+          unsafeMetadata: {
+            ...(user.unsafeMetadata ?? {}),
+            [TOUR_METADATA_KEY]: true,
+          },
+        });
+      }}
+    />
+  );
+}
+
+type OnboardingTourInnerProps = OnboardingTourProps & {
+  authLoaded: boolean;
+  signedIn: boolean;
+  userId?: string;
+  metadataSeen?: boolean;
+  markMetadataSeen?: () => Promise<void>;
+};
+
+function OnboardingTourInner({
+  runNonce = 0,
+  onSeenChange,
+  authLoaded,
+  signedIn,
+  userId,
+  metadataSeen = false,
+  markMetadataSeen,
+}: OnboardingTourInnerProps) {
   const pathname = usePathname();
   const onListings = isListingsRoute(pathname);
   const [mounted, setMounted] = useState(false);
   const [run, setRun] = useState(false);
   const [showFallbackBubble, setShowFallbackBubble] = useState(false);
+  const storageKey = userId ? `${TOUR_STORAGE_KEY}:${userId}` : TOUR_STORAGE_KEY;
+  const canAutoStart = !isAuthEnabled || (authLoaded && signedIn && Boolean(userId));
 
   const steps: Step[] = useMemo(
     () => [
@@ -67,11 +121,12 @@ export default function OnboardingTour({ runNonce = 0, onSeenChange }: Onboardin
   }, []);
 
   useEffect(() => {
-    if (!onListings) return;
-    const alreadySeen = localStorage.getItem(TOUR_STORAGE_KEY) === 'true';
+    if (!onListings || !authLoaded) return;
+    const alreadySeen = metadataSeen || localStorage.getItem(storageKey) === 'true';
+    if (alreadySeen && metadataSeen) localStorage.setItem(storageKey, 'true');
     onSeenChange?.(alreadySeen);
-    if (!alreadySeen) setRun(true);
-  }, [onListings, onSeenChange]);
+    if (canAutoStart && !alreadySeen) setRun(true);
+  }, [authLoaded, canAutoStart, metadataSeen, onListings, onSeenChange, storageKey]);
 
   useEffect(() => {
     if (!onListings || runNonce === 0) return;
@@ -111,12 +166,19 @@ export default function OnboardingTour({ runNonce = 0, onSeenChange }: Onboardin
     };
   }, [run]);
 
+  const markSeen = () => {
+    localStorage.setItem(storageKey, 'true');
+    void markMetadataSeen?.().catch(() => {
+      // Local storage still prevents repeated tours if Clerk metadata update is unavailable.
+    });
+    onSeenChange?.(true);
+    setShowFallbackBubble(false);
+    setRun(false);
+  };
+
   const handleJoyrideCallback = (data: CallBackProps) => {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
-      localStorage.setItem(TOUR_STORAGE_KEY, 'true');
-      onSeenChange?.(true);
-      setShowFallbackBubble(false);
-      setRun(false);
+      markSeen();
     }
   };
 
@@ -154,10 +216,7 @@ export default function OnboardingTour({ runNonce = 0, onSeenChange }: Onboardin
               type="button"
               className="rounded-md bg-brand-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-600"
               onClick={() => {
-                localStorage.setItem(TOUR_STORAGE_KEY, 'true');
-                onSeenChange?.(true);
-                setShowFallbackBubble(false);
-                setRun(false);
+                markSeen();
               }}
             >
               Close Tour

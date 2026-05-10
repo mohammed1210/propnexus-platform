@@ -40,6 +40,12 @@ export default function Header() {
 
   // Close the mobile menu by remounting Disclosure when a link is tapped
   const handleMobileNavigate = () => setMobileMenuKey((k) => k + 1);
+  const handleStartTour = () => {
+    setTourRunNonce((n) => n + 1);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('propnexus:start-tour'));
+    }
+  };
 
   return (
     <header
@@ -87,12 +93,7 @@ export default function Header() {
               type="button"
               data-testid="header-tour-button"
               className="hidden lg:inline-flex h-10 px-3 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-              onClick={() => {
-                setTourRunNonce((n) => n + 1);
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new Event('propnexus:start-tour'));
-                }
-              }}
+              onClick={handleStartTour}
             >
               {tourSeen ? 'Replay Tour' : 'Start Tour'}
             </button>
@@ -216,6 +217,19 @@ export default function Header() {
 
                       {/* Account / Auth */}
                       <div className="pt-2">
+                        {showTourControls ? (
+                          <button
+                            type="button"
+                            data-testid="mobile-tour-button"
+                            className="mb-3 w-full rounded-md border border-brand-200 bg-brand-50 px-3 py-2 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-100 dark:border-brand-900/60 dark:bg-brand-950/30 dark:text-brand-300 dark:hover:bg-brand-950/50"
+                            onClick={() => {
+                              handleStartTour();
+                              handleMobileNavigate();
+                            }}
+                          >
+                            {tourSeen ? 'Replay Tour' : 'Start Tour'}
+                          </button>
+                        ) : null}
                         <SafeSignedIn>
                           <div className="flex flex-col gap-3 text-sm">
                             <Link
