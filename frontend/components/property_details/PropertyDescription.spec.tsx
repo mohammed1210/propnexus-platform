@@ -27,7 +27,7 @@ describe('PropertyDescription investor brief', () => {
     render(<PropertyDescription brief={brief} />);
 
     expect(screen.getByText('Investor Brief')).toBeInTheDocument();
-    expect(screen.getByText(/AI-generated summary using the listing, deal score and available market evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/Generated from the listing, deal score and available market evidence/i)).toBeInTheDocument();
 
     const paragraph = screen.getByTestId('investor-brief-paragraph');
     expect(paragraph).toHaveTextContent('4-bedroom detached house');
@@ -57,28 +57,45 @@ describe('PropertyDescription investor brief', () => {
     const details = container.querySelector('details');
     expect(details).toBeInTheDocument();
     expect(details).not.toHaveAttribute('open');
-    expect(screen.getByText('Original listing notes from source')).toBeInTheDocument();
+    expect(screen.getByText('Source listing notes')).toBeInTheDocument();
   });
 
-  it('limits feature chips to four and avoids opportunity duplicates', () => {
+  it('hides numeric duplicate chips and keeps useful non-numeric chips', () => {
     const brief = buildInvestmentDescription({
       propertyType: 'House',
+      price: 450000,
+      yieldPercent: 7.1,
+      roiPercent: 15.2,
+      aiScore: 81,
       description:
         'Chain free. Close to the station. Large garden. Potential to extend STPP. Needs refurbishment. Parking and garage. Good schools nearby. Reduced price.',
     });
 
     render(<PropertyDescription brief={brief} />);
 
-    const opportunityText = screen.getByText(/useful listing signals/i).textContent ?? '';
+    const opportunityText = screen.getByText(/may support the investment story/i).textContent ?? '';
     const chips = screen.getAllByTestId('investor-brief-chip');
 
     expect(chips.length).toBeLessThanOrEqual(4);
+    expect(chips.length).toBeGreaterThanOrEqual(2);
     for (const chip of chips) {
       expect(opportunityText.toLowerCase()).not.toContain(chip.textContent?.toLowerCase() ?? '');
+      expect(chip).not.toHaveTextContent(/£|%|ROI|AI score|yield/i);
     }
   });
 
-  it('renders a maximum of three checks before offer', () => {
+  it('hides the chip row when fewer than two meaningful chips remain', () => {
+    const brief = buildInvestmentDescription({
+      propertyType: 'Flat',
+      description: 'Chain free listing.',
+    });
+
+    render(<PropertyDescription brief={brief} />);
+
+    expect(screen.queryByLabelText('Investor brief feature tags')).not.toBeInTheDocument();
+  });
+
+  it('renders a maximum of two checks before offer', () => {
     const brief = buildInvestmentDescription({
       propertyType: 'House',
       hasSoldComps: true,
@@ -88,8 +105,8 @@ describe('PropertyDescription investor brief', () => {
     render(<PropertyDescription brief={brief} />);
 
     const checklist = screen.getByRole('list', { name: /checks before offer/i });
-    expect(within(checklist).getAllByRole('listitem').length).toBeLessThanOrEqual(3);
-    expect(screen.getByText('Compare recent Land Registry sold comps before offer.')).toBeInTheDocument();
+    expect(within(checklist).getAllByRole('listitem').length).toBeLessThanOrEqual(2);
+    expect(screen.getAllByText('Confirm refurbishment, planning, finance and void-cost assumptions.').length).toBeGreaterThan(0);
   });
 
   it('does not create fake claims when source data is limited', () => {
@@ -102,7 +119,7 @@ describe('PropertyDescription investor brief', () => {
     render(<PropertyDescription brief={brief} />);
 
     const paragraph = screen.getByTestId('investor-brief-paragraph');
-    expect(paragraph).toHaveTextContent(/available listing evidence is limited/i);
+    expect(paragraph).toHaveTextContent(/Listing evidence is limited/i);
     expect(paragraph).not.toHaveTextContent(/chain-free|outdoor space|near station|sold comps/i);
     expect(screen.getByText('Evidence-light listing')).toBeInTheDocument();
   });

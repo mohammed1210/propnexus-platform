@@ -28,7 +28,7 @@ describe('buildInvestmentDescription', () => {
     expect(result.paragraph).not.toContain('72/100 AI score');
     expect(result.cards).toHaveLength(3);
     expect(result.cards[0]).toMatchObject({ title: 'Best suited for', value: 'Value-add' });
-    expect(result.cards[1].value).toContain('Chain-free status');
+    expect(result.cards[1].value).toContain('Extension potential');
     expect(result.keySignals.length).toBeLessThanOrEqual(4);
     expect(result.keySignals).not.toContain('6.4% yield');
     expect(result.checks).toContain('Validate achievable rent against nearby rental evidence.');
@@ -50,7 +50,7 @@ describe('buildInvestmentDescription', () => {
 
     expect(result.paragraph).toContain('2-bedroom terraced house');
     expect(result.paragraph).toContain('appears best suited to a buy-to-let investor');
-    expect(result.paragraph).toContain('available listing evidence is limited');
+    expect(result.paragraph).toContain('Listing evidence is limited');
     expect(result.keySignals).toEqual([]);
     expect(result.checks).toContain('Validate achievable rent against nearby rental evidence.');
     expect(result.originalNotes).toBe('');

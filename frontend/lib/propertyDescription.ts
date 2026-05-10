@@ -33,7 +33,7 @@ export type InvestmentDescriptionOutput = {
 };
 
 const MAX_SIGNALS = 4;
-const MAX_CHECKS = 3;
+const MAX_CHECKS = 2;
 const MAX_NOTES_LENGTH = 700;
 
 type ListingSignal = {
@@ -105,7 +105,7 @@ function extractListingSignals(description: string): ListingSignal[] {
   const signals: ListingSignal[] = [];
 
   if (/chain\s*free|no\s+chain/.test(lower)) {
-    uniquePush(signals, { label: 'Chain-free status', chip: 'Chain free', phrase: 'chain-free status', category: 'chain' }, (s) => s.category);
+    uniquePush(signals, { label: 'Chain-free', chip: 'Chain-free', phrase: 'chain-free status', category: 'chain' }, (s) => s.category);
   }
   if (/station|tube|underground|rail|train|crossrail|elizabeth line/.test(lower)) {
     uniquePush(signals, { label: 'Near station', chip: 'Near station', phrase: 'transport access', category: 'transport' }, (s) => s.category);
@@ -116,10 +116,10 @@ function extractListingSignals(description: string): ListingSignal[] {
     uniquePush(signals, { label: 'Outdoor space', chip: 'Outdoor space', phrase: 'outdoor space', category: 'outdoor' }, (s) => s.category);
   }
   if (/extend|extension|stpp|planning|potential/.test(lower)) {
-    uniquePush(signals, { label: 'Potential to extend', chip: 'Potential to extend', phrase: 'potential value-add upside', category: 'valueAdd' }, (s) => s.category);
+    uniquePush(signals, { label: 'Extension potential', chip: 'Extension potential', phrase: 'extension or planning upside', category: 'valueAdd' }, (s) => s.category);
   }
   if (/refurb|renovat|modernis|improv|scope|works required/.test(lower)) {
-    uniquePush(signals, { label: 'Needs refurbishment', chip: 'Needs refurbishment', phrase: 'refurbishment upside', category: 'refurb' }, (s) => s.category);
+    uniquePush(signals, { label: 'Refurbishment upside', chip: 'Refurbishment', phrase: 'refurbishment upside', category: 'refurb' }, (s) => s.category);
   }
   if (/tenant|tenanted|let\b|rental/.test(lower)) {
     uniquePush(signals, { label: 'Rental use referenced', chip: 'Rental use referenced', phrase: 'rental appeal', category: 'rental' }, (s) => s.category);
@@ -149,45 +149,48 @@ function chooseFit(input: InvestmentDescriptionInput, signals: ListingSignal[]):
   if (hasFlip && hasValueAdd) {
     return {
       value: 'Flip',
-      phrase: 'a resale-led or flip investor',
-      reason: 'The strongest signals point to works, resale or timing-sensitive execution rather than a passive hold.',
+      phrase: 'a flip investor',
+      reason: 'Works or resale signals make execution and exit value more important than passive holding.',
     };
   }
   if (hasValueAdd) {
     return {
       value: 'Value-add',
       phrase: 'a value-add investor',
-      reason: 'Listing language points to improvement, extension or refurbishment potential that needs costing before offer.',
+      reason: 'Improvement or extension language suggests upside if works and planning costs are validated.',
     };
   }
   if (hasRental || /flat|apartment|terrace|detached|house/.test(raw)) {
     return {
       value: 'BTL',
       phrase: 'a buy-to-let investor',
-      reason: 'The asset profile looks more suited to income-led underwriting once achievable rent is verified.',
+      reason: 'The asset profile may support income-led underwriting once achievable rent is verified.',
     };
   }
   return {
-    value: 'Hold',
-    phrase: 'a cautious hold investor',
-    reason: 'Available evidence is limited, so the first step is validating fundamentals before committing to a strategy.',
+    value: 'Cautious review',
+    phrase: 'a cautious review before offer',
+    reason: 'Available evidence is limited, so fundamentals need validation before choosing a route.',
   };
 }
 
 function opportunityFrom(signals: ListingSignal[]): { value: string; text: string; usedCategories: Set<ListingSignal['category']> } {
-  const primary = signals.slice(0, 2);
+  const priority = ['refurb', 'valueAdd', 'chain', 'outdoor', 'transport', 'rental', 'parking', 'discount', 'speed', 'school'];
+  const primary = [...signals]
+    .sort((a, b) => priority.indexOf(a.category) - priority.indexOf(b.category))
+    .slice(0, 2);
   const usedCategories = new Set(primary.map((signal) => signal.category));
   if (!primary.length) {
     return {
       value: 'Evidence-light listing',
-      text: 'The source notes provide limited positive signals, so the brief should stay cautious until market evidence is checked.',
+      text: 'The source notes are thin, so avoid assuming upside until market evidence is checked.',
       usedCategories,
     };
   }
 
   return {
     value: primary.map((signal) => signal.label).join(' + '),
-    text: `Useful listing signals include ${joinNatural(primary.map((signal) => signal.phrase))}.`,
+    text: `${joinNatural(primary.map((signal) => signal.phrase))} may support the investment story if verified.`,
     usedCategories,
   };
 }
@@ -198,16 +201,16 @@ function buildChecks(input: InvestmentDescriptionInput, listingSignals: ListingS
   const hasExplicitRentalEvidence = input.hasRentalEvidence === true;
   const hasComps = input.hasSoldComps === true;
 
+  if (hasWorksOrPlanning) {
+    uniquePush(checks, 'Confirm refurbishment, planning, finance and void-cost assumptions.');
+  }
   if (!hasExplicitRentalEvidence) {
     uniquePush(checks, 'Validate achievable rent against nearby rental evidence.');
   }
   if (hasComps) {
-    uniquePush(checks, 'Compare recent Land Registry sold comps before offer.');
+    uniquePush(checks, 'Compare recent sold comps before offer.');
   }
-  if (hasWorksOrPlanning) {
-    uniquePush(checks, 'Confirm refurbishment, planning, finance and void-cost assumptions.');
-  }
-  if (!hasWorksOrPlanning) {
+  if (!hasWorksOrPlanning && hasExplicitRentalEvidence && !hasComps) {
     uniquePush(checks, 'Confirm refurbishment, finance, legal and void-cost assumptions.');
   }
 
@@ -215,9 +218,9 @@ function buildChecks(input: InvestmentDescriptionInput, listingSignals: ListingS
 }
 
 function checkCardValue(checks: string[]): string {
-  if (checks.some((check) => /rent/i.test(check))) return 'Validate rent and costs';
-  if (checks.some((check) => /Land Registry|sold comps/i.test(check))) return 'Check sold comps';
   if (checks.some((check) => /planning|refurbishment/i.test(check))) return 'Price works risk';
+  if (checks.some((check) => /rent/i.test(check))) return 'Validate rent and costs';
+  if (checks.some((check) => /sold comps/i.test(check))) return 'Check sold comps';
   return 'Validate assumptions';
 }
 
@@ -230,13 +233,13 @@ export function buildInvestmentDescription(input: InvestmentDescriptionInput): I
   const quality = cleanText(input.dealQuality).toLowerCase();
   const asset = describeAsset(input);
 
-  const qualityPhrase = quality && !/unknown|n\/a/.test(quality) ? ` Overall, the available evidence looks ${quality}, but it still needs market validation.` : '';
+  const qualityPhrase = quality && !/unknown|n\/a/.test(quality) ? ` The available evidence looks ${quality}, but still needs validation.` : '';
   const signalPhrase = listingSignals.length
-    ? ` The available listing evidence points to ${joinNatural(listingSignals.slice(0, 3).map((signal) => signal.phrase))}.`
-    : ' The available listing evidence is limited, so investors should avoid assuming upside that is not supported by the source notes.';
+    ? ` Listing signals point to ${joinNatural(listingSignals.slice(0, 2).map((signal) => signal.phrase))}.`
+    : ' Listing evidence is limited, so avoid assuming upside that is not supported by the source notes.';
   const checkPhrase = checks.length
-    ? ` Before making an offer, investors should ${checks[0].replace(/\.$/, '').toLowerCase()}.`
-    : ' Before progressing, investors should validate the core underwriting assumptions.';
+    ? ` Before offer, ${checks[0].replace(/\.$/, '').toLowerCase()}.`
+    : ' Before offer, validate the core underwriting assumptions.';
 
   const chips = listingSignals
     .filter((signal) => !opportunity.usedCategories.has(signal.category))
@@ -244,7 +247,7 @@ export function buildInvestmentDescription(input: InvestmentDescriptionInput): I
     .slice(0, MAX_SIGNALS);
 
   return {
-    paragraph: compactText(`${asset} appears best suited to ${fit.phrase}.${qualityPhrase}${signalPhrase}${checkPhrase}`, 430),
+    paragraph: compactText(`${asset} appears best suited to ${fit.phrase}.${qualityPhrase}${signalPhrase}${checkPhrase}`, 320),
     keySignals: chips,
     checks,
     originalNotes,

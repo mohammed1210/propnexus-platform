@@ -8,32 +8,33 @@ export default function PropertyDescription({ brief }: PropertyDescriptionProps)
   if (!brief.paragraph) return null;
 
   const cards = brief.cards.slice(0, 3);
-  const checks = brief.checks.slice(0, 3);
+  const checks = brief.checks.slice(0, 2);
   const chips = brief.keySignals.slice(0, 4);
+  const showChips = chips.length >= 2;
 
   return (
-    <section className="border-t border-slate-200 bg-gradient-to-br from-white via-slate-50/70 to-brand-50/30 p-5 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-brand-950/20 sm:p-6">
-      <div className="space-y-4">
+    <section className="border-t border-slate-200 bg-gradient-to-br from-white via-slate-50/70 to-brand-50/30 p-4 dark:border-slate-800 dark:from-slate-950 dark:via-slate-950 dark:to-brand-950/20 sm:p-5">
+      <div className="space-y-3">
         <div className="max-w-3xl">
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-700 dark:text-brand-300">
             Investor Brief
           </div>
           <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-            AI-generated summary using the listing, deal score and available market evidence.
+            Generated from the listing, deal score and available market evidence.
           </p>
           <p
             data-testid="investor-brief-paragraph"
-            className="mt-3 line-clamp-4 text-[15px] leading-7 text-slate-800 dark:text-slate-200"
+            className="mt-2 line-clamp-3 text-sm leading-6 text-slate-800 dark:text-slate-200"
           >
             {brief.paragraph}
           </p>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3" data-testid="investor-brief-cards">
+        <div className="grid items-stretch gap-2.5 md:grid-cols-3" data-testid="investor-brief-cards">
           {cards.map((card) => (
             <div
               key={card.title}
-              className="rounded-2xl border border-slate-200 bg-white/80 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/45"
+              className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white/80 p-2.5 shadow-sm dark:border-slate-800 dark:bg-slate-950/45"
             >
               <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
                 {card.title}
@@ -54,7 +55,7 @@ export default function PropertyDescription({ brief }: PropertyDescriptionProps)
           ))}
         </div>
 
-        {chips.length > 0 ? (
+        {showChips ? (
           <div className="flex flex-wrap gap-2" aria-label="Investor brief feature tags">
             {chips.map((signal) => (
               <span
@@ -69,9 +70,9 @@ export default function PropertyDescription({ brief }: PropertyDescriptionProps)
         ) : null}
 
         {brief.originalNotes ? (
-          <details className="rounded-2xl border border-slate-200 bg-white/50 p-3 dark:border-slate-800 dark:bg-slate-950/25">
+          <details className="rounded-xl border border-slate-200 bg-white/40 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/20">
             <summary className="cursor-pointer text-xs font-medium text-slate-500 marker:text-slate-400 dark:text-slate-400">
-              Original listing notes from source
+              Source listing notes
             </summary>
             <p className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{brief.originalNotes}</p>
           </details>

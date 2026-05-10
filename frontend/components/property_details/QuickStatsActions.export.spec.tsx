@@ -29,11 +29,11 @@ describe('QuickStatsActions launch controls', () => {
     });
   });
 
-  it('keeps save and share visible while hiding export actions by default', () => {
-    render(
+  it('keeps save, share and deal action visible while moving stats into a collapsed Deal Snapshot', () => {
+    const { container } = render(
       <QuickStatsActions
         propertyId="prop-123"
-        property={{ title: 'Central Flat', location: 'Leeds' }}
+        property={{ title: 'Central Flat', location: 'Leeds', source_url: 'https://www.rightmove.co.uk/properties/123' }}
         price={210000}
         yieldPercent={6.4}
         roiPercent={8.1}
@@ -42,13 +42,26 @@ describe('QuickStatsActions launch controls', () => {
       />,
     );
 
+    expect(screen.getByText('Quick Actions')).toBeInTheDocument();
+    expect(screen.getByText('Deal Action')).toBeInTheDocument();
+    expect(screen.getByText('Deal Snapshot')).toBeInTheDocument();
     expect(screen.getByText('AI Score')).toBeInTheDocument();
     expect(screen.getByText('8.4')).toBeInTheDocument();
+    expect(screen.queryByText('Quick Stats')).not.toBeInTheDocument();
     expect(screen.queryByText('Discount')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /save this deal/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: /share this property/i }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: /view on rightmove/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /export property details as pdf/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /copy property data as json/i })).not.toBeInTheDocument();
+
+    const snapshot = screen.getByText('Deal Snapshot').closest('details');
+    expect(snapshot).toBeInTheDocument();
+    expect(snapshot).not.toHaveAttribute('open');
+
+    const text = container.textContent ?? '';
+    expect(text.indexOf('Quick Actions')).toBeLessThan(text.indexOf('Deal Action'));
+    expect(text.indexOf('Deal Action')).toBeLessThan(text.indexOf('Deal Snapshot'));
   });
 
   it('can re-enable deal pack and CRM export actions independently', () => {

@@ -255,62 +255,6 @@ export default function QuickStatsActions({
       {/* Desktop floating sidebar - combined stats and actions */}
       <div className="hidden lg:block fixed right-4 top-24 w-56 z-10 no-print">
         <div className="sticky top-24 space-y-3">
-          {/* Quick Stats */}
-          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-lg p-4">
-            <h3 className="font-bold text-[11px] text-slate-900 dark:text-white uppercase tracking-[0.16em] mb-3.5">
-              Quick Stats
-            </h3>
-
-            <div className="space-y-3.5">
-              <div className="pb-3 border-b border-slate-200 dark:border-slate-800">
-                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Price</div>
-                <div className="text-xl font-bold leading-tight text-slate-900 dark:text-slate-100">
-                  {formatValue(displayPrice, 'currency')}
-                </div>
-              </div>
-
-              <div className="pb-3 border-b border-slate-200 dark:border-slate-800">
-                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">Rental Yield</div>
-                <div
-                  className={`text-xl font-bold leading-tight ${
-                    typeof displayYield === 'number' ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  {formatValue(displayYield, 'percent')}
-                </div>
-              </div>
-
-              <div className="pb-3 border-b border-slate-200 dark:border-slate-800">
-                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">
-                  ROI{roiDisplay.isProxy ? ' (proxy)' : ''}
-                </div>
-                <div
-                  className={`text-xl font-bold leading-tight ${
-                    typeof displayRoi === 'number' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  {formatRoiDisplay(roiDisplay)}
-                </div>
-                {roiValidationNote ? (
-                  <p className="mt-1 text-[11px] leading-4 text-amber-600 dark:text-amber-300">
-                    {roiValidationNote}
-                  </p>
-                ) : null}
-              </div>
-
-              <div>
-                <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1">AI Score</div>
-                <div
-                  className={`text-xl font-bold leading-tight ${
-                    typeof aiScore === 'number' ? 'text-brand-600 dark:text-brand-400' : 'text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  {formatValue(aiScore, 'score')}
-                </div>
-              </div>
-            </div>
-          </div>
-
           {/* Quick Actions */}
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-lg p-4">
             <h3 className="font-bold text-[11px] text-slate-900 dark:text-white uppercase tracking-[0.16em] mb-3">
@@ -387,6 +331,47 @@ export default function QuickStatsActions({
           </div>
 
           <DealActionPanel propertyId={propertyId} property={merged} compact />
+
+          <details className="rounded-xl border border-slate-200 bg-white/90 p-3 shadow-md backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
+            <summary className="cursor-pointer list-none text-[11px] font-bold uppercase tracking-[0.16em] text-slate-800 marker:text-slate-400 dark:text-slate-100">
+              Deal Snapshot
+            </summary>
+            <div className="mt-3 space-y-2.5 border-t border-slate-200 pt-3 dark:border-slate-800">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Price</span>
+                <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {formatValue(displayPrice, 'currency')}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Yield</span>
+                <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  {formatValue(displayYield, 'percent')}
+                </span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    ROI{roiDisplay.isProxy ? ' proxy' : ''}
+                  </span>
+                  <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                    {formatRoiDisplay(roiDisplay)}
+                  </span>
+                </div>
+                {roiValidationNote ? (
+                  <p className="text-[11px] leading-4 text-amber-600 dark:text-amber-300">
+                    {roiValidationNote}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">AI Score</span>
+                <span className="text-sm font-semibold text-brand-600 dark:text-brand-400">
+                  {formatValue(aiScore, 'score')}
+                </span>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
 
