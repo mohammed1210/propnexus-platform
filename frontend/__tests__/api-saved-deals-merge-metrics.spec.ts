@@ -67,4 +67,35 @@ describe('/api/saved-deals merges snapshot metrics', () => {
       roi_percent: 9.1,
     });
   });
+
+  it('returns exact saved check without enriching every saved deal', async () => {
+    global.fetch = jest.fn(async (input: any) => {
+      const url = String(typeof input === 'string' ? input : input?.url);
+
+      if (url.includes('/saved-deals')) {
+        return new Response(
+          JSON.stringify({
+            data: [
+              { id: 'deal1', property_id: 'prop1', saved_at: '2026-01-01T00:00:00Z' },
+              { id: 'deal2', property_id: 'prop2', saved_at: '2026-01-02T00:00:00Z' },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+
+      return new Response('unexpected enrichment', { status: 500 });
+    }) as any;
+
+    const { GET } = await import('@/app/api/saved-deals/route');
+
+    const res = await GET(new Request('http://localhost/api/saved-deals?property_id=prop2'));
+    expect(res.status).toBe(200);
+
+    const json = await res.json();
+    expect(json.saved).toBe(true);
+    expect(json.deals).toHaveLength(1);
+    expect(json.deals[0]).toMatchObject({ property_id: 'prop2', property: null });
+    expect((global.fetch as jest.Mock).mock.calls.some(([url]) => String(url).includes('/properties/'))).toBe(false);
+  });
 });

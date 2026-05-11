@@ -17,6 +17,7 @@ import {
 } from '@/lib/normalizeProperty';
 import { buildInvestorEnquiry, getOriginalListingUrl, getSourceLabel } from '@/lib/propertyDealActions';
 import DealActionPanel from './DealActionPanel';
+import MetricExplainer from './MetricExplainer';
 
 type QuickStatsActionsProps = {
   propertyId: string;
@@ -106,7 +107,18 @@ export default function QuickStatsActions({
         const json: any = await res.json().catch(() => null);
         const items = Array.isArray(json) ? json : Array.isArray(json?.deals) ? json.deals : json?.data;
         if (cancelled) return;
-        if (Array.isArray(items) && items.length > 0) setSaved(true);
+        if (typeof json?.saved === 'boolean') {
+          setSaved(json.saved);
+          return;
+        }
+        const hasExactMatch = Array.isArray(items)
+          ? items.some((item: any) => {
+              const direct = String(item?.property_id ?? '').trim();
+              const nested = String(item?.data?.property_id ?? '').trim();
+              return direct === propertyId || nested === propertyId;
+            })
+          : false;
+        setSaved(hasExactMatch);
       } catch {
         // ignore
       }
@@ -118,8 +130,26 @@ export default function QuickStatsActions({
   }, [propertyId]);
 
   const handleSave = async () => {
+    if (saving) return;
     try {
       setSaving(true);
+
+      if (saved) {
+        const res = await fetchWithRetry(`/api/saved-deals?property_id=${encodeURIComponent(propertyId)}`, {
+          method: 'DELETE',
+          cache: 'no-store',
+        });
+
+        if (!res.ok) {
+          const msg = await res.text().catch(() => '');
+          throw new Error(msg || `Remove failed (${res.status})`);
+        }
+
+        setSaved(false);
+        toast.success('Removed from saved deals');
+        return;
+      }
+
       const res = await fetchWithRetry('/api/save-deal', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -263,9 +293,9 @@ export default function QuickStatsActions({
             <div className="space-y-2">
               <button
                 onClick={handleSave}
-                disabled={saving || saved}
+                disabled={saving}
                 className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-sm text-white font-semibold hover:from-brand-600 hover:to-brand-700 transition-all disabled:opacity-70 shadow-sm hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2"
-                aria-label={saved ? 'Deal saved' : saving ? 'Saving deal' : 'Save this deal'}
+                aria-label={saved ? 'Remove saved deal' : saving ? 'Saving deal' : 'Save this deal'}
                 aria-pressed={saved}
               >
                 {saved ? (
@@ -278,7 +308,7 @@ export default function QuickStatsActions({
                     >
                       <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                     </svg>
-                    <span>Saved to Deals</span>
+                    <span>{saving ? 'Removing…' : 'Saved ✓'}</span>
                   </>
                 ) : (
                   <>
@@ -344,7 +374,9 @@ export default function QuickStatsActions({
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Yield</span>
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Yield <MetricExplainer metric="gross_yield" property={merged} />
+                </span>
                 <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                   {formatValue(displayYield, 'percent')}
                 </span>
@@ -352,7 +384,7 @@ export default function QuickStatsActions({
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    ROI{roiDisplay.isProxy ? ' proxy' : ''}
+                    ROI{roiDisplay.isProxy ? ' proxy' : ''} <MetricExplainer metric="roi_proxy" property={merged} />
                   </span>
                   <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
                     {formatRoiDisplay(roiDisplay)}
@@ -365,7 +397,9 @@ export default function QuickStatsActions({
                 ) : null}
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">AI Score</span>
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  AI Score <MetricExplainer metric="ai_score" property={merged} />
+                </span>
                 <span className="text-sm font-semibold text-brand-600 dark:text-brand-400">
                   {formatValue(aiScore, 'score')}
                 </span>
@@ -380,9 +414,9 @@ export default function QuickStatsActions({
         <div className="flex gap-2 max-w-7xl mx-auto" role="group" aria-label="Quick actions">
           <button
             onClick={handleSave}
-            disabled={saving || saved}
+            disabled={saving}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 text-white font-semibold disabled:opacity-70 shadow-md hover:shadow-lg transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-            aria-label={saved ? 'Deal saved' : 'Save this deal'}
+            aria-label={saved ? 'Remove saved deal' : 'Save this deal'}
             aria-pressed={saved}
           >
             {saved ? (
@@ -397,7 +431,7 @@ export default function QuickStatsActions({
             ) : (
               <FiHeart className="w-5 h-5" aria-hidden="true" />
             )}
-            <span className="text-sm">{saved ? 'Saved' : 'Save'}</span>
+            <span className="text-sm">{saved ? (saving ? 'Removing…' : 'Saved ✓') : saving ? 'Saving…' : 'Save'}</span>
           </button>
           <button
             onClick={handleShare}

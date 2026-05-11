@@ -19,6 +19,8 @@ import {
   normalizeProperty,
 } from '@/lib/normalizeProperty';
 import { Badge } from '@/components/Badges';
+import MetricExplainer from '@/components/property_details/MetricExplainer';
+import { getTopDealDisplay } from '@/lib/topDealCopy';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -49,7 +51,7 @@ type Property = {
   top_deal_score?: number | null;
   top_deal_tier?: string | null;
   top_deal_reasons?: string[] | null;
-  top_deal?: { score?: number; tier?: string; reasons?: string[] } | null;
+  top_deal?: { score?: number; tier?: string; reasons?: string[]; evidence?: Record<string, unknown> | null } | null;
   deal_reasons?: string[];
   deal_signals?: string[];
   discount_estimate_pct?: number | null;
@@ -236,27 +238,7 @@ export default function PropertyCard({
   const yieldProgress = clampMetricPercent(displayYieldPct, 10);
   const roiProgress = clampMetricPercent(displayRoiPct, 20);
   const scoreVerdict = getScoreVerdict(normalizedScore);
-  const topDeal = useMemo(() => {
-    const embedded = p.top_deal && typeof p.top_deal === 'object' ? p.top_deal : null;
-    const score =
-      typeof p.top_deal_score === 'number'
-        ? p.top_deal_score
-        : typeof embedded?.score === 'number'
-          ? embedded.score
-          : null;
-    const tier = String(p.top_deal_tier || embedded?.tier || '').trim().toLowerCase();
-    const rawReasons = Array.isArray(p.top_deal_reasons)
-      ? p.top_deal_reasons
-      : Array.isArray(embedded?.reasons)
-        ? embedded.reasons
-        : [];
-    const reasons = rawReasons
-      .filter((reason) => typeof reason === 'string' && reason.trim())
-      .filter((reason) => !/\bbmv\b|below market/i.test(reason) || /sold-comps|sold comps|comps median|local sold/i.test(reason))
-      .slice(0, 2);
-    if (typeof score !== 'number' && !tier && reasons.length === 0) return null;
-    return { score, tier: tier || 'watchlist', reasons };
-  }, [p.top_deal, p.top_deal_reasons, p.top_deal_score, p.top_deal_tier]);
+  const topDeal = useMemo(() => getTopDealDisplay(p as any), [p]);
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -797,23 +779,38 @@ export default function PropertyCard({
           </div>
         )}
 
-        {topDeal && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 shadow-sm dark:border-amber-300/25 dark:bg-amber-400/10 dark:text-amber-100">
+        {topDeal?.prominent && (
+          <div className={cx(
+            'rounded-2xl px-3 py-2 text-xs shadow-sm',
+            topDeal.lowConfidence
+              ? 'border border-slate-200 bg-slate-50/80 text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200'
+              : 'border border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-300/25 dark:bg-amber-400/10 dark:text-amber-100',
+          )}>
             <div className="flex items-center justify-between gap-2">
-              <span className="font-black uppercase tracking-[0.14em]">
-                Top Deal{topDeal.score !== null ? ` · ${Math.round(topDeal.score)}` : ''}
-              </span>
-              <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold capitalize text-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
-                {topDeal.tier.replace('_', ' ')}
+              <div>
+                <div className="font-black uppercase tracking-[0.14em]">Deal Finder · {topDeal.title}</div>
+                <div className="mt-0.5 text-[11px] opacity-80">{topDeal.subtitle}</div>
+              </div>
+              <span className="shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold text-slate-800 dark:bg-slate-950/40 dark:text-white">
+                {topDeal.badge}{topDeal.score !== null ? ` · ${topDeal.score}` : ''}
               </span>
             </div>
-            {topDeal.reasons.length > 0 && (
-              <ul className="mt-1 space-y-0.5 text-[11px] leading-snug">
+            {topDeal.reasons.length > 0 ? (
+              <ul className="mt-2 space-y-1 text-[11px] leading-snug">
                 {topDeal.reasons.map((reason) => (
-                  <li key={reason}>• {reason}</li>
+                  <li key={`${reason.kind}-${reason.label}`} title={reason.subtext}>
+                    <span className="font-semibold">{reason.label}</span>
+                    <span className="text-slate-500 dark:text-slate-400"> — {reason.subtext}</span>
+                  </li>
                 ))}
               </ul>
-            )}
+            ) : null}
+          </div>
+        )}
+
+        {!topDeal?.prominent && topDeal && topDeal.rawReasons.length > 0 && (
+          <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            Low-confidence signal: check manually
           </div>
         )}
 
@@ -853,7 +850,9 @@ export default function PropertyCard({
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200/70 dark:bg-emerald-400/15 dark:text-emerald-200 dark:ring-emerald-300/20">
                   <FiTrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Yield</span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Yield <MetricExplainer metric="gross_yield" property={p as any} />
+                </span>
               </div>
               <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
                 {typeof displayYieldPct === 'number' ? formatPercent(displayYieldPct) : '—'}
@@ -872,7 +871,9 @@ export default function PropertyCard({
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-700 ring-1 ring-blue-200/70 dark:bg-blue-400/15 dark:text-blue-200 dark:ring-blue-300/20">
                   <FiBarChart2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">ROI</span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  ROI <MetricExplainer metric="roi_proxy" property={p as any} />
+                </span>
               </div>
               <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
                 {typeof displayRoiPct === 'number' ? formatRoiDisplay(roiDisplay) : '—'}

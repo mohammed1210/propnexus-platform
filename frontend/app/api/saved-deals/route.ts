@@ -80,7 +80,7 @@ function mergeMissing(target: Record<string, any>, source: Record<string, any>, 
   }
 }
 
-export async function GET() {
+export async function GET(req?: Request) {
   const userId = await getSafeUserId();
   if (!userId) {
     return NextResponse.json(
@@ -90,6 +90,9 @@ export async function GET() {
   }
 
   try {
+    const url = new URL(req?.url ?? 'http://localhost/api/saved-deals');
+    const propertyIdFilter = url.searchParams.get('property_id')?.trim();
+
     const dealsRes = await backendFetch(`/saved-deals?user_id=${encodeURIComponent(userId)}`, {
       method: 'GET',
       headers: {
@@ -115,13 +118,32 @@ export async function GET() {
       | { deals?: SavedDealRow[]; data?: SavedDealRow[] }
       | null;
 
-    const dealsList: SavedDealRow[] = Array.isArray(raw)
+    let dealsList: SavedDealRow[] = Array.isArray(raw)
       ? raw
       : Array.isArray((raw as any)?.deals)
         ? ((raw as any).deals as SavedDealRow[])
         : Array.isArray((raw as any)?.data)
           ? ((raw as any).data as SavedDealRow[])
           : [];
+
+    if (propertyIdFilter) {
+      dealsList = dealsList.filter((row) => getPropertyId(row) === propertyIdFilter);
+      const matchingDeals = dealsList.map((d) => ({
+        id: String(d.id),
+        property_id: getPropertyId(d) ?? '',
+        saved_at: (d.saved_at ?? d.created_at ?? null) as string | null,
+        deal_status: d.deal_status ?? null,
+        contacted_at: d.contacted_at ?? null,
+        last_action_at: d.last_action_at ?? null,
+        action_notes: d.action_notes ?? null,
+        property: null,
+      }));
+
+      return NextResponse.json(
+        { deals: matchingDeals, saved: matchingDeals.length > 0 },
+        { status: 200, headers: { ...noStoreHeaders } },
+      );
+    }
 
     const settled = await Promise.allSettled(
       dealsList.map(async (d) => {

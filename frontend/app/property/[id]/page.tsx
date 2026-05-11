@@ -30,8 +30,6 @@ import type { Property } from '@/types';
 import { FF } from '@/lib/flags';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import {
-  formatPercent,
-  formatRoiDisplay,
   getRoiDisplay,
   getRoiProxyValidationNote,
   getYieldPercent,
@@ -312,23 +310,35 @@ export default function PropertyDetailsPage() {
     (property as any).investmentType,
     (property as any).propertyType,
   );
-  const summaryMetrics = [
+  const summaryInsights = [
     {
-      label: 'Best fit',
+      label: 'Best suited for',
       value: bestFitStrategy,
+      helper:
+        bestFitStrategy === 'Flip'
+          ? 'Check works budget, resale comps and legal pack before bidding.'
+          : bestFitStrategy === 'BTL'
+            ? 'Start with rent evidence, void assumptions and lender stress tests.'
+            : 'Treat as a cautious review until the evidence base improves.',
     },
     {
-      label: 'Quality',
+      label: 'Main evidence',
       value: tldr.label,
       tone: tldr.tone,
+      helper: tldr.tone === 'positive' ? 'Available inputs point to a stronger investor case; still verify the evidence.' : 'The case is based on limited available fields, so treat it as directional.',
     },
     {
-      label: 'Yield',
-      value: formatPercent(yieldPercent),
+      label: 'Main risk',
+      value: roiValidationNote ? 'ROI proxy' : tldr.tone === 'positive' ? 'Offer discipline' : 'Evidence depth',
+      helper: roiValidationNote ?? 'Validate rent, condition, fees and comparable sales before relying on the headline score.',
     },
     {
-      label: roiDisplay.isProxy ? 'ROI proxy' : 'ROI',
-      value: formatRoiDisplay(roiDisplay),
+      label: 'Next action',
+      value: tldr.tone === 'positive' ? 'Diligence pack' : tldr.tone === 'neutral' ? 'Validate assumptions' : 'Manual checks',
+      helper:
+        tldr.tone === 'positive'
+          ? 'Prepare offer range, finance terms and inspection checklist.'
+          : 'Confirm rent, comps, lease, EPC, condition and walk-away price.',
     },
   ];
   const investmentDescription = buildInvestmentDescription({
@@ -453,7 +463,7 @@ export default function PropertyDetailsPage() {
 
                 <div className="space-y-5 p-5 sm:p-6">
                   <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    {summaryMetrics.map((metric) => (
+                    {summaryInsights.map((metric) => (
                       <div
                         key={metric.label}
                         className="rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-800 dark:bg-slate-950/30"
@@ -464,6 +474,9 @@ export default function PropertyDetailsPage() {
                         <div className="mt-1 text-base font-bold tracking-tight text-slate-950 dark:text-white">
                           {metric.value}
                         </div>
+                        <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                          {metric.helper}
+                        </p>
                       </div>
                     ))}
                   </div>
