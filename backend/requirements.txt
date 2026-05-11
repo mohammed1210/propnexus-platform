@@ -20,5 +20,5 @@ ruff==0.15.12
 aiohttp>=3.13.5
 prometheus-fastapi-instrumentator>=7.1.0
 slowapi>=0.1.9
-xgboost>=2.1.0
+xgboost>=3.2.0
 scikit-learn>=1.8.0
