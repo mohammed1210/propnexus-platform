@@ -48,6 +48,7 @@ from backend.utils.property_type_classifier import (
 )
 from backend.utils.recommended_ranker import normalize_deal_type, rerank_recommended
 from backend.utils.supabase_client import get_supabase
+from backend.utils.top_deal_ranker import score_top_deal_candidate
 from supabase import create_client
 
 try:
@@ -943,6 +944,18 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
                         out["roi_percent"] = round(float(roi_v), 2)
     except Exception:
         pass
+
+    # Response-only Top Deal hydration for legacy rows that predate the migration/import
+    # backfill. This keeps the API contract stable without writing inferred fields here.
+    try:
+        if out.get("top_deal_score") is None and not isinstance(out.get("top_deal"), dict):
+            ranked = score_top_deal_candidate(out)
+            out["top_deal_score"] = ranked.get("score")
+            out["top_deal_tier"] = ranked.get("tier")
+            out["top_deal_reasons"] = ranked.get("reasons") or []
+            out["top_deal"] = ranked
+    except Exception:
+        out.setdefault("top_deal_reasons", [])
 
     return out
 
