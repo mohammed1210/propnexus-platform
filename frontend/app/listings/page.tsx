@@ -1751,6 +1751,14 @@ function ListingsInner() {
             ) : null}
           </div>
 
+          {(sort === 'top_deals' || sort === 'recommended') && (
+            <div className="mt-2 rounded-xl border border-slate-200 bg-white/70 px-3 py-2 text-xs text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300">
+              {sort === 'top_deals'
+                ? 'Sorted by deal-discovery signals: discounts, comps, rent evidence, auction/value-add wording and data quality.'
+                : 'Recommended combines model score with available evidence.'}
+            </div>
+          )}
+
           {!mapAvailable && !loading && rows.length > 0 && (
             <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">
               Map hidden — no listings in this result have coordinates yet

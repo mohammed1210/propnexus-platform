@@ -375,7 +375,7 @@ export default function QuickStatsActions({
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  Yield <MetricExplainer metric="gross_yield" property={merged} />
+                  Gross yield <MetricExplainer metric="gross_yield" property={merged} compact />
                 </span>
                 <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
                   {formatValue(displayYield, 'percent')}
@@ -384,7 +384,7 @@ export default function QuickStatsActions({
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                    ROI{roiDisplay.isProxy ? ' proxy' : ''} <MetricExplainer metric="roi_proxy" property={merged} />
+                    ROI{roiDisplay.isProxy ? ' proxy' : ''} <MetricExplainer metric="roi_proxy" property={merged} compact />
                   </span>
                   <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
                     {formatRoiDisplay(roiDisplay)}
@@ -398,7 +398,7 @@ export default function QuickStatsActions({
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                  AI Score <MetricExplainer metric="ai_score" property={merged} />
+                  AI score <MetricExplainer metric="ai_score" property={merged} compact />
                 </span>
                 <span className="text-sm font-semibold text-brand-600 dark:text-brand-400">
                   {formatValue(aiScore, 'score')}

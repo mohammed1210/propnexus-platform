@@ -6,6 +6,7 @@ import ImageWithFallback from '@/components/ImageWithFallback';
 import { Highlight } from '@/components/Highlight';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@clerk/nextjs';
+import { toast } from 'sonner';
 import { FiBarChart2, FiChevronLeft, FiChevronRight, FiHeart, FiHome, FiMapPin, FiTarget, FiTrendingUp } from 'react-icons/fi';
 import { buildVerdict, verdictToneClasses } from '@/lib/verdict';
 import { FF } from '@/lib/flags';
@@ -20,7 +21,7 @@ import {
 } from '@/lib/normalizeProperty';
 import { Badge } from '@/components/Badges';
 import MetricExplainer from '@/components/property_details/MetricExplainer';
-import { getTopDealDisplay } from '@/lib/topDealCopy';
+import { getTopDealDisplay, isProminentDealFinder, shouldShowDealFinderOnCard } from '@/lib/topDealCopy';
 
 // tiny classnames helper – keeps conditional class logic tidy
 function cx(...p: Array<string | false | null | undefined>) {
@@ -99,49 +100,6 @@ export function extractLikelyUkPostcode(text: string): string | null {
   // Outward-only fallback (e.g. SW11, E8, W1K). Avoid pure numbers.
   const outward = t.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\b/);
   return outward ? outward[1] : null;
-}
-
-/** JSON POST with timeout + small retry for resilience */
-async function postJSON<T>(
-  url: string,
-  body: unknown,
-  { timeoutMs = 10000, retries = 1 }: { timeoutMs?: number; retries?: number } = {},
-): Promise<T> {
-  let attempt = 0;
-  let lastErr: unknown;
-
-  while (attempt <= retries) {
-    const controller = typeof AbortController !== 'undefined' ? new AbortController() : undefined;
-    const id = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
-
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller?.signal,
-      });
-      if (!res.ok) {
-        // retry only on transient-ish codes
-        if (![408, 429, 500, 502, 503, 504].includes(res.status) || attempt === retries) {
-          throw new Error(`POST ${url} failed (${res.status})`);
-        }
-        throw new Error(`retryable-${res.status}`);
-      }
-      return (await res.json()) as T;
-    } catch (err) {
-      lastErr = err;
-      attempt += 1;
-      if (attempt > retries) break;
-      // jittered backoff
-      await new Promise((r) =>
-        setTimeout(r, 300 * Math.pow(2, attempt - 1) + Math.floor(Math.random() * 200)),
-      );
-    } finally {
-      if (id) clearTimeout(id);
-    }
-  }
-  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 function formatSourceBadge(source: string | null | undefined): string {
@@ -239,9 +197,12 @@ export default function PropertyCard({
   const roiProgress = clampMetricPercent(displayRoiPct, 20);
   const scoreVerdict = getScoreVerdict(normalizedScore);
   const topDeal = useMemo(() => getTopDealDisplay(p as any), [p]);
+  const showDealFinder = shouldShowDealFinderOnCard(topDeal);
+  const prominentDealFinder = isProminentDealFinder(topDeal);
+  const topDealHeading = topDeal && (topDeal.score ?? 0) >= 68 ? `Top Deal · ${topDeal.title}` : `Deal Finder · ${topDeal?.title ?? ''}`;
 
   const [saving, setSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [carouselIndex, setCarouselIndex] = useState(0);
 
   const articleRef = useRef<HTMLElement | null>(null);
@@ -372,7 +333,6 @@ export default function PropertyCard({
       grossYieldPct?: number;
       priceToRent?: number;
       crimeLabel?: 'Low' | 'Med' | 'High';
-      schoolsRating?: number;
       compsMedianSold?: number;
       compsCount?: number;
       compsDateRange?: string;
@@ -418,13 +378,11 @@ export default function PropertyCard({
     // Price-to-rent (annual)
     if (price && out.rentMonthly) out.priceToRent = price / (out.rentMonthly * 12);
 
-    // Crime + schools
+    // Crime only when backed by a real police.uk source.
     const crime = typeof area?.crime_index === 'number' ? area.crime_index : undefined;
     if (typeof crime === 'number') {
       out.crimeLabel = crime < 40 ? 'Low' : crime < 70 ? 'Med' : 'High';
     }
-    if (typeof area?.schools_rating === 'number') out.schoolsRating = area.schools_rating;
-
     // Comps: median sold + count + date range
     const salesArr: any[] = Array.isArray(comps?.sales) ? comps.sales : [];
     const salePrices: number[] = salesArr
@@ -481,20 +439,84 @@ export default function PropertyCard({
 
   const href = useMemo(() => `/property/${encodeURIComponent(p.id)}`, [p.id]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadSavedState() {
+      if (!userId || !p.id) {
+        setSaved(false);
+        return;
+      }
+      try {
+        const res = await fetchWithRetry(`/api/saved-deals?property_id=${encodeURIComponent(p.id)}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const json: any = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (typeof json?.saved === 'boolean') {
+          setSaved(json.saved);
+          return;
+        }
+        const items = Array.isArray(json) ? json : Array.isArray(json?.deals) ? json.deals : json?.data;
+        const exact = Array.isArray(items)
+          ? items.some((item: any) => {
+              const direct = String(item?.property_id ?? '').trim();
+              const nested = String(item?.data?.property_id ?? '').trim();
+              return direct === p.id || nested === p.id;
+            })
+          : false;
+        setSaved(exact);
+      } catch {
+        // keep card usable even if the saved-state check fails
+      }
+    }
+    void loadSavedState();
+    return () => {
+      cancelled = true;
+    };
+  }, [p.id, userId]);
+
   const handleSaveDeal = useCallback(async () => {
+    if (saving) return;
+    if (!userId) {
+      toast.error('Please sign in to save deals');
+      return;
+    }
     try {
       setSaving(true);
-      await postJSON<{ ok: boolean }>(`/api/save-deal`, {
-        property_id: p.id,
+
+      if (saved) {
+        const res = await fetchWithRetry(`/api/saved-deals?property_id=${encodeURIComponent(p.id)}`, {
+          method: 'DELETE',
+          cache: 'no-store',
+        });
+        if (!res.ok) throw new Error(`Remove failed (${res.status})`);
+        setSaved(false);
+        toast.success('Removed from saved deals');
+        return;
+      }
+
+      const res = await fetchWithRetry('/api/save-deal', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ property_id: p.id }),
       });
-      setSaveSuccess(true);
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          toast.error('Please sign in to save deals');
+          return;
+        }
+        throw new Error(`Save failed (${res.status})`);
+      }
+      setSaved(true);
+      toast.success('Saved to Deals');
     } catch (e) {
       console.error(e);
-      alert('Could not save this deal.');
+      toast.error(saved ? 'Could not remove this deal.' : 'Could not save this deal.');
     } finally {
       setSaving(false);
     }
-  }, [p.id]);
+  }, [p.id, saved, saving, userId]);
 
   const imageSources = useMemo(() => {
     const seen = new Set<string>();
@@ -621,23 +643,23 @@ export default function PropertyCard({
             e.stopPropagation();
             handleSaveDeal();
           }}
-          disabled={saving || saveSuccess}
+          disabled={saving}
           className={cx(
             'absolute top-3 left-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-white',
             'active:scale-[0.98]',
-            saveSuccess
+            saved
               ? 'bg-white/95 backdrop-blur-sm text-red-600 dark:text-red-400 border-2 border-white/60 hover:bg-white hover:border-white shadow-md'
               : 'bg-white/90 backdrop-blur-sm text-slate-900 border-2 border-white/50 hover:bg-white hover:border-white shadow-md',
-            (saving || saveSuccess) && 'cursor-not-allowed',
+            saving && 'cursor-not-allowed',
           )}
           aria-label={
-            saveSuccess ? 'Deal saved successfully' : saving ? 'Saving deal' : 'Save this property'
+            saved ? 'Remove saved property' : saving ? 'Saving deal' : 'Save this property'
           }
-          aria-pressed={saveSuccess}
-          title={saveSuccess ? 'Saved to Deals' : 'Save to Deals'}
+          aria-pressed={saved}
+          title={saved ? 'Remove from Saved Deals' : 'Save to Deals'}
         >
-          {saveSuccess ? (
+          {saved ? (
             <>
               <svg
                 aria-hidden
@@ -647,7 +669,7 @@ export default function PropertyCard({
               >
                 <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
               </svg>
-              <span className="text-xs font-semibold">Saved</span>
+              <span className="text-xs font-semibold">{saving ? 'Removing…' : 'Saved'}</span>
             </>
           ) : saving ? (
             <>
@@ -779,16 +801,16 @@ export default function PropertyCard({
           </div>
         )}
 
-        {topDeal?.prominent && (
+        {showDealFinder && prominentDealFinder && topDeal && (
           <div className={cx(
             'rounded-2xl px-3 py-2 text-xs shadow-sm',
-            topDeal.lowConfidence
-              ? 'border border-slate-200 bg-slate-50/80 text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200'
-              : 'border border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-300/25 dark:bg-amber-400/10 dark:text-amber-100',
+            (topDeal.score ?? 0) >= 68
+              ? 'border border-amber-200 bg-amber-50/80 text-amber-900 dark:border-amber-300/25 dark:bg-amber-400/10 dark:text-amber-100'
+              : 'border border-slate-200 bg-slate-50/80 text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200',
           )}>
             <div className="flex items-center justify-between gap-2">
               <div>
-                <div className="font-black uppercase tracking-[0.14em]">Deal Finder · {topDeal.title}</div>
+                <div className="font-black uppercase tracking-[0.14em]">{topDealHeading}</div>
                 <div className="mt-0.5 text-[11px] opacity-80">{topDeal.subtitle}</div>
               </div>
               <span className="shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold text-slate-800 dark:bg-slate-950/40 dark:text-white">
@@ -808,9 +830,15 @@ export default function PropertyCard({
           </div>
         )}
 
-        {!topDeal?.prominent && topDeal && topDeal.rawReasons.length > 0 && (
-          <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            Low-confidence signal: check manually
+        {showDealFinder && !prominentDealFinder && topDeal && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
+            <div className="font-bold text-slate-700 dark:text-slate-200">Early signal — needs validation</div>
+            {topDeal.reasons[0] ? (
+              <div className="mt-0.5">
+                <span className="font-semibold">{topDeal.reasons[0].label}</span>
+                <span className="text-slate-500 dark:text-slate-400"> — {topDeal.reasons[0].subtext}</span>
+              </div>
+            ) : null}
           </div>
         )}
 
@@ -818,7 +846,7 @@ export default function PropertyCard({
           <div className="flex items-center justify-between gap-2 border-b border-brand-100/80 bg-gradient-to-r from-brand-50/90 via-white/80 to-emerald-50/80 px-3 py-2 dark:border-white/10 dark:from-brand-500/15 dark:via-slate-950/70 dark:to-emerald-500/10">
             <div>
               <div className="text-[9px] font-black uppercase tracking-[0.18em] text-brand-700 dark:text-brand-200">Investor scorecard</div>
-              <div className="text-[11px] font-semibold text-slate-500 dark:text-white/65">Model-ranked deal signals</div>
+              <div className="text-[11px] font-semibold text-slate-500 dark:text-white/65">Yield, ROI and model risk</div>
             </div>
             <div className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] text-emerald-700 dark:border-emerald-300/25 dark:bg-emerald-400/10 dark:text-emerald-100">
               {scoreVerdict}
@@ -831,7 +859,7 @@ export default function PropertyCard({
                 <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-100 text-brand-700 ring-1 ring-brand-200/70 dark:bg-brand-400/15 dark:text-brand-200 dark:ring-brand-300/20">
                   <FiTarget className="h-3.5 w-3.5" aria-hidden="true" />
                 </div>
-                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Score</span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">AI score</span>
               </div>
               <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
                 {typeof displayScore === 'number' ? Math.round(displayScore) : '—'}
@@ -851,7 +879,7 @@ export default function PropertyCard({
                   <FiTrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
                 </div>
                 <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                  Yield <MetricExplainer metric="gross_yield" property={p as any} />
+                  Gross yield <MetricExplainer metric="gross_yield" property={p as any} compact />
                 </span>
               </div>
               <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
@@ -872,7 +900,7 @@ export default function PropertyCard({
                   <FiBarChart2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </div>
                 <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                  ROI <MetricExplainer metric="roi_proxy" property={p as any} />
+                  {roiDisplay.isProxy ? 'ROI proxy' : 'ROI'} <MetricExplainer metric="roi_proxy" property={p as any} compact />
                 </span>
               </div>
               <div className="text-lg font-black leading-none text-slate-950 dark:text-white">
@@ -931,36 +959,14 @@ export default function PropertyCard({
                 ) : (
                   <div className="space-y-1 text-[11px]">
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
-                      {typeof derived.rentMonthly === 'number' && (
-                        <span className="text-slate-700 dark:text-slate-200">
-                          Rent <span className="font-semibold">£{derived.rentMonthly.toLocaleString()}/mo</span>
-                          <span className="text-slate-500 dark:text-slate-400">
-                            {' '}
-                            ({derived.rentSource === 'provided' ? 'provided' : 'proxy'})
-                          </span>
-                        </span>
-                      )}
                       {typeof derived.grossYieldPct === 'number' && isFinite(derived.grossYieldPct) && (
                         <span className="text-slate-700 dark:text-slate-200">
-                          Yield <span className="font-semibold">{derived.grossYieldPct.toFixed(1)}%</span>
+                          Gross yield <span className="font-semibold">{derived.grossYieldPct.toFixed(1)}%</span>
                         </span>
                       )}
-                      {typeof derived.priceToRent === 'number' && isFinite(derived.priceToRent) && (
-                        <span className="text-slate-700 dark:text-slate-200">
-                          P/R <span className="font-semibold">{derived.priceToRent.toFixed(1)}x</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-x-3 gap-y-1">
-                      {derived.crimeLabel && (
+                      {derived.crimeLabel && insights?.payload?.area?.source === 'police.uk' && (
                         <span className="text-slate-700 dark:text-slate-200">
                           Crime <span className="font-semibold">{derived.crimeLabel}</span>
-                        </span>
-                      )}
-                      {typeof derived.schoolsRating === 'number' && isFinite(derived.schoolsRating) && (
-                        <span className="text-slate-700 dark:text-slate-200">
-                          Schools <span className="font-semibold">{derived.schoolsRating.toFixed(1)}/5</span>
                         </span>
                       )}
                       {FF.COMPS && typeof derived.compsCount === 'number' && (
@@ -983,7 +989,7 @@ export default function PropertyCard({
               </div>
             ) : (
               <div className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                Add postcode to load insights.
+                Market evidence unavailable — postcode needed.
               </div>
             )}
           </div>

@@ -25,10 +25,12 @@ describe('WhySurfaced', () => {
     );
 
     expect(screen.getByText('Why PropNexus surfaced this')).toBeInTheDocument();
+    expect(screen.getByText(/Strong discovery signals found before deeper due diligence/i)).toBeInTheDocument();
     expect(screen.getByText(/82\/100/)).toBeInTheDocument();
     expect(screen.getAllByText(/Below local sold comps/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Price reduction found/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Sold comps:/i)).toBeInTheDocument();
+    expect(screen.getByText('Comps evidence')).toBeInTheDocument();
+    expect(screen.getByText(/Sold comps available/i)).toBeInTheDocument();
   });
 
   it('does not render unsupported BMV claims without comps evidence', () => {
@@ -43,6 +45,7 @@ describe('WhySurfaced', () => {
     );
 
     expect(screen.queryByText(/BMV bargain/i)).not.toBeInTheDocument();
+    expect(screen.getByText('Why this is on the watchlist')).toBeInTheDocument();
     expect(screen.getAllByText(/Auction route/i).length).toBeGreaterThan(0);
   });
 
@@ -56,8 +59,24 @@ describe('WhySurfaced', () => {
       />,
     );
 
-    expect(screen.getByText('Why this is not a top deal yet')).toBeInTheDocument();
-    expect(screen.getByText(/Low-confidence discovery score/i)).toBeInTheDocument();
+    expect(screen.getByText('Not a top deal yet')).toBeInTheDocument();
+    expect(screen.getByText(/PropNexus found limited signals/i)).toBeInTheDocument();
+  });
+
+  it('uses early signal copy and marks missing evidence explicitly', () => {
+    render(
+      <WhySurfaced
+        property={{
+          top_deal_score: 49,
+          top_deal_reasons: ['Guide price'],
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Early signal found')).toBeInTheDocument();
+    expect(screen.getByText(/Listing-signal based/i)).toBeInTheDocument();
+    expect(screen.getByText('Comps evidence')).toBeInTheDocument();
+    expect(screen.getAllByText('Missing').length).toBeGreaterThan(0);
   });
 
   it('renders nothing when no top deal data exists', () => {

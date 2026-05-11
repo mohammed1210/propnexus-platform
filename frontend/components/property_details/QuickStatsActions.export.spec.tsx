@@ -52,7 +52,7 @@ describe('QuickStatsActions launch controls', () => {
     expect(screen.getByText('Quick Actions')).toBeInTheDocument();
     expect(screen.getByText('Deal Action')).toBeInTheDocument();
     expect(screen.getByText('Deal Snapshot')).toBeInTheDocument();
-    expect(screen.getAllByText('AI Score').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('AI score').length).toBeGreaterThan(0);
     expect(screen.getByText('8.4')).toBeInTheDocument();
     expect(screen.queryByText('Quick Stats')).not.toBeInTheDocument();
     expect(screen.queryByText('Discount')).not.toBeInTheDocument();

@@ -467,7 +467,7 @@ export default function DealScore({ property }: DealScoreProps) {
 
               <div className="max-w-xl">
                 <div className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-200">
-                  AI Deal Score <MetricExplainer metric="ai_score" property={property as any} />
+                  AI Deal Score <MetricExplainer metric="ai_score" property={property as any} compact />
                 </div>
                 <h3 className="mt-1.5 text-xl font-bold tracking-tight text-white sm:text-2xl">
                   Deal quality at a glance
@@ -485,7 +485,7 @@ export default function DealScore({ property }: DealScoreProps) {
               >
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-50/85">
                   {kpi.label}
-                  {'metric' in kpi ? <MetricExplainer metric={kpi.metric} property={property as any} /> : null}
+                  {kpi.metric ? <MetricExplainer metric={kpi.metric} property={property as any} compact /> : null}
                 </div>
                 <div className="mt-1.5 text-xl font-bold text-white">{kpi.value}</div>
                 <div className="mt-1 text-xs text-brand-50/75">{kpi.helper}</div>
@@ -521,7 +521,7 @@ export default function DealScore({ property }: DealScoreProps) {
                       <div className="min-w-0">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
                           {factor.label}
-                          {factor.key === 'price_to_rent' ? <MetricExplainer metric="price_to_rent" property={property as any} /> : null}
+                          {factor.key === 'price_to_rent' ? <MetricExplainer metric="price_to_rent" property={property as any} compact /> : null}
                         </div>
                         <div className="mt-1 text-xl font-bold text-slate-950 dark:text-white">
                           {factor.displayValue}
