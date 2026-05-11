@@ -7,8 +7,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
-from postgrest.exceptions import APIError
-
 from backend.utils.supabase_client import get_supabase
 
 PPD_COLUMNS = [
@@ -140,27 +138,6 @@ def _chunks(rows: Iterable[Dict[str, Any]], size: int) -> Iterable[List[Dict[str
         yield batch
 
 
-def _is_missing_on_conflict_constraint(error: APIError) -> bool:
-    payload = error.args[0] if error.args else None
-    if isinstance(payload, dict):
-        return payload.get("code") == "42P10"
-    return "no unique or exclusion constraint" in str(error).lower()
-
-
-def _write_batch(sb: Any, batch: List[Dict[str, Any]]) -> str:
-    try:
-        sb.table("ppd_sales").upsert(batch, on_conflict="transaction_id").execute()
-        return "upserted"
-    except APIError as error:
-        # Some legacy Supabase projects have `ppd_sales` but are missing the
-        # transaction_id unique index needed for `ON CONFLICT`. First imports
-        # should still be able to proceed; apply the index later for reruns.
-        if not _is_missing_on_conflict_constraint(error):
-            raise
-        sb.table("ppd_sales").insert(batch).execute()
-        return "inserted"
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Import Land Registry PPD CSV rows into Supabase ppd_sales."
@@ -200,14 +177,11 @@ def main() -> int:
 
     sb = get_supabase(required=True)
     total = 0
-    modes: set[str] = set()
     for batch in _chunks(_iter_rows(path, prefixes), max(1, args.batch_size)):
-        mode = _write_batch(sb, batch)
-        modes.add(mode)
+        sb.table("ppd_sales").upsert(batch, on_conflict="transaction_id").execute()
         total += len(batch)
         print(f"Imported {total} rows...", flush=True)
-    mode_text = "/".join(sorted(modes)) if modes else "upserted"
-    print(f"Done. Imported/{mode_text} {total} rows.")
+    print(f"Done. Imported/upserted {total} rows.")
     return 0
 
 

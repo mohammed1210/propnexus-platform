@@ -224,6 +224,7 @@ ALLOWED_SORT_COLS = {
     "roi_percent",
     "ai_score",
     "score",
+    "top_deal_score",
 }
 
 
@@ -606,6 +607,23 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
         ):
             out["discount_estimate_pct"] = data_obj.get("discount_estimate_pct")
 
+        # Top Deal fields may be first-class columns or embedded into `data.top_deal`.
+        top_deal_obj = (
+            data_obj.get("top_deal") if isinstance(data_obj.get("top_deal"), dict) else None
+        )
+        if isinstance(top_deal_obj, dict):
+            if out.get("top_deal_score") is None and top_deal_obj.get("score") is not None:
+                out["top_deal_score"] = top_deal_obj.get("score")
+            if out.get("top_deal_tier") in (None, "") and isinstance(top_deal_obj.get("tier"), str):
+                out["top_deal_tier"] = top_deal_obj.get("tier")
+            if out.get("top_deal_reasons") is None and isinstance(
+                top_deal_obj.get("reasons"), list
+            ):
+                out["top_deal_reasons"] = top_deal_obj.get("reasons")
+            out.setdefault("top_deal", top_deal_obj)
+        if out.get("search_metadata") is None and isinstance(data_obj.get("search_metadata"), dict):
+            out["search_metadata"] = data_obj.get("search_metadata")
+
         # Property types may be stored in optional columns or embedded in data.
         if out.get("property_type") in (None, "") and isinstance(
             data_obj.get("property_type"), str
@@ -868,6 +886,20 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             out["discount_estimate_pct"] = None
 
+    if out.get("top_deal_score") is not None and not isinstance(out.get("top_deal_score"), int):
+        try:
+            out["top_deal_score"] = int(float(out.get("top_deal_score")))
+        except Exception:
+            out["top_deal_score"] = None
+    if out.get("top_deal_reasons") is not None and not isinstance(
+        out.get("top_deal_reasons"), list
+    ):
+        out["top_deal_reasons"] = []
+    if isinstance(out.get("top_deal_reasons"), list):
+        out["top_deal_reasons"] = [
+            str(s) for s in out["top_deal_reasons"] if isinstance(s, str) and s.strip()
+        ]
+
     # Canonical metrics backfill for frontend normalizers.
     # Adds/derives: price, rent_monthly, yield_percent, roi_percent.
     try:
@@ -1045,9 +1077,9 @@ def list_properties(
         description="Persona for recommended ranking: balanced|cashflow|growth (only used with sort=recommended)",
     ),
     sort: str = Query(
-        default="created_at_desc",
+        default="top_deals",
         description=(
-            "Sort order. Preferred values: recommended, created_at_desc, price_asc, price_desc, "
+            "Sort order. Preferred values: top_deals, recommended, created_at_desc, price_asc, price_desc, "
             "yield_desc, roi_desc. Backwards compatible: you may also pass a column "
             "name and use dir=asc|desc."
         ),
@@ -1090,7 +1122,7 @@ def list_properties(
         if isinstance(deal_type, Param):
             deal_type = getattr(deal_type, "default", "balanced")
         if isinstance(sort, Param):
-            sort = getattr(sort, "default", "created_at_desc")
+            sort = getattr(sort, "default", "top_deals")
         if isinstance(dir, Param):
             dir = getattr(dir, "default", "desc")
         if isinstance(limit, Param):
@@ -1359,6 +1391,7 @@ def list_properties(
         sort_key = (sort or "").strip().lower()
         is_recommended = sort_key in {"recommended", "best_deals"}
         sort_map = {
+            "top_deals": ("top_deal_score", True),
             "recommended": ("score", True),
             "best_deals": ("score", True),
             "created_at_desc": ("created_at", True),
@@ -1504,6 +1537,7 @@ def list_properties(
             query = query.range(start, end)
 
         fallback_sort = sort_key in {"price_asc", "price_desc", "yield_desc", "roi_desc"}
+        fallback_top_deals_sort = False
         try:
             res = query.execute()
         except APIError as e:
@@ -1518,6 +1552,14 @@ def list_properties(
                 query = query.range(0, pool_size - 1)
                 fetched_pool_from_zero = True
 
+                res = query.execute()
+            elif missing == "top_deal_score" and sort_key == "top_deals":
+                fallback_top_deals_sort = True
+                query = _build_base_query()
+                query = _safe_order(query, "created_at", desc=True, nulls_last=True)
+                pool_size = builtins.min(builtins.max(offset + limit, limit * 8), 500)
+                query = query.range(0, int(pool_size) - 1)
+                fetched_pool_from_zero = True
                 res = query.execute()
             else:
                 raise
@@ -1754,6 +1796,15 @@ def list_properties(
                 items = ranked[offset : offset + limit]
             else:
                 items = ranked
+        elif fallback_top_deals_sort and items:
+            items = sorted(
+                items,
+                key=lambda it: (
+                    int(it.get("top_deal_score") or 0),
+                    str(it.get("created_at") or ""),
+                ),
+                reverse=True,
+            )[offset : offset + limit]
         elif fetched_pool_from_zero and any_deal_filter and not used_exact_filtered_page:
             # Non-recommended + deal filters: slice after filtering.
             items = items[offset : offset + limit]

@@ -10,6 +10,15 @@ export interface Property {
   imageurl: string;
   yield_percent: number;
   roi_percent: number;
+  top_deal_score?: number | null;
+  top_deal_tier?: string | null;
+  top_deal_reasons?: string[] | null;
+  top_deal?: {
+    score?: number | null;
+    tier?: string | null;
+    reasons?: string[] | null;
+    evidence?: Record<string, unknown> | null;
+  } | null;
   source: string;
   source_url?: string | null;
   listing_url?: string | null;

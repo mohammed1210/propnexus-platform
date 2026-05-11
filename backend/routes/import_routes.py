@@ -52,8 +52,10 @@ from backend.utils.listing_keys import (
     strip_empty_for_upsert,
 )
 from backend.utils.postcode import get_lat_lng_from_postcode
+from backend.utils.ppd_comps import get_sold_comps_summary
 from backend.utils.property_type_classifier import classify_property_type
 from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run, update_scrape_run_data
+from backend.utils.top_deal_ranker import apply_top_deal_ranking
 
 # Shared Supabase client
 try:
@@ -1129,6 +1131,20 @@ def _upsert_properties_rows(
             # Never fail ingestion due to property-type classification.
             pass
 
+        # Top Deal Score is a scrape/discovery ranking layer, separate from AI Deal Score.
+        try:
+            sold_comps = None
+            try:
+                postcode_for_comps = cleaned.get("postcode")
+                if sb and isinstance(postcode_for_comps, str) and postcode_for_comps.strip():
+                    sold_comps = get_sold_comps_summary(sb, postcode=postcode_for_comps, limit=20)
+            except Exception:
+                sold_comps = None
+            cleaned = apply_top_deal_ranking(cleaned, sold_comps=sold_comps)
+        except Exception:
+            # Never fail ingestion due to discovery ranking.
+            pass
+
         prepared.append(cleaned)
 
     # Final guardrail: never send columns not present in Supabase schema.
@@ -1179,6 +1195,10 @@ def _upsert_properties_rows(
         "score",
         "score_updated_at",
         "score_breakdown",
+        "top_deal_score",
+        "top_deal_tier",
+        "top_deal_reasons",
+        "search_metadata",
     }
 
     db_prepared: list[Dict[str, Any]] = []
@@ -1230,6 +1250,21 @@ def _upsert_properties_rows(
                 return True, None
             except Exception as e2:
                 return False, str(e2)
+
+        # Top Deal fields may not exist yet; the full payload is embedded in `data.top_deal`.
+        if any(
+            f in msg
+            for f in ("top_deal_score", "top_deal_tier", "top_deal_reasons", "search_metadata")
+        ) and ("PGRST204" in msg or "Could not find" in msg):
+            try:
+                stripped = _strip_fields(
+                    prepared,
+                    ["top_deal_score", "top_deal_tier", "top_deal_reasons", "search_metadata"],
+                )
+                sb.table("properties").upsert(stripped, on_conflict=on_conflict).execute()
+                return True, None
+            except Exception as e2b:
+                return False, str(e2b)
 
         # Score fields may not exist yet in some environments / schema cache.
         if ("score" in msg or "score_updated_at" in msg or "score_breakdown" in msg) and (

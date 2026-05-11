@@ -6,6 +6,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Header, Query, Request
 
 from backend.utils.admin_auth import require_admin
+from backend.utils.top_deal_ranker import score_top_deal_candidate
 
 try:
     from backend.db import sb  # type: ignore
@@ -95,3 +96,35 @@ def properties_with_multiple_images(
 
     items.sort(key=lambda x: int(x.get("image_count") or 0), reverse=True)
     return {"items": items[:limit]}
+
+
+@router.get("/admin/debug/top-deal-score")
+def debug_top_deal_score(
+    request: Request,
+    property_id: str = Query(..., min_length=1),
+    explain: bool = Query(True),
+    _x_admin_token: str | None = Header(None),
+):
+    """Admin-only explainer for the deterministic Top Deal score."""
+
+    require_admin(request)
+
+    if not sb:
+        return {"ok": False, "error": "Supabase client not configured"}
+
+    res = sb.table("properties").select("*").eq("id", property_id).limit(1).maybe_single().execute()
+    row = getattr(res, "data", None)
+    if not isinstance(row, dict):
+        return {"ok": False, "error": "Property not found", "property_id": property_id}
+
+    ranked = score_top_deal_candidate(row)
+    out: Dict[str, Any] = {
+        "ok": True,
+        "property_id": property_id,
+        "top_deal_score": ranked.get("score"),
+        "top_deal_tier": ranked.get("tier"),
+        "top_deal_reasons": ranked.get("reasons"),
+    }
+    if explain:
+        out["top_deal"] = ranked
+    return out

@@ -1,3 +1,10 @@
+# Top Deal Ranking launch checks
+
+- [ ] Apply `supabase/migrations/20260510_top_deal_ranking.sql` before relying on DB-level `sort=top_deals` in production.
+- [ ] Run a fresh import and confirm returned rows include `top_deal_score`, `top_deal_tier`, and `top_deal_reasons`.
+- [ ] Confirm no BMV/below-market copy appears unless `data.top_deal.evidence.sold_comps` is present.
+- [ ] Confirm `/listings?sort=top_deals` returns `200` and shows Top Deal badges where evidence exists.
+
 # Go-Live PASS/FAIL Checklist
 
 This is a strict go-live checklist. Every step has a command, a PASS condition, and what to do if it FAILs.

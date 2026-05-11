@@ -7,6 +7,8 @@ from typing import Any, Dict, List
 from backend.db import require_sb
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.enrichment_queue import enqueue_property_ids
+from backend.utils.ppd_comps import get_sold_comps_summary
+from backend.utils.top_deal_ranker import apply_top_deal_ranking
 
 try:
     from fastapi import APIRouter, HTTPException  # type: ignore
@@ -131,6 +133,10 @@ async def scrape_endpoint(req: ScrapeRequest):
             "score",
             "score_updated_at",
             "score_breakdown",
+            "top_deal_score",
+            "top_deal_tier",
+            "top_deal_reasons",
+            "search_metadata",
         }
         for p in normalized:
             if isinstance(p, dict):
@@ -159,6 +165,20 @@ async def scrape_endpoint(req: ScrapeRequest):
                     row["score"] = score
                     row["score_breakdown"] = breakdown
                     row["score_updated_at"] = datetime.now(timezone.utc).isoformat()
+                except Exception:
+                    pass
+
+                try:
+                    sold_comps = None
+                    try:
+                        postcode_for_comps = row.get("postcode")
+                        if isinstance(postcode_for_comps, str) and postcode_for_comps.strip():
+                            sold_comps = get_sold_comps_summary(
+                                require_sb(), postcode=postcode_for_comps, limit=20
+                            )
+                    except Exception:
+                        sold_comps = None
+                    row = apply_top_deal_ranking(row, sold_comps=sold_comps)
                 except Exception:
                     pass
 

@@ -21,6 +21,17 @@
 | `SR_MAX_PAGES` | Max SpareRoom pages | `1` |
 | `SR_DELAY_MS` | Delay between SpareRoom pages (ms) | `900` |
 
+## Top Deal Ranking
+
+PropNexus now computes a deterministic `top_deal_score` during scrape/import. This is a discovery ranking signal, separate from the AI Deal Score (`score`). It rewards evidence found in portal search passes, listing text, source URLs, images, and verified sold-comps discounts.
+
+Safety rules:
+
+- BMV / below-market reasons are only emitted when sold-comps evidence exists.
+- Proxy rent, proxy yield, and proxy ROI do not count as verified rent evidence.
+- The ranker stores explainability in `data.top_deal` and, when the migration is applied, mirrors key fields to `top_deal_score`, `top_deal_tier`, `top_deal_reasons`, and `search_metadata`.
+- Listings default to `sort=top_deals`; use `sort=recommended` for the AI/recommended score.
+
 ## Output Schema
 
 Each scraper returns a list of dictionaries keyed for Supabase upsert:

@@ -150,10 +150,10 @@ def test_list_properties_default_sort(mock_create_client, client):
         == PROPERTIES_NORMALIZATION_VERSION
     )
 
-    # Should order by created_at by default
+    # Should order by evidence-backed Top Deal score by default, then created_at for stability.
     assert mock_query.order.call_count >= 1
     first_call = mock_query.order.call_args_list[0]
-    assert first_call[0][0] == "created_at"
+    assert first_call[0][0] == "top_deal_score"
 
 
 @patch("backend.routes.properties_routes.create_client")

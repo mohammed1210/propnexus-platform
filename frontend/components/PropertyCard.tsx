@@ -46,6 +46,10 @@ type Property = {
   ai_score?: number | null;
   score?: number | null;
   recommended_score?: number | null;
+  top_deal_score?: number | null;
+  top_deal_tier?: string | null;
+  top_deal_reasons?: string[] | null;
+  top_deal?: { score?: number; tier?: string; reasons?: string[] } | null;
   deal_reasons?: string[];
   deal_signals?: string[];
   discount_estimate_pct?: number | null;
@@ -232,6 +236,27 @@ export default function PropertyCard({
   const yieldProgress = clampMetricPercent(displayYieldPct, 10);
   const roiProgress = clampMetricPercent(displayRoiPct, 20);
   const scoreVerdict = getScoreVerdict(normalizedScore);
+  const topDeal = useMemo(() => {
+    const embedded = p.top_deal && typeof p.top_deal === 'object' ? p.top_deal : null;
+    const score =
+      typeof p.top_deal_score === 'number'
+        ? p.top_deal_score
+        : typeof embedded?.score === 'number'
+          ? embedded.score
+          : null;
+    const tier = String(p.top_deal_tier || embedded?.tier || '').trim().toLowerCase();
+    const rawReasons = Array.isArray(p.top_deal_reasons)
+      ? p.top_deal_reasons
+      : Array.isArray(embedded?.reasons)
+        ? embedded.reasons
+        : [];
+    const reasons = rawReasons
+      .filter((reason) => typeof reason === 'string' && reason.trim())
+      .filter((reason) => !/\bbmv\b|below market/i.test(reason) || /sold-comps|sold comps|comps median|local sold/i.test(reason))
+      .slice(0, 2);
+    if (typeof score !== 'number' && !tier && reasons.length === 0) return null;
+    return { score, tier: tier || 'watchlist', reasons };
+  }, [p.top_deal, p.top_deal_reasons, p.top_deal_score, p.top_deal_tier]);
 
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -769,6 +794,26 @@ export default function PropertyCard({
             {p.badges.map((badgeId) => (
               <Badge key={badgeId} id={String(badgeId)} />
             ))}
+          </div>
+        )}
+
+        {topDeal && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 shadow-sm dark:border-amber-300/25 dark:bg-amber-400/10 dark:text-amber-100">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-black uppercase tracking-[0.14em]">
+                Top Deal{topDeal.score !== null ? ` · ${Math.round(topDeal.score)}` : ''}
+              </span>
+              <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold capitalize text-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+                {topDeal.tier.replace('_', ' ')}
+              </span>
+            </div>
+            {topDeal.reasons.length > 0 && (
+              <ul className="mt-1 space-y-0.5 text-[11px] leading-snug">
+                {topDeal.reasons.map((reason) => (
+                  <li key={reason}>• {reason}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 

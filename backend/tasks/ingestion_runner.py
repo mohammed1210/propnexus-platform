@@ -33,7 +33,9 @@ except Exception:
 
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.ingest import scrape_all_sources
+from backend.utils.ppd_comps import get_sold_comps_summary
 from backend.utils.supabase_client import get_supabase
+from backend.utils.top_deal_ranker import apply_top_deal_ranking
 
 sb = get_supabase(required=False)
 
@@ -76,6 +78,24 @@ async def _ingest_location(location: str, *, limit: Optional[int] = None) -> int
                                 row["score"] = score
                                 row["score_breakdown"] = breakdown
                                 row["score_updated_at"] = datetime.now(timezone.utc).isoformat()
+                            except Exception:
+                                pass
+
+                            try:
+                                sold_comps = None
+                                try:
+                                    postcode_for_comps = row.get("postcode")
+                                    if (
+                                        sb
+                                        and isinstance(postcode_for_comps, str)
+                                        and postcode_for_comps.strip()
+                                    ):
+                                        sold_comps = get_sold_comps_summary(
+                                            sb, postcode=postcode_for_comps, limit=20
+                                        )
+                                except Exception:
+                                    sold_comps = None
+                                row = apply_top_deal_ranking(row, sold_comps=sold_comps)
                             except Exception:
                                 pass
 
@@ -126,6 +146,10 @@ async def _ingest_location(location: str, *, limit: Optional[int] = None) -> int
                                 "score",
                                 "score_updated_at",
                                 "score_breakdown",
+                                "top_deal_score",
+                                "top_deal_tier",
+                                "top_deal_reasons",
+                                "search_metadata",
                             }
                             from backend.utils.supabase_sanitize import sanitize_property_payload
 

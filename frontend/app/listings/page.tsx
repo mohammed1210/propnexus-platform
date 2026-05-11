@@ -153,6 +153,7 @@ const Popup = nextDynamic(() => import('react-leaflet').then((m) => m.Popup), { 
 const useMap = () => require('react-leaflet').useMap();
 
 const SORTABLE = [
+  'top_deals',
   'recommended',
   'created_at_desc',
   'price_asc',
@@ -244,6 +245,10 @@ type RawProperty = {
   ai_score?: number | null;
   score?: number | null;
   recommended_score?: number | null;
+  top_deal_score?: number | null;
+  top_deal_tier?: string | null;
+  top_deal_reasons?: string[] | null;
+  top_deal?: { score?: number; tier?: string; reasons?: string[] } | null;
   deal_reasons?: string[];
   deal_signals?: string[];
   discount_estimate_pct?: number | null;
@@ -656,7 +661,7 @@ function ListingsInner() {
     if (legacy === 'yield_percent') return 'yield_desc';
     if (legacy === 'roi_percent') return 'roi_desc';
 
-    return 'recommended';
+    return 'top_deals';
   })();
 
   const limit = ((): number => {
@@ -790,7 +795,7 @@ function ListingsInner() {
     if (!hasSort || (!isValid && !isLegacy)) {
       pushParams(
         (p) => {
-          p.set('sort', 'recommended');
+          p.set('sort', 'top_deals');
         },
         { replace: true },
       );
@@ -913,6 +918,10 @@ function ListingsInner() {
             ai_score: prop?.ai_score ?? prop?.score,
             score: prop?.score ?? prop?.ai_score,
             recommended_score: prop?.recommended_score,
+            top_deal_score: prop?.top_deal_score,
+            top_deal_tier: prop?.top_deal_tier,
+            top_deal_reasons: Array.isArray(prop?.top_deal_reasons) ? prop.top_deal_reasons : undefined,
+            top_deal: prop?.top_deal,
             deal_reasons: Array.isArray(prop?.deal_reasons) ? prop.deal_reasons : undefined,
             deal_signals: Array.isArray(prop?.deal_signals) ? prop.deal_signals : undefined,
             discount_estimate_pct:
@@ -949,6 +958,10 @@ function ListingsInner() {
                 ai_score: prop?.ai_score ?? prop?.score,
                 score: prop?.score ?? prop?.ai_score,
                 recommended_score: prop?.recommended_score,
+                top_deal_score: prop?.top_deal_score,
+                top_deal_tier: prop?.top_deal_tier,
+                top_deal_reasons: Array.isArray(prop?.top_deal_reasons) ? prop.top_deal_reasons : undefined,
+                top_deal: prop?.top_deal,
                 deal_reasons: Array.isArray(prop?.deal_reasons) ? prop.deal_reasons : undefined,
                 deal_signals: Array.isArray(prop?.deal_signals) ? prop.deal_signals : undefined,
                 discount_estimate_pct:
@@ -1296,6 +1309,11 @@ function ListingsInner() {
             {showingFrom}-{showingTo}
           </span>{' '}
           of <span className="font-semibold text-slate-900 dark:text-white">{total}</span>
+          {sort === 'top_deals' && (
+            <span className="ml-2 text-xs text-amber-700 dark:text-amber-300">
+              ranked by evidence-backed Top Deal Score
+            </span>
+          )}
           {totalPages > 1 && (
             <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
               Page {currentPage} of {totalPages}
@@ -1685,7 +1703,8 @@ function ListingsInner() {
                   style={{ height: 40, padding: '0.5rem 0.75rem' }}
                   aria-label="Sort"
                 >
-                  <option value="recommended">Top deals (Recommended)</option>
+                  <option value="top_deals">Top Deals (evidence-backed)</option>
+                  <option value="recommended">AI recommended</option>
                   <option value="created_at_desc">Most recent</option>
                   <option value="price_asc">Price: low to high</option>
                   <option value="price_desc">Price: high to low</option>
@@ -1852,7 +1871,7 @@ function ListingsInner() {
                   <PropertyCard
                     key={property.id || Math.random()}
                     p={property}
-                    showDealReasonChip={sort === 'recommended'}
+                    showDealReasonChip={sort === 'recommended' || sort === 'top_deals'}
                     isHovered={hoveredId === property.id}
                     onHoverChange={(h) => setHoveredId(h ? property.id : null)}
                     queryId={queryId || null}
@@ -1894,7 +1913,7 @@ function ListingsInner() {
                     <PropertyCard
                       key={property.id || Math.random()}
                       p={property}
-                      showDealReasonChip={sort === 'recommended'}
+                      showDealReasonChip={sort === 'recommended' || sort === 'top_deals'}
                       isHovered={hoveredId === property.id}
                       onHoverChange={(h) => setHoveredId(h ? property.id : null)}
                       queryId={queryId || null}

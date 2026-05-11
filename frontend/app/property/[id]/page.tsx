@@ -23,6 +23,7 @@ import CollapsibleCard from '@/components/property_details/CollapsibleCard';
 import ImageGallery from '@/components/property_details/ImageGallery';
 import PropertyHeader from '@/components/property_details/PropertyHeader';
 import PropertyDescription from '@/components/property_details/PropertyDescription';
+import WhySurfaced from '@/components/property_details/WhySurfaced';
 import TradesmenList from '@/components/tradesmen/TradesmenList';
 
 import type { Property } from '@/types';
@@ -90,6 +91,11 @@ type LooseProperty = Partial<Property> & {
   contacted_at?: string | null;
   last_action_at?: string | null;
   action_notes?: string | null;
+  top_deal_score?: number | null;
+  top_deal_tier?: string | null;
+  top_deal_reasons?: string[] | null;
+  top_deal?: { score?: number | null; tier?: string | null; reasons?: string[] | null; evidence?: Record<string, unknown> | null } | null;
+  data?: { top_deal?: { score?: number | null; tier?: string | null; reasons?: string[] | null; evidence?: Record<string, unknown> | null } | null } | null;
 };
 
 const toNum = (v: unknown) =>
@@ -379,6 +385,7 @@ export default function PropertyDetailsPage() {
           </div>
 
           <PropertyDescription brief={investmentDescription} />
+          <WhySurfaced property={property as any} />
         </div>
 
         <div className="grid grid-cols-1 gap-6">

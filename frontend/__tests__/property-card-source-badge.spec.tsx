@@ -85,4 +85,47 @@ describe('PropertyCard source badge', () => {
     expect(screen.getByText(/floorplan/i)).toBeInTheDocument();
     expect(screen.getByText(/agent photo/i)).toBeInTheDocument();
   });
+
+  it('renders evidence-backed top deal badge and reasons', () => {
+    render(
+      <PropertyCard
+        p={{
+          id: '5',
+          title: 'Reduced terrace',
+          source: 'rightmove',
+          location: 'Liverpool',
+          price: 125000,
+          top_deal_score: 78,
+          top_deal_tier: 'prime',
+          top_deal_reasons: [
+            'Asking price is 20% below local sold-comps median',
+            'Portal search marked it as reduced',
+          ],
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/Top Deal · 78/i)).toBeInTheDocument();
+    expect(screen.getByText(/sold-comps median/i)).toBeInTheDocument();
+  });
+
+  it('filters unsupported BMV top deal claims on cards', () => {
+    render(
+      <PropertyCard
+        p={{
+          id: '6',
+          title: 'Auction terrace',
+          source: 'rightmove',
+          location: 'Liverpool',
+          price: 125000,
+          top_deal_score: 62,
+          top_deal_tier: 'strong',
+          top_deal_reasons: ['BMV bargain', 'Auction wording detected'],
+        }}
+      />,
+    );
+
+    expect(screen.queryByText(/BMV bargain/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Auction wording detected/i)).toBeInTheDocument();
+  });
 });

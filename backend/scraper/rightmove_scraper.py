@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, unquote, urlencode, urljoin, urlparse
 import aiohttp
 from bs4 import BeautifulSoup
 
-from backend.scraper.search_utils import build_rightmove_search_urls
+from backend.scraper.search_utils import build_rightmove_top_deal_search_urls
 from backend.scraper.utils import normalize_image_urls
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
 from backend.utils.postcode import get_lat_lng_from_postcode
@@ -41,6 +41,21 @@ def _looks_like_html_document(text: object) -> bool:
     if not s:
         return False
     return s.startswith("<!doctype html") or s.startswith("<html")
+
+
+def _attach_search_metadata(
+    row: Dict[str, Any], metadata: Optional[Dict[str, Any]]
+) -> Dict[str, Any]:
+    if not metadata:
+        return row
+    out = dict(row or {})
+    data_obj = out.get("data")
+    if not isinstance(data_obj, dict):
+        data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+    data_obj["search_metadata"] = dict(metadata)
+    out["data"] = data_obj
+    out["search_metadata"] = dict(metadata)
+    return out
 
 
 def _extract_properties_from_rightmove_api_payload(
@@ -1671,7 +1686,7 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                 seen: Set[str] = set()
 
                 if location_identifier:
-                    search_urls = build_rightmove_search_urls(
+                    search_urls = build_rightmove_top_deal_search_urls(
                         normalize_location_identifier(location_identifier)
                     )
                 else:
@@ -1680,7 +1695,16 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
 
                 # NOTE: Do not use Rightmove JSON endpoints in production.
                 # They are frequently blocked/404. Always prefer search HTML.
-                for url_index, url in enumerate(search_urls):
+                for url_index, search_entry in enumerate(search_urls):
+                    search_metadata: Optional[Dict[str, Any]] = None
+                    if isinstance(search_entry, dict):
+                        url = str(search_entry.get("url") or "")
+                        raw_meta = search_entry.get("metadata")
+                        search_metadata = raw_meta if isinstance(raw_meta, dict) else None
+                    else:
+                        url = str(search_entry or "")
+                    if not url:
+                        continue
                     # Spec: log the final Rightmove find.html URL being fetched (do not log ScraperAPI proxy URLs).
                     print(f"[rightmove] search_url={url}")
                     html = await _fetch_html(session, url)
@@ -1781,7 +1805,11 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             if should_insert:
                                 if isinstance(external_id, str):
                                     seen.add(external_id)
-                                results.append(clean_property_data(mapped))
+                                results.append(
+                                    clean_property_data(
+                                        _attach_search_metadata(mapped, search_metadata)
+                                    )
+                                )
                                 stats.log_parse_success()
                             else:
                                 stats.log_validation_failure(reason or "Unknown")
@@ -1812,7 +1840,11 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             if should_insert:
                                 if isinstance(external_id, str):
                                     seen.add(external_id)
-                                results.append(clean_property_data(mapped))
+                                results.append(
+                                    clean_property_data(
+                                        _attach_search_metadata(mapped, search_metadata)
+                                    )
+                                )
                                 stats.log_parse_success()
                             else:
                                 stats.log_validation_failure(reason or "Unknown")
@@ -1880,7 +1912,11 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                             continue
                                         should_insert, reason = should_insert_property(mapped)
                                         if should_insert:
-                                            results.append(clean_property_data(mapped))
+                                            results.append(
+                                                clean_property_data(
+                                                    _attach_search_metadata(mapped, search_metadata)
+                                                )
+                                            )
                                             stats.log_parse_success()
                                         else:
                                             stats.log_validation_failure(reason or "Unknown")
@@ -1908,7 +1944,11 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                                             continue
                                         should_insert, reason = should_insert_property(mapped)
                                         if should_insert:
-                                            results.append(clean_property_data(mapped))
+                                            results.append(
+                                                clean_property_data(
+                                                    _attach_search_metadata(mapped, search_metadata)
+                                                )
+                                            )
                                             stats.log_parse_success()
                                         else:
                                             stats.log_validation_failure(reason or "Unknown")
@@ -2060,7 +2100,11 @@ async def scrape_rightmove_properties(location: str, limit: int = 50) -> List[Di
                             should_insert, reason = should_insert_property(property_data)
                             if should_insert:
                                 seen.add(external_id)
-                                results.append(clean_property_data(property_data))
+                                results.append(
+                                    clean_property_data(
+                                        _attach_search_metadata(property_data, search_metadata)
+                                    )
+                                )
                                 stats.log_parse_success()
                             else:
                                 stats.log_validation_failure(reason or "Unknown")
