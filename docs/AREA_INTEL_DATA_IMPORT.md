@@ -8,7 +8,7 @@ No fake, mock, random, or hand-authored sold-price rows should be inserted. The 
 
 Download the official HM Land Registry Price Paid Data CSV from:
 
-- https://www.gov.uk/government/statistical-data-sets/price-paid-data-downloads
+- [HM Land Registry Price Paid Data downloads](https://www.gov.uk/government/statistical-data-sets/price-paid-data-downloads)
 
 Use the standard CSV order supplied by HM Land Registry:
 

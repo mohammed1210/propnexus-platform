@@ -3,13 +3,14 @@
 ## Modes
 
 `SCRAPER_MODE` controls the first fetch attempt:
+
 - `direct` (default): try the site with a realistic `User-Agent`. If blocked (403/503 or captcha keywords), automatically falls back to proxy (ScraperAPI) when `SCRAPERAPI_KEY` is set.
 - `scraperapi`: use ScraperAPI from the start; if that fails the request is skipped.
 
 ## Environment Variables
 
 | Variable | Purpose | Default |
-|----------|---------|---------|
+| ---------- | ------- | ------- |
 | `SCRAPER_MODE` | `direct` or `scraperapi` | `direct` |
 | `SCRAPERAPI_KEY` | API key for ScraperAPI fallback | (empty) |
 | `RM_MAX_PAGES` | Max Rightmove pages (24 listings per page) | `1` |
@@ -35,6 +36,7 @@ Safety rules:
 ## Output Schema
 
 Each scraper returns a list of dictionaries keyed for Supabase upsert:
+
 ```json
 {
   "external_id": "provider-specific ID",
@@ -58,6 +60,7 @@ Coordinates are appended via `get_lat_lng_from_postcode(location_text)`. If look
 ## Bot Wall Detection
 
 A response is considered blocked when:
+
 - HTTP status is `403` or `503`
 - Body contains any of: `captcha`, `access denied`, `unusual traffic`
 
@@ -66,6 +69,7 @@ In `direct` mode and with a valid `SCRAPERAPI_KEY`, the scraper retries through 
 ## Extending Providers
 
 To add more proxy providers (ZenRows, ScrapingBee), replicate `_fetch_html` logic with additional conditionals and environment variables:
+
 - `ZENROWS_API_KEY`
 - `SCRAPINGBEE_KEY`
 - A generic `SCRAPER_PROVIDER` selector (e.g., `zenrows|scraperapi|bee|direct`).
@@ -127,7 +131,7 @@ Recommended enhancements:
 
 Minimal scheduler example (Railway / cron):
 
-```
+```bash
 curl -X POST "$API_BASE/admin/schedule/daily" \
   -H "x-api-key: $OFF_MARKET_ADMIN_TOKEN" \
   -H "Content-Type: application/json"
