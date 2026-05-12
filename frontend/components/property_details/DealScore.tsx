@@ -89,6 +89,12 @@ type VerdictRow = {
   helper: string;
 };
 
+type ScoreChartItem = {
+  label: string;
+  value: number;
+  tone: DisplayScoreFactor['tone'];
+};
+
 function getDealVerdict(score: number): DealVerdict {
   if (score >= 75) {
     return {
@@ -223,6 +229,66 @@ function getBeforeOfferChecks(property: PropertyData, factors: DisplayScoreFacto
   add('Set a walk-away price before bidding.');
 
   return checks;
+}
+
+function chartToneClass(tone: DisplayScoreFactor['tone']): string {
+  if (tone === 'emerald') return 'from-emerald-300 to-emerald-500';
+  if (tone === 'amber') return 'from-amber-300 to-amber-500';
+  if (tone === 'rose') return 'from-rose-300 to-rose-500';
+  if (tone === 'brand') return 'from-cyan-300 to-brand-400';
+  return 'from-slate-300 to-slate-500';
+}
+
+function CompactScoreLogicChart({ score, items }: { score: number; items: ScoreChartItem[] }) {
+  const safeScore = clampScore(Math.round(score));
+  const visibleItems = items.slice(0, 4);
+
+  if (visibleItems.length === 0) return null;
+
+  return (
+    <div
+      data-testid="ai-score-logic-chart"
+      className="mt-3 max-w-md rounded-2xl border border-white/10 bg-white/[0.08] p-3 shadow-sm backdrop-blur-md"
+      aria-label="AI score logic chart"
+    >
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-brand-100">
+            Score logic
+          </div>
+          <div className="text-[11px] text-slate-200/85">How the visible factors support the score</div>
+        </div>
+        <span className="rounded-full border border-white/10 bg-slate-950/35 px-2 py-0.5 text-[10px] font-bold text-white">
+          {safeScore}/100
+        </span>
+      </div>
+
+      <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-white/15" aria-hidden="true">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-rose-400 via-amber-300 to-emerald-400 transition-[width] duration-700"
+          style={{ width: `${safeScore}%` }}
+        />
+      </div>
+
+      <ul className="space-y-1.5">
+        {visibleItems.map((item) => {
+          const value = clampScore(item.value);
+          return (
+            <li key={item.label} className="grid grid-cols-[minmax(86px,0.86fr)_minmax(0,1fr)_34px] items-center gap-2">
+              <span className="truncate text-[10px] font-semibold text-slate-100/90">{item.label}</span>
+              <span className="h-1.5 overflow-hidden rounded-full bg-white/15" aria-hidden="true">
+                <span
+                  className={`block h-full rounded-full bg-gradient-to-r ${chartToneClass(item.tone)}`}
+                  style={{ width: `${value}%` }}
+                />
+              </span>
+              <span className="text-right text-[10px] font-bold text-slate-100/80">{value}%</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
 }
 
 export default function DealScore({ property }: DealScoreProps) {
@@ -375,6 +441,9 @@ export default function DealScore({ property }: DealScoreProps) {
   const strongestFactor = getStrongestFactor(evidenceFactors);
   const mainRisk = getMainRisk(evidenceFactors);
   const beforeOfferChecks = getBeforeOfferChecks(property, evidenceFactors);
+  const chartItems = evidenceFactors
+    .map((factor) => ({ label: factor.label, value: factor.value, tone: factor.tone }))
+    .sort((a, b) => b.value - a.value);
   const normalizedRoiDisplay = {
     value: normalized.roiPercent ?? normalized.roiProxyPercent,
     isProxy: normalized.roiIsProxy,
@@ -473,6 +542,7 @@ export default function DealScore({ property }: DealScoreProps) {
                   Deal quality at a glance
                 </h3>
                 <p className="mt-2 text-sm leading-5 text-slate-200">{dealBand.summary}</p>
+                <CompactScoreLogicChart score={score} items={chartItems} />
               </div>
             </div>
           </div>

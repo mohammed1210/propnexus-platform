@@ -52,6 +52,9 @@ describe('DealScore breakdown display', () => {
     expect(screen.getAllByText('Rental Yield').length).toBeGreaterThan(0);
     expect(screen.getByText('Evidence-backed score drivers')).toBeInTheDocument();
     expect(screen.getByText('Investor verdict')).toBeInTheDocument();
+    expect(screen.getByTestId('ai-score-logic-chart')).toBeInTheDocument();
+    expect(screen.getByText('Score logic')).toBeInTheDocument();
+    expect(screen.getByText(/How the visible factors support the score/i)).toBeInTheDocument();
     expect(screen.getByText('Best fit')).toBeInTheDocument();
     expect(screen.getByText('Strongest signal')).toBeInTheDocument();
     expect(screen.getByText('Main check before offer')).toBeInTheDocument();
@@ -126,7 +129,7 @@ describe('DealScore breakdown display', () => {
 
     render(<DealScore property={property} />);
 
-    expect(await screen.findByText('Schools Access')).toBeInTheDocument();
+    expect((await screen.findAllByText('Schools Access')).length).toBeGreaterThan(0);
     expect(screen.getByText('4.2/5')).toBeInTheDocument();
     expect(screen.getByText('Schools source')).toBeInTheDocument();
   });
