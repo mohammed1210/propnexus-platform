@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import DealScore from './DealScore';
 
 const mockGetAreaIntel = jest.fn();
@@ -52,7 +52,10 @@ describe('DealScore breakdown display', () => {
     expect(screen.getAllByText('Rental Yield').length).toBeGreaterThan(0);
     expect(screen.getByText('Evidence-backed score drivers')).toBeInTheDocument();
     expect(screen.getByText('Investor verdict')).toBeInTheDocument();
+    expect(screen.queryByTestId('ai-score-logic-chart')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /open ai score logic graph/i }));
     expect(screen.getByTestId('ai-score-logic-chart')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /ai score logic graph/i })).toBeInTheDocument();
     expect(screen.getByText('Score logic')).toBeInTheDocument();
     expect(screen.getByText(/How the visible factors support the score/i)).toBeInTheDocument();
     expect(screen.getByText('Best fit')).toBeInTheDocument();

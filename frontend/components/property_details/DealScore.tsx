@@ -1,7 +1,8 @@
 // frontend/components/property_details/DealScore.tsx
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   FiActivity,
   FiAlertTriangle,
@@ -239,7 +240,7 @@ function chartToneClass(tone: DisplayScoreFactor['tone']): string {
   return 'from-slate-300 to-slate-500';
 }
 
-function CompactScoreLogicChart({ score, items }: { score: number; items: ScoreChartItem[] }) {
+function CompactScoreLogicChart({ score, items, className = '' }: { score: number; items: ScoreChartItem[]; className?: string }) {
   const safeScore = clampScore(Math.round(score));
   const visibleItems = items.slice(0, 4);
 
@@ -248,7 +249,7 @@ function CompactScoreLogicChart({ score, items }: { score: number; items: ScoreC
   return (
     <div
       data-testid="ai-score-logic-chart"
-      className="mt-3 max-w-md rounded-2xl border border-white/10 bg-white/[0.08] p-3 shadow-sm backdrop-blur-md"
+      className={`max-w-md rounded-2xl border border-white/10 bg-white/[0.08] p-3 shadow-sm backdrop-blur-md ${className}`}
       aria-label="AI score logic chart"
     >
       <div className="mb-2 flex items-center justify-between gap-3">
@@ -293,6 +294,8 @@ function CompactScoreLogicChart({ score, items }: { score: number; items: ScoreC
 
 export default function DealScore({ property }: DealScoreProps) {
   const scoreRef = useRef<HTMLDivElement>(null);
+  const scoreButtonRef = useRef<HTMLButtonElement | null>(null);
+  const scorePopupRef = useRef<HTMLDivElement | null>(null);
 
   const normalized = useMemo(() => normalizeProperty(property as any), [property]);
   const [areaIntel, setAreaIntel] = useState<AreaIntelEvidence | null>(null);
@@ -377,6 +380,8 @@ export default function DealScore({ property }: DealScoreProps) {
   // Animation state (kept from prior UX)
   const [isVisible, setIsVisible] = useState(false);
   const [animatedScore, setAnimatedScore] = useState(0);
+  const [chartOpen, setChartOpen] = useState(false);
+  const [chartPosition, setChartPosition] = useState<{ left: number; top: number; width: number } | null>(null);
 
   useEffect(() => {
     if (scoreData) {
@@ -428,6 +433,54 @@ export default function DealScore({ property }: DealScoreProps) {
     requestAnimationFrame(animate);
   }, [animatedScore, isVisible, scoreData]);
 
+  const updateChartPosition = useCallback(() => {
+    const trigger = scoreButtonRef.current;
+    if (!trigger || typeof window === 'undefined') return;
+
+    const rect = trigger.getBoundingClientRect();
+    const margin = 16;
+    const gap = 12;
+    const width = Math.min(320, Math.max(240, window.innerWidth - margin * 2));
+    const estimatedHeight = 220;
+    const below = rect.bottom + gap + estimatedHeight <= window.innerHeight - margin;
+    const left = Math.max(margin, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - margin));
+    const top = below
+      ? rect.bottom + gap
+      : Math.max(margin, rect.top - gap - estimatedHeight);
+
+    setChartPosition({ left, top, width });
+  }, []);
+
+  useEffect(() => {
+    if (!chartOpen) {
+      setChartPosition(null);
+      return;
+    }
+
+    updateChartPosition();
+    const onPointerDown = (event: MouseEvent | PointerEvent) => {
+      const target = event.target as Node;
+      if (!scoreButtonRef.current?.contains(target) && !scorePopupRef.current?.contains(target)) {
+        setChartOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setChartOpen(false);
+    };
+    const onUpdate = () => updateChartPosition();
+
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    window.addEventListener('resize', onUpdate);
+    window.addEventListener('scroll', onUpdate, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('resize', onUpdate);
+      window.removeEventListener('scroll', onUpdate, true);
+    };
+  }, [chartOpen, updateChartPosition]);
+
   if (!scoreData) return null;
 
   const { score, version } = scoreData;
@@ -444,6 +497,7 @@ export default function DealScore({ property }: DealScoreProps) {
   const chartItems = evidenceFactors
     .map((factor) => ({ label: factor.label, value: factor.value, tone: factor.tone }))
     .sort((a, b) => b.value - a.value);
+  const showChartTrigger = chartItems.length > 0;
   const normalizedRoiDisplay = {
     value: normalized.roiPercent ?? normalized.roiProxyPercent,
     isProxy: normalized.roiIsProxy,
@@ -488,8 +542,24 @@ export default function DealScore({ property }: DealScoreProps) {
     return 'text-red-600 dark:text-red-400';
   };
 
+  const chartPopup = chartOpen && chartPosition && showChartTrigger && typeof document !== 'undefined'
+    ? createPortal(
+        <div
+          ref={scorePopupRef}
+          className="fixed z-[1000] rounded-2xl border border-slate-200 bg-slate-950 p-2 text-white shadow-2xl shadow-slate-950/30 dark:border-slate-700"
+          style={{ left: chartPosition.left, top: chartPosition.top, width: chartPosition.width, maxWidth: 'calc(100vw - 32px)' }}
+          role="dialog"
+          aria-label="AI score logic graph"
+        >
+          <CompactScoreLogicChart score={score} items={chartItems} className="bg-slate-900/95" />
+        </div>,
+        document.body,
+      )
+    : null;
+
   return (
     <div ref={scoreRef} className="space-y-4">
+      {chartPopup}
       <div
         className={`relative overflow-hidden rounded-[1.35rem] border border-brand-200/70 bg-gradient-to-br from-brand-500 via-brand-600 to-brand-700 text-white shadow-sm transition-all duration-700 ease-out motion-reduce:translate-y-0 motion-reduce:scale-100 motion-reduce:opacity-100 motion-reduce:transition-none dark:border-brand-900/60 dark:from-brand-950 dark:via-brand-900 dark:to-brand-800 ${
           isVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-3 scale-[0.98] opacity-0'
@@ -513,12 +583,17 @@ export default function DealScore({ property }: DealScoreProps) {
             </div>
 
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div
-                className="relative grid h-32 w-32 shrink-0 place-items-center rounded-full p-2.5 shadow-2xl shadow-black/25 sm:h-36 sm:w-36"
+              <button
+                ref={scoreButtonRef}
+                type="button"
+                onClick={() => showChartTrigger && setChartOpen((value) => !value)}
+                disabled={!showChartTrigger}
+                className="relative grid h-32 w-32 shrink-0 place-items-center rounded-full p-2.5 shadow-2xl shadow-black/25 transition hover:scale-[1.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 disabled:cursor-default sm:h-36 sm:w-36"
                 style={{
                   background: `conic-gradient(rgb(16 185 129) ${clampScore(animatedRoundedScore)}%, rgba(255,255,255,0.12) 0)`,
                 }}
-                aria-label={`AI Deal Score ${roundedScore} out of 100`}
+                aria-label={showChartTrigger ? `Open AI score logic graph for AI Deal Score ${roundedScore} out of 100` : `AI Deal Score ${roundedScore} out of 100`}
+                aria-expanded={showChartTrigger ? chartOpen : undefined}
               >
                 <div className="grid h-full w-full place-items-center rounded-full border border-white/10 bg-slate-950/95">
                   <div className="text-center">
@@ -530,9 +605,14 @@ export default function DealScore({ property }: DealScoreProps) {
                     <div className="mt-1 text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
                       / 100
                     </div>
+                    {showChartTrigger ? (
+                      <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.14em] text-brand-200">
+                        View graph
+                      </div>
+                    ) : null}
                   </div>
                 </div>
-              </div>
+              </button>
 
               <div className="max-w-xl">
                 <div className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-200">
@@ -542,7 +622,6 @@ export default function DealScore({ property }: DealScoreProps) {
                   Deal quality at a glance
                 </h3>
                 <p className="mt-2 text-sm leading-5 text-slate-200">{dealBand.summary}</p>
-                <CompactScoreLogicChart score={score} items={chartItems} />
               </div>
             </div>
           </div>
