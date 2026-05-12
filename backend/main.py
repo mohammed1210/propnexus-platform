@@ -70,6 +70,7 @@ from backend.routes.events import router as events_router
 from backend.routes.gpt_routes import router as gpt_router
 from backend.routes.import_routes import admin_alias_router
 from backend.routes.import_routes import router as import_router
+from backend.routes.investor_alerts import router as investor_alerts_router
 from backend.routes.notes import router as notes_router
 from backend.routes.off_market_routes import router as off_market_router
 from backend.routes.properties_routes import router as properties_router
@@ -323,6 +324,7 @@ app.include_router(debug_properties_router, dependencies=[Depends(require_debug_
 app.include_router(debug_scrape_probe_router, dependencies=[Depends(require_debug_enabled)])
 app.include_router(gpt_router)
 app.include_router(import_router)
+app.include_router(investor_alerts_router)
 app.include_router(admin_alias_router)
 app.include_router(enrichment_router)
 app.include_router(enrichment_queue_router)
