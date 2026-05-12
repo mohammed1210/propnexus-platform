@@ -30,6 +30,7 @@ from backend.search.query import (
     query_db,
     search_with_optional_rerank,
 )
+from backend.services.investor_intel import build_investor_intel_payload
 from backend.utils.admin_auth import require_admin
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
@@ -2237,6 +2238,22 @@ def get_property(property_id: str, response: Response):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"property fetch failed: {e}")
+
+
+@router.get("/properties/{property_id}/investor-intel")
+def get_property_investor_intel(property_id: str, response: Response):
+    try:
+        response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
+        sb = _get_supabase()
+        res = sb.table("properties").select("*").eq("id", property_id).maybe_single().execute()
+        if not res.data or not isinstance(res.data, dict):
+            raise HTTPException(status_code=404, detail="Property not found")
+        row = _normalize_property_row(res.data)
+        return build_investor_intel_payload(row)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"investor intel fetch failed: {e}")
 
 
 @router.post("/properties/admin/backfill-scores")

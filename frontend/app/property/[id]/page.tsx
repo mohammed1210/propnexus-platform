@@ -24,6 +24,9 @@ import ImageGallery from '@/components/property_details/ImageGallery';
 import PropertyHeader from '@/components/property_details/PropertyHeader';
 import PropertyDescription from '@/components/property_details/PropertyDescription';
 import WhySurfaced from '@/components/property_details/WhySurfaced';
+import OfferIntelligence from '@/components/property_details/OfferIntelligence';
+import ListingHistory from '@/components/property_details/ListingHistory';
+import ComparableEvidencePanel from '@/components/property_details/ComparableEvidencePanel';
 import TradesmenList from '@/components/tradesmen/TradesmenList';
 
 import type { Property } from '@/types';
@@ -69,6 +72,14 @@ type LooseProperty = Partial<Property> & {
   rent_pcm?: number | null;
   rent_per_month?: number | null;
   rent?: number | null;
+  first_seen_at?: string | null;
+  last_seen_at?: string | null;
+  initial_price?: number | null;
+  previous_price?: number | null;
+  last_price_change_at?: string | null;
+  price_change_count?: number | null;
+  price_history?: Array<Record<string, unknown>> | null;
+  sold_comp_benchmark?: Record<string, unknown> | null;
   source_url?: string | null;
   listing_url?: string | null;
   property_url?: string | null;
@@ -404,6 +415,21 @@ export default function PropertyDetailsPage() {
             <div className="text-xs text-slate-500 dark:text-slate-400">
               Showing the most relevant insights first
             </div>
+            <CollapsibleCard
+              title="Offer Intelligence"
+              icon={
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center">
+                  <FiBarChart2 className="w-5 h-5 text-white" />
+                </div>
+              }
+              defaultExpanded={true}
+            >
+              <OfferIntelligence propertyId={String(property.id ?? id)} />
+            </CollapsibleCard>
+
+            <ListingHistory property={property as any} />
+            <ComparableEvidencePanel benchmark={(property as any)?.sold_comp_benchmark ?? (property as any)?.comps?.sales_benchmark ?? null} />
+
             {/* AI Deal Score - Always visible, gated for non-pro users */}
             {showDealScore ? (
               <CollapsibleCard
