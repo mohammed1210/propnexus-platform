@@ -24,14 +24,27 @@
 
 ## Top Deal Ranking
 
-PropNexus now computes a deterministic `top_deal_score` during scrape/import. This is a discovery ranking signal, separate from the AI Deal Score (`score`). It rewards evidence found in portal search passes, listing text, source URLs, images, and verified sold-comps discounts.
+PropNexus now computes a deterministic `top_deal_score` during scrape/import. This is a discovery ranking signal, separate from the AI Deal Score (`score`). It rewards evidence found in portal search passes, listing text, source URLs, images, listing history, verified price reductions, rent evidence, and sold-comps discounts.
 
 Safety rules:
 
 - BMV / below-market reasons are only emitted when sold-comps evidence exists.
 - Proxy rent, proxy yield, and proxy ROI do not count as verified rent evidence.
+- `prime` and `strong` require at least two evidence categories and at least one hard evidence signal. Search-pass wording alone cannot create a Top Deal.
 - The ranker stores explainability in `data.top_deal` and, when the migration is applied, mirrors key fields to `top_deal_score`, `top_deal_tier`, `top_deal_reasons`, and `search_metadata`.
 - Listings default to `sort=top_deals`; use `sort=recommended` for the AI/recommended score.
+
+## Listing History and Price Changes
+
+Apply `supabase/migrations/20260512_investor_intel_history_alerts.sql` before relying on listing-history UI. The migration adds `first_seen_at`, `last_seen_at`, `initial_price`, `previous_price`, `last_price_change_at`, `price_change_count`, and `price_history` to `public.properties`.
+
+The database trigger maintains history during scraper upserts:
+
+- first insert: sets first/last seen and initial price when available
+- repeated observation: updates `last_seen_at`
+- verified price change: stores previous price, increments count, and appends old/new price to `price_history`
+
+Scrapers should continue sending the current observed `price` only. Do not populate history fields in scraper code unless importing a verified historical source.
 
 ## Output Schema
 

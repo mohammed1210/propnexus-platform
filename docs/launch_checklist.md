@@ -3,9 +3,20 @@
 ## Top Deal Ranking launch checks
 
 - [ ] Apply `supabase/migrations/20260510_top_deal_ranking.sql` before relying on DB-level `sort=top_deals` in production.
+- [ ] Apply `supabase/migrations/20260512_investor_intel_history_alerts.sql` to enable listing history, price-change tracking, and saved-search alerts.
 - [ ] Run a fresh import and confirm returned rows include `top_deal_score`, `top_deal_tier`, and `top_deal_reasons`.
+- [ ] Confirm `prime`/`strong` tiers require `data.top_deal.evidence.hard_signal_count >= 1` and at least two evidence categories.
 - [ ] Confirm no BMV/below-market copy appears unless `data.top_deal.evidence.sold_comps` is present.
-- [ ] Confirm `/listings?sort=top_deals` returns `200` and shows Top Deal badges where evidence exists.
+- [ ] Confirm `/listings?sort=top_deals` returns `200`, shows only `prime`/`strong` in the main Top Deals section, and uses the empty state when none exist.
+
+## Investor Deal Triage launch checks
+
+- [ ] Confirm `/properties/{id}/investor-intel` returns asking price, rent evidence quality, target prices from evidenced rent, sold-comp benchmark, listing history, and an evidence-safe conclusion.
+- [ ] Confirm Offer Intelligence is gated as an Investor feature and does not calculate a target price from estimate-only or missing rent evidence.
+- [ ] Confirm Listing History shows first seen, days tracked, initial/current/previous price, and a no-movement state when history is empty.
+- [ ] Confirm Comparable Evidence labels comp strength as strong, limited, or weak and does not invent bedrooms/floor area.
+- [ ] Confirm `/investor-alerts` CRUD works through the frontend API proxy with Clerk user identity.
+- [ ] If email delivery is not configured, use `/investor-alerts/digest-preview` only as a scheduler/email payload builder; do not claim emails are sent.
 
 This is a strict go-live checklist. Every step has a command, a PASS condition, and what to do if it FAILs.
 
