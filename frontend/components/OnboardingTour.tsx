@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useUser } from '@clerk/react';
-import { Joyride, type CallBackProps, STATUS, type Step } from 'react-joyride';
+import { Joyride, STATUS, type Step } from 'react-joyride';
 import { isAuthEnabled } from '@/lib/auth';
 
 const TOUR_STORAGE_KEY = 'propnexus_onboarding_seen';
 const TOUR_METADATA_KEY = 'propnexusOnboardingSeen';
+const JoyrideAny = Joyride as any;
 
 interface OnboardingTourProps {
   runNonce?: number;
@@ -176,7 +177,7 @@ function OnboardingTourInner({
     setRun(false);
   };
 
-  const handleJoyrideCallback = (data: CallBackProps) => {
+  const handleJoyrideCallback = (data: any) => {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
       markSeen();
     }
@@ -186,7 +187,7 @@ function OnboardingTourInner({
 
   return (
     <>
-      <Joyride
+      <JoyrideAny
         steps={steps}
         run={run}
         continuous
@@ -200,7 +201,7 @@ function OnboardingTourInner({
             primaryColor: '#0f766e',
             zIndex: 10000,
           },
-        }}
+        } as any}
       />
 
       {run && showFallbackBubble ? (

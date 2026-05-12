@@ -91,7 +91,7 @@ export async function POST() {
       );
     }
 
-    const stripe = new Stripe(KEY, { apiVersion: '2025-09-30.clover' });
+    const stripe = new Stripe(KEY, { apiVersion: '2026-03-25.dahlia' });
 
     const customer = await getCustomerIdForSignedInUser(email);
 
