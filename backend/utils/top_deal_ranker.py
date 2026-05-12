@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from backend.utils.deal_signals import extract_deal_signals
 
-TOP_DEAL_VERSION = "top-deal-v1"
+TOP_DEAL_VERSION = "top-deal-v2"
 LUXURY_OUTLIER_PRICE = 1_500_000
 
 
@@ -121,8 +121,12 @@ def _extract_sold_comp_median(
             comp_obj = row.get("sold_comps")
     if not comp_obj:
         return None, 0
-    med = _to_float(comp_obj.get("median_price") or comp_obj.get("median_sold_price"))
-    count = _to_int(comp_obj.get("count")) or 0
+    med = _to_float(
+        comp_obj.get("median_similar_price")
+        or comp_obj.get("median_price")
+        or comp_obj.get("median_sold_price")
+    )
+    count = _to_int(comp_obj.get("similar_sales_count") or comp_obj.get("count")) or 0
     if med is None:
         items = comp_obj.get("items")
         if isinstance(items, list):
@@ -141,6 +145,75 @@ def _compute_discount_vs_comps(
         return None
     discount = ((median_sold - price) / median_sold) * 100.0
     return discount if discount > 0 else None
+
+
+def _parse_dt(value: Any) -> Optional[datetime]:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _days_since(value: Any) -> Optional[int]:
+    dt = _parse_dt(value)
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    delta = datetime.now(timezone.utc) - dt.astimezone(timezone.utc)
+    return max(0, int(delta.days))
+
+
+def _listing_history(row: Dict[str, Any]) -> Dict[str, Any]:
+    data = row.get("data") if isinstance(row.get("data"), dict) else {}
+    history = row.get("price_history")
+    if not isinstance(history, list):
+        history = data.get("price_history") if isinstance(data.get("price_history"), list) else []
+    price_change_count = (
+        _to_int(row.get("price_change_count") or data.get("price_change_count")) or 0
+    )
+    initial = _to_float(row.get("initial_price") or data.get("initial_price"))
+    previous = _to_float(row.get("previous_price") or data.get("previous_price"))
+    current = _extract_price(row)
+    last_change = row.get("last_price_change_at") or data.get("last_price_change_at")
+    first_seen = row.get("first_seen_at") or data.get("first_seen_at") or row.get("created_at")
+    days_tracked = _days_since(first_seen)
+
+    latest_reduction_amount: Optional[float] = None
+    latest_reduction_pct: Optional[float] = None
+    if previous and current and previous > current:
+        latest_reduction_amount = previous - current
+        latest_reduction_pct = ((previous - current) / previous) * 100.0
+    elif history:
+        for item in reversed(history):
+            if not isinstance(item, dict):
+                continue
+            old = _to_float(item.get("old_price"))
+            new = _to_float(item.get("new_price"))
+            if old and new and old > new:
+                latest_reduction_amount = old - new
+                latest_reduction_pct = ((old - new) / old) * 100.0
+                break
+
+    total_reduction_pct: Optional[float] = None
+    if initial and current and initial > current:
+        total_reduction_pct = ((initial - current) / initial) * 100.0
+
+    return {
+        "first_seen_at": first_seen,
+        "last_seen_at": row.get("last_seen_at") or data.get("last_seen_at"),
+        "days_tracked": days_tracked,
+        "initial_price": initial,
+        "previous_price": previous,
+        "last_price_change_at": last_change,
+        "price_change_count": price_change_count,
+        "latest_reduction_amount": latest_reduction_amount,
+        "latest_reduction_pct": latest_reduction_pct,
+        "total_reduction_pct": total_reduction_pct,
+        "price_history": history[:20],
+    }
 
 
 def _is_luxury_outlier(row: Dict[str, Any], price: Optional[int] = None) -> bool:
@@ -198,6 +271,9 @@ def score_top_deal_candidate(
     score = 0.0
     reasons: List[str] = []
     evidence: Dict[str, Any] = {"version": TOP_DEAL_VERSION}
+    evidence_categories: set[str] = set()
+    hard_signal_count = 0
+    hard_reasons: List[str] = []
 
     price = _extract_price(row)
     source_url = _extract_source_url(row)
@@ -209,13 +285,16 @@ def score_top_deal_candidate(
     if price:
         score += 8
         evidence["has_price"] = True
+        evidence_categories.add("data_quality")
     if source_url:
         score += 8
         evidence["has_source_url"] = True
+        evidence_categories.add("data_quality")
     if images:
         image_points = min(10, 3 + len(images))
         score += image_points
         evidence["image_count"] = len(images)
+        evidence_categories.add("data_quality")
 
     strategy = str(meta.get("strategy") or meta.get("intent") or "").lower()
     sort_label = str(meta.get("sort_label") or meta.get("sort") or "").lower()
@@ -227,17 +306,21 @@ def score_top_deal_candidate(
         "auction",
     }:
         score += 8
-        reasons.append("Found via top-deal search pass")
+        reasons.append("Found via investor discovery search pass")
         evidence["search_metadata"] = meta
+        evidence_categories.add("search_pass")
     if sort_label in {"reduced", "recently_reduced"}:
-        score += 8
+        score += 5
         reasons.append("Portal search marked it as reduced")
+        evidence_categories.add("listing_signal")
     if sort_label == "oldest":
         score += 5
         reasons.append("Older listing pass can reveal stale stock")
+        evidence_categories.add("listing_signal")
     if sort_label == "lowest_price":
         score += 5
         reasons.append("Low-price search pass surfaced it")
+        evidence_categories.add("listing_signal")
 
     signal_weights = {
         "reduced": (12, "Listing text indicates a price reduction"),
@@ -254,8 +337,29 @@ def score_top_deal_candidate(
         if signal in signal_set:
             score += points
             reasons.append(reason)
+            evidence_categories.add("listing_signal")
     if isinstance(signals, dict):
         evidence["deal_signals"] = signals.get("signals") or []
+
+    history = _listing_history(row)
+    evidence["listing_history"] = history
+    if history.get("latest_reduction_amount"):
+        amount = int(round(float(history["latest_reduction_amount"])))
+        pct = history.get("latest_reduction_pct")
+        score += 16 if float(pct or 0) >= 8 else 11
+        hard_signal_count += 1
+        evidence_categories.add("listing_history")
+        reason = f"PropNexus verified a £{amount:,} price reduction"
+        hard_reasons.append(reason)
+        reasons.insert(0, reason)
+    days_tracked = history.get("days_tracked")
+    if isinstance(days_tracked, int) and days_tracked >= 60:
+        stale_points = 8 if days_tracked >= 120 else 5
+        score += stale_points
+        evidence_categories.add("listing_history")
+        reasons.append(
+            f"Tracked for {days_tracked} days; stale-stock diligence may help negotiation"
+        )
 
     median_sold, comp_count = _extract_sold_comp_median(row, sold_comps)
     discount = _compute_discount_vs_comps(price, median_sold, comp_count)
@@ -269,14 +373,23 @@ def score_top_deal_candidate(
         if discount >= 20:
             score += 25
             bmv_evidence = True
-            reasons.insert(0, f"Asking price is {round(discount)}% below local sold-comps median")
+            hard_signal_count += 1
+            evidence_categories.add("sold_comps")
+            reason = f"Asking price is {round(discount)}% below comparable sold-comps median"
+            hard_reasons.append(reason)
+            reasons.insert(0, reason)
         elif discount >= 10:
             score += 15
             bmv_evidence = True
-            reasons.insert(0, f"Asking price is {round(discount)}% below sold-comps median")
+            hard_signal_count += 1
+            evidence_categories.add("sold_comps")
+            reason = f"Asking price is {round(discount)}% below comparable sold-comps median"
+            hard_reasons.append(reason)
+            reasons.insert(0, reason)
         elif discount >= 5:
             score += 7
-            reasons.insert(0, "Asking price is modestly below sold-comps median")
+            evidence_categories.add("sold_comps")
+            reasons.insert(0, "Asking price is modestly below comparable sold-comps median")
 
     rent_evidence = _has_real_rent_evidence(row)
     evidence["rent_evidence"] = _get_rent_confidence(row)
@@ -284,10 +397,30 @@ def score_top_deal_candidate(
     roi = _to_float(row.get("roi_percent"))
     if rent_evidence and y and y >= 7:
         score += 8
-        reasons.append("Verified rent evidence supports strong yield")
+        hard_signal_count += 1
+        evidence_categories.add("rent_evidence")
+        reason = f"Real rent evidence supports {round(y, 1)}% gross yield"
+        hard_reasons.append(reason)
+        reasons.append(reason)
     if rent_evidence and roi and roi >= 12:
         score += 6
         reasons.append("Verified rent evidence supports ROI")
+        evidence_categories.add("rent_evidence")
+
+    if "auction" in signal_set and (
+        {"needs_refurb", "guide_price"} & signal_set
+        or discount
+        or history.get("latest_reduction_amount")
+    ):
+        hard_signal_count += 1
+        evidence_categories.add("listing_signal")
+        hard_reasons.append("Auction route combined with value/negotiation signal")
+    if "needs_refurb" in signal_set and (
+        discount or history.get("latest_reduction_amount") or source_url
+    ):
+        hard_signal_count += 1
+        evidence_categories.add("listing_signal")
+        hard_reasons.append("Value-add wording combined with supporting data quality")
 
     if _is_luxury_outlier(row, price):
         score -= 15
@@ -302,13 +435,27 @@ def score_top_deal_candidate(
         score -= 5
 
     score_int = int(round(_clamp(score)))
-    tier = "watchlist"
-    if score_int >= 75:
+    categories = sorted(evidence_categories)
+    has_min_evidence = len(categories) >= 2
+    has_hard_signal = hard_signal_count >= 1
+    tier = "standard"
+    if score_int >= 75 and has_min_evidence and has_hard_signal:
         tier = "prime"
-    elif score_int >= 60:
+    elif score_int >= 60 and has_min_evidence and has_hard_signal:
         tier = "strong"
-    elif score_int >= 40:
-        tier = "emerging"
+    elif 45 <= score_int <= 59 or (score_int >= 60 and not (has_min_evidence and has_hard_signal)):
+        tier = "watchlist"
+
+    evidence["hard_signal_count"] = hard_signal_count
+    evidence["evidence_categories"] = categories
+    evidence["strongest_reason"] = (
+        hard_reasons[0]
+        if hard_reasons
+        else (_dedupe_reasons(reasons, limit=1)[0] if reasons else None)
+    )
+    evidence["confidence_level"] = (
+        "high" if tier in {"prime", "strong"} else "medium" if tier == "watchlist" else "low"
+    )
 
     return {
         "score": score_int,
@@ -344,6 +491,11 @@ def rank_top_deal_candidates(rows: Iterable[Dict[str, Any]]) -> List[Dict[str, A
     return sorted(
         ranked,
         key=lambda r: (
+            (
+                2
+                if r.get("top_deal_tier") == "prime"
+                else 1 if r.get("top_deal_tier") == "strong" else 0
+            ),
             int(r.get("top_deal_score") or 0),
             1 if _extract_source_url(r) else 0,
             _extract_price(r) or 0,

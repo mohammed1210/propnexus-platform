@@ -199,7 +199,7 @@ export default function PropertyCard({
   const topDeal = useMemo(() => getTopDealDisplay(p as any), [p]);
   const showDealFinder = shouldShowDealFinderOnCard(topDeal);
   const prominentDealFinder = isProminentDealFinder(topDeal);
-  const topDealHeading = topDeal && (topDeal.score ?? 0) >= 68 ? `Top Deal · ${topDeal.title}` : `Deal Finder · ${topDeal?.title ?? ''}`;
+  const topDealHeading = topDeal && ['prime', 'strong'].includes(topDeal.tier) ? `Top Deal · ${topDeal.title}` : `Watchlist · ${topDeal?.title ?? ''}`;
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -817,6 +817,11 @@ export default function PropertyCard({
                 {topDeal.badge}{topDeal.score !== null ? ` · ${topDeal.score}` : ''}
               </span>
             </div>
+            {topDeal.heroReason ? (
+              <div className="mt-2 rounded-xl border border-white/70 bg-white/80 px-2.5 py-1.5 text-[12px] font-black text-slate-950 shadow-sm dark:border-white/10 dark:bg-slate-950/50 dark:text-white">
+                {topDeal.heroReason}
+              </div>
+            ) : null}
             {topDeal.reasons.length > 0 ? (
               <ul className="mt-2 space-y-1 text-[11px] leading-snug">
                 {topDeal.reasons.map((reason) => (
@@ -832,7 +837,8 @@ export default function PropertyCard({
 
         {showDealFinder && !prominentDealFinder && topDeal && (
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
-            <div className="font-bold text-slate-700 dark:text-slate-200">Early signal — needs validation</div>
+            <div className="font-bold text-slate-700 dark:text-slate-200">Watchlist lead — needs validation</div>
+            {topDeal.heroReason ? <div className="mt-0.5 font-semibold text-slate-800 dark:text-slate-100">{topDeal.heroReason}</div> : null}
             {topDeal.reasons[0] ? (
               <div className="mt-0.5">
                 <span className="font-semibold">{topDeal.reasons[0].label}</span>

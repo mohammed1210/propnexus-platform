@@ -58,11 +58,19 @@ function hasFullPostcode(property: WhySurfacedProperty, evidence: Record<string,
   return /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/i.test(postcode);
 }
 
+function tierLabel(tier?: string | null) {
+  const t = String(tier || '').toLowerCase();
+  if (t === 'prime' || t === 'strong') return 'Top Deal';
+  if (t === 'watchlist') return 'Watchlist Lead';
+  return 'Standard Listing / Not a top deal yet';
+}
+
 export default function WhySurfaced({ property }: { property: WhySurfacedProperty }) {
   const embedded = property.top_deal ?? property.data?.top_deal ?? null;
   const display = getTopDealDisplay(property as any);
   const score = display?.score ?? null;
   const evidence = embedded?.evidence ?? null;
+  const tier = display?.tier ?? embedded?.tier ?? property.top_deal_tier;
   const rawSignals = Array.isArray((evidence as any)?.deal_signals) ? (evidence as any).deal_signals : [];
   const listingSignals = rawSignals.length
     ? rawSignals.map((signal: unknown) => String(signal).replace(/_/g, ' ')).slice(0, 4).join(' + ')
@@ -78,7 +86,7 @@ export default function WhySurfaced({ property }: { property: WhySurfacedPropert
   const hasChainFree = Boolean(display?.evidenceFlags.has_chain_free || display?.positives.some((r) => /cleaner purchase/i.test(r.label)));
   const fullPostcode = hasFullPostcode(property, evidence as Record<string, unknown> | null);
   const hasSourceUrl = Boolean((evidence as any)?.has_source_url || property.source_url || property.listing_url);
-  const copy = getCopy(score);
+  const copy = tier === 'standard' ? getCopy(null) : getCopy(score);
   const hasEvidenceBackedSignal = hasSoldComps || hasRent || hasPriceReduction || hasDiscount || hasValueAdd;
 
   if (!display) return null;
@@ -123,7 +131,7 @@ export default function WhySurfaced({ property }: { property: WhySurfacedPropert
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
-            {hasEvidenceBackedSignal ? 'Discovery signal' : 'Listing-signal based'}
+            {tierLabel(tier)}
           </div>
           <h2 className="mt-1 text-lg font-black tracking-tight text-slate-950 dark:text-white">
             {copy.title}
@@ -139,6 +147,12 @@ export default function WhySurfaced({ property }: { property: WhySurfacedPropert
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div className="rounded-xl border border-amber-100 bg-white/90 p-3 text-sm dark:border-amber-300/15 dark:bg-slate-950/60 md:col-span-2 lg:col-span-3">
+          <div className="font-bold text-slate-950 dark:text-white">Strongest actual evidence</div>
+          <p className="mt-1 text-slate-700 dark:text-slate-200">
+            {display.heroReason || (hasEvidenceBackedSignal ? listingSignals : 'No high-confidence evidence yet.')}
+          </p>
+        </div>
         <div className="rounded-xl border border-amber-100 bg-white/80 p-3 text-sm dark:border-amber-300/15 dark:bg-slate-950/50">
           <div className="font-bold text-slate-950 dark:text-white">Listing signals</div>
           <p className="mt-1 text-slate-600 dark:text-slate-300">Found by: {listingSignals}.</p>
@@ -161,6 +175,16 @@ export default function WhySurfaced({ property }: { property: WhySurfacedPropert
           ))}
         </ul>
       ) : null}
+
+      <div className="mt-4 rounded-xl border border-slate-200 bg-white/75 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/40">
+        <div className="font-bold text-slate-950 dark:text-white">What is missing</div>
+        <p className="mt-1 text-slate-600 dark:text-slate-300">
+          {!hasSoldComps ? 'Comparable sold evidence is missing or thin. ' : ''}
+          {!hasRent ? 'Rent evidence is missing or estimate-only. ' : ''}
+          {!hasPriceReduction ? 'No PropNexus-verified price reduction is recorded yet. ' : ''}
+          {hasSoldComps && hasRent && hasPriceReduction ? 'Core evidence is present; still verify source listing, condition, lease, fees and finance.' : ''}
+        </p>
+      </div>
     </section>
   );
 }

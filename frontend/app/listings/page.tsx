@@ -9,6 +9,7 @@ import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
 import { FiSearch, FiSliders, FiMap, FiX } from 'react-icons/fi';
 
 import PropertyCard from '@/components/PropertyCard';
+import SaveSearchAlert from '@/components/SaveSearchAlert';
 import { isAuthEnabled } from '@/lib/auth';
 import { API_BASE } from '@/lib/api';
 
@@ -1042,6 +1043,16 @@ function ListingsInner() {
     return rows.filter((p) => normInv(p.investment_type) === selected);
   }, [investmentTypeUrl, normInv, rows]);
 
+  const highConfidenceTopDeals = useMemo(
+    () => typeFilteredRows.filter((p) => ['prime', 'strong'].includes(String(p.top_deal_tier || p.top_deal?.tier || '').toLowerCase())),
+    [typeFilteredRows],
+  );
+  const watchlistTopDeals = useMemo(
+    () => typeFilteredRows.filter((p) => String(p.top_deal_tier || p.top_deal?.tier || '').toLowerCase() === 'watchlist'),
+    [typeFilteredRows],
+  );
+  const displayedRows = sort === 'top_deals' ? highConfidenceTopDeals : typeFilteredRows;
+
   const typeFilteredMapRows = useMemo(() => {
     if (!mapRows) return typeFilteredRows;
     if (!investmentTypeUrl) return mapRows;
@@ -1759,6 +1770,21 @@ function ListingsInner() {
             </div>
           )}
 
+          <div className="mt-2">
+            <SaveSearchAlert
+              query={q || qRaw}
+              sort={sort}
+              filters={{
+                min: minP,
+                max: maxP,
+                beds,
+                baths,
+                investment_type: investmentTypeUrl || undefined,
+                property_type: propertyTypeUrl || undefined,
+              }}
+            />
+          </div>
+
           {!mapAvailable && !loading && rows.length > 0 && (
             <div className="mt-2 text-xs text-slate-600 dark:text-slate-300">
               Map hidden — no listings in this result have coordinates yet
@@ -1866,36 +1892,70 @@ function ListingsInner() {
                 <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
                 <p className="mt-4 text-slate-600 dark:text-slate-400">Loading properties...</p>
               </div>
-            ) : typeFilteredRows.length === 0 ? (
+            ) : displayedRows.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-xl text-slate-600 dark:text-slate-400">No properties found</p>
+                <p className="text-xl text-slate-600 dark:text-slate-400">
+                  {sort === 'top_deals' ? 'No high-confidence Top Deals surfaced in this search yet.' : 'No properties found'}
+                </p>
+                {sort === 'top_deals' && watchlistTopDeals.length > 0 ? (
+                  <p className="mt-2 text-sm text-slate-500">{watchlistTopDeals.length} watchlist leads are available, but they do not meet Top Deal confidence yet.</p>
+                ) : null}
                 <button onClick={resetFilters} className="btn-primary mt-4">
                   Clear Filters
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {typeFilteredRows.map((property, idx) => (
-                  <PropertyCard
-                    key={property.id || Math.random()}
-                    p={property}
-                    showDealReasonChip={sort === 'recommended' || sort === 'top_deals'}
-                    isHovered={hoveredId === property.id}
-                    onHoverChange={(h) => setHoveredId(h ? property.id : null)}
-                    queryId={queryId || null}
-                    queryText={q || qRaw}
-                    filters={{
-                      min: minP,
-                      max: maxP,
-                      beds,
-                      baths,
-                      investment_type: investmentTypeUrl || undefined,
-                      property_type: propertyTypeUrl || undefined,
-                    }}
-                    rank={offset + idx + 1}
-                  />
-                ))}
-              </div>
+              <>
+                {sort === 'top_deals' ? (
+                  <div className="mb-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-900 dark:border-emerald-900/50 dark:bg-emerald-950/20 dark:text-emerald-100">
+                    High-confidence Top Deals
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {displayedRows.map((property, idx) => (
+                    <PropertyCard
+                      key={property.id || Math.random()}
+                      p={property}
+                      showDealReasonChip={sort === 'recommended' || sort === 'top_deals'}
+                      isHovered={hoveredId === property.id}
+                      onHoverChange={(h) => setHoveredId(h ? property.id : null)}
+                      queryId={queryId || null}
+                      queryText={q || qRaw}
+                      filters={{
+                        min: minP,
+                        max: maxP,
+                        beds,
+                        baths,
+                        investment_type: investmentTypeUrl || undefined,
+                        property_type: propertyTypeUrl || undefined,
+                      }}
+                      rank={offset + idx + 1}
+                    />
+                  ))}
+                </div>
+                {sort === 'top_deals' && watchlistTopDeals.length > 0 ? (
+                  <div className="mt-8">
+                    <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
+                      Watchlist Leads — useful but not premium-confidence yet
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {watchlistTopDeals.slice(0, 6).map((property, idx) => (
+                        <PropertyCard
+                          key={`watch-${property.id || idx}`}
+                          p={property}
+                          showDealReasonChip
+                          isHovered={hoveredId === property.id}
+                          onHoverChange={(h) => setHoveredId(h ? property.id : null)}
+                          queryId={queryId || null}
+                          queryText={q || qRaw}
+                          filters={{ min: minP, max: maxP, beds, baths, investment_type: investmentTypeUrl || undefined, property_type: propertyTypeUrl || undefined }}
+                          rank={offset + idx + 1}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
             )}
           </>
         )}
@@ -1908,16 +1968,18 @@ function ListingsInner() {
                   <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
                   <p className="mt-4 text-slate-600 dark:text-slate-400">Loading properties...</p>
                 </div>
-              ) : typeFilteredRows.length === 0 ? (
+              ) : displayedRows.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-xl text-slate-600 dark:text-slate-400">No properties found</p>
+                  <p className="text-xl text-slate-600 dark:text-slate-400">
+                    {sort === 'top_deals' ? 'No high-confidence Top Deals surfaced in this search yet.' : 'No properties found'}
+                  </p>
                   <button onClick={resetFilters} className="btn-primary mt-4">
                     Clear Filters
                   </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {typeFilteredRows.map((property, idx) => (
+                  {displayedRows.map((property, idx) => (
                     <PropertyCard
                       key={property.id || Math.random()}
                       p={property}
