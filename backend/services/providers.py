@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from backend.utils.enrichment import fetch_crime_police_uk, geocode_postcode
 from backend.utils.enrichment_store import is_fresh, safe_select_ppd_sales
 from backend.utils.listing_keys import extract_postcode
+from backend.utils.ppd_comps import build_sold_comp_benchmark
 from backend.utils.supabase_client import get_supabase
 
 _FULL_POSTCODE_RE = re.compile(r"^[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}$", re.I)
@@ -492,12 +493,14 @@ def get_comps_from_provider(postcode: str) -> dict:
 
     sales = _sold_comps(sb, key, outward)
     rents = _rental_comps(sb, outward)
+    sales_benchmark = build_sold_comp_benchmark(sales)
     sales_match_level = sales[0].get("match_level") if sales else None
     payload = {
         "postcode": key or outward,
         "outward_code": outward or None,
         "sales": sales,
         "rents": rents,
+        "sales_benchmark": sales_benchmark,
         "source": "partial_live" if sales or rents else "unavailable",
         "source_details": {
             "sales": "land_registry_ppd" if sales else "not_available",
@@ -531,6 +534,7 @@ def get_area_intel_from_provider(key: str) -> dict:
     derived_rents = [] if rents else _derived_rent_estimates(sb, outward, limit=20)
 
     sale_prices = [float(item["price"]) for item in sales if _num(item.get("price"))]
+    sales_benchmark = build_sold_comp_benchmark(sales)
     rent_source = (
         "internal_property_listings"
         if rents
@@ -583,6 +587,7 @@ def get_area_intel_from_provider(key: str) -> dict:
         "is_proxy": rent_source == "derived_internal_estimate",
         "avg_price": avg_price,
         "median_price": median_price,
+        "sold_comp_benchmark": sales_benchmark,
         "avg_rent": avg_rent,
         "rent_source": rent_source,
         "rent_evidence_count": len(rents),
