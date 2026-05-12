@@ -1,10 +1,9 @@
 """AI routes for summary and exit strategy generation."""
 
-from __future__ import annotations
-
 import logging
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
 
 from backend.middleware.rate_limit import AI_RATE_LIMIT, is_test_or_ci, limiter
 from backend.schemas.ai import (
@@ -58,7 +57,7 @@ async def ai_health(request: Request, response: Response) -> dict:
 @router.post("/summary", response_model=SummaryResponse)
 @limiter.limit(AI_RATE_LIMIT, exempt_when=is_test_or_ci)
 async def ai_summary(
-    req: SummaryRequest,
+    req: Annotated[SummaryRequest, Body()],
     request: Request,
     response: Response,
     _api_key: str = Depends(_require_api_key_compat),
@@ -85,7 +84,7 @@ async def ai_summary(
 @router.post("/strategies", response_model=StrategiesResponse)
 @limiter.limit(AI_RATE_LIMIT, exempt_when=is_test_or_ci)
 async def ai_strategies(
-    req: StrategiesRequest,
+    req: Annotated[StrategiesRequest, Body()],
     request: Request,
     response: Response,
     _api_key: str = Depends(_require_api_key_compat),
@@ -112,7 +111,7 @@ async def ai_strategies(
 @router.post("/tradesmen/recommend", response_model=TradesmenRecommendResponse)
 @limiter.limit(AI_RATE_LIMIT, exempt_when=is_test_or_ci)
 async def ai_tradesmen_recommend(
-    req: TradesmenRecommendRequest,
+    req: Annotated[TradesmenRecommendRequest, Body()],
     request: Request,
     response: Response,
     _api_key: str = Depends(_require_api_key_compat),

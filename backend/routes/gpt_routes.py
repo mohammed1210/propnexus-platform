@@ -200,12 +200,10 @@ BULLETS:
 
         if not bullets:
             bullets = [
-                "Strong rental yield indicates good cash flow potential",
-                "Area demand and growth prospects are favorable",
-                "Property price aligns well with market comparables",
-                "Low crime rates contribute to tenant appeal",
-                "Good access to schools and amenities",
+                "Score explanation could not be generated. Review the visible evidence-backed factors before relying on the score.",
             ]
+        if not summary:
+            summary = "Explanation unavailable."
 
         return {
             "ok": True,

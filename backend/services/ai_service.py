@@ -40,17 +40,28 @@ def require_api_key() -> str:
 
 
 def format_summary_prompt(req: SummaryRequest) -> List[Dict[str, str]]:
+    strategy = (
+        (req.strategy_fit or req.investment_type or "unconfirmed").strip()
+        if isinstance(req.strategy_fit or req.investment_type, str)
+        else "unconfirmed"
+    )
     sys_prompt = (
-        "You are an investment analyst for UK buy-to-let properties. "
+        "You are an investment analyst for UK property investors. "
         "Be concise and factual. Currency GBP. Use UK property terms. "
+        "Be strategy-aware: if the strategy is Flip, Value-add, Auction, Hybrid/BRR, Development or uncertain, do not describe it as buy-to-let unless BTL evidence is explicitly provided. "
+        "For BTL, focus on rent and yield; for Flip/Value-add, focus on works, resale comps and condition risk; for Auction, mention legal pack, speed and finance timing only as checks. "
         "Return plain text only."
     )
     user_prompt = (
         f"Title: {req.title}\n"
         f"Location: {req.location}\n"
         f"Price: {req.price or 'N/A'}\n"
-        f"Yield: {req.yield_ or 'N/A'}\n"
-        f"ROI: {req.roi or 'N/A'}\n"
+        f"Bedrooms: {req.bedrooms or 'N/A'}\n"
+        f"Bathrooms: {req.bathrooms or 'N/A'}\n"
+        f"Property type: {req.property_type or 'N/A'}\n"
+        f"Investment type / strategy: {strategy}\n"
+        f"Yield: {req.yield_ or req.yield_percent or 'N/A'}\n"
+        f"ROI: {req.roi or req.roi_percent or 'N/A'}\n"
         f"Description: {req.description or 'N/A'}\n\n"
         "Write the response in this exact format:\n"
         "1) First line: a single sentence investment summary (no label).\n"
@@ -58,6 +69,7 @@ def format_summary_prompt(req: SummaryRequest) -> List[Dict[str, str]]:
         "Rules:\n"
         "- Use only the provided facts; if something is missing, say it's unknown.\n"
         "- Mention yield/ROI only if given.\n"
+        "- Do not invent crime, schools, demand, BMV or rent evidence.\n"
         "- Avoid disclaimers and avoid speculation."
     )
     return [

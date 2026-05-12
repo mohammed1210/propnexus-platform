@@ -9,9 +9,18 @@ class SummaryRequest(BaseModel):
     title: str
     price: Optional[float] = None
     location: str
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    property_type: Optional[str] = Field(default=None, alias="propertyType")
+    investment_type: Optional[str] = Field(default=None, alias="investmentType")
+    strategy_fit: Optional[str] = Field(default=None, alias="strategyFit")
     yield_: Optional[float] = Field(default=None, alias="yield")
+    yield_percent: Optional[float] = None
     roi: Optional[float] = None
+    roi_percent: Optional[float] = None
     description: Optional[str] = None
+
+    model_config = {"populate_by_name": True}
 
 
 class SummaryResponse(BaseModel):
