@@ -18,7 +18,7 @@ describe('Feature Flags', () => {
     process.env = originalEnv;
   });
 
-  it('should default to false when env vars are not set', () => {
+  it('should use launch defaults when env vars are not set', () => {
     // Remove all feature flag env vars
     delete process.env.NEXT_PUBLIC_FEATURE_AI_CHATBOT;
     delete process.env.NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE;
@@ -35,14 +35,14 @@ describe('Feature Flags', () => {
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
 
-      expect(FF.AI_CHAT).toBe(false);
+      expect(FF.AI_CHAT).toBe(true);
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AI_SCORE_BREAKDOWN).toBe(false);
       expect(FF.DEAL_PACK).toBe(false);
       expect(FF.CRM_EXPORT).toBe(false);
       expect(FF.OFF_MARKET).toBe(false);
       expect(FF.TRADESMEN).toBe(false);
-      // Area Intel + Comps are default-on (can be explicitly disabled)
+      // AI Chat, Area Intel + Comps are default-on (can be explicitly disabled)
       expect(FF.AREA_INTEL).toBe(true);
       expect(FF.COMPS).toBe(true);
     });

@@ -241,8 +241,8 @@ curl -X POST http://localhost:8000/stripe/webhook \
 
 ### Test 13: AI Chatbot
 
-**With NEXT_PUBLIC_FEATURE_AI_CHATBOT=true:**
-- [ ] "Ask AI" floating button appears in bottom-right corner
+**Default / with NEXT_PUBLIC_FEATURE_AI_CHATBOT=true:**
+- [ ] "Ask AI" floating button appears in bottom-right corner across the app
 - [ ] Button has blue background and white text
 
 **Click "Ask AI":**
@@ -269,7 +269,7 @@ curl -X POST http://localhost:8000/stripe/webhook \
 - [ ] Can continue conversation
 
 **With NEXT_PUBLIC_FEATURE_AI_CHATBOT=false:**
-- [ ] Chatbot button does NOT appear
+- [ ] Chatbot remains visible and uses the local fallback reply path instead of live GPT
 
 ---
 

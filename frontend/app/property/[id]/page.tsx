@@ -46,11 +46,6 @@ const NotesFields = dynamic(
   { ssr: false }
 );
 
-const AIChatbot = dynamic(
-  () => import('@/components/property_details/AIChatbot'),
-  { ssr: false }
-);
-
 const MapSingle = dynamic(
   () => import('@/components/property_details/MapSingle'),
   { ssr: false }
@@ -626,9 +621,6 @@ export default function PropertyDetailsPage() {
           </div>
         </div>
       </div>
-
-      {/* Floating AI Chatbot - Always visible, gated for non-investor users */}
-      <AIChatbot property={property as any} />
     </div>
   );
 }

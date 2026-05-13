@@ -12,7 +12,7 @@ type LaunchFlagConfig = {
 };
 
 const LAUNCH_FLAG_CONFIG: Record<string, LaunchFlagConfig> = {
-  AI_CHAT: { env: 'NEXT_PUBLIC_FEATURE_AI_CHATBOT', default: false },
+  AI_CHAT: { env: 'NEXT_PUBLIC_FEATURE_AI_CHATBOT', default: true },
   DEAL_SCORE: { env: 'NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE', default: false },
   AI_SCORE_BREAKDOWN: { env: 'NEXT_PUBLIC_FEATURE_AI_SCORE_BREAKDOWN', default: false },
   OFF_MARKET: { env: 'NEXT_PUBLIC_FEATURE_OFF_MARKET', default: false },

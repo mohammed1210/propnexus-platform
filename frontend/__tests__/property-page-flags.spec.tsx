@@ -17,7 +17,7 @@ describe('Property Details Page - Feature Flags', () => {
     process.env = originalEnv;
   });
 
-  it('should have all AI feature flags disabled by default', () => {
+  it('should use launch defaults when feature flags are unset', () => {
     // Remove all feature flag env vars
     delete process.env.NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE;
     delete process.env.NEXT_PUBLIC_FEATURE_AI_SCORE_BREAKDOWN;
@@ -33,17 +33,17 @@ describe('Property Details Page - Feature Flags', () => {
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
 
-      // All should default to false
+      // Most panels default to false until explicitly launched.
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AI_SCORE_BREAKDOWN).toBe(false);
       expect(FF.OFF_MARKET).toBe(false);
       expect(FF.DEAL_PACK).toBe(false);
       expect(FF.CRM_EXPORT).toBe(false);
       expect(FF.TRADESMEN).toBe(false);
-      // Area Intel + Comps are default-on (can be explicitly disabled via env)
+      // AI Chat, Area Intel + Comps are default-on (can be explicitly disabled via env)
       expect(FF.AREA_INTEL).toBe(true);
       expect(FF.COMPS).toBe(true);
-      expect(FF.AI_CHAT).toBe(false);
+      expect(FF.AI_CHAT).toBe(true);
     });
   });
 
@@ -136,7 +136,7 @@ describe('Property Details Page - Feature Flags', () => {
     });
   });
 
-  it('should treat undefined flags as false', () => {
+  it('should treat undefined flags according to their launch defaults', () => {
     // Explicitly delete all flags
     delete process.env.NEXT_PUBLIC_FEATURE_AI_DEAL_SCORE;
     delete process.env.NEXT_PUBLIC_FEATURE_AI_SCORE_BREAKDOWN;
@@ -152,17 +152,17 @@ describe('Property Details Page - Feature Flags', () => {
     jest.isolateModules(() => {
       const { FF } = require('@/lib/flags');
 
-      // All should be false when undefined
+      // Most features remain off when undefined.
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AI_SCORE_BREAKDOWN).toBe(false);
       expect(FF.OFF_MARKET).toBe(false);
       expect(FF.DEAL_PACK).toBe(false);
       expect(FF.CRM_EXPORT).toBe(false);
       expect(FF.TRADESMEN).toBe(false);
-      // Area Intel + Comps default to true when undefined
+      // AI Chat, Area Intel + Comps default to true when undefined
       expect(FF.AREA_INTEL).toBe(true);
       expect(FF.COMPS).toBe(true);
-      expect(FF.AI_CHAT).toBe(false);
+      expect(FF.AI_CHAT).toBe(true);
     });
   });
 });

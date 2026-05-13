@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import "../styles/design-tokens.css";
+import GlobalAIChatbot from "@/components/ai/GlobalAIChatbot";
 import RootShell from "@components/RootShell";
 import Providers from "./providers";
 
@@ -78,6 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div id="main" tabIndex={-1} className="flex-1 outline-none">
             <RootShell>{children}</RootShell>
           </div>
+          <GlobalAIChatbot />
         </Providers>
       </body>
     </html>

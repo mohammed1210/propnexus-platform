@@ -11,7 +11,7 @@ Feature flags are centralized in `frontend/lib/flags.ts` to ensure consistent be
 All feature flag logic is implemented in a single location (`frontend/lib/flags.ts`), which provides:
 
 - **Consistent behavior**: All components use the same flag evaluation logic
-- **Safe defaults**: Flags default to `false` when environment variables are missing
+- **Launch defaults**: Most flags default to `false` when environment variables are missing; launched features such as AI chat, Area Intel, and Comps default to `true`
 - **Type safety**: TypeScript ensures proper usage of flags
 
 **Important:** Never use `process.env.NEXT_PUBLIC_FEATURE_*` directly in components. Always import and use flags from `lib/flags.ts`.
@@ -31,13 +31,13 @@ All frontend feature flags are environment variables prefixed with `NEXT_PUBLIC_
 
 ### NEXT_PUBLIC_FEATURE_AI_CHATBOT
 
-**Default:** `false`
-**Description:** Enables the floating AI chatbot assistant on property detail pages.
+**Default:** `true`
+**Description:** Enables live GPT-backed replies for the floating AI chatbot assistant.
 
 When enabled:
-- Shows a floating "Ask AI" button in the bottom-right corner
+- Shows a floating "Ask AI" button across the app
 - Opens an interactive chat modal when clicked
-- Sends user messages to `/gpt/chat` endpoint with property context
+- Sends user messages to `/gpt/chat` through the same-origin Next.js proxy
 - Persists conversation history in localStorage (last 60 messages)
 - Falls back to local responses if backend is unavailable
 
