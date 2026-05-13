@@ -11,7 +11,7 @@ alter table if exists public.properties
 
 update public.properties
 set first_seen_at = coalesce(first_seen_at, created_at, now()),
-    last_seen_at = coalesce(last_seen_at, updated_at, created_at, now()),
+    last_seen_at = coalesce(last_seen_at, created_at, now()),
     initial_price = coalesce(initial_price, price)
 where first_seen_at is null or last_seen_at is null or initial_price is null;
 
