@@ -28,6 +28,7 @@ import OfferIntelligence from '@/components/property_details/OfferIntelligence';
 import ListingHistory from '@/components/property_details/ListingHistory';
 import ComparableEvidencePanel from '@/components/property_details/ComparableEvidencePanel';
 import TradesmenList from '@/components/tradesmen/TradesmenList';
+import { useRegisterCurrentProperty } from '@/components/ai/CurrentPropertyContext';
 
 import type { Property } from '@/types';
 import { FF } from '@/lib/flags';
@@ -124,6 +125,8 @@ export default function PropertyDetailsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedTradeType, setSelectedTradeType] = useState<string>('');
 
+  useRegisterCurrentProperty(property as any);
+
   const PLACEHOLDER_IMG = '/placeholder.jpg';
 
   const imageUrls = useMemo((): string[] => {
@@ -159,6 +162,7 @@ export default function PropertyDetailsPage() {
     (async () => {
       setLoading(true);
       setError(null);
+      setProperty(null);
       try {
         const res = await fetch(`/api/properties/${encodeURIComponent(id)}`, {
           method: 'GET',

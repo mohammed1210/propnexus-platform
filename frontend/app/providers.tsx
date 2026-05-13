@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { NextIntlClientProvider } from "next-intl";
+import { CurrentPropertyProvider } from "@/components/ai/CurrentPropertyContext";
 import { isAuthEnabled } from "@/lib/auth";
 import messages from "@/messages/en.json";
 
@@ -23,7 +24,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   if (!isAuthEnabled) {
     return (
       <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC" now={new Date()}>
-        {children}
+        <CurrentPropertyProvider>{children}</CurrentPropertyProvider>
       </NextIntlClientProvider>
     );
   }
@@ -31,7 +32,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ClerkProvider>
       <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC" now={new Date()}>
-        {children}
+        <CurrentPropertyProvider>{children}</CurrentPropertyProvider>
       </NextIntlClientProvider>
     </ClerkProvider>
   );

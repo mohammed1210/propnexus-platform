@@ -22,11 +22,64 @@ type LooseProperty = Property & {
 };
 
 type Message = { role: 'user' | 'assistant'; content: string };
+type ChatbotPageMode = 'generic' | 'listings';
+
 interface AIChatbotProps {
   property?: Partial<LooseProperty>;
+  pageMode?: ChatbotPageMode;
 }
 
 const STORAGE_KEY_PREFIX = 'pn_chat_history_';
+const initialMessage = (property?: Partial<LooseProperty>, pageMode: ChatbotPageMode = 'generic'): Message => ({
+  role: 'assistant',
+  content: property?.title
+    ? `Hi! I'm your AI Investment Assistant. Ask me anything about ${property.title}.`
+    : pageMode === 'listings'
+      ? 'Hi! I can help with property trends, area research, sales evidence, yields and search strategy across these listings.'
+      : 'Hi! I can help with UK property investing, area research, sales evidence and deal screening.',
+});
+
+const quickPrompts = (hasProperty: boolean, pageMode: ChatbotPageMode) => {
+  if (hasProperty) return ['Is this a good investment?', 'Suggest exit strategies', 'Risk factors?'];
+  if (pageMode === 'listings') return ['Which areas look strongest?', 'What trends should I check?', 'How do I compare sales?'];
+  return ['Where should I invest?', 'What market trends matter?', 'How do I compare areas?'];
+};
+
+const formatPageSummary = (pageMode: ChatbotPageMode) => {
+  if (pageMode === 'listings') {
+    return [
+      'Page: Listings search results.',
+      'No single property is selected. Do not assume the user is asking about one specific listing unless they provide details.',
+      'Focus on property trends, area trends, comparable sales evidence, rental demand, yields, pricing signals, search filters and investor research workflow.',
+      'When useful, ask for a location, postcode, budget, property type, bedrooms, target yield or investment strategy before giving specific advice.',
+    ].join('\n');
+  }
+
+  return [
+    'Page: General PropNexus assistant.',
+    'No single property is selected. Provide UK property investment guidance, area research pointers, sales evidence checks and deal-screening advice.',
+  ].join('\n');
+};
+
+const formatPropertySummary = (property?: Partial<LooseProperty>) => {
+  if (!property) return '';
+
+  const details = [
+    property.title ? `Title: ${property.title}` : null,
+    property.location ? `Location: ${property.location}` : null,
+    typeof property.price === 'number' ? `Price: £${property.price.toLocaleString()}` : null,
+    typeof property.bedrooms === 'number' ? `Bedrooms: ${property.bedrooms}` : null,
+    typeof property.bathrooms === 'number' ? `Bathrooms: ${property.bathrooms}` : null,
+    property.propertyType ? `Property type: ${property.propertyType}` : null,
+    property.investmentType ? `Investment type: ${property.investmentType}` : null,
+    typeof property.yield_percent === 'number' ? `Yield: ${formatPercent(property.yield_percent)}` : null,
+    typeof property.roi_percent === 'number' ? `ROI: ${formatPercent(property.roi_percent)}` : null,
+    typeof property.top_deal_score === 'number' ? `Top deal score: ${property.top_deal_score}` : null,
+    property.description ? `Description: ${String(property.description).slice(0, 600)}` : null,
+  ].filter(Boolean);
+
+  return details.join('\n');
+};
 
 export default function AIChatbot(props: AIChatbotProps) {
   // If auth is disabled (or Clerk keys missing), we must not touch Clerk hooks.
@@ -46,6 +99,7 @@ function AIChatbotAuthed(props: AIChatbotProps) {
 
 function AIChatbotInner({
   property,
+  pageMode = 'generic',
   userHasAccess,
 }: AIChatbotProps & { userHasAccess: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -53,39 +107,41 @@ function AIChatbotInner({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: "Hi! I'm your AI Investment Assistant. Ask me anything about this deal.",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([initialMessage(property, pageMode)]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
-  const propertyId = property?.id || 'default';
+  const chatContextKey = property?.id || pageMode;
 
-  // Load conversation history from localStorage on mount
+  // Load conversation history whenever the active property changes.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const storageKey = STORAGE_KEY_PREFIX + propertyId;
+    if (typeof window === 'undefined') {
+      setMessages([initialMessage(property, pageMode)]);
+      return;
+    }
+
+    const storageKey = STORAGE_KEY_PREFIX + chatContextKey;
     const stored = localStorage.getItem(storageKey);
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setMessages(parsed);
+          return;
         }
       } catch (e) {
         // Ignore parse errors
       }
     }
-  }, [propertyId]);
+
+    setMessages([initialMessage(property, pageMode)]);
+  }, [property, pageMode, chatContextKey]);
 
   // Save conversation history to localStorage whenever messages change
   useEffect(() => {
     if (typeof window === 'undefined' || messages.length <= 1) return;
-    const storageKey = STORAGE_KEY_PREFIX + propertyId;
+    const storageKey = STORAGE_KEY_PREFIX + chatContextKey;
     localStorage.setItem(storageKey, JSON.stringify(messages));
-  }, [messages, propertyId]);
+  }, [messages, chatContextKey]);
 
   const sendLocalReply = (prompt: string) => {
     const hints: string[] = [];
@@ -100,12 +156,16 @@ function AIChatbotInner({
     if (typeof property?.price === 'number')
       hints.push(`price ≈ £${property.price.toLocaleString()}`);
 
-    const base =
-      hints.length > 0
-        ? `🤖 Quick take: ${hints.join(' · ')}. Sense-check product fees, refi assumptions and local demand.`
-        : '🤖 Share price, yield, ROI or postcode and I can give a sharper take.';
+    const base = hints.length > 0
+      ? `🤖 Quick take: ${hints.join(' · ')}. Sense-check product fees, refi assumptions and local demand.`
+      : pageMode === 'listings'
+        ? '🤖 I can help compare locations, sale prices, rental demand, yields and filter strategy across the search results.'
+        : '🤖 Share a location, budget, property type or postcode and I can give a sharper market view.';
 
     const lower = prompt.toLowerCase();
+    if (!property && (lower.includes('trend') || lower.includes('area') || lower.includes('sales') || lower.includes('compare'))) {
+      return `${base} Start with sold-price evidence, days-on-market, rent comps, supply levels, transport links and regeneration signals before narrowing to individual deals.`;
+    }
     if (lower.includes('risk'))
       return `${base} Key risks: down-valuation, refurb overrun, and void periods. Add contingency and model DSCR ≥ 1.25×.`;
     if (lower.includes('exit'))
@@ -135,8 +195,8 @@ function AIChatbotInner({
     setIsLoading(true);
     try {
       const context = {
-        property_id: propertyId,
-        summary: property?.title || '',
+        property_id: property?.id,
+        summary: property ? formatPropertySummary(property) : formatPageSummary(pageMode),
         area_key: property?.location || '',
         postcode: property?.location || '',
       };
@@ -253,7 +313,7 @@ function AIChatbotInner({
           </div>
 
           <div className="bg-slate-100 dark:bg-neutral-900 px-2 py-1 flex flex-wrap gap-2 justify-center" role="group" aria-label="Quick prompt suggestions">
-            {['Is this a good investment?', 'Suggest exit strategies', 'Risk factors?'].map((t) => (
+            {quickPrompts(Boolean(property), pageMode).map((t) => (
               <button
                 key={t}
                 onClick={() => handleQuickPrompt(t)}
