@@ -58,11 +58,14 @@ function hasFullPostcode(property: WhySurfacedProperty, evidence: Record<string,
   return /[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/i.test(postcode);
 }
 
-function tierLabel(tier?: string | null) {
+function discoveryLabel(score: number | null, hasEvidenceBackedSignal: boolean, tier?: string | null) {
+  if (!hasEvidenceBackedSignal) return score !== null && score >= 45 ? 'Listing-signal based' : 'Standard listing';
+
   const t = String(tier || '').toLowerCase();
-  if (t === 'prime' || t === 'strong') return 'Top Deal';
-  if (t === 'watchlist') return 'Watchlist Lead';
-  return 'Standard Listing / Not a top deal yet';
+  if (score !== null && score >= 68) return 'Evidence-backed Top Deal';
+  if (score !== null && score >= 55) return 'Evidence-backed watchlist';
+  if (t === 'watchlist') return 'Evidence-backed watchlist';
+  return 'Evidence-backed signal';
 }
 
 export default function WhySurfaced({ property }: { property: WhySurfacedProperty }) {
@@ -131,7 +134,7 @@ export default function WhySurfaced({ property }: { property: WhySurfacedPropert
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-200">
-            {tierLabel(tier)}
+            {discoveryLabel(score, hasEvidenceBackedSignal, tier)}
           </div>
           <h2 className="mt-1 text-lg font-black tracking-tight text-slate-950 dark:text-white">
             {copy.title}

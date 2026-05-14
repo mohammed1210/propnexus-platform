@@ -151,7 +151,6 @@ function getScoreVerdict(score: number | null): string {
 
 export default function PropertyCard({
   p,
-  showDealReasonChip,
   isHovered,
   onHoverChange,
   queryId,
@@ -199,7 +198,7 @@ export default function PropertyCard({
   const topDeal = useMemo(() => getTopDealDisplay(p as any), [p]);
   const showDealFinder = shouldShowDealFinderOnCard(topDeal);
   const prominentDealFinder = isProminentDealFinder(topDeal);
-  const topDealHeading = topDeal && ['prime', 'strong'].includes(topDeal.tier) ? `Top Deal · ${topDeal.title}` : `Watchlist · ${topDeal?.title ?? ''}`;
+  const topDealHeading = topDeal && (topDeal.score ?? 0) >= 68 ? `Top Deal · ${topDeal.title}` : `Deal Finder · ${topDeal?.title ?? ''}`;
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -217,18 +216,6 @@ export default function PropertyCard({
     const haystack = `${p.postcode ?? ''} ${p.postcode_full ?? ''} ${p.postcodeFull ?? ''} ${p.postal_code ?? ''} ${p.postalCode ?? ''} ${p.address ?? ''} ${p.location ?? ''} ${p.title ?? ''} ${p.description ?? ''}`;
     return extractLikelyUkPostcode(haystack);
   }, [p.address, p.description, p.location, p.postalCode, p.postal_code, p.postcode, p.postcodeFull, p.postcode_full, p.title]);
-
-  const dealChipText = useMemo(() => {
-    if (!Array.isArray(p.deal_reasons) || !p.deal_reasons[0]) return null;
-
-    const sigs = Array.isArray(p.deal_signals) ? p.deal_signals : [];
-    const hasReduced = sigs.some((s) => String(s).toLowerCase() === 'reduced');
-    const disc = typeof p.discount_estimate_pct === 'number' ? p.discount_estimate_pct : null;
-    if (hasReduced && disc !== null && isFinite(disc) && disc > 0) {
-      return `~${Math.round(disc)}% below prior ask`;
-    }
-    return p.deal_reasons[0];
-  }, [p.deal_reasons, p.deal_signals, p.discount_estimate_pct]);
 
   useEffect(() => {
     // Only hydrate the insights payloads once the card is near the viewport.
@@ -837,8 +824,7 @@ export default function PropertyCard({
 
         {showDealFinder && !prominentDealFinder && topDeal && (
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
-            <div className="font-bold text-slate-700 dark:text-slate-200">Watchlist lead — needs validation</div>
-            {topDeal.heroReason ? <div className="mt-0.5 font-semibold text-slate-800 dark:text-slate-100">{topDeal.heroReason}</div> : null}
+            <div className="font-bold text-slate-700 dark:text-slate-200">Early signal — needs validation</div>
             {topDeal.reasons[0] ? (
               <div className="mt-0.5">
                 <span className="font-semibold">{topDeal.reasons[0].label}</span>
@@ -936,22 +922,6 @@ export default function PropertyCard({
                 {derived.cacheTag ? ` · ${derived.cacheTag}` : ''}
               </div>
             </div>
-
-            {showDealReasonChip && dealChipText && Array.isArray(p.deal_reasons) && p.deal_reasons[0] && (
-              <div className="mt-1.5">
-                <span
-                  className={cx(
-                    'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold',
-                    'border-slate-200 text-slate-700 bg-slate-50',
-                    'dark:border-slate-700 dark:text-slate-200 dark:bg-slate-800/60',
-                  )}
-                  aria-label={`Deal reason: ${dealChipText}`}
-                  title={p.deal_reasons.slice(0, 3).join(' • ')}
-                >
-                  {dealChipText}
-                </span>
-              </div>
-            )}
 
             {postcodeKey ? (
               <div className="mt-1.5">

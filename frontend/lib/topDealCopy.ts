@@ -82,9 +82,12 @@ function fmtGBP(n: unknown): string | null {
 
 function getHeroReason(evidence: TopDealEvidence, rawReasons: string[]): string | null {
   const strongest = typeof evidence?.strongest_reason === 'string' ? evidence.strongest_reason.trim() : '';
-  if (strongest) return strongest;
   const sold = evidence?.sold_comps;
   const discount = Number(sold?.discount_vs_comps_pct ?? evidence?.discount_vs_comps_pct ?? 0);
+  const hasSoldCompsDiscount = Boolean(sold && Number(sold?.count ?? 0) >= 3 && Number.isFinite(discount) && discount > 0);
+  const isUnsupportedBmv = (value: string) => /\bbmv\b|below market|below local sold|sold-comps|sold comps|comps median/i.test(value) && !hasSoldCompsDiscount;
+
+  if (strongest && !isUnsupportedBmv(strongest)) return strongest;
   if (Number.isFinite(discount) && discount >= 5) return `${Math.round(discount)}% below comparable sold median`;
   const history = (evidence as any)?.listing_history;
   const reduction = fmtGBP(history?.latest_reduction_amount);
@@ -94,11 +97,20 @@ function getHeroReason(evidence: TopDealEvidence, rawReasons: string[]): string 
   if (rawReasons.some((reason) => /auction/i.test(reason)) && rawReasons.some((reason) => /refurb|value|modernis|guide|discount/i.test(reason))) {
     return 'Auction route with value-add wording';
   }
-  return rawReasons.find((reason) => !/found via|search pass/i.test(reason))?.replace(/\.$/, '') ?? null;
+  return null;
 }
 
-export function getTopDealTierCopy(score: number | null, tier?: string | null): TopDealTierCopy {
-  const t = String(tier || '').toLowerCase();
+function getTierFromScore(score: number | null): 'prime' | 'strong' | 'watchlist' | 'early' | 'standard' {
+  if (score === null) return 'standard';
+  if (score >= 78) return 'prime';
+  if (score >= 68) return 'strong';
+  if (score >= 55) return 'watchlist';
+  if (score >= 45) return 'early';
+  return 'standard';
+}
+
+export function getTopDealTierCopy(score: number | null): TopDealTierCopy {
+  const t = getTierFromScore(score);
   if (t === 'prime') {
     return {
       badge: 'Prime',
@@ -126,7 +138,7 @@ export function getTopDealTierCopy(score: number | null, tier?: string | null): 
       lowConfidence: false,
     };
   }
-  if (score !== null && score >= 45) {
+  if (t === 'early') {
     return {
       badge: 'Early',
       title: 'Early signal',
@@ -136,7 +148,7 @@ export function getTopDealTierCopy(score: number | null, tier?: string | null): 
     };
   }
   return {
-    badge: tier && tier !== 'watchlist' ? tier : 'Standard',
+    badge: 'Standard',
     title: 'Standard listing',
     subtitle: 'No strong discovery signal yet',
     prominent: false,
@@ -282,16 +294,12 @@ export function shouldShowTopDealCard(score: number | null, reasons: unknown): b
 export function shouldShowDealFinderOnCard(display: TopDealDisplay | null): boolean {
   if (!display || display.score === null) return false;
   if (display.score < 45) return false;
-  if (display.tier === 'standard') return false;
   if (display.score < 55 && display.reasons.length === 0) return false;
   return true;
 }
 
 export function isProminentDealFinder(display: TopDealDisplay | null): boolean {
-  return Boolean(
-    typeof display?.score === 'number' &&
-    ['prime', 'strong'].includes(display.tier),
-  );
+  return typeof display?.score === 'number' && display.score >= 55;
 }
 
 function reasonPriority(reason: TopDealReasonCopy): number {
@@ -313,7 +321,6 @@ function reasonPriority(reason: TopDealReasonCopy): number {
 export function getTopDealDisplay(property: TopDealLike): TopDealDisplay | null {
   const embedded = extractEmbedded(property);
   const score = toScore(property.top_deal_score) ?? toScore(embedded?.score);
-  const tier = String(property.top_deal_tier || embedded?.tier || '').trim().toLowerCase() || 'watchlist';
   const rawReasons = (Array.isArray(property.top_deal_reasons)
     ? property.top_deal_reasons
     : Array.isArray(embedded?.reasons)
@@ -322,7 +329,8 @@ export function getTopDealDisplay(property: TopDealLike): TopDealDisplay | null 
     .filter((reason): reason is string => typeof reason === 'string' && reason.trim().length > 0);
 
   const evidenceFlags = getEvidenceFlags(embedded?.evidence);
-  const tierCopy = getTopDealTierCopy(score, tier);
+  const tierCopy = getTopDealTierCopy(score);
+  const tier = getTierFromScore(score);
   const heroReason = getHeroReason(embedded?.evidence, rawReasons);
   const seen = new Set<string>();
   const mapped = rawReasons
