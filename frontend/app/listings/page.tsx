@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import nextDynamic from 'next/dynamic';
 import type { Map as LeafletMap, LatLngBoundsExpression } from 'leaflet';
-import { FiSearch, FiSliders, FiMap, FiX } from 'react-icons/fi';
+import { FiBarChart2, FiCheck, FiSearch, FiSliders, FiMap, FiX } from 'react-icons/fi';
 
 import PropertyCard from '@/components/PropertyCard';
 import SaveSearchAlert from '@/components/SaveSearchAlert';
@@ -163,6 +163,16 @@ const SORTABLE = [
   'roi_desc',
 ] as const;
 type SortKey = (typeof SORTABLE)[number];
+
+const SORT_OPTIONS: Array<{ value: SortKey; label: string; shortLabel: string }> = [
+  { value: 'top_deals', label: 'Top Deals (evidence-backed)', shortLabel: 'Top Deals' },
+  { value: 'recommended', label: 'AI Recommended', shortLabel: 'AI' },
+  { value: 'created_at_desc', label: 'Most Recent', shortLabel: 'Recent' },
+  { value: 'price_asc', label: 'Price: Low to High', shortLabel: 'Price ↑' },
+  { value: 'price_desc', label: 'Price: High to Low', shortLabel: 'Price ↓' },
+  { value: 'yield_desc', label: 'Highest Yield', shortLabel: 'Yield' },
+  { value: 'roi_desc', label: 'Highest ROI', shortLabel: 'ROI' },
+];
 
 const INVESTMENT_TYPES = ['HMO', 'BTL', 'SA', 'BRR', 'Flip', 'Commercial'] as const;
 
@@ -552,11 +562,13 @@ function ListingsInner() {
 
   const [showMap, setShowMap] = useState(() => searchParams?.get('map') === '1');
   const [showFilters, setShowFilters] = useState(false);
+  const [showSortMenu, setShowSortMenu] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [controlsCollapsed, setControlsCollapsed] = useState(false);
   const [mappableCount, setMappableCount] = useState<number | null>(null);
   const [mapRows, setMapRows] = useState<RawProperty[] | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const sortMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Keep map toggle state in URL so it persists across pagination/filter changes.
   useEffect(() => {
@@ -619,13 +631,25 @@ function ListingsInner() {
 
   // Close filters on Escape.
   useEffect(() => {
-    if (!showFilters) return;
+    if (!showFilters && !showSortMenu) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setShowFilters(false);
+      if (e.key === 'Escape') setShowSortMenu(false);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [showFilters]);
+  }, [showFilters, showSortMenu]);
+
+  useEffect(() => {
+    if (!showSortMenu) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Node | null;
+      if (target && sortMenuRef.current?.contains(target)) return;
+      setShowSortMenu(false);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, [showSortMenu]);
 
   const qRaw = searchParams?.get('q') ?? '';
   const q = sanitizeSearch(qRaw);
@@ -898,7 +922,6 @@ function ListingsInner() {
             : qRaw.trim() || null;
 
         const mappedData: RawProperty[] = (items || [])
-          .filter((prop: any) => String(prop?.source ?? '').toLowerCase() !== 'spareroom')
           .map((prop: any) => ({
             ...(prop && typeof prop === 'object' ? prop : {}),
             id: String(prop?.id ?? ''),
@@ -938,7 +961,6 @@ function ListingsInner() {
 
         const mappedPoints: RawProperty[] | null = rawPoints
           ? (rawPoints || [])
-              .filter((prop: any) => String(prop?.source ?? '').toLowerCase() !== 'spareroom')
               .map((prop: any) => ({
                 ...(prop && typeof prop === 'object' ? prop : {}),
                 id: String(prop?.id ?? ''),
@@ -1238,6 +1260,17 @@ function ListingsInner() {
     setShowFilters(false);
   };
 
+  const activeSortOption = SORT_OPTIONS.find((option) => option.value === sort) ?? SORT_OPTIONS[0];
+
+  const selectSort = (nextSort: SortKey) => {
+    pushParams((p) => {
+      p.set('sort', nextSort);
+      p.delete('dir');
+      p.set('offset', '0');
+    });
+    setShowSortMenu(false);
+  };
+
   const removeFilter = (key: string, value?: string) => {
     pushParams((p) => {
       p.delete(key);
@@ -1245,8 +1278,9 @@ function ListingsInner() {
     });
   };
 
-  const showingFrom = total > 0 ? offset + 1 : 0;
-  const showingTo = total > 0 ? Math.min(offset + typeFilteredRows.length, total) : 0;
+  const visibleCount = displayedRows.length;
+  const showingFrom = total > 0 && visibleCount > 0 ? offset + 1 : 0;
+  const showingTo = total > 0 && visibleCount > 0 ? Math.min(offset + visibleCount, total) : 0;
 
   const activeFilters: Array<{ key: string; label: string; value: string }> = [];
   if (qRaw) activeFilters.push({ key: 'q', label: qRaw, value: qRaw });
@@ -1305,7 +1339,7 @@ function ListingsInner() {
   }, [currentPage, totalPages]);
 
   const PaginationControls = ({ placement }: { placement: 'top' | 'bottom' }) => {
-    if (total <= 0) return null;
+    if (total <= 0 || visibleCount <= 0) return null;
 
     return (
       <div
@@ -1700,28 +1734,51 @@ function ListingsInner() {
                   </button>
                 </label>
 
-                <select
-                  data-testid="onboarding-sort-select"
-                  value={sort}
-                  onChange={(e) => {
-                    pushParams((p) => {
-                      p.set('sort', e.target.value);
-                      p.delete('dir');
-                      p.set('offset', '0');
-                    });
-                  }}
-                  className="investment-type-select input-field"
-                  style={{ height: 40, padding: '0.5rem 0.75rem' }}
-                  aria-label="Sort"
-                >
-                  <option value="top_deals">Top Deals (evidence-backed)</option>
-                  <option value="recommended">AI recommended</option>
-                  <option value="created_at_desc">Most recent</option>
-                  <option value="price_asc">Price: low to high</option>
-                  <option value="price_desc">Price: high to low</option>
-                  <option value="yield_desc">Highest yield</option>
-                  <option value="roi_desc">Highest ROI</option>
-                </select>
+                <div ref={sortMenuRef} className="relative">
+                  <button
+                    type="button"
+                    data-testid="onboarding-sort-select"
+                    onClick={() => setShowSortMenu((v) => !v)}
+                    className="h-10 max-w-[210px] rounded-full border border-emerald-200 bg-emerald-50 px-3 text-sm font-semibold text-emerald-900 shadow-sm transition-colors hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-900/40 inline-flex items-center gap-2"
+                    aria-haspopup="menu"
+                    aria-expanded={showSortMenu}
+                    aria-label={`Sort listings, current sort ${activeSortOption.label}`}
+                  >
+                    <FiBarChart2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span className="hidden lg:inline truncate">Sort · {activeSortOption.label}</span>
+                    <span className="hidden sm:inline lg:hidden truncate">Sort: {activeSortOption.shortLabel}</span>
+                    <span className="sm:hidden">Sort</span>
+                  </button>
+
+                  {showSortMenu && (
+                    <div
+                      className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+                      role="menu"
+                      aria-label="Sort listings"
+                    >
+                      {SORT_OPTIONS.map((option) => {
+                        const selected = option.value === sort;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={selected}
+                            onClick={() => selectSort(option.value)}
+                            className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors ${
+                              selected
+                                ? 'bg-emerald-50 font-semibold text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100'
+                                : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            <span>{option.label}</span>
+                            {selected ? <FiCheck className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
 
                 <button
                   onClick={applyFilters}
@@ -1895,7 +1952,7 @@ function ListingsInner() {
             ) : displayedRows.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-xl text-slate-600 dark:text-slate-400">
-                  {sort === 'top_deals' ? 'No high-confidence Top Deals surfaced in this search yet.' : 'No properties found'}
+                  {sort === 'top_deals' ? 'No high-confidence Top Deals surfaced in this search yet.' : 'No properties match these filters.'}
                 </p>
                 {sort === 'top_deals' && watchlistTopDeals.length > 0 ? (
                   <p className="mt-2 text-sm text-slate-500">{watchlistTopDeals.length} watchlist leads are available, but they do not meet Top Deal confidence yet.</p>
@@ -1971,7 +2028,7 @@ function ListingsInner() {
               ) : displayedRows.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-xl text-slate-600 dark:text-slate-400">
-                    {sort === 'top_deals' ? 'No high-confidence Top Deals surfaced in this search yet.' : 'No properties found'}
+                    {sort === 'top_deals' ? 'No high-confidence Top Deals surfaced in this search yet.' : 'No properties match these filters.'}
                   </p>
                   <button onClick={resetFilters} className="btn-primary mt-4">
                     Clear Filters

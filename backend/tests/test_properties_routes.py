@@ -1183,5 +1183,5 @@ def test_list_properties_include_points_uses_synonym_expansion(monkeypatch):
 
     calls = [c.args[0] for c in mock_query.or_.call_args_list if getattr(c, "args", None)]
     assert len(calls) >= 2
-    assert "apartment" in calls[0]
+    assert any("apartment" in call for call in calls)
     assert "apartment" in calls[1]

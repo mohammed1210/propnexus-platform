@@ -1,0 +1,101 @@
+import '@testing-library/jest-dom';
+
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+import ListingsPage from '@/app/listings/page';
+
+let mockCurrentParams = new URLSearchParams('sort=price_asc&offset=0');
+const mockPush = jest.fn((url: string) => {
+  mockCurrentParams = new URLSearchParams(url.split('?')[1] ?? '');
+});
+const mockReplace = jest.fn((url: string) => {
+  mockCurrentParams = new URLSearchParams(url.split('?')[1] ?? '');
+});
+
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useSearchParams: () => mockCurrentParams,
+}));
+
+jest.mock('next/dynamic', () => () => function DynamicMock() {
+  return null;
+});
+
+jest.mock('next/link', () => {
+  return function LinkMock({ children, href }: any) {
+    return <a href={href}>{children}</a>;
+  };
+});
+
+jest.mock('@/components/PropertyCard', () => ({
+  __esModule: true,
+  default: ({ p }: any) => <article>{p.title}</article>,
+}));
+
+jest.mock('@/components/SaveSearchAlert', () => ({
+  __esModule: true,
+  default: () => null,
+}));
+
+jest.mock('@/lib/auth', () => ({
+  isAuthEnabled: false,
+}));
+
+jest.mock('@/lib/api', () => ({
+  API_BASE: 'https://api.example.test',
+}));
+
+const fetchMock = jest.fn();
+
+describe('Listings page regressions', () => {
+  beforeEach(() => {
+    mockCurrentParams = new URLSearchParams('sort=price_asc&offset=0');
+    mockPush.mockClear();
+    mockReplace.mockClear();
+    fetchMock.mockReset();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        items: [
+          {
+            id: 'rightmove-1',
+            title: 'Visible Rightmove',
+            source: 'rightmove',
+            price: 150000,
+            created_at: '2026-05-14T00:00:00Z',
+          },
+        ],
+        total: 1,
+        limit: 25,
+        offset: 0,
+        has_more: false,
+      }),
+    });
+    global.fetch = fetchMock as any;
+  });
+
+  it('does not show the empty state when the backend returns visible properties', async () => {
+    render(<ListingsPage />);
+
+    expect(await screen.findByText('Visible Rightmove')).toBeInTheDocument();
+    expect(screen.queryByText('No properties match these filters.')).not.toBeInTheDocument();
+    expect(screen.queryByText('No properties found')).not.toBeInTheDocument();
+    expect(screen.getByText('1-1')).toBeInTheDocument();
+  });
+
+  it('updates URL sort, removes legacy dir, resets offset, and closes the menu', async () => {
+    mockCurrentParams = new URLSearchParams('sort=price_asc&dir=asc&offset=50');
+    render(<ListingsPage />);
+
+    await screen.findByText('Visible Rightmove');
+    fireEvent.click(screen.getByTestId('onboarding-sort-select'));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Highest ROI' }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+    const pushedUrl = String(mockPush.mock.calls.at(-1)?.[0] ?? '');
+    expect(pushedUrl).toContain('sort=roi_desc');
+    expect(pushedUrl).toContain('offset=0');
+    expect(pushedUrl).not.toContain('dir=');
+    expect(screen.queryByRole('menu', { name: 'Sort listings' })).not.toBeInTheDocument();
+  });
+});
