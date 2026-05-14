@@ -1,17 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import GatedPanel from '@/components/property_details/GatedPanel';
-
-type Intel = {
-  asking_price?: number | null;
-  current_monthly_rent?: number | null;
-  gross_yield_percent?: number | null;
-  rent_evidence?: { source?: string; quality?: string; is_real_rent_evidence?: boolean; monthly_rent?: number | null };
-  sold_comp_benchmark?: { median_similar_price?: number | null; benchmark_confidence?: string; subject_vs_median_amount?: number | null; subject_vs_median_pct?: number | null; similar_sales_count?: number | null; range_low?: number | null; range_high?: number | null };
-  offer_intelligence?: { rent_required_at_asking?: Record<string, number | null>; target_purchase_price_from_rent?: Record<string, number | null>; price_gap_to_7pct_yield?: number | null };
-  conclusion?: string;
-};
+import type { InvestorIntel } from '@/types/investorIntel';
 
 export function fmtGBP(n: unknown): string {
   const v = typeof n === 'number' ? n : Number(n);
@@ -24,29 +14,7 @@ function fmtPct(n: unknown): string {
   return Number.isFinite(v) ? `${v > 0 ? '+' : ''}${v.toFixed(1)}%` : '—';
 }
 
-export default function OfferIntelligence({ propertyId }: { propertyId: string }) {
-  const [intel, setIntel] = useState<Intel | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/properties/${encodeURIComponent(propertyId)}/investor-intel`, { cache: 'no-store' });
-        const json = res.ok ? await res.json() : null;
-        if (!cancelled) setIntel(json);
-      } catch {
-        if (!cancelled) setIntel(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [propertyId]);
-
+export default function OfferIntelligence({ intel, loading = false }: { intel: InvestorIntel | null; loading?: boolean }) {
   const body = loading ? (
     <div className="animate-pulse space-y-3">
       <div className="h-20 rounded-2xl bg-slate-200 dark:bg-slate-800" />

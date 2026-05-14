@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from statistics import median
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from backend.services.providers import get_comps_from_provider
 from backend.utils.ppd_comps import build_sold_comp_benchmark
@@ -45,7 +45,9 @@ def rent_evidence_summary(
     rent_values = [
         float(r.get("rent_monthly") or r.get("price"))
         for r in rents or []
-        if isinstance(r, dict) and _num(r.get("rent_monthly") or r.get("price"))
+        if isinstance(r, dict)
+        and str(r.get("source") or "") != "derived_internal_estimate"
+        and _num(r.get("rent_monthly") or r.get("price"))
     ]
 
     if real_rent:
@@ -87,6 +89,69 @@ def rent_evidence_summary(
         "quality": "missing",
         "is_real_rent_evidence": False,
         "usable_rent_comps": 0,
+    }
+
+
+def _sanitize_rent_comp(row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    rent = _num(row.get("rent_monthly") or row.get("price"))
+    if not rent:
+        return None
+    source = str(row.get("source") or "rental_listing").strip()
+    if source == "derived_internal_estimate":
+        return None
+
+    out: Dict[str, Any] = {
+        "rent_monthly": round(rent, 2),
+        "source": source or "rental_listing",
+    }
+    for src, dest in (
+        ("title", "title"),
+        ("address", "short_address"),
+        ("postcode", "postcode"),
+        ("location", "location"),
+        ("property_type", "property_type"),
+        ("type", "property_type"),
+        ("date", "date"),
+        ("updated_at", "date"),
+        ("source_url", "source_url"),
+    ):
+        value = row.get(src)
+        if value not in (None, "") and out.get(dest) in (None, ""):
+            out[dest] = value
+    bedrooms = row.get("bedrooms")
+    if bedrooms not in (None, ""):
+        out["bedrooms"] = bedrooms
+    return out
+
+
+def rent_comps_payload(comps: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    rents = (comps or {}).get("rents") if isinstance(comps, dict) else []
+    sanitized: List[Dict[str, Any]] = []
+    for item in rents or []:
+        if not isinstance(item, dict):
+            continue
+        clean = _sanitize_rent_comp(item)
+        if clean:
+            sanitized.append(clean)
+        if len(sanitized) >= 6:
+            break
+
+    values = [float(item["rent_monthly"]) for item in sanitized if _num(item.get("rent_monthly"))]
+    confidence = "missing"
+    if len(values) >= 5:
+        confidence = "strong"
+    elif len(values) >= 3:
+        confidence = "moderate"
+    elif values:
+        confidence = "limited"
+
+    return {
+        "items": sanitized,
+        "count": len(sanitized),
+        "range_low": round(min(values), 2) if values else None,
+        "range_high": round(max(values), 2) if values else None,
+        "median_rent": round(float(median(values)), 2) if values else None,
+        "confidence": confidence,
     }
 
 
@@ -152,6 +217,7 @@ def build_investor_intel_payload(
         subject_property_type=row.get("property_type"),
     )
     rent = rent_evidence_summary(row, comps_payload)
+    rent_comps = rent_comps_payload(comps_payload)
     monthly_rent = rent.get("monthly_rent") if rent.get("is_real_rent_evidence") else None
     offer = offer_calculations(asking, _num(monthly_rent))
 
@@ -181,6 +247,12 @@ def build_investor_intel_payload(
         "asking_price": asking,
         "current_monthly_rent": rent.get("monthly_rent"),
         "rent_evidence": rent,
+        "rent_comps": rent_comps["items"],
+        "rent_comp_count": rent_comps["count"],
+        "rent_comp_range_low": rent_comps["range_low"],
+        "rent_comp_range_high": rent_comps["range_high"],
+        "rent_comp_median": rent_comps["median_rent"],
+        "rent_comp_confidence": rent_comps["confidence"],
         "gross_yield_percent": gross_yield,
         "sold_comp_benchmark": comp_benchmark,
         "comp_evidence_quality": comp_benchmark.get("benchmark_confidence"),

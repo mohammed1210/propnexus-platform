@@ -36,6 +36,59 @@ using (true);
 - If this migration has not been applied, `PATCH /saved-deals/status` returns a clear migration-required error while the rest of the property detail page remains usable.
 - Do not backfill or fabricate agent details. Only copy real source URLs/contact fields from scraper/provider payloads.
 
+## Investor Intel, Listing History and Alerts Migration
+
+Run `supabase/migrations/20260512_investor_intel_history_alerts.sql` in Supabase before relying on Offer Intelligence history fields, price-change tracking, or saved deal alerts in production.
+
+After applying the migration:
+
+- Run a fresh scrape/import so `first_seen_at`, `last_seen_at`, `initial_price`, and Top Deal metadata are refreshed on current rows.
+- Run a later repeat scrape/import to begin accumulating meaningful `last_seen_at` updates and verified price-change history.
+- Keep alert delivery claims honest: `/investor-alerts` CRUD is live, while `/investor-alerts/digest-preview` only builds the scheduler/email payload unless a real email job is separately configured and verified.
+
+Safe Supabase verification snippets:
+
+```sql
+select column_name
+from information_schema.columns
+where table_schema = 'public'
+  and table_name = 'properties'
+  and column_name in (
+    'first_seen_at', 'last_seen_at', 'initial_price', 'previous_price',
+    'last_price_change_at', 'price_change_count', 'price_history'
+  )
+order by column_name;
+```
+
+```sql
+select to_regclass('public.investor_alerts') as investor_alerts_table;
+```
+
+```sql
+select tgname
+from pg_trigger
+where tgrelid = 'public.properties'::regclass
+  and tgname = 'trg_properties_listing_history_guard';
+```
+
+```sql
+select id, title, first_seen_at, last_seen_at, initial_price, price,
+       previous_price, price_change_count, price_history
+from public.properties
+order by last_seen_at desc nulls last
+limit 10;
+```
+
+```sql
+select id, user_id, label, search_query, include_tiers, frequency, active,
+       created_at, last_sent_at
+from public.investor_alerts
+order by created_at desc
+limit 10;
+```
+
+If any column/table/trigger check returns no rows, stop launch verification and re-run the migration before testing the UI.
+
 ## Search Guardrails (#331)
 
 - **Alert rule file**: `infra/prometheus/alerts/search-alerts.yml`

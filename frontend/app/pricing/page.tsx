@@ -21,7 +21,7 @@ const investorFeatures = [
   'See what price makes the deal work with Offer Intelligence',
   'Compare sold and rent evidence before bidding',
   'Track price changes, days on market and stale listings',
-  'Save alerts for newly surfaced strong opportunities',
+  'Save alert criteria for newly surfaced strong opportunities',
   'AI Deal Score, Investment Summary and strategy guidance',
   'Priority access to new launch features',
 ];

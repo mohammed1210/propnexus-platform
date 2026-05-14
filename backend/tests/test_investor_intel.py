@@ -23,6 +23,61 @@ def test_investor_intel_missing_rent_does_not_invent_offer_target():
     )
 
 
+def test_investor_intel_includes_sanitized_real_rent_comps():
+    payload = build_investor_intel_payload(
+        {"id": "p1", "price": 200000, "postcode": "LS1 1AA"},
+        comps={
+            "sales": [],
+            "rents": [
+                {
+                    "title": "Nearby rental flat",
+                    "address": "Central Leeds",
+                    "rent_monthly": 1250,
+                    "bedrooms": 2,
+                    "property_type": "Flat",
+                    "postcode": "LS1",
+                    "source": "internal_property_listings",
+                    "source_url": "https://example.test/rent",
+                },
+                {"title": "Second rental", "price": 1300, "source": "internal_property_listings"},
+            ],
+        },
+    )
+
+    assert payload["rent_comp_count"] == 2
+    assert payload["rent_comps"][0]["rent_monthly"] == 1250
+    assert payload["rent_comps"][0]["short_address"] == "Central Leeds"
+    assert payload["rent_comps"][0]["source"] == "internal_property_listings"
+    assert payload["rent_comp_range_low"] == 1250
+    assert payload["rent_comp_range_high"] == 1300
+
+
+def test_investor_intel_does_not_expose_derived_estimates_as_rent_comps():
+    payload = build_investor_intel_payload(
+        {
+            "id": "p1",
+            "price": 200000,
+            "postcode": "LS1 1AA",
+            "data": {"rent_estimate_monthly": 1200},
+        },
+        comps={
+            "sales": [],
+            "rents": [
+                {
+                    "title": "Derived estimate",
+                    "rent_monthly": 1200,
+                    "source": "derived_internal_estimate",
+                }
+            ],
+        },
+    )
+
+    assert payload["rent_evidence"]["quality"] == "estimate_only"
+    assert payload["rent_comps"] == []
+    assert payload["rent_comp_count"] == 0
+    assert payload["offer_intelligence"]["target_purchase_price_from_rent"]["7"] is None
+
+
 def test_sold_comp_benchmark_subject_gap():
     benchmark = build_sold_comp_benchmark(
         [

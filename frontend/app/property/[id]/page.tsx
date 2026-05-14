@@ -27,6 +27,7 @@ import WhySurfaced from '@/components/property_details/WhySurfaced';
 import OfferIntelligence from '@/components/property_details/OfferIntelligence';
 import ListingHistory from '@/components/property_details/ListingHistory';
 import ComparableEvidencePanel from '@/components/property_details/ComparableEvidencePanel';
+import RentalEvidencePanel from '@/components/property_details/RentalEvidencePanel';
 import TradesmenList from '@/components/tradesmen/TradesmenList';
 import { useRegisterCurrentProperty } from '@/components/ai/CurrentPropertyContext';
 
@@ -40,6 +41,7 @@ import {
   normalizeProperty,
 } from '@/lib/normalizeProperty';
 import { buildInvestmentDescription } from '@/lib/propertyDescription';
+import type { InvestorIntel } from '@/types/investorIntel';
 
 /** ---- Client-only widgets (no SSR) ---- */
 const NotesFields = dynamic(
@@ -121,6 +123,8 @@ const investmentFitLabel = (investmentType?: unknown, propertyType?: unknown): s
 export default function PropertyDetailsPage() {
   const { id } = useParams() as { id: string };
   const [property, setProperty] = useState<LooseProperty | null>(null);
+  const [investorIntel, setInvestorIntel] = useState<InvestorIntel | null>(null);
+  const [investorIntelLoading, setInvestorIntelLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTradeType, setSelectedTradeType] = useState<string>('');
@@ -218,6 +222,32 @@ export default function PropertyDetailsPage() {
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!property?.id) {
+      setInvestorIntel(null);
+      setInvestorIntelLoading(false);
+      return;
+    }
+
+    (async () => {
+      setInvestorIntelLoading(true);
+      try {
+        const res = await fetch(`/api/properties/${encodeURIComponent(String(property.id))}/investor-intel`, { cache: 'no-store' });
+        const json = res.ok ? await res.json().catch(() => null) : null;
+        if (!cancelled) setInvestorIntel(json && typeof json === 'object' ? json : null);
+      } catch {
+        if (!cancelled) setInvestorIntel(null);
+      } finally {
+        if (!cancelled) setInvestorIntelLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [property?.id]);
 
   const normalized = useMemo(() => (property ? normalizeProperty(property as any) : null), [property]);
 
@@ -423,11 +453,12 @@ export default function PropertyDetailsPage() {
               }
               defaultExpanded={true}
             >
-              <OfferIntelligence propertyId={String(property.id ?? id)} />
+              <OfferIntelligence intel={investorIntel} loading={investorIntelLoading} />
             </CollapsibleCard>
 
-            <ListingHistory property={property as any} />
-            <ComparableEvidencePanel benchmark={(property as any)?.sold_comp_benchmark ?? (property as any)?.comps?.sales_benchmark ?? null} />
+            <RentalEvidencePanel intel={investorIntel} />
+            <ListingHistory property={(investorIntel?.listing_history as any) ?? (property as any)} />
+            <ComparableEvidencePanel benchmark={investorIntel?.sold_comp_benchmark ?? (property as any)?.sold_comp_benchmark ?? (property as any)?.comps?.sales_benchmark ?? null} />
 
             {/* AI Deal Score - Always visible, gated for non-pro users */}
             {showDealScore ? (

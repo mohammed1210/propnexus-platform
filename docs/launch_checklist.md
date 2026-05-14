@@ -13,9 +13,12 @@
 
 - [ ] Confirm `/properties/{id}/investor-intel` returns asking price, rent evidence quality, target prices from evidenced rent, sold-comp benchmark, listing history, and an evidence-safe conclusion.
 - [ ] Confirm Offer Intelligence is gated as an Investor feature and does not calculate a target price from estimate-only or missing rent evidence.
+- [ ] Confirm Rental Evidence shows real rental comps, derived-estimate-only, and missing-evidence states without labelling estimates as comps.
 - [ ] Confirm Listing History shows first seen, days tracked, initial/current/previous price, and a no-movement state when history is empty.
+- [ ] Run a repeat scrape/import after the migration so `last_seen_at` and future price-history accumulation can be verified.
 - [ ] Confirm Comparable Evidence labels comp strength as strong, limited, or weak and does not invent bedrooms/floor area.
 - [ ] Confirm `/investor-alerts` CRUD works through the frontend API proxy with Clerk user identity.
+- [ ] Confirm saved-alert UI copy does not claim email delivery unless a scheduler/email provider has been configured and verified.
 - [ ] If email delivery is not configured, use `/investor-alerts/digest-preview` only as a scheduler/email payload builder; do not claim emails are sent.
 
 This is a strict go-live checklist. Every step has a command, a PASS condition, and what to do if it FAILs.

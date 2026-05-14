@@ -328,11 +328,14 @@ export default function SaveSearchAlert({ query, filters, sort }: SaveSearchAler
           </div>
 
           <label className="block">
-            <span className="mb-1 block font-bold text-slate-700 dark:text-slate-200">Digest frequency</span>
+            <span className="mb-1 block font-bold text-slate-700 dark:text-slate-200">Alert cadence</span>
             <select value={frequency} onChange={(event) => setFrequency(event.target.value)} className="input-field w-full">
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
             </select>
+            <span className="mt-1 block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              Saves the cadence preference for the alert workflow; email delivery is not claimed until configured.
+            </span>
           </label>
 
           {authRequired ? (

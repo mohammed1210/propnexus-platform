@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from fastapi import HTTPException, status
 
@@ -92,10 +92,64 @@ def parse_summary_response(text: str) -> SummaryResponse:
     return SummaryResponse(summary=summary, bullets=bullets)
 
 
+def _strategy_text(property_data: Dict[str, Any]) -> str:
+    for key in ("strategyFit", "strategy_fit", "investmentType", "investment_type"):
+        value = property_data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    property_type = property_data.get("propertyType") or property_data.get("property_type")
+    if isinstance(property_type, str) and property_type.strip():
+        text = property_type.strip().lower()
+        if any(token in text for token in ("hmo", "multi let", "buy to let", "btl")):
+            return property_type.strip()
+
+    description = property_data.get("description")
+    if isinstance(description, str) and description.strip():
+        text = description.lower()
+        if any(token in text for token in ("auction", "guide price", "legal pack")):
+            return "auction"
+        if any(
+            token in text
+            for token in ("refurb", "modernisation", "modernization", "value add", "works")
+        ):
+            return "value-add"
+        if any(token in text for token in ("flip", "resale", "sell on")):
+            return "flip"
+        if any(token in text for token in ("brr", "refinance", "remortgage")):
+            return "BRR/refinance"
+        if any(token in text for token in ("development", "planning", "conversion", "land")):
+            return "development"
+
+    return "unknown/mixed"
+
+
+def _strategy_guidance(strategy: str) -> str:
+    text = strategy.lower()
+    if any(token in text for token in ("auction", "guide price", "legal pack")):
+        return "Auction route: focus on legal pack review, completion speed, funding timing, fees and compressed due diligence."
+    if any(token in text for token in ("brr", "brrr", "refinance", "remortgage")):
+        return "BRR/refinance route: focus on post-works value, achievable rent, refinance risk, lender assumptions and capital left in."
+    if any(token in text for token in ("develop", "planning", "conversion", "land")):
+        return "Development route: focus on planning status, use class, capex, delivery risk and exit liquidity."
+    if any(token in text for token in ("flip", "value", "refurb", "modernis", "works", "resale")):
+        return "Flip/value-add route: focus on works budget, condition risk, resale comps, programme risk and margin discipline."
+    if any(
+        token in text
+        for token in ("btl", "buy-to-let", "buy to let", "rental", "rent", "hmo", "hold")
+    ):
+        return "BTL/income route: focus on rent evidence, voids, lender stress, income durability, compliance and management costs."
+    return "Unknown or mixed route: use neutral investment-route language, avoid overcommitting, and make validation steps evidence-led."
+
+
 def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
+    strategy = _strategy_text(req.property)
+    guidance = _strategy_guidance(strategy)
     sys_prompt = (
-        "You are an investment analyst for UK buy-to-let properties. "
+        "You are an investment analyst for UK property investors. "
         "Provide exit strategies with rationale, steps and risk. Currency GBP. Use UK property terms. "
+        "Be strategy-aware and evidence-safe: do not force buy-to-let framing unless the inputs support an income-led route. "
+        f"Strategy frame: {strategy}. {guidance} "
         "Return plain text only."
     )
     prop_lines = "\n".join(f"{k}: {v}" for k, v in req.property.items())
@@ -114,6 +168,8 @@ def format_strategies_prompt(req: StrategiesRequest) -> List[Dict[str, str]]:
         "Risk: <single sentence>\n\n"
         "Rules:\n"
         "- Keep steps action-oriented and specific to UK property investing.\n"
+        "- Match the route to the provided strategy context; if the strategy is uncertain, say what must be validated before choosing an exit.\n"
+        "- Do not invent rent, resale, planning, legal pack, crime, schools or demand evidence.\n"
         "- If constraints are provided, respect them.\n"
         "- Avoid marketing tone and avoid speculation."
     )

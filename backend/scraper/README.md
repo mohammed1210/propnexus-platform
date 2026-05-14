@@ -16,7 +16,7 @@ Unification and normalization:
 Continuous ingestion:
 
 - `backend/tasks/ingestion_runner.py` runs a loop over configured locations and upserts results.
-- `scripts/cron-ingest.sh` starts the runner in a container/worker.
+- `scripts/cron-ingest.sh` is a thin wrapper around `backend/scripts/cron-ingest.sh`, which calls the protected admin ingestion endpoint. A separate worker can also run `python -m backend.tasks.ingestion_runner` directly.
 
 Environment (backend/.env or service config):
 
@@ -45,8 +45,9 @@ python -m backend.tasks.ingestion_runner
 Production (Railway/Render) options:
 
 - Keep the existing API service (Procfile -> uvicorn)
-- Add a second “worker” service with start command: `bash scripts/cron-ingest.sh`
+- Add a scheduled/worker service with start command `bash scripts/cron-ingest.sh` when calling the API endpoint, or `python -m backend.tasks.ingestion_runner` for a long-running ingestion loop.
 - Configure env vars per above on the worker
+- Verify the worker in Railway/Render logs before claiming continuous ingestion is live.
 
 Verification:
 

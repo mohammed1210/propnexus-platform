@@ -97,7 +97,7 @@ describe('SaveSearchAlert', () => {
     fireEvent.change(screen.getByLabelText(/baths/i), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText(/minimum price/i), { target: { value: '150000' } });
     fireEvent.change(screen.getByLabelText(/maximum price/i), { target: { value: '300000' } });
-    fireEvent.change(screen.getByLabelText(/digest frequency/i), { target: { value: 'weekly' } });
+    fireEvent.change(screen.getByLabelText(/alert cadence/i), { target: { value: 'weekly' } });
     fireEvent.click(screen.getByRole('button', { name: /create alert/i }));
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Deal alert created'));
