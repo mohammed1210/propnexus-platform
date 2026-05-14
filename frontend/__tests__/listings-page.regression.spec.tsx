@@ -98,4 +98,17 @@ describe('Listings page regressions', () => {
     expect(pushedUrl).not.toContain('dir=');
     expect(screen.queryByRole('menu', { name: 'Sort listings' })).not.toBeInTheDocument();
   });
+
+  it('selects AI Recommended from the sort menu', async () => {
+    render(<ListingsPage />);
+
+    await screen.findByText('Visible Rightmove');
+    fireEvent.click(screen.getByTestId('onboarding-sort-select'));
+    fireEvent.pointerDown(screen.getByRole('menuitemradio', { name: 'AI Recommended' }));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+    const pushedUrl = String(mockPush.mock.calls.at(-1)?.[0] ?? '');
+    expect(pushedUrl).toContain('sort=recommended');
+    expect(pushedUrl).toContain('offset=0');
+  });
 });

@@ -1764,6 +1764,10 @@ function ListingsInner() {
                             type="button"
                             role="menuitemradio"
                             aria-checked={selected}
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              selectSort(option.value);
+                            }}
                             onClick={() => selectSort(option.value)}
                             className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors ${
                               selected
