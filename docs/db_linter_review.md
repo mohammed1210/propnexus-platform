@@ -49,4 +49,5 @@ The hardening migration adds missing baseline support indexes for `properties(fi
 
 - Off-market remains a soft-launch-hidden/incomplete surface. Keep public UI entry points hidden until ownership, storage and write policy flows have been re-reviewed.
 - Rightmove reliability is intentionally not claimed while ScraperAPI is switched off.
+- Railway ingest-worker launch health depends on a successful direct-mode deployment and fresh scheduled cycles; individual blocked/empty direct sources are degraded, not fatal.
 - Price history will only become meaningful after repeated ingestion cycles; the baseline migration does not fabricate historical price changes.

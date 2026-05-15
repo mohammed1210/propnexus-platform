@@ -7,9 +7,11 @@ builder = "NIXPACKS"
 buildCommand = "pip3 install -r backend/requirements.txt && python3 -m playwright install --with-deps chromium"
 
 [deploy]
-# Run FastAPI (backend.main:app) on the provided PORT
-startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port 8080"
-# FastAPI health route
+# Dispatch API and worker services from one repo. The ingest-worker service is
+# detected via Railway service/process env and runs python -m backend.tasks.ingestion_runner.
+startCommand = "bash scripts/railway-start.sh"
+# FastAPI health route. The ingest worker also exposes a tiny /health responder
+# when Railway provides PORT so the same service config can deploy both shapes.
 healthcheckPath = "/health"
 
 [env]

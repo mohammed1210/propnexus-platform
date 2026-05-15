@@ -4,6 +4,7 @@
 
 - **App**: visit `/api/diag` – reports env presence and connection to Supabase.
 - **Supabase**: console → Table Editor → `properties`.
+- **Railway ingest-worker**: service should start with `bash scripts/railway-start.sh`, dispatch to `python -m backend.tasks.ingestion_runner`, log `[ingest-worker] starting`, and keep running between cycles. When Railway provides `PORT`, the worker exposes a minimal `/health` responder for the shared Railway health check.
 
 ## Environments
 
@@ -14,7 +15,18 @@
 - **Required env** (backend/private):
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
+- **Required env** (Railway ingest-worker):
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `SCRAPER_MODE=direct`
+  - `INGEST_SOURCES=zoopla,onthemarket,spareroom`
+  - `INGEST_LOCATIONS=London,Manchester,Liverpool,Birmingham` or the active launch list
+  - `INGEST_INTERVAL_SECONDS=900`
 - Vercel → Project → Settings → Environment Variables. Redeploy after changes.
+
+While ScraperAPI is off, leave `SCRAPERAPI_KEY` empty/omitted and keep Rightmove opt-in. The worker should be treated as degraded when an individual direct source is blocked or returns 0, and failed only when the process exits or cannot start.
+
+Direct-mode worker policy: `SCRAPER_MODE=direct` disables ScraperAPI fallback even if a stale key exists in the environment. Only set `SCRAPERAPI_ALLOW_FALLBACK=true` when deliberately re-enabling paid fallback behavior.
 
 ## Data Access
 

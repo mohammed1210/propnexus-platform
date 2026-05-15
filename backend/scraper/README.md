@@ -58,10 +58,28 @@ python -m backend.tasks.ingestion_runner
 
 Production (Railway/Render) options:
 
-- Keep the existing API service (Procfile -> uvicorn)
-- Add a scheduled/worker service with start command `bash scripts/cron-ingest.sh` when calling the API endpoint, or `python -m backend.tasks.ingestion_runner` for a long-running ingestion loop.
+- Railway uses `bash scripts/railway-start.sh` as the repo start command. It dispatches API services to `uvicorn backend.main:app` and services named like `ingest-worker` to `python -m backend.tasks.ingestion_runner`.
+- Keep the existing API service as HTTP/FastAPI.
+- Run the worker as a long-running ingestion loop. Use `bash scripts/cron-ingest.sh` only for scheduled one-off calls into the API endpoint.
 - Configure env vars per above on the worker
-- Verify the worker in Railway/Render logs before claiming continuous ingestion is live.
+- Verify the worker in Railway/Render logs before claiming continuous ingestion is live. Expected startup lines include `[ingest-worker] starting`, `scraper_mode=direct`, `sources=zoopla,onthemarket,spareroom`, `scraperapi_configured=False`, and `supabase_configured=True`.
+
+Railway ingest-worker required env:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY` (or the service role env resolved by backend config)
+- `SCRAPER_MODE=direct`
+- `INGEST_SOURCES=zoopla,onthemarket,spareroom`
+- `INGEST_LOCATIONS=London,Manchester,Liverpool,Birmingham` or the current launch target list
+- `INGEST_INTERVAL_SECONDS=900` or another deliberate interval
+
+`SCRAPERAPI_KEY` may be empty or omitted while `SCRAPER_MODE=direct`. Direct mode disables ScraperAPI fallback even if a stale key is present, unless `SCRAPERAPI_ALLOW_FALLBACK=true` is explicitly set. If a stale service env sets `SCRAPER_MODE=scraperapi` without a key, the worker logs a warning and coerces itself back to direct mode instead of exiting.
+
+Worker health semantics while ScraperAPI is off:
+
+- Healthy: process stays alive, exposes `/health` when Railway provides `PORT`, and completes scheduled direct-mode cycles.
+- Degraded: one source is blocked, skipped, or returns 0 while the cycle continues.
+- Failed: the service process exits or cannot start.
 
 Verification:
 

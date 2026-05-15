@@ -16,6 +16,7 @@ normalized rows to the Supabase `properties` table in batches.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -26,8 +27,12 @@ try:
     # Load environment variables from .env and .env.local at repo root if present
     from dotenv import load_dotenv  # type: ignore
 
-    load_dotenv()  # .env
-    load_dotenv(".env.local", override=True)  # .env.local
+    if not any(
+        (os.getenv(name) or "").strip()
+        for name in ("RAILWAY_ENVIRONMENT", "RAILWAY_SERVICE_ID", "RAILWAY_SERVICE_NAME")
+    ):
+        load_dotenv()  # .env
+        load_dotenv(".env.local", override=False)  # .env.local
 except Exception:
     pass
 
@@ -41,6 +46,7 @@ from backend.utils.top_deal_ranker import apply_top_deal_ranking
 sb = get_supabase(required=False)
 
 DEFAULT_DIRECT_SOURCES = ["zoopla", "onthemarket", "spareroom"]
+VALID_SCRAPER_MODES = {"direct", "scraperapi", "smart"}
 _STATUS: dict[str, Any] = {
     "latest_run_id": None,
     "last_started_at": None,
@@ -49,6 +55,55 @@ _STATUS: dict[str, Any] = {
     "last_error": None,
     "sources": {},
 }
+
+
+def _env_flag(name: str, default: str = "") -> bool:
+    value = (os.getenv(name) or default).strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
+def _scraperapi_configured() -> bool:
+    return bool((os.getenv("SCRAPERAPI_KEY") or "").strip())
+
+
+def _scraperapi_enabled_for_mode(mode: str | None = None) -> bool:
+    if not _scraperapi_configured():
+        return False
+    effective_mode = mode or (os.getenv("SCRAPER_MODE") or "direct").strip().lower()
+    if effective_mode in {"scraperapi", "smart"}:
+        return True
+    return _env_flag("SCRAPERAPI_ALLOW_FALLBACK")
+
+
+def _effective_scraper_mode() -> str:
+    raw = (os.getenv("SCRAPER_MODE") or "direct").strip().lower()
+    mode = raw if raw in VALID_SCRAPER_MODES else "direct"
+    if mode in {"scraperapi", "smart"} and not _scraperapi_configured():
+        logging.warning(
+            "[ingest-worker] SCRAPER_MODE=%s requested without SCRAPERAPI_KEY; using direct mode",
+            mode,
+        )
+        return "direct"
+    return mode
+
+
+def _apply_scraperapi_launch_policy() -> None:
+    mode = _effective_scraper_mode()
+    os.environ["SCRAPER_MODE"] = mode
+    if mode == "direct" and not _env_flag("SCRAPERAPI_ALLOW_FALLBACK"):
+        os.environ.pop("SCRAPERAPI_KEY", None)
+
+
+def _load_int_env(name: str, default: int, *, minimum: int = 0) -> int:
+    raw = os.getenv(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        value = int(str(raw).strip())
+    except ValueError:
+        logging.warning("[ingest-worker] invalid %s=%r; using %s", name, raw, default)
+        return default
+    return max(minimum, value)
 
 
 def _load_locations() -> List[str]:
@@ -63,6 +118,87 @@ def _load_sources() -> List[str]:
     return [part.strip().lower() for part in raw.split(",") if part.strip()]
 
 
+def _worker_version() -> str:
+    for key in ("RAILWAY_GIT_COMMIT_SHA", "GIT_COMMIT_SHA", "SOURCE_VERSION"):
+        value = (os.getenv(key) or "").strip()
+        if value:
+            return value[:12]
+    return "unknown"
+
+
+def get_worker_startup_summary() -> dict[str, Any]:
+    mode = _effective_scraper_mode()
+    return {
+        "worker_version": _worker_version(),
+        "scraper_mode": mode,
+        "sources": _load_sources(),
+        "locations": _load_locations(),
+        "interval_seconds": _load_int_env("INGEST_INTERVAL_SECONDS", 900, minimum=1),
+        "scraperapi_configured": _scraperapi_enabled_for_mode(mode),
+        "supabase_configured": sb is not None,
+        "run_once": os.getenv("INGEST_RUN_ONCE", "0") == "1",
+    }
+
+
+def log_worker_startup_summary(summary: dict[str, Any]) -> None:
+    logging.info("[ingest-worker] starting")
+    logging.info("[ingest-worker] worker_version=%s", summary["worker_version"])
+    logging.info("[ingest-worker] scraper_mode=%s", summary["scraper_mode"])
+    logging.info("[ingest-worker] sources=%s", ",".join(summary["sources"]))
+    logging.info("[ingest-worker] locations=%s", ",".join(summary["locations"]))
+    logging.info("[ingest-worker] interval_seconds=%s", summary["interval_seconds"])
+    logging.info("[ingest-worker] scraperapi_configured=%s", summary["scraperapi_configured"])
+    logging.info("[ingest-worker] supabase_configured=%s", summary["supabase_configured"])
+
+
+async def _handle_health_request(
+    reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+) -> None:
+    try:
+        await reader.read(2048)
+        payload = json.dumps(
+            {
+                "ok": True,
+                "service": "ingest-worker",
+                "status": "running",
+                "scraper_mode": _effective_scraper_mode(),
+                "sources": _load_sources(),
+                "latest_run_id": _STATUS.get("latest_run_id"),
+                "last_finished_at": _STATUS.get("last_finished_at"),
+                "last_error": _STATUS.get("last_error"),
+            }
+        ).encode("utf-8")
+        writer.write(
+            b"HTTP/1.1 200 OK\r\n"
+            + b"Content-Type: application/json\r\n"
+            + f"Content-Length: {len(payload)}\r\n".encode("ascii")
+            + b"Connection: close\r\n\r\n"
+            + payload
+        )
+        await writer.drain()
+    finally:
+        writer.close()
+        try:
+            await writer.wait_closed()
+        except Exception:
+            pass
+
+
+async def _start_health_server_if_configured() -> asyncio.AbstractServer | None:
+    if _env_flag("INGEST_WORKER_DISABLE_HEALTH_SERVER"):
+        return None
+    port = (os.getenv("PORT") or "").strip()
+    if not port:
+        return None
+    try:
+        server = await asyncio.start_server(_handle_health_request, "0.0.0.0", int(port))
+    except Exception as exc:
+        logging.warning("[ingest-worker] health server failed to bind port=%s: %s", port, exc)
+        return None
+    logging.info("[ingest-worker] health server listening on port=%s path=/health", port)
+    return server
+
+
 def get_ingestion_status_snapshot() -> dict[str, Any]:
     return dict(_STATUS)
 
@@ -75,6 +211,7 @@ async def _ingest_location(
     location: str, *, limit: Optional[int] = None, sources: Optional[List[str]] = None
 ) -> int:
     """Scrape+upsert for a single location. Returns count of rows processed."""
+    _apply_scraperapi_launch_policy()
     start = time.time()
     run_id = create_scrape_run(source="direct", location=location, status="started")
     run_label = run_id or f"local-{int(start)}"
@@ -272,9 +409,10 @@ async def _ingest_location(
 
 async def run_cycle() -> int:
     """Run one full ingestion cycle across all locations."""
+    _apply_scraperapi_launch_policy()
     locations = _load_locations()
     sources = _load_sources()
-    batch_sleep_ms = int(os.getenv("INGEST_BATCH_SLEEP_MS", "1500"))
+    batch_sleep_ms = _load_int_env("INGEST_BATCH_SLEEP_MS", 1500, minimum=0)
     total = 0
     for loc in locations:
         try:
@@ -288,24 +426,26 @@ async def run_cycle() -> int:
 
 
 async def main() -> None:
-    interval = int(os.getenv("INGEST_INTERVAL_SECONDS", "900"))
-    once = os.getenv("INGEST_RUN_ONCE", "0") == "1"
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    logging.info(
-        "Ingestion runner started (interval=%ss once=%s mode=%s sources=%s scraperapi_key=%s)",
-        interval,
-        once,
-        os.getenv("SCRAPER_MODE", "direct"),
-        ",".join(_load_sources()),
-        "present" if os.getenv("SCRAPERAPI_KEY") else "absent",
-    )
+    _apply_scraperapi_launch_policy()
+    summary = get_worker_startup_summary()
+    os.environ["SCRAPER_MODE"] = summary["scraper_mode"]
+    interval = int(summary["interval_seconds"])
+    once = bool(summary["run_once"])
+    log_worker_startup_summary(summary)
+    health_server = await _start_health_server_if_configured()
 
-    while True:
-        await run_cycle()
-        if once:
-            break
-        logging.info("[ingest] next_run_wait_seconds=%s", interval)
-        await asyncio.sleep(interval)
+    try:
+        while True:
+            await run_cycle()
+            if once:
+                break
+            logging.info("[ingest] next_run_wait_seconds=%s", interval)
+            await asyncio.sleep(interval)
+    finally:
+        if health_server is not None:
+            health_server.close()
+            await health_server.wait_closed()
 
 
 if __name__ == "__main__":  # pragma: no cover
