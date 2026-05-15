@@ -60,6 +60,11 @@ jobs:
             --ci \
             --json
 
+      - name: List Railway services
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: railway service list
+
       - name: Deploy ingest worker with Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
