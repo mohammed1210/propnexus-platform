@@ -70,7 +70,7 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway up \
-            --service "vivacious-embrace" \
+            --service "function-bun" \
             --ci \
             --json
 

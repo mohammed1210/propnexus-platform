@@ -8,7 +8,7 @@ cd "$REPO_ROOT"
 service_name="${RAILWAY_SERVICE_NAME:-${RAILWAY_SERVICE:-${SERVICE_NAME:-}}}"
 process_type="${PROCESS_TYPE:-}"
 
-if [[ "${INGEST_WORKER:-}" == "1" || "$process_type" == "worker" || "$service_name" == "vivacious-embrace" || "$service_name" == *"ingest"* || "$service_name" == *"worker"* ]]; then
+if [[ "${INGEST_WORKER:-}" == "1" || "$process_type" == "worker" || "$service_name" == "vivacious-embrace" || "$service_name" == "function-bun" || "$service_name" == *"ingest"* || "$service_name" == *"worker"* ]]; then
   export SCRAPER_MODE="${SCRAPER_MODE:-direct}"
   export INGEST_SOURCES="${INGEST_SOURCES:-zoopla,onthemarket,spareroom}"
   export INGEST_INTERVAL_SECONDS="${INGEST_INTERVAL_SECONDS:-900}"
