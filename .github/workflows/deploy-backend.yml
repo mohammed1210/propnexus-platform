@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/**"
       - "railway.toml"
+      - "scripts/railway-start.sh"
       - "Dockerfile"
       - "requirements.txt"
       - "pyproject.toml"
@@ -56,6 +57,15 @@ jobs:
         run: |
           railway up \
             --service "propnexus-backend" \
+            --ci \
+            --json
+
+      - name: Deploy ingest worker with Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          railway up \
+            --service "ingest-worker" \
             --ci \
             --json
 
