@@ -58,7 +58,7 @@ python -m backend.tasks.ingestion_runner
 
 Production (Railway/Render) options:
 
-- Railway uses `bash scripts/railway-start.sh` as the repo start command. It dispatches API services to `uvicorn backend.main:app` and services named like `ingest-worker` to `python -m backend.tasks.ingestion_runner`.
+- Railway uses `bash scripts/railway-start.sh` as the repo start command. It dispatches API services to `uvicorn backend.main:app` and the `vivacious-embrace` ingest-worker service to `python -m backend.tasks.ingestion_runner`.
 - Keep the existing API service as HTTP/FastAPI.
 - Run the worker as a long-running ingestion loop. Use `bash scripts/cron-ingest.sh` only for scheduled one-off calls into the API endpoint.
 - Configure env vars per above on the worker

@@ -65,7 +65,7 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           railway up \
-            --service "ingest-worker" \
+            --service "vivacious-embrace" \
             --ci \
             --json
 
