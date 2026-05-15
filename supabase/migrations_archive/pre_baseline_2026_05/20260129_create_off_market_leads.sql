@@ -48,4 +48,3 @@ CREATE INDEX IF NOT EXISTS off_market_leads_location_idx
 
 CREATE INDEX IF NOT EXISTS off_market_leads_investment_type_idx
 	ON public.off_market_leads (investment_type);
-

@@ -4,7 +4,7 @@
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables 
+    SELECT 1 FROM information_schema.tables
     WHERE table_schema = 'public' AND table_name = 'off_market_deals'
   ) THEN
     RAISE NOTICE 'Table public.off_market_deals does not exist; skipping migration.';

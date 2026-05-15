@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- Add plan column if it doesn't exist
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                  WHERE table_name='users' AND column_name='plan') THEN
     ALTER TABLE users ADD COLUMN plan TEXT DEFAULT 'free';
   END IF;
@@ -21,7 +21,7 @@ END $$;
 -- Add stripe_customer_id column if it doesn't exist
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                  WHERE table_name='users' AND column_name='stripe_customer_id') THEN
     ALTER TABLE users ADD COLUMN stripe_customer_id TEXT;
   END IF;

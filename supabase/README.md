@@ -169,6 +169,14 @@ Automatic `updated_at` timestamp triggers on all tables:
 
 ## Migration Notes
 
+### Production Baseline - 2026-05-15
+
+The active migration chain has been reset to a production baseline pulled from the linked Supabase project `wsfemkhxttddztnhthkc`.
+
+- Current baseline: `migrations/20260515180247_production_baseline_2026_05.sql`
+- Previous migration files are archived under `migrations_archive/pre_baseline_2026_05/`
+- New schema changes should be added as migrations after the baseline, not by editing archived migrations
+
 ### From Existing Database
 If migrating from an existing database:
 

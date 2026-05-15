@@ -12,7 +12,7 @@ ALTER TABLE public.users
 -- Add columns if they don't exist for plan tracking
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                  WHERE table_name='users' AND column_name='plan_status') THEN
     ALTER TABLE public.users ADD COLUMN plan_status TEXT DEFAULT 'active';
   END IF;
@@ -20,7 +20,7 @@ END $$;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                  WHERE table_name='users' AND column_name='current_period_end') THEN
     ALTER TABLE public.users ADD COLUMN current_period_end BIGINT;
   END IF;

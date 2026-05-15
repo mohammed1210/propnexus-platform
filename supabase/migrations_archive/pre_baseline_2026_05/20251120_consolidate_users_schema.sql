@@ -15,7 +15,7 @@ create table if not exists public.users (
 do $$
 begin
   if not exists (
-    select 1 from information_schema.columns 
+    select 1 from information_schema.columns
     where table_schema='public' and table_name='users' and column_name='stripe_customer_id'
   ) then
     alter table public.users add column stripe_customer_id text;
@@ -27,7 +27,7 @@ end $$;
 do $$
 begin
   if not exists (
-    select 1 from information_schema.columns 
+    select 1 from information_schema.columns
     where table_schema='public' and table_name='users' and column_name='plan'
   ) then
     alter table public.users add column plan text default 'free';
@@ -38,7 +38,7 @@ end $$;
 do $$
 begin
   if not exists (
-    select 1 from information_schema.columns 
+    select 1 from information_schema.columns
     where table_schema='public' and table_name='users' and column_name='plan_status'
   ) then
     alter table public.users add column plan_status text default 'active';
@@ -49,7 +49,7 @@ end $$;
 do $$
 begin
   if not exists (
-    select 1 from information_schema.columns 
+    select 1 from information_schema.columns
     where table_schema='public' and table_name='users' and column_name='current_period_end'
   ) then
     alter table public.users add column current_period_end bigint;
@@ -58,8 +58,8 @@ end $$;
 
 -- Update or create plan constraint
 alter table public.users drop constraint if exists users_plan_check;
-alter table public.users 
-  add constraint users_plan_check 
+alter table public.users
+  add constraint users_plan_check
   check (plan in ('free', 'pro', 'investor'));
 
 -- Create indexes for performance (idempotent)
