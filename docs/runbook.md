@@ -31,14 +31,14 @@ using (true);
 
 ## Deal Action / Contact Agent workflow
 
-- Run `supabase/migrations/20260509_deal_action_fields.sql` in Supabase before enabling saved-deal progress tracking.
-- The migration adds nullable original listing/contact columns on `properties` and `deal_status`, `contacted_at`, `last_action_at`, `action_notes` on `saved_deals`.
-- If this migration has not been applied, `PATCH /saved-deals/status` returns a clear migration-required error while the rest of the property detail page remains usable.
+- The production baseline is established at `supabase/migrations/20260515180247_production_baseline_2026_05.sql`.
+- Archived migrations under `supabase/migrations_archive/` are audit/reference files only and should not be applied after the baseline.
+- New DB changes must be added as migrations after the production baseline.
 - Do not backfill or fabricate agent details. Only copy real source URLs/contact fields from scraper/provider payloads.
 
-## Investor Intel, Listing History and Alerts Migration
+## Investor Intel, Listing History and Alerts
 
-Run `supabase/migrations/20260512_investor_intel_history_alerts.sql` in Supabase before relying on Offer Intelligence history fields, price-change tracking, or saved deal alerts in production.
+The baseline includes Offer Intelligence history fields and saved-alert criteria storage. Apply any post-baseline launch hardening migration before final launch verification.
 
 After applying the migration:
 
@@ -88,6 +88,45 @@ limit 10;
 ```
 
 If any column/table/trigger check returns no rows, stop launch verification and re-run the migration before testing the UI.
+
+## Supabase Security Verification SQL
+
+List broad permissive policies:
+
+```sql
+select schemaname, tablename, policyname, cmd, roles, qual, with_check
+from pg_policies
+where schemaname = 'public'
+  and (
+    coalesce(qual, '') ilike '%true%'
+    or coalesce(with_check, '') ilike '%true%'
+    or roles::text ilike '%anon%'
+  )
+order by tablename, policyname;
+```
+
+List public functions without a pinned `search_path`:
+
+```sql
+select n.nspname as schema, p.proname as function_name, pg_get_function_identity_arguments(p.oid) as args
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and not exists (
+    select 1 from unnest(coalesce(p.proconfig, array[]::text[])) cfg
+    where cfg like 'search_path=%'
+  )
+order by p.proname;
+```
+
+List public storage bucket policies:
+
+```sql
+select schemaname, tablename, policyname, cmd, roles, qual, with_check
+from pg_policies
+where schemaname = 'storage'
+order by tablename, policyname;
+```
 
 ## Search Guardrails (#331)
 

@@ -27,7 +27,7 @@ code=$(curl -sS -i -o "$tmp" -w "%{http_code}" \
   -X POST "$BASE_URL/admin/run-ingestion" \
   -H "Content-Type: application/json" \
   -H "$AUTH_HEADER" \
-  -d "${PAYLOAD:-{\"location\":\"London\",\"mode\":\"scraperapi\",\"limit\":5}}" \
+  -d "${PAYLOAD:-{\"location\":\"London\",\"mode\":\"direct\",\"sources\":[\"zoopla\",\"onthemarket\",\"spareroom\"],\"limit\":5}}" \
 )
 
 cat "$tmp"

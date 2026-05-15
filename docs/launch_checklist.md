@@ -2,8 +2,10 @@
 
 ## Top Deal Ranking launch checks
 
-- [ ] Apply `supabase/migrations/20260510_top_deal_ranking.sql` before relying on DB-level `sort=top_deals` in production.
-- [ ] Apply `supabase/migrations/20260512_investor_intel_history_alerts.sql` to enable listing history, price-change tracking, and saved-search alerts.
+- [x] Production baseline is established at `supabase/migrations/20260515180247_production_baseline_2026_05.sql`.
+- [ ] Apply the latest post-baseline launch hardening migration before relying on normalized launch data in production.
+- [ ] Future DB changes must be new migrations after `20260515180247_production_baseline_2026_05.sql`; do not apply archived migrations from `supabase/migrations_archive/`.
+- [ ] Run `python -m backend.scripts.backfill_top_deals --batch-size 100 --force` and confirm existing visible sale listings are scored.
 - [ ] Run a fresh import and confirm returned rows include `top_deal_score`, `top_deal_tier`, and `top_deal_reasons`.
 - [ ] Confirm `prime`/`strong` tiers require `data.top_deal.evidence.hard_signal_count >= 1` and at least two evidence categories.
 - [ ] Confirm no BMV/below-market copy appears unless `data.top_deal.evidence.sold_comps` is present.
@@ -22,6 +24,18 @@
 - [ ] If email delivery is not configured, use `/investor-alerts/digest-preview` only as a scheduler/email payload builder; do not claim emails are sent.
 
 This is a strict go-live checklist. Every step has a command, a PASS condition, and what to do if it FAILs.
+
+## Current soft-launch readiness checklist
+
+- [ ] `top_deal_score` populated for >90% of visible non-SpareRoom sale listings.
+- [ ] Ingestion worker is healthy or manually scheduled imports are confirmed.
+- [ ] Repeated import completed after the production baseline.
+- [ ] Price history fields are populated with baseline values without fabricated reductions.
+- [ ] Source values are normalized (`rightmove`, `zoopla`, `onthemarket`, `spareroom`).
+- [ ] Postcode coverage reviewed through `/admin/launch-health` or `python -m backend.scripts.launch_health_report`.
+- [ ] Image coverage reviewed through `/admin/launch-health` or `python -m backend.scripts.launch_health_report`.
+- [ ] Alert copy does not claim email delivery.
+- [ ] ScraperAPI-dependent Rightmove recovery is left as a follow-up while ScraperAPI is off.
 
 ## 0) Prereqs (one-time)
 
@@ -47,6 +61,7 @@ FAIL → Next action:
 PASS:
 
 - Railway backend has `IMPORT_ADMIN_TOKEN`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and (if using ScraperAPI) `SCRAPERAPI_KEY`.
+- ScraperAPI-off launch mode uses `SCRAPER_MODE=direct` and `INGEST_SOURCES=zoopla,onthemarket,spareroom`.
 - Vercel frontend has `NEXT_PUBLIC_API_BASE` pointing at Railway backend.
 
 FAIL → Next action:
@@ -192,8 +207,9 @@ curl -sS "$BACKEND_URL/properties?limit=50" \
   | /workspaces/propnexus-platform/.venv/bin/python - <<'PY'
 import json,sys
 data=json.load(sys.stdin)
-print(len(data) if isinstance(data,list) else 0)
-sys.exit(0 if isinstance(data,list) and len(data)>0 else 1)
+items=data.get('items') if isinstance(data,dict) else data
+print(len(items) if isinstance(items,list) else 0)
+sys.exit(0 if isinstance(items,list) and len(items)>0 else 1)
 PY
 ```
 
@@ -222,6 +238,7 @@ PASS:
 FAIL → Next action:
 
 - If `blocked`: enable/verify ScraperAPI settings.
+- While ScraperAPI is intentionally off, treat Rightmove-only blocking as deferred and verify Zoopla/OTM/SpareRoom instead.
 - If `timeout`: increase timeouts or reduce sources.
 
 ## 7) Frontend rendering (images + cards)

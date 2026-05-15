@@ -36,3 +36,31 @@ def test_admin_run_ingestion_accepts_when_unconfigured(client, monkeypatch):
 
     resp = client.post("/admin/run-ingestion", json={"location": "London"})
     assert resp.status_code == 401
+
+
+def test_admin_ingestion_status_returns_useful_shape(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
+    monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
+
+    resp = client.get("/admin/ingestion/status", headers={"Authorization": "Bearer secret"})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["ok"] is True
+    assert data["status"] in {"healthy", "degraded", "stale"}
+    assert "runner" in data
+    assert "latest_scrape_runs" in data
+
+
+def test_admin_launch_health_returns_json_shape(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "secret")
+    monkeypatch.setenv("IMPORT_ADMIN_TOKEN", "secret")
+
+    resp = client.get("/admin/launch-health", headers={"Authorization": "Bearer secret"})
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "operational" in data
+    assert "data" in data
+    assert "security" in data
+    assert "top_deal_version" in data["operational"]

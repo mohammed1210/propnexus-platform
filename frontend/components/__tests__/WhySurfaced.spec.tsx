@@ -59,7 +59,7 @@ describe('WhySurfaced', () => {
       />,
     );
 
-    expect(screen.getByText('Not a top deal yet')).toBeInTheDocument();
+    expect(screen.getAllByText('Standard listing').length).toBeGreaterThan(0);
     expect(screen.getByText(/PropNexus found limited signals/i)).toBeInTheDocument();
   });
 

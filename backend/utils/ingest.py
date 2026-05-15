@@ -33,6 +33,12 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 from dotenv import load_dotenv
 
 from backend.utils.deal_signals import extract_deal_signals
+from backend.utils.property_quality import (
+    clean_image_urls,
+    extract_best_postcode,
+    normalize_source_value,
+    should_replace_postcode,
+)
 from backend.utils.property_type_classifier import classify_property_type
 from backend.utils.supabase_client import get_supabase
 from supabase import Client
@@ -444,6 +450,8 @@ def _classify_investment_type(title: str | None, description: str | None) -> str
 
 
 def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
+    source_key = normalize_source_value(source) or clean_str(source) or source
+
     def _norm_url(u: Any) -> str | None:
         if not isinstance(u, str):
             return None
@@ -483,8 +491,10 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
     agent_email = clean_str(pick_first(raw, ["agent_email", "email", "contact_email"]))
 
     # Preserve gallery photos when available.
-    image_urls = _normalize_image_urls(
-        pick_first(raw, ["image_urls", "imageUrls", "images", "photos", "gallery"])
+    image_urls = clean_image_urls(
+        _normalize_image_urls(
+            pick_first(raw, ["image_urls", "imageUrls", "images", "photos", "gallery"])
+        )
     )
 
     normalized: Dict[str, Any] = {
@@ -505,8 +515,8 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
         "investment_type": clean_str(pick_first(raw, ["investment_type", "strategy", "type"])),
         "created_at": clean_str(pick_first(raw, ["created_at", "scraped_at", "timestamp"])),
         # optional
-        "external_id": extract_external_id(source=source, listing_url=listing_url, raw=raw),
-        "source": clean_str(source),
+        "external_id": extract_external_id(source=source_key, listing_url=listing_url, raw=raw),
+        "source": clean_str(source_key),
         # DB schema uses `url`; prefer it as the single canonical field.
         "url": listing_url,
         # Preserve the real source URL for investor handoff when DB columns exist.
@@ -565,6 +575,21 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
         normalized["investment_type"] = _classify_investment_type(
             normalized.get("title"), normalized.get("description")
         )
+
+    # Postcode enrichment from already-fetched/direct-source payload fields only.
+    # Never downgrade a full postcode to an outward code.
+    try:
+        postcode_candidate = extract_best_postcode({**raw, **normalized, "raw": raw})
+        if should_replace_postcode(normalized.get("postcode"), postcode_candidate):
+            normalized["postcode"] = postcode_candidate.value
+        data_obj = normalized.get("data")
+        if not isinstance(data_obj, dict):
+            data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+        data_obj["postcode_source"] = postcode_candidate.source
+        data_obj["postcode_quality"] = postcode_candidate.quality
+        normalized["data"] = data_obj
+    except Exception:
+        pass
 
     # Deal signals (investor feed): best-effort, additive.
     try:

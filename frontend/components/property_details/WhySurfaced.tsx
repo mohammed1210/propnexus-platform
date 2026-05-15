@@ -47,8 +47,8 @@ function getCopy(score: number | null) {
     };
   }
   return {
-    title: 'Not a top deal yet',
-    subtitle: 'PropNexus found limited signals. Treat this as a standard listing unless further evidence improves.',
+    title: 'Standard listing',
+    subtitle: 'PropNexus found limited signals. Treat this as unscored or standard unless further evidence improves.',
   };
 }
 

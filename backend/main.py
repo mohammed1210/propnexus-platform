@@ -56,6 +56,7 @@ from backend.middleware.rate_limit import limiter
 from backend.middleware.security import SecurityHeadersMiddleware
 from backend.routes import admin_schedule
 from backend.routes.admin_ingestion import router as admin_ingestion_router
+from backend.routes.admin_launch_health import router as admin_launch_health_router
 from backend.routes.admin_ml import router as admin_ml_router
 from backend.routes.admin_scrape_runs import router as admin_scrape_runs_router
 from backend.routes.ai import router as ai_router
@@ -330,6 +331,7 @@ app.include_router(enrichment_router)
 app.include_router(enrichment_queue_router)
 app.include_router(events_router)
 app.include_router(admin_ingestion_router)
+app.include_router(admin_launch_health_router)
 app.include_router(admin_scrape_runs_router)
 app.include_router(notes_router)
 app.include_router(off_market_router)

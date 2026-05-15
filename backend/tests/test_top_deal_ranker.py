@@ -27,7 +27,7 @@ def base_row(**extra):
 def test_scores_explicit_deal_signals_and_search_metadata():
     result = score_top_deal_candidate(base_row())
     assert result["score"] >= 50
-    assert result["tier"] in {"emerging", "strong", "prime"}
+    assert result["tier"] in {"watchlist", "strong", "prime"}
     assert any("reduced" in r.lower() for r in result["reasons"])
     assert result["evidence"]["search_metadata"]["portal"] == "rightmove"
 

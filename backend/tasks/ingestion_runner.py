@@ -20,7 +20,7 @@ import logging
 import os
 import time
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, List, Optional
 
 try:
     # Load environment variables from .env and .env.local at repo root if present
@@ -34,10 +34,21 @@ except Exception:
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.ingest import scrape_all_sources
 from backend.utils.ppd_comps import get_sold_comps_summary
+from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run
 from backend.utils.supabase_client import get_supabase
 from backend.utils.top_deal_ranker import apply_top_deal_ranking
 
 sb = get_supabase(required=False)
+
+DEFAULT_DIRECT_SOURCES = ["zoopla", "onthemarket", "spareroom"]
+_STATUS: dict[str, Any] = {
+    "latest_run_id": None,
+    "last_started_at": None,
+    "last_finished_at": None,
+    "last_total_imported": 0,
+    "last_error": None,
+    "sources": {},
+}
 
 
 def _load_locations() -> List[str]:
@@ -45,15 +56,73 @@ def _load_locations() -> List[str]:
     return [part.strip() for part in raw.split(",") if part.strip()]
 
 
+def _load_sources() -> List[str]:
+    raw = os.getenv("INGEST_SOURCES")
+    if not raw:
+        return list(DEFAULT_DIRECT_SOURCES)
+    return [part.strip().lower() for part in raw.split(",") if part.strip()]
+
+
+def get_ingestion_status_snapshot() -> dict[str, Any]:
+    return dict(_STATUS)
+
+
 def _chunk(items, size=100):
     return [items[i : i + size] for i in range(0, len(items), size)]
 
 
-async def _ingest_location(location: str, *, limit: Optional[int] = None) -> int:
+async def _ingest_location(
+    location: str, *, limit: Optional[int] = None, sources: Optional[List[str]] = None
+) -> int:
     """Scrape+upsert for a single location. Returns count of rows processed."""
     start = time.time()
+    run_id = create_scrape_run(source="direct", location=location, status="started")
+    run_label = run_id or f"local-{int(start)}"
+    selected_sources = sources or _load_sources()
+    source_counts: dict[str, int] = {source: 0 for source in selected_sources}
+    _STATUS.update(
+        {
+            "latest_run_id": run_label,
+            "last_started_at": datetime.now(timezone.utc).isoformat(),
+            "last_finished_at": None,
+            "last_error": None,
+        }
+    )
+
+    async def _source_complete(
+        source: str,
+        items: list[dict[str, Any]],
+        status: str,
+        error: str | None,
+        telemetry: dict[str, Any] | None = None,
+    ) -> None:
+        count = len(items) if isinstance(items, list) else 0
+        source_counts[source] = count
+        classification = "degraded" if status in {"blocked", "timeout", "error"} else status
+        _STATUS.setdefault("sources", {})[source] = {
+            "location": location,
+            "status": classification,
+            "last_imported_count": count,
+            "last_error": error,
+            "telemetry": telemetry or {},
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        logging.info(
+            "[ingest] run_id=%s source=%s location=%s status=%s count=%s error=%s",
+            run_label,
+            source,
+            location,
+            classification,
+            count,
+            error,
+        )
+
     try:
-        normalized = await scrape_all_sources(location)
+        normalized = await scrape_all_sources(
+            location,
+            sources=selected_sources,
+            on_source_complete=_source_complete,
+        )
 
         if limit is not None:
             try:
@@ -169,22 +238,52 @@ async def _ingest_location(location: str, *, limit: Optional[int] = None) -> int
                 except Exception as e:  # pragma: no cover
                     logging.warning("Upsert failed for batch (%s): %s", location, e)
         dur = (time.time() - start) * 1000
-        logging.info("[ingest] %s -> %d properties (%.0f ms)", location, count, dur)
+        finish_scrape_run(run_id=run_id, status="success", count_inserted=count)
+        _STATUS.update(
+            {
+                "last_finished_at": datetime.now(timezone.utc).isoformat(),
+                "last_total_imported": count,
+                "last_duration_ms": round(dur),
+                "last_error": None,
+            }
+        )
+        logging.info(
+            "[ingest] run_id=%s location=%s sources=%s imported=%d duration_ms=%.0f",
+            run_label,
+            location,
+            ",".join(selected_sources),
+            count,
+            dur,
+        )
         return count
     except Exception as e:  # pragma: no cover
-        logging.exception("[ingest] %s failed: %s", location, type(e).__name__)
+        finish_scrape_run(run_id=run_id, status="error", count_inserted=0, error=str(e))
+        _STATUS.update(
+            {
+                "last_finished_at": datetime.now(timezone.utc).isoformat(),
+                "last_error": f"{type(e).__name__}: {e}",
+            }
+        )
+        logging.exception(
+            "[ingest] run_id=%s location=%s failed: %s", run_label, location, type(e).__name__
+        )
         return 0
 
 
 async def run_cycle() -> int:
     """Run one full ingestion cycle across all locations."""
     locations = _load_locations()
+    sources = _load_sources()
     batch_sleep_ms = int(os.getenv("INGEST_BATCH_SLEEP_MS", "1500"))
     total = 0
     for loc in locations:
-        total += await _ingest_location(loc)
+        try:
+            total += await _ingest_location(loc, sources=sources)
+        except Exception as e:  # pragma: no cover - defensive runner guard
+            _STATUS["last_error"] = f"{loc}: {type(e).__name__}: {e}"
+            logging.exception("[ingest] location failed but cycle will continue location=%s", loc)
         await asyncio.sleep(batch_sleep_ms / 1000.0)
-    logging.info("[ingest] cycle complete total=%d", total)
+    logging.info("[ingest] cycle complete sources=%s total=%d", ",".join(sources), total)
     return total
 
 
@@ -192,12 +291,20 @@ async def main() -> None:
     interval = int(os.getenv("INGEST_INTERVAL_SECONDS", "900"))
     once = os.getenv("INGEST_RUN_ONCE", "0") == "1"
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    logging.info("Ingestion runner started (interval=%ss once=%s)", interval, once)
+    logging.info(
+        "Ingestion runner started (interval=%ss once=%s mode=%s sources=%s scraperapi_key=%s)",
+        interval,
+        once,
+        os.getenv("SCRAPER_MODE", "direct"),
+        ",".join(_load_sources()),
+        "present" if os.getenv("SCRAPERAPI_KEY") else "absent",
+    )
 
     while True:
         await run_cycle()
         if once:
             break
+        logging.info("[ingest] next_run_wait_seconds=%s", interval)
         await asyncio.sleep(interval)
 
 

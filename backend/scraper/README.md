@@ -25,13 +25,27 @@ Environment (backend/.env or service config):
 	- `SUPABASE_SERVICE_ROLE_KEY`
 - Scrapers
 	- `SCRAPER_MODE=direct|scraperapi`
+	- Launch mode while ScraperAPI is off: `SCRAPER_MODE=direct`
+	- Launch source allow-list: `INGEST_SOURCES=zoopla,onthemarket,spareroom`
 	- Provider keys as available: `SCRAPERAPI_KEY` (optional)
 	- Pagination/delay knobs: `RM_MAX_PAGES`, `ZP_MAX_PAGES`, `OT_MAX_PAGES`, `SR_MAX_PAGES`, and `*_DELAY_MS`
 - Ingestion runner
 	- `INGEST_LOCATIONS=London,Manchester,Liverpool,Birmingham`
 	- `INGEST_INTERVAL_SECONDS=900` (15m)
+	- `INGEST_SOURCES=zoopla,onthemarket,spareroom`
 	- `INGEST_RUN_ONCE=0`
 	- `INGEST_BATCH_SLEEP_MS=1500`
+
+ScraperAPI-off soft-launch mode:
+
+```bash
+export SCRAPER_MODE=direct
+export INGEST_SOURCES=zoopla,onthemarket,spareroom
+export INGEST_INTERVAL_SECONDS=900
+python -m backend.tasks.ingestion_runner
+```
+
+Rightmove is optional in this mode. Direct Rightmove scraping may return `0`, blocked, or degraded results; that should be logged as a degraded source, not treated as a worker crash. Full Rightmove reliability may require ScraperAPI later.
 
 Local quick start (single cycle):
 
@@ -58,4 +72,4 @@ Verification:
 Notes & follow‑ups:
 
 - Add data validation and monitoring (counts, blocking detection) post‑launch
-- Consider provider rotation and quotas if `SCRAPERAPI_KEY` is used
+- Consider provider rotation and quotas if `SCRAPERAPI_KEY` is switched back on
