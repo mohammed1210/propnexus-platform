@@ -65,6 +65,24 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: railway service list
 
+      - name: Configure ingest worker variables
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "❌ SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY GitHub secrets are required for the ingest worker"
+            exit 1
+          fi
+
+          railway variable set "SUPABASE_URL=$SUPABASE_URL" --service "function-bun" --skip-deploys
+          railway variable set "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" --service "function-bun" --skip-deploys
+          railway variable set "SCRAPER_MODE=direct" --service "function-bun" --skip-deploys
+          railway variable set "SCRAPERAPI_ALLOW_FALLBACK=false" --service "function-bun" --skip-deploys
+          railway variable set "INGEST_SOURCES=zoopla,onthemarket,spareroom" --service "function-bun" --skip-deploys
+          railway variable set "INGEST_INTERVAL_SECONDS=900" --service "function-bun" --skip-deploys
+
       - name: Deploy ingest worker with Railway
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
