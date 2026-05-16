@@ -5,6 +5,7 @@
 - **App**: visit `/api/diag` – reports env presence and connection to Supabase.
 - **Supabase**: console → Table Editor → `properties`.
 - **Railway ingest-worker**: service should start with `bash scripts/railway-start.sh`, dispatch to `python -m backend.tasks.ingestion_runner`, log `[ingest-worker] starting`, and keep running between cycles. When Railway provides `PORT`, the worker exposes a minimal `/health` responder for the shared Railway health check.
+- **Railway deploy targets**: GitHub Actions deploys the API to `propnexus-backend` and the active ingest worker to `function-bun`. A red GitHub commit status named `vivacious-embrace - ingest-worker` is an obsolete Railway status context from an old integration/service; if it persists, remove or disconnect it in Railway/GitHub integration settings rather than changing application code.
 
 ## Environments
 
@@ -27,6 +28,25 @@
 While ScraperAPI is off, leave `SCRAPERAPI_KEY` empty/omitted and keep Rightmove opt-in. The worker should be treated as degraded when an individual direct source is blocked or returns 0, and failed only when the process exits or cannot start.
 
 Direct-mode worker policy: `SCRAPER_MODE=direct` disables ScraperAPI fallback even if a stale key exists in the environment. Only set `SCRAPERAPI_ALLOW_FALLBACK=true` when deliberately re-enabling paid fallback behavior.
+
+## Launch Backfills and Health Checks
+
+Run these commands from the repository root with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` configured. They do not require ScraperAPI.
+
+```bash
+python -m backend.scripts.backfill_top_deals --limit 50 --dry-run
+python -m backend.scripts.backfill_property_quality --limit 50 --dry-run
+python -m backend.scripts.launch_health_report
+```
+
+Expected backfill dry-run output includes `total_scanned`, `updated`, `skipped`, and `errors`; `errors: 0` is required before running without `--dry-run`. The launch-health report should show `Supabase configured: True`, `Scraper mode: direct`, and the current direct source list.
+
+To apply the backfills after dry-run verification:
+
+```bash
+python -m backend.scripts.backfill_top_deals --batch-size 100 --force
+python -m backend.scripts.backfill_property_quality --batch-size 100 --force
+```
 
 ## Data Access
 

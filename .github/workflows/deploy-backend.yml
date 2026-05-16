@@ -16,6 +16,13 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      RAILWAY_API_SERVICE: propnexus-backend
+      RAILWAY_WORKER_SERVICE: function-bun
+      WORKER_SCRAPER_MODE: direct
+      WORKER_SCRAPERAPI_ALLOW_FALLBACK: "false"
+      WORKER_INGEST_SOURCES: zoopla,onthemarket,spareroom
+      WORKER_INGEST_INTERVAL_SECONDS: "900"
 
     steps:
       - name: Checkout
@@ -51,14 +58,24 @@ jobs:
 
           railway --version
 
+      - name: Report Railway deployment targets
+        run: |
+          echo "Railway API deploy target: $RAILWAY_API_SERVICE"
+          echo "Railway ingest worker deploy target: $RAILWAY_WORKER_SERVICE"
+          echo "Worker scraper mode: $WORKER_SCRAPER_MODE"
+          echo "ScraperAPI fallback: disabled"
+
       - name: Deploy with Railway
+        id: deploy_api
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
+          echo "Deploying PropNexus backend API to Railway service: $RAILWAY_API_SERVICE"
           railway up \
-            --service "propnexus-backend" \
+            --service "$RAILWAY_API_SERVICE" \
             --ci \
             --json
+          echo "PropNexus backend API deployment complete: $RAILWAY_API_SERVICE"
 
       - name: List Railway services
         env:
@@ -66,6 +83,7 @@ jobs:
         run: railway service list
 
       - name: Configure ingest worker variables
+        id: configure_worker_env
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -76,28 +94,34 @@ jobs:
             exit 1
           fi
 
-          railway variable set "SUPABASE_URL=$SUPABASE_URL" --service "function-bun" --skip-deploys
-          railway variable set "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" --service "function-bun" --skip-deploys
-          railway variable set "SCRAPER_MODE=direct" --service "function-bun" --skip-deploys
-          railway variable set "SCRAPERAPI_ALLOW_FALLBACK=false" --service "function-bun" --skip-deploys
-          railway variable set "INGEST_SOURCES=zoopla,onthemarket,spareroom" --service "function-bun" --skip-deploys
-          railway variable set "INGEST_INTERVAL_SECONDS=900" --service "function-bun" --skip-deploys
+          echo "Seeding ingest worker environment for Railway service: $RAILWAY_WORKER_SERVICE"
+          railway variable set "SUPABASE_URL=$SUPABASE_URL" --service "$RAILWAY_WORKER_SERVICE" --skip-deploys
+          railway variable set "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" --service "$RAILWAY_WORKER_SERVICE" --skip-deploys
+          railway variable set "SCRAPER_MODE=$WORKER_SCRAPER_MODE" --service "$RAILWAY_WORKER_SERVICE" --skip-deploys
+          railway variable set "SCRAPERAPI_ALLOW_FALLBACK=$WORKER_SCRAPERAPI_ALLOW_FALLBACK" --service "$RAILWAY_WORKER_SERVICE" --skip-deploys
+          railway variable set "INGEST_SOURCES=$WORKER_INGEST_SOURCES" --service "$RAILWAY_WORKER_SERVICE" --skip-deploys
+          railway variable set "INGEST_INTERVAL_SECONDS=$WORKER_INGEST_INTERVAL_SECONDS" --service "$RAILWAY_WORKER_SERVICE" --skip-deploys
+          echo "Ingest worker environment seeded successfully for service: $RAILWAY_WORKER_SERVICE"
 
       - name: Deploy ingest worker with Railway
+        id: deploy_worker
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
+          echo "Deploying PropNexus ingest worker to Railway service: $RAILWAY_WORKER_SERVICE"
           railway up \
-            --service "function-bun" \
+            --service "$RAILWAY_WORKER_SERVICE" \
             --ci \
             --json
+          echo "PropNexus ingest worker deployment complete: $RAILWAY_WORKER_SERVICE"
 
       - name: Verify ingest worker startup logs
+        id: verify_worker
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           for i in {1..18}; do
-            logs="$(railway logs --service "function-bun" --latest --deployment --lines 160 2>&1 || true)"
+            logs="$(railway logs --service "$RAILWAY_WORKER_SERVICE" --latest --deployment --lines 160 2>&1 || true)"
             printf '%s\n' "$logs"
 
             if printf '%s\n' "$logs" | grep -q "\[ingest-worker\] starting" \
@@ -105,6 +129,7 @@ jobs:
               && printf '%s\n' "$logs" | grep -q "\[ingest-worker\] supabase_configured=True" \
               && printf '%s\n' "$logs" | grep -q "\[ingest-worker\] sources="; then
               echo "✅ ingest worker startup diagnostics found"
+              echo "PropNexus ingest worker verified healthy: $RAILWAY_WORKER_SERVICE"
               exit 0
             fi
 
@@ -116,6 +141,7 @@ jobs:
           exit 1
 
       - name: Wait for expected deployed version
+        id: verify_api
         env:
           URL: https://propnexus-backend-production.up.railway.app/health
           EXPECT_SHA: ${{ github.sha }}
@@ -153,3 +179,20 @@ jobs:
 
           echo "❌ Deployed version did not advance to this commit ($EXPECT_SHA) in time"
           exit 1
+
+      - name: Railway deployment summary
+        if: always()
+        run: |
+          {
+            echo "## Railway deployment summary"
+            echo ""
+            echo "- PropNexus backend API target: $RAILWAY_API_SERVICE"
+            echo "- PropNexus backend API deployment: ${{ steps.deploy_api.outcome }}"
+            echo "- PropNexus backend API version check: ${{ steps.verify_api.outcome }}"
+            echo "- PropNexus ingest worker target: $RAILWAY_WORKER_SERVICE"
+            echo "- PropNexus ingest worker environment seed: ${{ steps.configure_worker_env.outcome }}"
+            echo "- PropNexus ingest worker deployment: ${{ steps.deploy_worker.outcome }}"
+            echo "- PropNexus ingest worker startup verification: ${{ steps.verify_worker.outcome }}"
+            echo "- Worker scraper mode: $WORKER_SCRAPER_MODE"
+            echo "- ScraperAPI fallback: disabled"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
