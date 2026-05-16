@@ -5,7 +5,7 @@
 - **App**: visit `/api/diag` – reports env presence and connection to Supabase.
 - **Supabase**: console → Table Editor → `properties`.
 - **Railway ingest-worker**: service should start with `bash scripts/railway-start.sh`, dispatch to `python -m backend.tasks.ingestion_runner`, log `[ingest-worker] starting`, and keep running between cycles. When Railway provides `PORT`, the worker exposes a minimal `/health` responder for the shared Railway health check.
-- **Railway deploy targets**: GitHub Actions deploys the API to `propnexus-backend` and the active ingest worker to `function-bun`. A red GitHub commit status named `vivacious-embrace - ingest-worker` is an obsolete Railway status context from an old integration/service; if it persists, remove or disconnect it in Railway/GitHub integration settings rather than changing application code.
+- **Railway deploy targets**: GitHub Actions deploys the API to `propnexus-backend` and the active ingest worker to `function-bun`. The GitHub Actions `Deploy Backend (Railway)` run is the source of truth for deploy health. A red GitHub commit status named `vivacious-embrace - ingest-worker`, or duplicate Railway direct-integration statuses that conflict with the Actions result, are external Railway/GitHub integration contexts; if they persist, remove or disconnect the old Railway GitHub integration/service connection rather than changing application code.
 
 ## Environments
 
