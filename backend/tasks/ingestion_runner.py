@@ -41,6 +41,7 @@ from backend.utils.ingest import scrape_all_sources
 from backend.utils.ppd_comps import get_sold_comps_summary
 from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run
 from backend.utils.supabase_client import get_supabase
+from backend.utils.supabase_env import resolve_supabase_env_block
 from backend.utils.top_deal_ranker import apply_top_deal_ranking
 
 sb = get_supabase(required=False)
@@ -128,6 +129,7 @@ def _worker_version() -> str:
 
 def get_worker_startup_summary() -> dict[str, Any]:
     mode = _effective_scraper_mode()
+    supabase_env = resolve_supabase_env_block()
     return {
         "worker_version": _worker_version(),
         "scraper_mode": mode,
@@ -135,7 +137,9 @@ def get_worker_startup_summary() -> dict[str, Any]:
         "locations": _load_locations(),
         "interval_seconds": _load_int_env("INGEST_INTERVAL_SECONDS", 900, minimum=1),
         "scraperapi_configured": _scraperapi_enabled_for_mode(mode),
-        "supabase_configured": sb is not None,
+        "supabase_configured": supabase_env.configured,
+        "supabase_client_ready": sb is not None,
+        "supabase_missing_vars": list(supabase_env.missing_vars),
         "run_once": os.getenv("INGEST_RUN_ONCE", "0") == "1",
     }
 
@@ -149,6 +153,12 @@ def log_worker_startup_summary(summary: dict[str, Any]) -> None:
     logging.info("[ingest-worker] interval_seconds=%s", summary["interval_seconds"])
     logging.info("[ingest-worker] scraperapi_configured=%s", summary["scraperapi_configured"])
     logging.info("[ingest-worker] supabase_configured=%s", summary["supabase_configured"])
+    logging.info("[ingest-worker] supabase_client_ready=%s", summary["supabase_client_ready"])
+    if summary["supabase_missing_vars"]:
+        logging.warning(
+            "[ingest-worker] supabase_missing_vars=%s",
+            ",".join(summary["supabase_missing_vars"]),
+        )
 
 
 async def _handle_health_request(
@@ -270,6 +280,10 @@ async def _ingest_location(
                 pass
 
         count = len(normalized)
+        global sb
+        if sb is None:
+            sb = get_supabase(required=False)
+
         if sb and normalized:
             for batch in _chunk(normalized):
                 try:

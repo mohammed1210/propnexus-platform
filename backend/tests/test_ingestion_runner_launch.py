@@ -82,6 +82,7 @@ def test_startup_summary_does_not_expose_secrets(monkeypatch, caplog):
     monkeypatch.setenv("SCRAPER_MODE", "direct")
     monkeypatch.setenv("SCRAPERAPI_KEY", "super-secret-value")
     monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "another-secret-value")
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("INGEST_SOURCES", "zoopla")
     monkeypatch.setattr(ingestion_runner, "sb", object())
 
@@ -94,3 +95,20 @@ def test_startup_summary_does_not_expose_secrets(monkeypatch, caplog):
     assert "another-secret-value" not in rendered
     assert "scraperapi_configured=False" in rendered
     assert "supabase_configured=True" in rendered
+    assert "supabase_client_ready=True" in rendered
+
+
+def test_startup_summary_reports_missing_supabase_vars(monkeypatch):
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("NEXT_PUBLIC_SUPABASE_URL", raising=False)
+    monkeypatch.delenv("PUBLIC_SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_KEY", raising=False)
+    monkeypatch.delenv("SUPABASE_ANON_KEY", raising=False)
+    monkeypatch.delenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", raising=False)
+
+    summary = ingestion_runner.get_worker_startup_summary()
+
+    assert summary["supabase_configured"] is False
+    assert summary["supabase_missing_vars"] == ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]

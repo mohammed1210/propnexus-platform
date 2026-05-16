@@ -84,6 +84,7 @@ jobs:
 
             if printf '%s\n' "$logs" | grep -q "\[ingest-worker\] starting" \
               && printf '%s\n' "$logs" | grep -q "\[ingest-worker\] scraper_mode=direct" \
+              && printf '%s\n' "$logs" | grep -q "\[ingest-worker\] supabase_configured=True" \
               && printf '%s\n' "$logs" | grep -q "\[ingest-worker\] sources="; then
               echo "✅ ingest worker startup diagnostics found"
               exit 0
