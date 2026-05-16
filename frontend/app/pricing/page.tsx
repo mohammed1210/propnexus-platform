@@ -21,7 +21,7 @@ const investorFeatures = [
   'See what price makes the deal work with Offer Intelligence',
   'Compare sold and rent evidence before bidding',
   'Track price changes, days on market and stale listings',
-  'Save alert criteria for newly surfaced strong opportunities',
+  'Save search criteria for newly surfaced strong opportunities',
   'AI Deal Score, Investment Summary and strategy guidance',
   'Priority access to new launch features',
 ];
@@ -57,7 +57,7 @@ export default function PricingPage() {
           Choose your plan
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-400 sm:text-lg">
-          Start free, then upgrade when you want investor-grade lead triage, offer pricing and deal alerts.
+          Start free, then upgrade when you want investor-grade lead triage, offer pricing and saved-search workflows.
         </p>
       </div>
 

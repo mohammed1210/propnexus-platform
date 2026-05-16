@@ -64,6 +64,9 @@ const formatPageSummary = (pageMode: ChatbotPageMode) => {
 const formatPropertySummary = (property?: Partial<LooseProperty>) => {
   if (!property) return '';
 
+  const yieldPct = getYieldPercent(property as any);
+  const roiDisplay = getRoiDisplay(property as any);
+
   const details = [
     property.title ? `Title: ${property.title}` : null,
     property.location ? `Location: ${property.location}` : null,
@@ -72,8 +75,8 @@ const formatPropertySummary = (property?: Partial<LooseProperty>) => {
     typeof property.bathrooms === 'number' ? `Bathrooms: ${property.bathrooms}` : null,
     property.propertyType ? `Property type: ${property.propertyType}` : null,
     property.investmentType ? `Investment type: ${property.investmentType}` : null,
-    typeof property.yield_percent === 'number' ? `Yield: ${formatPercent(property.yield_percent)}` : null,
-    typeof property.roi_percent === 'number' ? `ROI: ${formatPercent(property.roi_percent)}` : null,
+    typeof yieldPct === 'number' ? `Yield: ${formatPercent(yieldPct)}` : null,
+    typeof roiDisplay.value === 'number' ? `ROI: ${formatRoiDisplay(roiDisplay)}` : null,
     typeof property.top_deal_score === 'number' ? `Top deal score: ${property.top_deal_score}` : null,
     property.description ? `Description: ${String(property.description).slice(0, 600)}` : null,
   ].filter(Boolean);
