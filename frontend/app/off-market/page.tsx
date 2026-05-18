@@ -188,7 +188,7 @@ export default function OffMarketPage() {
         <SectionTitle>Off‑Market Deals</SectionTitle>
         <p className="mt-2 max-w-xl text-sm text-zinc-600 dark:text-zinc-300">
           Track and experiment with off‑market opportunities you or your agents uncover.
-          Use the AI generator for ideas, then refine with filters to focus on the best deals.
+          Use the AI generator for ideas, then refine with filters to focus on stronger evidence-backed leads.
         </p>
 
         {/* AI Generator toolbar */}

@@ -3,7 +3,10 @@ import Link from "next/link";
 import AuthStatusPanel from "@/components/admin/AuthStatusPanel";
 import RunImportPanel from "@/components/admin/RunImportPanel";
 
-export const metadata = { title: "Admin • PropNexus" };
+export const metadata = {
+  title: "Admin • PropNexus",
+  robots: { index: false, follow: false },
+};
 
 /**
  * Admin pages should NOT be statically generated during build.
@@ -326,15 +329,9 @@ export default async function AdminPage() {
             Please ensure Supabase environment variables are configured correctly (server-side).
           </p>
 
-          <div className="mt-4 rounded-lg bg-zinc-50 p-4 text-xs text-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300">
-            <p className="mb-1 font-semibold">Expected variables (examples):</p>
-            <ul className="list-disc space-y-1 pl-5">
-              <li>SUPABASE_URL</li>
-              <li>SUPABASE_SERVICE_ROLE_KEY</li>
-              <li>NEXT_PUBLIC_SUPABASE_URL</li>
-              <li>NEXT_PUBLIC_SUPABASE_ANON_KEY</li>
-            </ul>
-          </div>
+          <p className="mt-4 rounded-lg bg-zinc-50 p-4 text-xs text-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300">
+            Expected server-side Supabase configuration is missing or invalid. Check deployment secrets in the hosting dashboard.
+          </p>
         </div>
       </main>
     );

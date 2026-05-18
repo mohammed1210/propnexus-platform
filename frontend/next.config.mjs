@@ -8,6 +8,22 @@ const __dirname = dirname(__filename);
 const nextConfig = {
   reactStrictMode: true,
 
+  async headers() {
+    const securityHeaders = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+    ];
+
+    return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
+    ];
+  },
+
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -39,6 +55,9 @@ const nextConfig = {
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**" }],
   },
+
+  // CSP is intentionally deferred for a dedicated allowlist pass covering Clerk,
+  // Stripe, Sentry, map providers and remote listing images.
 
   webpack: (config) => {
     config.resolve.alias = {

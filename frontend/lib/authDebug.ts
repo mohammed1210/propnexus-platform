@@ -19,19 +19,17 @@ export type AuthDebugPayload = {
   clerk: {
     hasPublishableKey: boolean;
     hasValidPublishableKey: boolean;
-    publishableKeyPrefix: string | null;
-    publishableKeyLength: number;
     publishableKeyHasWhitespace: boolean;
     hasSecretKey: boolean;
-    signInUrl: string | null;
-    signUpUrl: string | null;
-    afterSignInUrl: string | null;
-    afterSignUpUrl: string | null;
+    hasSignInUrl: boolean;
+    hasSignUpUrl: boolean;
+    hasAfterSignInUrl: boolean;
+    hasAfterSignUpUrl: boolean;
   };
   whoami: {
-    userId: string | null;
-    sessionId: string | null;
-    email: string | null;
+    hasUserId: boolean;
+    hasSessionId: boolean;
+    hasEmail: boolean;
     error?: string;
   };
 };
@@ -50,24 +48,21 @@ export async function buildAuthDebugPayload(): Promise<AuthDebugPayload> {
   const isAuthEnabledServer = !disableAuth && hasValidPublishableKey && hasSecretKey;
 
   const whoami: AuthDebugPayload['whoami'] = {
-    userId: null,
-    sessionId: null,
-    email: null,
+    hasUserId: false,
+    hasSessionId: false,
+    hasEmail: false,
   };
 
   if (isAuthEnabledServer) {
     try {
       const a = await auth();
-      whoami.userId = a.userId ?? null;
-      whoami.sessionId = a.sessionId ?? null;
+      whoami.hasUserId = Boolean(a.userId);
+      whoami.hasSessionId = Boolean(a.sessionId);
 
       if (a.userId) {
         const client = await clerkClient();
         const user = await client.users.getUser(a.userId);
-        whoami.email =
-          user.primaryEmailAddress?.emailAddress ??
-          user.emailAddresses?.[0]?.emailAddress ??
-          null;
+        whoami.hasEmail = Boolean(user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress);
       }
     } catch (err: any) {
       whoami.error = err?.message || 'Failed to load Clerk auth';
@@ -84,14 +79,12 @@ export async function buildAuthDebugPayload(): Promise<AuthDebugPayload> {
     clerk: {
       hasPublishableKey,
       hasValidPublishableKey,
-      publishableKeyPrefix: publishable ? publishable.slice(0, 6) : null,
-      publishableKeyLength: publishable.length,
       publishableKeyHasWhitespace: hasPublishableWhitespace,
       hasSecretKey,
-      signInUrl: process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL ?? null,
-      signUpUrl: process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL ?? null,
-      afterSignInUrl: process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL ?? null,
-      afterSignUpUrl: process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL ?? null,
+      hasSignInUrl: Boolean(process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL),
+      hasSignUpUrl: Boolean(process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL),
+      hasAfterSignInUrl: Boolean(process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL),
+      hasAfterSignUpUrl: Boolean(process.env.NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL),
     },
     whoami,
   };

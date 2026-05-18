@@ -51,6 +51,7 @@
     "type-check": "npm run typecheck",
     "typecheck": "tsc --noEmit",
     "health:report": "node scripts/system-health-report.mjs",
+    "launch:audit": "bash scripts/launch_audit.sh",
     "test": "jest --passWithNoTests --testPathIgnorePatterns='e2e/'",
     "e2e": "playwright test --reporter=list"
   },

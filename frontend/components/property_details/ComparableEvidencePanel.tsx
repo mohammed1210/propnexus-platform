@@ -1,6 +1,8 @@
 'use client';
 
 import { fmtGBP } from '@/components/property_details/OfferIntelligence';
+import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
+import { COMPS_DISCLAIMER } from '@/lib/legalCopy';
 
 type Benchmark = {
   similar_sales_count?: number | null;
@@ -32,6 +34,9 @@ export default function ComparableEvidencePanel({ benchmark }: { benchmark?: Ben
         <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/50"><div className="text-xs text-slate-500">Comps used</div><div className="font-bold">{benchmark.similar_sales_count ?? 0}</div></div>
         <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-900/50"><div className="text-xs text-slate-500">Subject vs median</div><div className="font-bold">{typeof diff === 'number' ? `${diff > 0 ? '+' : ''}${diff.toFixed(1)}%` : '—'}</div></div>
       </div>
+      <InfoDisclaimer className="mt-4" label="Comparable evidence disclaimer">
+        {COMPS_DISCLAIMER} Check property type, size, tenure, condition, distance and sale date before relying on it.
+      </InfoDisclaimer>
     </div>
   );
 }

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FiCheckCircle, FiClipboard, FiExternalLink, FiMail, FiPhone } from 'react-icons/fi';
 import { toast } from 'sonner';
+import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
+import { CONTACT_ORIGINAL_LISTING_DISCLAIMER } from '@/lib/legalCopy';
 
 import {
   buildInvestorEnquiry,
@@ -246,6 +248,10 @@ export default function DealActionPanel({ propertyId, property, compact = false 
             </p>
           )}
         </div>
+
+        <InfoDisclaimer label="Original listing disclaimer">
+          {CONTACT_ORIGINAL_LISTING_DISCLAIMER} Use the original listing to confirm availability, price and viewing details.
+        </InfoDisclaimer>
       </div>
     </section>
   );

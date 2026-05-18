@@ -216,8 +216,6 @@ def debug_supabase_env():
         "SUPABASE_URL_present": bool(url),
         "SUPABASE_URL_host": host,
         "key_present": bool(key),
-        "key_len": len(key),
-        "key_prefix": key[:8] if key else "",
         "checked_vars_order": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
     }
 
@@ -233,8 +231,6 @@ def debug_scraper_env():
         "SCRAPER_TIMEOUT_SECONDS": os.getenv("SCRAPER_TIMEOUT_SECONDS", "20"),
         "INGEST_TIMEOUT_SECONDS": os.getenv("INGEST_TIMEOUT_SECONDS", ""),
         "SCRAPERAPI_KEY_present": bool(scraperapi_key),
-        "SCRAPERAPI_KEY_len": len(scraperapi_key),
-        "SCRAPERAPI_KEY_prefix": scraperapi_key[:6] if scraperapi_key else "",
         "PLAYWRIGHT_ENABLE": os.getenv("PLAYWRIGHT_ENABLE", "0") == "1",
         "PLAYWRIGHT_BROWSER": os.getenv("PLAYWRIGHT_BROWSER", "chromium"),
         "PLAYWRIGHT_TIMEOUT_MS": os.getenv("PLAYWRIGHT_TIMEOUT_MS", "15000"),

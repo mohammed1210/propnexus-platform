@@ -8,6 +8,8 @@ import { useAuth } from '@clerk/nextjs';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
+import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
+import { SAVED_DEALS_DISCLAIMER } from '@/lib/legalCopy';
 import { formatRoiDisplay, getRoiProxyValidationNote, normalizeProperty } from '@/lib/normalizeProperty';
 
 type Property = {
@@ -316,6 +318,9 @@ export default function SavedDealsView() {
             <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
               Select 2–4 deals to compare side-by-side.
             </div>
+            <InfoDisclaimer className="mt-2" label="Saved deals disclaimer">
+              {SAVED_DEALS_DISCLAIMER}
+            </InfoDisclaimer>
             {!loading && !error && !authRequired ? (
               <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">{deals.length} saved</div>
             ) : null}

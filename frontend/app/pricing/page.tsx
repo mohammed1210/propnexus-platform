@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import StartFreeButton from '@/components/StartFreeButton';
 import UpgradeButton from '@/components/UpgradeButton';
 import WaitlistForm from '@/components/WaitlistForm';
+import LegalNotice from '@/components/legal/LegalNotice';
 
 const INVESTOR_PRODUCT_ID = process.env.NEXT_PUBLIC_STRIPE_PRODUCT_INVESTOR || 'prod_TGprLukyGJfRBH';
 
@@ -17,7 +18,7 @@ const freeFeatures = [
 
 const investorFeatures = [
   'Everything in Free',
-  'Find investment-grade leads faster with stricter Top Deal tiers',
+  'Find stronger evidence-backed leads faster with stricter Top Deal tiers',
   'See what price makes the deal work with Offer Intelligence',
   'Compare sold and rent evidence before bidding',
   'Track price changes, days on market and stale listings',
@@ -57,7 +58,7 @@ export default function PricingPage() {
           Choose your plan
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-400 sm:text-lg">
-          Start free, then upgrade when you want investor-grade lead triage, offer pricing and saved-search workflows.
+          Start free, then upgrade when you want evidence-backed lead triage, offer pricing and saved-search workflows.
         </p>
       </div>
 
@@ -124,6 +125,10 @@ export default function PricingPage() {
       <p className="mt-10 text-center text-sm text-slate-500 dark:text-slate-400">
         Investor starts with a 7-day free trial. No payment required during trial. Cancel anytime.
       </p>
+
+      <LegalNotice className="mx-auto mt-5 max-w-3xl text-center" variant="compact">
+        Subscription features provide analysis and workflow tools only. PropNexus does not guarantee profitable deals, below-market purchases, finance approval or investment outcomes.
+      </LegalNotice>
 
       <section className="mx-auto mt-12 max-w-2xl rounded-2xl border border-slate-200 bg-slate-50/80 p-6 dark:border-slate-800 dark:bg-slate-900/50">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">

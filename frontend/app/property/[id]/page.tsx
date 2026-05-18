@@ -29,7 +29,9 @@ import ListingHistory from '@/components/property_details/ListingHistory';
 import ComparableEvidencePanel from '@/components/property_details/ComparableEvidencePanel';
 import RentalEvidencePanel from '@/components/property_details/RentalEvidencePanel';
 import TradesmenList from '@/components/tradesmen/TradesmenList';
+import LegalNotice from '@/components/legal/LegalNotice';
 import { useRegisterCurrentProperty } from '@/components/ai/CurrentPropertyContext';
+import { INVESTMENT_DISCLAIMER_SHORT } from '@/lib/legalCopy';
 
 import type { Property } from '@/types';
 import { FF } from '@/lib/flags';
@@ -444,6 +446,9 @@ export default function PropertyDetailsPage() {
             <div className="text-xs text-slate-500 dark:text-slate-400">
               Showing the most relevant insights first
             </div>
+            <LegalNotice title="Due diligence" variant="compact">
+              Investor brief and scores are indicative only. Verify rent, comparable sales, finance, works, legal pack and tax position before making an offer. {INVESTMENT_DISCLAIMER_SHORT}
+            </LegalNotice>
             <CollapsibleCard
               title="Offer Intelligence"
               icon={

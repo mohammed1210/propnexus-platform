@@ -5,8 +5,10 @@ import { FiBarChart2, FiHome, FiMapPin, FiShield } from 'react-icons/fi';
 
 import CollapsibleCard from '@/components/property_details/CollapsibleCard';
 import GatedPanel from '@/components/property_details/GatedPanel';
+import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
 import { getAreaIntel, getComps } from '@/lib/api';
 import { FF } from '@/lib/flags';
+import { AREA_INTEL_DISCLAIMER, COMPS_DISCLAIMER, DATA_ACCURACY_DISCLAIMER } from '@/lib/legalCopy';
 
 type AreaIntelData = {
   key: string;
@@ -544,6 +546,9 @@ export default function AreaInsights({
                         ) : null}
                       </div>
                     </div>
+                    <InfoDisclaimer label="Area intelligence disclaimer">
+                      {AREA_INTEL_DISCLAIMER} {DATA_ACCURACY_DISCLAIMER}
+                    </InfoDisclaimer>
                   </>
                 )}
               </div>
@@ -629,6 +634,9 @@ export default function AreaInsights({
                     </div>
                   </div>
                 ) : null}
+                <InfoDisclaimer label="Comparable evidence disclaimer">
+                  {COMPS_DISCLAIMER} Check property type, size, tenure, condition, distance and sale date before relying on it.
+                </InfoDisclaimer>
               </div>
             </GatedPanel>
           </div>

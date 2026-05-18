@@ -15,6 +15,8 @@ import {
 import { getAreaIntel, getComps } from '@/lib/api';
 import { buildDealScoreFactors, type AreaIntelEvidence, type CompsEvidence, type DisplayScoreFactor } from '@/lib/dealScoreFactors';
 import { formatRoiDisplay, getRoiProxyValidationNote, normalizeProperty } from '@/lib/normalizeProperty';
+import { AI_DISCLAIMER } from '@/lib/legalCopy';
+import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
 import MetricExplainer from './MetricExplainer';
 
 interface PropertyData {
@@ -79,7 +81,7 @@ function factorToneClasses(tone: DisplayScoreFactor['tone']): string {
 }
 
 type DealVerdict = {
-  label: 'Investor-grade' | 'Watchlist' | 'Needs stronger evidence';
+  label: 'Stronger evidence' | 'Watchlist' | 'Needs stronger evidence';
   tone: DisplayScoreFactor['tone'];
   summary: string;
 };
@@ -99,7 +101,7 @@ type ScoreChartItem = {
 function getDealVerdict(score: number): DealVerdict {
   if (score >= 75) {
     return {
-      label: 'Investor-grade',
+      label: 'Stronger evidence',
       tone: 'emerald',
       summary: 'Strong evidence base. Move into offer diligence, not blind bidding.',
     };
@@ -506,7 +508,7 @@ export default function DealScore({ property }: DealScoreProps) {
   const dealBand =
     score >= 75
       ? {
-          label: 'Investor-grade opportunity',
+          label: 'Stronger evidence signal',
           chip: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300',
           summary:
             'Strong fundamentals. Prioritise offer strategy, finance terms and diligence checks.',
@@ -756,6 +758,9 @@ export default function DealScore({ property }: DealScoreProps) {
           Version {version ?? 'v1.0'} • Scores are indicative and only display factors backed by available data. Overall score may include legacy model weighting; visible factors show available evidence only.
         </div>
       ) : null}
+      <InfoDisclaimer label="AI Deal Score disclaimer">
+        Scores are indicative and evidence-limited. They are not a recommendation to buy. {AI_DISCLAIMER}
+      </InfoDisclaimer>
     </div>
   );
 }

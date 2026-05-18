@@ -1,3 +1,5 @@
+import { LEGAL_PAGE_UPDATED_DATE } from '@/lib/legalCopy';
+
 export const metadata = {
   title: 'Privacy Policy',
   description: 'How PropNexus collects, uses, and protects your personal information',
@@ -13,12 +15,12 @@ export default function PrivacyPage() {
       <div className="prose prose-slate dark:prose-invert max-w-none space-y-8">
         <section>
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-6">
-            Last updated: November 2025
+            Last updated: {LEGAL_PAGE_UPDATED_DATE}
           </p>
 
           <p className="text-slate-700 dark:text-slate-300">
-            At PropNexus, we take your privacy seriously. This Privacy Policy explains how we
-            collect, use, disclose, and safeguard your information when you use our platform.
+            This Privacy Policy explains how PropNexus may collect, use, disclose and safeguard
+            information when you use the platform.
           </p>
         </section>
 
@@ -34,10 +36,11 @@ export default function PrivacyPage() {
             We collect information that you provide directly to us, including:
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
-            <li>Email address and name when you create an account</li>
-            <li>Payment information when you subscribe to a paid plan</li>
-            <li>Property search preferences and saved searches</li>
-            <li>Saved deals and portfolio information</li>
+            <li>Account details such as name, email address and authentication identifiers</li>
+            <li>Saved deals, searches, alerts, notes, shortlists and related workflow data</li>
+            <li>Usage data such as pages visited, features used, events and device/browser details</li>
+            <li>Payment and subscription identifiers handled by Stripe, such as customer or subscription IDs</li>
+            <li>Authentication data handled through Clerk and/or Supabase depending on the active configuration</li>
             <li>Communications with our support team</li>
           </ul>
 
@@ -83,8 +86,9 @@ export default function PrivacyPage() {
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
             <li>
-              <strong>Service Providers:</strong> Third-party vendors who perform services on our
-              behalf (e.g., payment processing, hosting, analytics)
+              <strong>Service Providers:</strong> Third-party processors who help run the service,
+              including hosting, database, authentication, payments, analytics/logging and email
+              tools if configured
             </li>
             <li>
               <strong>Legal Requirements:</strong> When required by law or to protect our rights
@@ -101,20 +105,26 @@ export default function PrivacyPage() {
             4. Third-Party Services
           </h2>
           <p className="text-slate-700 dark:text-slate-300 mb-4">
-            Our platform integrates with third-party services:
+            Our platform may integrate with third-party processors and services:
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
             <li>
-              <strong>Authentication:</strong> We use Clerk for secure user authentication
+              <strong>Authentication:</strong> Clerk and/or Supabase may process authentication data
             </li>
             <li>
               <strong>Payments:</strong> Stripe processes all payment transactions
             </li>
             <li>
-              <strong>Analytics:</strong> We use analytics services to understand platform usage
+              <strong>Database and hosting:</strong> Supabase, Vercel, Railway or similar providers may
+              process application data and operational logs
             </li>
             <li>
-              <strong>AI Services:</strong> OpenAI processes property data for analysis features
+              <strong>Analytics and logging:</strong> analytics, error tracking and logging tools may be
+              used to understand reliability and product usage where configured
+            </li>
+            <li>
+              <strong>AI Services:</strong> AI providers may process prompts, property context or derived
+              summaries for analysis features when enabled
             </li>
           </ul>
           <p className="text-slate-700 dark:text-slate-300 mt-4">
@@ -139,7 +149,8 @@ export default function PrivacyPage() {
             6. Your Rights
           </h2>
           <p className="text-slate-700 dark:text-slate-300 mb-4">
-            Depending on your location, you may have the following rights:
+            Depending on your location, including under UK/GDPR-style data protection laws where
+            applicable, you may have the following rights:
           </p>
           <ul className="list-disc list-inside space-y-2 text-slate-700 dark:text-slate-300 ml-4">
             <li>Access your personal information</li>

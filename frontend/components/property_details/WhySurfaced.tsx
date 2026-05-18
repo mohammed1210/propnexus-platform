@@ -1,4 +1,5 @@
 import { getTopDealDisplay } from '@/lib/topDealCopy';
+import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
 
 type WhySurfacedProperty = {
   postcode?: string | null;
@@ -188,6 +189,10 @@ export default function WhySurfaced({ property }: { property: WhySurfacedPropert
           {hasSoldComps && hasRent && hasPriceReduction ? 'Core evidence is present; still verify source listing, condition, lease, fees and finance.' : ''}
         </p>
       </div>
+
+      <InfoDisclaimer className="mt-3" label="Discovery score disclaimer">
+        Discovery score ranks scrape-discovery signals, not investment suitability. A high discovery score still requires full due diligence.
+      </InfoDisclaimer>
     </section>
   );
 }

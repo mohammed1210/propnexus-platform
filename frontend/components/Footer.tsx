@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { INVESTMENT_DISCLAIMER_SHORT } from '@/lib/legalCopy';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -16,7 +17,7 @@ export default function Footer() {
               PropNexus
             </h3>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              AI-powered property sourcing and investment analysis platform.
+              Information and due-diligence tools for property investors.
             </p>
           </div>
 
@@ -60,12 +61,12 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <a
-                  href="mailto:support@propnexus.com"
+                <Link
+                  href="/contact"
                   className="text-slate-600 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"
                 >
                   Contact
-                </a>
+                </Link>
               </li>
               <li>
                 <a
@@ -104,6 +105,22 @@ export default function Footer() {
               </li>
               <li>
                 <Link
+                  href="/disclaimer"
+                  className="text-slate-600 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"
+                >
+                  Disclaimer
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/contact"
+                  className="text-slate-600 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"
+                >
+                  Contact
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/cookies"
                   className="text-slate-600 dark:text-slate-400 hover:text-brand-600 dark:hover:text-brand-400"
                 >
@@ -116,6 +133,9 @@ export default function Footer() {
 
         {/* Copyright */}
         <div className="pt-6 border-t border-slate-200 dark:border-slate-800">
+          <p className="mx-auto mb-3 max-w-3xl text-center text-xs leading-5 text-slate-500 dark:text-slate-400">
+            {INVESTMENT_DISCLAIMER_SHORT}
+          </p>
           <p className="text-center text-sm text-slate-600 dark:text-slate-400">
             © {currentYear} PropNexus. All rights reserved.
           </p>

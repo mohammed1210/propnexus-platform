@@ -10,6 +10,7 @@ import { FF } from '@/lib/flags';
 import { useUserPlan } from '@/lib/useUserPlan';
 import { hasAccess } from '@/lib/planPermissions';
 import { isAuthEnabled } from '@/lib/auth';
+import { AI_DISCLAIMER } from '@/lib/legalCopy';
 import { formatPercent, formatRoiDisplay, getRoiDisplay, getYieldPercent } from '@/lib/normalizeProperty';
 
 type LooseProperty = Property & {
@@ -284,6 +285,10 @@ function AIChatbotInner({
             >
               ×
             </button>
+          </div>
+
+          <div className="border-b border-neutral-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900 dark:border-neutral-800 dark:bg-amber-950/25 dark:text-amber-100">
+            AI responses are for general review only and may be inaccurate. Do not rely on them as professional advice. {AI_DISCLAIMER}
           </div>
 
           <div className="flex-1 p-3 overflow-y-auto bg-gray-50 dark:bg-neutral-950 text-sm">

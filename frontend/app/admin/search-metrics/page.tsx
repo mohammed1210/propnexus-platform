@@ -1,6 +1,9 @@
 import Link from 'next/link';
 
-export const metadata = { title: 'Search Metrics • PropNexus Admin' };
+export const metadata = {
+  title: 'Search Metrics • PropNexus Admin',
+  robots: { index: false, follow: false },
+};
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 

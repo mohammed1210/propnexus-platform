@@ -5,7 +5,16 @@ import { cookies, headers } from 'next/headers';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function isDebugEnabled() {
+  if (process.env.NODE_ENV !== 'production') return true;
+  return ['1', 'true', 'yes', 'on'].includes((process.env.ENABLE_DEBUG_ENDPOINTS ?? '').trim().toLowerCase());
+}
+
 export async function GET() {
+  if (!isDebugEnabled()) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+  }
+
   const a = await auth();
   const h = await headers();
   const c = await cookies();
@@ -43,23 +52,20 @@ export async function GET() {
   return NextResponse.json(
     {
       hasUserId: Boolean(a.userId),
-      userId: a.userId ?? null,
-      sessionId: (a as any)?.sessionId ?? null,
       request: {
-        host: h.get('host'),
-        forwardedHost: h.get('x-forwarded-host'),
-        forwardedProto: h.get('x-forwarded-proto'),
+        hasHost: Boolean(h.get('host')),
+        hasForwardedHost: Boolean(h.get('x-forwarded-host')),
+        hasForwardedProto: Boolean(h.get('x-forwarded-proto')),
       },
       cookies: {
         count: cookieNames.length,
-        names: cookieNames,
         hasClerkCookie,
       },
       clerkHeaders: {
-        names: clerkHeaderNames,
+        count: clerkHeaderNames.length,
         authStatus,
-        authReason,
-        authMessage,
+        hasAuthReason: Boolean(authReason),
+        hasAuthMessage: Boolean(authMessage),
       },
       env: {
         hasClerkSecretKey: Boolean(process.env.CLERK_SECRET_KEY),
