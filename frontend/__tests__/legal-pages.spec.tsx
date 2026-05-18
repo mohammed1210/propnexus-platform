@@ -6,6 +6,7 @@ import path from 'node:path';
 import DisclaimerPage from '@/app/(legal)/disclaimer/page';
 import PrivacyPage from '@/app/(legal)/privacy/page';
 import TermsPage from '@/app/(legal)/terms/page';
+import PricingPage from '@/app/pricing/page';
 import Footer from '@/components/Footer';
 
 describe('legal readiness surfaces', () => {
@@ -36,5 +37,19 @@ describe('legal readiness surfaces', () => {
   it('launch audit script exists', () => {
     const script = path.join(process.cwd(), '..', 'scripts', 'launch_audit.sh');
     expect(fs.existsSync(script)).toBe(true);
+  });
+
+  it('pricing page includes launch and investment outcome disclaimers', () => {
+    render(<PricingPage />);
+
+    expect(screen.getByText(/does not guarantee profitable deals/i)).toBeInTheDocument();
+    expect(screen.getByText(/soft-launch beta/i)).toBeInTheDocument();
+  });
+
+  it('property detail page includes the investor brief disclaimer copy', () => {
+    const pagePath = path.join(process.cwd(), 'app', 'property', '[id]', 'page.tsx');
+    const source = fs.readFileSync(pagePath, 'utf8');
+
+    expect(source).toContain('Investor brief and scores are indicative only');
   });
 });

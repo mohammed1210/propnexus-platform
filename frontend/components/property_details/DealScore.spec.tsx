@@ -63,7 +63,7 @@ describe('DealScore breakdown display', () => {
     expect(screen.getByText('Main check before offer')).toBeInTheDocument();
     expect(screen.queryByText('Top scoring factors')).not.toBeInTheDocument();
     expect(screen.queryByText('Investor lens')).not.toBeInTheDocument();
-    expect(screen.getByText(/Scores are indicative/i)).toBeInTheDocument();
+    expect(screen.getByText(/Version v2\.1 .* Scores are indicative/i)).toBeInTheDocument();
   });
 
   it('shows Needs validation instead of an unrealistic ROI proxy percentage', () => {

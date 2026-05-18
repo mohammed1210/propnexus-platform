@@ -4,8 +4,6 @@
 
 - **App**: visit `/api/diag` – reports env presence and connection to Supabase.
 - **Supabase**: console → Table Editor → `properties`.
-- **Railway ingest-worker**: service should start with `bash scripts/railway-start.sh`, dispatch to `python -m backend.tasks.ingestion_runner`, log `[ingest-worker] starting`, and keep running between cycles. When Railway provides `PORT`, the worker exposes a minimal `/health` responder for the shared Railway health check.
-- **Railway deploy targets**: GitHub Actions deploys the API to `propnexus-backend` and the active ingest worker to `function-bun`. The GitHub Actions `Deploy Backend (Railway)` run is the source of truth for deploy health. A red GitHub commit status named `vivacious-embrace - ingest-worker`, or duplicate Railway direct-integration statuses that conflict with the Actions result, are external Railway/GitHub integration contexts; if they persist, remove or disconnect the old Railway GitHub integration/service connection rather than changing application code. After disconnecting obsolete direct Railway GitHub source integrations, push a fresh commit and confirm stale Railway commit-status contexts no longer reappear on the new SHA.
 
 ## Environments
 
@@ -16,37 +14,7 @@
 - **Required env** (backend/private):
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
-- **Required env** (Railway ingest-worker):
-  - `SUPABASE_URL`
-  - `SUPABASE_SERVICE_ROLE_KEY`
-  - `SCRAPER_MODE=direct`
-  - `INGEST_SOURCES=zoopla,onthemarket,spareroom`
-  - `INGEST_LOCATIONS=London,Manchester,Liverpool,Birmingham` or the active launch list
-  - `INGEST_INTERVAL_SECONDS=900`
 - Vercel → Project → Settings → Environment Variables. Redeploy after changes.
-
-While ScraperAPI is off, leave `SCRAPERAPI_KEY` empty/omitted and keep Rightmove opt-in. The worker should be treated as degraded when an individual direct source is blocked or returns 0, and failed only when the process exits or cannot start.
-
-Direct-mode worker policy: `SCRAPER_MODE=direct` disables ScraperAPI fallback even if a stale key exists in the environment. Only set `SCRAPERAPI_ALLOW_FALLBACK=true` when deliberately re-enabling paid fallback behavior.
-
-## Launch Backfills and Health Checks
-
-Run these commands from the repository root with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` configured. They do not require ScraperAPI.
-
-```bash
-python -m backend.scripts.backfill_top_deals --limit 50 --dry-run
-python -m backend.scripts.backfill_property_quality --limit 50 --dry-run
-python -m backend.scripts.launch_health_report
-```
-
-Expected backfill dry-run output includes `total_scanned`, `updated`, `skipped`, and `errors`; `errors: 0` is required before running without `--dry-run`. The launch-health report should show `Supabase configured: True`, `Scraper mode: direct`, and the current direct source list.
-
-To apply the backfills after dry-run verification:
-
-```bash
-python -m backend.scripts.backfill_top_deals --batch-size 100 --force
-python -m backend.scripts.backfill_property_quality --batch-size 100 --force
-```
 
 ## Data Access
 
@@ -63,14 +31,14 @@ using (true);
 
 ## Deal Action / Contact Agent workflow
 
-- The production baseline is established at `supabase/migrations/20260515180247_production_baseline_2026_05.sql`.
-- Archived migrations under `supabase/migrations_archive/` are audit/reference files only and should not be applied after the baseline.
-- New DB changes must be added as migrations after the production baseline.
+- Run `supabase/migrations/20260509_deal_action_fields.sql` in Supabase before enabling saved-deal progress tracking.
+- The migration adds nullable original listing/contact columns on `properties` and `deal_status`, `contacted_at`, `last_action_at`, `action_notes` on `saved_deals`.
+- If this migration has not been applied, `PATCH /saved-deals/status` returns a clear migration-required error while the rest of the property detail page remains usable.
 - Do not backfill or fabricate agent details. Only copy real source URLs/contact fields from scraper/provider payloads.
 
-## Investor Intel, Listing History and Alerts
+## Investor Intel, Listing History and Alerts Migration
 
-The baseline includes Offer Intelligence history fields and saved-alert criteria storage. Apply any post-baseline launch hardening migration before final launch verification.
+Run `supabase/migrations/20260512_investor_intel_history_alerts.sql` in Supabase before relying on Offer Intelligence history fields, price-change tracking, or saved deal alerts in production.
 
 After applying the migration:
 
@@ -120,45 +88,6 @@ limit 10;
 ```
 
 If any column/table/trigger check returns no rows, stop launch verification and re-run the migration before testing the UI.
-
-## Supabase Security Verification SQL
-
-List broad permissive policies:
-
-```sql
-select schemaname, tablename, policyname, cmd, roles, qual, with_check
-from pg_policies
-where schemaname = 'public'
-  and (
-    coalesce(qual, '') ilike '%true%'
-    or coalesce(with_check, '') ilike '%true%'
-    or roles::text ilike '%anon%'
-  )
-order by tablename, policyname;
-```
-
-List public functions without a pinned `search_path`:
-
-```sql
-select n.nspname as schema, p.proname as function_name, pg_get_function_identity_arguments(p.oid) as args
-from pg_proc p
-join pg_namespace n on n.oid = p.pronamespace
-where n.nspname = 'public'
-  and not exists (
-    select 1 from unnest(coalesce(p.proconfig, array[]::text[])) cfg
-    where cfg like 'search_path=%'
-  )
-order by p.proname;
-```
-
-List public storage bucket policies:
-
-```sql
-select schemaname, tablename, policyname, cmd, roles, qual, with_check
-from pg_policies
-where schemaname = 'storage'
-order by tablename, policyname;
-```
 
 ## Search Guardrails (#331)
 

@@ -2,7 +2,6 @@
 export const dynamic = 'force-dynamic';
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import nextDynamic from 'next/dynamic';
@@ -570,9 +569,6 @@ function ListingsInner() {
   const [mapRows, setMapRows] = useState<RawProperty[] | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const sortMenuRef = useRef<HTMLDivElement | null>(null);
-  const sortButtonRef = useRef<HTMLButtonElement | null>(null);
-  const sortMenuPanelRef = useRef<HTMLDivElement | null>(null);
-  const [sortMenuPosition, setSortMenuPosition] = useState<{ top: number; right: number } | null>(null);
 
   // Keep map toggle state in URL so it persists across pagination/filter changes.
   useEffect(() => {
@@ -649,37 +645,11 @@ function ListingsInner() {
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as Node | null;
       if (target && sortMenuRef.current?.contains(target)) return;
-      if (target && sortMenuPanelRef.current?.contains(target)) return;
       setShowSortMenu(false);
     };
     window.addEventListener('pointerdown', onPointerDown);
     return () => window.removeEventListener('pointerdown', onPointerDown);
   }, [showSortMenu]);
-
-  const positionSortMenu = useCallback(() => {
-    const rect = sortButtonRef.current?.getBoundingClientRect();
-    if (!rect || typeof window === 'undefined') return;
-    setSortMenuPosition({
-      top: rect.bottom + 8,
-      right: Math.max(12, window.innerWidth - rect.right),
-    });
-  }, []);
-
-  const toggleSortMenu = useCallback(() => {
-    positionSortMenu();
-    setShowSortMenu((v) => !v);
-  }, [positionSortMenu]);
-
-  useEffect(() => {
-    if (!showSortMenu) return;
-    positionSortMenu();
-    window.addEventListener('resize', positionSortMenu);
-    window.addEventListener('scroll', positionSortMenu, true);
-    return () => {
-      window.removeEventListener('resize', positionSortMenu);
-      window.removeEventListener('scroll', positionSortMenu, true);
-    };
-  }, [positionSortMenu, showSortMenu]);
 
   const qRaw = searchParams?.get('q') ?? '';
   const q = sanitizeSearch(qRaw);
@@ -1301,44 +1271,6 @@ function ListingsInner() {
     setShowSortMenu(false);
   };
 
-  const SortMenu = showSortMenu ? (
-    <div
-      ref={sortMenuPanelRef}
-      className="fixed z-[1000] w-64 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800"
-      style={{
-        top: sortMenuPosition?.top ?? 0,
-        right: sortMenuPosition?.right ?? 12,
-      }}
-      role="menu"
-      aria-label="Sort listings"
-    >
-      {SORT_OPTIONS.map((option) => {
-        const selected = option.value === sort;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="menuitemradio"
-            aria-checked={selected}
-            onPointerDown={(event) => {
-              event.preventDefault();
-              selectSort(option.value);
-            }}
-            onClick={() => selectSort(option.value)}
-            className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors ${
-              selected
-                ? 'bg-emerald-50 font-semibold text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100'
-                : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            <span>{option.label}</span>
-            {selected ? <FiCheck className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
-          </button>
-        );
-      })}
-    </div>
-  ) : null;
-
   const removeFilter = (key: string, value?: string) => {
     pushParams((p) => {
       p.delete(key);
@@ -1804,10 +1736,9 @@ function ListingsInner() {
 
                 <div ref={sortMenuRef} className="relative">
                   <button
-                    ref={sortButtonRef}
                     type="button"
                     data-testid="onboarding-sort-select"
-                    onClick={toggleSortMenu}
+                    onClick={() => setShowSortMenu((v) => !v)}
                     className="h-10 max-w-[210px] rounded-full border border-emerald-200 bg-emerald-50 px-3 text-sm font-semibold text-emerald-900 shadow-sm transition-colors hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-100 dark:hover:bg-emerald-900/40 inline-flex items-center gap-2"
                     aria-haspopup="menu"
                     aria-expanded={showSortMenu}
@@ -1819,7 +1750,38 @@ function ListingsInner() {
                     <span className="sm:hidden">Sort</span>
                   </button>
 
-                  {typeof document !== 'undefined' && SortMenu ? createPortal(SortMenu, document.body) : null}
+                  {showSortMenu && (
+                    <div
+                      className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+                      role="menu"
+                      aria-label="Sort listings"
+                    >
+                      {SORT_OPTIONS.map((option) => {
+                        const selected = option.value === sort;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={selected}
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              selectSort(option.value);
+                            }}
+                            onClick={() => selectSort(option.value)}
+                            className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors ${
+                              selected
+                                ? 'bg-emerald-50 font-semibold text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100'
+                                : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700'
+                            }`}
+                          >
+                            <span>{option.label}</span>
+                            {selected ? <FiCheck className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <button

@@ -32,7 +32,7 @@ export default function SignUpPage() {
             <span className="text-white font-bold text-2xl">PN</span>
           </div>
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Create your account</h1>
-          <p className="text-slate-600 text-sm">Get started with AI-powered property sourcing in minutes.</p>
+          <p className="text-slate-600 text-sm">Get started with AI-assisted property due diligence in minutes.</p>
         </div>
 
         <div className="bg-white rounded-brand-xl border border-slate-200 shadow-brand-xl p-6">
