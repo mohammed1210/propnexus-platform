@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { internalApiHeaders } from '@/lib/server/internalApi';
+import { internalApiHeaders, isInternalApiConfigError } from '@/lib/server/internalApi';
 
 function getBackendBase(): string {
   const base = (
@@ -68,8 +68,14 @@ export async function PATCH(req: Request) {
       });
     }
   } catch (err: any) {
+    if (isInternalApiConfigError(err)) {
+      return NextResponse.json(
+        { ok: false, error: 'server_configuration', message: 'Saved deals are temporarily unavailable. Please try again shortly.' },
+        { status: 503 },
+      );
+    }
     return NextResponse.json(
-      { ok: false, error: err?.message || 'Saved deal status proxy error' },
+      { ok: false, error: 'server_error', message: 'Could not update deal progress.' },
       { status: 502 },
     );
   }

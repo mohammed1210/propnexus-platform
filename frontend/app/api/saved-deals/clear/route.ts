@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
-import { internalApiHeaders } from '@/lib/server/internalApi';
+import { internalApiHeaders, isInternalApiConfigError } from '@/lib/server/internalApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -75,8 +75,14 @@ export async function POST() {
       });
     }
   } catch (err: any) {
+    if (isInternalApiConfigError(err)) {
+      return NextResponse.json(
+        { ok: false, error: 'server_configuration', message: 'Saved deals are temporarily unavailable. Please try again shortly.' },
+        { status: 503, headers: { ...noStoreHeaders } },
+      );
+    }
     return NextResponse.json(
-      { ok: false, error: err?.message || 'Internal error' },
+      { ok: false, error: 'server_error', message: 'Could not clear saved deals.' },
       { status: 500, headers: { ...noStoreHeaders } },
     );
   }

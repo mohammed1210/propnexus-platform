@@ -197,8 +197,9 @@ export default function SavedDealsView() {
         return;
       }
       if (!r.ok) {
-        const t = await r.text().catch(() => '');
-        throw new Error(t || `Failed to load saved deals (${r.status})`);
+        const payload = await r.json().catch(() => null);
+        const message = typeof payload?.message === 'string' ? payload.message : `Failed to load saved deals (${r.status})`;
+        throw new Error(message);
       }
       const data = await r.json().catch(() => ({}));
       const list: SavedDeal[] = Array.isArray((data as any)?.deals) ? (data as any).deals : [];
