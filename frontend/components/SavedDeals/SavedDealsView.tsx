@@ -5,6 +5,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@clerk/nextjs';
+import { FiGrid, FiList } from 'react-icons/fi';
 
 import Section from '@/components/ui/Section';
 import SectionTitle from '@/components/ui/SectionTitle';
@@ -59,7 +60,16 @@ type Toast = {
   message: string;
 };
 
+type PageViewMode = 'grid' | 'list';
+type GridColumnCount = 3 | 4 | 5;
+
 const FALLBACK_IMAGE = '/images/fallback-property.png';
+const gridColumnsClass: Record<GridColumnCount, string> = {
+  3: 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5',
+  4: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4',
+  5: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4',
+};
+const listViewClass = 'grid grid-cols-1 gap-4';
 
 function isValidHttpUrl(maybe: string | null | undefined) {
   if (!maybe) return false;
@@ -136,6 +146,8 @@ export default function SavedDealsView() {
   const [busyRemove, setBusyRemove] = useState<Record<string, boolean>>({});
   const [busyClearAll, setBusyClearAll] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [pageView, setPageView] = useState<PageViewMode>('grid');
+  const [gridColumns, setGridColumns] = useState<GridColumnCount>(3);
 
   const pushToast = useCallback((type: Toast['type'], message: string) => {
     const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -146,6 +158,7 @@ export default function SavedDealsView() {
   }, []);
 
   const selectedIds = useMemo(() => Object.keys(selected).filter((k) => selected[k]), [selected]);
+  const dealsLayoutClass = pageView === 'list' ? listViewClass : gridColumnsClass[gridColumns];
 
   const selectedDeals = useMemo(() => {
     const map = new Map(deals.map((d) => [d.property_id, d]));
@@ -356,7 +369,7 @@ export default function SavedDealsView() {
           </div>
         </div>
       ) : loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className={dealsLayoutClass}>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="card p-0 overflow-hidden">
               <div className="aspect-[16/9] bg-slate-200 dark:bg-slate-800 animate-pulse" />
@@ -392,19 +405,74 @@ export default function SavedDealsView() {
         </div>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex flex-col gap-3 mb-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="text-sm text-slate-600 dark:text-slate-300">{deals.length} saved</div>
-            <button
-              type="button"
-              className="text-sm font-semibold text-rose-700 dark:text-rose-300 hover:underline disabled:opacity-60"
-              onClick={clearAll}
-              disabled={busyClearAll}
-            >
-              {busyClearAll ? 'Clearing…' : 'Clear all'}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-1 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                <span className="px-2 font-semibold text-slate-600 dark:text-slate-300">Page view</span>
+                <button
+                  type="button"
+                  title="Grid view"
+                  aria-label="Grid view"
+                  aria-pressed={pageView === 'grid'}
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition ${
+                    pageView === 'grid'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`}
+                  onClick={() => setPageView('grid')}
+                >
+                  <FiGrid className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  title="List view"
+                  aria-label="List view"
+                  aria-pressed={pageView === 'list'}
+                  className={`inline-flex h-8 w-8 items-center justify-center rounded-md transition ${
+                    pageView === 'list'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                      : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                  }`}
+                  onClick={() => setPageView('list')}
+                >
+                  <FiList className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="flex items-center rounded-lg border border-slate-200 bg-white p-1 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                {([3, 4, 5] as const).map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    title={`${count} columns`}
+                    aria-label={`${count} columns`}
+                    aria-pressed={pageView === 'grid' && gridColumns === count}
+                    className={`h-8 min-w-8 rounded-md px-2 font-semibold transition ${
+                      pageView === 'grid' && gridColumns === count
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                        : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                    }`}
+                    onClick={() => {
+                      setGridColumns(count);
+                      setPageView('grid');
+                    }}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="text-sm font-semibold text-rose-700 dark:text-rose-300 hover:underline disabled:opacity-60"
+                onClick={clearAll}
+                disabled={busyClearAll}
+              >
+                {busyClearAll ? 'Clearing…' : 'Clear all'}
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+          <div className={dealsLayoutClass}>
             {deals.map((d) => {
               const p = d.property;
               const pid = d.property_id;
@@ -438,9 +506,12 @@ export default function SavedDealsView() {
               const compareDisabled = !selectedOn && selectedIds.length >= 4;
 
               return (
-                <div key={pid} className="card p-0 overflow-hidden">
+                <div
+                  key={pid}
+                  className={`card p-0 overflow-hidden ${pageView === 'list' ? 'md:grid md:grid-cols-[220px_minmax(0,1fr)]' : ''}`}
+                >
                   <div className="relative">
-                    <div className="aspect-[16/9] bg-slate-100 dark:bg-slate-800">
+                    <div className={`bg-slate-100 dark:bg-slate-800 ${pageView === 'list' ? 'aspect-[16/9] md:h-full md:min-h-48 md:aspect-auto' : 'aspect-[16/9]'}`}>
                       <img
                         src={safeImgSrc(norm.imageUrl)}
                         alt={title}
