@@ -2039,7 +2039,7 @@ function ListingsInner() {
                   </button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {displayedRows.map((property, idx) => (
                     <PropertyCard
                       key={property.id || Math.random()}
@@ -2064,7 +2064,7 @@ function ListingsInner() {
               )}
             </div>
 
-            <div className="w-full lg:w-[40%] relative">
+            <div className="w-full lg:w-[38%] relative">
               <div className="lg:sticky lg:top-[calc(var(--header-h)+56px+16px)]">
                 <div
                   className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden h-[360px] lg:h-[calc(100vh-(var(--header-h)+56px+32px))]"

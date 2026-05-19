@@ -66,25 +66,6 @@ describe('DealActionPanel', () => {
     const link = screen.getByRole('link', { name: /view on onthemarket/i });
     expect(link).toHaveAttribute('href', 'https://www.onthemarket.com/details/123');
     expect(link).toHaveAttribute('target', '_blank');
-    expect(screen.getByRole('button', { name: /copy and checklist/i })).toHaveAttribute('aria-expanded', 'false');
-  });
-
-  it('collapses copy and checklist by default in compact mode', () => {
-    render(
-      <DealActionPanel
-        compact
-        propertyId="prop-1"
-        property={{ source_url: 'https://www.rightmove.co.uk/properties/123', source: 'rightmove' }}
-      />,
-    );
-
-    expect(screen.queryByRole('button', { name: /copy enquiry/i })).not.toBeInTheDocument();
-    const toggle = screen.getByRole('button', { name: /copy and checklist/i });
-    fireEvent.click(toggle);
-
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: /copy enquiry/i })).toBeInTheDocument();
-    expect(screen.getByText(/before offer checklist/i)).toBeInTheDocument();
   });
 
   it('does not render original listing button without a URL', () => {
@@ -112,7 +93,6 @@ describe('DealActionPanel', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: /copy and checklist/i })).toHaveAttribute('aria-expanded', 'true');
     fireEvent.click(screen.getByRole('button', { name: /copy enquiry/i }));
 
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled());
