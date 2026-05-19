@@ -65,9 +65,9 @@ type GridColumnCount = 3 | 4 | 5;
 
 const FALLBACK_IMAGE = '/images/fallback-property.png';
 const gridColumnsClass: Record<GridColumnCount, string> = {
-  3: 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5',
-  4: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4',
-  5: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4',
+  3: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5',
+  4: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4',
+  5: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4',
 };
 const listViewClass = 'grid grid-cols-1 gap-4';
 
