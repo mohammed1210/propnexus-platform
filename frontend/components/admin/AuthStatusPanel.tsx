@@ -8,24 +8,30 @@ type AuthDebugPayload = {
   disableAuthRaw: string;
   disableAuthParsed: boolean;
   isAuthEnabled: boolean;
-  isAuthEnabledClient?: boolean;
+  isAuthEnabledClient: boolean;
   vercelEnv: string | null;
   commitSha: string | null;
   clerk: {
     hasPublishableKey: boolean;
     hasValidPublishableKey: boolean;
-    publishableKeyPrefix?: string | null;
-    publishableKeyLength?: number;
-    publishableKeyHasWhitespace?: boolean;
+    publishableKeyHasWhitespace: boolean;
     hasSecretKey: boolean;
+    hasSignInUrl: boolean;
+    hasSignUpUrl: boolean;
+    hasAfterSignInUrl: boolean;
+    hasAfterSignUpUrl: boolean;
   };
   whoami: {
-    userId: string | null;
-    email: string | null;
-    sessionId: string | null;
+    hasUserId: boolean;
+    hasSessionId: boolean;
+    hasEmail: boolean;
     error?: string;
   };
 };
+
+function yesNo(value: boolean): string {
+  return value ? "Yes" : "No";
+}
 
 function Badge({ ok, label }: { ok: boolean; label: string }) {
   return (
@@ -44,19 +50,25 @@ function Badge({ ok, label }: { ok: boolean; label: string }) {
 
 export default function AuthStatusPanel() {
   const [data, setData] = useState<AuthDebugPayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function load() {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch("/api/debug/auth", { cache: "no-store" });
+      const res = await fetch("/api/admin/auth-status", { cache: "no-store" });
       const json = (await res.json().catch(() => null)) as AuthDebugPayload | null;
       if (!res.ok || !json) {
-        throw new Error((json as any)?.error || `Failed (${res.status})`);
+        throw new Error((json as any)?.error || `Failed to load admin auth status (${res.status})`);
       }
       setData(json);
+      setError(null);
     } catch (e: any) {
-      toast.error(e?.message || "Failed to load auth status");
+      const message = e?.message || "Failed to load admin auth status";
+      setData(null);
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -88,7 +100,7 @@ export default function AuthStatusPanel() {
           <div>
           <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Auth Status</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Live runtime snapshot from <span className="font-mono">/api/debug/auth</span>.
+            Live admin-only runtime snapshot from <span className="font-mono">/api/admin/auth-status</span>.
           </p>
           </div>
         </div>
@@ -118,6 +130,7 @@ export default function AuthStatusPanel() {
           <div className="space-y-2 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <Badge ok={data.isAuthEnabled} label={data.isAuthEnabled ? "Auth Enabled" : "Auth Disabled"} />
+              <Badge ok={data.isAuthEnabledClient} label={data.isAuthEnabledClient ? "Client auth enabled" : "Client auth disabled"} />
               <Badge ok={!!data.clerk.hasPublishableKey} label={data.clerk.hasPublishableKey ? "PK present" : "PK missing"} />
               <Badge
                 ok={!!data.clerk.hasValidPublishableKey}
@@ -140,14 +153,8 @@ export default function AuthStatusPanel() {
                 <span className="font-mono">{`${data.disableAuthRaw} → ${String(data.disableAuthParsed)}`}</span>
               </div>
               <div className="mt-1 flex items-center justify-between">
-                <span className="font-semibold">PK Prefix/Len</span>
-                <span className="font-mono">
-                  {data.clerk.publishableKeyPrefix ?? "(none)"}/{data.clerk.publishableKeyLength ?? 0}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center justify-between">
                 <span className="font-semibold">PK Whitespace</span>
-                <span className="font-mono">{String(!!data.clerk.publishableKeyHasWhitespace)}</span>
+                <span className="font-mono">{yesNo(data.clerk.publishableKeyHasWhitespace)}</span>
               </div>
             </div>
           </div>
@@ -156,19 +163,40 @@ export default function AuthStatusPanel() {
             <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/30">
               <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">whoami</p>
               <p className="mt-1 text-sm text-slate-900 dark:text-slate-100">
-                <span className="font-semibold">User ID:</span> {data.whoami.userId ?? "(none)"}
+                <span className="font-semibold">User detected:</span> {yesNo(data.whoami.hasUserId)}
               </p>
               <p className="mt-1 text-sm text-slate-900 dark:text-slate-100">
-                <span className="font-semibold">Email:</span> {data.whoami.email ?? "(none)"}
+                <span className="font-semibold">Session detected:</span> {yesNo(data.whoami.hasSessionId)}
+              </p>
+              <p className="mt-1 text-sm text-slate-900 dark:text-slate-100">
+                <span className="font-semibold">Email available:</span> {yesNo(data.whoami.hasEmail)}
               </p>
               {data.whoami.error ? (
                 <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">{data.whoami.error}</p>
               ) : null}
             </div>
+
+            <div className="rounded-lg border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-950/30">
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">Clerk URLs</p>
+              <div className="mt-2 grid grid-cols-1 gap-1 text-slate-900 dark:text-slate-100 sm:grid-cols-2">
+                <span>Sign-in: {yesNo(data.clerk.hasSignInUrl)}</span>
+                <span>Sign-up: {yesNo(data.clerk.hasSignUpUrl)}</span>
+                <span>After sign-in: {yesNo(data.clerk.hasAfterSignInUrl)}</span>
+                <span>After sign-up: {yesNo(data.clerk.hasAfterSignUpUrl)}</span>
+              </div>
+            </div>
           </div>
         </div>
+      ) : error ? (
+        <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200">
+          <p className="font-semibold">Unable to load admin auth status.</p>
+          <p className="mt-1">{error}</p>
+          <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">Use Refresh to retry.</p>
+        </div>
+      ) : loading ? (
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">Loading auth status…</div>
       ) : (
-        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">Loading…</div>
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">Auth status has not loaded yet.</div>
       )}
     </div>
   );
