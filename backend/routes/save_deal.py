@@ -440,11 +440,11 @@ async def list_saved_deals(
     sb = _require_supabase()
 
     try:
-        query = sb.table("saved_deals").select("*")
-
         identity_col, identity_val = _trusted_identity_filter(
             request, sb, x_propnexus_user_id, x_clerk_user_id
         )
+        query = sb.table("saved_deals").select("*")
+
         query = query.eq(identity_col, identity_val)
 
         # Order by saved_at when present; if column is missing, PostgREST will error.
@@ -599,11 +599,10 @@ async def get_saved_deal(
     """Retrieve a specific saved deal."""
     sb = _require_supabase()
     try:
-        query = sb.table("saved_deals").select("*").eq("id", deal_id)
-
         identity_col, identity_val = _trusted_identity_filter(
             request, sb, x_propnexus_user_id, x_clerk_user_id
         )
+        query = sb.table("saved_deals").select("*").eq("id", deal_id)
         query = query.eq(identity_col, identity_val)
         res = query.single().execute()
 
