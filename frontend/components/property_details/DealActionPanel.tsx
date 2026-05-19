@@ -20,6 +20,7 @@ export type DealActionPanelProps = {
   propertyId: string;
   property?: Record<string, any> | null;
   compact?: boolean;
+  defaultCollapsed?: boolean;
 };
 
 const DEAL_STATUS_OPTIONS = [
@@ -53,12 +54,13 @@ function findSavedDeal(payload: any, propertyId: string): any | null {
   return list.find((deal: any) => String(deal?.property_id ?? deal?.property?.id ?? '') === String(propertyId)) ?? null;
 }
 
-export default function DealActionPanel({ propertyId, property, compact = false }: DealActionPanelProps) {
+export default function DealActionPanel({ propertyId, property, compact = false, defaultCollapsed = false }: DealActionPanelProps) {
   const [copied, setCopied] = useState(false);
   const [savedDeal, setSavedDeal] = useState<any | null>(null);
   const [status, setStatus] = useState<DealStatus>('not_contacted');
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(!defaultCollapsed);
   const [copyChecklistOpen, setCopyChecklistOpen] = useState(!compact);
 
   const originalUrl = useMemo(() => getOriginalListingUrl(property), [property]);
@@ -137,14 +139,25 @@ export default function DealActionPanel({ propertyId, property, compact = false 
 
   return (
     <section className={`rounded-xl border border-slate-200 bg-white/95 shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95 ${compact ? 'p-3' : 'p-4'}`}>
-      <div className={compact ? 'mb-2' : 'mb-3'}>
-        <h3 className="font-bold text-[11px] uppercase tracking-[0.16em] text-slate-900 dark:text-white">
-          Deal Action
-        </h3>
-        <p className={`${compact ? 'mt-0.5' : 'mt-1'} text-xs text-slate-500 dark:text-slate-400`}>Move from analysis to enquiry.</p>
-      </div>
+      <button
+        type="button"
+        onClick={() => setPanelOpen((open) => !open)}
+        className={`flex w-full items-start justify-between gap-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${panelOpen ? (compact ? 'mb-2' : 'mb-3') : ''}`}
+        aria-expanded={panelOpen}
+      >
+        <span>
+          <span className="block font-bold text-[11px] uppercase tracking-[0.16em] text-slate-900 dark:text-white">
+            Deal Action
+          </span>
+          <span className={`${compact ? 'mt-0.5' : 'mt-1'} block text-xs text-slate-500 dark:text-slate-400`}>Move from analysis to enquiry.</span>
+        </span>
+        <FiChevronDown
+          className={`mt-0.5 h-4 w-4 shrink-0 text-slate-500 transition-transform dark:text-slate-400 ${panelOpen ? 'rotate-180' : ''}`}
+          aria-hidden="true"
+        />
+      </button>
 
-      <div className={compact ? 'space-y-2' : 'space-y-3'}>
+      {panelOpen ? <div className={compact ? 'space-y-2' : 'space-y-3'}>
         {originalUrl ? (
           <a
             href={originalUrl}
@@ -272,7 +285,7 @@ export default function DealActionPanel({ propertyId, property, compact = false 
         <InfoDisclaimer label="Original listing disclaimer">
           {CONTACT_ORIGINAL_LISTING_DISCLAIMER} Use the original listing to confirm availability, price and viewing details.
         </InfoDisclaimer>
-      </div>
+      </div> : null}
     </section>
   );
 }

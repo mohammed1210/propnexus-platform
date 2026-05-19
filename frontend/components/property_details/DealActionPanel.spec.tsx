@@ -87,6 +87,26 @@ describe('DealActionPanel', () => {
     expect(screen.getByText(/before offer checklist/i)).toBeInTheDocument();
   });
 
+  it('can collapse the whole panel by default for the property details sidebar', () => {
+    render(
+      <DealActionPanel
+        compact
+        defaultCollapsed
+        propertyId="prop-1"
+        property={{ source_url: 'https://www.rightmove.co.uk/properties/123', source: 'rightmove' }}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: /deal action/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('link', { name: /view on rightmove/i })).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('link', { name: /view on rightmove/i })).toBeInTheDocument();
+  });
+
   it('does not render original listing button without a URL', () => {
     render(<DealActionPanel propertyId="prop-1" property={{ title: 'No source listing' }} />);
 
