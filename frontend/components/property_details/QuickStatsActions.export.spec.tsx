@@ -58,8 +58,6 @@ describe('QuickStatsActions launch controls', () => {
     expect(screen.queryByText('Discount')).not.toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /save this deal/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('button', { name: /share this property/i }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: /deal action/i })).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.click(screen.getByRole('button', { name: /deal action/i }));
     expect(screen.getByRole('link', { name: /view on rightmove/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /export property details as pdf/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /copy property data as json/i })).not.toBeInTheDocument();

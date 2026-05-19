@@ -360,7 +360,7 @@ export default function QuickStatsActions({
             </div>
           </div>
 
-          <DealActionPanel propertyId={propertyId} property={merged} compact defaultCollapsed />
+          <DealActionPanel propertyId={propertyId} property={merged} compact />
 
           <details className="rounded-xl border border-slate-200 bg-white/90 p-3 shadow-md backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/90">
             <summary className="cursor-pointer list-none text-[11px] font-bold uppercase tracking-[0.16em] text-slate-800 marker:text-slate-400 dark:text-slate-100">
