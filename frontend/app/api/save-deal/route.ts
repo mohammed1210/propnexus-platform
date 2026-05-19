@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { internalApiHeaders } from '@/lib/server/internalApi';
 
 function getBackendBase(): string {
   const base = (
@@ -26,19 +27,12 @@ function isClerkServerEnabled(): boolean {
   return !disable && pk.startsWith('pk_') && Boolean(sk);
 }
 
-async function getBearerTokenOrNull(): Promise<{ userId: string | null; token: string | null }> {
-  if (!isClerkServerEnabled()) return { userId: null, token: null };
+async function getVerifiedUserId(): Promise<string | null> {
+  if (!isClerkServerEnabled()) return null;
 
   const a: any = await auth();
   const userId = (a?.userId as string | null) ?? null;
-  if (!userId) return { userId: null, token: null };
-
-  try {
-    const token = typeof a?.getToken === 'function' ? await a.getToken() : null;
-    return { userId, token: token ? String(token) : null };
-  } catch {
-    return { userId, token: null };
-  }
+  return userId;
 }
 
 export async function POST(req: Request) {
@@ -48,7 +42,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Body must be a JSON object' }, { status: 400 });
     }
 
-    const { userId, token } = await getBearerTokenOrNull();
+    const userId = await getVerifiedUserId();
     if (isClerkServerEnabled() && !userId) {
       return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
     }
@@ -57,8 +51,8 @@ export async function POST(req: Request) {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        ...(userId ? { 'x-clerk-user-id': userId } : {}),
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...internalApiHeaders(),
+        ...(userId ? { 'x-propnexus-user-id': userId, 'x-clerk-user-id': userId } : {}),
       },
       body: JSON.stringify(body),
       cache: 'no-store',

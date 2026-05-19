@@ -124,7 +124,7 @@ export default function PricingPage() {
       </div>
 
       <p className="mt-10 text-center text-sm text-slate-500 dark:text-slate-400">
-        Investor starts with a 7-day free trial. No payment required during trial. Cancel anytime.
+        Investor starts with a 7-day free trial. No charge during the 7-day trial. Cancel anytime.
       </p>
 
       <LegalNotice title="Subscription note" variant="compact" className="mx-auto mt-5 max-w-3xl">

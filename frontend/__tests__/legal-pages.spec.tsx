@@ -4,13 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import DisclaimerPage from '@/app/(legal)/disclaimer/page';
+import CookiesPage from '@/app/(legal)/cookies/page';
 import PrivacyPage from '@/app/(legal)/privacy/page';
 import TermsPage from '@/app/(legal)/terms/page';
 import PricingPage from '@/app/pricing/page';
 import Footer from '@/components/Footer';
 
 describe('legal readiness surfaces', () => {
-  it('renders Terms, Privacy and Disclaimer pages', () => {
+  it('renders Terms, Privacy, Disclaimer and Cookie Policy pages', () => {
     let view = render(<TermsPage />);
     expect(screen.getByRole('heading', { name: 'Terms of Service' })).toBeInTheDocument();
     expect(screen.getByText(/does not provide financial advice/i)).toBeInTheDocument();
@@ -21,17 +22,23 @@ describe('legal readiness surfaces', () => {
     expect(screen.getByText(/We do not sell your personal information/i)).toBeInTheDocument();
     view.unmount();
 
-    render(<DisclaimerPage />);
+    view = render(<DisclaimerPage />);
     expect(screen.getByRole('heading', { name: 'Disclaimer' })).toBeInTheDocument();
     expect(screen.getByText(/AI-generated content may be incomplete or inaccurate/i)).toBeInTheDocument();
+    view.unmount();
+
+    render(<CookiesPage />);
+    expect(screen.getByRole('heading', { name: 'Cookie Policy' })).toBeInTheDocument();
+    expect(screen.getByText(/Essential cookies may be used for authentication/i)).toBeInTheDocument();
   });
 
-  it('footer has Terms, Privacy and Disclaimer links', () => {
+  it('footer has Terms, Privacy, Disclaimer and Cookie Policy links', () => {
     render(<Footer />);
 
     expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/terms');
     expect(screen.getByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
     expect(screen.getByRole('link', { name: 'Disclaimer' })).toHaveAttribute('href', '/disclaimer');
+    expect(screen.getByRole('link', { name: 'Cookie Policy' })).toHaveAttribute('href', '/cookies');
   });
 
   it('launch audit script exists', () => {

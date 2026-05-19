@@ -14,7 +14,14 @@
 - **Required env** (backend/private):
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
+  - `PROPNEXUS_INTERNAL_API_TOKEN`
+- **Required env** (frontend/server-only):
+  - `PROPNEXUS_INTERNAL_API_TOKEN`
 - Vercel → Project → Settings → Environment Variables. Redeploy after changes.
+
+Set `PROPNEXUS_INTERNAL_API_TOKEN` to the same long random secret in Railway and Vercel. Next.js API routes send it to FastAPI in `X-PropNexus-Internal-Token` for user-sensitive billing and saved-deal operations. Do not prefix it with `NEXT_PUBLIC_`, print it in logs, or expose it to browser code.
+
+Before external soft launch, confirm `support@propnexus.com` and `privacy@propnexus.com` are live and monitored, because the legal and contact pages reference those inboxes.
 
 ## Data Access
 

@@ -20,6 +20,9 @@ check_legal_pages() {
   exists_any "frontend/app/terms/page.tsx" "frontend/app/(legal)/terms/page.tsx" && pass "terms page exists" || fail "missing terms page"
   exists_any "frontend/app/privacy/page.tsx" "frontend/app/(legal)/privacy/page.tsx" && pass "privacy page exists" || fail "missing privacy page"
   exists_any "frontend/app/disclaimer/page.tsx" "frontend/app/(legal)/disclaimer/page.tsx" && pass "disclaimer page exists" || fail "missing disclaimer page"
+  if grep -RIn 'href="/cookies"' "$ROOT/frontend/components" "$ROOT/frontend/app" 2>/dev/null | grep -vE '/\.next/' >/tmp/propnexus-launch-cookie-links.txt; then
+    exists_any "frontend/app/cookies/page.tsx" "frontend/app/(legal)/cookies/page.tsx" && pass "cookie policy page exists" || fail "footer links /cookies but cookie policy page is missing"
+  fi
 }
 
 check_footer_links() {

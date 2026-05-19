@@ -13,6 +13,7 @@ describe('/api/saved-deals merges snapshot metrics', () => {
   beforeEach(() => {
     process.env = { ...oldEnv };
     process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend.example';
+    process.env.PROPNEXUS_INTERNAL_API_TOKEN = 'test-internal-token';
 
     global.fetch = jest.fn(async (input: any) => {
       const url = String(typeof input === 'string' ? input : input?.url);
@@ -66,6 +67,15 @@ describe('/api/saved-deals merges snapshot metrics', () => {
       yield_percent: 7.2,
       roi_percent: 9.1,
     });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('https://backend.example/saved-deals'),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'X-PropNexus-Internal-Token': 'test-internal-token',
+          'x-propnexus-user-id': 'user_test_123',
+        }),
+      }),
+    );
   });
 
   it('returns exact saved check without enriching every saved deal', async () => {

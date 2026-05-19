@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import base64
-import json
 import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, Optional
@@ -16,6 +14,7 @@ from backend.routes.properties_routes import _attach_cached_enrichment
 from backend.utils.canonical_metrics import apply_canonical_metrics
 from backend.utils.deal_scoring import compute_deal_score
 from backend.utils.enrichment_store import get_property_enrichment_cache
+from backend.utils.internal_api_auth import require_internal_api_token
 
 if TYPE_CHECKING:
     from supabase import Client as SupabaseClient
@@ -229,14 +228,13 @@ def _fetch_property_snapshot(sb: SupabaseClient, property_id: str) -> Optional[D
     return None
 
 
-def _extract_clerk_user_id_from_header(x_clerk_user_id: Optional[str]) -> Optional[str]:
-    if not x_clerk_user_id:
+def _sanitize_forwarded_user_id(value: Optional[str]) -> Optional[str]:
+    if not value:
         return None
-    v = str(x_clerk_user_id).strip()
+    v = str(value).strip()
     if not v:
         return None
-    # Simple sanity check per requirements
-    if not v.startswith("user_"):
+    if not (v.startswith("user_") or _is_uuid(v)):
         return None
     return v
 
@@ -252,20 +250,8 @@ def _merge_data_payload(row: Dict[str, Any]) -> Dict[str, Any]:
     return row
 
 
-def _identity_filter(sb: SupabaseClient, subject: str, x_clerk_user_id: Optional[str] = None):
+def _identity_filter(sb: SupabaseClient, subject: str):
     """Return (column, value) pair to filter saved_deals for the current user."""
-    clerk_id = _extract_clerk_user_id_from_header(x_clerk_user_id)
-    if clerk_id:
-        if not _saved_deals_has_clerk_user_id(sb):
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    "Database schema not migrated for Clerk saved deals. "
-                    "Add public.saved_deals.clerk_user_id (text) and make user_id nullable."
-                ),
-            )
-        return "clerk_user_id", clerk_id
-
     if not subject:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -283,77 +269,33 @@ def _identity_filter(sb: SupabaseClient, subject: str, x_clerk_user_id: Optional
     return "clerk_user_id", subject
 
 
-def _extract_user_id_from_token(authorization: Optional[str]) -> Optional[str]:
-    """
-    Extract user_id from JWT token in Authorization header.
-    Expected format: "Bearer <token>"
-    Returns None if token is invalid or missing.
-
-    SECURITY NOTE: This function extracts the 'sub' claim from JWT tokens without full verification.
-
-    This is acceptable because:
-    1. The user_id is used ONLY to filter queries on the saved_deals table
-    2. Supabase RLS policies on saved_deals enforce that auth.uid() = user_id
-    3. The service role key used by this API bypasses RLS, but the explicit
-       user_id filter + RLS double-check prevents data leakage
-    4. Even if a token is forged, RLS will block access to rows where user_id != auth.uid()
-    5. Supabase validates the JWT signature when RLS policies check auth.uid()
-
-    For additional security:
-    - We return empty results if no user_id is present
-    - RLS policies provide defense-in-depth
-    - The worst case is someone queries their own data
-
-    For security-critical operations beyond filtering, full JWT verification with
-    Supabase's JWT secret would be required.
-    """
-    if not authorization:
-        return None
-
-    # Extract token from "Bearer <token>" format
-    parts = authorization.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return None
-
-    token = parts[1]
-
-    try:
-        # Decode JWT payload without verification to extract claims.
-        # This intentionally avoids enforcing/assuming a signing algorithm
-        # (Clerk tokens are commonly RS256, Supabase tokens may vary).
-        jwt_parts = token.split(".")
-        if len(jwt_parts) < 2:
-            return None
-
-        payload_b64 = jwt_parts[1]
-        # Base64url decode with padding
-        payload_b64 += "=" * (-len(payload_b64) % 4)
-        payload_raw = base64.urlsafe_b64decode(payload_b64.encode("utf-8"))
-        payload = json.loads(payload_raw.decode("utf-8"))
-
-        # Extract user_id from 'sub' field (JWT standard)
-        sub = payload.get("sub")
-        return str(sub) if sub else None
-    except Exception:
-        return None
+def _trusted_identity_filter(
+    request: Request,
+    sb: SupabaseClient,
+    x_propnexus_user_id: Optional[str],
+    x_clerk_user_id: Optional[str],
+) -> tuple[str, str]:
+    require_internal_api_token(request)
+    subject = _sanitize_forwarded_user_id(x_propnexus_user_id) or _sanitize_forwarded_user_id(
+        x_clerk_user_id
+    )
+    if not subject:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return _identity_filter(sb, subject)
 
 
 @router.post("/save-deal")
 async def save_deal(
     request: Request,
-    authorization: Optional[str] = Header(None),
+    x_propnexus_user_id: Optional[str] = Header(None, alias="X-PropNexus-User-Id"),
     x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
 ) -> Dict[str, Any]:
     """
     Insert one saved deal.
     Frontend can post minimal payload like {"property_id": "..."} or a richer record.
-    Attaches user_id from Authorization: Bearer JWT (sub claim) on insert.
+    Attaches user identity only from the trusted Next.js server-side proxy.
     """
     sb = _require_supabase()
-
-    # Extract JWT subject from Authorization token.
-    # For Clerk this is typically "user_..." (string); for Supabase Auth it's a UUID.
-    subject = _extract_user_id_from_token(authorization)
 
     try:
         payload = await request.json()
@@ -365,7 +307,9 @@ async def save_deal(
         if not property_id:
             raise HTTPException(status_code=400, detail="Missing property_id")
 
-        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+        identity_col, identity_val = _trusted_identity_filter(
+            request, sb, x_propnexus_user_id, x_clerk_user_id
+        )
 
         # Build insert record defensively based on schema.
         # Prefer real columns when present; otherwise store in data jsonb.
@@ -444,8 +388,9 @@ async def save_deal(
 
 @router.delete("/save-deal")
 async def delete_save_deal(
+    request: Request,
     property_id: str = Query(..., description="Property UUID to remove from saved deals"),
-    authorization: Optional[str] = Header(None),
+    x_propnexus_user_id: Optional[str] = Header(None, alias="X-PropNexus-User-Id"),
     x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
 ) -> Dict[str, Any]:
     """Preferred delete endpoint (matches frontend contract).
@@ -454,8 +399,9 @@ async def delete_save_deal(
     """
     sb = _require_supabase()
     try:
-        subject = _extract_user_id_from_token(authorization)
-        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+        identity_col, identity_val = _trusted_identity_filter(
+            request, sb, x_propnexus_user_id, x_clerk_user_id
+        )
 
         if not property_id:
             raise HTTPException(status_code=400, detail="Missing property_id")
@@ -483,30 +429,22 @@ async def delete_save_deal(
 
 @router.get("/saved-deals")
 async def list_saved_deals(
-    authorization: Optional[str] = Header(None),
+    request: Request,
+    x_propnexus_user_id: Optional[str] = Header(None, alias="X-PropNexus-User-Id"),
     x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
 ) -> Dict[str, Any]:
     """
     Return saved deals for the current user (newest first).
-    Filters by user_id from Authorization token if provided.
-    RLS policies enforce per-user access.
-
-    Returns empty list if no valid token is provided (for security).
+    Filters by user identity forwarded by the trusted Next.js server-side proxy.
     """
     sb = _require_supabase()
-
-    # Extract JWT subject from token (UUID for Supabase, string for Clerk)
-    subject = _extract_user_id_from_token(authorization)
-
-    # If no subject, return empty list (don't expose all data)
-    # If no identity at all, return empty list (don't expose all data)
-    if not subject and not _extract_clerk_user_id_from_header(x_clerk_user_id):
-        return {"data": []}
 
     try:
         query = sb.table("saved_deals").select("*")
 
-        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+        identity_col, identity_val = _trusted_identity_filter(
+            request, sb, x_propnexus_user_id, x_clerk_user_id
+        )
         query = query.eq(identity_col, identity_val)
 
         # Order by saved_at when present; if column is missing, PostgREST will error.
@@ -575,6 +513,8 @@ async def list_saved_deals(
                 pass
 
         return {"data": merged_rows}
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[list-saved-deals-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
@@ -583,7 +523,7 @@ async def list_saved_deals(
 @router.patch("/saved-deals/status")
 async def update_saved_deal_status(
     request: Request,
-    authorization: Optional[str] = Header(None),
+    x_propnexus_user_id: Optional[str] = Header(None, alias="X-PropNexus-User-Id"),
     x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
 ) -> Dict[str, Any]:
     """Update launch-action progress for a saved deal owned by the current user."""
@@ -616,8 +556,9 @@ async def update_saved_deal_status(
                 ),
             )
 
-        subject = _extract_user_id_from_token(authorization)
-        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+        identity_col, identity_val = _trusted_identity_filter(
+            request, sb, x_propnexus_user_id, x_clerk_user_id
+        )
         now = _now_iso()
         update_payload: Dict[str, Any] = {
             "deal_status": status,
@@ -652,16 +593,17 @@ async def update_saved_deal_status(
 async def get_saved_deal(
     deal_id: str,
     request: Request,
-    authorization: Optional[str] = Header(None),
+    x_propnexus_user_id: Optional[str] = Header(None, alias="X-PropNexus-User-Id"),
     x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
 ) -> Dict[str, Any]:
     """Retrieve a specific saved deal."""
     sb = _require_supabase()
     try:
-        subject = _extract_user_id_from_token(authorization)
         query = sb.table("saved_deals").select("*").eq("id", deal_id)
 
-        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+        identity_col, identity_val = _trusted_identity_filter(
+            request, sb, x_propnexus_user_id, x_clerk_user_id
+        )
         query = query.eq(identity_col, identity_val)
         res = query.single().execute()
 
@@ -684,14 +626,15 @@ async def get_saved_deal(
 async def delete_saved_deal(
     property_id: str,
     request: Request,
-    authorization: Optional[str] = Header(None),
+    x_propnexus_user_id: Optional[str] = Header(None, alias="X-PropNexus-User-Id"),
     x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
 ) -> Dict[str, Any]:
     """Delete a saved deal for the current user by property_id."""
     sb = _require_supabase()
     try:
-        subject = _extract_user_id_from_token(authorization)
-        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+        identity_col, identity_val = _trusted_identity_filter(
+            request, sb, x_propnexus_user_id, x_clerk_user_id
+        )
 
         if not _saved_deals_has_property_id(sb):
             raise HTTPException(
@@ -709,6 +652,8 @@ async def delete_saved_deal(
         res = query.execute()
         return {"ok": True, "deleted": True, "data": res.data}
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"[delete-saved-deal-error] {e}")
         raise HTTPException(status_code=500, detail=f"Server error: {e}") from e
@@ -716,14 +661,16 @@ async def delete_saved_deal(
 
 @router.post("/saved-deals/clear")
 async def clear_saved_deals(
-    authorization: Optional[str] = Header(None),
+    request: Request,
+    x_propnexus_user_id: Optional[str] = Header(None, alias="X-PropNexus-User-Id"),
     x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
 ) -> Dict[str, Any]:
     """Clear all saved deals for the current user."""
     sb = _require_supabase()
     try:
-        subject = _extract_user_id_from_token(authorization)
-        identity_col, identity_val = _identity_filter(sb, subject or "", x_clerk_user_id)
+        identity_col, identity_val = _trusted_identity_filter(
+            request, sb, x_propnexus_user_id, x_clerk_user_id
+        )
 
         res = sb.table("saved_deals").delete().eq(identity_col, identity_val).execute()
         return {"ok": True, "cleared": True, "data": res.data}

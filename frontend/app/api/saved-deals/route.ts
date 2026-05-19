@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { internalApiHeaders } from '@/lib/server/internalApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -97,6 +98,8 @@ export async function GET(req?: Request) {
       method: 'GET',
       headers: {
         'content-type': 'application/json',
+        ...internalApiHeaders(),
+        'x-propnexus-user-id': userId,
         'x-clerk-user-id': userId,
       },
     });
@@ -296,6 +299,8 @@ export async function DELETE(req: Request) {
   try {
     const baseHeaders = {
       'content-type': 'application/json',
+      ...internalApiHeaders(),
+      'x-propnexus-user-id': userId,
       'x-clerk-user-id': userId,
     };
 
