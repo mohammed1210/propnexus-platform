@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { FiCopy, FiRefreshCw, FiShield } from "react-icons/fi";
 import { toast } from "sonner";
 
 type AuthDebugPayload = {
@@ -30,10 +31,10 @@ function Badge({ ok, label }: { ok: boolean; label: string }) {
   return (
     <span
       className={
-        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold " +
+        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 " +
         (ok
-          ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-200"
-          : "bg-rose-100 text-rose-900 dark:bg-rose-900/30 dark:text-rose-200")
+          ? "bg-emerald-50 text-emerald-800 ring-emerald-100 dark:bg-emerald-950/35 dark:text-emerald-200 dark:ring-emerald-900/50"
+          : "bg-rose-50 text-rose-800 ring-rose-100 dark:bg-rose-950/35 dark:text-rose-200 dark:ring-rose-900/50")
       }
     >
       {label}
@@ -78,28 +79,35 @@ export default function AuthStatusPanel() {
   }
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Auth Status</h2>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-700 ring-1 ring-brand-100 dark:bg-brand-950/40 dark:text-brand-200 dark:ring-brand-900/50">
+            <FiShield className="h-4 w-4" aria-hidden />
+          </span>
+          <div>
+          <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Auth Status</h2>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
             Live runtime snapshot from <span className="font-mono">/api/debug/auth</span>.
           </p>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={load}
             disabled={loading}
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
+            <FiRefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
             {loading ? "Refreshing…" : "Refresh"}
           </button>
           <button
             onClick={copyJson}
             disabled={!data}
-            className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-60 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
+            className="inline-flex items-center gap-2 rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
           >
+            <FiCopy className="h-4 w-4" aria-hidden />
             Copy JSON
           </button>
         </div>
@@ -118,7 +126,7 @@ export default function AuthStatusPanel() {
               <Badge ok={!!data.clerk.hasSecretKey} label={data.clerk.hasSecretKey ? "SK present" : "SK missing"} />
             </div>
 
-            <div className="rounded-lg bg-zinc-50 p-3 text-xs text-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
               <div className="flex items-center justify-between">
                 <span className="font-semibold">Vercel</span>
                 <span className="font-mono">{data.vercelEnv ?? "(unknown)"}</span>
@@ -145,12 +153,12 @@ export default function AuthStatusPanel() {
           </div>
 
           <div className="space-y-2 text-sm">
-            <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-              <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">whoami</p>
-              <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">
+            <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-950/30">
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">whoami</p>
+              <p className="mt-1 text-sm text-slate-900 dark:text-slate-100">
                 <span className="font-semibold">User ID:</span> {data.whoami.userId ?? "(none)"}
               </p>
-              <p className="mt-1 text-sm text-zinc-900 dark:text-zinc-100">
+              <p className="mt-1 text-sm text-slate-900 dark:text-slate-100">
                 <span className="font-semibold">Email:</span> {data.whoami.email ?? "(none)"}
               </p>
               {data.whoami.error ? (
@@ -160,7 +168,7 @@ export default function AuthStatusPanel() {
           </div>
         </div>
       ) : (
-        <div className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">Loading…</div>
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">Loading…</div>
       )}
     </div>
   );
