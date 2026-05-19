@@ -601,7 +601,7 @@ export default function PropertyCard({
         isHovered && 'ring-2 ring-brand-500/20 border-brand-500/40 shadow-xl shadow-brand-950/10',
       )}
     >
-      <div className="relative aspect-[3/2] w-full overflow-hidden">
+      <div className="relative aspect-[16/9] w-full overflow-hidden">
         <Link
           href={href}
           onClick={handleSearchClickTrack}
@@ -724,7 +724,7 @@ export default function PropertyCard({
 
       </div>
 
-      <div className="space-y-2.5 p-3.5">
+      <div className="space-y-2 p-3">
         <Link href={href} onClick={handleSearchClickTrack} className="block group">
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <span
@@ -741,12 +741,12 @@ export default function PropertyCard({
               Investor view
             </span>
           </div>
-          <h3 className="text-[15px] font-black leading-snug text-slate-950 line-clamp-2 transition-colors group-hover:text-brand-600 dark:text-white dark:group-hover:text-brand-300">
+          <h3 className="text-sm font-black leading-snug text-slate-950 line-clamp-2 transition-colors group-hover:text-brand-600 dark:text-white dark:group-hover:text-brand-300">
             <Highlight text={p.title || 'Untitled property'} tokens={matchInfo.tokens} />
           </h3>
         </Link>
 
-        <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-brand-50/50 px-3 py-2 shadow-sm dark:border-slate-800 dark:from-slate-900/80 dark:via-slate-950 dark:to-brand-950/20">
+        <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-brand-50/50 px-2.5 py-2 shadow-sm dark:border-slate-800 dark:from-slate-900/80 dark:via-slate-950 dark:to-brand-950/20">
           <div className="flex items-center justify-between gap-2">
             <span className="text-base font-black leading-none text-slate-950 dark:text-white">{priceText}</span>
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700">

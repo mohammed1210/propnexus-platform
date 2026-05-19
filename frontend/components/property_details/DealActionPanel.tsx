@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { FiCheckCircle, FiClipboard, FiExternalLink, FiMail, FiPhone } from 'react-icons/fi';
+import { FiCheckCircle, FiChevronDown, FiClipboard, FiExternalLink, FiMail, FiPhone } from 'react-icons/fi';
 import { toast } from 'sonner';
 import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
 import { CONTACT_ORIGINAL_LISTING_DISCLAIMER } from '@/lib/legalCopy';
@@ -59,6 +59,7 @@ export default function DealActionPanel({ propertyId, property, compact = false 
   const [status, setStatus] = useState<DealStatus>('not_contacted');
   const [loadingSaved, setLoadingSaved] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [copyChecklistOpen, setCopyChecklistOpen] = useState(!compact);
 
   const originalUrl = useMemo(() => getOriginalListingUrl(property), [property]);
   const sourceLabel = useMemo(() => getSourceLabel(property), [property]);
@@ -201,27 +202,46 @@ export default function DealActionPanel({ propertyId, property, compact = false 
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleCopyEnquiry}
-          className={`flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-brand-500 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-brand-300 ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'}`}
-        >
-          {copied ? <FiCheckCircle className="h-4 w-4" aria-hidden="true" /> : <FiClipboard className="h-4 w-4" aria-hidden="true" />}
-          <span>{copied ? 'Copied' : 'Copy enquiry'}</span>
-        </button>
-
         <div className={`rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950/30 ${compact ? 'p-2.5' : 'p-3'}`}>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-            Before offer checklist
-          </div>
-          <ul className={`${compact ? 'mt-1.5 space-y-1' : 'mt-2 space-y-1.5'}`}>
-            {checklist.map((item) => (
-              <li key={item} className="flex gap-2 text-xs leading-4 text-slate-600 dark:text-slate-300">
-                <FiCheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
+          <button
+            type="button"
+            onClick={() => setCopyChecklistOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600 transition hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:text-slate-300 dark:hover:text-white"
+            aria-expanded={copyChecklistOpen}
+          >
+            <span>Copy and checklist</span>
+            <FiChevronDown
+              className={`h-4 w-4 shrink-0 transition-transform ${copyChecklistOpen ? 'rotate-180' : ''}`}
+              aria-hidden="true"
+            />
+          </button>
+
+          {copyChecklistOpen ? (
+            <div className={compact ? 'mt-2 space-y-2' : 'mt-3 space-y-3'}>
+              <button
+                type="button"
+                onClick={handleCopyEnquiry}
+                className={`flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-700 transition hover:border-brand-500 hover:text-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:text-brand-300 ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'}`}
+              >
+                {copied ? <FiCheckCircle className="h-4 w-4" aria-hidden="true" /> : <FiClipboard className="h-4 w-4" aria-hidden="true" />}
+                <span>{copied ? 'Copied' : 'Copy enquiry'}</span>
+              </button>
+
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  Before offer checklist
+                </div>
+                <ul className={`${compact ? 'mt-1.5 space-y-1' : 'mt-2 space-y-1.5'}`}>
+                  {checklist.map((item) => (
+                    <li key={item} className="flex gap-2 text-xs leading-4 text-slate-600 dark:text-slate-300">
+                      <FiCheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" aria-hidden="true" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className={`rounded-lg border border-slate-200 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/40 ${compact ? 'p-2.5' : 'p-3'}`}>
