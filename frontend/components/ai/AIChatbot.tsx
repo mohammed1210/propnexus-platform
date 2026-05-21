@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { FiLock } from 'react-icons/fi';
+import { FiLock, FiX } from 'react-icons/fi';
 import type { Property } from '@/types';
 import { postAIChat } from '@/lib/api';
 import { FF } from '@/lib/flags';
@@ -111,6 +111,7 @@ function AIChatbotInner({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
   const [messages, setMessages] = useState<Message[]>([initialMessage(property, pageMode)]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -287,9 +288,21 @@ function AIChatbotInner({
             </button>
           </div>
 
-          <div className="border-b border-neutral-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900 dark:border-neutral-800 dark:bg-amber-950/25 dark:text-amber-100">
-            AI responses are for general review only and may be inaccurate. Do not rely on them as professional advice. {AI_DISCLAIMER}
-          </div>
+          {showDisclaimer && (
+            <div className="flex items-start gap-2 border-b border-neutral-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900 dark:border-neutral-800 dark:bg-amber-950/25 dark:text-amber-100">
+              <p className="flex-1">
+                AI responses are for general review only and may be inaccurate. Do not rely on them as professional advice. {AI_DISCLAIMER}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowDisclaimer(false)}
+                className="-mr-1 rounded p-1 text-amber-900 transition hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40 dark:focus-visible:ring-amber-200"
+                aria-label="Dismiss AI disclaimer"
+              >
+                <FiX className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          )}
 
           <div className="flex-1 p-3 overflow-y-auto bg-gray-50 dark:bg-neutral-950 text-sm">
             {messages.map((m, i) => (
