@@ -867,6 +867,7 @@ function ListingsInner() {
         params.set('sort', sort);
         params.set('limit', String(limit));
         params.set('offset', String(offset));
+        if (sort === 'top_deals') params.set('high_confidence_top_deals', '1');
 
         if (dealsOnlyUrl) params.set('deals_only', '1');
         if (auctionOnlyUrl) params.set('auction_only', '1');
