@@ -162,21 +162,21 @@ function AIChatbotInner({
       hints.push(`price ≈ £${property.price.toLocaleString()}`);
 
     const base = hints.length > 0
-      ? `🤖 Quick take: ${hints.join(' · ')}. Sense-check product fees, refi assumptions and local demand.`
+      ? `Quick take: ${hints.join(' · ')}. Check fees, refi assumptions and demand.`
       : pageMode === 'listings'
-        ? '🤖 I can help compare locations, sale prices, rental demand, yields and filter strategy across the search results.'
-        : '🤖 Share a location, budget, property type or postcode and I can give a sharper market view.';
+        ? 'Quick take: compare sold prices, rent demand, yield and supply before shortlisting.'
+        : 'Share a location, budget, property type or postcode for a sharper view.';
 
     const lower = prompt.toLowerCase();
     if (!property && (lower.includes('trend') || lower.includes('area') || lower.includes('sales') || lower.includes('compare'))) {
-      return `${base} Start with sold-price evidence, days-on-market, rent comps, supply levels, transport links and regeneration signals before narrowing to individual deals.`;
+      return `${base} Prioritise sold comps, rent comps, days-on-market and supply.`;
     }
     if (lower.includes('risk'))
-      return `${base} Key risks: down-valuation, refurb overrun, and void periods. Add contingency and model DSCR ≥ 1.25×.`;
+      return `${base} Main risks: down-valuation, refurb overrun and voids. Add contingency.`;
     if (lower.includes('exit'))
-      return `${base} Consider: let & refinance (BRRR), flip at GDV, or leave as vanilla BTL.`;
+      return `${base} Likely exits: BRR/refinance, flip, or vanilla BTL if rent stacks.`;
     if (lower.includes('good') || lower.includes('invest'))
-      return `${base} Run both GDV and BRRR paths in the calculator and compare cash left in the deal.`;
+      return `${base} Check GDV, works, rent evidence and cash left in before viewing.`;
     return base;
   };
 
