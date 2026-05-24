@@ -29,9 +29,8 @@ import ListingHistory from '@/components/property_details/ListingHistory';
 import ComparableEvidencePanel from '@/components/property_details/ComparableEvidencePanel';
 import RentalEvidencePanel from '@/components/property_details/RentalEvidencePanel';
 import TradesmenList from '@/components/tradesmen/TradesmenList';
-import LegalNotice from '@/components/legal/LegalNotice';
 import { useRegisterCurrentProperty } from '@/components/ai/CurrentPropertyContext';
-import { INVESTMENT_DISCLAIMER_SHORT } from '@/lib/legalCopy';
+import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
 
 import type { Property } from '@/types';
 import { FF } from '@/lib/flags';
@@ -43,6 +42,7 @@ import {
   normalizeProperty,
 } from '@/lib/normalizeProperty';
 import { buildInvestmentDescription } from '@/lib/propertyDescription';
+import { INVESTMENT_DISCLAIMER_SHORT } from '@/lib/legalCopy';
 import type { InvestorIntel } from '@/types/investorIntel';
 
 /** ---- Client-only widgets (no SSR) ---- */
@@ -440,15 +440,16 @@ export default function PropertyDetailsPage() {
           <WhySurfaced property={property as any} />
         </div>
 
+        <InfoDisclaimer className="mb-6" label="Investor brief disclaimer">
+          Investor brief and scores are indicative only. Verify rent, comparable sales, finance, works, legal pack and tax position before making an offer. {INVESTMENT_DISCLAIMER_SHORT}
+        </InfoDisclaimer>
+
         <div className="grid grid-cols-1 gap-6">
           {/* Main content - single column now since sidebar is floating */}
           <div className="space-y-6">
             <div className="text-xs text-slate-500 dark:text-slate-400">
               Showing the most relevant insights first
             </div>
-            <LegalNotice title="Due diligence" variant="compact">
-              Investor brief and scores are indicative only. Verify rent, comparable sales, finance, works, legal pack and tax position before making an offer. {INVESTMENT_DISCLAIMER_SHORT}
-            </LegalNotice>
             <CollapsibleCard
               title="Offer Intelligence"
               icon={

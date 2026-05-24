@@ -1,5 +1,6 @@
 import { supabaseServer } from "@/lib/supabaseServer";
 import Link from "next/link";
+import { FiAlertTriangle, FiBarChart2, FiPieChart, FiSearch, FiShield, FiTrendingUp, FiUsers, FiZap } from "react-icons/fi";
 import AuthStatusPanel from "@/components/admin/AuthStatusPanel";
 import RunImportPanel from "@/components/admin/RunImportPanel";
 
@@ -269,19 +270,37 @@ function StatCard({
   label,
   value,
   sub,
+  tone = "brand",
+  icon: Icon,
 }: {
   label: string;
   value: string | number;
   sub?: string;
+  tone?: "brand" | "emerald" | "blue" | "amber" | "violet" | "slate";
+  icon?: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
 }) {
+  const toneClass = {
+    brand: "bg-brand-50 text-brand-700 ring-brand-100 dark:bg-brand-950/40 dark:text-brand-200 dark:ring-brand-900/50",
+    emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100 dark:bg-emerald-950/35 dark:text-emerald-200 dark:ring-emerald-900/50",
+    blue: "bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-950/35 dark:text-blue-200 dark:ring-blue-900/50",
+    amber: "bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-950/35 dark:text-amber-200 dark:ring-amber-900/50",
+    violet: "bg-violet-50 text-violet-700 ring-violet-100 dark:bg-violet-950/35 dark:text-violet-200 dark:ring-violet-900/50",
+    slate: "bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700",
+  }[tone];
+
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{label}</p>
-      <p className="mt-2 text-3xl font-semibold text-zinc-900 dark:text-zinc-100">
-        {value}
-      </p>
+    <div className="group rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/40 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20 dark:hover:border-slate-700">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">{label}</p>
+        {Icon ? (
+          <span className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ring-1 ${toneClass}`}>
+            <Icon className="h-4 w-4" aria-hidden />
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{value}</p>
       {sub ? (
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{sub}</p>
+        <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">{sub}</p>
       ) : null}
     </div>
   );
@@ -290,8 +309,11 @@ function StatCard({
 function WarningBox({ warnings }: { warnings?: string[] }) {
   if (!warnings?.length) return null;
   return (
-    <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-      <p className="font-semibold">Heads up</p>
+    <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50/90 p-5 text-amber-900 shadow-sm dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+      <div className="flex items-center gap-2">
+        <FiAlertTriangle className="h-4 w-4" aria-hidden />
+        <p className="font-semibold">Heads up</p>
+      </div>
       <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
         {warnings.map((w, idx) => (
           <li key={idx}>{w}</li>
@@ -311,27 +333,33 @@ export default async function AdminPage() {
   // If Supabase client is missing, show a friendly message — no crash.
   if (!supabase) {
     return (
-      <main className="mx-auto max-w-5xl px-6 py-12">
-        <div className="mb-8">
-          <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+      <main className="min-h-screen bg-slate-50 px-4 py-8 dark:bg-slate-950 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
+          <div className="mb-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            <FiShield className="h-3.5 w-3.5" aria-hidden />
+            Runtime configuration
+          </div>
+          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">
             Admin Dashboard
           </h1>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
             Admin stats require Supabase server environment variables.
           </p>
-        </div>
+          </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-          <p className="text-zinc-700 dark:text-zinc-200">
+        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-slate-700 dark:text-slate-200">
             Admin dashboard is not available right now.
           </p>
-          <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
             Please ensure Supabase environment variables are configured correctly (server-side).
           </p>
 
-          <p className="mt-4 rounded-lg bg-zinc-50 p-4 text-xs text-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300">
+          <p className="mt-4 rounded-lg bg-slate-50 p-4 text-xs text-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
             Expected server-side Supabase configuration is missing or invalid. Check deployment secrets in the hosting dashboard.
           </p>
+        </div>
         </div>
       </main>
     );
@@ -340,35 +368,58 @@ export default async function AdminPage() {
   const stats = await getAdminStats();
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
-          Admin Dashboard
-        </h1>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Live stats based on active subscriptions (trialing + active).
-        </p>
-      </div>
+    <main className="min-h-screen bg-slate-50 px-4 py-8 dark:bg-slate-950 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:p-7">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-200">
+                <FiShield className="h-3.5 w-3.5" aria-hidden />
+                Admin workspace
+              </div>
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                Admin Dashboard
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+                Live operating view for subscriptions, revenue health, imports, and search telemetry.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:items-center">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/50">
+                <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Active subs</p>
+                <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{stats.subscribers}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/50">
+                <p className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">MRR</p>
+                <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{formatGBP(stats.mrrGBP)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
       <AuthStatusPanel />
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatCard label="Subscribers" value={stats.subscribers} />
-        <StatCard label="Total MRR (GBP)" value={formatGBP(stats.mrrGBP)} sub="Investor + Pro" />
-        <StatCard label="Investor Tier" value={stats.investorTier} sub={`MRR: ${formatGBP(stats.investorMRRGBP)}`} />
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <StatCard label="Subscribers" value={stats.subscribers} sub="Trialing + active" icon={FiUsers} tone="brand" />
+        <StatCard label="Total MRR (GBP)" value={formatGBP(stats.mrrGBP)} sub="Investor + Pro" icon={FiTrendingUp} tone="emerald" />
+        <StatCard label="Investor Tier" value={stats.investorTier} sub={`MRR: ${formatGBP(stats.investorMRRGBP)}`} icon={FiZap} tone="amber" />
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <StatCard label="Pro Tier" value={stats.proTier} sub={`MRR: ${formatGBP(stats.proMRRGBP)}`} />
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <StatCard label="Pro Tier" value={stats.proTier} sub={`MRR: ${formatGBP(stats.proMRRGBP)}`} icon={FiBarChart2} tone="blue" />
         <StatCard
           label="MRR Split"
           value={`${formatGBP(stats.investorMRRGBP)} / ${formatGBP(stats.proMRRGBP)}`}
           sub="Investor / Pro"
+          icon={FiPieChart}
+          tone="violet"
         />
         <StatCard
           label="Tier Coverage"
           value={`${stats.investorTier + stats.proTier}/${stats.subscribers}`}
           sub="Tiered subs / Total"
+          icon={FiShield}
+          tone="slate"
         />
       </div>
 
@@ -378,35 +429,43 @@ export default async function AdminPage() {
         <RunImportPanel />
       </div>
 
-      <div className="mt-6 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Search Analytics</h2>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100 dark:bg-blue-950/35 dark:text-blue-200 dark:ring-blue-900/50">
+              <FiSearch className="h-4 w-4" aria-hidden />
+            </div>
+            <h2 className="mt-3 text-lg font-semibold text-slate-950 dark:text-white">Search Analytics</h2>
+          </div>
+          <Link
+            href="/admin/search-metrics"
+            className="inline-flex items-center justify-center rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-white dark:text-slate-950 dark:hover:bg-slate-200"
+          >
+            Open Dashboard
+          </Link>
+        </div>
+        <p className="mt-3 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
           View 7-day search health KPIs and top zero-result queries.
         </p>
-        <Link
-          href="/admin/search-metrics"
-          className="mt-3 inline-flex text-sm text-brand-600 hover:underline dark:text-brand-400"
-        >
-          Open Search Metrics Dashboard
-        </Link>
       </div>
 
-      <div className="mt-8 rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Notes</h2>
-        <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-zinc-600 dark:text-zinc-400">
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Notes</h2>
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600 dark:text-slate-300">
           <li>
             If MRR shows £0, confirm{" "}
-            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">prices</code> →
-            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">products</code>{" "}
+            <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">prices</code> →
+            <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">products</code>{" "}
             relationship exists and that product metadata contains{" "}
-            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">tier</code> ={" "}
-            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">investor</code> or{" "}
-            <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">pro</code>.
+            <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">tier</code> ={" "}
+            <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">investor</code> or{" "}
+            <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">pro</code>.
           </li>
           <li>
             This page is forced dynamic to avoid build-time failures in Vercel and to keep stats fresh.
           </li>
         </ul>
+      </div>
       </div>
     </main>
   );

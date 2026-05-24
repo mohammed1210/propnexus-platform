@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
 import { auth, clerkClient } from '@clerk/nextjs/server';
-import Stripe from 'stripe';
+import { internalApiHeaders } from '@/lib/server/internalApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-const KEY = process.env.STRIPE_SECRET_KEY;
-const BASE = process.env.NEXT_PUBLIC_APP_BASE_URL ?? '';
 
 function getBackendBase(): string {
   const base = (
@@ -31,40 +28,17 @@ function isClerkServerEnabled(): boolean {
   return !disable && pk.startsWith('pk_') && Boolean(sk);
 }
 
-async function getSignedInUserEmail(): Promise<string | null> {
-  if (!isClerkServerEnabled()) return null;
+async function getSignedInUserContext(): Promise<{ userId: string | null; email: string | null }> {
+  if (!isClerkServerEnabled()) return { userId: null, email: null };
 
   const a: any = await auth();
   const userId = (a?.userId as string | null) ?? null;
-  if (!userId) return null;
+  if (!userId) return { userId: null, email: null };
 
   const client = await clerkClient();
   const user = await client.users.getUser(userId);
-  return user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? null;
-}
-
-async function fetchJsonOrNull(res: Response): Promise<any> {
-  const type = (res.headers.get('content-type') || '').toLowerCase();
-  if (!type.includes('application/json')) return null;
-  return res.json().catch(() => null);
-}
-
-async function getCustomerIdForSignedInUser(email: string): Promise<string | null> {
-  const res = await fetch(`${getBackendBase()}/users/plan?email=${encodeURIComponent(email)}`, {
-    method: 'GET',
-    headers: { 'content-type': 'application/json' },
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    const payload = await fetchJsonOrNull(res);
-    const message = payload?.detail || payload?.message || payload?.error || 'Failed to load billing profile';
-    throw new Error(String(message));
-  }
-
-  const payload = await fetchJsonOrNull(res);
-  const customer = payload?.stripe_customer_id;
-  return typeof customer === 'string' && customer.trim() ? customer.trim() : null;
+  const email = user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? null;
+  return { userId, email: email ? String(email) : null };
 }
 
 export async function POST() {
@@ -76,38 +50,35 @@ export async function POST() {
       );
     }
 
-    const email = await getSignedInUserEmail();
-    if (!email) {
+    const { userId, email } = await getSignedInUserContext();
+    if (!userId || !email) {
       return NextResponse.json(
         { ok: false, error: 'You must be signed in to manage billing.' },
         { status: 401 },
       );
     }
 
-    if (!KEY) {
-      return NextResponse.json(
-        { ok: false, error: 'Billing portal is not configured right now.' },
-        { status: 500 },
-      );
-    }
-
-    const stripe = new Stripe(KEY, { apiVersion: '2026-03-25.dahlia' });
-
-    const customer = await getCustomerIdForSignedInUser(email);
-
-    if (!customer) {
-      return NextResponse.json(
-        { ok: false, error: 'No billing account found for your signed-in user.' },
-        { status: 404 },
-      );
-    }
-
-    const session = await stripe.billingPortal.sessions.create({
-      customer,
-      return_url: `${BASE || 'http://localhost:3000'}/account`,
+    const upstream = await fetch(`${getBackendBase()}/stripe/create-portal-session`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...internalApiHeaders(),
+        'x-propnexus-user-id': userId,
+        'x-propnexus-user-email': email,
+      },
+      body: JSON.stringify({ email }),
+      cache: 'no-store',
     });
 
-    return NextResponse.json({ ok: true, url: session.url });
+    const payload = await upstream.json().catch(() => null);
+    if (!upstream.ok) {
+      return NextResponse.json(
+        { ok: false, error: upstream.status === 404 ? 'No billing account found for your signed-in user.' : 'Could not open billing portal right now.' },
+        { status: upstream.status },
+      );
+    }
+
+    return NextResponse.json({ ok: true, url: payload?.url });
   } catch (err: any) {
     console.error('Stripe portal error', {
       message: err?.message,

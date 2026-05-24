@@ -186,6 +186,7 @@ def test_saved_deals_contracts(client: TestClient, monkeypatch: pytest.MonkeyPat
 
     # Avoid hard dependency on a real Supabase backend.
     monkeypatch.setattr(save_routes, "_require_supabase", lambda: object(), raising=True)
+    monkeypatch.setenv("PROPNEXUS_INTERNAL_API_TOKEN", "test-internal-token")
 
     # Save endpoint should reject invalid body shape.
     bad_save = client.post("/save-deal", json={})
@@ -193,13 +194,12 @@ def test_saved_deals_contracts(client: TestClient, monkeypatch: pytest.MonkeyPat
     assert isinstance(bad_save.json(), dict)
     assert "detail" in bad_save.json()
 
-    # Saved-deals list should return a stable shape for anonymous/no-token calls.
+    # Saved-deals list should fail closed for anonymous/no-token calls.
     saved_list = client.get("/saved-deals")
-    assert saved_list.status_code == 200
+    assert saved_list.status_code == 401
     body = saved_list.json()
     assert isinstance(body, dict)
-    _assert_keys(body, {"data"})
-    assert isinstance(body["data"], list)
+    _assert_keys(body, {"detail"})
 
 
 def test_events_contract(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:

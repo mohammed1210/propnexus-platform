@@ -92,4 +92,15 @@ describe('AIChatbot property context', () => {
     expect(payload.context?.summary).toContain('No single property is selected.');
     expect(payload.context?.summary).toContain('property trends, area trends, comparable sales evidence');
   });
+
+  it('lets users dismiss the AI disclaimer inside the chat panel', () => {
+    render(<AIChatbot pageMode="listings" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /open ai assistant/i }));
+    expect(screen.getByText(/AI responses are for general review only/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /dismiss ai disclaimer/i }));
+
+    expect(screen.queryByText(/AI responses are for general review only/i)).not.toBeInTheDocument();
+  });
 });

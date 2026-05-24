@@ -15,14 +15,14 @@ export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: { default: "PropNexus", template: "%s · PropNexus" },
   description:
-    "AI-powered property sourcing: analyse yield & ROI, score deals, and track your portfolio.",
+    "AI-assisted property due diligence: review listings, evidence, scores and saved-deal workflows.",
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
     url: ABS("/"),
     title: "PropNexus",
     siteName: "PropNexus",
-    description: "AI-powered property sourcing platform.",
+    description: "AI-assisted property due-diligence platform.",
     images: [
       {
         url: ABS("/og/cover.png"),
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "PropNexus",
-    description: "AI-powered property sourcing platform.",
+    description: "AI-assisted property due-diligence platform.",
     images: [ABS("/og/cover.png")],
   },
 };
