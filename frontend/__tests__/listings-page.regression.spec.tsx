@@ -83,6 +83,33 @@ describe('Listings page regressions', () => {
     expect(screen.getByText('1-1')).toBeInTheDocument();
   });
 
+  it('does not present backend fetch failures as zero matching properties', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      text: async () => 'backend_unconfigured',
+    });
+
+    render(<ListingsPage />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/unable to load property listings/i);
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.queryByText('No properties match these filters.')).not.toBeInTheDocument();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('defaults to a non-filtering listing sort instead of Top Deals', async () => {
+    mockCurrentParams = new URLSearchParams('');
+
+    render(<ListingsPage />);
+
+    expect(await screen.findByText('Visible Rightmove')).toBeInTheDocument();
+    const requestedUrl = String(fetchMock.mock.calls[0]?.[0] ?? '');
+    expect(requestedUrl).toContain('sort=created_at_desc');
+    expect(requestedUrl).not.toContain('high_confidence_top_deals=1');
+    expect(mockReplace).toHaveBeenCalledWith('/listings?sort=created_at_desc');
+  });
+
   it('updates URL sort, removes legacy dir, resets offset, and closes the menu', async () => {
     mockCurrentParams = new URLSearchParams('sort=price_asc&dir=asc&offset=50');
     render(<ListingsPage />);

@@ -235,6 +235,7 @@ const COUNT_OPTIONS = [
 ] as const;
 
 const DEFAULT_LISTINGS_LIMIT = 25;
+const DEFAULT_LISTINGS_SORT: SortKey = 'created_at_desc';
 const MAP_POINTS_LIMIT = 2000;
 
 type RawProperty = {
@@ -686,7 +687,7 @@ function ListingsInner() {
     if (legacy === 'yield_percent') return 'yield_desc';
     if (legacy === 'roi_percent') return 'roi_desc';
 
-    return 'top_deals';
+    return DEFAULT_LISTINGS_SORT;
   })();
 
   const limit = ((): number => {
@@ -784,7 +785,8 @@ function ListingsInner() {
 
   const [rows, setRows] = useState<RawProperty[]>([]);
   const [loading, setLoading] = useState(true);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState<number | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [correctionApplied, setCorrectionApplied] = useState(false);
   const [correctedQuery, setCorrectedQuery] = useState<string | null>(null);
@@ -820,7 +822,7 @@ function ListingsInner() {
     if (!hasSort || (!isValid && !isLegacy)) {
       pushParams(
         (p) => {
-          p.set('sort', 'top_deals');
+          p.set('sort', DEFAULT_LISTINGS_SORT);
         },
         { replace: true },
       );
@@ -843,6 +845,7 @@ function ListingsInner() {
 
     (async () => {
       setLoading(true);
+      setFetchError(null);
 
       try {
         const rawBase = (API_BASE || '').replace(/\/+$/, '');
@@ -897,7 +900,8 @@ function ListingsInner() {
         if (cancelled) return;
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch properties: ${response.status}`);
+          const body = await response.text().catch(() => '');
+          throw new Error(body || `Failed to fetch properties: ${response.status}`);
         }
 
         const data = await response.json();
@@ -1008,17 +1012,19 @@ function ListingsInner() {
         setCorrectionApplied(correctionFlag && Boolean(correctionTo));
         setCorrectedQuery(correctionFlag ? correctionTo : null);
         setOriginalQuery(correctionFlag ? correctionFrom : null);
+        setFetchError(null);
       } catch (error) {
         if (cancelled || (error as any)?.name === 'AbortError') return;
         console.error('[listings] fetch error', error);
         setRows([]);
         setMapRows(null);
-        setTotal(0);
+        setTotal(null);
         setHasMore(false);
         setMappableCount(0);
         setCorrectionApplied(false);
         setCorrectedQuery(null);
         setOriginalQuery(null);
+        setFetchError(error instanceof Error ? error.message : 'Unable to load properties.');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -1947,6 +1953,12 @@ function ListingsInner() {
           </p>
         </div>
 
+        {fetchError && !loading ? (
+          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-100" role="alert">
+            Unable to load property listings right now. Check the backend API configuration and try again.
+          </div>
+        ) : null}
+
         {!showSplit && (
           <>
             {loading ? (
@@ -1954,7 +1966,7 @@ function ListingsInner() {
                 <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
                 <p className="mt-4 text-slate-600 dark:text-slate-400">Loading properties...</p>
               </div>
-            ) : displayedRows.length === 0 ? (
+            ) : fetchError ? null : displayedRows.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-xl text-slate-600 dark:text-slate-400">
                   {sort === 'top_deals' ? 'No high-confidence Top Deals surfaced in this search yet.' : 'No properties match these filters.'}
@@ -2030,7 +2042,7 @@ function ListingsInner() {
                   <div className="inline-block w-12 h-12 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
                   <p className="mt-4 text-slate-600 dark:text-slate-400">Loading properties...</p>
                 </div>
-              ) : displayedRows.length === 0 ? (
+              ) : fetchError ? null : displayedRows.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-xl text-slate-600 dark:text-slate-400">
                     {sort === 'top_deals' ? 'No high-confidence Top Deals surfaced in this search yet.' : 'No properties match these filters.'}
