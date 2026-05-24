@@ -123,6 +123,43 @@ export async function POST(req: Request) {
     return typeof tier === 'string' && tier.trim() ? tier.trim() : null;
   };
 
+  const upsertClerkUser = async (
+    id: string,
+    email: string,
+    planTier?: string | null
+  ): Promise<'linked_by_email' | 'upserted'> => {
+    const payload: Record<string, unknown> = {
+      clerk_user_id: id,
+      email,
+    };
+    if (planTier) payload.plan = planTier;
+
+    const { data: existingUser, error: lookupError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (lookupError) throw lookupError;
+
+    if (existingUser) {
+      const { error: updateError } = await supabase
+        .from('users')
+        .update(payload)
+        .eq('email', email);
+
+      if (updateError) throw updateError;
+      return 'linked_by_email';
+    }
+
+    const { error: upsertError } = await supabase
+      .from('users')
+      .upsert(payload, { onConflict: 'clerk_user_id' });
+
+    if (upsertError) throw upsertError;
+    return 'upserted';
+  };
+
   try {
     switch (eventType) {
       case 'user.created': {
@@ -131,28 +168,15 @@ export async function POST(req: Request) {
         const planTier = extractPlanTier(evt.data) ?? 'free';
 
         if (!email) {
-          console.error('[Clerk Webhook] No email found for user:', id);
-          return NextResponse.json({ error: 'No email address found' }, { status: 400 });
+          console.warn('[Clerk Webhook] No email found for user:', id);
+          return NextResponse.json({ success: true, action: 'skip_no_email' });
         }
 
         console.log(`[Clerk Webhook] Upserting user: ${email} (${id})`);
 
-        const { error: upsertError } = await supabase
-          .from('users')
-          .upsert(
-            {
-              clerk_user_id: id,
-              email,
-              plan: planTier,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'clerk_user_id' }
-          );
+        const action = await upsertClerkUser(id, email, planTier);
 
-        if (upsertError) throw upsertError;
-
-        return NextResponse.json({ success: true, action: 'upserted' });
+        return NextResponse.json({ success: true, action });
       }
 
       case 'user.updated': {
@@ -165,22 +189,9 @@ export async function POST(req: Request) {
           return NextResponse.json({ success: true, action: 'skip' });
         }
 
-        const updatePayload: Record<string, unknown> = {
-          clerk_user_id: id,
-          email,
-          updated_at: new Date().toISOString(),
-        };
-        if (planTier) updatePayload.plan = planTier;
+        const action = await upsertClerkUser(id, email, planTier);
 
-        const { error: upsertError } = await supabase
-          .from('users')
-          .upsert(updatePayload, { onConflict: 'clerk_user_id' });
-
-        if (upsertError) {
-          console.warn('[Clerk Webhook] User upsert failed:', upsertError);
-        }
-
-        return NextResponse.json({ success: true, action: 'upserted' });
+        return NextResponse.json({ success: true, action });
       }
 
       case 'user.deleted': {
