@@ -95,7 +95,13 @@ async def ai_chat(data: dict, response: Response):
         )
 
     # Build system prompt with context if provided
-    system_msg = "You are a helpful AI assistant for PropNexus, a UK property investment platform."
+    system_msg = (
+        "You are a concise AI assistant for PropNexus, a UK property investment platform. "
+        "Answer like a practical property investor. Keep replies short, precise and evidence-led: "
+        "usually 2-4 bullets or 80 words max. Lead with the answer, then the key checks. "
+        "Avoid long explanations, filler, hype and generic disclaimers. Do not recommend a purchase; "
+        "frame outputs as quick review points and validation steps."
+    )
     if context:
         ctx_parts = []
         if context.get("property_id"):
@@ -112,7 +118,7 @@ async def ai_chat(data: dict, response: Response):
     full_messages = [{"role": "system", "content": system_msg}] + messages
 
     try:
-        reply = await ai_service.chat_messages(full_messages)
+        reply = await ai_service.chat_messages(full_messages, temperature=0.2, max_tokens=320)
         usage = {"prompt_tokens": 0, "completion_tokens": 0}
         return {"ok": True, "reply": reply, "usage": usage}
     except HTTPException as exc:

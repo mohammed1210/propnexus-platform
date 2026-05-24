@@ -49,6 +49,7 @@ PropNexus does not provide financial advice, investment advice, mortgage advice,
 
 - Backend `/health` remains public and minimal.
 - Debug routes are disabled in production or return sanitized booleans only.
+- `bash scripts/launch_audit.sh` should pass before launch; warnings require review, failures are blockers.
 - Service role, Stripe secret and OpenAI keys must not appear in client bundles.
 - Original listing links should be tested from listings, detail pages and saved deals.
 - Ingest worker should be direct mode running or explicitly paused with that state recorded.
@@ -71,3 +72,4 @@ Before soft launch:
 - [ ] Property detail page tested
 - [ ] No debug route leaks
 - [ ] No service role key in frontend bundle
+- [ ] `bash scripts/launch_audit.sh` passes

@@ -22,6 +22,7 @@ def test_debug_endpoints_hidden_in_production_by_default(monkeypatch: pytest.Mon
     assert client.get("/debug/routes").status_code == 404
     assert client.get("/debug/supabase-env").status_code == 404
     assert client.get("/debug/scraper-env").status_code == 404
+    assert client.get("/debug/properties-count").status_code == 404
 
     # Router-level debug endpoint should also be gated.
     assert client.get("/debug/scrape-probe?location=London").status_code == 404
@@ -47,3 +48,7 @@ def test_debug_endpoints_allow_in_production_when_explicitly_enabled(
     # This endpoint still requires admin auth inside the handler.
     r2 = client.get("/debug/scrape-probe?location=London")
     assert r2.status_code == 401
+
+    r3 = client.get("/debug/properties-count")
+    assert r3.status_code == 200
+    assert set(r3.json()).issubset({"count"})

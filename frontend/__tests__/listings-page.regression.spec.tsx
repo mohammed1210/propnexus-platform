@@ -111,4 +111,37 @@ describe('Listings page regressions', () => {
     expect(pushedUrl).toContain('sort=recommended');
     expect(pushedUrl).toContain('offset=0');
   });
+
+  it('requests high-confidence backend pagination for Top Deals', async () => {
+    mockCurrentParams = new URLSearchParams('sort=top_deals&offset=25');
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        items: [
+          {
+            id: 'strong-1',
+            title: 'Strong Top Deal',
+            source: 'zoopla',
+            price: 175000,
+            created_at: '2026-05-14T00:00:00Z',
+            top_deal_tier: 'strong',
+            top_deal_score: 72,
+          },
+        ],
+        total: 30,
+        limit: 25,
+        offset: 25,
+        has_more: false,
+      }),
+    });
+
+    render(<ListingsPage />);
+
+    expect(await screen.findByText('Strong Top Deal')).toBeInTheDocument();
+    const requestedUrl = String(fetchMock.mock.calls[0]?.[0] ?? '');
+    expect(requestedUrl).toContain('sort=top_deals');
+    expect(requestedUrl).toContain('offset=25');
+    expect(requestedUrl).toContain('high_confidence_top_deals=1');
+    expect(screen.queryByText('No high-confidence Top Deals surfaced in this search yet.')).not.toBeInTheDocument();
+  });
 });

@@ -8,6 +8,7 @@ describe('/api/stripe/checkout', () => {
     process.env = {
       ...oldEnv,
       NEXT_PUBLIC_BACKEND_URL: 'https://backend.example',
+      PROPNEXUS_INTERNAL_API_TOKEN: 'test-internal-token',
     };
     jest.resetModules();
   });
@@ -52,8 +53,14 @@ describe('/api/stripe/checkout', () => {
     expect(global.fetch).toHaveBeenNthCalledWith(
       2,
       'https://backend.example/stripe/create-checkout-session',
-      expect.objectContaining({ method: 'POST' }),
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          'X-PropNexus-Internal-Token': 'test-internal-token',
+        }),
+      }),
     );
+    expect(JSON.stringify(body)).not.toContain('test-internal-token');
   });
 
   it('returns 502 when no backend checkout endpoint exists', async () => {
