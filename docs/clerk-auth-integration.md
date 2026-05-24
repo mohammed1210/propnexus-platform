@@ -56,6 +56,48 @@ PropNexus now uses **Clerk** as the primary authentication provider, replacing t
    - Copy the webhook secret
    - Add to environment: `CLERK_WEBHOOK_SECRET=whsec_xxx`
 
+### 1a. Production Domain Setup
+
+For the production Clerk primary domain `propnexus.uk`, DNS is managed by One.com nameservers (`ns01.one.com`, `ns02.one.com`). Add these CNAME records in the One.com DNS editor:
+
+| Purpose | Host/name | Type | Value/target |
+| --- | --- | --- | --- |
+| Frontend API | `clerk` | CNAME | `frontend-api.clerk.services` |
+| Account portal | `accounts` | CNAME | `accounts.clerk.services` |
+| Clerk email | `clkmail` | CNAME | `mail.s4y4xnryjagz.clerk.services` |
+| DKIM 1 | `clk._domainkey` | CNAME | `dkim1.s4y4xnryjagz.clerk.services` |
+| DKIM 2 | `clk2._domainkey` | CNAME | `dkim2.s4y4xnryjagz.clerk.services` |
+
+Do not proxy these records. After DNS propagation, return to Clerk Dashboard -> Domains and run verification again. Clerk can issue SSL certificates only after all five records verify.
+
+Production environment variables should use the live Clerk instance and public app URL:
+
+```env
+NEXT_PUBLIC_APP_URL=https://www.propnexus.uk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_xxx
+CLERK_SECRET_KEY=sk_live_xxx
+CLERK_WEBHOOK_SECRET=whsec_xxx
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/saved
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/saved
+```
+
+Update the Clerk webhook endpoint to `https://www.propnexus.uk/api/webhooks/clerk`. If the apex domain is later configured with valid Vercel SSL, the endpoint can be changed to `https://propnexus.uk/api/webhooks/clerk`.
+
+### 1b. Google SSO in Production
+
+Production Clerk instances require custom Google OAuth credentials. Create a Google OAuth client in Google Cloud Console and paste the values into Clerk Dashboard -> User & Authentication -> Social connections -> Google.
+
+Use these Google OAuth settings:
+
+| Field | Value |
+| --- | --- |
+| Application type | Web application |
+| Authorized JavaScript origins | `https://propnexus.uk`, `https://www.propnexus.uk` |
+| Authorized redirect URI | `https://clerk.propnexus.uk/v1/oauth_callback` |
+| Scopes | `openid`, `email`, `profile` |
+
+In the Google OAuth consent screen, set the app domain to `propnexus.uk` and add production contact details. If Google asks for authorized domains, add `propnexus.uk`. After saving the Google Client ID and Client Secret in Clerk, test both `/sign-in` and `/sign-up`; the Clerk components display the Google provider automatically when enabled.
+
 ### 2. Supabase Configuration
 
 Ensure your Supabase users table has the following structure:
@@ -63,6 +105,7 @@ Ensure your Supabase users table has the following structure:
 ```sql
 create table if not exists public.users (
   id uuid primary key default uuid_generate_v4(),
+   clerk_user_id text unique,
   email text unique not null,
   plan text default 'free',
   stripe_customer_id text unique,

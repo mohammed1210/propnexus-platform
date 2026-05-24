@@ -8,6 +8,7 @@ create extension if not exists "uuid-ossp";
 create table if not exists public.users (
   id uuid primary key default uuid_generate_v4(),
   email text unique not null,
+  clerk_user_id text unique,
   stripe_customer_id text unique,
   plan text default 'free',
   plan_status text default 'active',
@@ -168,6 +169,7 @@ comment on column public.users.plan is 'Subscription plan: free, pro, investor';
 comment on column public.users.plan_status is 'Subscription status: active, past_due, canceled, trialing';
 comment on column public.users.current_period_end is 'Unix timestamp of current billing period end';
 comment on column public.users.stripe_customer_id is 'Stripe customer ID for billing';
+comment on column public.users.clerk_user_id is 'Clerk user ID used by Clerk webhooks and app authentication';
 
 -- Enable Row Level Security (RLS)
 alter table public.saved_deals enable row level security;
