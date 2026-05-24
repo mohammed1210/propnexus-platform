@@ -980,6 +980,114 @@ def test_list_properties_deal_filter_high_offset_reports_filtered_total(monkeypa
     assert body["items"] == []
 
 
+def test_list_properties_top_deals_high_offset_uses_high_confidence_total(monkeypatch):
+    from backend.routes import properties_routes as routes
+
+    class _FakeRes:
+        def __init__(self, data, count):
+            self.data = data
+            self.count = count
+
+    class _FakeQuery:
+        def __init__(self, rows):
+            self.rows = rows
+            self._start = 0
+            self._end = max(len(rows) - 1, 0)
+
+        def select(self, *args, **kwargs):
+            return self
+
+        def eq(self, *args, **kwargs):
+            return self
+
+        def neq(self, *args, **kwargs):
+            return self
+
+        def gte(self, *args, **kwargs):
+            return self
+
+        def lte(self, *args, **kwargs):
+            return self
+
+        def in_(self, *args, **kwargs):
+            return self
+
+        def ilike(self, *args, **kwargs):
+            return self
+
+        def or_(self, *args, **kwargs):
+            return self
+
+        def order(self, *args, **kwargs):
+            return self
+
+        def range(self, start, end):
+            self._start = int(start)
+            self._end = int(end)
+            return self
+
+        def execute(self):
+            return _FakeRes(self.rows[self._start : self._end + 1], len(self.rows))
+
+    class _FakeSupabase:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def table(self, _name):
+            return _FakeQuery(self.rows)
+
+    rows = []
+    for i in range(25):
+        rows.append(
+            {
+                "id": f"prime-{i}",
+                "title": f"Prime deal {i}",
+                "location": "London",
+                "created_at": f"2026-05-{(i % 28) + 1:02d}T00:00:00Z",
+                "top_deal_score": 90 - i,
+                "top_deal_tier": "prime",
+            }
+        )
+    for i in range(25):
+        rows.append(
+            {
+                "id": f"watch-{i}",
+                "title": f"Watchlist deal {i}",
+                "location": "London",
+                "created_at": f"2026-04-{(i % 28) + 1:02d}T00:00:00Z",
+                "top_deal_score": 70 - i,
+                "top_deal_tier": "watchlist",
+            }
+        )
+    for i in range(5):
+        rows.append(
+            {
+                "id": f"strong-{i}",
+                "title": f"Strong deal {i}",
+                "location": "London",
+                "created_at": f"2026-03-{(i % 28) + 1:02d}T00:00:00Z",
+                "top_deal_score": 65 - i,
+                "top_deal_tier": "strong",
+            }
+        )
+
+    monkeypatch.setattr(routes, "_get_supabase", lambda: _FakeSupabase(rows))
+
+    body = routes.list_properties(
+        Response(),
+        limit=25,
+        offset=25,
+        sort="top_deals",
+        high_confidence_top_deals=True,
+        dir="desc",
+    )
+
+    assert body["total"] == 30
+    assert body["has_more"] is False
+    assert [item["id"] for item in body["items"]] == [f"strong-{i}" for i in range(5)]
+    assert all(item["top_deal_tier"] in {"prime", "strong"} for item in body["items"])
+
+
 def test_list_properties_deal_filter_deep_offset_returns_tail_page(monkeypatch):
     from backend.routes import properties_routes as routes
 
