@@ -13,6 +13,7 @@ describe('/api/saved-deals merges snapshot metrics', () => {
   beforeEach(() => {
     process.env = { ...oldEnv };
     process.env.NEXT_PUBLIC_BACKEND_URL = 'https://backend.example';
+    process.env.PROPNEXUS_INTERNAL_API_TOKEN = 'test-internal-token';
 
     global.fetch = jest.fn(async (input: any) => {
       const url = String(typeof input === 'string' ? input : input?.url);
@@ -66,6 +67,15 @@ describe('/api/saved-deals merges snapshot metrics', () => {
       yield_percent: 7.2,
       roi_percent: 9.1,
     });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('https://backend.example/saved-deals'),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          'X-PropNexus-Internal-Token': 'test-internal-token',
+          'x-propnexus-user-id': 'user_test_123',
+        }),
+      }),
+    );
   });
 
   it('returns exact saved check without enriching every saved deal', async () => {
@@ -97,5 +107,24 @@ describe('/api/saved-deals merges snapshot metrics', () => {
     expect(json.deals).toHaveLength(1);
     expect(json.deals[0]).toMatchObject({ property_id: 'prop2', property: null });
     expect((global.fetch as jest.Mock).mock.calls.some(([url]) => String(url).includes('/properties/'))).toBe(false);
+  });
+
+  it('returns a safe unavailable response when the internal API token is missing', async () => {
+    delete process.env.PROPNEXUS_INTERNAL_API_TOKEN;
+    global.fetch = jest.fn() as any;
+
+    const { GET } = await import('@/app/api/saved-deals/route');
+
+    const res = await GET(new Request('http://localhost/api/saved-deals'));
+    const json = await res.json();
+
+    expect(res.status).toBe(503);
+    expect(json).toEqual({
+      error: 'server_configuration',
+      message: 'Saved deals are temporarily unavailable. Please try again shortly.',
+    });
+    expect(JSON.stringify(json)).not.toContain('PROPNEXUS_INTERNAL_API_TOKEN');
+    expect(JSON.stringify(json)).not.toContain('token');
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
