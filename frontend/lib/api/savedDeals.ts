@@ -37,8 +37,9 @@ export async function fetchSavedDeals(args: { userId?: string | null; signal?: A
   });
 
   if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    const err = new Error(text || `Failed to load saved deals (${res.status})`);
+    const payload = await res.json().catch(() => null);
+    const message = typeof (payload as any)?.message === 'string' ? (payload as any).message : `Failed to load saved deals (${res.status})`;
+    const err = new Error(message);
     (err as any).status = res.status;
     throw err;
   }

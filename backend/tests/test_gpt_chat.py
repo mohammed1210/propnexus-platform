@@ -43,6 +43,12 @@ def test_ai_chat_success(mock_openai_client):
     assert "prompt_tokens" in data["usage"]
     assert "completion_tokens" in data["usage"]
 
+    messages = mock_openai_client.call_args.args[0]
+    assert messages[0]["role"] == "system"
+    assert "Keep replies short, precise and evidence-led" in messages[0]["content"]
+    assert "2-4 bullets or 80 words max" in messages[0]["content"]
+    assert mock_openai_client.call_args.kwargs == {"temperature": 0.2, "max_tokens": 320}
+
 
 def test_ai_chat_missing_messages():
     """Test AI chat request with missing messages."""

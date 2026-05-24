@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { FiLock } from 'react-icons/fi';
+import { FiLock, FiX } from 'react-icons/fi';
 import type { Property } from '@/types';
 import { postAIChat } from '@/lib/api';
 import { FF } from '@/lib/flags';
@@ -111,6 +111,7 @@ function AIChatbotInner({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
   const [messages, setMessages] = useState<Message[]>([initialMessage(property, pageMode)]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -161,21 +162,21 @@ function AIChatbotInner({
       hints.push(`price ≈ £${property.price.toLocaleString()}`);
 
     const base = hints.length > 0
-      ? `🤖 Quick take: ${hints.join(' · ')}. Sense-check product fees, refi assumptions and local demand.`
+      ? `Quick take: ${hints.join(' · ')}. Check fees, refi assumptions and demand.`
       : pageMode === 'listings'
-        ? '🤖 I can help compare locations, sale prices, rental demand, yields and filter strategy across the search results.'
-        : '🤖 Share a location, budget, property type or postcode and I can give a sharper market view.';
+        ? 'Quick take: compare sold prices, rent demand, yield and supply before shortlisting.'
+        : 'Share a location, budget, property type or postcode for a sharper view.';
 
     const lower = prompt.toLowerCase();
     if (!property && (lower.includes('trend') || lower.includes('area') || lower.includes('sales') || lower.includes('compare'))) {
-      return `${base} Start with sold-price evidence, days-on-market, rent comps, supply levels, transport links and regeneration signals before narrowing to individual deals.`;
+      return `${base} Prioritise sold comps, rent comps, days-on-market and supply.`;
     }
     if (lower.includes('risk'))
-      return `${base} Key risks: down-valuation, refurb overrun, and void periods. Add contingency and model DSCR ≥ 1.25×.`;
+      return `${base} Main risks: down-valuation, refurb overrun and voids. Add contingency.`;
     if (lower.includes('exit'))
-      return `${base} Consider: let & refinance (BRRR), flip at GDV, or leave as vanilla BTL.`;
+      return `${base} Likely exits: BRR/refinance, flip, or vanilla BTL if rent stacks.`;
     if (lower.includes('good') || lower.includes('invest'))
-      return `${base} Run both GDV and BRRR paths in the calculator and compare cash left in the deal.`;
+      return `${base} Check GDV, works, rent evidence and cash left in before viewing.`;
     return base;
   };
 
@@ -287,9 +288,21 @@ function AIChatbotInner({
             </button>
           </div>
 
-          <div className="border-b border-neutral-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900 dark:border-neutral-800 dark:bg-amber-950/25 dark:text-amber-100">
-            AI responses are for general review only and may be inaccurate. Do not rely on them as professional advice. {AI_DISCLAIMER}
-          </div>
+          {showDisclaimer && (
+            <div className="flex items-start gap-2 border-b border-neutral-200 bg-amber-50 px-3 py-2 text-[11px] leading-4 text-amber-900 dark:border-neutral-800 dark:bg-amber-950/25 dark:text-amber-100">
+              <p className="flex-1">
+                AI responses are for general review only and may be inaccurate. Do not rely on them as professional advice. {AI_DISCLAIMER}
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowDisclaimer(false)}
+                className="-mr-1 rounded p-1 text-amber-900 transition hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40 dark:focus-visible:ring-amber-200"
+                aria-label="Dismiss AI disclaimer"
+              >
+                <FiX className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          )}
 
           <div className="flex-1 p-3 overflow-y-auto bg-gray-50 dark:bg-neutral-950 text-sm">
             {messages.map((m, i) => (

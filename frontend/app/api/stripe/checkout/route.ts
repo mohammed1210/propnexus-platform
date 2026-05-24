@@ -1,6 +1,7 @@
 // app/api/stripe/checkout/route.ts
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
+import { internalApiHeaders } from '@/lib/server/internalApi';
 
 function getBackendBase(): string {
   const base = (
@@ -25,13 +26,15 @@ function isClerkServerEnabled(): boolean {
   return !disable && pk.startsWith('pk_') && Boolean(sk);
 }
 
-async function getVerifiedUserContext(): Promise<{ userId: string | null; token: string | null }> {
-  if (!isClerkServerEnabled()) return { userId: null, token: null };
+async function getVerifiedUserContext(): Promise<{ userId: string | null; email: string | null }> {
+  if (!isClerkServerEnabled()) return { userId: null, email: null };
   const a: any = await auth();
   const userId = (a?.userId as string | null) ?? null;
-  if (!userId) return { userId: null, token: null };
-  const token = typeof a?.getToken === 'function' ? await a.getToken().catch(() => null) : null;
-  return { userId, token: token ? String(token) : null };
+  if (!userId) return { userId: null, email: null };
+  const client = await clerkClient();
+  const user = await client.users.getUser(userId);
+  const email = user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? null;
+  return { userId, email: email ? String(email) : null };
 }
 
 /**
@@ -42,14 +45,23 @@ async function getVerifiedUserContext(): Promise<{ userId: string | null; token:
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { userId, token } = await getVerifiedUserContext();
+    const clerkEnabled = isClerkServerEnabled();
+    const { userId, email } = await getVerifiedUserContext();
     if (isClerkServerEnabled() && !userId) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { 'content-type': 'application/json' },
       });
     }
+    if (clerkEnabled && !email) {
+      return new Response(JSON.stringify({ error: 'Authenticated email is required' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
     const backend = getBackendBase();
+    const billingEmail = email ?? (typeof body?.email === 'string' ? body.email : null);
+    const trustedBody = { ...body, ...(billingEmail ? { email: billingEmail } : {}) };
 
     // Keep checkout ownership explicit. Portal creation stays on /api/stripe/portal.
     const candidates = [
@@ -63,10 +75,11 @@ export async function POST(req: NextRequest) {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
-            ...(userId ? { 'x-clerk-user-id': userId } : {}),
-            ...(token ? { authorization: `Bearer ${token}` } : {}),
+            ...internalApiHeaders(),
+            ...(userId ? { 'x-propnexus-user-id': userId, 'x-clerk-user-id': userId } : {}),
+            ...(billingEmail ? { 'x-propnexus-user-email': billingEmail } : {}),
           },
-          body: JSON.stringify(body),
+          body: JSON.stringify(trustedBody),
         });
 
         if (r.ok) {

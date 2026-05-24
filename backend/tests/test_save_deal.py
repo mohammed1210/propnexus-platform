@@ -25,7 +25,16 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     save_routes._SAVED_DEALS_HAS_SAVED_AT = None
     save_routes._SAVED_DEALS_ACTION_COLUMNS = None
     monkeypatch.setenv("ENVIRONMENT", "development")
+    monkeypatch.setenv("PROPNEXUS_INTERNAL_API_TOKEN", "test-internal-token")
     return TestClient(app)
+
+
+def _trusted_headers(user_id: str = "user_test") -> dict[str, str]:
+    return {
+        "X-PropNexus-Internal-Token": "test-internal-token",
+        "X-PropNexus-User-Id": user_id,
+        "X-Clerk-User-Id": user_id,
+    }
 
 
 class _Result:
@@ -93,7 +102,7 @@ def test_update_saved_deal_status_filters_by_current_user(
 
     resp = client.patch(
         "/saved-deals/status",
-        headers={"X-Clerk-User-Id": "user_test"},
+        headers=_trusted_headers(),
         json={"property_id": "prop-1", "status": "contacted"},
     )
 
@@ -117,7 +126,7 @@ def test_update_saved_deal_status_rejects_invalid_status(
 
     resp = client.patch(
         "/saved-deals/status",
-        headers={"X-Clerk-User-Id": "user_test"},
+        headers=_trusted_headers(),
         json={"property_id": "prop-1", "status": "made_up"},
     )
 
@@ -136,9 +145,85 @@ def test_update_saved_deal_status_reports_missing_migration(
 
     resp = client.patch(
         "/saved-deals/status",
-        headers={"X-Clerk-User-Id": "user_test"},
+        headers=_trusted_headers(),
         json={"property_id": "prop-1", "status": "contacted"},
     )
 
     assert resp.status_code == 500
     assert "20260509_deal_action_fields.sql" in resp.json()["detail"]
+
+
+def test_saved_deals_rejects_spoofed_clerk_header_without_internal_token(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import backend.routes.save_deal as save_routes
+
+    monkeypatch.setattr(save_routes, "_require_supabase", lambda: _FakeSupabase(), raising=True)
+
+    resp = client.get("/saved-deals", headers={"X-Clerk-User-Id": "user_test"})
+
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Unauthorized"
+
+
+def test_saved_deals_rejects_unverified_jwt_without_internal_token(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import backend.routes.save_deal as save_routes
+
+    monkeypatch.setattr(save_routes, "_require_supabase", lambda: _FakeSupabase(), raising=True)
+
+    fake_jwt = "Bearer eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1c2VyX3Rlc3QifQ.signature"
+    resp = client.get("/saved-deals", headers={"Authorization": fake_jwt})
+
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Unauthorized"
+
+
+def test_saved_deals_rejects_invalid_internal_token(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import backend.routes.save_deal as save_routes
+
+    monkeypatch.setattr(save_routes, "_require_supabase", lambda: _FakeSupabase(), raising=True)
+
+    resp = client.get(
+        "/saved-deals",
+        headers={
+            "X-PropNexus-Internal-Token": "wrong-token",
+            "X-PropNexus-User-Id": "user_test",
+        },
+    )
+
+    assert resp.status_code == 401
+    assert resp.json()["detail"] == "Unauthorized"
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "kwargs"),
+    [
+        ("delete", "/save-deal?property_id=prop-1", {}),
+        (
+            "patch",
+            "/saved-deals/status",
+            {"json": {"property_id": "prop-1", "status": "contacted"}},
+        ),
+        ("delete", "/saved-deals/prop-1", {}),
+        ("post", "/saved-deals/clear", {}),
+    ],
+)
+def test_mutating_saved_deal_routes_reject_forged_identity_without_internal_token(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    method: str,
+    path: str,
+    kwargs: dict,
+) -> None:
+    import backend.routes.save_deal as save_routes
+
+    monkeypatch.setattr(save_routes, "_require_supabase", lambda: _FakeSupabase(), raising=True)
+
+    response = getattr(client, method)(path, headers={"X-Clerk-User-Id": "user_test"}, **kwargs)
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Unauthorized"

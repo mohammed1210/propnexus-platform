@@ -87,7 +87,8 @@ export default function RentalEvidencePanel({ intel }: { intel: InvestorIntel | 
           <p className="mt-1">Offer targets are intentionally withheld where rent evidence is missing.</p>
         </div>
       )}
-      <InfoDisclaimer className="mt-4" label="Rent evidence disclaimer">
+
+      <InfoDisclaimer className="mt-4" label="Rent estimate disclaimer">
         {RENT_ESTIMATE_DISCLAIMER}
       </InfoDisclaimer>
     </section>
