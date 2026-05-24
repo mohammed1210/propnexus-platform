@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { internalApiHeaders, isInternalApiConfigError } from '@/lib/server/internalApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,24 +34,17 @@ function isClerkServerEnabled(): boolean {
   return !disable && pk.startsWith('pk_') && Boolean(sk);
 }
 
-async function getBearerTokenOrNull(): Promise<{ userId: string | null; token: string | null }> {
-  if (!isClerkServerEnabled()) return { userId: null, token: null };
+async function getVerifiedUserId(): Promise<string | null> {
+  if (!isClerkServerEnabled()) return null;
 
   const a = await auth();
   const userId = (a?.userId as string | null) ?? null;
-  if (!userId) return { userId: null, token: null };
-
-  try {
-    const token = typeof (a as any)?.getToken === 'function' ? await (a as any).getToken() : null;
-    return { userId, token: token ? String(token) : null };
-  } catch {
-    return { userId, token: null };
-  }
+  return userId;
 }
 
 export async function POST() {
   try {
-    const { userId, token } = await getBearerTokenOrNull();
+    const userId = await getVerifiedUserId();
     if (isClerkServerEnabled() && !userId) {
       return NextResponse.json(
         { ok: false, error: 'Not authenticated' },
@@ -61,8 +55,8 @@ export async function POST() {
     const res = await fetch(`${getBackendBase()}/saved-deals/clear`, {
       method: 'POST',
       headers: {
-        ...(userId ? { 'x-clerk-user-id': userId } : {}),
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...internalApiHeaders(),
+        ...(userId ? { 'x-propnexus-user-id': userId, 'x-clerk-user-id': userId } : {}),
       },
       cache: 'no-store',
     });
@@ -81,8 +75,14 @@ export async function POST() {
       });
     }
   } catch (err: any) {
+    if (isInternalApiConfigError(err)) {
+      return NextResponse.json(
+        { ok: false, error: 'server_configuration', message: 'Saved deals are temporarily unavailable. Please try again shortly.' },
+        { status: 503, headers: { ...noStoreHeaders } },
+      );
+    }
     return NextResponse.json(
-      { ok: false, error: err?.message || 'Internal error' },
+      { ok: false, error: 'server_error', message: 'Could not clear saved deals.' },
       { status: 500, headers: { ...noStoreHeaders } },
     );
   }

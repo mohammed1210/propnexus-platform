@@ -4,9 +4,10 @@ import os
 from typing import Optional
 
 import stripe
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
 
+from backend.utils.internal_api_auth import require_internal_api_token
 from backend.utils.supabase_client import get_supabase
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
@@ -17,13 +18,13 @@ sb = None  # tests patch backend.routes.stripe_routes.sb
 
 
 class CheckoutRequest(BaseModel):
-    email: str
+    email: Optional[str] = None
     price_id: Optional[str] = None
     product_id: Optional[str] = None
 
 
 class PortalRequest(BaseModel):
-    email: str
+    email: Optional[str] = None
 
 
 def _get_supabase():
@@ -65,13 +66,26 @@ def _resolve_price_id_from_product(product_id: str) -> str:
     raise HTTPException(status_code=400, detail="No active monthly Stripe price found for product")
 
 
+def _trusted_billing_email(header_email: Optional[str]) -> str:
+    email = str(header_email or "").lower().strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Authenticated billing email is required")
+    return email
+
+
 @router.post("/create-checkout-session")
-def create_checkout_session(payload: CheckoutRequest):
+def create_checkout_session(
+    payload: CheckoutRequest,
+    request: Request,
+    x_propnexus_user_email: Optional[str] = Header(None, alias="X-PropNexus-User-Email"),
+):
     """
     Creates a Stripe Checkout Session with a 7-day trial.
     Tests mock stripe + sb, so this must not hard-fail on missing env.
     """
     try:
+        require_internal_api_token(request)
+
         global sb
         if sb is None:
             sb = _get_supabase()
@@ -81,7 +95,7 @@ def create_checkout_session(payload: CheckoutRequest):
         if secret:
             stripe.api_key = secret
 
-        email = str(payload.email).lower().strip()
+        email = _trusted_billing_email(x_propnexus_user_email)
         price_id = payload.price_id or (
             _resolve_price_id_from_product(payload.product_id) if payload.product_id else None
         )
@@ -130,11 +144,17 @@ def create_checkout_session(payload: CheckoutRequest):
 
 
 @router.post("/create-portal-session")
-def create_portal_session(payload: PortalRequest):
+def create_portal_session(
+    payload: PortalRequest,
+    request: Request,
+    x_propnexus_user_email: Optional[str] = Header(None, alias="X-PropNexus-User-Email"),
+):
     """
     Creates a Stripe billing portal session.
     """
     try:
+        require_internal_api_token(request)
+
         global sb
         if sb is None:
             sb = _get_supabase()
@@ -143,7 +163,7 @@ def create_portal_session(payload: PortalRequest):
         if secret:
             stripe.api_key = secret
 
-        email = str(payload.email).lower().strip()
+        email = _trusted_billing_email(x_propnexus_user_email)
 
         # Source of truth: users.stripe_customer_id (webhook-synced)
         customer_id: Optional[str] = None

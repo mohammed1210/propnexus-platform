@@ -20,6 +20,9 @@ check_legal_pages() {
   exists_any "frontend/app/terms/page.tsx" "frontend/app/(legal)/terms/page.tsx" && pass "terms page exists" || fail "missing terms page"
   exists_any "frontend/app/privacy/page.tsx" "frontend/app/(legal)/privacy/page.tsx" && pass "privacy page exists" || fail "missing privacy page"
   exists_any "frontend/app/disclaimer/page.tsx" "frontend/app/(legal)/disclaimer/page.tsx" && pass "disclaimer page exists" || fail "missing disclaimer page"
+  if grep -RIn 'href="/cookies"' "$ROOT/frontend/components" "$ROOT/frontend/app" 2>/dev/null | grep -vE '/\.next/' >/tmp/propnexus-launch-cookie-links.txt; then
+    exists_any "frontend/app/cookies/page.tsx" "frontend/app/(legal)/cookies/page.tsx" && pass "cookie policy page exists" || fail "footer links /cookies but cookie policy page is missing"
+  fi
 }
 
 check_footer_links() {
@@ -36,7 +39,7 @@ check_footer_links() {
 
 check_client_secret_references() {
   local client_files
-  client_files=$(grep -RIl "^['\"]use client['\"]" "$ROOT/frontend/app" "$ROOT/frontend/components" "$ROOT/frontend/lib" 2>/dev/null || true)
+  client_files=$(grep -RIl "^['\"]use client['\"]" "$ROOT/frontend/app" "$ROOT/frontend/components" "$ROOT/frontend/lib" 2>/dev/null | grep -vE '/app/api/|\.bak(\.|$)' || true)
 
   if [[ -n "$client_files" ]] && grep -nE 'SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY|OPENAI_API_KEY' $client_files >/tmp/propnexus-launch-client-secrets.txt 2>/dev/null; then
     fail "client-side frontend code references server secret env names"
@@ -44,10 +47,38 @@ check_client_secret_references() {
     pass "no server secret env names in client-side frontend code"
   fi
 
-  if grep -RInE 'SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY|OPENAI_API_KEY' "$ROOT/frontend/app/api" "$ROOT/frontend/lib" 2>/dev/null | grep -vE '/lib/legalCopy\.ts|\.bak\.' >/tmp/propnexus-launch-server-secret-refs.txt; then
+  if grep -RInE 'SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY|OPENAI_API_KEY' "$ROOT/frontend/public" 2>/dev/null >/tmp/propnexus-launch-public-secrets.txt; then
+    fail "frontend public assets reference server secret env names"
+  else
+    pass "no server secret env names in frontend public assets"
+  fi
+
+  if grep -RInE 'SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY|OPENAI_API_KEY' "$ROOT/frontend/app/api" "$ROOT/frontend/lib" 2>/dev/null | grep -vE '/lib/legalCopy\.ts|\.bak(\.|$)' >/tmp/propnexus-launch-server-secret-refs.txt; then
     warn "server/API frontend files reference secret env names; verify they remain server-only"
   else
     pass "no server secret env names found in frontend server/API files"
+  fi
+}
+
+check_tracked_sensitive_artifacts() {
+  local tracked
+  tracked=$(git -C "$ROOT" ls-files | grep -E '\.localcopy$|\.bak(\.|$)' | while IFS= read -r path; do [[ -e "$ROOT/$path" ]] && printf '%s\n' "$path"; done || true)
+  if [[ -n "$tracked" ]]; then
+    fail "tracked env-copy or backup artifacts found"
+    printf '%s\n' "$tracked" | head -n 20
+  else
+    pass "no tracked env-copy or backup artifacts"
+  fi
+
+  local tracked_env
+  tracked_env=$(git -C "$ROOT" ls-files | grep -E '(^|/)\.env\.(local|production|prod|staging)(\.|$)' | grep -vE '\.example$|\.template$' | while IFS= read -r path; do [[ -e "$ROOT/$path" ]] && printf '%s\n' "$path"; done || true)
+  if [[ -n "$tracked_env" ]]; then
+    if printf '%s\n' "$tracked_env" | xargs grep -nE 'SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY|OPENAI_API_KEY|SECRET|TOKEN|KEY=' >/tmp/propnexus-launch-tracked-env-secrets.txt 2>/dev/null; then
+      fail "tracked non-example env file contains sensitive-looking keys"
+    else
+      warn "tracked non-example env file found; verified no sensitive-looking key names"
+      printf '%s\n' "$tracked_env" | head -n 20
+    fi
   fi
 }
 
@@ -100,6 +131,7 @@ check_overconfident_wording() {
 check_legal_pages
 check_footer_links
 check_client_secret_references
+check_tracked_sensitive_artifacts
 check_visible_placeholders
 check_debug_routes
 check_scraperapi_launch_dependency

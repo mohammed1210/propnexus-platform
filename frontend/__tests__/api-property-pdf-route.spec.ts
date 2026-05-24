@@ -51,6 +51,7 @@ describe('/api/property-pdf/[id]', () => {
   });
 
   it('returns a safe error payload when generation fails', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => {});
     mockRenderDealPackPdfFromUrl.mockRejectedValue(new Error('browser launch failed'));
 
     const { GET } = await import('@/app/api/property-pdf/[id]/route');

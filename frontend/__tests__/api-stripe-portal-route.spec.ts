@@ -42,6 +42,7 @@ describe('/api/stripe/portal', () => {
       NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_123',
       CLERK_SECRET_KEY: 'sk_clerk_123',
       NEXT_PUBLIC_DISABLE_AUTH: 'false',
+      PROPNEXUS_INTERNAL_API_TOKEN: 'test-internal-token',
     };
 
     mockAuth.mockReset();
@@ -63,12 +64,11 @@ describe('/api/stripe/portal', () => {
       emailAddresses: [{ emailAddress: 'mapped@example.com' }],
     });
     global.fetch = jest.fn(async () => {
-      return new Response(JSON.stringify({ plan: 'pro', stripe_customer_id: 'cus_mapped_123' }), {
+      return new Response(JSON.stringify({ url: 'https://billing.stripe.com/p/session_123' }), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
     }) as any;
-    mockPortalCreate.mockResolvedValue({ url: 'https://billing.stripe.com/p/session_123' });
 
     const { POST } = await import('@/app/api/stripe/portal/route');
     const res = await POST();
@@ -78,18 +78,18 @@ describe('/api/stripe/portal', () => {
     expect(body).toEqual({ ok: true, url: 'https://billing.stripe.com/p/session_123' });
     expect(mockCustomerSearch).not.toHaveBeenCalled();
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://backend.example/users/plan?email=mapped%40example.com',
+      'https://backend.example/stripe/create-portal-session',
       expect.objectContaining({
-        method: 'GET',
+        method: 'POST',
         cache: 'no-store',
+        headers: expect.objectContaining({
+          'X-PropNexus-Internal-Token': 'test-internal-token',
+          'x-propnexus-user-id': 'user_1',
+          'x-propnexus-user-email': 'mapped@example.com',
+        }),
       }),
     );
-    expect(mockPortalCreate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customer: 'cus_mapped_123',
-        return_url: 'http://localhost:3000/account',
-      }),
-    );
+    expect(mockPortalCreate).not.toHaveBeenCalled();
   });
 
   it('returns safe 404 when authenticated user has no mapped Stripe customer', async () => {
@@ -99,8 +99,8 @@ describe('/api/stripe/portal', () => {
       emailAddresses: [{ emailAddress: 'nomap@example.com' }],
     });
     global.fetch = jest.fn(async () => {
-      return new Response(JSON.stringify({ plan: 'free', stripe_customer_id: null }), {
-        status: 200,
+      return new Response(JSON.stringify({ detail: 'No Stripe customer found for this email' }), {
+        status: 404,
         headers: { 'content-type': 'application/json' },
       });
     }) as any;
@@ -127,10 +127,10 @@ describe('/api/stripe/portal', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('returns safe error when Stripe is not configured', async () => {
+  it('returns safe error when the internal API token is not configured', async () => {
     process.env = {
       ...process.env,
-      STRIPE_SECRET_KEY: '',
+      PROPNEXUS_INTERNAL_API_TOKEN: '',
     };
 
     mockAuth.mockResolvedValue({ userId: 'user_3' });
@@ -144,6 +144,6 @@ describe('/api/stripe/portal', () => {
     const body = await res.json();
 
     expect(res.status).toBe(500);
-    expect(body).toEqual({ ok: false, error: 'Billing portal is not configured right now.' });
+    expect(body).toEqual({ ok: false, error: 'Could not open billing portal right now.' });
   });
 });

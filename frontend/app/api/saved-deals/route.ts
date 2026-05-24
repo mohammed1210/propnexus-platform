@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
+import { internalApiHeaders, isInternalApiConfigError } from '@/lib/server/internalApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,11 @@ const noStoreHeaders = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
   Pragma: 'no-cache',
   Expires: '0',
+} as const;
+
+const savedDealsUnavailable = {
+  error: 'server_configuration',
+  message: 'Saved deals are temporarily unavailable. Please try again shortly.',
 } as const;
 
 function getBackendBaseUrl(): string {
@@ -97,6 +103,8 @@ export async function GET(req?: Request) {
       method: 'GET',
       headers: {
         'content-type': 'application/json',
+        ...internalApiHeaders(),
+        'x-propnexus-user-id': userId,
         'x-clerk-user-id': userId,
       },
     });
@@ -267,8 +275,11 @@ export async function GET(req?: Request) {
 
     return NextResponse.json({ deals: enriched }, { status: 200, headers: { ...noStoreHeaders } });
   } catch (err: any) {
+    if (isInternalApiConfigError(err)) {
+      return NextResponse.json(savedDealsUnavailable, { status: 503, headers: { ...noStoreHeaders } });
+    }
     return NextResponse.json(
-      { error: 'server_error', message: err?.message || 'Unexpected error.' },
+      { error: 'server_error', message: 'Failed to load saved deals.' },
       { status: 500, headers: { ...noStoreHeaders } },
     );
   }
@@ -296,6 +307,8 @@ export async function DELETE(req: Request) {
   try {
     const baseHeaders = {
       'content-type': 'application/json',
+      ...internalApiHeaders(),
+      'x-propnexus-user-id': userId,
       'x-clerk-user-id': userId,
     };
 
@@ -336,8 +349,14 @@ export async function DELETE(req: Request) {
       { status: 502, headers: { ...noStoreHeaders } },
     );
   } catch (e: any) {
+    if (isInternalApiConfigError(e)) {
+      return NextResponse.json(
+        { ok: false, ...savedDealsUnavailable },
+        { status: 503, headers: { ...noStoreHeaders } },
+      );
+    }
     return NextResponse.json(
-      { ok: false, error: 'server_error', message: e?.message || 'Unexpected error.' },
+      { ok: false, error: 'server_error', message: 'Could not remove this deal.' },
       { status: 500, headers: { ...noStoreHeaders } },
     );
   }
