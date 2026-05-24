@@ -11,7 +11,6 @@ import { FiBarChart2, FiCheck, FiSearch, FiSliders, FiMap, FiX } from 'react-ico
 import PropertyCard from '@/components/PropertyCard';
 import SaveSearchAlert from '@/components/SaveSearchAlert';
 import { isAuthEnabled } from '@/lib/auth';
-import { API_BASE } from '@/lib/api';
 
 /* ---------------- Helper Functions ---------------- */
 /**
@@ -848,17 +847,6 @@ function ListingsInner() {
       setFetchError(null);
 
       try {
-        const rawBase = (API_BASE || '').replace(/\/+$/, '');
-        const origin = typeof window !== 'undefined' ? window.location.origin.replace(/\/+$/, '') : '';
-        const backendUrl =
-          rawBase && origin && (rawBase === origin || rawBase === `${origin}/`)
-            ? `${origin}/api`
-            : rawBase;
-
-        if (!backendUrl.trim()) {
-          throw new Error('Missing backend base URL env (NEXT_PUBLIC_API_BASE).');
-        }
-
         const params = new URLSearchParams();
         if (q) params.set('q', q);
         if (minP !== undefined) params.set('min', String(minP));
@@ -890,7 +878,7 @@ function ListingsInner() {
           params.set('points_limit', String(MAP_POINTS_LIMIT));
         }
 
-        const response = await fetch(`${backendUrl}/properties?${params.toString()}`, {
+        const response = await fetch(`/api/properties?${params.toString()}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           cache: 'no-store',

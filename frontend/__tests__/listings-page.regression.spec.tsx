@@ -41,10 +41,6 @@ jest.mock('@/lib/auth', () => ({
   isAuthEnabled: false,
 }));
 
-jest.mock('@/lib/api', () => ({
-  API_BASE: 'https://api.example.test',
-}));
-
 const fetchMock = jest.fn();
 
 describe('Listings page regressions', () => {
@@ -78,6 +74,8 @@ describe('Listings page regressions', () => {
     render(<ListingsPage />);
 
     expect(await screen.findByText('Visible Rightmove')).toBeInTheDocument();
+    const requestedUrl = String(fetchMock.mock.calls[0]?.[0] ?? '');
+    expect(requestedUrl).toMatch(/^\/api\/properties\?/);
     expect(screen.queryByText('No properties match these filters.')).not.toBeInTheDocument();
     expect(screen.queryByText('No properties found')).not.toBeInTheDocument();
     expect(screen.getByText('1-1')).toBeInTheDocument();
@@ -105,6 +103,7 @@ describe('Listings page regressions', () => {
 
     expect(await screen.findByText('Visible Rightmove')).toBeInTheDocument();
     const requestedUrl = String(fetchMock.mock.calls[0]?.[0] ?? '');
+    expect(requestedUrl).toMatch(/^\/api\/properties\?/);
     expect(requestedUrl).toContain('sort=created_at_desc');
     expect(requestedUrl).not.toContain('high_confidence_top_deals=1');
     expect(mockReplace).toHaveBeenCalledWith('/listings?sort=created_at_desc');
@@ -166,6 +165,7 @@ describe('Listings page regressions', () => {
 
     expect(await screen.findByText('Strong Top Deal')).toBeInTheDocument();
     const requestedUrl = String(fetchMock.mock.calls[0]?.[0] ?? '');
+    expect(requestedUrl).toMatch(/^\/api\/properties\?/);
     expect(requestedUrl).toContain('sort=top_deals');
     expect(requestedUrl).toContain('offset=25');
     expect(requestedUrl).toContain('high_confidence_top_deals=1');
