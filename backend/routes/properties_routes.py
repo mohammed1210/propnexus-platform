@@ -990,6 +990,13 @@ def _parse_bool(v: Any) -> bool:
     return s in {"1", "true", "t", "yes", "y", "on"}
 
 
+def _is_high_confidence_top_deal(item: Dict[str, Any]) -> bool:
+    tier = item.get("top_deal_tier")
+    if not isinstance(tier, str) and isinstance(item.get("top_deal"), dict):
+        tier = item["top_deal"].get("tier")
+    return str(tier or "").strip().lower() in {"prime", "strong"}
+
+
 def _ensure_deal_fields(item: Dict[str, Any]) -> Dict[str, Any]:
     if not isinstance(item, dict):
         return item
@@ -1120,6 +1127,10 @@ def list_properties(
             "name and use dir=asc|desc."
         ),
     ),
+    high_confidence_top_deals: bool = Query(
+        default=False,
+        description="When sort=top_deals, restrict pagination/count to prime/strong Top Deal tiers.",
+    ),
     dir: str = Query(default="desc", description="Legacy sort direction (used with column sort)"),
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
@@ -1161,6 +1172,10 @@ def list_properties(
             deal_type = getattr(deal_type, "default", "balanced")
         if isinstance(sort, Param):
             sort = getattr(sort, "default", "top_deals")
+        if isinstance(high_confidence_top_deals, Param):
+            high_confidence_top_deals = _parse_bool(
+                getattr(high_confidence_top_deals, "default", False)
+            )
         if isinstance(dir, Param):
             dir = getattr(dir, "default", "desc")
         if isinstance(limit, Param):
@@ -1202,6 +1217,7 @@ def list_properties(
         sort = str(sort or "created_at_desc")
         dir = str(dir or "desc")
         include_spareroom = _parse_bool(include_spareroom)
+        high_confidence_top_deals = _parse_bool(high_confidence_top_deals)
 
         response.headers["X-PropNexus-Properties-Normalization"] = PROPERTIES_NORMALIZATION_VERSION
 
@@ -1432,6 +1448,7 @@ def list_properties(
         # Sorting
         sort_key = (sort or "").strip().lower()
         is_recommended = sort_key in {"recommended", "best_deals"}
+        top_deals_filter_active = sort_key == "top_deals" and high_confidence_top_deals
         sort_map = {
             "top_deals": ("top_deal_score", True),
             "recommended": ("score", True),
@@ -1506,13 +1523,26 @@ def list_properties(
             scan_offset = 0
             filtered_total = 0
             page_items: List[Dict[str, Any]] = []
+            top_deal_matches: List[Dict[str, Any]] = []
             requested_inv = set(investment_type_filter)
             allowed_property_types = set(property_type_filter)
 
             while True:
                 scan_query = _apply_sorting(_build_base_query())
                 scan_query = scan_query.range(scan_offset, scan_offset + batch_size - 1)
-                scan_res = scan_query.execute()
+                try:
+                    scan_res = scan_query.execute()
+                except APIError as e:
+                    missing = _missing_col_from_api_error(e)
+                    if missing == "top_deal_score" and sort_key == "top_deals":
+                        scan_query = _build_base_query()
+                        scan_query = _safe_order(
+                            scan_query, "created_at", desc=True, nulls_last=True
+                        )
+                        scan_query = scan_query.range(scan_offset, scan_offset + batch_size - 1)
+                        scan_res = scan_query.execute()
+                    else:
+                        raise
                 scan_rows = scan_res.data or []
                 if not isinstance(scan_rows, list) or not scan_rows:
                     break
@@ -1551,14 +1581,30 @@ def list_properties(
                         )
                     ]
 
+                if top_deals_filter_active and batch_items:
+                    batch_items = [it for it in batch_items if _is_high_confidence_top_deal(it)]
+
                 for it in batch_items:
-                    if filtered_total >= offset and len(page_items) < limit:
+                    if top_deals_filter_active:
+                        top_deal_matches.append(it)
+                    elif filtered_total >= offset and len(page_items) < limit:
                         page_items.append(it)
                     filtered_total += 1
 
                 if len(scan_rows) < batch_size:
                     break
                 scan_offset += batch_size
+
+            if top_deals_filter_active:
+                top_deal_matches.sort(
+                    key=lambda it: (
+                        int(it.get("top_deal_score") or 0),
+                        str(it.get("created_at") or ""),
+                    ),
+                    reverse=True,
+                )
+                filtered_total = len(top_deal_matches)
+                page_items = top_deal_matches[offset : offset + limit]
 
             return page_items, filtered_total
 
@@ -1627,7 +1673,8 @@ def list_properties(
         needs_exact_filtered_page = bool(
             not is_recommended
             and (
-                inv_filter_active
+                top_deals_filter_active
+                or inv_filter_active
                 or any_deal_filter
                 or (property_type_filter and python_filter_property_type)
             )

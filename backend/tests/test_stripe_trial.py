@@ -17,10 +17,19 @@ def client():
     os.environ["STRIPE_SECRET_KEY"] = "sk_test_fake"
     os.environ["SUPABASE_URL"] = "https://fake.supabase.co"
     os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "fake_key"
+    os.environ["PROPNEXUS_INTERNAL_API_TOKEN"] = "test-internal-token"
 
     from backend.main import app
 
     return TestClient(app)
+
+
+def _internal_headers(email: str = "test@example.com") -> dict[str, str]:
+    return {
+        "X-PropNexus-Internal-Token": "test-internal-token",
+        "X-PropNexus-User-Email": email,
+        "X-PropNexus-User-Id": "user_test",
+    }
 
 
 @patch("backend.routes.stripe_routes.stripe")
@@ -46,6 +55,7 @@ def test_checkout_session_includes_trial(mock_sb, mock_stripe, client):
     # Make request to create checkout session
     response = client.post(
         "/stripe/create-checkout-session",
+        headers=_internal_headers(),
         json={"email": "test@example.com", "price_id": "price_test123"},
     )
 
@@ -76,6 +86,7 @@ def test_checkout_session_accepts_product_id(mock_sb, mock_stripe, client):
 
     response = client.post(
         "/stripe/create-checkout-session",
+        headers=_internal_headers(),
         json={"email": "test@example.com", "product_id": "prod_TGprLukyGJfRBH"},
     )
 
@@ -202,6 +213,7 @@ def test_portal_session_prefers_users_table_customer_id(mock_sb, mock_stripe, cl
 
     response = client.post(
         "/stripe/create-portal-session",
+        headers=_internal_headers("mapped@example.com"),
         json={"email": "mapped@example.com"},
     )
 
@@ -211,3 +223,37 @@ def test_portal_session_prefers_users_table_customer_id(mock_sb, mock_stripe, cl
     call_kwargs = mock_stripe.billing_portal.Session.create.call_args[1]
     assert call_kwargs["customer"] == "cus_from_users_table"
     assert not mock_stripe.Customer.search.called
+
+
+def test_checkout_session_rejects_direct_request_without_internal_token(client):
+    response = client.post(
+        "/stripe/create-checkout-session",
+        json={"email": "attacker@example.com", "price_id": "price_test123"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Unauthorized"
+
+
+def test_portal_session_rejects_direct_request_without_internal_token(client):
+    response = client.post(
+        "/stripe/create-portal-session",
+        json={"email": "attacker@example.com"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Unauthorized"
+
+
+def test_checkout_session_rejects_invalid_internal_token(client):
+    response = client.post(
+        "/stripe/create-checkout-session",
+        headers={
+            "X-PropNexus-Internal-Token": "wrong",
+            "X-PropNexus-User-Email": "test@example.com",
+        },
+        json={"email": "test@example.com", "price_id": "price_test123"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Unauthorized"

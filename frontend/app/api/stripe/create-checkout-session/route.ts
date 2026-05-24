@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
+import { internalApiHeaders } from '@/lib/server/internalApi';
 
 function getBackendBase(): string {
   const base = (
@@ -24,13 +25,15 @@ function isClerkServerEnabled(): boolean {
   return !disable && pk.startsWith('pk_') && Boolean(sk);
 }
 
-async function getVerifiedUserContext(): Promise<{ userId: string | null; token: string | null }> {
-  if (!isClerkServerEnabled()) return { userId: null, token: null };
+async function getVerifiedUserContext(): Promise<{ userId: string | null; email: string | null }> {
+  if (!isClerkServerEnabled()) return { userId: null, email: null };
   const a: any = await auth();
   const userId = (a?.userId as string | null) ?? null;
-  if (!userId) return { userId: null, token: null };
-  const token = typeof a?.getToken === 'function' ? await a.getToken().catch(() => null) : null;
-  return { userId, token: token ? String(token) : null };
+  if (!userId) return { userId: null, email: null };
+  const client = await clerkClient();
+  const user = await client.users.getUser(userId);
+  const email = user.primaryEmailAddress?.emailAddress ?? user.emailAddresses?.[0]?.emailAddress ?? null;
+  return { userId, email: email ? String(email) : null };
 }
 
 export const runtime = 'nodejs';
@@ -38,19 +41,25 @@ export const runtime = 'nodejs';
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { userId, token } = await getVerifiedUserContext();
-    if (isClerkServerEnabled() && !userId) {
+    const clerkEnabled = isClerkServerEnabled();
+    const { userId, email } = await getVerifiedUserContext();
+    if (clerkEnabled && !userId) {
       return NextResponse.json({ detail: 'Unauthorized' }, { status: 401 });
     }
+    if (clerkEnabled && !email) {
+      return NextResponse.json({ detail: 'Authenticated billing email is required' }, { status: 400 });
+    }
+    const billingEmail = email ?? (typeof body?.email === 'string' ? body.email : null);
 
     const r = await fetch(`${getBackendBase()}/stripe/create-checkout-session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(userId ? { 'x-clerk-user-id': userId } : {}),
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...internalApiHeaders(),
+        ...(userId ? { 'x-propnexus-user-id': userId, 'x-clerk-user-id': userId } : {}),
+        ...(billingEmail ? { 'x-propnexus-user-email': billingEmail } : {}),
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, ...(billingEmail ? { email: billingEmail } : {}) }),
     });
     if (!r.ok) {
       let detail = '';
