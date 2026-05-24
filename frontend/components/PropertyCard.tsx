@@ -21,6 +21,7 @@ import {
 } from '@/lib/normalizeProperty';
 import { Badge } from '@/components/Badges';
 import MetricExplainer from '@/components/property_details/MetricExplainer';
+import DealLabelChip from '@/components/property_details/DealLabelChip';
 import { getTopDealDisplay, isProminentDealFinder, shouldShowDealFinderOnCard } from '@/lib/topDealCopy';
 
 // tiny classnames helper – keeps conditional class logic tidy
@@ -403,6 +404,19 @@ export default function PropertyCard({
     void timeTick;
     return out;
   }, [insights, normalized.yieldPercent, p.monthly_rent, p.price, p.rent, p.rent_pcm, p.rent_per_month, timeTick]);
+
+  const dealLabelProperty = useMemo(
+    () => ({
+      ...(p as any),
+      derived,
+      displayYieldPct,
+      rentMonthly: derived.rentMonthly,
+      grossYieldPct: derived.grossYieldPct,
+      compsMedianSold: derived.compsMedianSold,
+      compsCount: derived.compsCount,
+    }),
+    [derived, displayYieldPct, p],
+  );
 
   function median(nums: number[]): number {
     const a = [...nums].sort((x, y) => x - y);
@@ -787,6 +801,8 @@ export default function PropertyCard({
             ))}
           </div>
         )}
+
+        <DealLabelChip property={dealLabelProperty} />
 
         {showDealFinder && prominentDealFinder && topDeal && (
           <div className={cx(

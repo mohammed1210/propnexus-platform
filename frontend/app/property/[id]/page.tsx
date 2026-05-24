@@ -16,6 +16,7 @@ import QuickStatsActions from '@/components/property_details/QuickStatsActions';
 import InvestmentSummary from '@/components/property_details/InvestmentSummary';
 import ExitStrategyGenerator from '@/components/property_details/ExitStrategyGenerator';
 import DealScore from '@/components/property_details/DealScore';
+import DealLabelPanel from '@/components/property_details/DealLabelPanel';
 import AreaInsights from '@/components/property_details/AreaInsights';
 import GatedPanel from '@/components/property_details/GatedPanel';
 import InvestmentCalculator from '@/components/property_details/InvestmentCalculator';
@@ -289,6 +290,22 @@ export default function PropertyDetailsPage() {
     return typeof d === 'string' ? d.trim() : '';
   }, [property]);
 
+  const dealLabelProperty = useMemo(() => {
+    if (!property) return null;
+    const listingHistory = (investorIntel as any)?.listing_history ?? null;
+    return {
+      ...(property as any),
+      sold_comp_benchmark:
+        (investorIntel as any)?.sold_comp_benchmark
+        ?? (property as any)?.sold_comp_benchmark
+        ?? (property as any)?.comps?.sales_benchmark
+        ?? null,
+      rental_evidence: (investorIntel as any)?.rental_evidence ?? (property as any)?.rental_evidence ?? null,
+      listing_history: listingHistory,
+      price_history: listingHistory?.price_history ?? (property as any)?.price_history ?? null,
+    };
+  }, [investorIntel, property]);
+
   if (loading) {
     return (
       <div className="page-wrapper">
@@ -439,6 +456,8 @@ export default function PropertyDetailsPage() {
           <PropertyDescription brief={investmentDescription} />
           <WhySurfaced property={property as any} />
         </div>
+
+        {dealLabelProperty ? <DealLabelPanel property={dealLabelProperty as any} className="mb-6" /> : null}
 
         <InfoDisclaimer className="mb-6" label="Investor brief disclaimer">
           Investor brief and scores are indicative only. Verify rent, comparable sales, finance, works, legal pack and tax position before making an offer. {INVESTMENT_DISCLAIMER_SHORT}
