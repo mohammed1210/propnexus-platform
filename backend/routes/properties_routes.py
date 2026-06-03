@@ -45,7 +45,9 @@ from backend.utils.investment_type_classifier import classify_investment_types
 from backend.utils.listing_keys import best_postcode
 from backend.utils.property_type_classifier import (
     classify_property_type,
+    classify_property_type_enrichment,
     normalize_property_type_value,
+    preferred_property_type_key,
 )
 from backend.utils.recommended_ranker import normalize_deal_type, rerank_recommended
 from backend.utils.supabase_client import get_supabase
@@ -617,6 +619,12 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
             out["deal_signals"] = data_obj.get("deal_signals")
         if out.get("deal_reasons") is None and isinstance(data_obj.get("deal_reasons"), list):
             out["deal_reasons"] = data_obj.get("deal_reasons")
+        if out.get("deal_keywords") is None and isinstance(data_obj.get("deal_keywords"), list):
+            out["deal_keywords"] = data_obj.get("deal_keywords")
+        if out.get("investment_signals") is None and isinstance(
+            data_obj.get("investment_signals"), list
+        ):
+            out["investment_signals"] = data_obj.get("investment_signals")
         if out.get("deal_signals_meta") is None and isinstance(
             data_obj.get("deal_signals_meta"), dict
         ):
@@ -653,6 +661,15 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
             data_obj.get("raw_property_type"), str
         ):
             out["raw_property_type"] = data_obj.get("raw_property_type")
+        for key in (
+            "normalised_property_type",
+            "property_type_confidence",
+            "property_type_source",
+            "property_type_mismatch",
+            "matched_type_terms",
+        ):
+            if out.get(key) in (None, "") and data_obj.get(key) not in (None, ""):
+                out[key] = data_obj.get(key)
 
     def _pick_raw(keys: List[str]) -> Any:
         for k in keys:
@@ -691,7 +708,7 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
                 out.get("description"),
                 raw_s,
                 extra=data_obj if isinstance(data_obj, dict) else None,
-            )
+            )  # type: ignore[misc]
             out["property_type"] = pt
             if raw_best and not (
                 isinstance(out.get("raw_property_type"), str)
@@ -705,6 +722,22 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
                 if raw_best:
                     data_obj.setdefault("raw_property_type", raw_best)
                 out["data"] = data_obj
+
+        if not (
+            isinstance(out.get("normalised_property_type"), str)
+            and out.get("normalised_property_type").strip()
+        ):
+            type_enrichment = classify_property_type_enrichment(out)
+            for key, value in type_enrichment.items():
+                if value not in (None, "") and out.get(key) in (None, "", []):
+                    out[key] = value
+            if isinstance(data_obj, dict):
+                for key, value in type_enrichment.items():
+                    if value not in (None, ""):
+                        data_obj.setdefault(key, value)
+                out["data"] = data_obj
+
+        out["resolved_property_type"] = preferred_property_type_key(out)
 
         # Avoid returning empty-string raw types.
         if (
@@ -896,6 +929,24 @@ def _normalize_property_row(row: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(out.get("deal_reasons"), list):
         out["deal_reasons"] = [
             str(s) for s in out["deal_reasons"] if isinstance(s, str) and s.strip()
+        ]
+    if out.get("deal_keywords") is not None and not isinstance(out.get("deal_keywords"), list):
+        out["deal_keywords"] = []
+    if isinstance(out.get("deal_keywords"), list):
+        out["deal_keywords"] = [
+            str(s) for s in out["deal_keywords"] if isinstance(s, str) and s.strip()
+        ]
+    if out.get("investment_signals") is not None and not isinstance(
+        out.get("investment_signals"), list
+    ):
+        out["investment_signals"] = []
+    if out.get("matched_type_terms") is not None and not isinstance(
+        out.get("matched_type_terms"), list
+    ):
+        out["matched_type_terms"] = []
+    if isinstance(out.get("matched_type_terms"), list):
+        out["matched_type_terms"] = [
+            str(s) for s in out["matched_type_terms"] if isinstance(s, str) and s.strip()
         ]
 
     if out.get("discount_estimate_pct") is not None and not isinstance(
@@ -1271,7 +1322,18 @@ def list_properties(
         property_type_filter: List[str] = []
         seen_pt: set[str] = set()
         for v in raw_pt_values:
-            canon = normalize_property_type_value(v)
+            resolved = preferred_property_type_key(
+                {
+                    "normalised_property_type": v,
+                    "property_type": v,
+                    "raw_property_type": v,
+                    "type": v,
+                }
+            )
+            if resolved == "unknown":
+                legacy = normalize_property_type_value(v)
+                resolved = preferred_property_type_key({"property_type": legacy}) if legacy else ""
+            canon = resolved if resolved and resolved != "unknown" else ""
             if canon and canon not in seen_pt:
                 seen_pt.add(canon)
                 property_type_filter.append(canon)
@@ -1343,11 +1405,7 @@ def list_properties(
                 return best_term
             return None
 
-        # We try DB filtering first; if the column doesn't exist, fall back to python filtering.
-        property_type_db_value: str | None = (
-            str(property_type) if property_type is not None else None
-        )
-        python_filter_property_type = False
+        python_filter_property_type = bool(property_type_filter)
 
         def _build_base_query(
             *,
@@ -1433,13 +1491,6 @@ def list_properties(
                 type_list: List[str] = [t.strip() for t in types.split(",") if t.strip()]
                 if type_list:
                     q0 = q0.in_("investment_type", type_list)
-
-            # Property type filter (future use; safe/additive)
-            if property_type_filter and property_type_db_value:
-                try:
-                    q0 = q0.in_("property_type", property_type_filter)
-                except Exception:
-                    pass
 
             return q0
 
@@ -1564,7 +1615,7 @@ def list_properties(
                     batch_items = [
                         it
                         for it in batch_items
-                        if it.get("property_type") in allowed_property_types
+                        if preferred_property_type_key(it) in allowed_property_types
                     ]
 
                 if any_deal_filter and batch_items:
@@ -1632,7 +1683,6 @@ def list_properties(
             missing = _missing_col_from_api_error(e)
             if missing == "property_type" and property_type_filter:
                 python_filter_property_type = True
-                property_type_db_value = None
                 query = _apply_sorting(_build_base_query())
 
                 # If we're going to python-filter, fetch a candidate pool from zero.
@@ -1843,14 +1893,10 @@ def list_properties(
                     if fetched_pool_from_zero:
                         total_int = len(items)
 
-        if property_type_filter and not python_filter_property_type:
-            # Even with DB filtering, ensure output is normalized for legacy rows.
-            pass
-
         if property_type_filter and python_filter_property_type and items:
             if not used_exact_filtered_page:
                 allowed = set(property_type_filter)
-                items = [it for it in items if it.get("property_type") in allowed]
+                items = [it for it in items if preferred_property_type_key(it) in allowed]
                 if fetched_pool_from_zero:
                     total_int = len(items)
 
@@ -1953,7 +1999,6 @@ def list_properties(
                 missing = _missing_col_from_api_error(e)
                 if missing == "property_type" and property_type_filter:
                     # Rebuild without DB property_type filtering; python-filter below.
-                    property_type_db_value = None
                     python_filter_property_type = True
                     points_q = _build_points_query()
                     points_q = _safe_order(points_q, "created_at", desc=True, nulls_last=True)
@@ -2021,7 +2066,7 @@ def list_properties(
                         continue
 
                 if property_type_filter and python_filter_property_type:
-                    if point_item.get("property_type") not in set(property_type_filter):
+                    if preferred_property_type_key(point_item) not in set(property_type_filter):
                         continue
 
                 if any_deal_filter:

@@ -56,8 +56,16 @@ type Property = {
   top_deal?: { score?: number; tier?: string; reasons?: string[]; evidence?: Record<string, unknown> | null } | null;
   deal_reasons?: string[];
   deal_signals?: string[];
+  deal_keywords?: string[] | null;
+  investment_signals?: Array<{ type?: string; label?: string; confidence?: number; source?: string }> | null;
   discount_estimate_pct?: number | null;
   discount_percent?: number | null;
+  raw_property_type?: string | null;
+  normalised_property_type?: string | null;
+  property_type_confidence?: number | null;
+  property_type_source?: string | null;
+  property_type_mismatch?: boolean | null;
+  matched_type_terms?: string[] | null;
   imageurl?: string | null;
   image_urls?: string[] | null;
   // Optional fields some feeds may include; used for “provided rent” detection.
@@ -148,6 +156,30 @@ function getScoreVerdict(score: number | null): string {
   if (score >= 65) return 'Strong signal';
   if (score >= 50) return 'Watchlist';
   return 'Needs review';
+}
+
+function formatDealKeyword(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  const normalized = raw.toLowerCase().replace(/[_-]+/g, ' ');
+  const map: Record<string, string> = {
+    'needs refurb': 'Refurb opportunity',
+    refurbishment: 'Refurb opportunity',
+    refurb: 'Refurb opportunity',
+    modernisation: 'Refurb opportunity',
+    modernization: 'Refurb opportunity',
+    'chain free': 'Chain free',
+    'no onward chain': 'Chain free',
+    auction: 'Auction',
+    'short lease': 'Short lease',
+    reduced: 'Reduced',
+    'price reduced': 'Reduced',
+    probate: 'Probate',
+    'development potential': 'Development potential',
+    'hmo potential': 'HMO potential',
+  };
+  if (map[normalized]) return map[normalized];
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 export default function PropertyCard({
@@ -589,6 +621,15 @@ export default function PropertyCard({
   const sourceBadgeClasses = useMemo(() => getSourceBadgeClasses(p.source), [p.source]);
 
   const verdict = useMemo(() => buildVerdict(p), [p]);
+  const whySurfacedLabel = useMemo(() => {
+    const signalLabel = Array.isArray(p.investment_signals)
+      ? p.investment_signals.find((signal) => typeof signal?.label === 'string' && signal.label.trim())?.label
+      : null;
+    const keyword = Array.isArray(p.deal_keywords)
+      ? p.deal_keywords.find((item) => typeof item === 'string' && item.trim())
+      : null;
+    return formatDealKeyword(signalLabel || keyword || '');
+  }, [p.deal_keywords, p.investment_signals]);
 
   const handleSearchClickTrack = useCallback(() => {
     if (!p.id) return;
@@ -799,6 +840,21 @@ export default function PropertyCard({
             {p.badges.map((badgeId) => (
               <Badge key={badgeId} id={String(badgeId)} />
             ))}
+          </div>
+        )}
+
+        {(p.property_type_mismatch || whySurfacedLabel) && (
+          <div className="flex flex-wrap gap-1">
+            {p.property_type_mismatch && (
+              <span className="inline-flex items-center rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 dark:border-sky-700/60 dark:bg-sky-900/20 dark:text-sky-300">
+                Type verified from listing text
+              </span>
+            )}
+            {whySurfacedLabel && (
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:border-amber-700/60 dark:bg-amber-900/20 dark:text-amber-200">
+                Why surfaced: {whySurfacedLabel}
+              </span>
+            )}
           </div>
         )}
 

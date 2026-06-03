@@ -177,17 +177,23 @@ const INVESTMENT_TYPES = ['HMO', 'BTL', 'SA', 'BRR', 'Flip', 'Commercial'] as co
 
 const PROPERTY_TYPE_OPTIONS = [
   { value: '', label: 'Any' },
+  { value: 'detached', label: 'Detached' },
+  { value: 'semi_detached', label: 'Semi-detached' },
+  { value: 'terraced', label: 'Terraced' },
+  { value: 'end_of_terrace', label: 'End of terrace' },
   { value: 'flat', label: 'Flat' },
+  { value: 'apartment', label: 'Apartment' },
   { value: 'studio', label: 'Studio' },
   { value: 'maisonette', label: 'Maisonette' },
-  { value: 'terraced', label: 'Terraced' },
-  { value: 'semi-detached', label: 'Semi-detached' },
-  { value: 'detached', label: 'Detached' },
   { value: 'bungalow', label: 'Bungalow' },
-  { value: 'commercial', label: 'Commercial' },
   { value: 'land', label: 'Land' },
-  { value: 'other', label: 'Other' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'mixed_use', label: 'Mixed use' },
 ] as const;
+
+const PROPERTY_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  PROPERTY_TYPE_OPTIONS.map((option) => [option.value, option.label]),
+);
 
 function normalizePropertyTypeParam(value: string): string {
   const raw = (value ?? '').trim();
@@ -196,21 +202,30 @@ function normalizePropertyTypeParam(value: string): string {
   const map: Record<string, string> = {
     // New keys (already correct)
     flat: 'flat',
+    apartment: 'apartment',
     studio: 'studio',
     maisonette: 'maisonette',
     terraced: 'terraced',
-    'semi-detached': 'semi-detached',
+    end_of_terrace: 'end_of_terrace',
+    'end-of-terrace': 'end_of_terrace',
+    'end of terrace': 'end_of_terrace',
+    'end terrace': 'end_of_terrace',
+    semi_detached: 'semi_detached',
+    'semi-detached': 'semi_detached',
     detached: 'detached',
     bungalow: 'bungalow',
     commercial: 'commercial',
     land: 'land',
-    other: 'other',
+    mixed_use: 'mixed_use',
+    'mixed-use': 'mixed_use',
+    'mixed use': 'mixed_use',
+    unknown: '',
+    other: '',
 
     // Back-compat: canonical labels previously used as values
     'flat/apartment': 'flat',
-    apartment: 'flat',
     terrace: 'terraced',
-    'semi detached': 'semi-detached',
+    'semi detached': 'semi_detached',
   };
   return map[key] ?? raw;
 }
@@ -270,6 +285,14 @@ type RawProperty = {
   created_at?: string | null;
   investment_type?: string | null;
   property_type?: string | null;
+  raw_property_type?: string | null;
+  normalised_property_type?: string | null;
+  property_type_confidence?: number | null;
+  property_type_source?: string | null;
+  property_type_mismatch?: boolean | null;
+  matched_type_terms?: string[] | null;
+  deal_keywords?: string[] | null;
+  investment_signals?: Array<{ type?: string; label?: string; confidence?: number; source?: string }> | null;
 };
 
 export default function ListingsPage() {
@@ -1274,8 +1297,9 @@ function ListingsInner() {
   };
 
   const visibleCount = displayedRows.length;
-  const showingFrom = total > 0 && visibleCount > 0 ? offset + 1 : 0;
-  const showingTo = total > 0 && visibleCount > 0 ? Math.min(offset + visibleCount, total) : 0;
+  const totalCount = typeof total === 'number' && Number.isFinite(total) ? total : 0;
+  const showingFrom = totalCount > 0 && visibleCount > 0 ? offset + 1 : 0;
+  const showingTo = totalCount > 0 && visibleCount > 0 ? Math.min(offset + visibleCount, totalCount) : 0;
 
   const activeFilters: Array<{ key: string; label: string; value: string }> = [];
   if (qRaw) activeFilters.push({ key: 'q', label: qRaw, value: qRaw });
@@ -1294,7 +1318,7 @@ function ListingsInner() {
   if (investmentTypeUrl)
     activeFilters.push({ key: 'investment_type', label: investmentTypeUrl, value: investmentTypeUrl });
   if (propertyTypeUrl)
-    activeFilters.push({ key: 'property_type', label: propertyTypeUrl, value: propertyTypeUrl });
+    activeFilters.push({ key: 'property_type', label: PROPERTY_TYPE_LABELS[propertyTypeUrl] || propertyTypeUrl, value: propertyTypeUrl });
 
   if (dealsOnlyUrl) activeFilters.push({ key: 'deals_only', label: 'Deals only', value: '1' });
   if (auctionOnlyUrl) activeFilters.push({ key: 'auction_only', label: 'Auction only', value: '1' });
@@ -1310,8 +1334,8 @@ function ListingsInner() {
   if (shortLeaseOnlyUrl)
     activeFilters.push({ key: 'short_lease_only', label: 'Short lease only', value: 'true' });
 
-  const totalPages = total > 0 ? Math.max(1, Math.ceil(total / limit)) : 1;
-  const currentPage = total > 0 ? Math.min(totalPages, Math.floor(offset / limit) + 1) : 1;
+  const totalPages = totalCount > 0 ? Math.max(1, Math.ceil(totalCount / limit)) : 1;
+  const currentPage = totalCount > 0 ? Math.min(totalPages, Math.floor(offset / limit) + 1) : 1;
 
   const pageItems = useMemo(() => {
     if (totalPages <= 1) return [] as Array<number | '…'>;
@@ -1334,7 +1358,7 @@ function ListingsInner() {
   }, [currentPage, totalPages]);
 
   const PaginationControls = ({ placement }: { placement: 'top' | 'bottom' }) => {
-    if (total <= 0 || visibleCount <= 0) return null;
+    if (totalCount <= 0 || visibleCount <= 0) return null;
 
     return (
       <div
