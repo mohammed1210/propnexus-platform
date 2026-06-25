@@ -1077,11 +1077,21 @@ function ListingsInner() {
       .replace(/[-_]/g, '');
   }, []);
 
+  const publicRows = useMemo(
+    () => rows.filter((p) => String(p.source ?? '').trim().toLowerCase() !== 'user_submitted'),
+    [rows],
+  );
+
+  const publicMapRows = useMemo(
+    () => (mapRows ?? []).filter((p) => String(p.source ?? '').trim().toLowerCase() !== 'user_submitted'),
+    [mapRows],
+  );
+
   const typeFilteredRows = useMemo(() => {
-    if (!investmentTypeUrl) return rows;
+    if (!investmentTypeUrl) return publicRows;
     const selected = normInv(investmentTypeUrl);
-    return rows.filter((p) => normInv(p.investment_type) === selected);
-  }, [investmentTypeUrl, normInv, rows]);
+    return publicRows.filter((p) => normInv(p.investment_type) === selected);
+  }, [investmentTypeUrl, normInv, publicRows]);
 
   const highConfidenceTopDeals = useMemo(
     () => typeFilteredRows.filter((p) => ['prime', 'strong'].includes(String(p.top_deal_tier || p.top_deal?.tier || '').toLowerCase())),
@@ -1095,10 +1105,10 @@ function ListingsInner() {
 
   const typeFilteredMapRows = useMemo(() => {
     if (!mapRows) return typeFilteredRows;
-    if (!investmentTypeUrl) return mapRows;
+    if (!investmentTypeUrl) return publicMapRows;
     const selected = normInv(investmentTypeUrl);
-    return mapRows.filter((p) => normInv(p.investment_type) === selected);
-  }, [investmentTypeUrl, mapRows, normInv, typeFilteredRows]);
+    return publicMapRows.filter((p) => normInv(p.investment_type) === selected);
+  }, [investmentTypeUrl, mapRows, normInv, publicMapRows, typeFilteredRows]);
 
   // ✅ robust points creation (no falsy checks, reject invalid/null-island)
   const points = useMemo(() => {

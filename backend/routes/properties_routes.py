@@ -1470,11 +1470,14 @@ def list_properties(
                 except Exception:
                     return q0
 
-            # Exact source filter (useful for verifying scraper inserts)
+            # Exact source filter (useful for verifying source-specific inserts)
             if source_filter:
                 q0 = q0.eq("source", source_filter)
-            elif not include_spareroom and not explicit_spareroom_source:
-                q0 = _exclude_spareroom_source(q0)
+            else:
+                # Hide manual user-submitted rows from public listing inventory by default.
+                q0 = q0.neq("source", "user_submitted")
+                if not include_spareroom and not explicit_spareroom_source:
+                    q0 = _exclude_spareroom_source(q0)
 
             # Optional created_at filter (useful for "show me what just got inserted")
             if created_after is not None:

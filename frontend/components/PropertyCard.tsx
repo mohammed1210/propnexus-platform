@@ -115,6 +115,7 @@ function formatSourceBadge(source: string | null | undefined): string {
   const raw = (source ?? '').trim();
   const normalized = raw.toLowerCase();
 
+  if (normalized === 'user_submitted') return 'Manual deal';
   if (normalized === 'zoopla') return 'Zoopla';
   if (normalized === 'rightmove') return 'Rightmove';
   if (normalized === 'onthemarket' || normalized === 'otm') return 'OTM';
@@ -127,6 +128,10 @@ function formatSourceBadge(source: string | null | undefined): string {
 
 function getSourceBadgeClasses(source: string | null | undefined): string {
   const normalized = (source ?? '').trim().toLowerCase();
+
+  if (normalized === 'user_submitted') {
+    return 'bg-slate-100 text-slate-700 border border-slate-300 dark:bg-slate-800/70 dark:text-slate-100 dark:border-slate-600';
+  }
 
   // Requested brand colors:
   // - Zoopla: purple
@@ -619,6 +624,19 @@ export default function PropertyCard({
 
   const sourceBadgeText = useMemo(() => formatSourceBadge(p.source), [p.source]);
   const sourceBadgeClasses = useMemo(() => getSourceBadgeClasses(p.source), [p.source]);
+  const bedsBathsDisplay = useMemo(() => {
+    const hasBeds = typeof p.bedrooms === 'number' && Number.isFinite(p.bedrooms);
+    const hasBaths = typeof p.bathrooms === 'number' && Number.isFinite(p.bathrooms);
+
+    if (!hasBeds && !hasBaths) {
+      return { text: 'Details not provided', hasValues: false };
+    }
+
+    const parts: string[] = [];
+    if (hasBeds) parts.push(`${p.bedrooms} bd`);
+    if (hasBaths) parts.push(`${p.bathrooms} ba`);
+    return { text: parts.join(' · '), hasValues: true };
+  }, [p.bathrooms, p.bedrooms]);
 
   const verdict = useMemo(() => buildVerdict(p), [p]);
   const whySurfacedLabel = useMemo(() => {
@@ -805,8 +823,8 @@ export default function PropertyCard({
           <div className="flex items-center justify-between gap-2">
             <span className="text-base font-black leading-none text-slate-950 dark:text-white">{priceText}</span>
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-2 py-1 text-[11px] font-bold text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700">
-              <FiHome className="h-3.5 w-3.5 text-brand-500" aria-hidden="true" />
-              {p.bedrooms ?? '—'} bd · {p.bathrooms ?? '—'} ba
+              {bedsBathsDisplay.hasValues ? <FiHome className="h-3.5 w-3.5 text-brand-500" aria-hidden="true" /> : null}
+              {bedsBathsDisplay.text}
             </span>
           </div>
           <div className="mt-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600 dark:text-slate-400">
