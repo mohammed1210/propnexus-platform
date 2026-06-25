@@ -41,6 +41,7 @@ from backend.utils.enrichment_store import (
     upsert_property_enrichment_cache,
 )
 from backend.utils.image_utils import dedupe_image_urls, pick_cover_image
+from backend.utils.internal_api_auth import require_internal_api_token
 from backend.utils.investment_type_classifier import classify_investment_types
 from backend.utils.listing_keys import best_postcode
 from backend.utils.property_type_classifier import (
@@ -271,6 +272,19 @@ class SearchPayload(BaseModel):
     allow_broaden: bool = True
     limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
+
+
+class UserSubmittedPropertyRequest(BaseModel):
+    source_url: str | None = Field(default=None, max_length=2048)
+    title: str = Field(min_length=1, max_length=240)
+    location: str = Field(min_length=1, max_length=240)
+    postcode: str | None = Field(default=None, max_length=24)
+    price: float = Field(gt=0, le=100_000_000)
+    bedrooms: int | None = Field(default=None, ge=0, le=50)
+    bathrooms: int | None = Field(default=None, ge=0, le=50)
+    property_type: str | None = Field(default=None, max_length=80)
+    estimated_monthly_rent: float | None = Field(default=None, ge=0, le=1_000_000)
+    description: str | None = Field(default=None, max_length=4000)
 
 
 def _log_search_query_metric(payload: dict[str, Any], total_results: int) -> None:
@@ -2374,6 +2388,123 @@ def get_property_investor_intel(property_id: str, response: Response):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"investor intel fetch failed: {e}")
+
+
+@router.post("/properties/user-submitted")
+def create_user_submitted_property(
+    payload: UserSubmittedPropertyRequest,
+    request: Request,
+    x_propnexus_user_id: Optional[str] = Header(None, alias="X-PropNexus-User-Id"),
+    x_clerk_user_id: Optional[str] = Header(None, alias="X-Clerk-User-Id"),
+):
+    require_internal_api_token(request)
+
+    title = payload.title.strip()
+    location = payload.location.strip()
+    postcode = (
+        payload.postcode.strip().upper()
+        if isinstance(payload.postcode, str) and payload.postcode.strip()
+        else None
+    )
+    property_type = (
+        payload.property_type.strip()
+        if isinstance(payload.property_type, str) and payload.property_type.strip()
+        else None
+    )
+    description = (
+        payload.description.strip()
+        if isinstance(payload.description, str) and payload.description.strip()
+        else None
+    )
+    source_url = (
+        payload.source_url.strip()
+        if isinstance(payload.source_url, str) and payload.source_url.strip()
+        else None
+    )
+    user_id = (x_propnexus_user_id or x_clerk_user_id or "").strip() or None
+
+    if source_url:
+        parsed = urlparse(source_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise HTTPException(status_code=400, detail="Source URL must be a valid http(s) URL")
+
+    data_payload: Dict[str, Any] = {
+        "intake_mode": "analyse_any_deal",
+        "user_submitted": True,
+        "submitted_via": "analyse",
+        "user_provided_reference_only": bool(source_url),
+        "created_by": user_id,
+        "submitted_by": user_id,
+        "property_type": property_type,
+        "source_url": source_url,
+        "listing_url": source_url,
+        "original_listing_url": source_url,
+        "original_url": source_url,
+        "monthly_rent": payload.estimated_monthly_rent,
+        "rent_monthly": payload.estimated_monthly_rent,
+    }
+    if description:
+        data_payload["submission_notes"] = description
+
+    insert_payload: Dict[str, Any] = {
+        "title": title,
+        "description": description,
+        "location": location,
+        "address": location,
+        "postcode": postcode,
+        "price": round(float(payload.price), 2),
+        "bedrooms": payload.bedrooms,
+        "bathrooms": payload.bathrooms,
+        "property_type": property_type,
+        "source": "user_submitted",
+        "investment_type": "Buy-to-let",
+        "data": data_payload,
+    }
+    if payload.estimated_monthly_rent is not None:
+        insert_payload["rent_monthly"] = round(float(payload.estimated_monthly_rent), 2)
+    if source_url:
+        insert_payload["url"] = source_url
+        insert_payload["source_url"] = source_url
+        insert_payload["listing_url"] = source_url
+        insert_payload["original_listing_url"] = source_url
+        insert_payload["original_url"] = source_url
+
+    sb = _get_supabase()
+    try:
+        res = sb.table("properties").insert(insert_payload).execute()
+    except APIError:
+        retry_payload = dict(insert_payload)
+        for key in (
+            "source_url",
+            "listing_url",
+            "original_listing_url",
+            "original_url",
+            "rent_monthly",
+        ):
+            retry_payload.pop(key, None)
+        try:
+            res = sb.table("properties").insert(retry_payload).execute()
+        except Exception as retry_err:
+            raise HTTPException(
+                status_code=500, detail=f"property create failed: {retry_err}"
+            ) from retry_err
+    except Exception as err:
+        raise HTTPException(status_code=500, detail=f"property create failed: {err}") from err
+
+    row = None
+    if isinstance(getattr(res, "data", None), list) and res.data:
+        row = res.data[0]
+    elif isinstance(getattr(res, "data", None), dict):
+        row = res.data
+
+    if not isinstance(row, dict) or not row.get("id"):
+        raise HTTPException(status_code=500, detail="property create failed: missing created id")
+
+    return {
+        "ok": True,
+        "property_id": row.get("id"),
+        "property": _normalize_property_row(row),
+    }
 
 
 @router.post("/properties/admin/backfill-scores")

@@ -23,6 +23,7 @@ export default function Header() {
   const pathname = usePathname();
   const links = [
     { href: '/', label: t('nav.home') },
+    { href: '/analyse', label: t('nav.analyse') },
     { href: '/listings', label: t('nav.listings') },
     { href: '/saved', label: t('nav.savedDeals') },
     ...(FF.OFF_MARKET ? [{ href: '/off-market', label: t('nav.offMarket') }] : []),
