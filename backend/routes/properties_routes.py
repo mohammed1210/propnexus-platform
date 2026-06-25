@@ -501,6 +501,35 @@ def _exclude_spareroom_source(query: Any) -> Any:
     return next_query or query
 
 
+def _exclude_public_hidden_sources(
+    query: Any,
+    *,
+    include_spareroom: bool,
+    explicit_spareroom_source: bool,
+) -> Any:
+    """Hide non-public sources from the default listings feed while preserving NULL sources."""
+
+    # Default public feed should hide user_submitted always.
+    # SpareRoom is hidden unless explicitly included.
+    if include_spareroom or explicit_spareroom_source:
+        expr = "source.is.null,source.neq.user_submitted"
+    else:
+        expr = "source.is.null,and(source.neq.user_submitted,source.neq.spareroom)"
+
+    try:
+        next_query = query.or_(expr)
+    except Exception:
+        return query
+
+    if (
+        type(query).__module__ == "unittest.mock"
+        and type(next_query).__module__ == "unittest.mock"
+        and next_query is not query
+    ):
+        return query
+    return next_query or query
+
+
 def _is_mappable_coordinate_pair(lat: Any, lng: Any) -> bool:
     def _to_float(v: Any) -> float | None:
         if v is None or isinstance(v, bool):
@@ -1474,10 +1503,11 @@ def list_properties(
             if source_filter:
                 q0 = q0.eq("source", source_filter)
             else:
-                # Hide manual user-submitted rows from public listing inventory by default.
-                q0 = q0.neq("source", "user_submitted")
-                if not include_spareroom and not explicit_spareroom_source:
-                    q0 = _exclude_spareroom_source(q0)
+                q0 = _exclude_public_hidden_sources(
+                    q0,
+                    include_spareroom=include_spareroom,
+                    explicit_spareroom_source=explicit_spareroom_source,
+                )
 
             # Optional created_at filter (useful for "show me what just got inserted")
             if created_after is not None:

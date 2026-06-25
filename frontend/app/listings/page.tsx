@@ -876,7 +876,7 @@ function ListingsInner() {
         if (maxP !== undefined) params.set('max', String(maxP));
         if (beds !== undefined) params.set('beds', String(beds));
         if (baths !== undefined) params.set('baths', String(baths));
-        // Investment type filtering can be inconsistent in scraped datasets.
+        // Investment type filtering can be inconsistent in imported listing datasets.
         // We keep the UI chips, but apply them client-side so they never feel “broken”.
         params.set('sort', sort);
         params.set('limit', String(limit));
@@ -1230,7 +1230,7 @@ function ListingsInner() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.detail || data?.error || `Scrape failed (${res.status})`);
+        throw new Error(data?.detail || data?.error || `Import failed (${res.status})`);
       }
 
       const c =
@@ -1239,12 +1239,12 @@ function ListingsInner() {
           : typeof data?.count === 'number'
             ? data.count
             : 0;
-      setScrapeMsg(`Scrape complete: imported ${c} listings for “${loc}”. Refreshing…`);
+      setScrapeMsg(`Admin import complete: imported ${c} listings for “${loc}”. Refreshing…`);
 
       // refresh the listings fetch
       setRefreshNonce((n) => n + 1);
     } catch (e: any) {
-      setScrapeErr(e?.message || 'Scrape failed');
+      setScrapeErr(e?.message || 'Import failed');
     } finally {
       setScrapeLoading(false);
     }
@@ -1843,9 +1843,9 @@ function ListingsInner() {
                     onClick={runScrape}
                     className="h-10 px-3 md:px-4 rounded-lg border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-200"
                     disabled={scrapeLoading}
-                    title="Admin: run scrapers and import fresh listings"
+                    title="Admin: run listing import and refresh inventory"
                   >
-                  {scrapeLoading ? 'Running…' : 'Run Scrape'}
+                  {scrapeLoading ? 'Running…' : 'Run Import'}
                   </button>
                 )}
               </div>
