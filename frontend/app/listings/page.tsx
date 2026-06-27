@@ -1996,14 +1996,9 @@ function ListingsInner() {
                 {sort === 'top_deals' && watchlistTopDeals.length > 0 ? (
                   <p className="mt-2 text-sm text-slate-500">{watchlistTopDeals.length} watchlist leads are available, but they do not meet Top Deal confidence yet.</p>
                 ) : null}
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                  <button onClick={resetFilters} className="btn-primary">
-                    Clear Filters
-                  </button>
-                  <Link href="/analyse" className="rounded-md border border-slate-300 dark:border-slate-700 px-5 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors inline-flex">
-                    Analyse your own deal instead
-                  </Link>
-                </div>
+                <button onClick={resetFilters} className="btn-primary mt-4">
+                  Clear Filters
+                </button>
               </div>
             ) : (
               <>
@@ -2074,14 +2069,9 @@ function ListingsInner() {
                   <p className="text-xl text-slate-600 dark:text-slate-400">
                     {sort === 'top_deals' ? 'No high-confidence Top Deals surfaced in this search yet.' : 'No properties match these filters.'}
                   </p>
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                    <button onClick={resetFilters} className="btn-primary">
-                      Clear Filters
-                    </button>
-                    <Link href="/analyse" className="rounded-md border border-slate-300 dark:border-slate-700 px-5 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors inline-flex">
-                      Analyse your own deal instead
-                    </Link>
-                  </div>
+                  <button onClick={resetFilters} className="btn-primary mt-4">
+                    Clear Filters
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

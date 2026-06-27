@@ -509,8 +509,6 @@ def _exclude_public_hidden_sources(
 ) -> Any:
     """Hide non-public sources from the default listings feed while preserving NULL sources."""
 
-    # Default public feed should hide user_submitted always.
-    # SpareRoom is hidden unless explicitly included.
     if include_spareroom or explicit_spareroom_source:
         expr = "source.is.null,source.neq.user_submitted"
     else:
