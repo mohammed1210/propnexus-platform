@@ -10,28 +10,33 @@ It is not a full integration suite and should stay fast.
 
 from __future__ import annotations
 
+import importlib
+import sys
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
-try:
-    from backend.main import app  # type: ignore
 
-    _import_error = None
-except Exception as e:  # pragma: no cover
-    app = None  # type: ignore[assignment]
-    _import_error = e
+def _load_fresh_app():
+    importlib.invalidate_caches()
+    sys.modules.pop("backend.main", None)
+
+    try:
+        module = importlib.import_module("backend.main")
+    except Exception as exc:  # pragma: no cover
+        pytest.skip(f"App unavailable in CI: {exc}")
+
+    return module.app
 
 
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    if app is None:  # pragma: no cover
-        pytest.skip(f"App unavailable in CI: {_import_error}")
-
     # Keep diagnostics routes visible.
     monkeypatch.setenv("ENVIRONMENT", "development")
-    return TestClient(app)
+
+    with TestClient(_load_fresh_app()) as test_client:
+        yield test_client
 
 
 def _assert_keys(payload: dict[str, Any], required_keys: set[str]) -> None:
