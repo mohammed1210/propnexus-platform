@@ -21,10 +21,28 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+def _unbind_parent_attr(name: str) -> None:
+    parent_name, _, child_name = name.rpartition(".")
+    if not parent_name or not child_name:
+        return
+
+    parent_module = sys.modules.get(parent_name)
+    if parent_module is not None and getattr(parent_module, child_name, None) is not None:
+        try:
+            delattr(parent_module, child_name)
+        except Exception:
+            pass
+
+
 def _purge_modules(prefixes: Iterable[str]) -> None:
-    for name in list(sys.modules):
-        if any(name == prefix or name.startswith(f"{prefix}.") for prefix in prefixes):
-            sys.modules.pop(name, None)
+    names = [
+        name
+        for name in list(sys.modules)
+        if any(name == prefix or name.startswith(f"{prefix}.") for prefix in prefixes)
+    ]
+    for name in sorted(names, key=lambda module_name: module_name.count("."), reverse=True):
+        _unbind_parent_attr(name)
+        sys.modules.pop(name, None)
 
 
 def _snapshot_modules(prefixes: Iterable[str]) -> dict[str, ModuleType]:
@@ -48,7 +66,7 @@ def _bind_module(name: str, module: ModuleType) -> None:
 
 def _restore_modules(snapshot: dict[str, ModuleType], prefixes: Iterable[str]) -> None:
     _purge_modules(prefixes)
-    for name, module in snapshot.items():
+    for name, module in sorted(snapshot.items(), key=lambda item: item[0].count(".")):
         _bind_module(name, module)
 
 
@@ -125,6 +143,19 @@ def _assert_keys(payload: dict[str, Any], required_keys: set[str]) -> None:
     assert not missing, f"Missing keys: {sorted(missing)}"
 
 
+def _route_debug_context(paths: set[str]) -> str:
+    backend_module = sys.modules.get("backend")
+    backend_main_module = sys.modules.get("backend.main")
+
+    return (
+        f"backend.main_id={id(backend_main_module) if backend_main_module is not None else None}; "
+        f"backend.main_file={getattr(backend_main_module, '__file__', None)}; "
+        f"backend_has_main={hasattr(backend_module, 'main') if backend_module is not None else False}; "
+        f"backend_has_routes={hasattr(backend_module, 'routes') if backend_module is not None else False}; "
+        f"paths={sorted(paths)[:20]}"
+    )
+
+
 def test_debug_routes_contains_critical_paths(client: TestClient) -> None:
     resp = client.get("/debug/routes")
     assert resp.status_code == 200
@@ -134,7 +165,9 @@ def test_debug_routes_contains_critical_paths(client: TestClient) -> None:
     assert isinstance(body.get("paths"), list)
 
     paths = set(body["paths"])
-    assert len(paths) >= 20, f"Unexpectedly low route count: {len(paths)}; paths={sorted(paths)}"
+    assert (
+        len(paths) >= 20
+    ), f"Unexpectedly low route count: {len(paths)}; {_route_debug_context(paths)}"
     critical = {
         "/",
         "/health",
