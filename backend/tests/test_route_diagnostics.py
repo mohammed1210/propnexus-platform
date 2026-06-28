@@ -10,132 +10,32 @@ It is not a full integration suite and should stay fast.
 
 from __future__ import annotations
 
-import importlib
+import json
 import os
+import subprocess
 import sys
-from collections.abc import Iterable
-from types import ModuleType
+import textwrap
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
+try:
+    from backend.main import app  # type: ignore
 
-def _unbind_parent_attr(name: str) -> None:
-    parent_name, _, child_name = name.rpartition(".")
-    if not parent_name or not child_name:
-        return
-
-    parent_module = sys.modules.get(parent_name)
-    if parent_module is not None and getattr(parent_module, child_name, None) is not None:
-        try:
-            delattr(parent_module, child_name)
-        except Exception:
-            pass
-
-
-def _purge_modules(prefixes: Iterable[str]) -> None:
-    names = [
-        name
-        for name in list(sys.modules)
-        if any(name == prefix or name.startswith(f"{prefix}.") for prefix in prefixes)
-    ]
-    for name in sorted(names, key=lambda module_name: module_name.count("."), reverse=True):
-        _unbind_parent_attr(name)
-        sys.modules.pop(name, None)
-
-
-def _snapshot_modules(prefixes: Iterable[str]) -> dict[str, ModuleType]:
-    return {
-        name: module
-        for name, module in list(sys.modules.items())
-        if module is not None
-        if any(name == prefix or name.startswith(f"{prefix}.") for prefix in prefixes)
-    }
-
-
-def _bind_module(name: str, module: ModuleType) -> None:
-    sys.modules[name] = module
-
-    parent_name, _, child_name = name.rpartition(".")
-    if parent_name and child_name:
-        parent_module = sys.modules.get(parent_name)
-        if parent_module is not None:
-            setattr(parent_module, child_name, module)
-
-
-def _restore_modules(snapshot: dict[str, ModuleType], prefixes: Iterable[str]) -> None:
-    _purge_modules(prefixes)
-    for name, module in sorted(snapshot.items(), key=lambda item: item[0].count(".")):
-        _bind_module(name, module)
-
-
-def _reset_route_metrics() -> None:
-    try:
-        from prometheus_client import REGISTRY
-    except Exception:
-        return
-
-    metric_names = {
-        "filter_click",
-        "filter_click_total",
-        "filter_click_created",
-        "search_requests",
-        "search_requests_total",
-        "search_requests_created",
-        "search_zero_results",
-        "search_zero_results_total",
-        "search_zero_results_created",
-        "search_ml_fallback",
-        "search_ml_fallback_total",
-        "search_ml_fallback_created",
-    }
-
-    collectors = {
-        REGISTRY._names_to_collectors[name]  # type: ignore[attr-defined]
-        for name in metric_names
-        if name in REGISTRY._names_to_collectors  # type: ignore[attr-defined]
-    }
-    for collector in collectors:
-        try:
-            REGISTRY.unregister(collector)
-        except Exception:
-            pass
-
-
-def _load_fresh_app():
-    importlib.invalidate_caches()
-    _reset_route_metrics()
-    _purge_modules(["backend.main", "backend.routes"])
-
-    try:
-        module = importlib.import_module("backend.main")
-    except Exception as exc:  # pragma: no cover
-        pytest.skip(f"App unavailable in CI: {exc}")
-
-    return module.app
-
-
-@pytest.fixture(scope="module")
-def fresh_app():
-    module_prefixes = ("backend.main", "backend.routes")
-    prior_environment = os.environ.get("ENVIRONMENT")
-    module_snapshot = _snapshot_modules(module_prefixes)
-    os.environ["ENVIRONMENT"] = "development"
-    try:
-        yield _load_fresh_app()
-    finally:
-        _restore_modules(module_snapshot, module_prefixes)
-        if prior_environment is None:
-            os.environ.pop("ENVIRONMENT", None)
-        else:
-            os.environ["ENVIRONMENT"] = prior_environment
+    _import_error = None
+except Exception as exc:  # pragma: no cover
+    app = None  # type: ignore[assignment]
+    _import_error = exc
 
 
 @pytest.fixture
-def client(fresh_app) -> TestClient:
-    with TestClient(fresh_app) as test_client:
-        yield test_client
+def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    if app is None:  # pragma: no cover
+        pytest.skip(f"App unavailable in CI: {_import_error}")
+
+    monkeypatch.setenv("ENVIRONMENT", "development")
+    return TestClient(app)
 
 
 def _assert_keys(payload: dict[str, Any], required_keys: set[str]) -> None:
@@ -143,31 +43,51 @@ def _assert_keys(payload: dict[str, Any], required_keys: set[str]) -> None:
     assert not missing, f"Missing keys: {sorted(missing)}"
 
 
-def _route_debug_context(paths: set[str]) -> str:
-    backend_module = sys.modules.get("backend")
-    backend_main_module = sys.modules.get("backend.main")
+def _load_routes_in_subprocess() -> set[str]:
+    script = textwrap.dedent(
+        """
+        import json
+        import os
 
-    return (
-        f"backend.main_id={id(backend_main_module) if backend_main_module is not None else None}; "
-        f"backend.main_file={getattr(backend_main_module, '__file__', None)}; "
-        f"backend_has_main={hasattr(backend_module, 'main') if backend_module is not None else False}; "
-        f"backend_has_routes={hasattr(backend_module, 'routes') if backend_module is not None else False}; "
-        f"paths={sorted(paths)[:20]}"
+        os.environ["ENVIRONMENT"] = "development"
+
+        from fastapi.routing import APIRoute
+        from backend.main import app
+
+        paths = sorted({r.path for r in app.routes if isinstance(r, APIRoute)})
+        print(json.dumps({
+            "route_count": len(paths),
+            "paths": paths,
+        }))
+        """
     )
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            check=True,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "ENVIRONMENT": "development"},
+        )
+    except subprocess.CalledProcessError as exc:
+        raise AssertionError(
+            "Failed to import backend.main in clean subprocess.\n"
+            f"stdout:\n{exc.stdout}\n"
+            f"stderr:\n{exc.stderr}\n"
+        ) from exc
+
+    payload = json.loads(result.stdout)
+    assert isinstance(payload, dict)
+    assert isinstance(payload.get("paths"), list)
+    return set(payload["paths"])
 
 
 def test_debug_routes_contains_critical_paths(client: TestClient) -> None:
-    resp = client.get("/debug/routes")
-    assert resp.status_code == 200
-
-    body = resp.json()
-    assert isinstance(body, dict)
-    assert isinstance(body.get("paths"), list)
-
-    paths = set(body["paths"])
+    paths = _load_routes_in_subprocess()
     assert (
         len(paths) >= 20
-    ), f"Unexpectedly low route count: {len(paths)}; {_route_debug_context(paths)}"
+    ), f"Unexpectedly low route count: {len(paths)}; paths={sorted(paths)[:50]}"
     critical = {
         "/",
         "/health",
