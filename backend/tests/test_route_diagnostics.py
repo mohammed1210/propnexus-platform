@@ -11,16 +11,84 @@ It is not a full integration suite and should stay fast.
 from __future__ import annotations
 
 import importlib
+import os
 import sys
+from collections.abc import Iterable
+from types import ModuleType
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 
 
+def _purge_modules(prefixes: Iterable[str]) -> None:
+    for name in list(sys.modules):
+        if any(name == prefix or name.startswith(f"{prefix}.") for prefix in prefixes):
+            sys.modules.pop(name, None)
+
+
+def _snapshot_modules(prefixes: Iterable[str]) -> dict[str, ModuleType]:
+    return {
+        name: module
+        for name, module in list(sys.modules.items())
+        if module is not None
+        if any(name == prefix or name.startswith(f"{prefix}.") for prefix in prefixes)
+    }
+
+
+def _bind_module(name: str, module: ModuleType) -> None:
+    sys.modules[name] = module
+
+    parent_name, _, child_name = name.rpartition(".")
+    if parent_name and child_name:
+        parent_module = sys.modules.get(parent_name)
+        if parent_module is not None:
+            setattr(parent_module, child_name, module)
+
+
+def _restore_modules(snapshot: dict[str, ModuleType], prefixes: Iterable[str]) -> None:
+    _purge_modules(prefixes)
+    for name, module in snapshot.items():
+        _bind_module(name, module)
+
+
+def _reset_route_metrics() -> None:
+    try:
+        from prometheus_client import REGISTRY
+    except Exception:
+        return
+
+    metric_names = {
+        "filter_click",
+        "filter_click_total",
+        "filter_click_created",
+        "search_requests",
+        "search_requests_total",
+        "search_requests_created",
+        "search_zero_results",
+        "search_zero_results_total",
+        "search_zero_results_created",
+        "search_ml_fallback",
+        "search_ml_fallback_total",
+        "search_ml_fallback_created",
+    }
+
+    collectors = {
+        REGISTRY._names_to_collectors[name]  # type: ignore[attr-defined]
+        for name in metric_names
+        if name in REGISTRY._names_to_collectors  # type: ignore[attr-defined]
+    }
+    for collector in collectors:
+        try:
+            REGISTRY.unregister(collector)
+        except Exception:
+            pass
+
+
 def _load_fresh_app():
     importlib.invalidate_caches()
-    sys.modules.pop("backend.main", None)
+    _reset_route_metrics()
+    _purge_modules(["backend.main", "backend.routes"])
 
     try:
         module = importlib.import_module("backend.main")
@@ -30,12 +98,25 @@ def _load_fresh_app():
     return module.app
 
 
-@pytest.fixture
-def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
-    # Keep diagnostics routes visible.
-    monkeypatch.setenv("ENVIRONMENT", "development")
+@pytest.fixture(scope="module")
+def fresh_app():
+    module_prefixes = ("backend.main", "backend.routes")
+    prior_environment = os.environ.get("ENVIRONMENT")
+    module_snapshot = _snapshot_modules(module_prefixes)
+    os.environ["ENVIRONMENT"] = "development"
+    try:
+        yield _load_fresh_app()
+    finally:
+        _restore_modules(module_snapshot, module_prefixes)
+        if prior_environment is None:
+            os.environ.pop("ENVIRONMENT", None)
+        else:
+            os.environ["ENVIRONMENT"] = prior_environment
 
-    with TestClient(_load_fresh_app()) as test_client:
+
+@pytest.fixture
+def client(fresh_app) -> TestClient:
+    with TestClient(fresh_app) as test_client:
         yield test_client
 
 
@@ -53,6 +134,7 @@ def test_debug_routes_contains_critical_paths(client: TestClient) -> None:
     assert isinstance(body.get("paths"), list)
 
     paths = set(body["paths"])
+    assert len(paths) >= 20, f"Unexpectedly low route count: {len(paths)}; paths={sorted(paths)}"
     critical = {
         "/",
         "/health",
