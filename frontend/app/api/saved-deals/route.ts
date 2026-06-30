@@ -86,7 +86,7 @@ function mergeMissing(target: Record<string, any>, source: Record<string, any>, 
   }
 }
 
-export async function GET(req: Request) {
+export async function GET(req?: Request) {
   const userId = await getSafeUserId();
   if (!userId) {
     return NextResponse.json(
@@ -96,7 +96,8 @@ export async function GET(req: Request) {
   }
 
   try {
-    const url = new URL(req.url || 'http://localhost/api/saved-deals');
+    // Unit tests call GET() directly without a Request; Next.js provides Request at runtime.
+    const url = new URL(req?.url || 'http://localhost/api/saved-deals');
     const propertyIdFilter = url.searchParams.get('property_id')?.trim();
 
     const dealsRes = await backendFetch(`/saved-deals?user_id=${encodeURIComponent(userId)}`, {
