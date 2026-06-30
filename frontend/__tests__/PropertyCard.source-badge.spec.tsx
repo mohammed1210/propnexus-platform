@@ -97,6 +97,74 @@ describe('PropertyCard source badge', () => {
     expect(badge).toHaveClass('bg-rose-100');
   });
 
+  it('renders user_submitted source as Manual deal with neutral badge styling', () => {
+    render(
+      <PropertyCard
+        p={{
+          id: 'manual-1',
+          title: 'Manual intake',
+          source: 'user_submitted',
+          location: 'Leeds',
+          price: 210000,
+        }}
+      />,
+    );
+
+    const badge = screen.getByText('Manual deal');
+    expect(badge).toHaveClass('bg-slate-100');
+  });
+
+  it('shows Details not provided when bedrooms and bathrooms are both missing', () => {
+    render(
+      <PropertyCard
+        p={{
+          id: 'manual-2',
+          title: 'Manual intake no details',
+          source: 'user_submitted',
+          location: 'Leeds',
+          price: 210000,
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Details not provided')).toBeInTheDocument();
+    expect(screen.queryByText(/— bd · — ba/i)).not.toBeInTheDocument();
+  });
+
+  it('shows only provided bed or bath values when one field is missing', () => {
+    const { rerender } = render(
+      <PropertyCard
+        p={{
+          id: 'manual-3',
+          title: 'Bedrooms only',
+          source: 'user_submitted',
+          location: 'Leeds',
+          price: 210000,
+          bedrooms: 3,
+        }}
+      />,
+    );
+
+    expect(screen.getByText('3 bd')).toBeInTheDocument();
+    expect(screen.queryByText(/ba$/i)).not.toBeInTheDocument();
+
+    rerender(
+      <PropertyCard
+        p={{
+          id: 'manual-4',
+          title: 'Bathrooms only',
+          source: 'user_submitted',
+          location: 'Leeds',
+          price: 210000,
+          bathrooms: 2,
+        }}
+      />,
+    );
+
+    expect(screen.getByText('2 ba')).toBeInTheDocument();
+    expect(screen.queryByText(/bd$/i)).not.toBeInTheDocument();
+  });
+
   it('renders trust badge chips from badges metadata', () => {
     render(
       <PropertyCard

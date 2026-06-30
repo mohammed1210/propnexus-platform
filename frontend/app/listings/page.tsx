@@ -876,7 +876,7 @@ function ListingsInner() {
         if (maxP !== undefined) params.set('max', String(maxP));
         if (beds !== undefined) params.set('beds', String(beds));
         if (baths !== undefined) params.set('baths', String(baths));
-        // Investment type filtering can be inconsistent in scraped datasets.
+        // Investment type filtering can be inconsistent in imported listing datasets.
         // We keep the UI chips, but apply them client-side so they never feel “broken”.
         params.set('sort', sort);
         params.set('limit', String(limit));
@@ -1077,11 +1077,21 @@ function ListingsInner() {
       .replace(/[-_]/g, '');
   }, []);
 
+  const publicRows = useMemo(
+    () => rows.filter((p) => String(p.source ?? '').trim().toLowerCase() !== 'user_submitted'),
+    [rows],
+  );
+
+  const publicMapRows = useMemo(
+    () => (mapRows ?? []).filter((p) => String(p.source ?? '').trim().toLowerCase() !== 'user_submitted'),
+    [mapRows],
+  );
+
   const typeFilteredRows = useMemo(() => {
-    if (!investmentTypeUrl) return rows;
+    if (!investmentTypeUrl) return publicRows;
     const selected = normInv(investmentTypeUrl);
-    return rows.filter((p) => normInv(p.investment_type) === selected);
-  }, [investmentTypeUrl, normInv, rows]);
+    return publicRows.filter((p) => normInv(p.investment_type) === selected);
+  }, [investmentTypeUrl, normInv, publicRows]);
 
   const highConfidenceTopDeals = useMemo(
     () => typeFilteredRows.filter((p) => ['prime', 'strong'].includes(String(p.top_deal_tier || p.top_deal?.tier || '').toLowerCase())),
@@ -1095,10 +1105,10 @@ function ListingsInner() {
 
   const typeFilteredMapRows = useMemo(() => {
     if (!mapRows) return typeFilteredRows;
-    if (!investmentTypeUrl) return mapRows;
+    if (!investmentTypeUrl) return publicMapRows;
     const selected = normInv(investmentTypeUrl);
-    return mapRows.filter((p) => normInv(p.investment_type) === selected);
-  }, [investmentTypeUrl, mapRows, normInv, typeFilteredRows]);
+    return publicMapRows.filter((p) => normInv(p.investment_type) === selected);
+  }, [investmentTypeUrl, mapRows, normInv, publicMapRows, typeFilteredRows]);
 
   // ✅ robust points creation (no falsy checks, reject invalid/null-island)
   const points = useMemo(() => {
@@ -1220,7 +1230,7 @@ function ListingsInner() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(data?.detail || data?.error || `Scrape failed (${res.status})`);
+        throw new Error(data?.detail || data?.error || `Import failed (${res.status})`);
       }
 
       const c =
@@ -1229,12 +1239,12 @@ function ListingsInner() {
           : typeof data?.count === 'number'
             ? data.count
             : 0;
-      setScrapeMsg(`Scrape complete: imported ${c} listings for “${loc}”. Refreshing…`);
+      setScrapeMsg(`Admin import complete: imported ${c} listings for “${loc}”. Refreshing…`);
 
       // refresh the listings fetch
       setRefreshNonce((n) => n + 1);
     } catch (e: any) {
-      setScrapeErr(e?.message || 'Scrape failed');
+      setScrapeErr(e?.message || 'Import failed');
     } finally {
       setScrapeLoading(false);
     }
@@ -1833,9 +1843,9 @@ function ListingsInner() {
                     onClick={runScrape}
                     className="h-10 px-3 md:px-4 rounded-lg border border-brand-300 dark:border-brand-700 bg-white dark:bg-slate-800 text-brand-700 dark:text-brand-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 font-semibold transition-all duration-200"
                     disabled={scrapeLoading}
-                    title="Admin: run scrapers and import fresh listings"
+                    title="Admin: run listing import and refresh inventory"
                   >
-                  {scrapeLoading ? 'Running…' : 'Run Scrape'}
+                  {scrapeLoading ? 'Running…' : 'Run Import'}
                   </button>
                 )}
               </div>
@@ -1986,14 +1996,9 @@ function ListingsInner() {
                 {sort === 'top_deals' && watchlistTopDeals.length > 0 ? (
                   <p className="mt-2 text-sm text-slate-500">{watchlistTopDeals.length} watchlist leads are available, but they do not meet Top Deal confidence yet.</p>
                 ) : null}
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                  <button onClick={resetFilters} className="btn-primary">
-                    Clear Filters
-                  </button>
-                  <Link href="/analyse" className="rounded-md border border-slate-300 dark:border-slate-700 px-5 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors inline-flex">
-                    Analyse your own deal instead
-                  </Link>
-                </div>
+                <button onClick={resetFilters} className="btn-primary mt-4">
+                  Clear Filters
+                </button>
               </div>
             ) : (
               <>
@@ -2064,14 +2069,9 @@ function ListingsInner() {
                   <p className="text-xl text-slate-600 dark:text-slate-400">
                     {sort === 'top_deals' ? 'No high-confidence Top Deals surfaced in this search yet.' : 'No properties match these filters.'}
                   </p>
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                    <button onClick={resetFilters} className="btn-primary">
-                      Clear Filters
-                    </button>
-                    <Link href="/analyse" className="rounded-md border border-slate-300 dark:border-slate-700 px-5 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors inline-flex">
-                      Analyse your own deal instead
-                    </Link>
-                  </div>
+                  <button onClick={resetFilters} className="btn-primary mt-4">
+                    Clear Filters
+                  </button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

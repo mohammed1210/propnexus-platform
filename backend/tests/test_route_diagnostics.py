@@ -10,6 +10,11 @@ It is not a full integration suite and should stay fast.
 
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+import sys
+import textwrap
 from typing import Any
 
 import pytest
@@ -19,9 +24,9 @@ try:
     from backend.main import app  # type: ignore
 
     _import_error = None
-except Exception as e:  # pragma: no cover
+except Exception as exc:  # pragma: no cover
     app = None  # type: ignore[assignment]
-    _import_error = e
+    _import_error = exc
 
 
 @pytest.fixture
@@ -29,7 +34,6 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     if app is None:  # pragma: no cover
         pytest.skip(f"App unavailable in CI: {_import_error}")
 
-    # Keep diagnostics routes visible.
     monkeypatch.setenv("ENVIRONMENT", "development")
     return TestClient(app)
 
@@ -39,15 +43,90 @@ def _assert_keys(payload: dict[str, Any], required_keys: set[str]) -> None:
     assert not missing, f"Missing keys: {sorted(missing)}"
 
 
+def _load_routes_in_subprocess() -> dict[str, Any]:
+    script = textwrap.dedent(
+        """
+        import json
+        import os
+        import sys
+        import traceback
+
+        payload = {
+            "cwd": os.getcwd(),
+            "python": sys.executable,
+            "sys_path_first": sys.path[:10],
+            "ENVIRONMENT": os.environ.get("ENVIRONMENT"),
+            "CI": os.environ.get("CI"),
+            "PYTHONPATH": os.environ.get("PYTHONPATH"),
+        }
+
+        try:
+            import backend
+
+            payload["backend_file"] = getattr(backend, "__file__", None)
+            payload["backend_path"] = list(getattr(backend, "__path__", []))
+        except Exception:
+            payload["backend_import_error"] = traceback.format_exc()
+
+        try:
+            import backend.main as main
+
+            payload["backend_main_file"] = getattr(main, "__file__", None)
+            payload["backend_main_id"] = id(main)
+            for name in [
+                "ai_router",
+                "properties_router",
+                "save_deal_router",
+                "area_intel_router",
+                "comps_router",
+                "gpt_router",
+            ]:
+                payload[f"has_{name}"] = hasattr(main, name)
+
+            app = main.app
+            route_details = main._collect_registered_route_details()
+            paths = sorted(
+                {
+                    route["path"]
+                    for route in route_details
+                    if isinstance(route, dict) and isinstance(route.get("path"), str)
+                }
+            )
+            payload["route_detail_count"] = len(route_details)
+            payload["route_count"] = len(paths)
+            payload["paths"] = paths
+        except Exception:
+            payload["main_import_error"] = traceback.format_exc()
+
+        print(json.dumps(payload))
+        """
+    )
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            check=True,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "ENVIRONMENT": "development"},
+        )
+    except subprocess.CalledProcessError as exc:
+        raise AssertionError(
+            "Failed to import backend.main in clean subprocess.\n"
+            f"stdout:\n{exc.stdout}\n"
+            f"stderr:\n{exc.stderr}\n"
+        ) from exc
+
+    payload = json.loads(result.stdout)
+    assert isinstance(payload, dict)
+    assert isinstance(payload.get("paths"), list)
+    return payload
+
+
 def test_debug_routes_contains_critical_paths(client: TestClient) -> None:
-    resp = client.get("/debug/routes")
-    assert resp.status_code == 200
-
-    body = resp.json()
-    assert isinstance(body, dict)
-    assert isinstance(body.get("paths"), list)
-
-    paths = set(body["paths"])
+    payload = _load_routes_in_subprocess()
+    paths = set(payload["paths"])
+    assert len(paths) >= 20, json.dumps(payload, indent=2, sort_keys=True)
     critical = {
         "/",
         "/health",
