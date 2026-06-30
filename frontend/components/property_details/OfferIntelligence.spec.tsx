@@ -52,6 +52,7 @@ describe('OfferIntelligence', () => {
     );
 
     expect(screen.getByText('Estimate/missing — not treated as a rent comp')).toBeInTheDocument();
-    expect(screen.getByText('Insufficient rent evidence to calculate a reliable offer target.')).toBeInTheDocument();
+    expect(screen.getByText('Add verified rent evidence to unlock a reliable target offer and walk-away price.')).toBeInTheDocument();
+    expect(screen.getByText('Manual deal records can still be analysed, but target offer calculations are withheld until rent/comparable evidence is available.')).toBeInTheDocument();
   });
 });

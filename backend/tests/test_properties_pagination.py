@@ -80,6 +80,7 @@ class _FilteringQuery:
         self._rows = rows
         self._source_eq: str | None = None
         self._exclude_spareroom = False
+        self._exclude_user_submitted = False
         self._range: tuple[int, int] | None = None
         self._orders: list[tuple[str, bool]] = []
         self.calls: List[Tuple[str, tuple, dict]] = []
@@ -98,11 +99,18 @@ class _FilteringQuery:
         self.calls.append(("neq", args, kwargs))
         if args == ("source", "spareroom"):
             self._exclude_spareroom = True
+        if args == ("source", "user_submitted"):
+            self._exclude_user_submitted = True
         return self
 
     def or_(self, *args, **kwargs):
         self.calls.append(("or_", args, kwargs))
         if args and args[0] == "source.is.null,source.neq.spareroom":
+            self._exclude_spareroom = True
+        if args and args[0] == "source.is.null,source.neq.user_submitted":
+            self._exclude_user_submitted = True
+        if args and args[0] == "source.is.null,and(source.neq.user_submitted,source.neq.spareroom)":
+            self._exclude_user_submitted = True
             self._exclude_spareroom = True
         return self
 
@@ -132,8 +140,20 @@ class _FilteringQuery:
         rows = list(self._rows)
         if self._source_eq is not None:
             rows = [r for r in rows if str(r.get("source") or "").lower() == self._source_eq]
-        elif self._exclude_spareroom:
-            rows = [r for r in rows if str(r.get("source") or "").lower() != "spareroom"]
+        else:
+            if self._exclude_user_submitted:
+                rows = [
+                    r
+                    for r in rows
+                    if r.get("source") is None
+                    or str(r.get("source") or "").lower() != "user_submitted"
+                ]
+            if self._exclude_spareroom:
+                rows = [
+                    r
+                    for r in rows
+                    if r.get("source") is None or str(r.get("source") or "").lower() != "spareroom"
+                ]
 
         def _sort_value(row: dict[str, Any], column: str):
             value = row.get(column)
@@ -321,3 +341,62 @@ def test_list_properties_allows_explicit_spareroom_opt_in_and_source(monkeypatch
     )
     assert spare_only["total"] == 1
     assert [item["id"] for item in spare_only["items"]] == ["spare-1"]
+
+
+def test_list_properties_hides_user_submitted_but_keeps_null_source(monkeypatch):
+    rows = [
+        {"id": "manual-1", "title": "Manual deal", "source": "user_submitted", "price": 120000},
+        {"id": "null-1", "title": "Unknown source", "source": None, "price": 130000},
+        {"id": "portal-1", "title": "Portal row", "source": "rightmove", "price": 140000},
+    ]
+    fake_sb = _FilteringSupabase(rows)
+    monkeypatch.setattr(properties_routes, "_get_supabase", lambda: fake_sb)
+
+    res = properties_routes.list_properties(
+        response=Response(),
+        q=None,
+        source=None,
+        created_after=None,
+        min=None,
+        max=None,
+        beds=None,
+        baths=None,
+        types=None,
+        limit=25,
+        offset=0,
+        sort="price_asc",
+        dir="desc",
+    )
+
+    ids = [item["id"] for item in res["items"]]
+    assert "manual-1" not in ids
+    assert "null-1" in ids
+    assert "portal-1" in ids
+
+
+def test_list_properties_allows_explicit_user_submitted_source(monkeypatch):
+    rows = [
+        {"id": "manual-1", "title": "Manual deal", "source": "user_submitted", "price": 120000},
+        {"id": "portal-1", "title": "Portal row", "source": "rightmove", "price": 140000},
+    ]
+    fake_sb = _FilteringSupabase(rows)
+    monkeypatch.setattr(properties_routes, "_get_supabase", lambda: fake_sb)
+
+    res = properties_routes.list_properties(
+        response=Response(),
+        q=None,
+        source="user_submitted",
+        created_after=None,
+        min=None,
+        max=None,
+        beds=None,
+        baths=None,
+        types=None,
+        limit=25,
+        offset=0,
+        sort="price_asc",
+        dir="desc",
+    )
+
+    assert res["total"] == 1
+    assert [item["id"] for item in res["items"]] == ["manual-1"]
