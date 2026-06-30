@@ -1,3 +1,4 @@
+from backend.utils.deal_signals import extract_deal_signals
 from backend.utils.property_type_classifier import classify_property_type
 
 
@@ -91,3 +92,45 @@ def test_property_type_noise_community_not_commercial_unit():
         extra=None,
     )
     assert pt == "Other"
+
+
+def test_normalised_property_type_semi_detached_from_description():
+    out = classify_property_type(
+        {
+            "title": "3 bedroom house for sale",
+            "description": "A well-presented semi-detached family home",
+        }
+    )
+    assert out["normalised_property_type"] == "semi_detached"
+    assert out["property_type_source"] == "description"
+    assert "semi-detached" in out["matched_type_terms"]
+
+
+def test_normalised_property_type_prefers_flat_title_over_apartment_description():
+    out = classify_property_type(
+        {
+            "title": "2 bedroom flat for sale",
+            "description": "A bright apartment with balcony",
+        }
+    )
+    assert out["normalised_property_type"] == "flat"
+    assert out["property_type_source"] == "title"
+
+
+def test_normalised_property_type_ignores_detached_garage_false_positive():
+    out = classify_property_type({"description": "Detached garage to rear"})
+    assert out["normalised_property_type"] != "detached"
+
+
+def test_normalised_property_type_ignores_semi_rural_false_positive():
+    out = classify_property_type({"description": "Semi-rural location"})
+    assert out["normalised_property_type"] != "semi_detached"
+
+
+def test_deal_signal_keywords_include_modernisation_and_chain_free():
+    out = extract_deal_signals({"description": "In need of modernisation and offered chain free"})
+    assert "needs_refurb" in out["signals"]
+    assert "chain_free" in out["signals"]
+    assert "modernisation" in out["deal_keywords"]
+    assert "chain free" in out["deal_keywords"]
+    assert any(signal["type"] == "value_add" for signal in out["investment_signals"])

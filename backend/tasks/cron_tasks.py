@@ -42,6 +42,9 @@ async def daily_scrape() -> None:
     from scraper.spare_room_scraper import scrape_spareroom_properties
     from scraper.zoopla_scraper import scrape_zoopla_properties
 
+    from backend.utils.deal_signals import extract_deal_signals
+    from backend.utils.property_type_classifier import classify_property_type_enrichment
+
     # Feature flags to enable/disable individual scrapers without code changes.
     ENABLE_ZOOPLA = os.getenv("ENABLE_ZOOPLA_SCRAPER", "true").lower() == "true"
     ENABLE_OTM = os.getenv("ENABLE_ONTHEMARKET_SCRAPER", "false").lower() == "true"
@@ -126,8 +129,17 @@ async def daily_scrape() -> None:
                 "imageurl",
                 "image_urls",  # keep if your table supports this
                 "property_type",
+                "raw_property_type",
+                "normalised_property_type",
+                "property_type_confidence",
+                "property_type_source",
+                "property_type_mismatch",
+                "matched_type_terms",
+                "deal_keywords",
+                "investment_signals",
                 "source",
                 "location",
+                "data",
             }
 
             payload: list[dict] = []
@@ -149,6 +161,32 @@ async def daily_scrape() -> None:
                             mapped["imageurl"] = urls[0]
                     except Exception:
                         pass
+
+                try:
+                    type_enrichment = classify_property_type_enrichment(mapped)
+                    mapped.update(type_enrichment)
+                    data_obj = mapped.get("data")
+                    if not isinstance(data_obj, dict):
+                        data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+                    for key, value in type_enrichment.items():
+                        if value not in (None, ""):
+                            data_obj[key] = value
+                    mapped["data"] = data_obj
+                except Exception:
+                    pass
+
+                try:
+                    deal_enrichment = extract_deal_signals(mapped)
+                    mapped["deal_keywords"] = deal_enrichment.get("deal_keywords")
+                    mapped["investment_signals"] = deal_enrichment.get("investment_signals")
+                    data_obj = mapped.get("data")
+                    if not isinstance(data_obj, dict):
+                        data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+                    data_obj["deal_keywords"] = mapped.get("deal_keywords")
+                    data_obj["investment_signals"] = mapped.get("investment_signals")
+                    mapped["data"] = data_obj
+                except Exception:
+                    pass
 
                 # Drop any fields that are not present in the table schema
                 mapped = {k: v for k, v in mapped.items() if k in allowed_keys}

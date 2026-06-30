@@ -10,6 +10,7 @@
     "closeMenu": "Close menu",
     "nav": {
       "home": "Home",
+      "analyse": "Analyse Deal",
       "listings": "Listings",
       "savedDeals": "Saved Deals",
       "offMarket": "Off-Market",
