@@ -31,6 +31,7 @@ describe('WhySurfaced', () => {
     expect(screen.getAllByText(/Price reduction found/i).length).toBeGreaterThan(0);
     expect(screen.getByText('Comps evidence')).toBeInTheDocument();
     expect(screen.getByText(/Sold comps available/i)).toBeInTheDocument();
+    expect(screen.getByText(/Discovery score ranks available deal-discovery signals, not investment suitability/i)).toBeInTheDocument();
   });
 
   it('does not render unsupported BMV claims without comps evidence', () => {

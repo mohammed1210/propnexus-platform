@@ -94,20 +94,20 @@ export default function HomePage() {
             {/* Badge */}
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 backdrop-blur-sm lg:mb-4">
               <FiZap className="w-4 h-4 text-white" />
-              <span className="text-xs font-semibold tracking-[0.16em] text-white sm:text-sm">AI-Powered Property Platform</span>
+              <span className="text-xs font-semibold tracking-[0.16em] text-white sm:text-sm">AI Deal Desk for UK Property Investors</span>
             </div>
 
             {/* Headline */}
             <h1 className="mb-4 text-4xl font-bold leading-[1.02] text-white sm:text-5xl lg:mb-4 lg:text-6xl xl:text-[4rem]">
-              Discover Your Next
+              Analyse Any UK
               <br />
               <span className="bg-gradient-to-r from-white to-cyan-100 bg-clip-text text-transparent">
-                Investment Property
+                Property Deal Before You Offer
               </span>
             </h1>
 
             <p className="mb-14 max-w-2xl text-lg leading-7 text-brand-50 sm:text-xl lg:mx-0 lg:mb-12 xl:text-[1.35rem] xl:leading-8">
-              Smart property sourcing powered by AI. Analyze yields, calculate ROI, and find the perfect investment with confidence.
+              Paste a listing link or enter the key details to generate an investor-ready Deal Pack, offer range context, and risk-first analysis.
             </p>
 
             {/* Search Form */}
@@ -140,18 +140,22 @@ export default function HomePage() {
             {/* CTA Buttons */}
             <div className="mb-8 flex flex-col items-center justify-center gap-3 sm:flex-row lg:mb-7 lg:justify-start">
               <Link
-                href="/listings"
+                href="/analyse"
                 className="btn-primary px-7 py-3 text-base lg:text-lg"
+              >
+                Analyse a deal
+              </Link>
+              <Link
+                href="/listings"
+                className="btn-secondary border-2 border-white/50 bg-white/10 px-7 py-3 text-base text-white backdrop-blur-sm hover:bg-white/20 lg:text-lg"
               >
                 Browse listings
               </Link>
-              <Link
-                href="/pricing"
-                className="btn-secondary border-2 border-white/50 bg-white/10 px-7 py-3 text-base text-white backdrop-blur-sm hover:bg-white/20 lg:text-lg"
-              >
-                View Pricing
-              </Link>
             </div>
+
+            <p className="mb-6 max-w-2xl text-sm leading-6 text-brand-100 lg:mb-5">
+              You provide the property information. PropNexus enriches it using available public, licensed and user-supplied data.
+            </p>
 
             {/* Stats */}
             <div className="grid max-w-3xl grid-cols-1 gap-4 rounded-3xl border border-white/15 bg-white/10 p-5 backdrop-blur-md sm:grid-cols-3 sm:gap-5 lg:mx-0 lg:max-w-2xl lg:bg-white/12 lg:p-4">
@@ -216,10 +220,10 @@ export default function HomePage() {
             Join thousands of investors who trust PropNexus to find their next property.
           </p>
           <Link
-            href="/magic-login"
+            href="/analyse"
             className="btn-primary text-lg px-8 py-4"
           >
-            <span>Get Started Free</span>
+            <span>Generate Deal Pack</span>
             <FiZap className="w-5 h-5" />
           </Link>
         </div>

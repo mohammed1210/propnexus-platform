@@ -15,6 +15,13 @@ function fmtPct(n: unknown): string {
 }
 
 export default function OfferIntelligence({ intel, loading = false }: { intel: InvestorIntel | null; loading?: boolean }) {
+  const hasVerifiedRentEvidence = Boolean(intel?.rent_evidence?.is_real_rent_evidence);
+  const rawConclusion = typeof intel?.conclusion === 'string' ? intel.conclusion.trim() : '';
+  const conclusionText =
+    !hasVerifiedRentEvidence && /insufficient rent evidence/i.test(rawConclusion)
+      ? 'Add verified rent evidence to unlock a reliable target offer and walk-away price.'
+      : rawConclusion;
+
   const body = loading ? (
     <div className="animate-pulse space-y-3">
       <div className="h-20 rounded-2xl bg-slate-200 dark:bg-slate-800" />
@@ -67,7 +74,12 @@ export default function OfferIntelligence({ intel, loading = false }: { intel: I
 
       <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm dark:border-brand-900/60 dark:bg-brand-950/20">
         <div className="font-black text-brand-900 dark:text-brand-100">Conclusion</div>
-        <p className="mt-1 text-brand-800 dark:text-brand-200">{intel.conclusion}</p>
+        <p className="mt-1 text-brand-800 dark:text-brand-200">{conclusionText}</p>
+        {!hasVerifiedRentEvidence ? (
+          <p className="mt-2 text-brand-700 dark:text-brand-200/90">
+            Manual deal records can still be analysed, but target offer calculations are withheld until rent/comparable evidence is available.
+          </p>
+        ) : null}
       </div>
       <div className="text-xs text-slate-500 dark:text-slate-400">
         Comparable median: {fmtGBP(intel.sold_comp_benchmark?.median_similar_price)} · Difference: {fmtGBP(Math.abs(Number(intel.sold_comp_benchmark?.subject_vs_median_amount || 0)))} ({fmtPct(intel.sold_comp_benchmark?.subject_vs_median_pct)}) · {intel.sold_comp_benchmark?.benchmark_confidence || 'weak'} comp set

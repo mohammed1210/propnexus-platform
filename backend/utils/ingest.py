@@ -39,7 +39,10 @@ from backend.utils.property_quality import (
     normalize_source_value,
     should_replace_postcode,
 )
-from backend.utils.property_type_classifier import classify_property_type
+from backend.utils.property_type_classifier import (
+    classify_property_type,
+    classify_property_type_enrichment,
+)
 from backend.utils.supabase_client import get_supabase
 from supabase import Client
 
@@ -396,6 +399,17 @@ OPTIONAL_COLUMNS = {
     # Optional columns (may not exist in all schemas).
     "property_type",
     "raw_property_type",
+    "normalised_property_type",
+    "property_type_confidence",
+    "property_type_source",
+    "property_type_mismatch",
+    "matched_type_terms",
+    "deal_signals",
+    "deal_reasons",
+    "deal_signals_meta",
+    "discount_estimate_pct",
+    "deal_keywords",
+    "investment_signals",
 }
 
 
@@ -549,18 +563,33 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
             normalized.get("description"),
             raw_type_s,
             extra=raw,
-        )
+        )  # type: ignore[misc]
+        type_enrichment = classify_property_type_enrichment({**raw, **normalized})
 
         normalized["property_type"] = prop_type
-        if raw_type_best:
-            normalized["raw_property_type"] = raw_type_best
+        raw_type_final = type_enrichment.get("raw_property_type") or raw_type_best
+        if raw_type_final:
+            normalized["raw_property_type"] = raw_type_final
+        normalized["normalised_property_type"] = type_enrichment.get("normalised_property_type")
+        normalized["property_type_confidence"] = type_enrichment.get("property_type_confidence")
+        normalized["property_type_source"] = type_enrichment.get("property_type_source")
+        normalized["property_type_mismatch"] = type_enrichment.get("property_type_mismatch")
+        normalized["matched_type_terms"] = type_enrichment.get("matched_type_terms")
 
         data_obj = normalized.get("data")
         if not isinstance(data_obj, dict):
             data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
         data_obj["property_type"] = prop_type
-        if raw_type_best:
-            data_obj["raw_property_type"] = raw_type_best
+        for key in (
+            "raw_property_type",
+            "normalised_property_type",
+            "property_type_confidence",
+            "property_type_source",
+            "property_type_mismatch",
+            "matched_type_terms",
+        ):
+            if type_enrichment.get(key) not in (None, ""):
+                data_obj[key] = type_enrichment.get(key)
         normalized["data"] = data_obj
     except Exception:
         pass
@@ -597,11 +626,24 @@ def normalize_record(raw: Dict[str, Any], source: str) -> Dict[str, Any]:
         if isinstance(extracted, dict):
             normalized["deal_signals"] = extracted.get("signals")
             normalized["deal_reasons"] = extracted.get("reasons")
+            normalized["deal_keywords"] = extracted.get("deal_keywords")
+            normalized["investment_signals"] = extracted.get("investment_signals")
             normalized["discount_estimate_pct"] = extracted.get("discount_estimate_pct")
             normalized["deal_signals_meta"] = {
                 "confidence": extracted.get("confidence"),
                 "matched_terms": extracted.get("matched_terms"),
             }
+
+            data_obj = normalized.get("data")
+            if not isinstance(data_obj, dict):
+                data_obj = {} if data_obj in (None, "") else {"raw": data_obj}
+            data_obj["deal_signals"] = normalized.get("deal_signals")
+            data_obj["deal_reasons"] = normalized.get("deal_reasons")
+            data_obj["deal_keywords"] = normalized.get("deal_keywords")
+            data_obj["investment_signals"] = normalized.get("investment_signals")
+            data_obj["discount_estimate_pct"] = normalized.get("discount_estimate_pct")
+            data_obj["deal_signals_meta"] = normalized.get("deal_signals_meta")
+            normalized["data"] = data_obj
 
             lease_years_remaining = extracted.get("lease_years_remaining")
             if lease_years_remaining is not None:

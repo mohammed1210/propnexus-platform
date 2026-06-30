@@ -53,7 +53,10 @@ from backend.utils.listing_keys import (
 )
 from backend.utils.postcode import get_lat_lng_from_postcode
 from backend.utils.ppd_comps import get_sold_comps_summary
-from backend.utils.property_type_classifier import classify_property_type
+from backend.utils.property_type_classifier import (
+    classify_property_type,
+    classify_property_type_enrichment,
+)
 from backend.utils.scrape_runs import create_scrape_run, finish_scrape_run, update_scrape_run_data
 from backend.utils.top_deal_ranker import apply_top_deal_ranking
 
@@ -1055,6 +1058,12 @@ def _upsert_properties_rows(
             cleaned["deal_reasons"] = (
                 extracted.get("reasons") if isinstance(extracted, dict) else []
             )
+            cleaned["deal_keywords"] = (
+                extracted.get("deal_keywords") if isinstance(extracted, dict) else []
+            )
+            cleaned["investment_signals"] = (
+                extracted.get("investment_signals") if isinstance(extracted, dict) else []
+            )
             cleaned["discount_estimate_pct"] = (
                 extracted.get("discount_estimate_pct") if isinstance(extracted, dict) else None
             )
@@ -1117,15 +1126,30 @@ def _upsert_properties_rows(
                 cleaned.get("description"),
                 raw_s,
                 extra=data_obj,
-            )
+            )  # type: ignore[misc]
+            type_enrichment = classify_property_type_enrichment(cleaned)
 
             cleaned["property_type"] = normalized_pt
-            if raw_pt:
-                cleaned["raw_property_type"] = raw_pt
+            raw_pt_final = type_enrichment.get("raw_property_type") or raw_pt
+            if raw_pt_final:
+                cleaned["raw_property_type"] = raw_pt_final
+            cleaned["normalised_property_type"] = type_enrichment.get("normalised_property_type")
+            cleaned["property_type_confidence"] = type_enrichment.get("property_type_confidence")
+            cleaned["property_type_source"] = type_enrichment.get("property_type_source")
+            cleaned["property_type_mismatch"] = type_enrichment.get("property_type_mismatch")
+            cleaned["matched_type_terms"] = type_enrichment.get("matched_type_terms")
 
             data_obj["property_type"] = normalized_pt
-            if raw_pt:
-                data_obj["raw_property_type"] = raw_pt
+            for key in (
+                "raw_property_type",
+                "normalised_property_type",
+                "property_type_confidence",
+                "property_type_source",
+                "property_type_mismatch",
+                "matched_type_terms",
+            ):
+                if type_enrichment.get(key) not in (None, ""):
+                    data_obj[key] = type_enrichment.get(key)
             cleaned["data"] = data_obj
         except Exception:
             # Never fail ingestion due to property-type classification.
@@ -1159,6 +1183,12 @@ def _upsert_properties_rows(
         "bedrooms",
         "bathrooms",
         "property_type",
+        "raw_property_type",
+        "normalised_property_type",
+        "property_type_confidence",
+        "property_type_source",
+        "property_type_mismatch",
+        "matched_type_terms",
         "address",
         "postcode",
         "latitude",
@@ -1199,6 +1229,12 @@ def _upsert_properties_rows(
         "top_deal_tier",
         "top_deal_reasons",
         "search_metadata",
+        "deal_signals",
+        "deal_reasons",
+        "deal_signals_meta",
+        "discount_estimate_pct",
+        "deal_keywords",
+        "investment_signals",
     }
 
     db_prepared: list[Dict[str, Any]] = []
@@ -1216,6 +1252,14 @@ def _upsert_properties_rows(
             "deal_reasons",
             "deal_signals_meta",
             "discount_estimate_pct",
+            "deal_keywords",
+            "investment_signals",
+            "raw_property_type",
+            "normalised_property_type",
+            "property_type_confidence",
+            "property_type_source",
+            "property_type_mismatch",
+            "matched_type_terms",
         )
         if any(f in row for f in deal_fields):
             data_obj = db_row.get("data")
@@ -1289,6 +1333,8 @@ def _upsert_properties_rows(
                         "deal_reasons",
                         "deal_signals_meta",
                         "discount_estimate_pct",
+                        "deal_keywords",
+                        "investment_signals",
                     ],
                 )
 
@@ -1301,6 +1347,8 @@ def _upsert_properties_rows(
                     deal_reasons = original.get("deal_reasons")
                     deal_meta = original.get("deal_signals_meta")
                     discount_est = original.get("discount_estimate_pct")
+                    deal_keywords = original.get("deal_keywords")
+                    investment_signals = original.get("investment_signals")
                     lease_years_remaining = None
                     data_original = original.get("data")
                     if isinstance(data_original, dict):
@@ -1314,6 +1362,8 @@ def _upsert_properties_rows(
                     data_obj["deal_reasons"] = deal_reasons
                     data_obj["deal_signals_meta"] = deal_meta
                     data_obj["discount_estimate_pct"] = discount_est
+                    data_obj["deal_keywords"] = deal_keywords
+                    data_obj["investment_signals"] = investment_signals
                     if lease_years_remaining is not None:
                         data_obj["lease_years_remaining"] = lease_years_remaining
 
@@ -1326,11 +1376,31 @@ def _upsert_properties_rows(
                 return False, str(e4)
 
         # Property type columns may not exist; we already embed into `data`.
-        if ("property_type" in msg or "raw_property_type" in msg) and (
-            "PGRST204" in msg or "Could not find" in msg
-        ):
+        if any(
+            f in msg
+            for f in (
+                "property_type",
+                "raw_property_type",
+                "normalised_property_type",
+                "property_type_confidence",
+                "property_type_source",
+                "property_type_mismatch",
+                "matched_type_terms",
+            )
+        ) and ("PGRST204" in msg or "Could not find" in msg):
             try:
-                stripped = _strip_fields(prepared, ["property_type", "raw_property_type"])
+                stripped = _strip_fields(
+                    prepared,
+                    [
+                        "property_type",
+                        "raw_property_type",
+                        "normalised_property_type",
+                        "property_type_confidence",
+                        "property_type_source",
+                        "property_type_mismatch",
+                        "matched_type_terms",
+                    ],
+                )
                 sb.table("properties").upsert(stripped, on_conflict=on_conflict).execute()
                 return True, None
             except Exception as e5:
