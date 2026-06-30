@@ -69,7 +69,6 @@ def _load_routes_in_subprocess() -> dict[str, Any]:
             payload["backend_import_error"] = traceback.format_exc()
 
         try:
-            from fastapi.routing import APIRoute
             import backend.main as main
 
             payload["backend_main_file"] = getattr(main, "__file__", None)
@@ -85,7 +84,15 @@ def _load_routes_in_subprocess() -> dict[str, Any]:
                 payload[f"has_{name}"] = hasattr(main, name)
 
             app = main.app
-            paths = sorted({r.path for r in app.routes if isinstance(r, APIRoute)})
+            route_details = main._collect_registered_route_details()
+            paths = sorted(
+                {
+                    route["path"]
+                    for route in route_details
+                    if isinstance(route, dict) and isinstance(route.get("path"), str)
+                }
+            )
+            payload["route_detail_count"] = len(route_details)
             payload["route_count"] = len(paths)
             payload["paths"] = paths
         except Exception:
