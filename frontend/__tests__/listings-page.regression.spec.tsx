@@ -171,4 +171,37 @@ describe('Listings page regressions', () => {
     expect(requestedUrl).toContain('high_confidence_top_deals=1');
     expect(screen.queryByText('No high-confidence Top Deals surfaced in this search yet.')).not.toBeInTheDocument();
   });
+
+  it('hides user_submitted rows from the public listings grid by default', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        items: [
+          {
+            id: 'manual-1',
+            title: 'Manual Uploaded Deal',
+            source: 'user_submitted',
+            price: 170000,
+            created_at: '2026-06-25T00:00:00Z',
+          },
+          {
+            id: 'public-1',
+            title: 'Visible Rightmove',
+            source: 'rightmove',
+            price: 150000,
+            created_at: '2026-06-25T00:00:00Z',
+          },
+        ],
+        total: 2,
+        limit: 25,
+        offset: 0,
+        has_more: false,
+      }),
+    });
+
+    render(<ListingsPage />);
+
+    expect(await screen.findByText('Visible Rightmove')).toBeInTheDocument();
+    expect(screen.queryByText('Manual Uploaded Deal')).not.toBeInTheDocument();
+  });
 });

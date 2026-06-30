@@ -469,39 +469,56 @@ def test_list_properties_investment_type_brr_filters_python_side(mock_create_cli
 
 
 @patch("backend.routes.properties_routes.create_client")
-def test_list_properties_property_type_single_uses_in(mock_create_client, client):
+def test_list_properties_property_type_single_filters_resolved_type(mock_create_client, client):
     mock_sb = Mock()
     mock_query = Mock()
     mock_query.select.return_value = mock_query
     mock_query.range.return_value = mock_query
     mock_query.order.return_value = mock_query
     mock_query.in_.return_value = mock_query
-    mock_query.execute.return_value = Mock(data=[], count=0)
+    mock_query.execute.return_value = Mock(
+        data=[
+            {"id": "p1", "title": "3 bed terraced house", "property_type": "House"},
+            {"id": "p2", "title": "2 bedroom flat", "property_type": "Flat/Apartment"},
+        ],
+        count=2,
+    )
 
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
 
     response = client.get("/properties", params={"property_type": "Terraced"})
     assert response.status_code == 200
-    mock_query.in_.assert_called_once_with("property_type", ["Terraced"])
+    items = response.json().get("items") or []
+    assert [item["id"] for item in items] == ["p1"]
+    mock_query.in_.assert_not_called()
 
 
 @patch("backend.routes.properties_routes.create_client")
-def test_list_properties_property_type_csv_normalizes_and_uses_in(mock_create_client, client):
+def test_list_properties_property_type_csv_filters_resolved_types(mock_create_client, client):
     mock_sb = Mock()
     mock_query = Mock()
     mock_query.select.return_value = mock_query
     mock_query.range.return_value = mock_query
     mock_query.order.return_value = mock_query
     mock_query.in_.return_value = mock_query
-    mock_query.execute.return_value = Mock(data=[], count=0)
+    mock_query.execute.return_value = Mock(
+        data=[
+            {"id": "p1", "title": "3 bed terraced house", "property_type": "House"},
+            {"id": "p2", "title": "2 bedroom flat", "property_type": "Flat/Apartment"},
+            {"id": "p3", "title": "Detached garage to rear", "property_type": "House"},
+        ],
+        count=3,
+    )
 
     mock_sb.table.return_value = mock_query
     mock_create_client.return_value = mock_sb
 
     response = client.get("/properties", params={"property_type": "flat,terraced"})
     assert response.status_code == 200
-    mock_query.in_.assert_called_once_with("property_type", ["Flat/Apartment", "Terraced"])
+    items = response.json().get("items") or []
+    assert [item["id"] for item in items] == ["p1", "p2"]
+    mock_query.in_.assert_not_called()
 
 
 @patch("backend.routes.properties_routes.create_client")
