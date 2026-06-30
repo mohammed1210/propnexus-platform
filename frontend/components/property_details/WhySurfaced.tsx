@@ -191,7 +191,7 @@ export default function WhySurfaced({ property }: { property: WhySurfacedPropert
       </div>
 
       <InfoDisclaimer className="mt-3" label="Discovery score disclaimer">
-        Discovery score ranks scrape-discovery signals, not investment suitability. A high discovery score still requires full due diligence.
+        Discovery score ranks available deal-discovery signals, not investment suitability. A high discovery score still requires full due diligence.
       </InfoDisclaimer>
     </section>
   );

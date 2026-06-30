@@ -121,6 +121,12 @@ def _first_str(d: Dict[str, Any], keys: List[str]) -> Optional[str]:
 def _collect_text(property_dict: Dict[str, Any]) -> Tuple[str, Dict[str, str]]:
     title = _first_str(property_dict, ["title", "name", "headline"]) or ""
     description = _first_str(property_dict, ["description", "summary", "details"]) or ""
+    key_features_raw = property_dict.get("key_features") or property_dict.get("keyFeatures")
+    key_features = ""
+    if isinstance(key_features_raw, list):
+        key_features = " ".join(str(v) for v in key_features_raw if isinstance(v, str))
+    elif isinstance(key_features_raw, str):
+        key_features = key_features_raw
 
     url = _first_str(property_dict, ["url", "listing_url", "raw_url", "link", "href"]) or ""
 
@@ -133,11 +139,37 @@ def _collect_text(property_dict: Dict[str, Any]) -> Tuple[str, Dict[str, str]]:
             description = description or (
                 _first_str(raw_obj, ["description", "summary", "details"]) or ""
             )
+            raw_features = raw_obj.get("key_features") or raw_obj.get("keyFeatures")
+            if not key_features and isinstance(raw_features, list):
+                key_features = " ".join(str(v) for v in raw_features if isinstance(v, str))
+            elif not key_features and isinstance(raw_features, str):
+                key_features = raw_features
             url = url or (_first_str(raw_obj, ["url", "listing_url", "raw_url", "link"]) or "")
 
-    pieces = [title, description, url]
+    pieces = [title, description, key_features, url]
     text = "\n".join(p for p in pieces if p)
-    return text, {"title": title, "description": description, "url": url}
+    return text, {
+        "title": title,
+        "description": description,
+        "key_features": key_features,
+        "url": url,
+    }
+
+
+def _source_for_term(fields: Dict[str, str], term: str) -> str:
+    needle = normalize(term)
+    if not needle:
+        return "description"
+    for source in ("title", "description", "key_features", "url"):
+        haystack = normalize(fields.get(source))
+        if needle in haystack:
+            return source
+    return "description"
+
+
+def _keyword_label(term: str) -> str:
+    clean = normalize(term).replace(" oieo ", " offers in excess of ").strip()
+    return clean or term.strip().lower()
 
 
 def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
@@ -287,6 +319,35 @@ def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
     if has("below_market", ["below market value", "bmv"]):
         signals.append("below_market")
 
+    if has("probate", ["probate"]):
+        signals.append("probate")
+
+    if has(
+        "development_potential", ["development potential", "scope to extend", "extension potential"]
+    ):
+        signals.append("development_potential")
+
+    if has("hmo_potential", ["hmo potential", "suitable for hmo", "potential hmo"]):
+        signals.append("hmo_potential")
+
+    if has("planning_permission", ["planning permission", "planning granted", "approved planning"]):
+        signals.append("planning_permission")
+
+    if has("vacant_possession", ["vacant possession"]):
+        signals.append("vacant_possession")
+
+    if has("repossession", ["repossession", "repossessed"]):
+        signals.append("repossession")
+
+    if has("buy_to_let", ["buy to let", "buy-to-let", "btl"]):
+        signals.append("buy_to_let")
+
+    if has("high_yield", ["high yield", "high-yield", "strong yield"]):
+        signals.append("high_yield")
+
+    if has("strong_rental_demand", ["strong rental demand", "high rental demand"]):
+        signals.append("strong_rental_demand")
+
     # Reasons (ordered by investor appeal)
     reason_map = {
         "auction": "Auction / guide price",
@@ -299,6 +360,15 @@ def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
         "cash_buyers_only": "Cash buyers only",
         "short_lease": "Short lease",
         "guide_price": "Guide price / offers",
+        "probate": "Probate",
+        "development_potential": "Development potential",
+        "hmo_potential": "HMO potential",
+        "planning_permission": "Planning permission",
+        "vacant_possession": "Vacant possession",
+        "repossession": "Repossession",
+        "buy_to_let": "Buy to let",
+        "high_yield": "High yield",
+        "strong_rental_demand": "Strong rental demand",
     }
     reason_priority = [
         "auction",
@@ -311,6 +381,15 @@ def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
         "cash_buyers_only",
         "short_lease",
         "guide_price",
+        "probate",
+        "vacant_possession",
+        "repossession",
+        "development_potential",
+        "hmo_potential",
+        "planning_permission",
+        "buy_to_let",
+        "high_yield",
+        "strong_rental_demand",
     ]
 
     reasons: List[str] = []
@@ -339,6 +418,16 @@ def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
             conf_parts.append(0.7)
         elif sig == "short_lease":
             conf_parts.append(0.7)
+        elif sig in {"probate", "vacant_possession", "repossession", "planning_permission"}:
+            conf_parts.append(0.8)
+        elif sig in {
+            "development_potential",
+            "hmo_potential",
+            "buy_to_let",
+            "high_yield",
+            "strong_rental_demand",
+        }:
+            conf_parts.append(0.7)
         else:
             conf_parts.append(0.6)
 
@@ -351,9 +440,55 @@ def extract_deal_signals(property_dict: Dict[str, Any]) -> Dict[str, Any]:
     # Ensure stable output types
     signals_sorted = sorted(set(signals))
 
+    deal_keywords: List[str] = []
+    for terms in matched_terms.values():
+        for term in terms:
+            label = _keyword_label(str(term))
+            if label and label not in deal_keywords:
+                deal_keywords.append(label)
+
+    signal_meta: dict[str, tuple[str, str, float]] = {
+        "auction": ("auction", "Auction", 0.9),
+        "guide_price": ("pricing", "Guide price", 0.55),
+        "cash_buyers_only": ("finance", "Cash buyers only", 0.85),
+        "needs_refurb": ("value_add", "Modernisation required", 0.9),
+        "chain_free": ("seller_position", "Chain free", 0.8),
+        "probate": ("seller_position", "Probate", 0.8),
+        "reduced": ("pricing", "Reduced", 0.8),
+        "motivated_seller": ("seller_position", "Motivated seller", 0.7),
+        "short_lease": ("lease", "Short lease", 0.75),
+        "development_potential": ("value_add", "Development potential", 0.75),
+        "hmo_potential": ("strategy", "HMO potential", 0.75),
+        "planning_permission": ("value_add", "Planning permission", 0.85),
+        "below_market": ("pricing", "Below market value", 0.7),
+        "vacant_possession": ("seller_position", "Vacant possession", 0.8),
+        "repossession": ("seller_position", "Repossession", 0.8),
+        "tenanted": ("strategy", "Investment opportunity", 0.65),
+        "buy_to_let": ("strategy", "Buy to let", 0.7),
+        "high_yield": ("yield", "High yield", 0.75),
+        "strong_rental_demand": ("rental_demand", "Strong rental demand", 0.75),
+    }
+    investment_signals: List[Dict[str, Any]] = []
+    for sig in reason_priority:
+        if sig not in signals_sorted or sig not in signal_meta:
+            continue
+        signal_type, label, signal_confidence = signal_meta[sig]
+        terms = matched_terms.get(sig) or []
+        source = _source_for_term(fields, str(terms[0])) if terms else "description"
+        investment_signals.append(
+            {
+                "type": signal_type,
+                "label": label,
+                "confidence": signal_confidence,
+                "source": source,
+            }
+        )
+
     return {
         "signals": signals_sorted,
         "reasons": reasons,
+        "deal_keywords": deal_keywords,
+        "investment_signals": investment_signals,
         "confidence": round(float(confidence), 4),
         "matched_terms": matched_terms,
         "lease_years_remaining": lease_years,

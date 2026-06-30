@@ -60,6 +60,7 @@ export function getOriginalListingUrl(property: PropertyLike): string | null {
 }
 
 export function getSourceLabel(property: PropertyLike): string {
+  if (textIncludes(property, /user_submitted|manual[_\s-]?deal/)) return 'Manual deal';
   if (textIncludes(property, /rightmove/)) return 'Rightmove';
   if (textIncludes(property, /zoopla/)) return 'Zoopla';
   if (textIncludes(property, /onthemarket|on the market|\botm\b/)) return 'OnTheMarket';

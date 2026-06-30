@@ -241,6 +241,46 @@ def debug_scraper_env():
     }
 
 
+def _collect_registered_route_details() -> list[dict[str, object]]:
+    detailed: list[dict[str, object]] = []
+
+    for route in app.routes:
+        if isinstance(route, APIRoute):
+            detailed.append(
+                {
+                    "path": route.path,
+                    "methods": sorted([m for m in (route.methods or set()) if m]),
+                    "name": route.name,
+                }
+            )
+            continue
+
+        effective_route_contexts = getattr(route, "effective_route_contexts", None)
+        if not callable(effective_route_contexts):
+            continue
+
+        for context in effective_route_contexts():
+            starlette_route = getattr(context, "starlette_route", None)
+            original_route = getattr(context, "original_route", None)
+            path = getattr(starlette_route, "path", None) or getattr(original_route, "path", None)
+            if not path:
+                continue
+
+            methods = getattr(starlette_route, "methods", None) or getattr(
+                original_route, "methods", None
+            )
+            detailed.append(
+                {
+                    "path": path,
+                    "methods": sorted([m for m in (methods or set()) if m]),
+                    "name": getattr(starlette_route, "name", None)
+                    or getattr(original_route, "name", None),
+                }
+            )
+
+    return detailed
+
+
 @app.get("/debug/routes", dependencies=[Depends(require_debug_enabled)])
 def debug_routes():
     """Return a sorted list of registered paths.
@@ -248,20 +288,8 @@ def debug_routes():
     This helps confirm route registration in production without relying only on OpenAPI.
     """
 
-    paths: set[str] = set()
-    detailed: list[dict] = []
-
-    for r in app.routes:
-        if not isinstance(r, APIRoute):
-            continue
-        paths.add(r.path)
-        detailed.append(
-            {
-                "path": r.path,
-                "methods": sorted([m for m in (r.methods or set()) if m]),
-                "name": r.name,
-            }
-        )
+    detailed = _collect_registered_route_details()
+    paths = {route["path"] for route in detailed if isinstance(route.get("path"), str)}
 
     return {
         "count": len(paths),
