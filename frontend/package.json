@@ -91,7 +91,7 @@
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",
     "postcss": "^8.5.14",
-    "tailwindcss": "^4.2.2",
+    "tailwindcss": "^4.3.0",
     "ts-jest": "^29.4.9",
     "typescript": "^5.9.2",
     "web-streams-polyfill": "^4.2.0"
