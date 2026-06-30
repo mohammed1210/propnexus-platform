@@ -96,7 +96,8 @@ export async function GET(req?: Request) {
   }
 
   try {
-    const url = new URL(req?.url ?? 'http://localhost/api/saved-deals');
+    // Unit tests call GET() directly without a Request; Next.js provides Request at runtime.
+    const url = new URL(req?.url || 'http://localhost/api/saved-deals');
     const propertyIdFilter = url.searchParams.get('property_id')?.trim();
 
     const dealsRes = await backendFetch(`/saved-deals?user_id=${encodeURIComponent(userId)}`, {

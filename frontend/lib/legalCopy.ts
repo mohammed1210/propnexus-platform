@@ -10,7 +10,7 @@ export const AI_DISCLAIMER =
   'AI-generated content may be incomplete or inaccurate. Treat summaries and strategy suggestions as a starting point for review, not as advice or a recommendation.';
 
 export const DATA_ACCURACY_DISCLAIMER =
-  'Data may come from third-party sources, cached records, scraped listings, public datasets, user inputs or derived estimates. Availability and accuracy can vary by property and area.';
+  'Data may come from third-party sources, cached records, aggregated listing records, public datasets, user inputs or derived estimates. Availability and accuracy can vary by property and area.';
 
 export const AREA_INTEL_DISCLAIMER =
   'Area intelligence is indicative and depends on available local data. Missing or cached data should not be treated as evidence that an area is low risk or high opportunity.';

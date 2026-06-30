@@ -430,7 +430,7 @@ export default function PropertyDetailsPage() {
         aiScore={aiScore}
       />
 
-      <div className="max-w-7xl mx-auto px-4 py-8 lg:pr-64">{/* Add right padding on desktop for floating sidebar */}
+      <div className="max-w-7xl mx-auto px-4 py-8 pb-28 lg:pr-64 lg:pb-8">{/* Add right padding on desktop for floating sidebar */}
         {/* Image-first (focal) carousel + details */}
         <div className="card mb-6 overflow-hidden !p-0">
           <ImageGallery
