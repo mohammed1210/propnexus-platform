@@ -6,11 +6,12 @@ import { useUserPlan } from '@/lib/useUserPlan';
 import { getPlanLabel, hasAccess } from '@/lib/planPermissions';
 import LockedFeature from '@/components/LockedFeature';
 import { isAuthEnabled } from '@/lib/auth';
+import type { UserPlan } from '@/lib/useUserPlan';
 
 interface GatedPanelProps {
   children: ReactNode;
   title: string;
-  requiredPlan: 'pro' | 'investor';
+  requiredPlan: Exclude<UserPlan, 'free'>;
   featureEnabled: boolean;
   showPreviewWhenLocked?: boolean;
 }
@@ -79,13 +80,17 @@ function GatedPanelAuthed({
   const userHasAccess = bypassGating || hasAccess(plan, requiredPlan);
 
   if (!userHasAccess) {
-    const requiredLabel = requiredPlan === 'pro' ? 'Pro' : 'Investor';
+    const requiredLabel = getPlanLabel(requiredPlan);
     const currentLabel = getPlanLabel(plan);
+    const availabilityCopy =
+      requiredPlan === 'pro'
+        ? 'Investor Starter or Investor Pro'
+        : 'Investor Pro';
     return (
       <LockedFeature
         title={title}
         requiredPlan={requiredLabel}
-        message={`${title} is available on ${requiredLabel} and Investor plans. Your current plan is ${currentLabel}.`}
+        message={`Upgrade to unlock ${title}. This section is available on ${availabilityCopy}. Your current plan is ${currentLabel}.`}
         showPreview={showPreviewWhenLocked}
       >
         {children}

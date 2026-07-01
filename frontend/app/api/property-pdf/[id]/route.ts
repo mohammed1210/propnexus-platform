@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createPropertyPdfFilename } from '@/lib/propertyDealPack';
 import { FF } from '@/lib/flags';
 import { renderDealPackPdfFromUrl } from '@/lib/server/propertyPdfRenderer';
+import { getServerEntitlements } from '@/lib/server/userPlan';
 import { fetchPropertyById, getOptionalClerkUserId } from '@/lib/server/propertyData';
 
 export const runtime = 'nodejs';
@@ -27,6 +28,14 @@ const encodeDispositionFilename = (filename: string) =>
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   if (!FF.DEAL_PACK) {
     return NextResponse.json({ error: 'not_found' }, { status: 404, headers: noStoreHeaders });
+  }
+
+  const entitlements = await getServerEntitlements();
+  if (!entitlements.hasPdfExport) {
+    return NextResponse.json(
+      { error: 'upgrade_required', required_plan: 'investor_pro' },
+      { status: 403, headers: noStoreHeaders },
+    );
   }
 
   const { id } = await context.params;

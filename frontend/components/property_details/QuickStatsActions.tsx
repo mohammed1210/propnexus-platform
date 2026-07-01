@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { FiHeart, FiShare2, FiDownload, FiCopy, FiCheck, FiExternalLink } from 'react-icons/fi';
 import { toast } from 'sonner';
 import { fetchWithRetry } from '@/lib/api';
+import { getEntitlements } from '@/lib/entitlements';
 import { exportPropertyPdf } from '@/lib/propertyPdfExport';
 import { createPropertyPdfFilename } from '@/lib/propertyDealPack';
 import { FF } from '@/lib/flags';
+import { useUserPlan } from '@/lib/useUserPlan';
 import {
   formatPercent,
   formatRoiDisplay,
@@ -65,12 +67,14 @@ export default function QuickStatsActions({
   discountPercent,
   aiScore,
 }: QuickStatsActionsProps) {
+  const { plan } = useUserPlan();
+  const entitlements = getEntitlements(plan);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [copied, setCopied] = useState(false);
   const [dealEnquiryCopied, setDealEnquiryCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const showDealPackExport = FF.DEAL_PACK;
+  const showDealPackExport = FF.DEAL_PACK && entitlements.hasPdfExport;
   const showCrmExports = FF.CRM_EXPORT;
 
   const merged = useMemo(() => {

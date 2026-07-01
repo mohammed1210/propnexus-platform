@@ -45,6 +45,10 @@ export default function UpgradeButton({ priceId, productId, children = 'Upgrade'
 
     setLoading(true);
     try {
+      if (!priceId && !productId) {
+        throw new Error('Checkout is not configured yet.');
+      }
+
       const r = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

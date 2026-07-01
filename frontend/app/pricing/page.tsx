@@ -5,28 +5,7 @@ import UpgradeButton from '@/components/UpgradeButton';
 import WaitlistForm from '@/components/WaitlistForm';
 import LegalNotice from '@/components/legal/LegalNotice';
 import { SOFT_LAUNCH_BETA_NOTICE } from '@/lib/legalCopy';
-
-const INVESTOR_PRODUCT_ID = process.env.NEXT_PUBLIC_STRIPE_PRODUCT_INVESTOR || 'prod_TGprLukyGJfRBH';
-
-const freeFeatures = [
-  'Browse property listings',
-  'Search and filter deals',
-  'View property detail pages',
-  'See core quick stats',
-  'Save deals to review later',
-  'Access basic investment signals where available',
-];
-
-const investorFeatures = [
-  'Everything in Free',
-  'Find stronger evidence signals faster with stricter Top Deal tiers',
-  'See what price makes the deal work with Offer Intelligence',
-  'Compare sold and rent evidence before bidding',
-  'Track price changes, days on market and stale listings',
-  'Save search criteria for newly surfaced strong opportunities',
-  'AI Deal Score, Investment Summary and strategy guidance',
-  'Priority access to new launch features',
-];
+import { FOUNDING_MEMBER_COPY, getCheckoutConfigForPlan, pricingPlans } from '@/lib/pricingPlans';
 
 /**
  * 7-Day Free Trial Configuration:
@@ -45,86 +24,105 @@ const investorFeatures = [
 
 export const metadata = {
   title: 'Pricing • PropNexus',
-  description: 'Choose your PropNexus plan — Free or Investor.',
+  description: 'Choose your PropNexus plan — Free, Investor Starter or Investor Pro.',
 };
 
 export default function PricingPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 pb-16 pt-20 sm:pt-24 lg:pt-28">
+    <main className="mx-auto max-w-7xl px-6 pb-16 pt-20 sm:pt-24 lg:pt-28">
       <div className="mx-auto max-w-3xl text-center">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-brand-600 dark:text-brand-400">
-          Soft launch pricing
+          Sprint 2 launch pricing
         </p>
         <h1 className="text-4xl font-semibold tracking-tight text-slate-950 dark:text-slate-50 sm:text-5xl">
           Choose your plan
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-600 dark:text-slate-400 sm:text-lg">
-          Start free, then upgrade when you want evidence-led lead triage, offer pricing and saved-search workflows.
+          Start free, then upgrade when you want full deal labels, offer ranges and the printable Deal Pack workflow.
+        </p>
+        <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+          {FOUNDING_MEMBER_COPY}
         </p>
       </div>
 
-      <div className="mx-auto mt-14 grid max-w-4xl grid-cols-1 items-stretch gap-8 md:grid-cols-2 lg:mt-16">
-        {/* ==== Free Tier ==== */}
-        <section className="card flex h-full flex-col p-7 transition-shadow hover:shadow-lg sm:p-8">
-          <div className="flex-1">
-            <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">Free</h2>
-            <p className="mt-3 min-h-[3.5rem] text-sm leading-6 text-slate-600 dark:text-slate-400">
-              Explore the platform and review live property opportunities.
-            </p>
-            <div className="mt-6 flex items-end gap-1">
-              <span className="text-4xl font-bold tracking-tight text-slate-950 dark:text-slate-50">£0</span>
-              <span className="pb-1 text-sm font-medium text-slate-500 dark:text-slate-400">/month</span>
-            </div>
-            <ul className="mt-7 space-y-3 text-sm text-slate-700 dark:text-slate-300">
-              {freeFeatures.map((feature) => (
-                <li key={feature} className="flex gap-3">
-                  <span className="mt-1.5 h-2 w-2 flex-none rounded-full bg-brand-500" aria-hidden="true" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="mt-8">
-            <StartFreeButton className="btn-secondary w-full justify-center">Start Free</StartFreeButton>
-          </div>
-        </section>
+      <div className="mx-auto mt-14 grid max-w-6xl grid-cols-1 items-stretch gap-6 md:grid-cols-2 xl:grid-cols-4 lg:mt-16">
+        {pricingPlans.map((plan) => {
+          const checkout = getCheckoutConfigForPlan(plan.id);
+          const highlight = plan.id === 'investor_pro';
 
-        {/* ==== Investor Tier ==== */}
-        <section className="card relative flex h-full flex-col border-2 border-brand-500 p-7 shadow-brand-md transition-shadow hover:shadow-brand-lg sm:p-8">
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-brand-600 px-4 py-1 text-xs font-semibold text-white shadow-sm">
-            Launch plan
-          </div>
-          <div className="flex-1">
-            <h2 className="text-2xl font-semibold text-brand-600 dark:text-brand-400">Investor</h2>
-            <p className="mt-3 min-h-[3.5rem] text-sm leading-6 text-slate-600 dark:text-slate-400">
-              For serious investors who want stronger deal analysis and saved-deal workflows.
-            </p>
-            <div className="mt-6">
-              <div className="flex items-end gap-1">
-                <span className="text-4xl font-bold tracking-tight text-slate-950 dark:text-slate-50">£19</span>
-                <span className="pb-1 text-sm font-medium text-slate-500 dark:text-slate-400">/month</span>
+          return (
+            <section
+              key={plan.id}
+              className={`card relative flex h-full flex-col p-7 transition-shadow hover:shadow-lg sm:p-8 ${
+                highlight ? 'border-2 border-brand-500 shadow-brand-md hover:shadow-brand-lg' : ''
+              }`}
+            >
+              {plan.badge ? (
+                <div className="absolute -top-3 left-6 rounded-full bg-brand-600 px-4 py-1 text-xs font-semibold text-white shadow-sm">
+                  {plan.badge}
+                </div>
+              ) : null}
+
+              <div className="flex-1">
+                <h2 className={`text-2xl font-semibold ${highlight ? 'text-brand-600 dark:text-brand-400' : 'text-slate-900 dark:text-slate-100'}`}>
+                  {plan.name}
+                </h2>
+                <p className="mt-3 min-h-[4.5rem] text-sm leading-6 text-slate-600 dark:text-slate-400">
+                  {plan.description}
+                </p>
+                <div className="mt-6">
+                  <div className="flex items-end gap-1">
+                    <span className="text-4xl font-bold tracking-tight text-slate-950 dark:text-slate-50">
+                      {plan.monthlyLabel.replace('/month', '')}
+                    </span>
+                    <span className="pb-1 text-sm font-medium text-slate-500 dark:text-slate-400">/month</span>
+                  </div>
+                  {plan.futureMonthlyPrice ? (
+                    <div className="mt-2 text-sm font-medium text-brand-600 dark:text-brand-400">
+                      Launch price. Later £{plan.futureMonthlyPrice}/month.
+                    </div>
+                  ) : null}
+                </div>
+
+                <ul className="mt-7 space-y-3 text-sm text-slate-700 dark:text-slate-300">
+                  {plan.includes.map((feature) => (
+                    <li key={feature} className="flex gap-3">
+                      <span className="mt-1.5 h-2 w-2 flex-none rounded-full bg-brand-500" aria-hidden="true" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {plan.locked?.length ? (
+                  <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      Not included
+                    </div>
+                    <p className="mt-2">{plan.locked.join(' • ')}</p>
+                  </div>
+                ) : null}
               </div>
-              <div className="mt-2 text-sm font-medium text-brand-600 dark:text-brand-400">
-                7-day free trial
+
+              <div className="mt-8">
+                {plan.ctaMode === 'free' ? (
+                  <StartFreeButton className="btn-secondary w-full justify-center">{plan.ctaLabel}</StartFreeButton>
+                ) : plan.ctaMode === 'checkout' ? (
+                  <UpgradeButton priceId={checkout.priceId} productId={checkout.productId} className="btn-primary w-full justify-center">
+                    {plan.ctaLabel}
+                  </UpgradeButton>
+                ) : (
+                  <button type="button" disabled className="btn-secondary w-full cursor-not-allowed justify-center opacity-70">
+                    {plan.ctaLabel}
+                  </button>
+                )}
               </div>
-            </div>
-            <ul className="mt-7 space-y-3 text-sm text-slate-700 dark:text-slate-300">
-              {investorFeatures.map((feature) => (
-                <li key={feature} className="flex gap-3">
-                  <span className="mt-1.5 h-2 w-2 flex-none rounded-full bg-brand-500" aria-hidden="true" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="mt-8">
-            <UpgradeButton productId={INVESTOR_PRODUCT_ID}>Start 7-Day Free Trial</UpgradeButton>
-          </div>
-        </section>
+            </section>
+          );
+        })}
       </div>
 
       <p className="mt-10 text-center text-sm text-slate-500 dark:text-slate-400">
-        Investor starts with a 7-day free trial. No charge during the 7-day trial. Cancel anytime.
+        Free stays available. Investor Starter unlocks the first paid layer. Investor Pro unlocks the full Deal Pack workflow and PDF export.
       </p>
 
       <LegalNotice title="Subscription note" variant="compact" className="mx-auto mt-5 max-w-3xl">
