@@ -1,6 +1,7 @@
 /** @jest-environment jsdom */
 
 import '@testing-library/jest-dom';
+import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 const mockFetchPropertyById = jest.fn() as jest.MockedFunction<
@@ -82,6 +83,11 @@ describe('property/[id]/deal-pack/page', () => {
       searchParams: Promise.resolve({}),
     });
 
-    expect(result).toBeTruthy();
+    render(result as React.ReactElement);
+
+    expect(screen.getByText('Deal Pack preview')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /unlock investor pro/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('deal-pack-root')).not.toBeInTheDocument();
+    expect(mockBuildPropertyDealPackModel).not.toHaveBeenCalled();
   });
 });

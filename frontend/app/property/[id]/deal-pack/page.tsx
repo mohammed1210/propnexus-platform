@@ -43,11 +43,13 @@ export default async function PropertyDealPackPage({ params, searchParams }: Dea
     property = await fetchPropertyById(id, userId);
     if (!property) notFound();
 
-    model = buildPropertyDealPackModel({
-      propertyId: id,
-      property,
-      url: source,
-    });
+    if (entitlements.hasDealPack) {
+      model = buildPropertyDealPackModel({
+        propertyId: id,
+        property,
+        url: source,
+      });
+    }
   } catch (error) {
     if (isNextNotFoundError(error)) {
       throw error;
