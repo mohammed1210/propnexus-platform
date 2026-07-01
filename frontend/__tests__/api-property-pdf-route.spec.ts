@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals
 const mockFetchPropertyById = jest.fn();
 const mockGetOptionalClerkUserId = jest.fn();
 const mockRenderDealPackPdfFromUrl = jest.fn();
+const mockGetServerEntitlements = jest.fn();
 
 jest.mock('@/lib/server/propertyData', () => ({
   fetchPropertyById: (...args: unknown[]) => mockFetchPropertyById(...args),
@@ -15,6 +16,10 @@ jest.mock('@/lib/server/propertyPdfRenderer', () => ({
   renderDealPackPdfFromUrl: (...args: unknown[]) => mockRenderDealPackPdfFromUrl(...args),
 }));
 
+jest.mock('@/lib/server/userPlan', () => ({
+  getServerEntitlements: (...args: unknown[]) => mockGetServerEntitlements(...args),
+}));
+
 describe('/api/property-pdf/[id]', () => {
   beforeEach(() => {
     jest.resetModules();
@@ -22,6 +27,7 @@ describe('/api/property-pdf/[id]', () => {
     process.env.NEXT_PUBLIC_FEATURE_DEAL_PACK = 'true';
     delete process.env.NEXT_PUBLIC_FEATURE_PROPERTY_EXPORTS;
     mockGetOptionalClerkUserId.mockResolvedValue('user_123');
+    mockGetServerEntitlements.mockResolvedValue({ hasPdfExport: true });
     mockFetchPropertyById.mockResolvedValue({
       id: 'prop-123',
       title: 'Central Flat',
@@ -76,5 +82,18 @@ describe('/api/property-pdf/[id]', () => {
     expect(await res.json()).toEqual({ error: 'not_found' });
     expect(mockFetchPropertyById).not.toHaveBeenCalled();
     expect(mockRenderDealPackPdfFromUrl).not.toHaveBeenCalled();
+  });
+
+  it('returns 403 when the signed-in plan does not include PDF export', async () => {
+    mockGetServerEntitlements.mockResolvedValue({ hasPdfExport: false });
+    const { GET } = await import('@/app/api/property-pdf/[id]/route');
+
+    const res = await GET(new Request('https://app.example/api/property-pdf/prop-123'), {
+      params: Promise.resolve({ id: 'prop-123' }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'upgrade_required', required_plan: 'investor_pro' });
+    expect(mockFetchPropertyById).not.toHaveBeenCalled();
   });
 });

@@ -10,6 +10,7 @@ const mockGetOptionalClerkUserId = jest.fn() as jest.MockedFunction<() => Promis
 const mockBuildPropertyDealPackModel = jest.fn() as jest.MockedFunction<
   (input: { propertyId: string; property: Record<string, unknown>; url?: string }) => { title: string }
 >;
+const mockGetServerEntitlements = jest.fn() as jest.MockedFunction<() => Promise<{ hasDealPack: boolean }>>;
 const notFoundError = Object.assign(new Error('not found'), {
   digest: 'NEXT_HTTP_ERROR_FALLBACK;404',
 });
@@ -26,6 +27,15 @@ jest.mock('@/lib/propertyDealPack', () => ({
   buildPropertyDealPackModel: mockBuildPropertyDealPackModel,
 }));
 
+jest.mock('@/lib/server/userPlan', () => ({
+  getServerEntitlements: () => mockGetServerEntitlements(),
+}));
+
+jest.mock('@/components/UpgradeButton', () => ({
+  __esModule: true,
+  default: ({ children }: { children: React.ReactNode }) => <button type="button">{children}</button>,
+}));
+
 jest.mock('next/navigation', () => ({
   notFound: () => mockNotFound(),
 }));
@@ -39,7 +49,9 @@ describe('property/[id]/deal-pack/page', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
+    process.env.NEXT_PUBLIC_FEATURE_DEAL_PACK = 'true';
     mockGetOptionalClerkUserId.mockResolvedValue('user_123');
+    mockGetServerEntitlements.mockResolvedValue({ hasDealPack: true });
     mockFetchPropertyById.mockResolvedValue({ id: 'prop-123', title: 'Central Flat' });
     mockBuildPropertyDealPackModel.mockReturnValue({ title: 'Central Flat' });
   });
@@ -59,5 +71,17 @@ describe('property/[id]/deal-pack/page', () => {
         searchParams: Promise.resolve({}),
       }),
     ).rejects.toMatchObject({ digest: 'NEXT_HTTP_ERROR_FALLBACK;404' });
+  });
+
+  it('shows the gated preview when the plan does not include the Deal Pack', async () => {
+    mockGetServerEntitlements.mockResolvedValue({ hasDealPack: false });
+
+    const Page = (await import('../app/property/[id]/deal-pack/page')).default;
+    const result = await Page({
+      params: Promise.resolve({ id: 'prop-123' }),
+      searchParams: Promise.resolve({}),
+    });
+
+    expect(result).toBeTruthy();
   });
 });

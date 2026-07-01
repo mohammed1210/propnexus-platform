@@ -75,7 +75,9 @@ describe('GatedPanel entitlement', () => {
 
     expect(screen.getByTestId('locked-feature')).toBeInTheDocument();
     expect(
-      screen.getByText('AI Deal Score is available on Pro and Investor plans. Your current plan is Free.'),
+      screen.getByText(
+        'Upgrade to unlock AI Deal Score. This section is available on Investor Starter or Investor Pro. Your current plan is Free.',
+      ),
     ).toBeInTheDocument();
     expect(screen.queryByTestId('deal-score-content')).not.toBeInTheDocument();
     expect(screen.queryByTestId('locked-preview')).not.toBeInTheDocument();

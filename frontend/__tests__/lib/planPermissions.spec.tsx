@@ -32,34 +32,34 @@ describe('planPermissions', () => {
   });
 
   describe('getPlanLabel', () => {
-    it('returns correctly capitalized plan labels', () => {
+    it('returns launch-plan labels for the existing backend tiers', () => {
       expect(getPlanLabel('free')).toBe('Free');
-      expect(getPlanLabel('pro')).toBe('Pro');
-      expect(getPlanLabel('investor')).toBe('Investor');
+      expect(getPlanLabel('pro')).toBe('Investor Starter');
+      expect(getPlanLabel('investor')).toBe('Investor Pro');
     });
   });
 
   describe('getPlanArticle', () => {
-    it('returns correct article for each plan', () => {
+    it('returns an article based on the public plan label', () => {
       expect(getPlanArticle('free')).toBe('a');
-      expect(getPlanArticle('pro')).toBe('a');
+      expect(getPlanArticle('pro')).toBe('an');
       expect(getPlanArticle('investor')).toBe('an');
     });
   });
 
   describe('getUpgradeMessage', () => {
-    it('generates correct upgrade messages', () => {
-      expect(getUpgradeMessage('free')).toBe('This feature requires a Free plan.');
-      expect(getUpgradeMessage('pro')).toBe('This feature requires a Pro plan.');
-      expect(getUpgradeMessage('investor')).toBe('This feature requires an Investor plan.');
+    it('generates launch-tier upgrade messages', () => {
+      expect(getUpgradeMessage('free')).toBe('Upgrade to Free to unlock this feature.');
+      expect(getUpgradeMessage('pro')).toBe('Upgrade to Investor Starter to unlock this feature.');
+      expect(getUpgradeMessage('investor')).toBe('Upgrade to Investor Pro to unlock this feature.');
     });
 
-    it('uses correct article based on plan', () => {
+    it('uses the launch plan label in the upgrade copy', () => {
       const proMessage = getUpgradeMessage('pro');
-      expect(proMessage).toContain('a Pro');
+      expect(proMessage).toContain('Investor Starter');
 
       const investorMessage = getUpgradeMessage('investor');
-      expect(investorMessage).toContain('an Investor');
+      expect(investorMessage).toContain('Investor Pro');
     });
   });
 

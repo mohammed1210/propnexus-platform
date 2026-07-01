@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import QuickStatsActions from './QuickStatsActions';
 
 const mockFetchWithRetry = jest.fn();
+const mockUseUserPlan = jest.fn();
 const mockFlagState = {
   DEAL_PACK: false,
   CRM_EXPORT: false,
@@ -18,6 +19,10 @@ jest.mock('@/lib/flags', () => ({
   },
 }));
 
+jest.mock('@/lib/useUserPlan', () => ({
+  useUserPlan: () => mockUseUserPlan(),
+}));
+
 jest.mock('sonner', () => ({
   toast: {
     success: jest.fn(),
@@ -28,6 +33,7 @@ jest.mock('sonner', () => ({
 describe('QuickStatsActions launch controls', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseUserPlan.mockReturnValue({ plan: 'free', loading: false, error: null, refetch: jest.fn() });
     mockFlagState.DEAL_PACK = false;
     mockFlagState.CRM_EXPORT = false;
     mockFetchWithRetry.mockResolvedValue({
@@ -74,6 +80,7 @@ describe('QuickStatsActions launch controls', () => {
   it('can re-enable deal pack and CRM export actions independently', () => {
     mockFlagState.DEAL_PACK = true;
     mockFlagState.CRM_EXPORT = true;
+    mockUseUserPlan.mockReturnValue({ plan: 'investor', loading: false, error: null, refetch: jest.fn() });
 
     render(
       <QuickStatsActions
@@ -84,6 +91,20 @@ describe('QuickStatsActions launch controls', () => {
 
     expect(screen.getAllByRole('button', { name: /export property details as pdf/i }).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: /copy property data as json/i })).toBeInTheDocument();
+  });
+
+  it('keeps PDF export locked for Investor Starter even when the feature flag is enabled', () => {
+    mockFlagState.DEAL_PACK = true;
+    mockUseUserPlan.mockReturnValue({ plan: 'pro', loading: false, error: null, refetch: jest.fn() });
+
+    render(
+      <QuickStatsActions
+        propertyId="prop-457"
+        property={{ title: 'Starter plan flat', location: 'Manchester' }}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /export property details as pdf/i })).not.toBeInTheDocument();
   });
 
   it('does not mark saved when the API returns only unrelated saved deals', async () => {

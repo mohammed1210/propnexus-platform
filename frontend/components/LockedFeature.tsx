@@ -7,7 +7,7 @@ type LockedFeatureProps = {
   /** Title shown in the header */
   title: string;
   /** Plan required to unlock (e.g., "Pro" or "Investor") */
-  requiredPlan: 'Pro' | 'Investor';
+  requiredPlan: string;
   /** Optional custom message */
   message?: string;
   /** Children shown blurred/minimized when locked */
@@ -23,7 +23,7 @@ export default function LockedFeature({
   children,
   showPreview = true,
 }: LockedFeatureProps) {
-  const defaultMessage = `Upgrade to ${requiredPlan} to unlock this feature`;
+  const defaultMessage = `Unlock ${title} with ${requiredPlan}.`;
 
   return (
     <div className="relative">

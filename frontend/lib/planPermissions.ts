@@ -1,5 +1,7 @@
 // frontend/lib/planPermissions.ts
 import { UserPlan } from './useUserPlan';
+import { getLaunchPlanId } from './entitlements';
+import { getPricingPlan } from './pricingPlans';
 
 // Plan hierarchy: free < pro < investor
 const PLAN_LEVELS: Record<UserPlan, number> = {
@@ -34,12 +36,8 @@ export function hasAccess(userPlan: UserPlan, requiredPlan: UserPlan): boolean {
  * @returns Capitalized plan name
  */
 export function getPlanLabel(plan: UserPlan): string {
-  const labels: Record<UserPlan, string> = {
-    free: 'Free',
-    pro: 'Pro',
-    investor: 'Investor',
-  };
-  return labels[plan] || 'Free';
+  const launchPlanId = getLaunchPlanId(plan);
+  return getPricingPlan(launchPlanId).name;
 }
 
 /**
@@ -49,7 +47,8 @@ export function getPlanLabel(plan: UserPlan): string {
  * @returns 'an' for 'investor', 'a' for others
  */
 export function getPlanArticle(plan: UserPlan): string {
-  return plan === 'investor' ? 'an' : 'a';
+  const label = getPlanLabel(plan);
+  return /^[aeiou]/i.test(label) ? 'an' : 'a';
 }
 
 /**
@@ -59,7 +58,6 @@ export function getPlanArticle(plan: UserPlan): string {
  * @returns A user-friendly message
  */
 export function getUpgradeMessage(requiredPlan: UserPlan): string {
-  const article = getPlanArticle(requiredPlan);
   const label = getPlanLabel(requiredPlan);
-  return `This feature requires ${article} ${label} plan.`;
+  return `Upgrade to ${label} to unlock this feature.`;
 }

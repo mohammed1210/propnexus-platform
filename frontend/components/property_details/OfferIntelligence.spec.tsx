@@ -1,13 +1,23 @@
 import '@testing-library/jest-dom';
 import { render, screen } from '@testing-library/react';
 
-jest.mock('@/components/property_details/GatedPanel', () =>
-  function MockGatedPanel({ children }: { children: React.ReactNode }) {
-    return <>{children}</>;
+const mockUseUserPlan = jest.fn();
+
+jest.mock('@/lib/useUserPlan', () => ({
+  useUserPlan: () => mockUseUserPlan(),
+}));
+
+jest.mock('@/components/UpgradeButton', () =>
+  function MockUpgradeButton({ children }: { children: React.ReactNode }) {
+    return <button type="button">{children}</button>;
   }
 );
 
 describe('OfferIntelligence', () => {
+  beforeEach(() => {
+    mockUseUserPlan.mockReturnValue({ plan: 'investor', loading: false, error: null, refetch: jest.fn() });
+  });
+
   it('renders target price calculations from evidenced rent', async () => {
     const OfferIntelligence = require('./OfferIntelligence').default;
     render(
@@ -31,6 +41,57 @@ describe('OfferIntelligence', () => {
     expect(screen.getAllByText('£200,000').length).toBeGreaterThan(0);
     expect(screen.getByText('£171,429')).toBeInTheDocument();
     expect(screen.getByText('Income case improves materially below £171,429.')).toBeInTheDocument();
+  });
+
+  it('shows a Starter upgrade preview for free users', async () => {
+    mockUseUserPlan.mockReturnValue({ plan: 'free', loading: false, error: null, refetch: jest.fn() });
+
+    const OfferIntelligence = require('./OfferIntelligence').default;
+    render(
+      <OfferIntelligence
+        intel={{
+          asking_price: 200000,
+          current_monthly_rent: 1000,
+          gross_yield_percent: 6,
+          rent_evidence: { is_real_rent_evidence: true, source: 'provided' },
+          offer_intelligence: {
+            rent_required_at_asking: { '6': 1000, '7': 1166.67, '8': 1333.33 },
+            target_purchase_price_from_rent: { '6': 200000, '7': 171429, '8': 150000 },
+          },
+          sold_comp_benchmark: { benchmark_confidence: 'limited' },
+          conclusion: 'Income case improves materially below £171,429.',
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Offer range preview')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /unlock investor starter/i })).toBeInTheDocument();
+  });
+
+  it('shows an indicative range for Starter users and reserves full underwriting for Pro', async () => {
+    mockUseUserPlan.mockReturnValue({ plan: 'pro', loading: false, error: null, refetch: jest.fn() });
+
+    const OfferIntelligence = require('./OfferIntelligence').default;
+    render(
+      <OfferIntelligence
+        intel={{
+          asking_price: 200000,
+          current_monthly_rent: 1000,
+          gross_yield_percent: 6,
+          rent_evidence: { is_real_rent_evidence: true, source: 'provided' },
+          offer_intelligence: {
+            rent_required_at_asking: { '6': 1000, '7': 1166.67, '8': 1333.33 },
+            target_purchase_price_from_rent: { '6': 200000, '7': 171429, '8': 150000 },
+          },
+          sold_comp_benchmark: { benchmark_confidence: 'limited' },
+          conclusion: 'Income case improves materially below £171,429.',
+        }}
+      />,
+    );
+
+    expect(screen.getByText('Starter offer range')).toBeInTheDocument();
+    expect(screen.getByText(/£150,000 to £200,000/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /unlock investor pro/i })).toBeInTheDocument();
   });
 
   it('labels missing rent evidence without overclaiming comps', async () => {
