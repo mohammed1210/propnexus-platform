@@ -38,7 +38,7 @@
     "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.104.1",
-    "@swc/helpers": "0.5.21",
+    "@swc/helpers": "0.5.23",
     "@vis.gl/react-google-maps": "^1.8.3",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
