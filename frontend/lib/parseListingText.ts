@@ -35,6 +35,29 @@ function normalizeTitleLine(line: string): string | undefined {
   return trimmed.slice(0, 240);
 }
 
+function findPurchasePrice(text: string): number | undefined {
+  const explicitMatch = text.match(
+    /(?:asking price|guide price|offers? (?:in excess of|over)|fixed price|purchase price|price)\D{0,20}(£\s?[\d,]+(?:\.\d+)?)/i,
+  );
+  if (explicitMatch) return cleanAmount(explicitMatch[1]);
+
+  const amountPattern = /£\s?[\d,]+(?:\.\d+)?/gi;
+  for (const match of text.matchAll(amountPattern)) {
+    const amount = cleanAmount(match[0]);
+    if (!amount || amount < 10_000) continue;
+
+    const start = match.index ?? 0;
+    const before = text.slice(Math.max(0, start - 32), start);
+    const after = text.slice(start + match[0].length, start + match[0].length + 32);
+    const hasRentContext = /(?:rent|rental|monthly rent)\s*[:\-]?\s*$/i.test(before)
+      || /^\s*(?:pcm|per calendar month|per month|monthly|pw|per week)\b/i.test(after);
+
+    if (!hasRentContext) return amount;
+  }
+
+  return undefined;
+}
+
 export function looksLikeUrl(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) return false;
@@ -66,8 +89,6 @@ export function parseListingText(input: string): ParsedListingDetails {
   const firstUsefulLine = lines.map(normalizeTitleLine).find(Boolean);
   const postcode = normalizeUkPostcode(text);
 
-  const priceMatch = text.match(/(?:asking price|guide price|offers? over|price)\D{0,20}(£\s?[\d,]+(?:\.\d+)?)/i)
-    || text.match(/(£\s?[\d,]{4,}(?:\.\d+)?)/i);
   const rentMatch = text.match(/(?:pcm|per calendar month|per month|monthly rent)\D{0,12}(£\s?[\d,]+(?:\.\d+)?)/i)
     || text.match(/(£\s?[\d,]+(?:\.\d+)?)\s*(?:pcm|per calendar month|per month)/i);
   const bedroomMatch = text.match(/\b(\d{1,2})\s*(?:bed|beds|bedroom|bedrooms)\b/i);
@@ -79,7 +100,7 @@ export function parseListingText(input: string): ParsedListingDetails {
     title: firstUsefulLine,
     description: text.slice(0, 4000),
     postcode,
-    price: priceMatch ? cleanAmount(priceMatch[1]) : undefined,
+    price: findPurchasePrice(text),
     estimatedMonthlyRent: rentMatch ? cleanAmount(rentMatch[1]) : undefined,
     bedrooms: bedroomMatch ? Number(bedroomMatch[1]) : undefined,
     bathrooms: bathroomMatch ? Number(bathroomMatch[1]) : undefined,

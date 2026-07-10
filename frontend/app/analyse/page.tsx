@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
 import { FiArrowRight, FiCheckCircle, FiLink2, FiZap } from 'react-icons/fi';
 
 import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
@@ -77,7 +77,7 @@ function buildDefaultTitle(form: FormState): string {
   return `Manual deal — ${suffix}`.slice(0, 240);
 }
 
-export default function AnalysePage() {
+function AnalysePageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [form, setForm] = useState<FormState>(initialState);
@@ -410,6 +410,24 @@ export default function AnalysePage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function AnalysePageFallback() {
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="h-48 animate-pulse rounded-3xl bg-slate-200 dark:bg-slate-800" />
+      </div>
+    </div>
+  );
+}
+
+export default function AnalysePage() {
+  return (
+    <Suspense fallback={<AnalysePageFallback />}>
+      <AnalysePageClient />
+    </Suspense>
   );
 }
 

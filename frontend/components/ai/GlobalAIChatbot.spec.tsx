@@ -29,6 +29,12 @@ describe('GlobalAIChatbot', () => {
     expect(screen.queryByText('Ask AI widget')).not.toBeInTheDocument();
   });
 
+  it('hides the floating Ask AI widget on locale-prefixed analyse routes', () => {
+    mockUsePathname.mockReturnValue('/en/analyse');
+    render(<GlobalAIChatbot />);
+    expect(screen.queryByText('Ask AI widget')).not.toBeInTheDocument();
+  });
+
   it('renders the widget on non-analyse pages', () => {
     mockUsePathname.mockReturnValue('/listings');
     render(<GlobalAIChatbot />);
