@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { createPropertyPdfFilename } from '@/lib/propertyDealPack';
 import { FF } from '@/lib/flags';
 import { renderDealPackPdfFromUrl } from '@/lib/server/propertyPdfRenderer';
+import { getPdfRenderToken, PDF_RENDER_TOKEN_HEADER } from '@/lib/server/pdfRenderAuth';
 import { getServerEntitlements } from '@/lib/server/userPlan';
 import { fetchPropertyById, getOptionalClerkUserId } from '@/lib/server/propertyData';
 
@@ -38,6 +39,14 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     );
   }
 
+  const pdfRenderToken = getPdfRenderToken();
+  if (!pdfRenderToken) {
+    return NextResponse.json(
+      { error: 'pdf_render_unavailable' },
+      { status: 503, headers: noStoreHeaders },
+    );
+  }
+
   const { id } = await context.params;
   const url = new URL(request.url);
   const source = url.searchParams.get('source')?.trim() || undefined;
@@ -55,7 +64,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       dealPackUrl.searchParams.set('source', source);
     }
 
-    const pdfBytes = await renderDealPackPdfFromUrl(dealPackUrl.toString());
+    const pdfBytes = await renderDealPackPdfFromUrl(dealPackUrl.toString(), {
+      headers: { [PDF_RENDER_TOKEN_HEADER]: pdfRenderToken },
+    });
 
     return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
