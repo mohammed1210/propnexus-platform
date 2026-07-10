@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 
 import UpgradeButton from '@/components/UpgradeButton';
@@ -6,6 +7,7 @@ import PropertyDealPackTemplate from '@/components/property_details/PropertyDeal
 import { FF } from '@/lib/flags';
 import { buildPropertyDealPackModel } from '@/lib/propertyDealPack';
 import { getCheckoutConfigForPlan } from '@/lib/pricingPlans';
+import { hasValidPdfRenderToken, PDF_RENDER_TOKEN_HEADER } from '@/lib/server/pdfRenderAuth';
 import { getServerEntitlements } from '@/lib/server/userPlan';
 import { fetchPropertyById, getOptionalClerkUserId } from '@/lib/server/propertyData';
 
@@ -33,6 +35,8 @@ export default async function PropertyDealPackPage({ params, searchParams }: Dea
   if (!FF.DEAL_PACK) notFound();
 
   const [{ id }, { source }] = await Promise.all([params, searchParams]);
+  const requestHeaders = await headers();
+  const isAuthorisedPdfRender = hasValidPdfRenderToken(requestHeaders.get(PDF_RENDER_TOKEN_HEADER));
   const userId = await getOptionalClerkUserId();
   const entitlements = await getServerEntitlements();
   const upgrade = getCheckoutConfigForPlan('investor_pro');
@@ -43,7 +47,7 @@ export default async function PropertyDealPackPage({ params, searchParams }: Dea
     property = await fetchPropertyById(id, userId);
     if (!property) notFound();
 
-    if (entitlements.hasDealPack) {
+    if (entitlements.hasDealPack || isAuthorisedPdfRender) {
       model = buildPropertyDealPackModel({
         propertyId: id,
         property,
@@ -61,7 +65,7 @@ export default async function PropertyDealPackPage({ params, searchParams }: Dea
     return <PropertyDealPackTemplate model={model} />;
   }
 
-  if (property && !entitlements.hasDealPack) {
+  if (property && !entitlements.hasDealPack && !isAuthorisedPdfRender) {
     return (
       <div className="min-h-screen bg-slate-950 px-6 py-12 text-white">
         <div className="mx-auto max-w-4xl rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur">
