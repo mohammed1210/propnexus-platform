@@ -18,6 +18,7 @@ def client():
     os.environ["SUPABASE_URL"] = "https://fake.supabase.co"
     os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "fake_key"
     os.environ["PROPNEXUS_INTERNAL_API_TOKEN"] = "test-internal-token"
+    os.environ["STRIPE_PRICE_PRO"] = "price_test"
 
     from backend.main import app
 
@@ -68,6 +69,11 @@ def test_checkout_session_includes_trial(mock_sb, mock_stripe, client):
 
     assert "subscription_data" in call_kwargs
     assert call_kwargs["subscription_data"]["trial_period_days"] == 7
+    assert call_kwargs["metadata"] == {"email": "test@example.com", "clerk_user_id": "user_test"}
+    assert call_kwargs["subscription_data"]["metadata"] == {
+        "email": "test@example.com",
+        "clerk_user_id": "user_test",
+    }
     assert call_kwargs["mode"] == "subscription"
     assert (
         call_kwargs["success_url"]

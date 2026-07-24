@@ -17,10 +17,77 @@ def client():
     os.environ["STRIPE_SECRET_KEY"] = "sk_test_fake"
     os.environ["SUPABASE_URL"] = "https://fake.supabase.co"
     os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "fake_key"
+    os.environ["STRIPE_PRICE_PRO"] = "price_test"
 
     from backend.main import app
 
     return TestClient(app)
+
+
+def _mock_supabase_tables(mock_supabase, *, user_update_rows=None, user_update_error=None):
+    users_table = Mock()
+    subscriptions_table = Mock()
+    prices_table = Mock()
+
+    user_execute = users_table.update.return_value.eq.return_value.execute
+    if user_update_error:
+        user_execute.side_effect = user_update_error
+    else:
+        user_execute.return_value = Mock(
+            data=user_update_rows if user_update_rows is not None else []
+        )
+    users_table.upsert.return_value.execute.return_value = Mock(data=[])
+
+    subscriptions_table.upsert.return_value.execute.return_value = Mock(data=[])
+    prices_table.upsert.return_value.execute.return_value = Mock(data=[])
+
+    def _table(name):
+        return {
+            "users": users_table,
+            "subscriptions": subscriptions_table,
+            "prices": prices_table,
+        }[name]
+
+    mock_supabase.table.side_effect = _table
+    return users_table, subscriptions_table, prices_table
+
+
+def _post_checkout_completed(client, mock_stripe, *, email_fields=None, price_id="price_pro_test"):
+    if email_fields is None:
+        email_fields = {"customer_details": {"email": "test@example.com"}}
+    mock_event = {
+        "id": "evt_checkout_test",
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "customer": "cus_test",
+                "subscription": "sub_test",
+                **email_fields,
+            }
+        },
+    }
+    mock_stripe.Webhook.construct_event.return_value = mock_event
+    mock_stripe.Subscription.retrieve.return_value = {
+        "status": "trialing",
+        "items": {"data": [{"price": {"id": price_id}}]},
+        "current_period_end": 1234567890,
+    }
+    mock_stripe.Price.retrieve.return_value = {
+        "id": price_id,
+        "product": "prod_test",
+        "nickname": "Test price",
+        "unit_amount": 900,
+        "currency": "gbp",
+        "recurring": {"interval": "month"},
+    }
+
+    os.environ["STRIPE_PRICE_PRO"] = price_id
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    return client.post(
+        "/stripe/webhook",
+        data=json.dumps(mock_event),
+        headers={"Stripe-Signature": "test_sig"},
+    )
 
 
 def test_webhook_endpoint_exists(client):
@@ -94,9 +161,11 @@ def test_checkout_completed_event(mock_supabase, mock_stripe, client):
     assert response.json()["ok"] is True
 
 
+@patch("backend.routes.stripe_webhook.supabase")
 @patch("backend.routes.stripe_webhook.stripe")
-def test_subscription_updated_event(mock_stripe, client):
+def test_subscription_updated_event(mock_stripe, mock_supabase, client):
     """Test handling of subscription update event"""
+    _mock_supabase_tables(mock_supabase, user_update_rows=[{"id": "existing-user-id"}])
     mock_event = {
         "type": "customer.subscription.updated",
         "data": {
@@ -131,14 +200,8 @@ def test_webhook_secret_per_request(mock_stripe, client):
     os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_initial"
 
     mock_event = {
-        "type": "checkout.session.completed",
-        "data": {
-            "object": {
-                "customer": "cus_test",
-                "customer_details": {"email": "test@example.com"},
-                "subscription": None,
-            }
-        },
+        "type": "customer.created",
+        "data": {"object": {"id": "cus_test"}},
     }
 
     mock_stripe.Webhook.construct_event.return_value = mock_event
@@ -167,7 +230,7 @@ def test_webhook_secret_per_request(mock_stripe, client):
 @patch("backend.routes.stripe_webhook.supabase")
 @patch("backend.routes.stripe_webhook.stripe")
 def test_unknown_price_id_preserves_plan(mock_stripe, mock_supabase, client):
-    """Test that unknown price IDs do NOT overwrite existing plan to 'free'"""
+    """Unknown checkout price IDs do not grant entitlement and force a retry."""
     # Ensure no price mapping env vars are set
     for key in ["STRIPE_PRICE_PRO", "STRIPE_PRICE_INVESTOR", "STRIPE_PRICE_ENTERPRISE"]:
         if key in os.environ:
@@ -200,20 +263,137 @@ def test_unknown_price_id_preserves_plan(mock_stripe, mock_supabase, client):
         "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
     )
 
+    assert response.status_code == 500
+    assert response.json() == {"ok": False, "error": "unknown_price_id"}
+    assert not mock_supabase.table.return_value.upsert.called
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_checkout_completed_updates_existing_user_by_normalized_email(
+    mock_stripe, mock_supabase, client
+):
+    users_table, _subscriptions_table, _prices_table = _mock_supabase_tables(
+        mock_supabase,
+        user_update_rows=[{"id": "existing-user-id", "email": "abbas_m90@hotmail.com"}],
+    )
+
+    response = _post_checkout_completed(
+        client,
+        mock_stripe,
+        email_fields={"customer_details": {"email": " Abbas_M90@HOTMAIL.COM "}},
+    )
+
     assert response.status_code == 200
     assert response.json()["ok"] is True
+    update_payload = users_table.update.call_args.args[0]
+    assert update_payload["plan"] == "pro"
+    assert update_payload["plan_status"] == "trialing"
+    users_table.update.return_value.eq.assert_called_with("email", "abbas_m90@hotmail.com")
+    assert not users_table.upsert.called
 
-    # Verify upsert was called
-    assert mock_supabase.table.return_value.upsert.called
 
-    # Get the upsert data
-    upsert_call = mock_supabase.table.return_value.upsert.call_args[0][0]
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_checkout_completed_upserts_on_email_conflict_when_no_existing_row(
+    mock_stripe, mock_supabase, client
+):
+    users_table, _subscriptions_table, _prices_table = _mock_supabase_tables(
+        mock_supabase,
+        user_update_rows=[],
+    )
 
-    # Verify that 'plan' field is NOT in the upsert data (preserving existing plan)
-    assert "plan" not in upsert_call, "Unknown price ID should not set plan field"
-    # But other fields should be present
-    assert "stripe_customer_id" in upsert_call
-    assert "plan_status" in upsert_call
+    response = _post_checkout_completed(
+        client,
+        mock_stripe,
+        email_fields={"customer_email": "New_User@Example.COM"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    users_table.upsert.assert_called_once()
+    upsert_payload = users_table.upsert.call_args.args[0]
+    assert upsert_payload["email"] == "new_user@example.com"
+    assert upsert_payload["plan"] == "pro"
+    assert users_table.upsert.call_args.kwargs["on_conflict"] == "email"
+
+
+@pytest.mark.parametrize(
+    ("email_fields", "expected_email"),
+    [
+        ({"customer_email": "customer-email@example.com"}, "customer-email@example.com"),
+        ({"metadata": {"email": "metadata-email@example.com"}}, "metadata-email@example.com"),
+        ({}, "customer-retrieve@example.com"),
+    ],
+)
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_checkout_completed_email_fallbacks(
+    mock_stripe, mock_supabase, client, email_fields, expected_email
+):
+    users_table, _subscriptions_table, _prices_table = _mock_supabase_tables(
+        mock_supabase,
+        user_update_rows=[{"id": "existing-user-id", "email": expected_email}],
+    )
+    mock_stripe.Customer.retrieve.return_value = {"email": "customer-retrieve@example.com"}
+
+    response = _post_checkout_completed(client, mock_stripe, email_fields=email_fields)
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    users_table.update.return_value.eq.assert_called_with("email", expected_email)
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_checkout_completed_required_user_write_failure_returns_500(
+    mock_stripe, mock_supabase, client
+):
+    _mock_supabase_tables(mock_supabase, user_update_error=Exception("duplicate email"))
+
+    response = _post_checkout_completed(client, mock_stripe)
+
+    assert response.status_code == 500
+    assert response.json() == {"ok": False, "error": "entitlement_write_failed"}
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_subscription_deleted_updates_existing_user_without_replacing_id(
+    mock_stripe, mock_supabase, client
+):
+    users_table, _subscriptions_table, _prices_table = _mock_supabase_tables(
+        mock_supabase,
+        user_update_rows=[{"id": "existing-user-id", "email": "downgrade@example.com"}],
+    )
+    mock_event = {
+        "id": "evt_deleted_test",
+        "type": "customer.subscription.deleted",
+        "data": {
+            "object": {
+                "id": "sub_deleted_test",
+                "customer": "cus_deleted_test",
+                "status": "canceled",
+            }
+        },
+    }
+    mock_stripe.Webhook.construct_event.return_value = mock_event
+    mock_stripe.Customer.retrieve.return_value = {"email": "downgrade@example.com"}
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+
+    response = client.post(
+        "/stripe/webhook",
+        data=json.dumps(mock_event),
+        headers={"Stripe-Signature": "test_sig"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    update_payload = users_table.update.call_args.args[0]
+    assert update_payload["plan"] == "free"
+    assert update_payload["plan_status"] == "canceled"
+    users_table.update.return_value.eq.assert_called_with("email", "downgrade@example.com")
+    assert not users_table.upsert.called
 
 
 @patch("backend.routes.stripe_webhook.stripe")
@@ -230,12 +410,17 @@ def test_graceful_handling_no_supabase(mock_stripe, client):
             "object": {
                 "customer": "cus_test",
                 "customer_details": {"email": "test@example.com"},
-                "subscription": None,
+                "subscription": "sub_test",
             }
         },
     }
 
     mock_stripe.Webhook.construct_event.return_value = mock_event
+    mock_stripe.Subscription.retrieve.return_value = {
+        "status": "active",
+        "items": {"data": [{"price": {"id": "price_test"}}]},
+        "current_period_end": 1234567890,
+    }
 
     os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
 
@@ -243,9 +428,8 @@ def test_graceful_handling_no_supabase(mock_stripe, client):
         "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
     )
 
-    # Should succeed gracefully without Supabase
-    assert response.status_code == 200
-    assert response.json()["ok"] is True
+    assert response.status_code == 500
+    assert response.json() == {"ok": False, "error": "entitlement_write_failed"}
 
     # Restore env vars for other tests
     os.environ["SUPABASE_URL"] = "https://fake.supabase.co"
@@ -282,14 +466,8 @@ def test_subscription_updated_email_retrieval_failure(mock_stripe, mock_supabase
         "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
     )
 
-    # Should succeed despite email retrieval failure
     assert response.status_code == 200
     assert response.json()["ok"] is True
-
-    # Verify upsert was still called (with email=None)
-    assert mock_supabase.table.return_value.upsert.called
-    upsert_data = mock_supabase.table.return_value.upsert.call_args[0][0]
-    assert upsert_data["email"] is None
 
 
 @patch("backend.routes.stripe_webhook.supabase")

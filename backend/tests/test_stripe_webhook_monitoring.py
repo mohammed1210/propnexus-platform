@@ -12,6 +12,7 @@ def client():
     os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
     os.environ["SUPABASE_URL"] = "https://fake.supabase.co"
     os.environ["SUPABASE_SERVICE_ROLE_KEY"] = "fake_key"
+    os.environ["STRIPE_PRICE_PRO"] = "price_test_123"
 
     from backend.main import app
 
@@ -40,6 +41,13 @@ def test_webhook_success_instrumentation(
         "status": "active",
         "items": {"data": [{"price": {"id": "price_test_123"}}]},
         "current_period_end": 1234567890,
+    }
+    mock_stripe.Price.retrieve.return_value = {
+        "product": "prod_test",
+        "nickname": "Test price",
+        "unit_amount": 900,
+        "currency": "gbp",
+        "recurring": {"interval": "month"},
     }
     mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
 
@@ -143,6 +151,14 @@ def test_webhook_partial_db_write_soft_failure_instrumentation(
     mock_stripe.Webhook.construct_event.return_value = mock_event
     mock_stripe.Customer.retrieve.return_value = {"email": "soft@example.com"}
 
+    os.environ["STRIPE_PRICE_PRO"] = "price_soft_1"
+    mock_stripe.Price.retrieve.return_value = {
+        "product": "prod_test",
+        "nickname": "Soft price",
+        "unit_amount": 900,
+        "currency": "gbp",
+        "recurring": {"interval": "month"},
+    }
     mock_supabase.table.return_value.upsert.return_value.execute.side_effect = Exception("db down")
 
     response = client.post(
@@ -151,12 +167,12 @@ def test_webhook_partial_db_write_soft_failure_instrumentation(
         headers={"Stripe-Signature": "sig_test"},
     )
 
-    assert response.status_code == 200
-    assert response.json()["ok"] is True
+    assert response.status_code == 500
+    assert response.json() == {"ok": False, "error": "entitlement_write_failed"}
     partial_calls = [
         call
         for call in mock_capture_message.call_args_list
-        if call.args and call.args[0] == "stripe_webhook_partial_db_write"
+        if call.args and call.args[0] == "stripe_webhook_entitlement_write_failed"
     ]
     assert partial_calls
     partial_ctx = partial_calls[-1].kwargs.get("stripe_webhook", {})
@@ -190,7 +206,7 @@ def test_webhook_unexpected_exception_instrumentation(
         headers={"Stripe-Signature": "sig_test"},
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 500
     assert response.json()["ok"] is False
 
     assert mock_capture_exception.called
