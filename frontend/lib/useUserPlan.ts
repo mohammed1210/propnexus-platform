@@ -2,7 +2,6 @@
 
 // frontend/lib/useUserPlan.ts
 import { useEffect, useState, useCallback } from 'react';
-import { useUser } from '@clerk/nextjs';
 import { isAuthEnabled } from '@/lib/auth';
 
 export type UserPlan = 'free' | 'pro' | 'investor';
@@ -22,30 +21,17 @@ export function useUserPlan(): UserPlanData {
   const [plan, setPlan] = useState<UserPlan>('free');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  const { isLoaded: clerkLoaded, user: clerkUser } = useUser();
-
   const fetchPlan = useCallback(async () => {
+    if (!isAuthEnabled) {
+      setPlan('free');
+      setError(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-
-      if (!isAuthEnabled) {
-        setPlan('free');
-        setLoading(false);
-        return;
-      }
-
-      if (!clerkLoaded) {
-        return;
-      }
-
-      if (!clerkUser) {
-        setPlan('free');
-        setLoading(false);
-        return;
-      }
 
       const response = await fetch('/api/users/plan', {
         method: 'GET',
@@ -54,6 +40,12 @@ export function useUserPlan(): UserPlanData {
         },
         cache: 'no-store',
       });
+
+      if (response.status === 401 || response.status === 403) {
+        setPlan('free');
+        setLoading(false);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`Failed to fetch plan: ${response.status}`);
@@ -68,18 +60,15 @@ export function useUserPlan(): UserPlanData {
       setPlan('free');
       setLoading(false);
     }
-  }, [clerkLoaded, clerkUser]);
+  }, []);
 
   const refetch = useCallback(async () => {
-    setRefreshTrigger((prev) => prev + 1);
     await fetchPlan();
   }, [fetchPlan]);
 
   useEffect(() => {
-    (async () => {
-      await fetchPlan();
-    })();
-  }, [refreshTrigger, fetchPlan]);
+    void fetchPlan();
+  }, [fetchPlan]);
 
   return {
     plan,
