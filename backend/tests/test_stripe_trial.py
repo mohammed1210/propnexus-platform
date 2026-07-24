@@ -69,6 +69,11 @@ def test_checkout_session_includes_trial(mock_sb, mock_stripe, client):
     assert "subscription_data" in call_kwargs
     assert call_kwargs["subscription_data"]["trial_period_days"] == 7
     assert call_kwargs["mode"] == "subscription"
+    assert (
+        call_kwargs["success_url"]
+        == "http://localhost:3000/success?session_id={CHECKOUT_SESSION_ID}"
+    )
+    assert call_kwargs["cancel_url"] == "http://localhost:3000/pricing"
 
 
 @patch("backend.routes.stripe_routes.stripe")
