@@ -9,6 +9,7 @@ import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
 import {
   analyseDealSchema,
   analysePropertyTypeOptions,
+  normalizeAnalyseLocationInput,
   type AnalyseDealInput,
 } from '@/lib/analyseDealSchema';
 import { normalizeUkPostcode, parseListingText } from '@/lib/parseListingText';
@@ -47,7 +48,7 @@ const inputClassName =
   'h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500';
 
 function buildFieldErrors(form: FormState): FieldErrorMap {
-  const parsed = analyseDealSchema.safeParse({
+  const parsed = analyseDealSchema.safeParse(normalizeAnalyseLocationInput({
     sourceUrl: form.sourceUrl,
     title: form.title,
     location: form.location,
@@ -58,7 +59,7 @@ function buildFieldErrors(form: FormState): FieldErrorMap {
     propertyType: form.propertyType,
     estimatedMonthlyRent: form.estimatedMonthlyRent,
     description: form.description,
-  } satisfies Record<keyof AnalyseDealInput, unknown>);
+  } satisfies Record<keyof AnalyseDealInput, unknown>));
 
   if (parsed.success) return {};
 
@@ -94,7 +95,7 @@ function AnalysePageClient() {
     return {
       sourceUrl,
       postcode,
-      location: postcode ? '' : rawLocation,
+      location: postcode || rawLocation,
     };
   }, [searchParams]);
 
@@ -133,13 +134,15 @@ function AnalysePageClient() {
 
     setSubmitting(true);
     try {
+      const location = form.location.trim() || form.postcode.trim();
+
       const response = await fetch('/api/analyse', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           sourceUrl: form.sourceUrl,
           title: form.title || buildDefaultTitle(form),
-          location: form.location,
+          location,
           postcode: form.postcode,
           price: form.price,
           bedrooms: form.bedrooms,
@@ -199,6 +202,7 @@ function AnalysePageClient() {
 
     if (!form.title.trim() && parsed.title) updates.title = parsed.title;
     if (!form.postcode.trim() && parsed.postcode) updates.postcode = parsed.postcode;
+    if (!form.location.trim() && parsed.postcode) updates.location = parsed.postcode;
     if (!form.price.trim() && typeof parsed.price === 'number') updates.price = String(parsed.price);
     if (!form.estimatedMonthlyRent.trim() && typeof parsed.estimatedMonthlyRent === 'number') {
       updates.estimatedMonthlyRent = String(parsed.estimatedMonthlyRent);

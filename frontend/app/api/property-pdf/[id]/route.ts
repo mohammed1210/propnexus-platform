@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { createPropertyPdfFilename } from '@/lib/propertyDealPack';
 import { FF } from '@/lib/flags';
 import { renderDealPackPdfFromUrl } from '@/lib/server/propertyPdfRenderer';
-import { getPdfRenderToken, PDF_RENDER_TOKEN_HEADER } from '@/lib/server/pdfRenderAuth';
+import { getPdfRenderToken, PDF_RENDER_TOKEN_HEADER, redactPdfRenderToken } from '@/lib/server/pdfRenderAuth';
 import { getServerEntitlements } from '@/lib/server/userPlan';
 import { fetchPropertyById, getOptionalClerkUserId } from '@/lib/server/propertyData';
 
@@ -77,9 +77,10 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       },
     });
   } catch (error) {
-    console.error('Failed to generate property PDF', error);
+    const safeMessage = error instanceof Error ? redactPdfRenderToken(error.message) : 'Unexpected error.';
+    console.error('Failed to generate property PDF', safeMessage);
     return NextResponse.json(
-      { error: 'pdf_generation_failed', message: error instanceof Error ? error.message : 'Unexpected error.' },
+      { error: 'pdf_generation_failed', message: safeMessage },
       { status: 500, headers: noStoreHeaders },
     );
   }

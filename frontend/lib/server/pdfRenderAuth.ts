@@ -14,3 +14,10 @@ export function hasValidPdfRenderToken(value: string | null): boolean {
   const receivedBuffer = Buffer.from(value);
   return expectedBuffer.length === receivedBuffer.length && timingSafeEqual(expectedBuffer, receivedBuffer);
 }
+
+export function redactPdfRenderToken(message: string): string {
+  const token = getPdfRenderToken();
+  if (!token || !message.includes(token)) return message;
+
+  return message.split(token).join('[redacted]');
+}

@@ -39,8 +39,35 @@ export async function renderDealPackPdfFromUrl(url: string, options: RenderPdfOp
   try {
     const page = await browser.newPage({
       viewport: { width: 1440, height: 2048 },
-      extraHTTPHeaders: options.headers,
     });
+    const targetUrl = new URL(url);
+    const authorisedHeaders = options.headers && Object.keys(options.headers).length > 0 ? options.headers : undefined;
+
+    if (authorisedHeaders) {
+      await page.route('**/*', async (route) => {
+        const request = route.request();
+        const requestUrl = new URL(request.url());
+
+        const isAuthorisedDocumentRequest =
+          request.isNavigationRequest()
+          && request.resourceType() === 'document'
+          && requestUrl.origin === targetUrl.origin
+          && requestUrl.pathname === targetUrl.pathname;
+
+        if (isAuthorisedDocumentRequest) {
+          await route.continue({
+            headers: {
+              ...request.headers(),
+              ...authorisedHeaders,
+            },
+          });
+          return;
+        }
+
+        await route.continue();
+      });
+    }
+
     await page.emulateMedia({ media: 'print' });
 
     const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
