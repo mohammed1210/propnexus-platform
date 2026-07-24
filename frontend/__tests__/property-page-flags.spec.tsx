@@ -37,7 +37,7 @@ describe('Property Details Page - Feature Flags', () => {
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AI_SCORE_BREAKDOWN).toBe(false);
       expect(FF.OFF_MARKET).toBe(false);
-      expect(FF.DEAL_PACK).toBe(false);
+      expect(FF.DEAL_PACK).toBe(true);
       expect(FF.CRM_EXPORT).toBe(false);
       expect(FF.TRADESMEN).toBe(false);
       // AI Chat, Area Intel + Comps are default-on (can be explicitly disabled via env)
@@ -156,7 +156,7 @@ describe('Property Details Page - Feature Flags', () => {
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AI_SCORE_BREAKDOWN).toBe(false);
       expect(FF.OFF_MARKET).toBe(false);
-      expect(FF.DEAL_PACK).toBe(false);
+      expect(FF.DEAL_PACK).toBe(true);
       expect(FF.CRM_EXPORT).toBe(false);
       expect(FF.TRADESMEN).toBe(false);
       // AI Chat, Area Intel + Comps default to true when undefined

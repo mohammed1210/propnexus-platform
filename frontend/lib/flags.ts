@@ -19,7 +19,7 @@ const LAUNCH_FLAG_CONFIG: Record<string, LaunchFlagConfig> = {
   DEAL_PACK: {
     env: 'NEXT_PUBLIC_FEATURE_DEAL_PACK',
     aliases: ['NEXT_PUBLIC_FEATURE_PROPERTY_EXPORTS'],
-    default: false,
+    default: true,
   },
   CRM_EXPORT: {
     env: 'NEXT_PUBLIC_FEATURE_CRM_EXPORT',

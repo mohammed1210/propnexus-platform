@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import AnalysePage from '@/app/analyse/page';
 
@@ -39,7 +39,7 @@ describe('/analyse page', () => {
 
     expect(screen.getByLabelText(/listing\/source url optional/i)).toHaveValue('https://example.com/listing/123');
     expect(screen.getByLabelText(/postcode/i)).toHaveValue('LS1 4AB');
-    expect(screen.getByLabelText(/address\/location/i)).toHaveValue('');
+    expect(screen.getByLabelText(/address\/location/i)).toHaveValue('LS1 4AB');
   });
 
   it('prefills a location-like query into the location field', () => {
@@ -64,8 +64,34 @@ describe('/analyse page', () => {
     expect(screen.getByText(/details extracted\. please review before analysing\./i)).toBeInTheDocument();
     expect(screen.getByLabelText(/property title/i)).toHaveValue('Typed title');
     expect(screen.getByLabelText(/postcode/i)).toHaveValue('LS1 4AB');
+    expect(screen.getByLabelText(/address\/location/i)).toHaveValue('LS1 4AB');
     expect(screen.getByLabelText(/asking price/i)).toHaveValue('250000');
     expect(screen.getByLabelText(/estimated monthly rent/i)).toHaveValue('1400');
+  });
+
+  it('fills both postcode and location from postcode-only pasted text', () => {
+    render(<AnalysePage />);
+
+    fireEvent.change(screen.getByLabelText(/quick import text optional/i), {
+      target: { value: 'LS1 4AB\nAsking price £250,000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /extract details/i }));
+
+    expect(screen.getByLabelText(/postcode/i)).toHaveValue('LS1 4AB');
+    expect(screen.getByLabelText(/address\/location/i)).toHaveValue('LS1 4AB');
+  });
+
+  it('does not overwrite an existing typed location when postcode-only text is extracted', () => {
+    render(<AnalysePage />);
+
+    fireEvent.change(screen.getByLabelText(/address\/location/i), { target: { value: 'Leeds city centre' } });
+    fireEvent.change(screen.getByLabelText(/quick import text optional/i), {
+      target: { value: 'LS1 4AB\nAsking price £250,000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /extract details/i }));
+
+    expect(screen.getByLabelText(/postcode/i)).toHaveValue('LS1 4AB');
+    expect(screen.getByLabelText(/address\/location/i)).toHaveValue('Leeds city centre');
   });
 
   it('shows a fallback message when the pasted text yields little data', () => {
@@ -77,5 +103,22 @@ describe('/analyse page', () => {
     fireEvent.click(screen.getByRole('button', { name: /extract details/i }));
 
     expect(screen.getByText(/we could not detect much from that text/i)).toBeInTheDocument();
+  });
+
+  it('fails locally and does not submit when both location and postcode are missing', async () => {
+    const oldFetch = global.fetch;
+    global.fetch = jest.fn() as typeof fetch;
+
+    render(<AnalysePage />);
+
+    fireEvent.change(screen.getByLabelText(/asking price/i), { target: { value: '250000' } });
+    fireEvent.click(screen.getByRole('button', { name: /generate deal pack/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/check the highlighted deal details and try again\./i)).toBeInTheDocument();
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+
+    global.fetch = oldFetch;
   });
 });

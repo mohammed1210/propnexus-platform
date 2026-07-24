@@ -49,6 +49,63 @@ describe('/api/analyse', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
+  it('rejects requests that omit both location and postcode before calling upstream', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_1' });
+    global.fetch = jest.fn() as any;
+
+    const { POST } = await import('@/app/api/analyse/route');
+    const response = await POST(
+      new Request('http://localhost/api/analyse', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: 'Deal', price: 250000 }),
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toMatchObject({
+      error: 'validation_error',
+      message: 'Address or location is required.',
+      fieldErrors: { location: ['Address or location is required.'] },
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('uses the postcode as location when the request omits location', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_postcode_only' });
+    global.fetch = jest.fn(async (_input, init) => {
+      expect(typeof init?.body).toBe('string');
+      const payload = JSON.parse(String(init?.body));
+      expect(payload.location).toBe('LS1 4AB');
+
+      return new Response(JSON.stringify({ ok: true, property_id: 'prop_321' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as any;
+
+    const { POST } = await import('@/app/api/analyse/route');
+    const response = await POST(
+      new Request('http://localhost/api/analyse', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          postcode: 'LS1 4AB',
+          price: 250000,
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://backend.example/properties/user-submitted',
+      expect.objectContaining({
+        body: expect.stringContaining('"location":"LS1 4AB"'),
+      }),
+    );
+  });
+
   it('creates a user_submitted property and stores the URL only as reference data', async () => {
     mockAuth.mockResolvedValue({ userId: 'user_2' });
     global.fetch = jest.fn(async () => {
@@ -119,5 +176,14 @@ describe('/api/analyse', () => {
         body: expect.stringContaining('"title":"Manual deal — LS1 4AB"'),
       }),
     );
+  });
+
+  it('keeps the shared schema aligned with the backend location requirement', async () => {
+    const { analyseDealSchema, normalizeAnalyseLocationInput } = await import('@/lib/analyseDealSchema');
+
+    expect(analyseDealSchema.safeParse({ postcode: 'LS1 4AB', price: 250000 }).success).toBe(false);
+    expect(
+      analyseDealSchema.safeParse(normalizeAnalyseLocationInput({ postcode: 'LS1 4AB', price: 250000 })).success,
+    ).toBe(true);
   });
 });

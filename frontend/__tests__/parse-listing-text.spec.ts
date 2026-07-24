@@ -28,6 +28,10 @@ describe('parseListingText', () => {
     expect(normalizeUkPostcode('ls14ab')).toBe('LS1 4AB');
   });
 
+  it('extracts a normalized postcode from postcode-only text', () => {
+    expect(parseListingText('ls14ab')).toMatchObject({ postcode: 'LS1 4AB' });
+  });
+
   it('does not treat rent-only text as a purchase price', () => {
     expect(parseListingText('Rent £1,200 pcm, 2 bed flat')).toMatchObject({
       estimatedMonthlyRent: 1200,

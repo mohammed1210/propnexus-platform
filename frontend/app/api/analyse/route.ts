@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 
-import { analyseDealSchema } from '@/lib/analyseDealSchema';
+import { analyseDealSchema, normalizeAnalyseLocationInput } from '@/lib/analyseDealSchema';
 import { internalApiHeaders, isInternalApiConfigError } from '@/lib/server/internalApi';
 
 export const runtime = 'nodejs';
@@ -49,7 +49,10 @@ function buildManualDealTitle(payload: { title?: string; postcode?: string; loca
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null);
-    const parsed = analyseDealSchema.safeParse(body);
+    const normalizedBody = normalizeAnalyseLocationInput(
+      body && typeof body === 'object' ? (body as Record<string, unknown>) : {},
+    );
+    const parsed = analyseDealSchema.safeParse(normalizedBody);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -72,6 +75,19 @@ export async function POST(req: Request) {
     }
 
     const payload = parsed.data;
+    const location = payload.location?.trim() || payload.postcode?.trim();
+    if (!location) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'validation_error',
+          message: 'Address or location is required.',
+          fieldErrors: { location: ['Address or location is required.'] },
+        },
+        { status: 400 },
+      );
+    }
+
     const upstream = await fetch(`${getBackendBase()}/properties/user-submitted`, {
       method: 'POST',
       headers: {
@@ -82,7 +98,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         source_url: payload.sourceUrl,
         title: buildManualDealTitle(payload),
-        location: payload.location,
+        location,
         postcode: payload.postcode,
         price: payload.price,
         bedrooms: payload.bedrooms,
