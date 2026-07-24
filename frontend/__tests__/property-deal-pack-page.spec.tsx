@@ -133,7 +133,6 @@ describe('property/[id]/deal-pack/page', () => {
     expect(screen.queryByTestId('deal-pack-root')).not.toBeInTheDocument();
     expect(mockBuildPropertyDealPackModel).not.toHaveBeenCalled();
   });
-
   it('renders the full template for a valid internal PDF render request', async () => {
     mockGetServerEntitlements.mockResolvedValue({ hasDealPack: false });
     mockHeaders.mockResolvedValue(new Headers({ 'X-PropNexus-PDF-Render-Token': 'test-pdf-render-token' }));
