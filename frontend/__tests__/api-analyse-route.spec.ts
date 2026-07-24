@@ -90,4 +90,34 @@ describe('/api/analyse', () => {
     );
     expect(global.fetch).not.toHaveBeenCalledWith('https://example.com/listing/123', expect.anything());
   });
+
+  it('auto-creates a manual title when the user leaves it blank', async () => {
+    mockAuth.mockResolvedValue({ userId: 'user_3' });
+    global.fetch = jest.fn(async () => {
+      return new Response(JSON.stringify({ ok: true, property_id: 'prop_999' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }) as any;
+
+    const { POST } = await import('@/app/api/analyse/route');
+    await POST(
+      new Request('http://localhost/api/analyse', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          location: 'Leeds',
+          postcode: 'LS1 4AB',
+          price: 250000,
+        }),
+      }),
+    );
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://backend.example/properties/user-submitted',
+      expect.objectContaining({
+        body: expect.stringContaining('"title":"Manual deal — LS1 4AB"'),
+      }),
+    );
+  });
 });
