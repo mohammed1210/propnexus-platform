@@ -1,6 +1,10 @@
 import chromium from '@sparticuz/chromium';
 import { chromium as playwrightChromium, type Page } from 'playwright-core';
 
+type RenderPdfOptions = {
+  headers?: Record<string, string>;
+};
+
 const waitForAssets = async (page: Page) => {
   await page.waitForSelector('[data-deal-pack-root]', { state: 'visible', timeout: 20_000 });
   await page.evaluate(async () => {
@@ -23,7 +27,7 @@ const waitForAssets = async (page: Page) => {
   });
 };
 
-export async function renderDealPackPdfFromUrl(url: string): Promise<Uint8Array> {
+export async function renderDealPackPdfFromUrl(url: string, options: RenderPdfOptions = {}): Promise<Uint8Array> {
   // Allow local/dev environments to provide a native Chrome path while Vercel/serverless uses Sparticuz Chromium.
   const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || (await chromium.executablePath());
   const browser = await playwrightChromium.launch({
@@ -33,7 +37,10 @@ export async function renderDealPackPdfFromUrl(url: string): Promise<Uint8Array>
   });
 
   try {
-    const page = await browser.newPage({ viewport: { width: 1440, height: 2048 } });
+    const page = await browser.newPage({
+      viewport: { width: 1440, height: 2048 },
+      extraHTTPHeaders: options.headers,
+    });
     await page.emulateMedia({ media: 'print' });
 
     const response = await page.goto(url, { waitUntil: 'networkidle', timeout: 30_000 });
