@@ -4,6 +4,7 @@
 import React from 'react';
 import { useUserPlan, UserPlan } from '@/lib/useUserPlan';
 import { isAuthEnabled } from '@/lib/auth';
+import { getPlanLabel } from '@/lib/planPermissions';
 
 interface PlanBadgeProps {
   /**
@@ -75,13 +76,15 @@ export default function PlanBadge({
 }
 
 function PlanBadgeNoAuth({ size, className = '' }: { size: 'sm' | 'md' | 'lg'; className?: string }) {
+  const label = getPlanLabel('free');
+
   return (
     <span
       className={`inline-flex items-center ${SIZE_CLASSES[size]} rounded-full border font-semibold ${PLAN_COLORS.free.bg} ${PLAN_COLORS.free.text} ${PLAN_COLORS.free.border} ${className}`}
       role="status"
-      aria-label="Current plan: free"
+      aria-label={`Current plan: ${label}`}
     >
-      <span className="capitalize">free</span>
+      <span>{label}</span>
     </span>
   );
 }
@@ -109,12 +112,13 @@ function PlanBadgeAuthed({
 
   // Get color scheme for current plan
   const colors = PLAN_COLORS[plan] || PLAN_COLORS.free;
+  const label = getPlanLabel(plan);
 
   return (
     <span
       className={`inline-flex items-center ${SIZE_CLASSES[size]} rounded-full border font-semibold ${colors.bg} ${colors.text} ${colors.border} ${className}`}
       role="status"
-      aria-label={`Current plan: ${plan}`}
+      aria-label={`Current plan: ${label}`}
     >
       {/* Plan icon */}
       {plan === 'investor' && (
@@ -142,7 +146,7 @@ function PlanBadgeAuthed({
         </svg>
       )}
 
-      <span className="capitalize">{plan}</span>
+      <span>{label}</span>
     </span>
   );
 }
