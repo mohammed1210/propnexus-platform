@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { FiSearch, FiTrendingUp, FiZap, FiMapPin, FiDollarSign, FiBarChart2, FiShield } from 'react-icons/fi';
+import { looksLikeUrl } from '@/lib/parseListingText';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,9 +19,19 @@ export default function HomePage() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const trimmed = q.trim();
+    if (!trimmed) {
+      router.push('/analyse');
+      return;
+    }
+
     const query = new URLSearchParams();
-    if (q.trim()) query.set('q', q.trim());
-    router.push(`/listings?${query.toString()}`);
+    if (looksLikeUrl(trimmed)) {
+      query.set('sourceUrl', trimmed);
+    } else {
+      query.set('location', trimmed);
+    }
+    router.push(`/analyse?${query.toString()}`);
   }
 
   const features = [
@@ -121,17 +132,17 @@ export default function HomePage() {
                   <input
                     value={q}
                     onChange={(e) => setQ(e.target.value)}
-                    placeholder="Enter location, city, or postcode…"
+                    placeholder="Paste a listing URL, postcode, or location..."
                     className="h-[3.25rem] flex-1 bg-transparent px-3 text-slate-900 outline-none placeholder-slate-500 sm:h-14 lg:h-12"
-                    aria-label="Search by location or postcode"
+                    aria-label="Analyse a deal from a URL, postcode, or location"
                   />
                   <button
                     type="submit"
                     className="flex h-[3.25rem] items-center gap-2 bg-gradient-to-r from-brand-500 to-brand-600 px-5 font-semibold text-white transition-all duration-300 hover:from-brand-600 hover:to-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:h-14 sm:px-6 lg:h-12 lg:px-5"
-                    aria-label="Search for properties"
+                    aria-label="Analyse deal"
                   >
                     <FiZap className="w-4 h-4" aria-hidden="true" />
-                    Search
+                    Analyse deal
                   </button>
                 </div>
               </div>
