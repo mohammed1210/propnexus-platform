@@ -38,6 +38,14 @@ async function getVerifiedUserId(): Promise<string | null> {
   return (session?.userId as string | null) ?? null;
 }
 
+function buildManualDealTitle(payload: { title?: string; postcode?: string; location?: string }): string {
+  const explicit = payload.title?.trim();
+  if (explicit) return explicit;
+
+  const suffix = payload.postcode?.trim() || payload.location?.trim() || 'Unknown location';
+  return `Manual deal — ${suffix}`.slice(0, 240);
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => null);
@@ -73,7 +81,7 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         source_url: payload.sourceUrl,
-        title: payload.title,
+        title: buildManualDealTitle(payload),
         location: payload.location,
         postcode: payload.postcode,
         price: payload.price,

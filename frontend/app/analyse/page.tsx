@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { FormEvent, useState } from 'react';
-import { FiArrowRight, FiCheckCircle, FiLink2 } from 'react-icons/fi';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { FormEvent, Suspense, useEffect, useMemo, useState } from 'react';
+import { FiArrowRight, FiCheckCircle, FiLink2, FiZap } from 'react-icons/fi';
 
 import InfoDisclaimer from '@/components/legal/InfoDisclaimer';
 import {
@@ -11,9 +11,11 @@ import {
   analysePropertyTypeOptions,
   type AnalyseDealInput,
 } from '@/lib/analyseDealSchema';
+import { normalizeUkPostcode, parseListingText } from '@/lib/parseListingText';
 
 type FormState = {
   sourceUrl: string;
+  listingText: string;
   title: string;
   location: string;
   postcode: string;
@@ -29,6 +31,7 @@ type FieldErrorMap = Partial<Record<keyof FormState, string>>;
 
 const initialState: FormState = {
   sourceUrl: '',
+  listingText: '',
   title: '',
   location: '',
   postcode: '',
@@ -69,15 +72,46 @@ function buildFieldErrors(form: FormState): FieldErrorMap {
   return nextErrors;
 }
 
-export default function AnalysePage() {
+function buildDefaultTitle(form: FormState): string {
+  const suffix = form.postcode.trim() || form.location.trim() || 'Unknown location';
+  return `Manual deal — ${suffix}`.slice(0, 240);
+}
+
+function AnalysePageClient() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState<FormState>(initialState);
   const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [extractMessage, setExtractMessage] = useState<string | null>(null);
+
+  const prefills = useMemo(() => {
+    const sourceUrl = searchParams.get('sourceUrl')?.trim() || '';
+    const rawLocation = searchParams.get('location')?.trim() || '';
+    const postcode = normalizeUkPostcode(rawLocation) || '';
+
+    return {
+      sourceUrl,
+      postcode,
+      location: postcode ? '' : rawLocation,
+    };
+  }, [searchParams]);
+
+  useEffect(() => {
+    setForm((current) => ({
+      ...current,
+      sourceUrl: current.sourceUrl || prefills.sourceUrl,
+      postcode: current.postcode || prefills.postcode,
+      location: current.location || prefills.location,
+    }));
+  }, [prefills]);
 
   function updateField(field: keyof FormState, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
+    if (field === 'listingText') {
+      setExtractMessage(null);
+    }
     setFieldErrors((current) => {
       if (!current[field]) return current;
       const next = { ...current };
@@ -104,7 +138,7 @@ export default function AnalysePage() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           sourceUrl: form.sourceUrl,
-          title: form.title,
+          title: form.title || buildDefaultTitle(form),
           location: form.location,
           postcode: form.postcode,
           price: form.price,
@@ -146,6 +180,43 @@ export default function AnalysePage() {
     }
   }
 
+  function handleExtractDetails() {
+    const parsed = parseListingText(form.listingText);
+    const updates: Partial<FormState> = {};
+    const meaningfulSignalCount = [
+      parsed.price,
+      parsed.estimatedMonthlyRent,
+      parsed.bedrooms,
+      parsed.bathrooms,
+      parsed.postcode,
+      parsed.propertyType,
+    ].filter((value) => value !== undefined && value !== null && value !== '').length;
+
+    if (meaningfulSignalCount === 0) {
+      setExtractMessage('We could not detect much from that text. Please add the key fields manually.');
+      return;
+    }
+
+    if (!form.title.trim() && parsed.title) updates.title = parsed.title;
+    if (!form.postcode.trim() && parsed.postcode) updates.postcode = parsed.postcode;
+    if (!form.price.trim() && typeof parsed.price === 'number') updates.price = String(parsed.price);
+    if (!form.estimatedMonthlyRent.trim() && typeof parsed.estimatedMonthlyRent === 'number') {
+      updates.estimatedMonthlyRent = String(parsed.estimatedMonthlyRent);
+    }
+    if (!form.bedrooms.trim() && typeof parsed.bedrooms === 'number') updates.bedrooms = String(parsed.bedrooms);
+    if (!form.bathrooms.trim() && typeof parsed.bathrooms === 'number') updates.bathrooms = String(parsed.bathrooms);
+    if (!form.propertyType.trim() && parsed.propertyType) updates.propertyType = parsed.propertyType;
+    if (!form.description.trim() && parsed.description) updates.description = parsed.description;
+
+    if (Object.keys(updates).length === 0) {
+      setExtractMessage('We could not detect much from that text. Please add the key fields manually.');
+      return;
+    }
+
+    setForm((current) => ({ ...current, ...updates }));
+    setExtractMessage('Details extracted. Please review before analysing.');
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <section className="mx-auto max-w-7xl px-4 py-12 pb-32 sm:px-6 lg:px-8 lg:py-16 lg:pb-16">
@@ -162,6 +233,9 @@ export default function AnalysePage() {
               </h1>
               <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600 dark:text-slate-300">
                 Paste a listing link, enter the key details, and PropNexus will generate an investor-ready Deal Pack.
+              </p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Start with a URL and a few key details. You can add more later.
               </p>
             </div>
 
@@ -197,23 +271,63 @@ export default function AnalysePage() {
 
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/40 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20 sm:p-8">
             <form className="space-y-5" onSubmit={onSubmit}>
-              <FormField label="Listing/source URL optional" htmlFor="sourceUrl" error={fieldErrors.sourceUrl}>
-                <div className="relative">
-                  <FiLink2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
-                  <input
-                    id="sourceUrl"
-                    name="sourceUrl"
-                    type="url"
-                    value={form.sourceUrl}
-                    onChange={(event) => updateField('sourceUrl', event.target.value)}
-                    placeholder="https://example.com/listing"
-                    className={`${inputClassName} pl-11`}
-                  />
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-950 dark:text-white">Deal details</h2>
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 bg-slate-50/90 p-5 dark:border-slate-800 dark:bg-slate-950/50">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+                  <FiZap className="h-4 w-4 text-brand-500" aria-hidden="true" />
+                  Speed up entry
                 </div>
-              </FormField>
+                <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Paste the listing text or key details and PropNexus will pre-fill the form. The URL is stored as your reference only.
+                </p>
+                <div className="mt-4 space-y-4">
+                  <FormField label="Listing/source URL optional" htmlFor="sourceUrl" error={fieldErrors.sourceUrl}>
+                    <div className="relative">
+                      <FiLink2 className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                      <input
+                        id="sourceUrl"
+                        name="sourceUrl"
+                        type="url"
+                        value={form.sourceUrl}
+                        onChange={(event) => updateField('sourceUrl', event.target.value)}
+                        placeholder="https://example.com/listing"
+                        className={`${inputClassName} pl-11`}
+                      />
+                    </div>
+                  </FormField>
+
+                  <FormField label="Quick import text optional" htmlFor="listingText">
+                    <textarea
+                      id="listingText"
+                      name="listingText"
+                      rows={5}
+                      value={form.listingText}
+                      onChange={(event) => updateField('listingText', event.target.value)}
+                      placeholder="Paste listing text, advert description, or key details..."
+                      className={`${inputClassName} min-h-[8rem] py-3`}
+                    />
+                  </FormField>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <button
+                      type="button"
+                      onClick={handleExtractDetails}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:border-brand-500 hover:text-brand-700 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:hover:border-brand-500 dark:hover:text-brand-300"
+                    >
+                      Extract details
+                    </button>
+                    {extractMessage ? (
+                      <p className="text-sm text-slate-600 dark:text-slate-300">{extractMessage}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
-                <FormField label="Property title" htmlFor="title" required error={fieldErrors.title}>
+                <FormField label="Property title" htmlFor="title" error={fieldErrors.title}>
                   <input id="title" name="title" value={form.title} onChange={(event) => updateField('title', event.target.value)} className={inputClassName} />
                 </FormField>
                 <FormField label="Postcode" htmlFor="postcode" error={fieldErrors.postcode}>
@@ -221,9 +335,13 @@ export default function AnalysePage() {
                 </FormField>
               </div>
 
-              <FormField label="Address/location" htmlFor="location" required error={fieldErrors.location}>
+              <FormField label="Address/location" htmlFor="location" error={fieldErrors.location}>
                 <input id="location" name="location" value={form.location} onChange={(event) => updateField('location', event.target.value)} className={inputClassName} />
               </FormField>
+
+              <div className="text-sm leading-6 text-slate-500 dark:text-slate-400">
+                Listing URLs are treated as user-provided references only.
+              </div>
 
               <div className="grid gap-5 sm:grid-cols-2">
                 <FormField label="Asking price" htmlFor="price" required error={fieldErrors.price}>
@@ -241,31 +359,36 @@ export default function AnalysePage() {
                 </FormField>
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-3">
-                <FormField label="Bedrooms" htmlFor="bedrooms" error={fieldErrors.bedrooms}>
-                  <input id="bedrooms" name="bedrooms" inputMode="numeric" value={form.bedrooms} onChange={(event) => updateField('bedrooms', event.target.value)} className={inputClassName} />
-                </FormField>
-                <FormField label="Bathrooms" htmlFor="bathrooms" error={fieldErrors.bathrooms}>
-                  <input id="bathrooms" name="bathrooms" inputMode="numeric" value={form.bathrooms} onChange={(event) => updateField('bathrooms', event.target.value)} className={inputClassName} />
-                </FormField>
-                <FormField label="Estimated monthly rent" htmlFor="estimatedMonthlyRent" error={fieldErrors.estimatedMonthlyRent}>
-                  <input id="estimatedMonthlyRent" name="estimatedMonthlyRent" inputMode="decimal" value={form.estimatedMonthlyRent} onChange={(event) => updateField('estimatedMonthlyRent', event.target.value)} placeholder="1400" className={inputClassName} />
-                </FormField>
+              <div className="rounded-2xl border border-dashed border-slate-200 p-4 dark:border-slate-700">
+                <div className="mb-4 text-sm font-semibold text-slate-900 dark:text-white">Optional details</div>
+                <div className="grid gap-5 sm:grid-cols-3">
+                  <FormField label="Bedrooms" htmlFor="bedrooms" error={fieldErrors.bedrooms}>
+                    <input id="bedrooms" name="bedrooms" inputMode="numeric" value={form.bedrooms} onChange={(event) => updateField('bedrooms', event.target.value)} className={inputClassName} />
+                  </FormField>
+                  <FormField label="Bathrooms" htmlFor="bathrooms" error={fieldErrors.bathrooms}>
+                    <input id="bathrooms" name="bathrooms" inputMode="numeric" value={form.bathrooms} onChange={(event) => updateField('bathrooms', event.target.value)} className={inputClassName} />
+                  </FormField>
+                  <FormField label="Estimated monthly rent" htmlFor="estimatedMonthlyRent" error={fieldErrors.estimatedMonthlyRent}>
+                    <input id="estimatedMonthlyRent" name="estimatedMonthlyRent" inputMode="decimal" value={form.estimatedMonthlyRent} onChange={(event) => updateField('estimatedMonthlyRent', event.target.value)} placeholder="1400" className={inputClassName} />
+                  </FormField>
+                </div>
+
+                <div className="mt-5">
+                  <FormField label="Notes/description" htmlFor="description" error={fieldErrors.description}>
+                    <textarea
+                      id="description"
+                      name="description"
+                      rows={5}
+                      value={form.description}
+                      onChange={(event) => updateField('description', event.target.value)}
+                      className={`${inputClassName} min-h-[8rem] py-3`}
+                    />
+                  </FormField>
+                </div>
               </div>
 
-              <FormField label="Notes/description" htmlFor="description" error={fieldErrors.description}>
-                <textarea
-                  id="description"
-                  name="description"
-                  rows={5}
-                  value={form.description}
-                  onChange={(event) => updateField('description', event.target.value)}
-                  className={`${inputClassName} min-h-[8rem] py-3`}
-                />
-              </FormField>
-
               <InfoDisclaimer className="w-full text-left">
-                PropNexus does not scrape or copy third-party listing pages in this flow. You are responsible for the information you provide. PropNexus outputs are indicative only and are not valuations, financial advice, mortgage advice, tax advice or legal advice.
+                PropNexus does not scrape or copy third-party listing pages in this flow. Listing URLs are treated as user-provided references only. You are responsible for the information you provide. PropNexus outputs are indicative only and are not valuations, financial advice, mortgage advice, tax advice or legal advice.
               </InfoDisclaimer>
 
               {error ? (
@@ -287,6 +410,24 @@ export default function AnalysePage() {
         </div>
       </section>
     </div>
+  );
+}
+
+function AnalysePageFallback() {
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="h-48 animate-pulse rounded-3xl bg-slate-200 dark:bg-slate-800" />
+      </div>
+    </div>
+  );
+}
+
+export default function AnalysePage() {
+  return (
+    <Suspense fallback={<AnalysePageFallback />}>
+      <AnalysePageClient />
+    </Suspense>
   );
 }
 

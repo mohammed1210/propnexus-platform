@@ -36,8 +36,8 @@ export const analysePropertyTypeOptions = [
 export const analyseDealSchema = z.object({
   sourceUrl: z
     .preprocess(textOrUndefined, z.string().url('Enter a valid http(s) URL.').max(2048).optional()),
-  title: z.preprocess(textOrUndefined, z.string().min(1, 'Property title is required.').max(240)),
-  location: z.preprocess(textOrUndefined, z.string().min(1, 'Address or location is required.').max(240)),
+  title: z.preprocess(textOrUndefined, z.string().max(240).optional()),
+  location: z.preprocess(textOrUndefined, z.string().max(240).optional()),
   postcode: z.preprocess(textOrUndefined, z.string().max(24).optional()),
   price: z.preprocess(
     numberOrUndefined,
@@ -51,6 +51,14 @@ export const analyseDealSchema = z.object({
     z.number().finite('Enter a valid monthly rent.').min(0).max(1000000).optional(),
   ),
   description: z.preprocess(textOrUndefined, z.string().max(4000).optional()),
+}).superRefine((value, ctx) => {
+  if (!value.location && !value.postcode) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['location'],
+      message: 'Add an address/location or a postcode.',
+    });
+  }
 });
 
 export type AnalyseDealInput = z.infer<typeof analyseDealSchema>;
