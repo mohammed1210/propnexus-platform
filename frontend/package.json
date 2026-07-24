@@ -48,7 +48,7 @@
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "next": "^16.2.1",
-    "next-intl": "^4.9.1",
+    "next-intl": "^4.13.1",
     "openai": "^6.35.0",
     "pako": "^2.1.0",
     "papaparse": "^5.5.3",
