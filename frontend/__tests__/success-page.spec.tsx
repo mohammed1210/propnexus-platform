@@ -3,6 +3,9 @@ import SuccessPage from '@/app/success/page';
 
 describe('/success page', () => {
   it('renders a safe checkout-complete state with a session id', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn() as any;
+
     render(await SuccessPage({ searchParams: Promise.resolve({ session_id: 'cs_test_123' }) }));
 
     expect(screen.getByRole('heading', { name: /checkout complete/i })).toBeInTheDocument();
@@ -10,6 +13,8 @@ describe('/success page', () => {
     expect(screen.getByRole('link', { name: /go to account/i })).toHaveAttribute('href', '/account');
     expect(screen.getByRole('link', { name: /analyse a deal/i })).toHaveAttribute('href', '/analyse');
     expect(screen.getByRole('link', { name: /view pricing/i })).toHaveAttribute('href', '/pricing');
+    expect(global.fetch).not.toHaveBeenCalled();
+    global.fetch = originalFetch;
   });
 
   it('renders safely without a session id', async () => {

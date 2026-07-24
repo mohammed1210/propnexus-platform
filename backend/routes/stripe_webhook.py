@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from typing import Any, Dict, Optional
@@ -25,12 +26,14 @@ router = APIRouter(prefix="/stripe", tags=["stripe"])
 def _monitor_webhook(
     message: str,
     *,
+    event_id: Optional[str] = None,
     level: str = "info",
     event_type: Optional[str] = None,
     customer_id: Optional[str] = None,
     subscription_id: Optional[str] = None,
     price_id: Optional[str] = None,
     mapped_plan: Optional[str] = None,
+    email_hash: Optional[str] = None,
     db_write_succeeded: Optional[bool] = None,
     failure_kind: Optional[str] = None,
 ) -> None:
@@ -38,11 +41,13 @@ def _monitor_webhook(
         message,
         level=level,
         stripe_webhook={
+            "event_id": event_id,
             "event_type": event_type,
             "customer_id": customer_id,
             "subscription_id": subscription_id,
             "price_id": price_id,
             "mapped_plan": mapped_plan,
+            "email_hash": email_hash,
             "db_write_succeeded": db_write_succeeded,
             "failure_kind": failure_kind,
         },
@@ -159,6 +164,64 @@ def _as_dict(obj: Any) -> Dict[str, Any]:
         return {}
 
 
+def _normalize_email(email: Optional[str]) -> Optional[str]:
+    value = str(email or "").strip().lower()
+    if not value or "@" not in value:
+        return None
+    return value
+
+
+def _email_hash(email: Optional[str]) -> Optional[str]:
+    normalized = _normalize_email(email)
+    if not normalized:
+        return None
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16]
+
+
+def _response_has_rows(response: Any) -> bool:
+    data = getattr(response, "data", None)
+    if isinstance(data, list):
+        return len(data) > 0
+    if isinstance(data, dict):
+        return bool(data)
+    return False
+
+
+def _get_metadata(data_obj: Dict[str, Any]) -> Dict[str, Any]:
+    metadata = data_obj.get("metadata") or {}
+    return metadata if isinstance(metadata, dict) else {}
+
+
+def _customer_email(customer_id: Optional[str]) -> Optional[str]:
+    if not customer_id:
+        return None
+
+    try:
+        customer = stripe.Customer.retrieve(customer_id)
+        if isinstance(customer, dict):
+            return _normalize_email(customer.get("email"))
+        return _normalize_email(getattr(customer, "email", None))
+    except Exception as e:
+        logger.debug(f"Failed to retrieve customer email for {customer_id}: {e}")
+        return None
+
+
+def _resolve_checkout_email(data_obj: Dict[str, Any]) -> Optional[str]:
+    customer_details = data_obj.get("customer_details") or {}
+    metadata = _get_metadata(data_obj)
+
+    return (
+        _normalize_email(customer_details.get("email"))
+        or _normalize_email(data_obj.get("customer_email"))
+        or _normalize_email(metadata.get("email"))
+        or _customer_email(data_obj.get("customer"))
+    )
+
+
+def _entitlement_failure_response(failure_kind: str = "entitlement_write_failed") -> JSONResponse:
+    return JSONResponse({"ok": False, "error": failure_kind}, status_code=500)
+
+
 def _upsert_price_metadata(sb_client: Any, price_id: Optional[str]) -> bool:
     if not sb_client or not price_id:
         return True
@@ -197,6 +260,7 @@ def _upsert_subscription_record(
     status: Optional[str],
     price_id: Optional[str],
 ) -> bool:
+    email = _normalize_email(email)
     if not sb_client or not email:
         return True
 
@@ -213,7 +277,10 @@ def _upsert_subscription_record(
         sb_client.table("subscriptions").upsert(data, on_conflict="email").execute()
         return True
     except Exception as e:
-        logger.warning(f"Failed to upsert subscription record for {email}: {e}")
+        logger.warning(
+            "Failed to upsert subscription record",
+            extra={"email_hash": _email_hash(email), "error": str(e)},
+        )
         return False
 
 
@@ -227,7 +294,9 @@ def _write_user_plan(
     plan: Optional[str],
 ) -> bool:
     if not sb_client:
-        return True
+        return False
+
+    email = _normalize_email(email)
 
     base = {
         "stripe_customer_id": customer_id,
@@ -238,16 +307,28 @@ def _write_user_plan(
         base["plan"] = plan
 
     try:
-        # Unit tests historically expect a users-table upsert to occur even when email is None.
-        # In production, avoid attempting an insert that would violate NOT NULL on users.email.
-        if email or is_test_or_ci():
+        if email:
+            update_res = sb_client.table("users").update(base).eq("email", email).execute()
+            if _response_has_rows(update_res):
+                return True
+
             upsert_data = {**base, "email": email}
-            sb_client.table("users").upsert(upsert_data).execute()
+            sb_client.table("users").upsert(upsert_data, on_conflict="email").execute()
         elif customer_id:
             sb_client.table("users").update(base).eq("stripe_customer_id", customer_id).execute()
+        else:
+            return False
         return True
     except Exception as e:
-        logger.warning(f"Failed to write user plan data for customer {customer_id}: {e}")
+        logger.warning(
+            "Failed to write user plan data",
+            extra={
+                "customer_id": customer_id,
+                "email_hash": _email_hash(email),
+                "mapped_plan": plan,
+                "error": str(e),
+            },
+        )
         return False
 
 
@@ -341,13 +422,14 @@ async def stripe_webhook(request: Request):
         return JSONResponse({"ok": False, "error": "webhook_internal_error"}, status_code=500)
 
     etype = event.get("type")
+    event_id = event.get("id")
     data_obj: Dict[str, Any] = (event.get("data") or {}).get("object") or {}
 
     try:
         if etype == "checkout.session.completed":
             sub_id = data_obj.get("subscription")
             customer_id = data_obj.get("customer")
-            customer_email = (data_obj.get("customer_details") or {}).get("email")
+            customer_email = _resolve_checkout_email(data_obj)
 
             # In tests, these calls are patched
             sub = (
@@ -364,6 +446,21 @@ async def stripe_webhook(request: Request):
 
             # Map price_id to plan - returns None for unknown IDs
             plan = map_price_to_plan(price_id) if eligible_for_plan else None
+            if eligible_for_plan and not plan:
+                _monitor_webhook(
+                    "stripe_webhook_entitlement_write_failed",
+                    level="error",
+                    event_id=event_id,
+                    event_type=etype,
+                    customer_id=customer_id,
+                    subscription_id=sub_id,
+                    price_id=price_id,
+                    mapped_plan=plan,
+                    email_hash=_email_hash(customer_email),
+                    db_write_succeeded=False,
+                    failure_kind="unknown_price_id",
+                )
+                return _entitlement_failure_response("unknown_price_id")
             # Always preserve the real Stripe status
             plan_status = status
 
@@ -393,44 +490,92 @@ async def stripe_webhook(request: Request):
                         current_period_end=current_period_end,
                         plan=plan,
                     )
-                    db_write_succeeded = all([price_ok, sub_ok, user_ok])
-                    if not db_write_succeeded:
+                    optional_ok = all([price_ok, sub_ok])
+                    db_write_succeeded = user_ok
+                    if not optional_ok:
                         _monitor_webhook(
                             "stripe_webhook_partial_db_write",
                             level="warning",
+                            event_id=event_id,
                             event_type=etype,
                             customer_id=customer_id,
                             subscription_id=sub_id,
                             price_id=price_id,
                             mapped_plan=plan,
+                            email_hash=_email_hash(customer_email),
                             db_write_succeeded=False,
                             failure_kind="db_write_soft_failure",
                         )
+                    if not user_ok:
+                        _monitor_webhook(
+                            "stripe_webhook_entitlement_write_failed",
+                            level="error",
+                            event_id=event_id,
+                            event_type=etype,
+                            customer_id=customer_id,
+                            subscription_id=sub_id,
+                            price_id=price_id,
+                            mapped_plan=plan,
+                            email_hash=_email_hash(customer_email),
+                            db_write_succeeded=False,
+                            failure_kind="entitlement_write_failed",
+                        )
+                        return _entitlement_failure_response()
                 except Exception as e:
-                    # Log error but don't fail the webhook - gracefully skip DB write
-                    logger.warning(f"Failed to upsert user data in checkout.session.completed: {e}")
+                    logger.warning(
+                        "Failed to write checkout.session.completed entitlement data",
+                        extra={
+                            "event_id": event_id,
+                            "customer_id": customer_id,
+                            "subscription_id": sub_id,
+                            "price_id": price_id,
+                            "mapped_plan": plan,
+                            "email_hash": _email_hash(customer_email),
+                            "error": str(e),
+                        },
+                    )
                     db_write_succeeded = False
                     _monitor_webhook(
-                        "stripe_webhook_partial_db_write",
-                        level="warning",
+                        "stripe_webhook_entitlement_write_failed",
+                        level="error",
+                        event_id=event_id,
                         event_type=etype,
                         customer_id=customer_id,
                         subscription_id=sub_id,
                         price_id=price_id,
                         mapped_plan=plan,
+                        email_hash=_email_hash(customer_email),
                         db_write_succeeded=False,
                         failure_kind="db_write_exception",
                     )
-                    pass
+                    return _entitlement_failure_response()
+
+            if not sb_client:
+                _monitor_webhook(
+                    "stripe_webhook_entitlement_write_failed",
+                    level="error",
+                    event_id=event_id,
+                    event_type=etype,
+                    customer_id=customer_id,
+                    subscription_id=sub_id,
+                    price_id=price_id,
+                    mapped_plan=plan,
+                    email_hash=_email_hash(customer_email),
+                    db_write_succeeded=False,
+                    failure_kind="missing_supabase_client",
+                )
+                return _entitlement_failure_response()
 
             _monitor_webhook(
                 "stripe_webhook_processed",
                 level="info",
+                event_id=event_id,
                 event_type=etype,
                 customer_id=customer_id,
                 subscription_id=sub_id,
                 price_id=price_id,
                 mapped_plan=plan,
+                email_hash=_email_hash(customer_email),
                 db_write_succeeded=db_write_succeeded,
             )
 
@@ -445,21 +590,28 @@ async def stripe_webhook(request: Request):
             current_period_end = data_obj.get("current_period_end")
 
             # Retrieve customer email - handle potential failures gracefully
-            email = None
-            try:
-                if customer_id:
-                    customer = stripe.Customer.retrieve(customer_id)
-                    email = customer.get("email")
-            except Exception as e:
-                # If we can't retrieve customer email, continue without it
-                logger.debug(f"Failed to retrieve customer email for {customer_id}: {e}")
-                pass
+            email = _customer_email(customer_id)
 
             # Only treat certain statuses as eligible for a paid plan
             eligible_for_plan = status in ["active", "trialing", "past_due"]
 
             # Map price_id to plan - returns None for unknown IDs
             plan = map_price_to_plan(price_id) if eligible_for_plan else None
+            if eligible_for_plan and not plan:
+                _monitor_webhook(
+                    "stripe_webhook_entitlement_write_failed",
+                    level="error",
+                    event_id=event_id,
+                    event_type=etype,
+                    customer_id=customer_id,
+                    subscription_id=data_obj.get("id"),
+                    price_id=price_id,
+                    mapped_plan=plan,
+                    email_hash=_email_hash(email),
+                    db_write_succeeded=False,
+                    failure_kind="unknown_price_id",
+                )
+                return _entitlement_failure_response("unknown_price_id")
             # Always preserve the real Stripe status
             plan_status = status
 
@@ -487,44 +639,92 @@ async def stripe_webhook(request: Request):
                         current_period_end=current_period_end,
                         plan=plan,
                     )
-                    db_write_succeeded = all([price_ok, sub_ok, user_ok])
-                    if not db_write_succeeded:
+                    optional_ok = all([price_ok, sub_ok])
+                    db_write_succeeded = user_ok
+                    if not optional_ok:
                         _monitor_webhook(
                             "stripe_webhook_partial_db_write",
                             level="warning",
+                            event_id=event_id,
                             event_type=etype,
                             customer_id=customer_id,
                             subscription_id=data_obj.get("id"),
                             price_id=price_id,
                             mapped_plan=plan,
+                            email_hash=_email_hash(email),
                             db_write_succeeded=False,
                             failure_kind="db_write_soft_failure",
                         )
+                    if not user_ok:
+                        _monitor_webhook(
+                            "stripe_webhook_entitlement_write_failed",
+                            level="error",
+                            event_id=event_id,
+                            event_type=etype,
+                            customer_id=customer_id,
+                            subscription_id=data_obj.get("id"),
+                            price_id=price_id,
+                            mapped_plan=plan,
+                            email_hash=_email_hash(email),
+                            db_write_succeeded=False,
+                            failure_kind="entitlement_write_failed",
+                        )
+                        return _entitlement_failure_response()
                 except Exception as e:
-                    # Log error but don't fail the webhook - gracefully skip DB write
-                    logger.warning(f"Failed to upsert user data in subscription.updated: {e}")
+                    logger.warning(
+                        "Failed to write subscription.updated entitlement data",
+                        extra={
+                            "event_id": event_id,
+                            "customer_id": customer_id,
+                            "subscription_id": data_obj.get("id"),
+                            "price_id": price_id,
+                            "mapped_plan": plan,
+                            "email_hash": _email_hash(email),
+                            "error": str(e),
+                        },
+                    )
                     db_write_succeeded = False
                     _monitor_webhook(
-                        "stripe_webhook_partial_db_write",
-                        level="warning",
+                        "stripe_webhook_entitlement_write_failed",
+                        level="error",
+                        event_id=event_id,
                         event_type=etype,
                         customer_id=customer_id,
                         subscription_id=data_obj.get("id"),
                         price_id=price_id,
                         mapped_plan=plan,
+                        email_hash=_email_hash(email),
                         db_write_succeeded=False,
                         failure_kind="db_write_exception",
                     )
-                    pass
+                    return _entitlement_failure_response()
+
+            if not sb_client:
+                _monitor_webhook(
+                    "stripe_webhook_entitlement_write_failed",
+                    level="error",
+                    event_id=event_id,
+                    event_type=etype,
+                    customer_id=customer_id,
+                    subscription_id=data_obj.get("id"),
+                    price_id=price_id,
+                    mapped_plan=plan,
+                    email_hash=_email_hash(email),
+                    db_write_succeeded=False,
+                    failure_kind="missing_supabase_client",
+                )
+                return _entitlement_failure_response()
 
             _monitor_webhook(
                 "stripe_webhook_processed",
                 level="info",
+                event_id=event_id,
                 event_type=etype,
                 customer_id=customer_id,
                 subscription_id=data_obj.get("id"),
                 price_id=price_id,
                 mapped_plan=plan,
+                email_hash=_email_hash(email),
                 db_write_succeeded=db_write_succeeded,
             )
 
@@ -539,18 +739,26 @@ async def stripe_webhook(request: Request):
             current_period_end = data_obj.get("current_period_end")
 
             # Retrieve customer email - handle potential failures gracefully
-            email = None
-            try:
-                if customer_id:
-                    customer = stripe.Customer.retrieve(customer_id)
-                    email = customer.get("email")
-            except Exception as e:
-                # If we can't retrieve customer email, continue without it
-                logger.debug(f"Failed to retrieve customer email for {customer_id}: {e}")
-                pass
+            email = _customer_email(customer_id)
 
             # Map price_id to plan - returns None for unknown IDs
             plan = map_price_to_plan(price_id)
+            eligible_for_plan = status in ["active", "trialing", "past_due"]
+            if eligible_for_plan and not plan:
+                _monitor_webhook(
+                    "stripe_webhook_entitlement_write_failed",
+                    level="error",
+                    event_id=event_id,
+                    event_type=etype,
+                    customer_id=customer_id,
+                    subscription_id=data_obj.get("id"),
+                    price_id=price_id,
+                    mapped_plan=plan,
+                    email_hash=_email_hash(email),
+                    db_write_succeeded=False,
+                    failure_kind="unknown_price_id",
+                )
+                return _entitlement_failure_response("unknown_price_id")
             plan_status = (
                 status if status in ["active", "past_due", "canceled", "trialing"] else "active"
             )
@@ -579,44 +787,92 @@ async def stripe_webhook(request: Request):
                         current_period_end=current_period_end,
                         plan=plan,
                     )
-                    db_write_succeeded = all([price_ok, sub_ok, user_ok])
-                    if not db_write_succeeded:
+                    optional_ok = all([price_ok, sub_ok])
+                    db_write_succeeded = user_ok
+                    if not optional_ok:
                         _monitor_webhook(
                             "stripe_webhook_partial_db_write",
                             level="warning",
+                            event_id=event_id,
                             event_type=etype,
                             customer_id=customer_id,
                             subscription_id=data_obj.get("id"),
                             price_id=price_id,
                             mapped_plan=plan,
+                            email_hash=_email_hash(email),
                             db_write_succeeded=False,
                             failure_kind="db_write_soft_failure",
                         )
+                    if not user_ok:
+                        _monitor_webhook(
+                            "stripe_webhook_entitlement_write_failed",
+                            level="error",
+                            event_id=event_id,
+                            event_type=etype,
+                            customer_id=customer_id,
+                            subscription_id=data_obj.get("id"),
+                            price_id=price_id,
+                            mapped_plan=plan,
+                            email_hash=_email_hash(email),
+                            db_write_succeeded=False,
+                            failure_kind="entitlement_write_failed",
+                        )
+                        return _entitlement_failure_response()
                 except Exception as e:
-                    # Log error but don't fail the webhook - gracefully skip DB write
-                    logger.warning(f"Failed to upsert user data in subscription.created: {e}")
+                    logger.warning(
+                        "Failed to write subscription.created entitlement data",
+                        extra={
+                            "event_id": event_id,
+                            "customer_id": customer_id,
+                            "subscription_id": data_obj.get("id"),
+                            "price_id": price_id,
+                            "mapped_plan": plan,
+                            "email_hash": _email_hash(email),
+                            "error": str(e),
+                        },
+                    )
                     db_write_succeeded = False
                     _monitor_webhook(
-                        "stripe_webhook_partial_db_write",
-                        level="warning",
+                        "stripe_webhook_entitlement_write_failed",
+                        level="error",
+                        event_id=event_id,
                         event_type=etype,
                         customer_id=customer_id,
                         subscription_id=data_obj.get("id"),
                         price_id=price_id,
                         mapped_plan=plan,
+                        email_hash=_email_hash(email),
                         db_write_succeeded=False,
                         failure_kind="db_write_exception",
                     )
-                    pass
+                    return _entitlement_failure_response()
+
+            if not sb_client:
+                _monitor_webhook(
+                    "stripe_webhook_entitlement_write_failed",
+                    level="error",
+                    event_id=event_id,
+                    event_type=etype,
+                    customer_id=customer_id,
+                    subscription_id=data_obj.get("id"),
+                    price_id=price_id,
+                    mapped_plan=plan,
+                    email_hash=_email_hash(email),
+                    db_write_succeeded=False,
+                    failure_kind="missing_supabase_client",
+                )
+                return _entitlement_failure_response()
 
             _monitor_webhook(
                 "stripe_webhook_processed",
                 level="info",
+                event_id=event_id,
                 event_type=etype,
                 customer_id=customer_id,
                 subscription_id=data_obj.get("id"),
                 price_id=price_id,
                 mapped_plan=plan,
+                email_hash=_email_hash(email),
                 db_write_succeeded=db_write_succeeded,
             )
 
@@ -626,15 +882,7 @@ async def stripe_webhook(request: Request):
             customer_id = data_obj.get("customer")
 
             # Retrieve customer email - handle potential failures gracefully
-            email = None
-            try:
-                if customer_id:
-                    customer = stripe.Customer.retrieve(customer_id)
-                    email = customer.get("email")
-            except Exception as e:
-                # If we can't retrieve customer email, continue without it
-                logger.debug(f"Failed to retrieve customer email for {customer_id}: {e}")
-                pass
+            email = _customer_email(customer_id)
 
             # Get Supabase client (lazy, may be None)
             sb_client = get_supabase_client()
@@ -661,41 +909,85 @@ async def stripe_webhook(request: Request):
                         current_period_end=None,
                         plan="free",
                     )
-                    db_write_succeeded = all([sub_ok, user_ok])
-                    if not db_write_succeeded:
+                    db_write_succeeded = user_ok
+                    if not sub_ok:
                         _monitor_webhook(
                             "stripe_webhook_partial_db_write",
                             level="warning",
+                            event_id=event_id,
                             event_type=etype,
                             customer_id=customer_id,
                             subscription_id=data_obj.get("id"),
                             mapped_plan="free",
+                            email_hash=_email_hash(email),
                             db_write_succeeded=False,
                             failure_kind="db_write_soft_failure",
                         )
+                    if not user_ok:
+                        _monitor_webhook(
+                            "stripe_webhook_entitlement_write_failed",
+                            level="error",
+                            event_id=event_id,
+                            event_type=etype,
+                            customer_id=customer_id,
+                            subscription_id=data_obj.get("id"),
+                            mapped_plan="free",
+                            email_hash=_email_hash(email),
+                            db_write_succeeded=False,
+                            failure_kind="entitlement_write_failed",
+                        )
+                        return _entitlement_failure_response()
                 except Exception as e:
-                    # Log error but don't fail the webhook - gracefully skip DB write
-                    logger.warning(f"Failed to upsert user data in subscription.deleted: {e}")
+                    logger.warning(
+                        "Failed to write subscription.deleted entitlement data",
+                        extra={
+                            "event_id": event_id,
+                            "customer_id": customer_id,
+                            "subscription_id": data_obj.get("id"),
+                            "mapped_plan": "free",
+                            "email_hash": _email_hash(email),
+                            "error": str(e),
+                        },
+                    )
                     db_write_succeeded = False
                     _monitor_webhook(
-                        "stripe_webhook_partial_db_write",
-                        level="warning",
+                        "stripe_webhook_entitlement_write_failed",
+                        level="error",
+                        event_id=event_id,
                         event_type=etype,
                         customer_id=customer_id,
                         subscription_id=data_obj.get("id"),
                         mapped_plan="free",
+                        email_hash=_email_hash(email),
                         db_write_succeeded=False,
                         failure_kind="db_write_exception",
                     )
-                    pass
+                    return _entitlement_failure_response()
+
+            if not sb_client:
+                _monitor_webhook(
+                    "stripe_webhook_entitlement_write_failed",
+                    level="error",
+                    event_id=event_id,
+                    event_type=etype,
+                    customer_id=customer_id,
+                    subscription_id=data_obj.get("id"),
+                    mapped_plan="free",
+                    email_hash=_email_hash(email),
+                    db_write_succeeded=False,
+                    failure_kind="missing_supabase_client",
+                )
+                return _entitlement_failure_response()
 
             _monitor_webhook(
                 "stripe_webhook_processed",
                 level="info",
+                event_id=event_id,
                 event_type=etype,
                 customer_id=customer_id,
                 subscription_id=data_obj.get("id"),
                 mapped_plan="free",
+                email_hash=_email_hash(email),
                 db_write_succeeded=db_write_succeeded,
             )
 
@@ -705,6 +997,7 @@ async def stripe_webhook(request: Request):
         _monitor_webhook(
             "stripe_webhook_processed",
             level="info",
+            event_id=event_id,
             event_type=etype,
             customer_id=data_obj.get("customer"),
             subscription_id=data_obj.get("id"),
@@ -712,10 +1005,10 @@ async def stripe_webhook(request: Request):
         )
         return JSONResponse({"ok": True, "ignored": etype})
     except Exception as e:
-        # Keep 200 for tests; surface as ok=false so assertions can still read the result
         capture_exception(
             e,
             stripe_webhook={
+                "event_id": event_id,
                 "event_type": etype,
                 "customer_id": data_obj.get("customer"),
                 "subscription_id": data_obj.get("id"),
@@ -725,10 +1018,11 @@ async def stripe_webhook(request: Request):
         _monitor_webhook(
             "stripe_webhook_unexpected_exception",
             level="error",
+            event_id=event_id,
             event_type=etype,
             customer_id=data_obj.get("customer"),
             subscription_id=data_obj.get("id"),
             db_write_succeeded=False,
             failure_kind="unexpected_processing_exception",
         )
-        return JSONResponse({"ok": False, "error": str(e)})
+        return JSONResponse({"ok": False, "error": "webhook_processing_failed"}, status_code=500)

@@ -16,10 +16,23 @@ const listingText = [
 const screenshotDir = path.resolve(process.cwd(), '../docs/screenshots');
 
 type PlanKey = 'free' | 'starter' | 'pro';
+type BackendPlan = 'free' | 'pro' | 'investor';
 
 type Credentials = {
   email: string;
   password: string;
+};
+
+const expectedBackendPlan: Record<PlanKey, BackendPlan> = {
+  free: 'free',
+  starter: 'pro',
+  pro: 'investor',
+};
+
+const credentialEnvNames: Record<PlanKey, string> = {
+  free: 'E2E_FREE_EMAIL/E2E_FREE_PASSWORD',
+  starter: 'E2E_STARTER_EMAIL/E2E_STARTER_PASSWORD',
+  pro: 'E2E_PRO_EMAIL/E2E_PRO_PASSWORD',
 };
 
 function getCredentials(plan: PlanKey): Credentials | null {
@@ -27,6 +40,12 @@ function getCredentials(plan: PlanKey): Credentials | null {
   const email = (process.env[`${prefix}_EMAIL`] ?? '').trim();
   const password = (process.env[`${prefix}_PASSWORD`] ?? '').trim();
   return email && password ? { email, password } : null;
+}
+
+function skipIfMissingCredentials(plan: PlanKey): Credentials {
+  const credentials = getCredentials(plan);
+  test.skip(!credentials, `Authenticated smoke skipped: missing ${credentialEnvNames[plan]} secrets.`);
+  return credentials!;
 }
 
 async function captureScreenshot(page: Page, name: string) {
@@ -43,6 +62,21 @@ async function signIn(page: Page, credentials: Credentials, redirectPath = '/ana
   await page.getByPlaceholder(/enter your password/i).fill(credentials.password);
   await page.getByRole('button', { name: /^continue$/i }).click();
   await page.waitForURL((url) => !url.pathname.startsWith('/sign-in'), { timeout: 30_000 });
+}
+
+async function confirmAuthenticatedPlan(page: Page, expectedPlan: BackendPlan) {
+  const response = await page.context().request.get('/api/users/plan', {
+    headers: { accept: 'application/json' },
+  });
+  expect(response.status()).toBe(200);
+  const payload = (await response.json()) as { plan?: unknown };
+  expect(payload.plan).toBe(expectedPlan);
+}
+
+async function signInAndConfirmPlan(page: Page, plan: PlanKey, redirectPath = '/analyse') {
+  const credentials = skipIfMissingCredentials(plan);
+  await signIn(page, credentials, redirectPath);
+  await confirmAuthenticatedPlan(page, expectedBackendPlan[plan]);
 }
 
 async function fillAnalyseForm(page: Page) {
@@ -80,6 +114,8 @@ async function fillAnalyseForm(page: Page) {
   await expect(page.getByLabel(/asking price/i)).toHaveValue('250000');
   expect(sourceRequests).toEqual([]);
 }
+
+test.use({ trace: 'off', screenshot: 'off', video: 'off' });
 
 test.describe('production smoke anonymous', () => {
   test('analyse, free public Deal Pack/PDF, and pricing checks', async ({ page, request }) => {
@@ -157,11 +193,8 @@ test.describe('production smoke anonymous', () => {
 
 test.describe('production smoke authenticated', () => {
   test('free account can submit analyse flow but remains locked out of Deal Pack and PDF', async ({ page }) => {
-    const credentials = getCredentials('free');
-    test.skip(!credentials, 'Missing E2E_FREE_EMAIL/E2E_FREE_PASSWORD');
-
     await page.setViewportSize({ width: 1440, height: 1600 });
-    await signIn(page, credentials!, '/analyse');
+    await signInAndConfirmPlan(page, 'free', '/analyse');
     await fillAnalyseForm(page);
 
     await page.getByRole('button', { name: /generate deal pack/i }).click();
@@ -181,10 +214,7 @@ test.describe('production smoke authenticated', () => {
   });
 
   test('starter account keeps full Deal Pack and PDF locked', async ({ page }) => {
-    const credentials = getCredentials('starter');
-    test.skip(!credentials, 'Missing E2E_STARTER_EMAIL/E2E_STARTER_PASSWORD');
-
-    await signIn(page, credentials!, `/property/${publicPropertyId}`);
+    await signInAndConfirmPlan(page, 'starter', `/property/${publicPropertyId}`);
     await page.goto(`/property/${publicPropertyId}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('body')).toContainText(/offer range preview|starter offer range|unlock investor pro/i);
 
@@ -197,10 +227,7 @@ test.describe('production smoke authenticated', () => {
   });
 
   test('pro account can open the full Deal Pack and download PDF', async ({ page }) => {
-    const credentials = getCredentials('pro');
-    test.skip(!credentials, 'Missing E2E_PRO_EMAIL/E2E_PRO_PASSWORD');
-
-    await signIn(page, credentials!, `/property/${publicPropertyId}`);
+    await signInAndConfirmPlan(page, 'pro', `/property/${publicPropertyId}`);
 
     await page.goto(`/property/${publicPropertyId}/deal-pack`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('[data-deal-pack-root]')).toBeVisible({ timeout: 30_000 });

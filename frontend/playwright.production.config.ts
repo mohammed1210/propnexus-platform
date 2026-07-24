@@ -9,7 +9,9 @@ export default defineConfig({
   reporter: 'list',
   use: {
     baseURL: BASE_URL,
-    trace: 'on-first-retry',
+    trace: 'off',
+    screenshot: 'off',
+    video: 'off',
   },
   projects: [
     {

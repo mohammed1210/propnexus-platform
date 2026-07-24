@@ -78,6 +78,7 @@ def create_checkout_session(
     payload: CheckoutRequest,
     request: Request,
     x_propnexus_user_email: Optional[str] = Header(None, alias="X-PropNexus-User-Email"),
+    x_propnexus_user_id: Optional[str] = Header(None, alias="X-PropNexus-User-Id"),
 ):
     """
     Creates a Stripe Checkout Session with a 7-day trial.
@@ -101,6 +102,12 @@ def create_checkout_session(
         )
         if not price_id:
             raise HTTPException(status_code=400, detail="price_id or product_id is required")
+
+        clerk_user_id = str(x_propnexus_user_id or "").strip() or None
+        metadata = {
+            "email": email,
+            **({"clerk_user_id": clerk_user_id} if clerk_user_id else {}),
+        }
 
         # 1) Find existing customer in Stripe (mocked in tests)
         existing = stripe.Customer.search(query=f"email:'{email}'")
@@ -129,7 +136,8 @@ def create_checkout_session(
             mode="subscription",
             customer=customer_id,
             line_items=[{"price": price_id, "quantity": 1}],
-            subscription_data={"trial_period_days": 7},
+            metadata=metadata,
+            subscription_data={"trial_period_days": 7, "metadata": metadata},
             success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
             cancel_url=cancel_url,
             allow_promotion_codes=True,

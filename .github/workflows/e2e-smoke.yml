@@ -55,6 +55,12 @@ jobs:
         working-directory: frontend
         env:
           E2E_BASE_URL: "http://localhost:3000"
+          E2E_FREE_EMAIL: ${{ secrets.E2E_FREE_EMAIL }}
+          E2E_FREE_PASSWORD: ${{ secrets.E2E_FREE_PASSWORD }}
+          E2E_STARTER_EMAIL: ${{ secrets.E2E_STARTER_EMAIL }}
+          E2E_STARTER_PASSWORD: ${{ secrets.E2E_STARTER_PASSWORD }}
+          E2E_PRO_EMAIL: ${{ secrets.E2E_PRO_EMAIL }}
+          E2E_PRO_PASSWORD: ${{ secrets.E2E_PRO_PASSWORD }}
         run: |
           npx --yes @playwright/test@1.48.0 install --with-deps
           npx --yes @playwright/test@1.48.0 test --reporter=list

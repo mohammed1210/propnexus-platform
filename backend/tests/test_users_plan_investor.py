@@ -92,7 +92,7 @@ def test_webhook_investor_plan_checkout():
 
                     second_call = mock_table.upsert.call_args_list[1]
                     second_payload = second_call.args[0]
-                    assert "on_conflict" not in second_call.kwargs
+                    assert second_call.kwargs.get("on_conflict") == "email"
                     assert second_payload["plan"] == "investor"
                     assert second_payload["plan_status"] == "active"
                     assert second_payload["current_period_end"] == 1735689600
@@ -191,13 +191,10 @@ def test_webhook_unknown_price_preserves_existing_plan():
                         headers={"Stripe-Signature": "test_sig"},
                     )
 
-                    assert response.status_code == 200
+                    assert response.status_code == 500
                     data = response.json()
-                    assert data["ok"] is True
-
-                    call_args = mock_table.upsert.call_args[0][0]
-                    # Unknown price_id should NOT set plan field (preserves existing plan)
-                    assert "plan" not in call_args
+                    assert data == {"ok": False, "error": "unknown_price_id"}
+                    assert not mock_table.upsert.called
 
 
 def test_users_plan_endpoint_returns_investor():
