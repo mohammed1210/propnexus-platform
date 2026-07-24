@@ -3,6 +3,14 @@ name: E2E Smoke
 on:
   workflow_dispatch:
     branches: [ "main", "All-Green" ]
+    inputs:
+      E2E_BASE_URL:
+        description: "Base URL for the E2E smoke target"
+        required: true
+        default: "https://propnexus-platform.vercel.app"
+
+env:
+  E2E_BASE_URL: ${{ inputs.E2E_BASE_URL || 'https://propnexus-platform.vercel.app' }}
 
 jobs:
   smoke:
@@ -10,15 +18,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        if: ${{ startsWith(env.E2E_BASE_URL, 'http://localhost') || startsWith(env.E2E_BASE_URL, 'http://127.0.0.1') }}
       - name: Backend deps
+        if: ${{ startsWith(env.E2E_BASE_URL, 'http://localhost') || startsWith(env.E2E_BASE_URL, 'http://127.0.0.1') }}
         run: |
           pip install -r backend/requirements.txt
       - name: Start backend
+        if: ${{ startsWith(env.E2E_BASE_URL, 'http://localhost') || startsWith(env.E2E_BASE_URL, 'http://127.0.0.1') }}
         run: |
-          nohup uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+          nohup uvicorn backend.main:app --host 0.0.0.0 --port 8000 >"$RUNNER_TEMP/propnexus-backend.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/propnexus-backend.pid"
           sleep 3
       - uses: actions/setup-node@v4
-      - name: Install + Build
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          npm ci || npm install
+
+      - name: Build local frontend
+        if: ${{ startsWith(env.E2E_BASE_URL, 'http://localhost') || startsWith(env.E2E_BASE_URL, 'http://127.0.0.1') }}
         working-directory: frontend
         env:
           NEXT_TELEMETRY_DISABLED: 1
@@ -28,11 +46,11 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY != '' && secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY != '' && secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
         run: |
-          npm ci || npm install
           npm i leaflet @types/leaflet --force
           npm run build
 
       - name: Start frontend
+        if: ${{ startsWith(env.E2E_BASE_URL, 'http://localhost') || startsWith(env.E2E_BASE_URL, 'http://127.0.0.1') }}
         working-directory: frontend
         env:
           NEXT_TELEMETRY_DISABLED: 1
@@ -42,19 +60,63 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY != '' && secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY != '' && secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
         run: |
-          nohup npm run start -- -p 3000 &
+          nohup npm run start -- -p 3000 >"$RUNNER_TEMP/propnexus-frontend.log" 2>&1 &
+          echo "$!" >"$RUNNER_TEMP/propnexus-frontend.pid"
 
       - name: Wait for servers
+        if: ${{ startsWith(env.E2E_BASE_URL, 'http://localhost') || startsWith(env.E2E_BASE_URL, 'http://127.0.0.1') }}
         run: |
-          for i in {1..40}; do curl -fs http://localhost:8000/properties && break || sleep 2; done
-          for i in {1..40}; do curl -fs http://localhost:3000 && break || sleep 2; done
-          curl -fs http://localhost:8000/properties >/dev/null
-          curl -fs http://localhost:3000 >/dev/null
+          set -u
+
+          backend_health_url="http://127.0.0.1:8000/health"
+          frontend_health_url="${E2E_BASE_URL%/}/"
+          deadline=$((SECONDS + 90))
+
+          status_code() {
+            curl -sS -o /dev/null -w "%{http_code}" --max-time 5 "$1" || true
+          }
+
+          print_diagnostics() {
+            echo "Process status:"
+            ps -eo pid,ppid,stat,etime,cmd | grep -E 'uvicorn|next start|node' | grep -v grep || true
+
+            echo "Backend log tail:"
+            tail -100 "$RUNNER_TEMP/propnexus-backend.log" 2>/dev/null || true
+
+            echo "Frontend log tail:"
+            tail -100 "$RUNNER_TEMP/propnexus-frontend.log" 2>/dev/null || true
+
+            for url in "$backend_health_url" "$frontend_health_url"; do
+              code="$(status_code "$url")"
+              echo "Health URL: $url HTTP status: ${code:-curl_failed}"
+            done
+          }
+
+          while (( SECONDS < deadline )); do
+            backend_code="$(status_code "$backend_health_url")"
+            frontend_code="$(status_code "$frontend_health_url")"
+
+            if [[ "$backend_code" == "200" && "$frontend_code" =~ ^[23] ]]; then
+              echo "Local E2E servers are ready."
+              exit 0
+            fi
+
+            sleep 2
+          done
+
+          echo "::error::Timed out waiting for local E2E servers within 90 seconds."
+          print_diagnostics
+          exit 1
+
+      - name: Use external E2E target
+        if: ${{ !(startsWith(env.E2E_BASE_URL, 'http://localhost') || startsWith(env.E2E_BASE_URL, 'http://127.0.0.1')) }}
+        run: |
+          echo "Using external E2E_BASE_URL=$E2E_BASE_URL; skipping local backend/frontend startup."
 
       - name: Run Playwright
         working-directory: frontend
         env:
-          E2E_BASE_URL: "http://localhost:3000"
+          E2E_BASE_URL: ${{ env.E2E_BASE_URL }}
           E2E_FREE_EMAIL: ${{ secrets.E2E_FREE_EMAIL }}
           E2E_FREE_PASSWORD: ${{ secrets.E2E_FREE_PASSWORD }}
           E2E_STARTER_EMAIL: ${{ secrets.E2E_STARTER_EMAIL }}
@@ -63,4 +125,4 @@ jobs:
           E2E_PRO_PASSWORD: ${{ secrets.E2E_PRO_PASSWORD }}
         run: |
           npx --yes @playwright/test@1.48.0 install --with-deps
-          npx --yes @playwright/test@1.48.0 test --reporter=list
+          npx --yes @playwright/test@1.48.0 test --config=playwright.production.config.ts --reporter=list
