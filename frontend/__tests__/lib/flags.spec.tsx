@@ -38,7 +38,7 @@ describe('Feature Flags', () => {
       expect(FF.AI_CHAT).toBe(true);
       expect(FF.DEAL_SCORE).toBe(false);
       expect(FF.AI_SCORE_BREAKDOWN).toBe(false);
-      expect(FF.DEAL_PACK).toBe(false);
+      expect(FF.DEAL_PACK).toBe(true);
       expect(FF.CRM_EXPORT).toBe(false);
       expect(FF.OFF_MARKET).toBe(false);
       expect(FF.TRADESMEN).toBe(false);

@@ -102,6 +102,34 @@ describe('/api/property-pdf/[id]', () => {
     expect(mockRenderDealPackPdfFromUrl).not.toHaveBeenCalled();
   });
 
+  it('returns 403 for an Investor Starter user before renderer launch', async () => {
+    mockGetServerEntitlements.mockResolvedValue({ hasPdfExport: false });
+    const { GET } = await import('@/app/api/property-pdf/[id]/route');
+
+    const res = await GET(new Request('https://app.example/api/property-pdf/prop-123'), {
+      params: Promise.resolve({ id: 'prop-123' }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'upgrade_required', required_plan: 'investor_pro' });
+    expect(mockFetchPropertyById).not.toHaveBeenCalled();
+    expect(mockRenderDealPackPdfFromUrl).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 only when the property is genuinely missing', async () => {
+    mockFetchPropertyById.mockResolvedValue(null);
+    const { GET } = await import('@/app/api/property-pdf/[id]/route');
+
+    const res = await GET(new Request('https://app.example/api/property-pdf/missing-prop'), {
+      params: Promise.resolve({ id: 'missing-prop' }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'not_found' });
+    expect(mockFetchPropertyById).toHaveBeenCalledWith('missing-prop', 'user_123');
+    expect(mockRenderDealPackPdfFromUrl).not.toHaveBeenCalled();
+  });
+
   it('returns a safe configuration error without launching Playwright when the render token is missing', async () => {
     delete process.env.PROPNEXUS_INTERNAL_API_TOKEN;
     const { GET } = await import('@/app/api/property-pdf/[id]/route');

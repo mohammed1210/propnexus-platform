@@ -81,7 +81,43 @@ describe('property/[id]/deal-pack/page', () => {
     ).rejects.toMatchObject({ digest: 'NEXT_HTTP_ERROR_FALLBACK;404' });
   });
 
-  it('shows the gated preview when the plan does not include the Deal Pack', async () => {
+  it('renders the full template for an entitled user', async () => {
+    mockGetServerEntitlements.mockResolvedValue({ hasDealPack: true });
+
+    const Page = (await import('../app/property/[id]/deal-pack/page')).default;
+    const result = await Page({
+      params: Promise.resolve({ id: 'prop-123' }),
+      searchParams: Promise.resolve({}),
+    });
+
+    render(result as React.ReactElement);
+
+    expect(screen.getByTestId('deal-pack-root')).toBeInTheDocument();
+    expect(screen.queryByText('Deal Pack preview')).not.toBeInTheDocument();
+    expect(mockBuildPropertyDealPackModel).toHaveBeenCalledWith(
+      expect.objectContaining({ propertyId: 'prop-123', property: expect.objectContaining({ id: 'prop-123' }) }),
+    );
+    expect(mockFetchPropertyById).toHaveBeenCalledWith('prop-123', 'user_123');
+  });
+
+  it('shows the gated preview for a Free user when the property exists', async () => {
+    mockGetServerEntitlements.mockResolvedValue({ hasDealPack: false });
+
+    const Page = (await import('../app/property/[id]/deal-pack/page')).default;
+    const result = await Page({
+      params: Promise.resolve({ id: 'prop-123' }),
+      searchParams: Promise.resolve({}),
+    });
+
+    render(result as React.ReactElement);
+
+    expect(screen.getByText('Deal Pack preview')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /unlock investor pro/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('deal-pack-root')).not.toBeInTheDocument();
+    expect(mockBuildPropertyDealPackModel).not.toHaveBeenCalled();
+  });
+
+  it('shows the gated preview for an Investor Starter user when the property exists', async () => {
     mockGetServerEntitlements.mockResolvedValue({ hasDealPack: false });
 
     const Page = (await import('../app/property/[id]/deal-pack/page')).default;
