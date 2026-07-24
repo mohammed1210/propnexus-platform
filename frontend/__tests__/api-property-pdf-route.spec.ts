@@ -25,6 +25,7 @@ describe('/api/property-pdf/[id]', () => {
     jest.resetModules();
     jest.clearAllMocks();
     process.env.NEXT_PUBLIC_FEATURE_DEAL_PACK = 'true';
+    process.env.PROPNEXUS_INTERNAL_API_TOKEN = 'test-pdf-render-token';
     delete process.env.NEXT_PUBLIC_FEATURE_PROPERTY_EXPORTS;
     mockGetOptionalClerkUserId.mockResolvedValue('user_123');
     mockGetServerEntitlements.mockResolvedValue({ hasPdfExport: true });
@@ -52,6 +53,9 @@ describe('/api/property-pdf/[id]', () => {
     expect(mockFetchPropertyById).toHaveBeenCalledWith('prop-123', 'user_123');
     expect(mockRenderDealPackPdfFromUrl).toHaveBeenCalledWith(
       'https://app.example/property/prop-123/deal-pack?source=https%3A%2F%2Fapp.example%2Fproperty%2Fprop-123',
+      expect.objectContaining({
+        headers: expect.objectContaining({ 'X-PropNexus-PDF-Render-Token': expect.any(String) }),
+      }),
     );
     expect(await res.arrayBuffer()).toEqual(Uint8Array.from([37, 80, 68, 70]).buffer);
   });
@@ -95,5 +99,20 @@ describe('/api/property-pdf/[id]', () => {
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: 'upgrade_required', required_plan: 'investor_pro' });
     expect(mockFetchPropertyById).not.toHaveBeenCalled();
+    expect(mockRenderDealPackPdfFromUrl).not.toHaveBeenCalled();
+  });
+
+  it('returns a safe configuration error without launching Playwright when the render token is missing', async () => {
+    delete process.env.PROPNEXUS_INTERNAL_API_TOKEN;
+    const { GET } = await import('@/app/api/property-pdf/[id]/route');
+
+    const res = await GET(new Request('https://app.example/api/property-pdf/prop-123'), {
+      params: Promise.resolve({ id: 'prop-123' }),
+    });
+
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: 'pdf_render_unavailable' });
+    expect(mockFetchPropertyById).not.toHaveBeenCalled();
+    expect(mockRenderDealPackPdfFromUrl).not.toHaveBeenCalled();
   });
 });
