@@ -124,5 +124,6 @@ jobs:
           E2E_PRO_EMAIL: ${{ secrets.E2E_PRO_EMAIL }}
           E2E_PRO_PASSWORD: ${{ secrets.E2E_PRO_PASSWORD }}
         run: |
-          npx --yes @playwright/test@1.48.0 install --with-deps
-          npx --yes @playwright/test@1.48.0 test --config=playwright.production.config.ts --reporter=list
+          npx playwright install --with-deps chromium
+          npx playwright test e2e/production-smoke.spec.ts --config=playwright.production.config.ts --list
+          npx playwright test e2e/production-smoke.spec.ts --config=playwright.production.config.ts --reporter=list

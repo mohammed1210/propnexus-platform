@@ -10,6 +10,12 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+class AttrOnlyObject:
+    def __init__(self, **values):
+        for key, value in values.items():
+            setattr(self, key, value)
+
+
 @pytest.fixture
 def client():
     """Create a test client"""
@@ -82,7 +88,7 @@ def _post_checkout_completed(client, mock_stripe, *, email_fields=None, price_id
     }
 
     os.environ["STRIPE_PRICE_PRO"] = price_id
-    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
     return client.post(
         "/stripe/webhook",
         data=json.dumps(mock_event),
@@ -149,7 +155,7 @@ def test_checkout_completed_event(mock_supabase, mock_stripe, client):
     mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
 
     # Set webhook secret
-    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
 
     response = client.post(
         "/stripe/webhook",
@@ -181,7 +187,7 @@ def test_subscription_updated_event(mock_stripe, mock_supabase, client):
     mock_stripe.Webhook.construct_event.return_value = mock_event
     mock_stripe.Customer.retrieve.return_value = {"email": "test@example.com"}
 
-    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
 
     response = client.post(
         "/stripe/webhook",
@@ -257,7 +263,7 @@ def test_unknown_price_id_preserves_plan(mock_stripe, mock_supabase, client):
     # Mock Supabase upsert
     mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
 
-    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
 
     response = client.post(
         "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
@@ -379,7 +385,7 @@ def test_subscription_deleted_updates_existing_user_without_replacing_id(
     }
     mock_stripe.Webhook.construct_event.return_value = mock_event
     mock_stripe.Customer.retrieve.return_value = {"email": "downgrade@example.com"}
-    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
 
     response = client.post(
         "/stripe/webhook",
@@ -422,7 +428,7 @@ def test_graceful_handling_no_supabase(mock_stripe, client):
         "current_period_end": 1234567890,
     }
 
-    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
 
     response = client.post(
         "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
@@ -460,7 +466,7 @@ def test_subscription_updated_email_retrieval_failure(mock_stripe, mock_supabase
     # Mock Supabase upsert
     mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
 
-    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
 
     response = client.post(
         "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
@@ -496,7 +502,7 @@ def test_subscription_created_pro(mock_stripe, mock_supabase, client):
     # Mock Supabase upsert
     mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
 
-    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
 
     response = client.post(
         "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
@@ -539,7 +545,7 @@ def test_subscription_created_investor(mock_stripe, mock_supabase, client):
     # Mock Supabase upsert
     mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
 
-    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
 
     response = client.post(
         "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
@@ -577,7 +583,7 @@ def test_subscription_deleted_downgrades_to_free(mock_stripe, mock_supabase, cli
     # Mock Supabase upsert
     mock_supabase.table.return_value.upsert.return_value.execute.return_value = Mock(data=[])
 
-    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
 
     response = client.post(
         "/stripe/webhook", data=json.dumps(mock_event), headers={"Stripe-Signature": "test_sig"}
@@ -681,3 +687,197 @@ def test_checkout_completed_with_investor_price(mock_stripe, mock_supabase, clie
     upsert_data = mock_supabase.table.return_value.upsert.call_args[0][0]
     assert upsert_data["plan"] == "investor"
     assert upsert_data["plan_status"] == "active"
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_checkout_completed_accepts_stripe_attr_objects_without_get(
+    mock_stripe, mock_supabase, client
+):
+    users_table, _subscriptions_table, _prices_table = _mock_supabase_tables(
+        mock_supabase,
+        user_update_rows=[{"id": "existing-user-id", "email": "attr@example.com"}],
+    )
+    assert not hasattr(AttrOnlyObject(), "get")
+
+    os.environ["STRIPE_PRICE_PRO"] = "price_attr_pro"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
+    mock_stripe.Webhook.construct_event.return_value = AttrOnlyObject(
+        id="evt_attr_checkout",
+        type="checkout.session.completed",
+        data=AttrOnlyObject(
+            object=AttrOnlyObject(
+                id="cs_attr",
+                customer=AttrOnlyObject(id="cus_attr", email="customer@example.com"),
+                subscription="sub_attr",
+                metadata=AttrOnlyObject(email=" Attr@Example.COM "),
+            )
+        ),
+    )
+    mock_stripe.Subscription.retrieve.return_value = AttrOnlyObject(
+        id="sub_attr",
+        customer="cus_attr",
+        status="trialing",
+        current_period_end=1234567890,
+        items=AttrOnlyObject(data=[AttrOnlyObject(price=AttrOnlyObject(id="price_attr_pro"))]),
+    )
+    mock_stripe.Price.retrieve.return_value = AttrOnlyObject(
+        id="price_attr_pro",
+        product="prod_attr",
+        recurring=AttrOnlyObject(interval="month"),
+    )
+
+    response = client.post(
+        "/stripe/webhook",
+        data=b"{}",
+        headers={"Stripe-Signature": "test_sig"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    update_payload = users_table.update.call_args.args[0]
+    assert update_payload["plan"] == "pro"
+    assert update_payload["plan_status"] == "trialing"
+    users_table.update.return_value.eq.assert_called_with("email", "attr@example.com")
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_subscription_created_accepts_attr_items_customer_string_and_no_metadata(
+    mock_stripe, mock_supabase, client
+):
+    users_table, _subscriptions_table, _prices_table = _mock_supabase_tables(
+        mock_supabase,
+        user_update_rows=[{"id": "existing-user-id", "email": "created@example.com"}],
+    )
+    os.environ["STRIPE_PRICE_PRO"] = "price_attr_created"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
+    mock_stripe.Webhook.construct_event.return_value = AttrOnlyObject(
+        id="evt_attr_created",
+        type="customer.subscription.created",
+        data=AttrOnlyObject(
+            object=AttrOnlyObject(
+                id="sub_attr_created",
+                customer="cus_attr_created",
+                status="active",
+                current_period_end=1234567890,
+                items=AttrOnlyObject(
+                    data=[AttrOnlyObject(price=AttrOnlyObject(id="price_attr_created"))]
+                ),
+            )
+        ),
+    )
+    mock_stripe.Customer.retrieve.return_value = AttrOnlyObject(email="created@example.com")
+
+    response = client.post(
+        "/stripe/webhook",
+        data=b"{}",
+        headers={"Stripe-Signature": "test_sig"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    update_payload = users_table.update.call_args.args[0]
+    assert update_payload["plan"] == "pro"
+    assert update_payload["stripe_customer_id"] == "cus_attr_created"
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_subscription_deleted_attr_object_maps_to_free(mock_stripe, mock_supabase, client):
+    users_table, _subscriptions_table, _prices_table = _mock_supabase_tables(
+        mock_supabase,
+        user_update_rows=[{"id": "existing-user-id", "email": "deleted@example.com"}],
+    )
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
+    mock_stripe.Webhook.construct_event.return_value = AttrOnlyObject(
+        id="evt_attr_deleted",
+        type="customer.subscription.deleted",
+        data=AttrOnlyObject(
+            object=AttrOnlyObject(
+                id="sub_attr_deleted",
+                customer=AttrOnlyObject(id="cus_attr_deleted", email="deleted@example.com"),
+                status="canceled",
+            )
+        ),
+    )
+
+    response = client.post(
+        "/stripe/webhook",
+        data=b"{}",
+        headers={"Stripe-Signature": "test_sig"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["ok"] is True
+    update_payload = users_table.update.call_args.args[0]
+    assert update_payload["plan"] == "free"
+    assert update_payload["plan_status"] == "canceled"
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_subscription_attr_unknown_price_is_retryable_without_grant(
+    mock_stripe, mock_supabase, client
+):
+    for key in ["STRIPE_PRICE_PRO", "NEXT_PUBLIC_STRIPE_PRICE_PRO", "STRIPE_PRICE_INVESTOR"]:
+        os.environ.pop(key, None)
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
+    mock_stripe.Webhook.construct_event.return_value = AttrOnlyObject(
+        id="evt_attr_unknown",
+        type="customer.subscription.updated",
+        data=AttrOnlyObject(
+            object=AttrOnlyObject(
+                id="sub_attr_unknown",
+                customer="cus_attr_unknown",
+                status="active",
+                items=AttrOnlyObject(
+                    data=[AttrOnlyObject(price=AttrOnlyObject(id="price_attr_unknown"))]
+                ),
+            )
+        ),
+    )
+    mock_stripe.Price.retrieve.side_effect = Exception("unknown price")
+
+    response = client.post(
+        "/stripe/webhook",
+        data=b"{}",
+        headers={"Stripe-Signature": "test_sig"},
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {"ok": False, "error": "unknown_price_id"}
+    assert not mock_supabase.table.called
+
+
+@patch("backend.routes.stripe_webhook.supabase")
+@patch("backend.routes.stripe_webhook.stripe")
+def test_subscription_attr_retry_is_idempotent(mock_stripe, mock_supabase, client):
+    users_table, _subscriptions_table, _prices_table = _mock_supabase_tables(
+        mock_supabase,
+        user_update_rows=[{"id": "existing-user-id", "email": "retry@example.com"}],
+    )
+    os.environ["STRIPE_PRICE_PRO"] = "price_attr_retry"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "test-webhook-secret"
+    mock_stripe.Webhook.construct_event.return_value = AttrOnlyObject(
+        id="evt_attr_retry",
+        type="customer.subscription.updated",
+        data=AttrOnlyObject(
+            object=AttrOnlyObject(
+                id="sub_attr_retry",
+                customer="cus_attr_retry",
+                status="active",
+                items=AttrOnlyObject(
+                    data=[AttrOnlyObject(price=AttrOnlyObject(id="price_attr_retry"))]
+                ),
+            )
+        ),
+    )
+    mock_stripe.Customer.retrieve.return_value = AttrOnlyObject(email="retry@example.com")
+
+    first = client.post("/stripe/webhook", data=b"{}", headers={"Stripe-Signature": "sig"})
+    second = client.post("/stripe/webhook", data=b"{}", headers={"Stripe-Signature": "sig"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert users_table.update.call_count == 2

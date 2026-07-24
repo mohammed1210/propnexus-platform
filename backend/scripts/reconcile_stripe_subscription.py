@@ -9,15 +9,18 @@ from typing import Any
 import stripe
 
 from backend.routes.stripe_webhook import (
+    ELIGIBLE_STATUSES,
+    TERMINAL_STATUSES,
     _normalize_email,
+    _stripe_list_data,
+    _stripe_object_id,
+    _stripe_value,
     _upsert_price_metadata,
     _upsert_subscription_record,
     _write_user_plan,
     map_price_to_plan,
 )
 from backend.utils.supabase_client import get_supabase
-
-ELIGIBLE_STATUSES = {"active", "trialing", "past_due"}
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -34,11 +37,12 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 def _customer_email(customer: Any) -> str | None:
     data = _as_dict(customer)
-    return _normalize_email(data.get("email") or getattr(customer, "email", None))
+    return _normalize_email(_stripe_value(data, "email") or _stripe_value(customer, "email"))
 
 
-def _subscription_price_id(subscription: dict[str, Any]) -> str | None:
-    return (((subscription.get("items") or {}).get("data") or [{}])[0].get("price") or {}).get("id")
+def _subscription_price_id(subscription: Any) -> str | None:
+    first_item = (_stripe_list_data(_stripe_value(subscription, "items", {})) or [{}])[0]
+    return _stripe_object_id(_stripe_value(first_item, "price"))
 
 
 def _retrieve_checkout_session(
@@ -50,16 +54,18 @@ def _retrieve_checkout_session(
             expand=["subscription", "customer"],
         )
     )
-    subscription_value = session.get("subscription")
+    subscription_value = _stripe_value(session, "subscription")
     subscription = (
         subscription_value
         if isinstance(subscription_value, dict)
         else _as_dict(stripe.Subscription.retrieve(subscription_value))
     )
-    customer = session.get("customer")
-    email = _normalize_email((session.get("customer_details") or {}).get("email"))
-    email = email or _normalize_email(session.get("customer_email"))
-    email = email or _normalize_email((session.get("metadata") or {}).get("email"))
+    customer = _stripe_value(session, "customer")
+    email = _normalize_email(_stripe_value(_stripe_value(session, "metadata", {}), "email"))
+    email = email or _normalize_email(
+        _stripe_value(_stripe_value(session, "customer_details", {}), "email")
+    )
+    email = email or _normalize_email(_stripe_value(session, "customer_email"))
     email = email or _customer_email(customer)
     return session, subscription, email
 
@@ -75,7 +81,7 @@ def _find_customer_by_email(email: str) -> dict[str, Any]:
 def _find_subscription_for_customer(customer_id: str) -> dict[str, Any]:
     subscriptions = stripe.Subscription.list(customer=customer_id, status="all", limit=10)
     items = [_as_dict(item) for item in (getattr(subscriptions, "data", None) or [])]
-    eligible = [item for item in items if item.get("status") in ELIGIBLE_STATUSES]
+    eligible = [item for item in items if _stripe_value(item, "status") in ELIGIBLE_STATUSES]
     if eligible:
         return eligible[0]
     if items:
@@ -88,8 +94,8 @@ def _resolve(
 ) -> tuple[dict[str, Any] | None, dict[str, Any], str | None, str | None]:
     if args.checkout_session_id:
         session, subscription, email = _retrieve_checkout_session(args.checkout_session_id)
-        customer = session.get("customer")
-        customer_id = customer.get("id") if isinstance(customer, dict) else customer
+        customer = _stripe_value(session, "customer")
+        customer_id = _stripe_object_id(customer)
         return session, subscription, customer_id, email
 
     if args.customer_id:
@@ -102,7 +108,7 @@ def _resolve(
         if not email:
             raise RuntimeError("A valid email is required")
         customer = _find_customer_by_email(email)
-        customer_id = customer.get("id")
+        customer_id = _stripe_object_id(customer)
         subscription = _find_subscription_for_customer(customer_id)
         return None, subscription, customer_id, email
 
@@ -129,11 +135,13 @@ def main() -> int:
     stripe.api_key = secret
 
     _session, subscription, customer_id, email = _resolve(args)
-    subscription_id = subscription.get("id")
-    status = subscription.get("status")
-    current_period_end = subscription.get("current_period_end")
+    subscription_id = _stripe_object_id(subscription)
+    status = _stripe_value(subscription, "status")
+    current_period_end = _stripe_value(subscription, "current_period_end")
     price_id = _subscription_price_id(subscription)
-    plan = map_price_to_plan(price_id) if status in ELIGIBLE_STATUSES else None
+    plan = map_price_to_plan(price_id) if status in ELIGIBLE_STATUSES else "free"
+    if status in TERMINAL_STATUSES:
+        plan = "free"
 
     result = {
         "dry_run": args.dry_run,
