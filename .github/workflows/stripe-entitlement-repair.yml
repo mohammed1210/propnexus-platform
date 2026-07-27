@@ -1,0 +1,412 @@
+name: Stripe Entitlement Repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      email:
+        description: Stripe customer email
+        required: true
+        default: abbas_m90@hotmail.com
+      expected_plan:
+        description: Expected PropNexus plan
+        type: choice
+        options:
+          - starter
+          - investor_pro
+        default: starter
+      failed_event_id:
+        description: Optional Stripe evt_ ID to resend
+        required: false
+      apply_changes:
+        description: Apply the Railway environment repair
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_API_SERVICE: propnexus-backend
+      BACKEND_HEALTH_URL: https://propnexus-backend-production.up.railway.app/health
+      PRODUCTION_WEBHOOK_URL: https://propnexus-backend-production.up.railway.app/stripe/webhook
+      STRIPE_CLI_VERSION: "1.23.10"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare secure workspace
+        run: |
+          set -euo pipefail
+          set +x
+          umask 077
+          repair_tmp="$(mktemp -d)"
+          echo "REPAIR_TMP=$repair_tmp" >> "$GITHUB_ENV"
+
+      - name: Validate required secrets
+        env:
+          STRIPE_TEST_RESTRICTED_KEY: ${{ secrets.STRIPE_TEST_RESTRICTED_KEY }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          python backend/scripts/stripe_entitlement_repair.py validate-key
+          if [ -z "${RAILWAY_TOKEN:-}" ]; then
+            echo "::error::RAILWAY_TOKEN is required"
+            exit 1
+          fi
+
+      - name: Resolve plan mapping
+        id: plan
+        run: |
+          set -euo pipefail
+          set +x
+          python backend/scripts/stripe_entitlement_repair.py plan \
+            --expected-plan "${{ inputs.expected_plan }}"
+
+      - name: Install Stripe CLI
+        run: |
+          set -euo pipefail
+          set +x
+          mkdir -p "$RUNNER_TEMP/bin"
+          archive="$RUNNER_TEMP/stripe-cli.tar.gz"
+          curl -fsSL \
+            "https://github.com/stripe/stripe-cli/releases/download/v${STRIPE_CLI_VERSION}/stripe_${STRIPE_CLI_VERSION}_linux_x86_64.tar.gz" \
+            -o "$archive"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/bin" stripe
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          stripe version
+
+      - name: Install Railway CLI
+        run: |
+          set -euo pipefail
+          set +x
+          if curl -fsSL https://railway.app/install.sh | sh; then
+            echo "$HOME/.railway/bin" >> "$GITHUB_PATH"
+          else
+            npm install -g @railway/cli
+            echo "$(npm bin -g)" >> "$GITHUB_PATH"
+          fi
+          railway --version
+
+      - name: Find exact Stripe customer
+        id: customer
+        env:
+          STRIPE_TEST_RESTRICTED_KEY: ${{ secrets.STRIPE_TEST_RESTRICTED_KEY }}
+          INPUT_EMAIL: ${{ inputs.email }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          normalized_email="$(python -c 'import os; print(os.environ["INPUT_EMAIL"].strip().lower())')"
+          customers_json="$REPAIR_TMP/customers.json"
+          customer_json="$REPAIR_TMP/customer.json"
+
+          stripe customers search \
+            --query "email:'${normalized_email}'" \
+            --limit 10 \
+            --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
+            > "$customers_json"
+
+          python backend/scripts/stripe_entitlement_repair.py select-customer \
+            --email "$normalized_email" \
+            --customers-json "$customers_json" \
+            --output-json "$customer_json"
+
+          customer_id="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["id"])' "$customer_json")"
+          echo "::add-mask::$customer_id"
+
+      - name: Find latest eligible subscription
+        id: subscription
+        env:
+          STRIPE_TEST_RESTRICTED_KEY: ${{ secrets.STRIPE_TEST_RESTRICTED_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          customer_json="$REPAIR_TMP/customer.json"
+          subscriptions_json="$REPAIR_TMP/subscriptions.json"
+          subscription_json="$REPAIR_TMP/subscription.json"
+          customer_id="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["id"])' "$customer_json")"
+
+          stripe subscriptions list \
+            --customer "$customer_id" \
+            --status all \
+            --limit 20 \
+            --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
+            > "$subscriptions_json"
+
+          python backend/scripts/stripe_entitlement_repair.py select-subscription \
+            --subscriptions-json "$subscriptions_json" \
+            --output-json "$subscription_json"
+
+          subscription_id="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["subscription"]["id"])' "$subscription_json")"
+          price_id="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["price_id"])' "$subscription_json")"
+          echo "::add-mask::$subscription_id"
+          echo "::add-mask::$price_id"
+
+      - name: Retrieve Stripe price and Railway variables
+        id: analyze
+        env:
+          STRIPE_TEST_RESTRICTED_KEY: ${{ secrets.STRIPE_TEST_RESTRICTED_KEY }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          subscription_json="$REPAIR_TMP/subscription.json"
+          price_json="$REPAIR_TMP/price.json"
+          railway_json="$REPAIR_TMP/railway-vars.json"
+          context_json="$REPAIR_TMP/context.json"
+          price_id="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["price_id"])' "$subscription_json")"
+
+          stripe prices retrieve "$price_id" \
+            --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
+            > "$price_json"
+
+          railway variables \
+            --service "$RAILWAY_API_SERVICE" \
+            --json \
+            > "$railway_json"
+
+          python backend/scripts/stripe_entitlement_repair.py analyze \
+            --email "${{ inputs.email }}" \
+            --expected-plan "${{ inputs.expected_plan }}" \
+            --customer-json "$REPAIR_TMP/customer.json" \
+            --subscription-json "$subscription_json" \
+            --price-json "$price_json" \
+            --railway-json "$railway_json" \
+            --duplicate-subscription-warning "${{ steps.subscription.outputs.duplicate_subscription_warning }}" \
+            --output-json "$context_json"
+
+          python backend/scripts/stripe_entitlement_repair.py summary \
+            --context-json "$context_json"
+
+      - name: Dry-run stop
+        if: ${{ !inputs.apply_changes }}
+        run: |
+          set -euo pipefail
+          set +x
+          echo "Dry run complete. No Railway variables were changed and no Stripe event was resent." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate apply preconditions
+        if: ${{ inputs.apply_changes }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ "${{ steps.analyze.outputs.apply_allowed }}" != "yes" ]; then
+            echo "::error::Selected subscription is not active or trialing; apply mode is blocked."
+            exit 1
+          fi
+
+      - name: Apply Railway variable repair
+        id: apply
+        if: ${{ inputs.apply_changes }}
+        env:
+          STRIPE_TEST_RESTRICTED_KEY: ${{ secrets.STRIPE_TEST_RESTRICTED_KEY }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          context_json="$REPAIR_TMP/context.json"
+          match_result="${{ steps.analyze.outputs.railway_match_result }}"
+          variable_name="${{ steps.analyze.outputs.mapped_railway_variable }}"
+          price_id="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["price_id"])' "$context_json")"
+          current_price_id="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("current_railway_price_id") or "")' "$context_json")"
+          if [ -n "$current_price_id" ]; then
+            echo "::add-mask::$current_price_id"
+          fi
+
+          if [ "$match_result" = "MATCH" ]; then
+            echo "deployment_needed=no" >> "$GITHUB_OUTPUT"
+            echo "Railway variable already matches; no production variable was changed." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if [ -n "$current_price_id" ]; then
+            stripe subscriptions list \
+              --price "$current_price_id" \
+              --status active \
+              --limit 100 \
+              --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
+              > "$REPAIR_TMP/old-price-active-subscriptions.json"
+            stripe subscriptions list \
+              --price "$current_price_id" \
+              --status trialing \
+              --limit 100 \
+              --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
+              > "$REPAIR_TMP/old-price-trialing-subscriptions.json"
+          else
+            printf '{"data": []}\n' > "$REPAIR_TMP/old-price-active-subscriptions.json"
+            printf '{"data": []}\n' > "$REPAIR_TMP/old-price-trialing-subscriptions.json"
+          fi
+
+          python backend/scripts/stripe_entitlement_repair.py validate-overwrite \
+            --context-json "$context_json" \
+            --subscriptions-json "$REPAIR_TMP/subscriptions.json" \
+            --subscriptions-json "$REPAIR_TMP/old-price-active-subscriptions.json" \
+            --subscriptions-json "$REPAIR_TMP/old-price-trialing-subscriptions.json"
+
+          railway variable set "${variable_name}=${price_id}" \
+            --service "$RAILWAY_API_SERVICE" \
+            --skip-deploys \
+            > "$REPAIR_TMP/railway-set.out" \
+            2> "$REPAIR_TMP/railway-set.err"
+
+          echo "deployment_needed=yes" >> "$GITHUB_OUTPUT"
+          echo "Updated selected Railway variable without printing its value." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Redeploy backend when repaired
+        id: deploy
+        if: ${{ inputs.apply_changes && steps.apply.outputs.deployment_needed == 'yes' }}
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+          printf '%s' "${GITHUB_SHA}" > backend/.app_version
+          railway up \
+            --service "$RAILWAY_API_SERVICE" \
+            --ci \
+            --json \
+            > "$REPAIR_TMP/railway-deploy.json"
+
+      - name: Wait for backend health
+        id: health
+        if: ${{ inputs.apply_changes }}
+        run: |
+          set -euo pipefail
+          set +x
+          deadline=$((SECONDS + 180))
+          attempt=0
+          expected_version="${GITHUB_SHA}"
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            attempt=$((attempt + 1))
+            code="$(curl -sS -o "$REPAIR_TMP/health.json" -w "%{http_code}" --max-time 8 "$BACKEND_HEALTH_URL" || true)"
+            if [ "$code" = "200" ]; then
+              if [ "${{ steps.apply.outputs.deployment_needed }}" != "yes" ]; then
+                echo "Backend health check passed." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+
+              actual_version="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("version", ""))' "$REPAIR_TMP/health.json" || true)"
+              if [ "$actual_version" = "$expected_version" ]; then
+                echo "Backend health check passed on the repaired deployment." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+            fi
+            echo "Health attempt $attempt returned HTTP ${code:-curl_failed}."
+            sleep 5
+          done
+
+          echo "::error::Backend health did not confirm the repaired deployment within 180 seconds."
+          if [ -s "$REPAIR_TMP/health.json" ]; then
+            python -c 'import json, sys; payload = json.load(open(sys.argv[1], encoding="utf-8")); print("Safe health diagnostics:", {"status": payload.get("status"), "version_present": bool(payload.get("version"))})' "$REPAIR_TMP/health.json" || echo "Safe health diagnostics unavailable"
+          fi
+          exit 1
+
+      - name: Validate optional event resend request
+        id: event_request
+        if: ${{ inputs.apply_changes && steps.health.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          set +x
+          python backend/scripts/stripe_entitlement_repair.py validate-event-id \
+            --event-id "${{ inputs.failed_event_id }}"
+
+      - name: Retrieve and validate failed Stripe event
+        if: ${{ inputs.apply_changes && steps.event_request.outputs.resend_requested == 'yes' }}
+        env:
+          STRIPE_TEST_RESTRICTED_KEY: ${{ secrets.STRIPE_TEST_RESTRICTED_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          event_id="${{ inputs.failed_event_id }}"
+          echo "::add-mask::$event_id"
+          stripe events retrieve "$event_id" \
+            --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
+            > "$REPAIR_TMP/event.json"
+          python backend/scripts/stripe_entitlement_repair.py validate-event \
+            --event-json "$REPAIR_TMP/event.json" \
+            --context-json "$REPAIR_TMP/context.json"
+
+      - name: Resend failed Stripe event to production webhook
+        id: resend
+        if: ${{ inputs.apply_changes && steps.event_request.outputs.resend_requested == 'yes' }}
+        env:
+          STRIPE_TEST_RESTRICTED_KEY: ${{ secrets.STRIPE_TEST_RESTRICTED_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          endpoints_json="$REPAIR_TMP/webhook-endpoints.json"
+          endpoint_json="$REPAIR_TMP/webhook-endpoint.json"
+
+          stripe webhook_endpoints list \
+            --limit 100 \
+            --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
+            > "$endpoints_json"
+
+          python backend/scripts/stripe_entitlement_repair.py select-endpoint \
+            --endpoints-json "$endpoints_json" \
+            --url "$PRODUCTION_WEBHOOK_URL" \
+            --output-json "$endpoint_json"
+
+          endpoint_id="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["id"])' "$endpoint_json")"
+          event_id="${{ inputs.failed_event_id }}"
+          echo "::add-mask::$endpoint_id"
+          echo "::add-mask::$event_id"
+
+          stripe events resend "$event_id" \
+            --webhook-endpoint="$endpoint_id" \
+            --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
+            > "$REPAIR_TMP/resend.json"
+
+          echo "resend_accepted=yes" >> "$GITHUB_OUTPUT"
+          echo "Stripe accepted the event resend request." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post-repair verification path
+        if: ${{ inputs.apply_changes }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          E2E_STARTER_EMAIL: ${{ secrets.E2E_STARTER_EMAIL }}
+          E2E_STARTER_PASSWORD: ${{ secrets.E2E_STARTER_PASSWORD }}
+          E2E_PRO_EMAIL: ${{ secrets.E2E_PRO_EMAIL }}
+          E2E_PRO_PASSWORD: ${{ secrets.E2E_PRO_PASSWORD }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ "${{ steps.event_request.outputs.resend_requested }}" = "yes" ]; then
+            sleep 10
+          fi
+
+          if [ "${{ inputs.expected_plan }}" = "starter" ]; then
+            email_present="$E2E_STARTER_EMAIL"
+            password_present="$E2E_STARTER_PASSWORD"
+          else
+            email_present="$E2E_PRO_EMAIL"
+            password_present="$E2E_PRO_PASSWORD"
+          fi
+
+          if [ -n "$email_present" ] && [ -n "$password_present" ]; then
+            gh workflow run e2e-smoke.yml \
+              --ref main \
+              -f E2E_BASE_URL=https://propnexus-platform.vercel.app
+            echo "Authenticated production smoke workflow was dispatched for final plan verification." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Webhook resend succeeded; refresh /account and confirm Investor Starter or Investor Pro." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Cleanup temporary files
+        if: always()
+        run: |
+          set -euo pipefail
+          set +x
+          if [ -n "${REPAIR_TMP:-}" ] && [ -d "$REPAIR_TMP" ]; then
+            rm -rf "$REPAIR_TMP"
+          fi
