@@ -93,7 +93,7 @@
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.0",
     "ts-jest": "^29.4.9",
-    "typescript": "^5.9.2",
+    "typescript": "^7.0.2",
     "web-streams-polyfill": "^4.2.0"
   },
   "overrides": {
