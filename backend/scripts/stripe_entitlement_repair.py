@@ -16,6 +16,11 @@ ALLOWED_EVENT_TYPES = {
     "customer.subscription.updated",
     "customer.subscription.deleted",
 }
+SUBSCRIPTION_EVENT_TYPES = {
+    "customer.subscription.created",
+    "customer.subscription.updated",
+    "customer.subscription.deleted",
+}
 
 
 @dataclass(frozen=True)
@@ -84,6 +89,10 @@ def data_items(payload: Any) -> list[dict[str, Any]]:
     else:
         data = []
     return [item for item in data if isinstance(item, dict)]
+
+
+def payload_has_more(payload: Any) -> bool:
+    return isinstance(payload, dict) and payload.get("has_more") is True
 
 
 def stripe_id(value: Any) -> str | None:
@@ -168,6 +177,28 @@ def subscription_recurring_price_id(subscription: dict[str, Any]) -> str:
     raise RepairError("missing_recurring_price", "Selected subscription has no recurring price")
 
 
+def subscription_uses_price(subscription: dict[str, Any], price_id: str) -> bool:
+    if subscription.get("status") not in ELIGIBLE_STATUSES:
+        return False
+    try:
+        return subscription_recurring_price_id(subscription) == price_id
+    except RepairError:
+        return False
+
+
+def has_other_eligible_subscribers(
+    subscriptions_payload: Any, *, selected_subscription_id: str, old_price_id: str | None
+) -> bool:
+    if not old_price_id:
+        return False
+    for subscription in data_items(subscriptions_payload):
+        if stripe_id(subscription) == selected_subscription_id:
+            continue
+        if subscription_uses_price(subscription, old_price_id):
+            return True
+    return False
+
+
 def parse_railway_variables(payload: Any) -> dict[str, str]:
     if isinstance(payload, dict):
         if all(isinstance(key, str) for key in payload):
@@ -231,6 +262,47 @@ def validate_event(event: dict[str, Any]) -> None:
     event_type = event.get("type")
     if event_type not in ALLOWED_EVENT_TYPES:
         raise RepairError("unknown_event_type", "Event type is not allowed for this repair")
+
+
+def event_data_object(event: dict[str, Any]) -> dict[str, Any]:
+    data = event.get("data")
+    if not isinstance(data, dict):
+        return {}
+    data_object = data.get("object")
+    return data_object if isinstance(data_object, dict) else {}
+
+
+def event_customer_id(event: dict[str, Any]) -> str | None:
+    data_object = event_data_object(event)
+    customer = data_object.get("customer")
+    if customer_id := stripe_id(customer):
+        return customer_id
+    customer_details = data_object.get("customer_details")
+    if isinstance(customer_details, dict):
+        return stripe_id(customer_details.get("customer"))
+    return None
+
+
+def event_subscription_id(event: dict[str, Any]) -> str | None:
+    data_object = event_data_object(event)
+    event_type = event.get("type")
+    if event_type in SUBSCRIPTION_EVENT_TYPES:
+        return stripe_id(data_object)
+    return stripe_id(data_object.get("subscription"))
+
+
+def validate_event_binding(event: dict[str, Any], context: dict[str, Any]) -> None:
+    validate_event(event)
+    expected_customer_id = context.get("customer_id")
+    expected_subscription_id = context.get("subscription_id")
+    actual_customer_id = event_customer_id(event)
+    actual_subscription_id = event_subscription_id(event)
+    if not expected_customer_id or actual_customer_id != expected_customer_id:
+        raise RepairError("event_customer_mismatch", "Event customer does not match repair context")
+    if not expected_subscription_id or actual_subscription_id != expected_subscription_id:
+        raise RepairError(
+            "event_subscription_mismatch", "Event subscription does not match repair context"
+        )
 
 
 def select_webhook_endpoint(payload: Any, url: str) -> dict[str, Any]:
@@ -353,6 +425,7 @@ def command_analyze(args: argparse.Namespace) -> int:
             "subscription_id": stripe_id(subscription),
             "price_id": price_id,
             "railway_product_variable": mapping.railway_product_variable,
+            "current_railway_price_id": railway_variables.get(mapping.railway_price_variable),
             "apply_allowed": "yes" if can_apply_subscription(subscription.get("status")) else "no",
         }
     )
@@ -378,7 +451,39 @@ def command_validate_event_id(args: argparse.Namespace) -> int:
 
 
 def command_validate_event(args: argparse.Namespace) -> int:
-    validate_event(load_json(args.event_json))
+    event = load_json(args.event_json)
+    if args.context_json:
+        validate_event_binding(event, load_json(args.context_json))
+    else:
+        validate_event(event)
+    return 0
+
+
+def command_validate_overwrite(args: argparse.Namespace) -> int:
+    context = load_json(args.context_json)
+    selected_subscription_id = context.get("subscription_id")
+    current_price_id = context.get("current_railway_price_id")
+    discovered_price_id = context.get("price_id")
+    if not selected_subscription_id:
+        raise RepairError("subscription_missing_id", "Selected subscription has no identifier")
+    if current_price_id and discovered_price_id and current_price_id == discovered_price_id:
+        return 0
+    for subscriptions_json in args.subscriptions_json:
+        subscriptions_payload = load_json(subscriptions_json)
+        if payload_has_more(subscriptions_payload):
+            raise RepairError(
+                "old_price_subscription_page_truncated",
+                "Old-price subscription inventory was truncated; overwrite cannot be proven safe",
+            )
+        if has_other_eligible_subscribers(
+            subscriptions_payload,
+            selected_subscription_id=selected_subscription_id,
+            old_price_id=current_price_id,
+        ):
+            raise RepairError(
+                "old_price_has_eligible_subscribers",
+                "Current Railway price is still used by another active or trialing subscription",
+            )
     return 0
 
 
@@ -449,7 +554,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     event_parser = subparsers.add_parser("validate-event")
     event_parser.add_argument("--event-json", required=True)
+    event_parser.add_argument("--context-json")
     event_parser.set_defaults(func=command_validate_event)
+
+    overwrite_parser = subparsers.add_parser("validate-overwrite")
+    overwrite_parser.add_argument("--context-json", required=True)
+    overwrite_parser.add_argument("--subscriptions-json", action="append", required=True)
+    overwrite_parser.set_defaults(func=command_validate_overwrite)
 
     endpoint_parser = subparsers.add_parser("select-endpoint")
     endpoint_parser.add_argument("--endpoints-json", required=True)

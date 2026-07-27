@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from backend.scripts import stripe_entitlement_repair as repair
@@ -128,3 +130,214 @@ def test_price_validation_rejects_unexpected_product():
         )
 
     assert error.value.code == "unexpected_product"
+
+
+def test_old_price_with_other_eligible_subscriber_blocks_overwrite():
+    assert repair.has_other_eligible_subscribers(
+        {
+            "data": [
+                {
+                    "id": "SELECTED_SUBSCRIPTION",
+                    "status": "active",
+                    "items": {
+                        "data": [
+                            {
+                                "price": {
+                                    "id": "NEW_PRICE_IDENTIFIER",
+                                    "recurring": {"interval": "month"},
+                                }
+                            }
+                        ]
+                    },
+                },
+                {
+                    "id": "OTHER_SUBSCRIPTION",
+                    "status": "trialing",
+                    "items": {
+                        "data": [
+                            {
+                                "price": {
+                                    "id": "OLD_PRICE_IDENTIFIER",
+                                    "recurring": {"interval": "month"},
+                                }
+                            }
+                        ]
+                    },
+                },
+            ]
+        },
+        selected_subscription_id="SELECTED_SUBSCRIPTION",
+        old_price_id="OLD_PRICE_IDENTIFIER",
+    )
+
+
+def test_old_price_without_other_eligible_subscriber_allows_overwrite():
+    assert not repair.has_other_eligible_subscribers(
+        {
+            "data": [
+                {
+                    "id": "OTHER_SUBSCRIPTION",
+                    "status": "canceled",
+                    "items": {
+                        "data": [
+                            {
+                                "price": {
+                                    "id": "OLD_PRICE_IDENTIFIER",
+                                    "recurring": {"interval": "month"},
+                                }
+                            }
+                        ]
+                    },
+                }
+            ]
+        },
+        selected_subscription_id="SELECTED_SUBSCRIPTION",
+        old_price_id="OLD_PRICE_IDENTIFIER",
+    )
+
+
+def test_checkout_event_must_match_selected_customer_and_subscription():
+    repair.validate_event_binding(
+        {
+            "livemode": False,
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "customer": "CUSTOMER_IDENTIFIER",
+                    "subscription": "SELECTED_SUBSCRIPTION",
+                }
+            },
+        },
+        {
+            "customer_id": "CUSTOMER_IDENTIFIER",
+            "subscription_id": "SELECTED_SUBSCRIPTION",
+        },
+    )
+
+
+def test_subscription_event_must_match_selected_subscription():
+    with pytest.raises(repair.RepairError) as error:
+        repair.validate_event_binding(
+            {
+                "livemode": False,
+                "type": "customer.subscription.deleted",
+                "data": {
+                    "object": {
+                        "id": "OTHER_SUBSCRIPTION",
+                        "customer": "CUSTOMER_IDENTIFIER",
+                    }
+                },
+            },
+            {
+                "customer_id": "CUSTOMER_IDENTIFIER",
+                "subscription_id": "SELECTED_SUBSCRIPTION",
+            },
+        )
+
+    assert error.value.code == "event_subscription_mismatch"
+
+
+def test_event_customer_mismatch_is_rejected():
+    with pytest.raises(repair.RepairError) as error:
+        repair.validate_event_binding(
+            {
+                "livemode": False,
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "SELECTED_SUBSCRIPTION",
+                        "customer": "OTHER_CUSTOMER",
+                    }
+                },
+            },
+            {
+                "customer_id": "CUSTOMER_IDENTIFIER",
+                "subscription_id": "SELECTED_SUBSCRIPTION",
+            },
+        )
+
+    assert error.value.code == "event_customer_mismatch"
+
+
+def test_validate_overwrite_command_checks_all_subscription_inventories(tmp_path):
+    context_json = tmp_path / "context.json"
+    selected_json = tmp_path / "selected.json"
+    global_json = tmp_path / "global.json"
+    context_json.write_text(
+        json.dumps(
+            {
+                "subscription_id": "SELECTED_SUBSCRIPTION",
+                "current_railway_price_id": "OLD_PRICE_IDENTIFIER",
+                "price_id": "NEW_PRICE_IDENTIFIER",
+            }
+        ),
+        encoding="utf-8",
+    )
+    selected_json.write_text(json.dumps({"data": []}), encoding="utf-8")
+    global_json.write_text(
+        json.dumps(
+            {
+                "data": [
+                    {
+                        "id": "OTHER_SUBSCRIPTION",
+                        "status": "active",
+                        "items": {
+                            "data": [
+                                {
+                                    "price": {
+                                        "id": "OLD_PRICE_IDENTIFIER",
+                                        "recurring": {"interval": "month"},
+                                    }
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert (
+        repair.main(
+            [
+                "validate-overwrite",
+                "--context-json",
+                str(context_json),
+                "--subscriptions-json",
+                str(selected_json),
+                "--subscriptions-json",
+                str(global_json),
+            ]
+        )
+        == 2
+    )
+
+
+def test_validate_overwrite_rejects_truncated_old_price_inventory(tmp_path):
+    context_json = tmp_path / "context.json"
+    subscriptions_json = tmp_path / "subscriptions.json"
+    context_json.write_text(
+        json.dumps(
+            {
+                "subscription_id": "SELECTED_SUBSCRIPTION",
+                "current_railway_price_id": "OLD_PRICE_IDENTIFIER",
+                "price_id": "NEW_PRICE_IDENTIFIER",
+            }
+        ),
+        encoding="utf-8",
+    )
+    subscriptions_json.write_text(json.dumps({"data": [], "has_more": True}), encoding="utf-8")
+
+    assert (
+        repair.main(
+            [
+                "validate-overwrite",
+                "--context-json",
+                str(context_json),
+                "--subscriptions-json",
+                str(subscriptions_json),
+            ]
+        )
+        == 2
+    )

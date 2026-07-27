@@ -208,6 +208,7 @@ jobs:
         id: apply
         if: ${{ inputs.apply_changes }}
         env:
+          STRIPE_TEST_RESTRICTED_KEY: ${{ secrets.STRIPE_TEST_RESTRICTED_KEY }}
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           set -euo pipefail
@@ -217,12 +218,40 @@ jobs:
           match_result="${{ steps.analyze.outputs.railway_match_result }}"
           variable_name="${{ steps.analyze.outputs.mapped_railway_variable }}"
           price_id="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["price_id"])' "$context_json")"
+          current_price_id="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("current_railway_price_id") or "")' "$context_json")"
+          if [ -n "$current_price_id" ]; then
+            echo "::add-mask::$current_price_id"
+          fi
 
           if [ "$match_result" = "MATCH" ]; then
             echo "deployment_needed=no" >> "$GITHUB_OUTPUT"
             echo "Railway variable already matches; no production variable was changed." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
+
+          if [ -n "$current_price_id" ]; then
+            stripe subscriptions list \
+              --price "$current_price_id" \
+              --status active \
+              --limit 100 \
+              --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
+              > "$REPAIR_TMP/old-price-active-subscriptions.json"
+            stripe subscriptions list \
+              --price "$current_price_id" \
+              --status trialing \
+              --limit 100 \
+              --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
+              > "$REPAIR_TMP/old-price-trialing-subscriptions.json"
+          else
+            printf '{"data": []}\n' > "$REPAIR_TMP/old-price-active-subscriptions.json"
+            printf '{"data": []}\n' > "$REPAIR_TMP/old-price-trialing-subscriptions.json"
+          fi
+
+          python backend/scripts/stripe_entitlement_repair.py validate-overwrite \
+            --context-json "$context_json" \
+            --subscriptions-json "$REPAIR_TMP/subscriptions.json" \
+            --subscriptions-json "$REPAIR_TMP/old-price-active-subscriptions.json" \
+            --subscriptions-json "$REPAIR_TMP/old-price-trialing-subscriptions.json"
 
           railway variable set "${variable_name}=${price_id}" \
             --service "$RAILWAY_API_SERVICE" \
@@ -241,6 +270,7 @@ jobs:
         run: |
           set -euo pipefail
           set +x
+          printf '%s' "${GITHUB_SHA}" > backend/.app_version
           railway up \
             --service "$RAILWAY_API_SERVICE" \
             --ci \
@@ -255,18 +285,27 @@ jobs:
           set +x
           deadline=$((SECONDS + 180))
           attempt=0
+          expected_version="${GITHUB_SHA}"
           while [ "$SECONDS" -lt "$deadline" ]; do
             attempt=$((attempt + 1))
             code="$(curl -sS -o "$REPAIR_TMP/health.json" -w "%{http_code}" --max-time 8 "$BACKEND_HEALTH_URL" || true)"
             if [ "$code" = "200" ]; then
-              echo "Backend health check passed." >> "$GITHUB_STEP_SUMMARY"
-              exit 0
+              if [ "${{ steps.apply.outputs.deployment_needed }}" != "yes" ]; then
+                echo "Backend health check passed." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+
+              actual_version="$(python -c 'import json, sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("version", ""))' "$REPAIR_TMP/health.json" || true)"
+              if [ "$actual_version" = "$expected_version" ]; then
+                echo "Backend health check passed on the repaired deployment." >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
             fi
             echo "Health attempt $attempt returned HTTP ${code:-curl_failed}."
             sleep 5
           done
 
-          echo "::error::Backend health did not return 200 within 180 seconds."
+          echo "::error::Backend health did not confirm the repaired deployment within 180 seconds."
           if [ -s "$REPAIR_TMP/health.json" ]; then
             python -c 'import json, sys; payload = json.load(open(sys.argv[1], encoding="utf-8")); print("Safe health diagnostics:", {"status": payload.get("status"), "version_present": bool(payload.get("version"))})' "$REPAIR_TMP/health.json" || echo "Safe health diagnostics unavailable"
           fi
@@ -294,7 +333,8 @@ jobs:
             --api-key "$STRIPE_TEST_RESTRICTED_KEY" \
             > "$REPAIR_TMP/event.json"
           python backend/scripts/stripe_entitlement_repair.py validate-event \
-            --event-json "$REPAIR_TMP/event.json"
+            --event-json "$REPAIR_TMP/event.json" \
+            --context-json "$REPAIR_TMP/context.json"
 
       - name: Resend failed Stripe event to production webhook
         id: resend
