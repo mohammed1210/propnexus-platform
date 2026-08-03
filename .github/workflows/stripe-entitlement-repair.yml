@@ -91,7 +91,7 @@ jobs:
             "$HOME/.railway/bin/railway" --version
           else
             npm install -g @railway/cli
-            npm_bin="$(npm bin -g)"
+            npm_bin="$(npm prefix -g)/bin"
             echo "$npm_bin" >> "$GITHUB_PATH"
             "$npm_bin/railway" --version
           fi
