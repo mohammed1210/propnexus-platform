@@ -80,7 +80,7 @@ jobs:
             -o "$archive"
           tar -xzf "$archive" -C "$RUNNER_TEMP/bin" stripe
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-          stripe version
+          "$RUNNER_TEMP/bin/stripe" version
 
       - name: Install Railway CLI
         run: |
@@ -88,11 +88,13 @@ jobs:
           set +x
           if curl -fsSL https://railway.app/install.sh | sh; then
             echo "$HOME/.railway/bin" >> "$GITHUB_PATH"
+            "$HOME/.railway/bin/railway" --version
           else
             npm install -g @railway/cli
-            echo "$(npm bin -g)" >> "$GITHUB_PATH"
+            npm_bin="$(npm prefix -g)/bin"
+            echo "$npm_bin" >> "$GITHUB_PATH"
+            "$npm_bin/railway" --version
           fi
-          railway --version
 
       - name: Find exact Stripe customer
         id: customer
