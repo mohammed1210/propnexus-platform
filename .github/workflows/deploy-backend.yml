@@ -48,6 +48,11 @@ jobs:
           # Primary install method.
           if curl -fsSL https://railway.app/install.sh | sh; then
             echo "$HOME/.railway/bin" >> $GITHUB_PATH
+            if [ -f "$HOME/.railway/env" ]; then
+              source "$HOME/.railway/env"
+            else
+              export PATH="$HOME/.railway/bin:$PATH"
+            fi
           else
             # Fallback: GitHub may be unreachable from the runner, which breaks the install script.
             # Using npm avoids fetching the release asset from GitHub.
