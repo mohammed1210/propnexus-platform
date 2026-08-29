@@ -85,7 +85,7 @@
     "babel-jest": "^30.4.1",
     "cypress": "^15.13.1",
     "eslint": "^9.39.1",
-    "eslint-config-next": "^16.1.6",
+    "eslint-config-next": "^16.2.12",
     "eslint-plugin-jsx-a11y": "^6.10.2",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.3.0",
