@@ -2,12 +2,21 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import time
 import traceback
 from typing import Any, Optional
 
 from backend.services.enrichment_service import compute_and_store_enrichment
 from backend.utils.enrichment_queue import fetch_next_job, mark_done, mark_failed, mark_processing
+
+
+def idle_poll_delay(poll_interval_sec: float, empty_polls: int) -> float:
+    """Back off idle queue polling to limit Supabase API requests and logs.
+
+    Keep the worker responsive to queued work, but avoid querying a quiet
+    database every 1–2 seconds indefinitely.
+    """
+    baseline = max(15.0, float(poll_interval_sec))
+    return min(60.0, baseline * (2 ** min(max(0, int(empty_polls)), 3)))
 
 
 class EnrichmentWorker:
@@ -33,12 +42,16 @@ class EnrichmentWorker:
         self._stop.set()
 
     def _run(self) -> None:
+        empty_polls = 0
         while not self._stop.is_set():
             try:
                 job = fetch_next_job(self.supabase)
                 if not job:
-                    time.sleep(self.poll_interval_sec)
+                    self._stop.wait(idle_poll_delay(self.poll_interval_sec, empty_polls))
+                    empty_polls += 1
                     continue
+
+                empty_polls = 0
 
                 job_id = int(job["id"])
                 property_id = str(job["property_id"])
@@ -62,4 +75,5 @@ class EnrichmentWorker:
 
             except Exception:
                 traceback.print_exc()
-                time.sleep(3)
+                self._stop.wait(idle_poll_delay(self.poll_interval_sec, empty_polls))
+                empty_polls += 1
